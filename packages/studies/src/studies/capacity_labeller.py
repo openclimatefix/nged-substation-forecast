@@ -100,14 +100,16 @@ constant before the first knot at the first knot's level, and constant after the
 no knots the capacity is the static power given in the case file.
 3. To write a step change, write two knots one day apart: the old level, then the new level. To \
 write the end of a loss, write the lower level and then the recovered level in the same way. If \
-you write any knot, start with one at the first date of the period at the level you believe is \
-normal.
-4. Knots must be in strictly increasing date order and inside the period. Write at most 24 knots.
+you write any knot, start with one at the first date the case file allows, at the level you \
+believe is normal.
+4. Knots must be in strictly increasing date order and inside the dates the case file allows \
+("Knot dates may run from ... to ..."). Write at most 24 knots.
 5. Each knot names one cause from: string_failure, soiling, degradation, curtailment, model_bias, \
 data_fault. The evidence list quotes short facts from the case file, such as a changepoint line.
 
 Reply with this JSON shape only:
-{"plant": "<label>", "period": ["<first date>", "<last date>"], "no_change": <true or false>, \
+{"plant": "<label>", "period": ["<first allowed date>", "<last allowed date>"], \
+"no_change": <true or false>, \
 "knots": [{"date": "YYYY-MM-DD", "capacity_mw": <number>, "cause": "<cause>", \
 "evidence": ["<short fact>"]}]}"""
 """The fixed system prompt, identical for every call of every arm."""
@@ -529,6 +531,34 @@ def raw_summary_text(*, evidence: Evidence) -> str:
     return "\n".join(lines)
 
 
+ALLOWED_WINDOW_PREFIX: Final[str] = "Knot dates may run from "
+"""The start of the case-file line that states the dates a knot may take."""
+
+_ALLOWED_WINDOW: Final[re.Pattern[str]] = re.compile(
+    re.escape(ALLOWED_WINDOW_PREFIX) + r"(\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\."
+)
+
+
+def allowed_window(*, text: str) -> tuple[date, date]:
+    """Read the dates a knot may take from a case file's text.
+
+    Args:
+        text: The case-file text.
+
+    Returns:
+        The first and last allowed dates. `parse_answer` is given these, so the prompt and the
+        parser cannot disagree about the window.
+
+    Raises:
+        ValueError: If the text states no window.
+    """
+    found = _ALLOWED_WINDOW.search(text)
+    if found is None:
+        msg = "the case file states no window of allowed knot dates"
+        raise ValueError(msg)
+    return date.fromisoformat(found.group(1)), date.fromisoformat(found.group(2))
+
+
 CaseKindType = Literal["tools", "raw"]
 """Which tools a case file shows: the six tools, or only weekly energy totals and data flags."""
 
@@ -540,6 +570,7 @@ def case_file_text(
     shown_months: int | None,
     current_knots: Sequence[Knot] | None = None,
     issue_day: date | None = None,
+    period_first: date | None = None,
 ) -> str:
     """Write a case file as text.
 
@@ -549,21 +580,29 @@ def case_file_text(
         shown_months: How many of the latest months the monthly tables list, or `None` for all.
         current_knots: The labeller's previous estimate, for a causal call, or `None`.
         issue_day: The day the labeller is asked, for a causal call, or `None`.
+        period_first: The first date a knot may take, or `None` for the first day of the data.
 
     Returns:
         The case file.
     """
     first, last = evidence.dates[0].astype(object), evidence.dates[-1].astype(object)
+    window_first = first if period_first is None else period_first
     fit = evidence.fit
-    parts = [
-        f"# Case file for plant {evidence.plant}",
-        f"Period: {first} to {last} ({len(evidence.dates)} days).",
-        (
-            f"Static power (99th percentile of the whole record): {evidence.static_p99_mw:.2f} MW. "
-            f"Fitted AC capacity {fit.ac_capacity_mw:.2f} MW, "
+    static_text = (
+        f"Static power (99th percentile of the readings in this case file): "
+        f"{evidence.static_p99_mw:.2f} MW."
+    )
+    if fit is not None:
+        static_text += (
+            f" Fitted AC capacity {fit.ac_capacity_mw:.2f} MW, "
             f"DC capacity {fit.dc_capacity_mw:.2f} MW, "
             f"tilt {fit.tilt_deg:.0f} deg, azimuth {fit.azimuth_deg:.0f} deg."
-        ),
+        )
+    parts = [
+        f"# Case file for plant {evidence.plant}",
+        f"Data: {first} to {last} ({len(evidence.dates)} days).",
+        f"{ALLOWED_WINDOW_PREFIX}{window_first} to {last}.",
+        static_text,
     ]
     if issue_day is not None:
         parts.append(

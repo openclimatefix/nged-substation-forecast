@@ -44,7 +44,11 @@ up to a cut-off day, and the builder has no argument that names a planted event.
 megawatts, and one of six causes. Capacity is linear between knots and constant outside them, so a
 step is two knots one day apart, and an empty list means the static power. The hindsight role
 reads the whole record once per plant. The causal role reads the record up to two days before each
-of six monthly issue dates and is shown its previous estimate.
+of six monthly issue dates and is shown its previous estimate. A causal case file states the
+static power and the knot dates it allows, and the static power is the 99th percentile of the
+readings up to the cut-off day. The plants' fitted tilts, azimuths, and capacities are left out of
+causal case files because they were fitted on the whole record. The physics model's output was
+built from those fits, so one look-ahead remains in the modelled output.
 
 **Part 4 rejects an implausible estimate with four hard checks.** The checks are bounds (0.2 to 1.1
 times the static power), a step that a changepoint candidate supports, a variance of the corrected
@@ -89,7 +93,9 @@ is cut first, then the samples.
 | CX2S (the first study's tuned CX2) | 2.39 | 59.7% | 2.1 |
 
 **The tuning rule picks the lowest recovery error among settings within the gate, and no HM2
-setting was within it.** For HM2 the rule then takes the setting with the least false movement. The
+setting was within it** (the least-moving setting moved on 13.8% of quiet days against the 10% gate).
+The HM2 row above is therefore the least-moving setting, and it is outside the gate. **The 23 quiet
+plant-months both tune and score the gate, so "within the gate" is an in-sample result for HYST2.** The
 first study's published figures for its own estimators, scored on its ten selection draws, were 4.40
 points and 2.6% of days for HYST, 2.9 points and 31.5% for HM, and 2.2 points and 63.4% for CX2,
 against 5.00 points for doing nothing. The comparison is loose, because the draws differ. The seasonal

@@ -58,6 +58,7 @@ from studies.capacity_estimators import CapacityRecord, IssueScale
 from studies.capacity_evidence import Evidence, build_evidence
 from studies.capacity_labeller import (
     Answer,
+    AnswerError,
     Prompt,
     capacity_series,
     tools_only_answer,
@@ -176,7 +177,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                     answer, _ = run_hindsight_job(
                         context=context, job=job, answer_function=answer_function
                     )
-                except ModelError:
+                except ModelError, AnswerError:
                     missing.append(job.label)
                     continue
                 raw_answers[(arm, record_id, plant, sample)] = answer
@@ -474,7 +475,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                     plant=plant,
                     answer_function=answer_function,
                 )
-            except ModelError:
+            except ModelError, AnswerError:
                 complete = False
                 continue
             bounds = [context.day_index(day=d) for d in (*CAUSAL_ISSUE_DAYS, date(2026, 7, 1))]

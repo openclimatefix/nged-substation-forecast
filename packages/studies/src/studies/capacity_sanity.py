@@ -16,7 +16,9 @@ correlated by a whole-series fallback. Knot order is enforced by the answer sche
    the step differs from the candidate's size by at most the larger of `STEP_TOLERANCE_POINTS` and
    `STEP_TOLERANCE_SHARE` of the candidate's size. A step with no candidate fails.
 3. `reproduces_the_power`: the variance of the corrected clear-sky ratio after dividing by the
-   estimate must not exceed its variance without the estimate. An empty knot list passes.
+   estimate must not exceed its variance without the estimate, each series first divided by its own
+   median, so a correct constant offset (an opening level of 0.9 times the static power) passes.
+   An empty knot list passes.
 4. `anm_consistency`: a knot whose cause is not `curtailment` must not sit inside a run of
    `CAP_RUN_DAYS` or more cap-binding days, and a `curtailment` knot needs a cap-binding day within
    `CANDIDATE_WINDOW_DAYS`.
@@ -58,6 +60,9 @@ CAP_BINDING_DAY_SHARE: Final[float] = 0.5
 
 CAP_RUN_DAYS: Final[int] = 3
 """A run of this many cap-binding days in a row is a curtailment run."""
+
+VARIANCE_TOLERANCE: Final[float] = 1e-9
+"""A variance ratio this close to 1 is a tie, which passes, so rounding cannot reject a constant."""
 
 CAUSAL_WINDOW_DAYS: Final[int] = 180
 """The causal role's variance check covers this many of the latest days."""
@@ -155,11 +160,14 @@ def variance_ratio(
     )
     if window_days is not None:
         series, capacity = series[-window_days:], capacity[-window_days:]
-    normalised = series / (capacity / evidence.static_p99_mw)
-    usable = np.isfinite(series) & np.isfinite(normalised)
+    relative = capacity / float(np.median(capacity))
+    usable = np.isfinite(series) & np.isfinite(relative)
     if usable.sum() < 3:
         return 1.0
-    with_estimate, without = float(np.var(normalised[usable])), float(np.var(series[usable]))
+    plain = series[usable] / float(np.median(series[usable]))
+    divided = series[usable] / relative[usable]
+    divided = divided / float(np.median(divided))
+    with_estimate, without = float(np.var(divided)), float(np.var(plain))
     if without == 0.0:
         return 1.0 if with_estimate == 0.0 else float("inf")
     return with_estimate / without
@@ -169,7 +177,8 @@ def check_reproduces(
     *, knots: tuple[Knot, ...], evidence: Evidence, window_days: int | None
 ) -> list[Failure]:
     """Return a failure if dividing by the estimate raises the ratio's variance (ties pass)."""
-    if variance_ratio(knots=knots, evidence=evidence, window_days=window_days) > 1.0:
+    ratio = variance_ratio(knots=knots, evidence=evidence, window_days=window_days)
+    if ratio > 1.0 + VARIANCE_TOLERANCE:
         return [Failure(check="reproduces_the_power", day=None)]
     return []
 

@@ -2,7 +2,9 @@
 
 Part of the study in <https://github.com/openclimatefix/nged-substation-forecast/issues/1147>.
 
-**The probe makes two calls, about US$0.05 in all.** The first sends a 200 by 100 pixel line chart
+**The probe makes two calls, about US$0.05 in all, and needs `--confirm-spend`. It runs under
+the spending guard and logs each call under `probe/` in the study's data folder.** The first
+sends a 200 by 100 pixel line chart
 as a base64 image and asks for the value at the line's right-hand end (the answer is 5). The second
 sends an 18,016-character numeric table and asks for the number of data rows (1,080). Both run
 through `studies.capacity_llm.ClaudeCliModel`'s flags: an empty directory, no tools, no settings.
@@ -18,13 +20,14 @@ import random
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 import altair as alt
 import polars as pl
 import vl_convert as vlc
 from labeller_paths import STUDY_DIR
 from studies.capacity_labeller import Prompt
-from studies.capacity_llm import MODEL_ID, ClaudeCliModel, parse_stream, stream_message
+from studies.capacity_llm import MODEL_ID, BudgetGuard, CallStore, ClaudeCliModel, parse_stream
 
 PROBE_DIR = STUDY_DIR / "probe"
 """Where the two saved outputs, and the command-line tool's version, live."""
@@ -67,17 +70,18 @@ def run_calls() -> None:
     )
 
     model = ClaudeCliModel()
+    store = CallStore(directory=PROBE_DIR / "calls", log_path=PROBE_DIR / "probe_log.jsonl")
+    guard = BudgetGuard.from_log(log_path=PROBE_DIR / "probe_log.jsonl")
     for prompt, name in ((image_prompt, IMAGE_FILE), (table_prompt, TABLE_FILE)):
-        with tempfile.TemporaryDirectory() as empty:
-            done = subprocess.run(
-                model.command(prompt=prompt),
-                input=stream_message(prompt=prompt),
-                capture_output=True,
-                text=True,
-                cwd=empty,
-                check=True,
+        guard.check(prompt=prompt)
+        with tempfile.TemporaryDirectory(prefix="labeller_empty_") as empty:
+            output = model.run_raw(prompt=prompt, directory=Path(empty))
+            (PROBE_DIR / name).write_text(output)
+            reply = parse_stream(
+                output=output, requested_model=model.model_id, expected_cwd=Path(empty)
             )
-        (PROBE_DIR / name).write_text(done.stdout)
+        guard.record(reply=reply)
+        store.put(key=name, reply=reply, prompt=prompt, sample_index=0, label=f"probe/{name}")
     (PROBE_DIR / "cli_version.txt").write_text(
         subprocess.run(["claude", "--version"], capture_output=True, text=True, check=True).stdout
     )
@@ -115,6 +119,8 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     if not arguments.summarise:
+        if not arguments.confirm_spend:
+            sys.exit("the probe makes 2 paid calls; pass --confirm-spend, or --summarise")
         run_calls()
     with pl.Config(tbl_cols=-1, tbl_width_chars=200):
         print(summarise())

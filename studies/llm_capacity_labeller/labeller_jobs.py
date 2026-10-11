@@ -38,6 +38,7 @@ from studies.capacity_labeller import (
     CaseKindType,
     Knot,
     Prompt,
+    allowed_window,
     build_prompt,
     case_file_text,
     chart_pngs,
@@ -198,11 +199,12 @@ class LabellerContext:
         evidence = self.evidence(record_id=record_id, plant=plant, last_day=len(self.dates) - 1)
         text = case_file_text(evidence=evidence, kind=kind, shown_months=None)
         images = chart_pngs(evidence=evidence, shown_months=None) if kind == "tools" else ()
+        first_day, last_day = allowed_window(text=text)
         return CaseFile(
             prompt=build_prompt(text=text, images=images),
             evidence=evidence,
-            first_day=self.dates[0].astype(date),
-            last_day=self.dates[-1].astype(date),
+            first_day=first_day,
+            last_day=last_day,
         )
 
     def causal_case(
@@ -232,13 +234,15 @@ class LabellerContext:
             shown_months=CAUSAL_SHOWN_MONTHS,
             current_knots=current_knots,
             issue_day=issue_day,
+            period_first=CAUSAL_PERIOD_FIRST,
         )
         images = chart_pngs(evidence=evidence, shown_months=CAUSAL_SHOWN_MONTHS)
+        first_day, last_day = allowed_window(text=text)
         return CaseFile(
             prompt=build_prompt(text=text, images=images),
             evidence=evidence,
-            first_day=CAUSAL_PERIOD_FIRST,
-            last_day=evidence.dates[-1].astype(date),
+            first_day=first_day,
+            last_day=last_day,
         )
 
 

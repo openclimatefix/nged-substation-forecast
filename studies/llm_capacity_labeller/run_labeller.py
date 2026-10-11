@@ -37,6 +37,7 @@ from typing import Final
 import numpy as np
 from labeller_jobs import (
     CAUSAL_ISSUE_DAYS,
+    CAUSAL_PERIOD_FIRST,
     CAUSAL_RECORDS,
     CAUSAL_SHOWN_MONTHS,
     READABLE_LAG_DAYS,
@@ -56,7 +57,7 @@ from labeller_paths import (
     write_json_atomic,
 )
 from studies.capacity_estimators import scramble_from_day
-from studies.capacity_evidence import CapOverlay, Evidence, build_evidence
+from studies.capacity_evidence import CapOverlay, Evidence, PlantFit, build_evidence
 from studies.capacity_labeller import (
     Answer,
     Prompt,
@@ -160,7 +161,8 @@ def assert_causal_prompts_ignore_the_future(
     """Raise if any causal prompt changes when every input after its cut-off day is noise.
 
     The probe replaces power, satellite irradiance, modelled output, and the export-cap overlay
-    after the cut-off day with noise, then compares the prompt text and the bytes of both charts,
+    after the cut-off day with noise, and replaces each plant's static power and fitted quantities
+    (which read the whole record) too, then compares the prompt text and the bytes of both charts,
     which covers the charts' axis domains.
 
     Args:
@@ -179,7 +181,17 @@ def assert_causal_prompts_ignore_the_future(
                 record_id=record_id, plant=plant, issue_day=issue_day, current_knots=()
             )
             noisy = scramble_from_day(
-                record=record, first_day=last_index + 1, seed=PROBE_SEED + plant
+                record=record,
+                first_day=last_index + 1,
+                seed=PROBE_SEED + plant,
+                scramble_static=True,
+            )
+            fit = context.fits[plant]
+            noisy_fit = PlantFit(
+                ac_capacity_mw=fit.ac_capacity_mw * 2,
+                dc_capacity_mw=fit.dc_capacity_mw * 3,
+                tilt_deg=fit.tilt_deg + 7,
+                azimuth_deg=fit.azimuth_deg + 11,
             )
             cap = context.caps.get(plant)
             noisy_cap = None
@@ -197,7 +209,7 @@ def assert_causal_prompts_ignore_the_future(
                 record=noisy,
                 plant=plant,
                 last_day=last_index,
-                fit=context.fits[plant],
+                fit=noisy_fit,
                 cap=noisy_cap,
             )
             text = case_file_text(
@@ -206,6 +218,7 @@ def assert_causal_prompts_ignore_the_future(
                 shown_months=CAUSAL_SHOWN_MONTHS,
                 current_knots=(),
                 issue_day=issue_day,
+                period_first=CAUSAL_PERIOD_FIRST,
             )
             images = chart_pngs(evidence=evidence, shown_months=CAUSAL_SHOWN_MONTHS)
             if text != kept.prompt.text or images != kept.prompt.images:

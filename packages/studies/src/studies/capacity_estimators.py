@@ -940,7 +940,9 @@ def scale_for_rows(
     return scale_mw[plants, days]
 
 
-def scramble_from_day(*, record: CapacityRecord, first_day: int, seed: int) -> CapacityRecord:
+def scramble_from_day(
+    *, record: CapacityRecord, first_day: int, seed: int, scramble_static: bool = False
+) -> CapacityRecord:
     """Return the record with every input from `first_day` on replaced by noise.
 
     The noise covers measured power (including the days it was missing), the satellite irradiance,
@@ -951,6 +953,8 @@ def scramble_from_day(*, record: CapacityRecord, first_day: int, seed: int) -> C
         record: The record.
         first_day: The first day index to replace.
         seed: The noise generator's seed.
+        scramble_static: Also replace each plant's static power, which reads the whole record,
+            so a probe can catch a reader of it.
 
     Returns:
         The record.
@@ -963,7 +967,14 @@ def scramble_from_day(*, record: CapacityRecord, first_day: int, seed: int) -> C
     ghi[:, first_day:] = rng.uniform(0.0, 1000.0, shape)
     modelled = record.cams_shape.copy()
     modelled[:, first_day:] = rng.uniform(0.0, 1.2, shape)
-    return replace(record, power_mw=power, cams_ghi_w_m2=ghi, cams_shape=modelled)
+    static = (
+        record.static_p99_mw * rng.uniform(0.5, 2.0, record.static_p99_mw.shape)
+        if scramble_static
+        else record.static_p99_mw
+    )
+    return replace(
+        record, power_mw=power, cams_ghi_w_m2=ghi, cams_shape=modelled, static_p99_mw=static
+    )
 
 
 ScaleFunction = Callable[[CapacityRecord, np.ndarray], np.ndarray]

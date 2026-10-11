@@ -1,5 +1,6 @@
 """Tests of knots, case files, prompts, and the cache key."""
 
+import re
 from datetime import date
 
 import numpy as np
@@ -12,6 +13,7 @@ from studies.capacity_labeller import (
     AnswerError,
     Knot,
     Prompt,
+    allowed_window,
     build_prompt,
     cache_key,
     capacity_series,
@@ -138,9 +140,12 @@ def test_a_case_file_names_no_path_under_data_and_is_the_same_every_time() -> No
 def test_the_prompt_text_and_chart_bytes_ignore_every_input_after_the_cut_off_day() -> None:
     record = _record()
     last = 640
-    scrambled = scramble_from_day(record=record, first_day=last + 1, seed=5)
+    scrambled = scramble_from_day(record=record, first_day=last + 1, seed=5, scramble_static=True)
     kept = _evidence(record=record, last_day=last)
-    other = _evidence(record=scrambled, last_day=last)
+    other = build_evidence(
+        record=scrambled, plant=0, last_day=last, cap=None,
+        fit=PlantFit(ac_capacity_mw=9.0, dc_capacity_mw=9.0, tilt_deg=1.0, azimuth_deg=2.0),
+    )  # fmt: skip
     assert case_file_text(evidence=kept, kind="tools", shown_months=12) == case_file_text(
         evidence=other, kind="tools", shown_months=12
     )
@@ -162,3 +167,48 @@ def test_the_tools_only_rule_writes_a_step_at_a_strong_changepoint_and_nothing_o
     assert answer.knots[0].day == first
     assert min(levels) < 0.7 * levels[0]
     assert all(a.day < b.day for a, b in zip(answer.knots, answer.knots[1:], strict=False))
+
+
+def test_a_cut_record_prints_a_static_power_and_no_fit_computed_from_its_own_readings() -> None:
+    record = _record()
+    cut = _evidence(record=record, last_day=300)
+    assert cut.fit is None
+    assert cut.static_p99_mw != float(record.static_p99_mw[0])
+    readings = record.power_mw[0, :301]
+    assert cut.static_p99_mw == pytest.approx(float(np.quantile(readings[readings > 0], 0.99)))
+    text = case_file_text(evidence=cut, kind="tools", shown_months=12)
+    assert "Fitted AC" not in text
+    whole = _evidence(record=record)
+    assert whole.fit is not None
+    assert whole.static_p99_mw == float(record.static_p99_mw[0])
+    assert "Fitted AC" in case_file_text(evidence=whole, kind="tools", shown_months=None)
+
+
+def test_a_reply_written_from_the_causal_text_alone_parses_and_the_stated_window_binds() -> None:
+    evidence = _evidence(record=_record(), last_day=400)
+    period_first = date(2024, 1, 1)
+    text = case_file_text(
+        evidence=evidence, kind="tools", shown_months=12, current_knots=(),
+        issue_day=date(2024, 8, 1), period_first=period_first,
+    )  # fmt: skip
+    stated = re.search(r"Knot dates may run from (\S+) to (\S+)\.", text)
+    assert stated is not None
+    first_day, last_day = date.fromisoformat(stated.group(1)), date.fromisoformat(stated.group(2))
+    assert (
+        (first_day, last_day)
+        == allowed_window(text=text)
+        == (period_first, evidence.dates[-1].astype(date))
+    )
+    assert "first date of the period" not in SYSTEM_PROMPT
+    opening = _reply(knots=[_knot(day=first_day, capacity=5.0)])
+    answer = parse_answer(text=opening, plant="A", first_day=first_day, last_day=last_day)
+    assert answer.knots[0].day == period_first
+    before_window = _reply(knots=[_knot(day=date(2023, 6, 1), capacity=5.0)])
+    with pytest.raises(AnswerError):
+        parse_answer(text=before_window, plant="A", first_day=first_day, last_day=last_day)
+    hindsight = case_file_text(
+        evidence=_evidence(record=_record()), kind="tools", shown_months=None
+    )
+    assert allowed_window(text=hindsight)[0] == date(2023, 6, 1)
+    with pytest.raises(ValueError, match="no window"):
+        allowed_window(text="nothing")

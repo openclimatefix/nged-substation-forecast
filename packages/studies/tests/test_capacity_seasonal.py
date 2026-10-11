@@ -108,3 +108,14 @@ def test_the_hidden_markov_estimator_runs_on_the_corrected_record() -> None:
     )
     assert scale.scale_mw.shape == (PLANTS, DAYS)
     assert np.isfinite(scale.scale_mw).all()
+
+
+def test_the_shared_term_of_a_plant_is_the_median_of_the_other_plants_only() -> None:
+    from studies.capacity_seasonal import shared_term
+
+    centred = np.array([[10.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
+    shared = shared_term(centred=centred)
+    assert shared[0, 0] == 1.5
+    assert shared[1, 0] == 6.0
+    assert shared[2, 0] == 5.5
+    assert np.isnan(shared_term(centred=np.array([[1.0], [np.nan]]))[0, 0])

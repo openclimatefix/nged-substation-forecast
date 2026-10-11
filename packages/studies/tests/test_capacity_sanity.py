@@ -1,5 +1,6 @@
 """Tests of the four hard checks and the two fallback policies."""
 
+from dataclasses import replace
 from datetime import date, timedelta
 
 import numpy as np
@@ -164,3 +165,102 @@ def test_the_hindsight_policy_drops_only_the_failing_knot() -> None:
     assert [k.day for k in outcome.answer.knots] == [k.day for k in good]
     assert [f.day for f in outcome.failures if f.check == "bounds"] == [bad.day]
     assert not outcome.fell_back
+
+
+def _noisy_ratio(*, level: float = 1.0) -> np.ndarray:
+    rng = np.random.default_rng(5)
+    return level * (1.0 + 0.03 * rng.standard_normal(DAYS))
+
+
+def test_a_correct_constant_offset_passes_the_variance_check_and_keeps_its_knots() -> None:
+    evidence = _evidence(ratio=_noisy_ratio(level=0.9))
+    knots = (_knot(index=0, capacity=9.0), _knot(index=150, capacity=9.0))
+    assert check_reproduces(knots=knots, evidence=evidence, window_days=None) == []
+    kept = apply_hindsight(answer=_answer(*knots), evidence=evidence)
+    assert len(kept.answer.knots) == 2
+    supported = replace(evidence, changepoints=(_change(index=100, size=1.0),))
+    assert not apply_causal(answer=_answer(*knots), evidence=supported).fell_back
+
+
+def test_the_step_tolerance_is_five_points_or_forty_percent_of_the_candidate() -> None:
+    knots = (_knot(index=99, capacity=10.0), _knot(index=100, capacity=8.0))
+    for size in (-0.24, -0.30, -0.33):
+        assert (
+            check_steps(knots=knots, evidence=_evidence(changes=(_change(index=100, size=size),)))
+            == []
+        )
+    assert check_steps(knots=knots, evidence=_evidence(changes=(_change(index=100, size=-0.38),)))
+    assert check_steps(knots=knots, evidence=_evidence(changes=(_change(index=100, size=-0.14),)))
+
+
+def test_a_candidate_counts_within_fourteen_days_of_the_knot_and_not_beyond() -> None:
+    knots = (_knot(index=99, capacity=10.0), _knot(index=100, capacity=8.0))
+    assert (
+        check_steps(knots=knots, evidence=_evidence(changes=(_change(index=114, size=-0.2),))) == []
+    )
+    assert check_steps(knots=knots, evidence=_evidence(changes=(_change(index=116, size=-0.2),)))
+    assert (
+        check_steps(knots=knots, evidence=_evidence(changes=(_change(index=86, size=-0.2),))) == []
+    )
+    assert check_steps(knots=knots, evidence=_evidence(changes=(_change(index=84, size=-0.2),)))
+
+
+def test_the_causal_policy_falls_back_when_only_one_check_other_than_bounds_fails() -> None:
+    drop = np.ones(DAYS)
+    drop[100:] = 0.8
+    unsupported_step = (
+        _knot(index=0, capacity=10.0),
+        _knot(index=99, capacity=10.0),
+        _knot(index=100, capacity=8.0),
+    )
+    outcome = apply_causal(answer=_answer(*unsupported_step), evidence=_evidence(ratio=drop))
+    assert {f.check for f in outcome.failures} == {"step_within_evidence"}
+    assert outcome.fell_back
+
+    curtailment_without_a_cap = (
+        _knot(index=0, capacity=10.0, cause="curtailment"),
+        _knot(index=50, capacity=10.0),
+    )
+    outcome = apply_causal(answer=_answer(*curtailment_without_a_cap), evidence=_evidence())
+    assert {f.check for f in outcome.failures} == {"anm_consistency"}
+    assert outcome.fell_back
+
+    supported_but_wrong = (
+        _knot(index=0, capacity=10.0),
+        _knot(index=149, capacity=10.0),
+        _knot(index=150, capacity=7.0),
+    )
+    evidence = _evidence(ratio=_noisy_ratio(), changes=(_change(index=150, size=-0.3),))
+    outcome = apply_causal(answer=_answer(*supported_but_wrong), evidence=evidence)
+    assert {f.check for f in outcome.failures} == {"reproduces_the_power"}
+    assert outcome.fell_back
+
+
+def test_the_causal_variance_check_reads_only_the_latest_180_days() -> None:
+    evidence = _evidence_of_length(ratio=_noisy_ratio_of(length=400))
+    knots = (
+        _knot(index=0, capacity=5.0),
+        _knot(index=99, capacity=5.0),
+        _knot(index=100, capacity=10.0),
+    )
+    assert check_reproduces(knots=knots, evidence=evidence, window_days=None)
+    assert check_reproduces(knots=knots, evidence=evidence, window_days=180) == []
+    supported = replace(evidence, changepoints=(_change(index=100, size=1.0),))
+    assert not apply_causal(answer=_answer(*knots), evidence=supported).fell_back
+
+
+def _noisy_ratio_of(*, length: int) -> np.ndarray:
+    return 1.0 + 0.03 * np.random.default_rng(6).standard_normal(length)
+
+
+def _evidence_of_length(*, ratio: np.ndarray) -> Evidence:
+    base = _evidence()
+    length = len(ratio)
+    nans = np.full(length, np.nan)
+    from dataclasses import replace
+
+    return replace(
+        base, dates=START + np.arange(length), gap=np.zeros(length, dtype=bool),
+        stuck=np.zeros(length, dtype=bool), clear_raw=ratio, clear_corrected=ratio,
+        shared=nans, own=nans, neighbour=nans, energy_mwh=nans, modelled_mwh=nans,
+    )  # fmt: skip

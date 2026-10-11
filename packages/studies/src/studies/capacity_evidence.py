@@ -159,7 +159,8 @@ class Evidence:
         plant: The plant's label.
         dates: The days, as `datetime64[D]`.
         static_p99_mw: The plant's fixed 99th-percentile power.
-        fit: The plant's fitted quantities.
+        fit: The plant's fitted quantities, or `None` for a cut record, whose fits would read the
+            whole record.
         gap: Whether the day is a gap (too little of its clear-sky energy observed).
         stuck: Whether the day holds a stuck run.
         clear_raw: The daily clear-sky ratio over its normaliser, NaN where unusable.
@@ -183,7 +184,7 @@ class Evidence:
     plant: str
     dates: np.ndarray
     static_p99_mw: float
-    fit: PlantFit
+    fit: PlantFit | None
     gap: np.ndarray
     stuck: np.ndarray
     clear_raw: np.ndarray
@@ -211,11 +212,26 @@ def truncate(*, record: CapacityRecord, last_day: int) -> CapacityRecord:
         last_day: The latest day index kept.
 
     Returns:
-        The shorter record.
+        The shorter record. **A strict cut gets the static power of its own readings,** the 99th
+        percentile of each plant's positive power up to `last_day`, because the stored static power
+        reads the whole record. The whole record keeps its stored value.
     """
     end = last_day + 1
+    static = record.static_p99_mw
+    if end < len(record.dates):
+        static = np.array(
+            [
+                float(np.quantile(row[np.isfinite(row) & (row > 0)], 0.99))
+                if (np.isfinite(row) & (row > 0)).any()
+                else float(fallback)
+                for row, fallback in zip(
+                    record.power_mw[:, :end], record.static_p99_mw, strict=True
+                )
+            ]
+        )
     return replace(
         record,
+        static_p99_mw=static,
         dates=record.dates[:end],
         power_mw=record.power_mw[:, :end],
         clear_sky_w_m2=record.clear_sky_w_m2[:, :end],
@@ -535,7 +551,8 @@ def build_evidence(
         plant: The plant's index.
         last_day: The latest day index the tools may read. For the causal labeller this is the issue
             day minus 2; for the hindsight labeller it is the record's last day.
-        fit: The plant's fitted quantities.
+        fit: The plant's fitted quantities. Ignored for a strict cut, whose evidence carries no fit,
+            because the fits read the whole record.
         cap: The plant's export-cap overlay on the full record's grid, or `None` for a plant with
             no recorded cap.
 
@@ -573,7 +590,7 @@ def build_evidence(
         plant=cut.sites[plant],
         dates=cut.dates,
         static_p99_mw=float(cut.static_p99_mw[plant]),
-        fit=fit,
+        fit=fit if last_day == len(record.dates) - 1 else None,
         gap=gap,
         stuck=stuck,
         clear_raw=clear_raw,
@@ -583,7 +600,10 @@ def build_evidence(
         neighbour=neighbour_ratio(record=cut)[plant],
         energy_mwh=np.where(gap, np.nan, np.nansum(cut.power_mw[plant], axis=1)),
         modelled_mwh=np.where(
-            gap, np.nan, np.nansum(cut.cams_shape[plant], axis=1) * fit.dc_capacity_mw
+            gap,
+            np.nan,
+            np.nansum(cut.cams_shape[plant], axis=1)
+            * (np.nan if fit is None else fit.dc_capacity_mw),
         ),
         cap_binding_share=cap_share,
         cap_mean_mw=cap_mean,

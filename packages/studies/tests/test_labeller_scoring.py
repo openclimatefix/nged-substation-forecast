@@ -145,3 +145,32 @@ def test_movement_counts_days_away_from_the_trailing_median_and_resamples_window
     share, lower, upper = movement_interval(per_window=counts, confidence=0.975, seed=1)
     assert share == 0.25
     assert lower <= share <= upper
+
+
+def test_the_drop_and_recovery_need_the_right_sign_at_their_own_end_of_the_event() -> None:
+    rising_first = segments_of(
+        knots=_knots((0, 10.0), (99, 10.0), (100, 13.0), (129, 13.0), (130, 10.0)), dates=DATES
+    )
+    assert not score_event(event=_event(), segments=rising_first).drop_found
+    falling_last = segments_of(
+        knots=_knots((0, 10.0), (99, 10.0), (100, 7.0), (129, 7.0), (130, 5.0)), dates=DATES
+    )
+    score = score_event(event=_event(), segments=falling_last)
+    assert score.drop_found
+    assert not score.recovery_found
+
+
+def test_an_original_run_segment_of_the_opposite_sign_does_not_explain_a_planted_run_step() -> None:
+    stray_down = segments_of(knots=_knots((0, 10.0), (299, 10.0), (300, 7.0)), dates=DATES)
+    stray_up = segments_of(knots=_knots((0, 10.0), (299, 10.0), (300, 13.0)), dates=DATES)
+    assert false_alarms(events=[_event()], planted=stray_down, original=stray_up) == 1
+    far_down = segments_of(knots=_knots((0, 10.0), (319, 10.0), (320, 7.0)), dates=DATES)
+    assert false_alarms(events=[_event()], planted=stray_down, original=far_down) == 1
+
+
+def test_the_bootstrap_draws_the_sample_index_with_the_event() -> None:
+    differences = np.stack([np.full(33, 1.0), np.full(33, -1.0)], axis=1)
+    mean, lower, upper = event_bootstrap_interval(differences=differences, confidence=0.975, seed=3)
+    assert mean == 0.0
+    assert lower < 0.0 < upper
+    assert upper - lower > 0.3

@@ -424,3 +424,11 @@ the exploratory forecast fits (3 seeds, 5 folds, primary setting only).
   planted step, a planted ramp, a quiet stretch, and a real low-output month) of seven panels each:
   static power, HYST2, HM2, CX2S, the tools-only rule, the model's hindsight labels, and the model's
   causal estimate.
+- **Pre-run review fixes:** the causal case file states the knot dates it allows, and `parse_answer`
+  reads the same window from the text; every billed call, failures and timeouts included, is
+  recorded in the guard and the log; the guard projects the next call at the per-call cap or the
+  largest seen; the probe needs `--confirm-spend`; `parse_stream` requires an assistant event naming
+  the model and an init event with no tools, skills, or MCP servers, and the empty directory; a
+  strict cut uses its own static power and carries no plant fit (the physics model's output still
+  rests on fits made from the whole record); and check 3 divides each series by its own median so a
+  correct constant offset passes.

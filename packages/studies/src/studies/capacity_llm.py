@@ -55,14 +55,12 @@ tokens)."""
 TOKENS_PER_IMAGE: Final[int] = 800
 """A generous token estimate for one case-file chart."""
 
-ASSUMED_FIRST_CALL_COST_USD: Final[float] = 0.25
-"""The cost assumed for the largest call before any call has been measured."""
-
 MODEL_ID: Final[str] = "claude-sonnet-5-5"
 """The model every real call requests."""
 
 PER_CALL_BUDGET_USD: Final[float] = 1.0
-"""The command-line tool's own per-call cap, a second guard under `COST_CEILING_USD`."""
+"""The command-line tool's own per-call cap. The guard projects the next call at this cost or the
+largest cost seen, whichever is larger, so the run cannot reach `COST_CEILING_USD`."""
 
 CALL_TIMEOUT_SECONDS: Final[int] = 900
 """How long one call may take."""
@@ -90,7 +88,22 @@ class BudgetExceeded(RuntimeError):
 
 
 class ModelError(RuntimeError):
-    """The model call failed or returned something unusable."""
+    """The model call failed or returned something unusable.
+
+    The `reply` attribute holds what the call was billed, when the command-line tool reported a
+    result before the failure was found, and `None` when nothing is known, which the caller counts
+    at the per-call cap.
+    """
+
+    def __init__(self, message: str, *, reply: ModelReply | None = None) -> None:
+        """Hold the message and any billed reply.
+
+        Args:
+            message: What went wrong.
+            reply: The billed reply, if one was reported.
+        """
+        super().__init__(message)
+        self.reply = reply
 
 
 @dataclass(frozen=True)
@@ -185,49 +198,83 @@ def stream_message(*, prompt: Prompt) -> str:
     return json.dumps({"type": "user", "message": {"role": "user", "content": content}}) + "\n"
 
 
-def parse_stream(*, output: str, requested_model: str) -> ModelReply:
+def _billed_reply(*, result: dict[str, object], model: str) -> ModelReply:
+    """Read the tokens and cost of a result event, tolerating a missing field."""
+    usage = result.get("usage")
+    usage = usage if isinstance(usage, dict) else {}
+    return ModelReply(
+        text=str(result.get("result", "")),
+        input_tokens=int(
+            usage.get("input_tokens", 0)
+            + usage.get("cache_creation_input_tokens", 0)
+            + usage.get("cache_read_input_tokens", 0)
+        ),
+        output_tokens=int(usage.get("output_tokens", 0)),
+        cost_usd=float(result.get("total_cost_usd", 0.0)),  # ty: ignore[invalid-argument-type]
+        model=model,
+    )
+
+
+def _check_isolation(*, init: dict[str, object] | None, expected_cwd: Path | None) -> None:
+    """Raise unless the init event shows no tools, skills, or MCP servers, and the empty cwd."""
+    if init is None:
+        msg = "the output holds no init event, so the isolation cannot be checked"
+        raise ModelError(msg)
+    for key in ("tools", "skills", "mcp_servers"):
+        if init.get(key) != []:
+            msg = f"the init event shows {key} = {init.get(key)!r}, not an empty list"
+            raise ModelError(msg)
+    if expected_cwd is not None and Path(str(init.get("cwd"))).resolve() != expected_cwd.resolve():
+        msg = f"the call ran in {init.get('cwd')}, not the empty directory {expected_cwd}"
+        raise ModelError(msg)
+
+
+def parse_stream(
+    *, output: str, requested_model: str, expected_cwd: Path | None = None
+) -> ModelReply:
     """Read the command-line tool's `stream-json` output.
 
     Args:
         output: The standard output, one JSON object per line.
         requested_model: The model the call asked for.
+        expected_cwd: The empty directory the call ran in, which the init event must name, or
+            `None` to skip that check.
 
     Returns:
         The reply.
 
     Raises:
-        ModelError: If there is no successful result, or the served model differs from the one
-            requested.
+        ModelError: If there is no init event showing no tools, skills, or MCP servers (and the
+            expected directory), no successful result, no assistant event, or a served model other
+            than the one requested. A failure after a result was reported carries that result's
+            billed reply.
     """
     result: dict[str, object] | None = None
+    init: dict[str, object] | None = None
     served: set[str] = set()
     for line in output.splitlines():
         if not line.strip():
             continue
         event = json.loads(line)
-        if event.get("type") == "assistant":
+        if event.get("type") == "system" and "tools" in event:
+            init = event
+        elif event.get("type") == "assistant":
             served.add(str(event["message"].get("model")))
         elif event.get("type") == "result":
             result = event
+    billed = None if result is None else _billed_reply(result=result, model=requested_model)
     if result is None or result.get("is_error"):
         msg = f"the model call returned no successful result: {str(result)[:300]}"
-        raise ModelError(msg)
-    if served - {requested_model}:
+        raise ModelError(msg, reply=billed)
+    try:
+        _check_isolation(init=init, expected_cwd=expected_cwd)
+    except ModelError as error:
+        raise ModelError(str(error), reply=billed) from error
+    if not served or served - {requested_model}:
         msg = f"asked for {requested_model} but {sorted(served)} answered"
-        raise ModelError(msg)
-    usage = result["usage"]
-    assert isinstance(usage, dict)
-    return ModelReply(
-        text=str(result["result"]),
-        input_tokens=int(
-            usage["input_tokens"]
-            + usage.get("cache_creation_input_tokens", 0)
-            + usage.get("cache_read_input_tokens", 0)
-        ),
-        output_tokens=int(usage["output_tokens"]),
-        cost_usd=float(result["total_cost_usd"]),
-        model=requested_model,
-    )
+        raise ModelError(msg, reply=billed)
+    assert billed is not None
+    return billed
 
 
 @dataclass(frozen=True)
@@ -253,6 +300,41 @@ class ClaudeCliModel:
             str(PER_CALL_BUDGET_USD),
         ]
 
+    def run_raw(self, *, prompt: Prompt, directory: Path) -> str:
+        """Run the command-line tool in `directory` and return its standard output.
+
+        Args:
+            prompt: The prompt.
+            directory: An empty directory to run in.
+
+        Returns:
+            The `stream-json` output.
+
+        Raises:
+            ModelError: If the tool times out or exits with an error. A call that fails this way
+                may still have been billed, so the error carries no reply and the caller counts
+                it at the per-call cap.
+        """
+        environment = {**os.environ, "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}
+        try:
+            done = subprocess.run(
+                self.command(prompt=prompt),
+                input=stream_message(prompt=prompt),
+                capture_output=True,
+                text=True,
+                cwd=directory,
+                env=environment,
+                timeout=CALL_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            msg = f"the model call timed out after {CALL_TIMEOUT_SECONDS} s"
+            raise ModelError(msg) from error
+        if done.returncode != 0:
+            msg = f"claude exited with {done.returncode}: {done.stderr[:300]}"
+            raise ModelError(msg)
+        return done.stdout
+
     def complete(self, *, prompt: Prompt) -> ModelReply:
         """Answer one prompt by running the command-line tool in an empty temporary directory.
 
@@ -261,30 +343,12 @@ class ClaudeCliModel:
 
         Returns:
             The reply, with the tokens and cost the tool reports.
-
-        Raises:
-            ModelError: If the tool fails, times out, or reports an error.
         """
-        environment = {**os.environ, "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}
         with tempfile.TemporaryDirectory(prefix="labeller_empty_") as empty:
-            try:
-                done = subprocess.run(
-                    self.command(prompt=prompt),
-                    input=stream_message(prompt=prompt),
-                    capture_output=True,
-                    text=True,
-                    cwd=empty,
-                    env=environment,
-                    timeout=CALL_TIMEOUT_SECONDS,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as error:
-                msg = f"the model call timed out after {CALL_TIMEOUT_SECONDS} s"
-                raise ModelError(msg) from error
-        if done.returncode != 0:
-            msg = f"claude exited with {done.returncode}: {done.stderr[:300]}"
-            raise ModelError(msg)
-        return parse_stream(output=done.stdout, requested_model=self.model_id)
+            output = self.run_raw(prompt=prompt, directory=Path(empty))
+            return parse_stream(
+                output=output, requested_model=self.model_id, expected_cwd=Path(empty)
+            )
 
 
 @dataclass
@@ -342,7 +406,8 @@ class BudgetGuard:
 
         Raises:
             BudgetExceeded: If the call count, the input tokens, or the projected cost (spent plus
-                the largest call so far, or an assumed cost before any call) would reach a ceiling.
+                the per-call cap or the largest call so far, whichever is larger) would reach a
+                ceiling.
         """
         if self.calls + 1 > self.max_calls:
             msg = f"the next call would be number {self.calls + 1}, past the {self.max_calls} cap"
@@ -354,7 +419,7 @@ class BudgetGuard:
                 f"past {self.max_input_tokens}"
             )
             raise BudgetExceeded(msg)
-        next_cost = self.largest_call_usd or ASSUMED_FIRST_CALL_COST_USD
+        next_cost = max(self.largest_call_usd, PER_CALL_BUDGET_USD)
         if self.spent_usd + next_cost >= self.ceiling_usd:
             msg = (
                 f"spent ${self.spent_usd:.2f}; another call of ${next_cost:.2f} "
@@ -429,7 +494,7 @@ class CallStore:
         temporary = path.with_name(path.name + ".tmp")
         temporary.write_text(json.dumps(reply.__dict__))
         temporary.rename(path)
-        entry = {
+        entry: dict[str, object] = {
             "time": datetime.now(UTC).isoformat(),
             "label": label,
             "key": key,
@@ -444,8 +509,44 @@ class CallStore:
             "output_tokens": reply.output_tokens,
             "cost_usd": reply.cost_usd,
         }
+        self.append_log(entry=entry)
+
+    def append_log(self, *, entry: dict[str, object]) -> None:
+        """Append one entry to the log.
+
+        Args:
+            entry: A JSON-ready mapping with at least `input_tokens`, `output_tokens`,
+                `cost_usd`, and `model`, which `BudgetGuard.from_log` sums.
+        """
         with self.log_path.open("a") as handle:
             handle.write(json.dumps(entry) + "\n")
+
+    def log_failure(
+        self, *, label: str, prompt: Prompt, error: ModelError, billed: ModelReply, model: str
+    ) -> None:
+        """Log a call that failed after it may have been billed, so a resume still counts it.
+
+        Args:
+            label: A short description of the call.
+            prompt: The prompt that was sent.
+            error: What went wrong.
+            billed: What the call is counted as: the reported result, or the per-call cap.
+            model: The model requested.
+        """
+        self.append_log(
+            entry={
+                "time": datetime.now(UTC).isoformat(),
+                "label": label,
+                "status": "failed",
+                "error": str(error)[:500],
+                "model": model,
+                "prompt": prompt.text,
+                "image_sha256": [_sha256(image) for image in prompt.images],
+                "input_tokens": billed.input_tokens,
+                "output_tokens": billed.output_tokens,
+                "cost_usd": billed.cost_usd,
+            }
+        )
 
 
 def _sha256(data: bytes) -> str:
@@ -500,7 +601,21 @@ def labelled_answer(
         reply = store.get(key=key)
         if reply is None:
             guard.check(prompt=prompt)
-            reply = model.complete(prompt=prompt)
+            try:
+                reply = model.complete(prompt=prompt)
+            except ModelError as error:
+                billed = error.reply or ModelReply(
+                    text="",
+                    input_tokens=estimate_input_tokens(prompt=prompt),
+                    output_tokens=0,
+                    cost_usd=PER_CALL_BUDGET_USD,
+                    model=model.model_id,
+                )
+                guard.record(reply=billed)
+                store.log_failure(
+                    label=label, prompt=prompt, error=error, billed=billed, model=model.model_id
+                )
+                raise
             guard.record(reply=reply)
             store.put(
                 key=key,
