@@ -154,9 +154,10 @@ a
   with ECMWF ENS's mean. The comparison is descriptive and uses stitched series that carry no run
   time.
 
-- [Does lagged power improve a day-ahead solar power forecast?](forecasts/lag-features.md) — at 6
-  solar plants over 18 months, giving an XGBoost model the plant's own power from an earlier day
-  changed the day-ahead error by −0.001 points of capacity [−0.075, +0.073] against a baseline of
-  8.93, so none of the five planned comparisons found a gain. A single lag cannot detect a planted
-  power loss that arms using weekly statistics or satellite irradiance partly recover, and at lead
-  days 10 to 14 blending the baseline with climatology beat every lag arm.
+- [Does a same-hour power lag improve a day-ahead solar forecast?](forecasts/lag-features.md) — at 6
+  solar plants over 18 months, giving an XGBoost model each plant's power from the same hour two
+  days earlier changed the day-ahead error by −0.001 points of capacity [−0.075, +0.073] against a
+  baseline of 8.93, so none of the five planned comparisons found a gain. The lag recovers little of
+  a planted power loss that weekly statistics or satellite irradiance partly recover, and the gains
+  of those inputs came mostly from one plant's low-output months in the training data. At lead days
+  10 to 14, blending the baseline with an earlier-years climatology beat every lag arm.
