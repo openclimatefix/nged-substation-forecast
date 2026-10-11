@@ -10,9 +10,9 @@ gain. The cloud groups are largely interchangeable with the other variables. How
 between the groups therefore depends on the order in which the study added them. ERA5's cloud fields
 come from its analysis, which has absorbed observations made after the short forecasts that give
 ERA5's solar radiation started. Part of the gain from the cloud fields may therefore be a timing
-advantage that a real forecast lacks. The page does not say that a forecast would gain as much. A
-follow-up study tests whether a forecast does, using forecasts from ECMWF's Integrated Forecasting
-System (IFS) at the lead times a live forecast would use.
+advantage that a real forecast lacks. The page does not say that a forecast would gain as much. [A
+follow-up study](../forecasts/ifs-solar-variables.md) tests whether a forecast does, using forecasts
+from ECMWF's Integrated Forecasting System (IFS) at the lead times a live forecast would use.
 
 ![Figure 1: Change in error from adding ERA5 variables, for each of the ten planned
 contrasts](../assets/era5_solar_variables_headline.svg)
@@ -53,8 +53,8 @@ and P4 is G9 minus G9 without 12 variables that we call MARS-only, defined below
   [−0.18, −0.08]) at the main setting and by 0.11 points ([−0.15, −0.06]) at the second setting.
   Both intervals straddle −0.1, so the rule gives no recommendation. The gain is about the size of
   the threshold, so settling the question would need a much longer record than the study has. The
-  follow-up IFS study compares this gain with the gain from adding a second weather model's
-  forecast.
+  [follow-up IFS study](../forecasts/ifs-solar-variables.md) compares this gain with the gain from
+  adding a second weather model's forecast.
 - **Does the gain hold on the satellite irradiance target?** In relative terms, yes.
   The second target is the CAMS clearness index: irradiance from the CAMS satellite service divided
   by the irradiance at the top of the atmosphere. The CAMS irradiance is a satellite-derived
@@ -398,10 +398,11 @@ paper that corrected ERA5 irradiance over Europe with humidity predictors.
   error by only 0.01 to 0.02 points. Cloud water and cloud base height give a further 0.33 points
   but are MARS-only. The cloud layers are in Open-Meteo's IFS service, and the page did not find
   them in ECMWF's free open-data feed. Whether a forecast gains the same is untested here, and the
-  follow-up IFS study tests that question.
+  [follow-up IFS study](../forecasts/ifs-solar-variables.md) tests that question.
 - **Do not decide on the 12 MARS-only variables from this page.** The gain of 0.11 to 0.13 points is
   real and may or may not exceed 0.1 points. The question is whether another weather model's
-  forecast would give more, and the follow-up IFS study measures that.
+  forecast would give more, and the [follow-up IFS study](../forecasts/ifs-solar-variables.md)
+  measures that.
 - **Check which groups a forecast supplier can deliver before ranking them.** On 2026-10-10, ECMWF's
   [free open-data page](https://www.ecmwf.int/en/forecasts/datasets/open-data) listed total cloud
   cover, 2 m dew point, total column water vapour, 10 m wind, skin temperature, snow depth,

@@ -130,6 +130,14 @@ OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
 }
 """Each study-folder constant against its folder under `data/studies/`."""
 
+IFS_LADDER_FOLDERS: Final[dict[str, str]] = {
+    "IFS_LADDER_DIR": "per_study/ifs_solar_variables",
+    "IFS_LADDER_INPUTS_DIR": "per_study/ifs_solar_variables/inputs",
+    "IFS_LADDER_RESULTS_DIR": "per_study/ifs_solar_variables/results",
+}
+"""The IFS solar-variables study's folders, which its build and fit scripts create, so they need
+not exist on disk."""
+
 NFC_BATCH_CONSTANTS: Final[frozenset[str]] = frozenset(
     constant
     for constant in OLD_STUDY_FOLDERS
@@ -143,7 +151,7 @@ HAND_WRITTEN_FOLDER_NAMES: Final[frozenset[str]] = frozenset(
         *(Path(folder).name for folder in PRODUCT_FOLDERS.values()),
         *(
             Path(folder).name
-            for constant, folder in OLD_STUDY_FOLDERS.items()
+            for constant, folder in {**OLD_STUDY_FOLDERS, **IFS_LADDER_FOLDERS}.items()
             if constant not in NFC_BATCH_CONSTANTS
         ),
         "nwp_forecast_comparison",
@@ -189,6 +197,13 @@ def test_each_previous_runs_product_has_a_folder_of_its_own_under_the_previous_r
 
 @pytest.mark.parametrize(("constant", "folder"), OLD_STUDY_FOLDERS.items())
 def test_each_study_constant_is_the_folder_the_study_has_now(constant: str, folder: str):
+    assert getattr(sources, constant) == REPO_DATA_DIR / "studies" / folder
+
+
+@pytest.mark.parametrize(("constant", "folder"), IFS_LADDER_FOLDERS.items())
+def test_each_ifs_ladder_constant_is_a_folder_of_the_study_under_per_study(
+    constant: str, folder: str
+):
     assert getattr(sources, constant) == REPO_DATA_DIR / "studies" / folder
 
 

@@ -116,9 +116,16 @@ the
   plan's rule the two archives are not mixed. The page does not compare CEDA's archive with the Met
   Office's live feed.
 
+- [Which ERA5 variables help predict solar farm output?](past-weather/era5-solar-variables.md) — at
+  six solar farms, an XGBoost model given ERA5's total and layered cloud cover as well as its solar
+  radiation has about 6% lower error, and one given every ERA5 variable has about 12% lower error.
+  ERA5 is a reanalysis, and part of the gain may come from cloud fields that saw later observations
+  than its solar radiation. Whether fetching the 12 variables that only ECMWF's MARS archive serves
+  is worth it is unresolved.
+
 ## Forecasts
 
-**Five studies score power forecasts driven by weather forecasts.**
+**Six studies score power forecasts driven by weather forecasts.**
 
 - [How accurate is a power forecast driven by ECMWF ENS at each
   horizon?](forecasts/ens-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
@@ -153,3 +160,10 @@ a
   7.4% of capacity for solar against 7.7% for ECMWF ENS's mean, and 5.75% for wind at 10 m, level
   with ECMWF ENS's mean. The comparison is descriptive and uses stitched series that carry no run
   time.
+- [Which IFS forecast variables, or which second forecast, help a solar power
+  forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, no planned step of adding
+  extra variables from ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved
+  amount, although all of them together lower it by about 0.45 points of capacity. Adding AIFS
+  Single's radiation and temperature lowers the error by about 1 point. The ensemble mean the
+  production service reads gives about the same gain, and AIFS Single adds about 0.13 points to
+  that mean, which the study cannot resolve.
