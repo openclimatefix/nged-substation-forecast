@@ -79,3 +79,19 @@ def test_the_soft_clip_follows_the_smaller_of_the_power_and_the_limit() -> None:
     assert float(low) == pytest.approx(0.5, abs=1e-6)
     assert float(high) == pytest.approx(2.0, abs=1e-3)
     assert float(soft_clip(power=torch.tensor(4.0, dtype=torch.float64), limit=limit)) < 2.0 + 1e-9
+
+
+def test_identical_records_in_one_batch_get_identical_estimates() -> None:
+    record = synthetic_record(days=200, seed=5)
+    sizes = _sizes(3)
+    first, second = run_dp1(
+        records=[record, record],
+        dc_prior=sizes / record.static_p99_mw,
+        ac_limit=np.full(3, 10.0),
+        params={**FAST, "first_steps": 60.0, "later_steps": 20.0},
+        dtype=torch.float64,
+    )
+    assert np.allclose(first.level, second.level, rtol=1e-9, equal_nan=True)
+    assert first.sd is not None
+    assert second.sd is not None
+    assert np.allclose(first.sd, second.sd, rtol=1e-9, equal_nan=True)

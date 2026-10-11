@@ -35,6 +35,13 @@ CRITERIA: Final[tuple[tuple[str, str], ...]] = (
 """The rubric's five criteria: a key and the question the grader answers."""
 
 RUBRIC: Final[Mapping[str, Mapping[str, GradeType]]] = {
+    "S0": {
+        "one_sentence": "yes",
+        "physical_units": "yes",
+        "attributable": "no",
+        "spread": "no",
+        "differentiable": "no",
+    },
     "EM": {
         "one_sentence": "yes",
         "physical_units": "partly",
@@ -109,6 +116,7 @@ RUBRIC: Final[Mapping[str, Mapping[str, GradeType]]] = {
 """Each estimator's grades, from reading its code. The reasons are in the table below."""
 
 RUBRIC_REASONS: Final[Mapping[str, str]] = {
+    "S0": "reports the static power, which never changes; the reference for doing nothing",
     "EM": "reports the highest power seen so far; it can only rise, so a loss is invisible",
     "R30": "reports the 30-day 99th percentile of output; no model of the cause",
     "CSQ": "reports a quantile of output per unit of clear-sky irradiance; no model of the cause",
@@ -142,7 +150,7 @@ def rubric_table() -> pl.DataFrame:
         rows.append(
             {
                 "estimator": name,
-                "family": ESTIMATOR_FAMILY[name],  # type: ignore[index]
+                "family": ESTIMATOR_FAMILY[name],
                 **grades,
                 "score": sum(points[grade] for grade in grades.values()),
                 "reason": RUBRIC_REASONS[name],
@@ -211,6 +219,7 @@ def explanation_sentence(
     """
     change = 100 * (scale_mw / earlier_scale_mw - 1.0)
     basis = {
+        "S0": "the plant's fixed 99th-percentile power",
         "EM": "the highest hourly power it has ever recorded",
         "R30": "the 99th percentile of its last 30 days of hourly power",
         "CSQ": "the 90th percentile of its last 30 days of output per unit of clear-sky irradiance",

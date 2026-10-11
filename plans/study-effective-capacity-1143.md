@@ -15,7 +15,7 @@ look most promising.
 
 ## Planned solution
 
-**Stage A runs 10 capacity estimators on synthetic planted losses, with no forecast in the loop, and
+**Stage A runs 9 candidate capacity estimators and 2 references on synthetic planted losses, with no forecast in the loop, and
 answers "which technique?" from how well each estimator recovers the planted loss.** Stage B
 normalises the lag study's baseline XGBoost forecaster by the one causal estimator a fixed rule
 picks from Stage A, and answers "is it worth it?" with a single planned contrast against that
@@ -146,7 +146,7 @@ that score. Checked against `_losses`: the training target becomes y/s; the frac
 fraction reduces the same way. The scored column is `absolute_error_capped_fraction_of_capacity`;
 the scaled `_mw` loss columns are dropped. Float64 scaling and XGBoost's Float32 labels make a
 constant scale reproduce B0 to about 1e-7 relative, so the constant-scale assertion uses a tolerance
-of 1e-4 points.
+of 1e-3 points.
 
 ### The estimators
 
@@ -154,9 +154,9 @@ of 1e-4 points.
 |---|---|---|
 | Cheap | EM | running maximum of the hourly power readable at issue time, the published reference of [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) and [Viotti et al. (2026)](https://doi.org/10.1002/we.70136); it never falls, so it cannot follow a loss |
 | Cheap | R30 | rolling 30-day P99 of hourly power (the roadmap's "simple rolling p99") |
-| Cheap | CSQ | rolling 30-day 90th percentile of clear-sky-normalised output |
+| Cheap | CSQ | rolling 30-day 90th percentile of power over the physics model's clear-sky output at the plant's fitted tilt and azimuth |
 | Cheap | NR | the plant's 7-day energy ratio to the daily mean of the other 5 plants, times the static P99 |
-| Cheap | PR | sum of power over sum of CAMS global horizontal irradiance across days T−8 to T−2, over its median in the year before 2024-12-01, times the static P99 |
+| Cheap | PR | sum of power over sum of the physics model's output driven by CAMS irradiance (at the plant's fitted tilt and azimuth) across days T−8 to T−2, over its median in the year before 2024-12-01, times the static P99 |
 | Cheap | KF | Kalman local-level filter on the daily log ratio of power to a `pv_physics` model at the fitted orientation, driven by CAMS |
 | Wacky | HM | hidden Markov model over discrete capacity levels (1.0, 0.9, 0.75, 0.5) |
 | Convex | CX1 | pinball loss at a high quantile plus a fused-lasso penalty on one daily DC trace |
@@ -169,8 +169,15 @@ inverters fail in whole units.**
 **NR and PR are computed fresh by one code path in both stages, from one CAMS source.** The import
 rule forbids importing `studies/lag_features/` helpers, so this study re-implements NR and asserts
 that it equals the lag frame's `rp_7d` on the overlapping rows, which also checks the causal driver.
-PR uses horizontal irradiance and so drifts with season through the plant's tilt; the false-movement
-check catches that drift. Each plant's orientation is fitted once with `pv_fit.fit_plant` on data
+PR and CSQ divide by the physics model's output at the plant's fitted tilt and azimuth, not by
+horizontal irradiance. A first version used horizontal irradiance, and the real record showed it
+drifting with the season through the tilt: CSQ's monthly mean ranged from 0.76 to 1.54 of the static
+power at one plant, and PR's false-movement share was 80% and CSQ's 87%. That was a definition error
+in a physical estimator, so both now divide by the modelled output. Their false-movement shares fell
+to 46% and 66%, and the rest is weather noise in a 7-day or 30-day window. R30 is the plain 99th
+percentile of power, and its monthly mean ranges from 0.41 to 1.0 of the static power through the
+season (67% false movement): that swing is inherent to R30's definition and stays as a finding.
+Each plant's orientation is fitted once with `pv_fit.fit_plant` on data
 before 2024-12-01 (for the ANM plant, about 2 months, which the report states).
 
 ### Stage A: recovery, the technique contrasts, and the selection rule
@@ -212,17 +219,27 @@ intervals are conditional on these 6 plants and this record.
 - **E2:** DP1 minus the convex representative, testing the roadmap's prediction that convex wins
   per plant.
 
-**The 10% false-movement gate is applied first; each family's representative is then its
-lowest-error surviving estimator on the tuning draw,** so neither contrast is scored on the draw
-that chose it. A contrast reads "beats" when its interval lies wholly below zero, "loses" when wholly
+**Two references are scored beside the candidates and never selected.** S0 is the static power on
+every day, so it never moves and has no skill. EM is the running maximum of the power readable at
+issue time, the published reference, and it cannot follow a loss down. **A candidate survives only if
+it beats S0's recovery error, its false-movement share is at most 10%, and its share of event days
+on the static-power fallback is at most 25%.** A day on which an estimator fell back to the static
+power counts as moving in the false-movement share, because a constant fallback is a failure to
+estimate and must not read as stability.
+
+**Each family's representative is its lowest-error survivor on the tuning draw,** so neither
+contrast is scored on the draw that chose it. A contrast reads "beats" when its interval lies wholly below zero, "loses" when wholly
 above, and "no detectable difference" otherwise; in the last case, the page ranks the families
 descriptively on detection delay, false movement, and operability.
 
 **Each estimator is tuned on the tuning draw only, never on a forecast error, and the selection
-rule is fixed now:** after the gate, the lowest primary metric over the 10 selection draws, averaged
-over all events and all 6 plants. If nothing passes, the page says every estimator chases the weather,
-and P1 runs on the lowest-error estimator, labelled exploratory. The best surviving estimator of
-each other family joins the selected one in a shortlist of 4.
+rule is fixed now:** after the gates, the lowest primary metric over the 10 selection draws, averaged
+over all events and all 6 plants. The best surviving estimator of each other family joins the
+selected one in a shortlist of 4. **If no candidate passes every gate,** P1 runs on the candidate
+with the lowest recovery error among those that beat S0 and pass the fallback-share gate, labelled
+"ungated pick" on the page. **If none beats S0,** the verdict is "no estimator beat doing nothing",
+P1 is not run, and that is reported as the finding. The report prints every estimator's
+false-movement share whatever the outcome.
 
 **CAMS latency:** the backtest reads CAMS through T−2, a day fresher than the live service could
 before February 2026. Stage A's primary metric is recomputed for PR, KF, and CX2 with CAMS read only
@@ -257,7 +274,7 @@ dependency, and the lag study used the same threshold.
 ### Controls
 
 - **Constant-scale assertion:** at the ANM plant, on a fold holding constrained rows, B0 with the
-  three `_mw` columns divided by s = 0.37 must reproduce B0 within 1e-4 points on both
+  three `_mw` columns divided by s = 0.37 must reproduce B0 within 1e-3 points on both
   `absolute_error_fraction_of_capacity` and `absolute_error_capped_fraction_of_capacity`, or the
   script raises before any other fit.
 - **NC2 (negative control):** the selected estimator's causal series with whole months deranged
@@ -399,7 +416,13 @@ R&D code fails fast; nothing runs in production; no engineering hypothesis conce
 estimation (checked). Verification: the CLAUDE.md set, `pytest --run-studies` with and without the
 `gpu` group, pydoclint, the docs-link checker, and `mkdocs build --strict`.
 
-**Limitations the page states:** the multi-day-zero filter reads later hours, so causal estimators
+**Limitations the page states:** training rows are divided by the estimate of their own day, which
+for a window estimator reads the power of earlier held-out months; that is not leakage into the
+scored row, because each training row predicts only its own power, but it is a stated limitation.
+The ANM plant's reference-year calibration rests on about 8 sampled days from 2 months (October and
+November 2024), and NR's neighbour mean includes the ANM plant, whose export-capped hours are
+removed. The constant-scale assertion's tolerance is 1e-3 points, not 1e-4, because 500 boosting
+rounds accumulate float noise. The multi-day-zero filter reads later hours, so causal estimators
 see a slightly cleaner history than a live service; the planted loss multiplies all power, clipping
 plateau included, so it is a proportional block loss of DC and AC together. A pure DC loss at a
 clipping plant, where CX2 and DP1 would differ from the rest, is the unplanted case.

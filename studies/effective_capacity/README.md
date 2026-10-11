@@ -1,11 +1,12 @@
 # Is a time-varying effective capacity worth estimating for solar forecasts?
 
 Study for [issue #1143](https://github.com/openclimatefix/nged-substation-forecast/issues/1143).
-Stage A plants known capacity losses in six solar plants' measured power and asks nine estimators to
-find them, with no forecast in the loop. Stage B divides the lag-features study's baseline forecast
-(B0) by the one causal estimator that a rule fixed in advance selects, and scores it in megawatts
-over each plant's fixed 99th-percentile power. The design is in `plans/study-effective-capacity-1143.md`
-and the results will be on the study's page under `docs/studies/forecasts/`.
+Stage A plants known capacity losses in six solar plants' measured power and asks nine candidate
+estimators (and two references, S0 and EM) to find them, with no forecast in the loop. Stage B
+divides the lag-features study's baseline forecast (B0) by the one causal estimator that a rule
+fixed in advance selects, and scores it in megawatts over each plant's fixed 99th-percentile power.
+The design is in `plans/study-effective-capacity-1143.md` and the results will be on the study's
+page under `docs/studies/forecasts/`.
 
 **Every script takes `--smoke`, which reads and writes under `<study directory>/_smoke/` and is not a
 result.** `capacity_paths.claim_root` marks each root `real` or `smoke` and raises if a run of the
@@ -18,7 +19,7 @@ overwrites a finished output.
 |---|---|
 | `capacity_paths.py`, `capacity_scores.py` | Imported by the others: paths, loaders, the tuning grids, and the conversion of saved estimates to issue-time scales. |
 | `build_capacity_inputs.py` | Builds the day-by-hour record (cleaned power, CAMS and clear-sky irradiance, fitted orientations and the modelled unit output), the 11 draws of planted losses, the positive control's months, and the false-movement windows. |
-| `estimate_capacity.py` | CPU. Runs R30, CSQ, NR, PR, KF, HM, CX1, and CX2 in the phases `tuning`, `main`, and `hindsight`. Checks that NR equals the lag frame's `rp_7d` and that every estimator is causal before the first estimate. |
+| `estimate_capacity.py` | CPU. Runs S0, EM, R30, CSQ, NR, PR, KF, HM, CX1, and CX2 in the phases `tuning`, `main`, and `hindsight`. Checks that NR equals the lag frame's `rp_7d` and that every estimator is causal before the first estimate. |
 | `estimate_capacity_torch.py` | GPU. Runs DP1 at both settings on every record. |
 | `score_capacity_recovery.py` | Chooses each estimator's setting on the tuning draw (`--phase tuning`), then scores the selection draws, applies the false-movement gate, and writes `selection.json` (`--phase selection`). Fits no XGBoost model. |
 | `fit_capacity_arms.py` | GPU. Runs the constant-scale assertion, the 90-fit reproduction of B0, the forecast-row join probe, and then every Stage B arm, with checkpoints. |

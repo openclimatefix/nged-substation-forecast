@@ -8,8 +8,12 @@ import polars as pl
 import pytest
 from studies.capacity_scaling import (
     SCORED_COLUMN,
+    SettingResult,
+    assert_arm_covers_frame,
     assert_constant_scale_reproduces_baseline,
     assert_refit_reproduces,
+    capped_daylight_share,
+    decision_verdict,
     derange_months,
     deranged_scale,
     drop_scaled_loss_columns,
@@ -305,3 +309,78 @@ def test_the_recovery_share_is_not_computed_when_the_oracle_gains_almost_nothing
     assert recovery_share(planted_gain=0.9, real_gain=0.1, oracle_gain=0.09) is None
     assert recovery_share(planted_gain=0.9, real_gain=0.1, oracle_gain=-0.5) is None
     assert recovery_share(planted_gain=0.2, real_gain=0.1, oracle_gain=0.1) == pytest.approx(1.0)
+
+
+THRESHOLD: Final[float] = 0.18
+
+
+def _worth() -> list[SettingResult]:
+    return [
+        SettingResult(-0.3, -0.4, -0.2, THRESHOLD),
+        SettingResult(-0.25, -0.35, -0.1, THRESHOLD),
+    ]
+
+
+def test_the_decision_rule_calls_a_gain_beyond_the_threshold_worth_building() -> None:
+    assert (
+        decision_verdict(settings=_worth(), nc2_upper=0.1, control_passed=True) == "worth building"
+    )
+    # Worth building does not depend on the control passing.
+    assert (
+        decision_verdict(settings=_worth(), nc2_upper=0.1, control_passed=False) == "worth building"
+    )
+
+
+def test_the_decision_rule_needs_both_settings_and_the_threshold_for_worth_building() -> None:
+    small = [SettingResult(-0.1, -0.2, -0.05, THRESHOLD), _worth()[1]]
+    assert decision_verdict(settings=small, nc2_upper=0.1, control_passed=True) == "unresolved"
+    straddling = [SettingResult(-0.3, -0.4, 0.05, THRESHOLD), _worth()[1]]
+    assert decision_verdict(settings=straddling, nc2_upper=0.1, control_passed=True) == "unresolved"
+    one_setting = [_worth()[0], SettingResult(-0.3, -0.4, -0.2, THRESHOLD)]
+    assert (
+        decision_verdict(settings=one_setting, nc2_upper=0.1, control_passed=True)
+        == "worth building"
+    )
+    # At exactly minus the threshold the difference still counts.
+    edge = [SettingResult(-THRESHOLD, -0.3, -0.1, THRESHOLD)]
+    assert decision_verdict(settings=edge, nc2_upper=0.1, control_passed=True) == "worth building"
+
+
+def test_the_decision_rule_calls_it_not_worth_building_only_with_a_passed_control() -> None:
+    flat = [SettingResult(0.0, -0.1, 0.1, THRESHOLD), SettingResult(0.02, -0.12, 0.15, THRESHOLD)]
+    assert (
+        decision_verdict(settings=flat, nc2_upper=0.1, control_passed=True) == "not worth building"
+    )
+    assert decision_verdict(settings=flat, nc2_upper=0.1, control_passed=False) == "unresolved"
+    wide = [SettingResult(0.0, -0.3, 0.1, THRESHOLD), flat[1]]
+    assert decision_verdict(settings=wide, nc2_upper=0.1, control_passed=True) == "unresolved"
+    edge = [SettingResult(0.0, -THRESHOLD, 0.1, THRESHOLD)]
+    assert decision_verdict(settings=edge, nc2_upper=0.1, control_passed=True) == "unresolved"
+
+
+def test_a_negative_control_that_gains_makes_every_verdict_unresolved() -> None:
+    flat = [SettingResult(0.0, -0.1, 0.1, THRESHOLD)]
+    assert decision_verdict(settings=_worth(), nc2_upper=-0.01, control_passed=True) == "unresolved"
+    assert decision_verdict(settings=flat, nc2_upper=-0.01, control_passed=True) == "unresolved"
+    assert (
+        decision_verdict(settings=flat, nc2_upper=0.0, control_passed=True) == "not worth building"
+    )
+
+
+def test_the_capped_share_counts_only_daylight_hours_in_the_numerator() -> None:
+    daylight = np.array([[False, True, True, True], [False, True, True, False]])
+    removed = np.array([[True, True, False, False], [True, False, False, True]])
+    assert capped_daylight_share(removed=removed, daylight=daylight) == pytest.approx(1 / 5)
+    assert capped_daylight_share(removed=daylight, daylight=daylight) == 1.0
+    assert np.isnan(capped_daylight_share(removed=removed, daylight=np.zeros_like(daylight)))
+
+
+def test_an_arm_must_score_every_frame_row_once_per_seed() -> None:
+    frame = _frame(rows=20)
+    keys = frame.select("site", "time").join(pl.DataFrame({"seed": [0, 1, 2]}), how="cross")
+    assert_arm_covers_frame(losses=keys, frame=frame, seeds=(0, 1, 2))
+    with pytest.raises(ValueError, match="scored 59 rows"):
+        assert_arm_covers_frame(losses=keys.head(59), frame=frame, seeds=(0, 1, 2))
+    shifted = keys.with_columns(time=pl.col("time") + pl.duration(hours=1))
+    with pytest.raises(ValueError, match="keys differ"):
+        assert_arm_covers_frame(losses=shifted, frame=frame, seeds=(0, 1, 2))

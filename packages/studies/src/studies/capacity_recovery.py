@@ -16,7 +16,6 @@ reference year that calibrates the estimators.
 import json
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -27,6 +26,7 @@ from scipy import stats
 from studies.capacity_estimators import (
     ESTIMATOR_FAMILY,
     REFERENCE_END,
+    REFERENCE_ESTIMATORS,
     REFERENCE_START,
     CapacityRecord,
     FamilyType,
@@ -419,6 +419,10 @@ def _events_from(
     return events
 
 
+MIN_CONTROL_VALID_SHARE: Final[float] = 0.8
+"""A control month needs at least this share of valid days at its plant."""
+
+
 def draw_control_steps(
     *,
     record: CapacityRecord,
@@ -430,45 +434,59 @@ def draw_control_steps(
 ) -> list[PlantedEvent]:
     """Plant a step of one size in a few scored months at every plant, in distinct months.
 
-    Every plant gets `months_per_plant` months and no month is used twice, so the neighbours of a
-    planted plant are never themselves planted.
+    No month is used twice, so the neighbours of a planted plant are never themselves planted. A
+    plant is planted only in months where at least `MIN_CONTROL_VALID_SHARE` of its days are valid,
+    so a plant with little data in a month is not asked to show a loss there. A plant with fewer
+    eligible months than `months_per_plant` gets fewer steps.
 
     Args:
         record: The record.
-        months_per_plant: How many months to plant at each plant.
+        months_per_plant: The most months to plant at each plant.
         size: The share of power lost.
         scored_months: The `%Y-%m` labels the frames score, which are the candidates.
         barred: For a plant index, the months it may not be planted in (its own real low months).
         seed: The generator's seed.
 
     Returns:
-        The step events.
+        The step events, in plant order then month order.
 
     Raises:
-        ValueError: If the months cannot be shared out: fewer scored months than plant-months, or no
-            assignment avoids every barred month.
+        ValueError: If a plant has no eligible month.
     """
-    plants = len(record.sites)
-    if len(scored_months) < plants * months_per_plant:
-        msg = f"{len(scored_months)} scored months cannot hold {plants * months_per_plant} steps"
-        raise ValueError(msg)
     spans = calendar_month_spans(record=record)
+    valid = valid_days(record=record)
+    eligible = {
+        plant: [
+            month
+            for month in scored_months
+            if month in spans
+            and month not in barred.get(plant, ())
+            and valid[plant, spans[month][0] : spans[month][0] + spans[month][1]].mean()
+            >= MIN_CONTROL_VALID_SHARE
+        ]
+        for plant in range(len(record.sites))
+    }
+    empty = [record.sites[p] for p, months in eligible.items() if not months]
+    if empty:
+        msg = f"plants {empty} have no scored month with enough valid days"
+        raise ValueError(msg)
     rng = np.random.default_rng(seed)
-    for _ in range(MAX_PLACEMENT_ATTEMPTS):
-        order = rng.permutation(list(scored_months))[: plants * months_per_plant]
-        assignment = {
-            p: list(order[p * months_per_plant : (p + 1) * months_per_plant]) for p in range(plants)
-        }
-        if all(
-            month not in barred.get(p, ()) for p, chosen in assignment.items() for month in chosen
-        ):
-            return [
-                PlantedEvent(plant, "step", size, spans[month][0], spans[month][1])
-                for plant, chosen in assignment.items()
-                for month in sorted(chosen)
+    used: set[str] = set()
+    chosen: dict[int, list[str]] = {plant: [] for plant in eligible}
+    for _ in range(months_per_plant):
+        for plant in rng.permutation(list(eligible)):
+            free = [
+                m for m in eligible[int(plant)] if m not in used and m not in chosen[int(plant)]
             ]
-    msg = "no assignment of months avoids the barred months"
-    raise ValueError(msg)
+            if free:
+                month = str(free[int(rng.integers(len(free)))])
+                used.add(month)
+                chosen[int(plant)].append(month)
+    return [
+        PlantedEvent(plant, "step", size, spans[month][0], spans[month][1])
+        for plant in sorted(chosen)
+        for month in sorted(chosen[plant])
+    ]
 
 
 def event_ratios(
@@ -677,18 +695,43 @@ def false_movement_share(*, windows: Sequence[tuple[int, int, int]], original: I
         original: The estimator's scale on the original record.
 
     Returns:
-        The share over all window days. Days whose trailing window holds a fallback value count as
-        not moving falsely only when the estimate equals the fallback; a fallback is part of the
-        series like any other value.
+        The share over all window days. A day on which the estimator fell back to the static power
+        counts as moving, because a constant fallback is a failure to estimate and must not read
+        as stability.
     """
     moved, total = 0, 0
     for plant, first, length in windows:
         series = original.scale_mw[plant]
         for day in range(first, first + length):
             trailing = np.median(series[day - FALSE_MOVEMENT_TRAILING_DAYS : day])
-            moved += int(abs(series[day] / trailing - 1.0) > FALSE_MOVEMENT_THRESHOLD)
+            fell_back = original.fallback_reason[plant, day] != 0
+            moved += int(fell_back or abs(series[day] / trailing - 1.0) > FALSE_MOVEMENT_THRESHOLD)
             total += 1
     return moved / total
+
+
+def fallback_share_on_events(*, events: Sequence[PlantedEvent], planted: IssueScale) -> float:
+    """Return the share of the events' scored days on which the estimator fell back.
+
+    Args:
+        events: The draw's events.
+        planted: The estimator's scale on the record with the losses planted.
+
+    Returns:
+        The share over all scored days of all events.
+    """
+    reasons = np.concatenate(
+        [planted.fallback_reason[e.plant, e.scored_days[0] : e.scored_days[1]] for e in events]
+    )
+    return float(np.mean(reasons != 0))
+
+
+FALLBACK_SHARE_GATE: Final[float] = 0.25
+"""An estimator that falls back to the static power on more than this share of event days is out."""
+
+StatusType = Literal["gated", "ungated_pick", "none_beat_s0"]
+"""How the selected estimator was reached: it passed every gate; it is the best that beats S0 and
+passes the fallback gate although none passed the false-movement gate; or nothing beat S0."""
 
 
 class SelectionInputs(NamedTuple):
@@ -697,6 +740,7 @@ class SelectionInputs(NamedTuple):
     tuning_error: Mapping[str, float]
     selection_errors: Mapping[str, np.ndarray]
     false_movement: Mapping[str, float]
+    fallback_share: Mapping[str, float]
 
 
 @dataclass(frozen=True)
@@ -717,22 +761,24 @@ class Selection:
     """The result of the selection rule.
 
     Attributes:
-        selected: The estimator the forecast contrast uses.
-        exploratory: True if no estimator passed the false-movement gate.
-        survivors: The estimators that passed the gate.
+        selected: The estimator the forecast contrast uses, or `None` if none beat S0.
+        status: `gated`, `ungated_pick`, or `none_beat_s0`.
+        survivors: The candidates that passed every gate.
         shortlist: The best surviving estimator of each family, selected one included.
         representatives: Each family group's representative, chosen on the tuning draw.
         contrasts: E1 and E2, or an empty list where a representative is missing.
         missing: A note for each contrast that cannot be computed.
+        s0_error: The no-skill reference's mean primary metric over the selection draws.
     """
 
-    selected: str
-    exploratory: bool
+    selected: str | None
+    status: StatusType
     survivors: tuple[str, ...]
     shortlist: tuple[str, ...]
     representatives: Mapping[str, str]
     contrasts: tuple[Contrast, ...]
     missing: tuple[str, ...]
+    s0_error: float
 
 
 def t_interval(*, differences: np.ndarray, confidence: float) -> tuple[float, float, float]:
@@ -792,50 +838,65 @@ def _contrast(
 def choose_estimators(*, inputs: SelectionInputs) -> Selection:
     """Apply the selection rule.
 
-    **The false-movement gate comes first.** An estimator whose share of falsely moving days is
-    above `FALSE_MOVEMENT_GATE` is out. Each family's representative is then its lowest-error
+    **The references S0 and EM are never candidates.** A candidate must beat S0's mean primary
+    metric over the selection draws, pass the false-movement gate (`FALSE_MOVEMENT_GATE`), and pass
+    the fallback gate (`FALLBACK_SHARE_GATE`). Each family's representative is its lowest-error
     survivor on the tuning draw, so neither contrast is scored on the draw that chose it. The
-    selected estimator is the survivor with the lowest mean primary metric over the selection draws.
-    The shortlist holds the best survivor of each family by the same mean. If nothing passes the
-    gate, the lowest-error estimator is selected and the selection is marked exploratory.
+    selected estimator is the survivor with the lowest mean primary metric over the selection
+    draws, and the shortlist holds the best survivor of each family by the same mean.
+
+    **If no candidate passes every gate, the selection is an ungated pick:** the lowest-error
+    candidate that beats S0 and passes the fallback gate. If none beats S0, nothing is selected and
+    the finding is that no estimator beat doing nothing.
 
     E1 is the convex representative minus the representative of the cheap and wacky families. E2 is
     the neural-network estimator minus the convex representative.
 
     Args:
-        inputs: The tuning-draw errors, the selection draws' errors, and the false-movement shares.
+        inputs: The tuning-draw errors, the selection draws' errors, the false-movement shares, and
+            the fallback shares on event days.
 
     Returns:
         The selection.
 
     Raises:
-        ValueError: If `inputs` hold no estimator.
+        ValueError: If `inputs` hold no estimator or lack S0.
     """
     names = sorted(inputs.selection_errors)
-    if not names:
-        msg = "no estimator was run"
+    if "S0" not in names:
+        msg = "the no-skill reference S0 was not run"
         raise ValueError(msg)
     mean_error = {name: float(np.mean(inputs.selection_errors[name])) for name in names}
-    survivors = [name for name in names if inputs.false_movement[name] <= FALSE_MOVEMENT_GATE]
-    exploratory = not survivors
-    pool = names if exploratory else survivors
-    selected = min(pool, key=lambda name: mean_error[name])
+    candidates = [name for name in names if name not in REFERENCE_ESTIMATORS]
+    if not candidates:
+        msg = "no candidate estimator was run"
+        raise ValueError(msg)
+    usable = [
+        name
+        for name in candidates
+        if mean_error[name] < mean_error["S0"]
+        and inputs.fallback_share[name] <= FALLBACK_SHARE_GATE
+    ]
+    survivors = [name for name in usable if inputs.false_movement[name] <= FALSE_MOVEMENT_GATE]
+    status: StatusType = "gated" if survivors else ("ungated_pick" if usable else "none_beat_s0")
+    eligible = survivors or usable
+    selected = min(eligible, key=lambda name: mean_error[name]) if eligible else None
     families: dict[FamilyType, list[str]] = {}
     for name in survivors:
-        families.setdefault(ESTIMATOR_FAMILY[name], []).append(name)  # type: ignore[index]
+        families.setdefault(ESTIMATOR_FAMILY[name], []).append(name)
     shortlist = tuple(
         min(members, key=lambda name: mean_error[name]) for members in families.values()
     )
-    if exploratory:
+    if status == "ungated_pick" and selected is not None:
         shortlist = (selected,)
 
     def representative(group: Sequence[str]) -> str | None:
-        members = [name for name in survivors if name in group]
+        members = [name for name in eligible if name in group]
         return min(members, key=lambda name: inputs.tuning_error[name]) if members else None
 
-    cheap_and_wacky = [n for n in names if ESTIMATOR_FAMILY[n] in ("cheap", "wacky")]  # type: ignore[index]
-    convex = [n for n in names if ESTIMATOR_FAMILY[n] == "convex"]  # type: ignore[index]
-    pytorch = [n for n in names if ESTIMATOR_FAMILY[n] == "pytorch"]  # type: ignore[index]
+    cheap_and_wacky = [n for n in candidates if ESTIMATOR_FAMILY[n] in ("cheap", "wacky")]
+    convex = [n for n in candidates if ESTIMATOR_FAMILY[n] == "convex"]
+    pytorch = [n for n in candidates if ESTIMATOR_FAMILY[n] == "pytorch"]
     reps = {
         "cheap_and_wacky": representative(cheap_and_wacky),
         "convex": representative(convex),
@@ -853,7 +914,7 @@ def choose_estimators(*, inputs: SelectionInputs) -> Selection:
             )
         )
     else:
-        missing.append("E1: no convex or no cheap-or-wacky estimator passed the gate")
+        missing.append("E1: no convex or no cheap-or-wacky estimator was eligible")
     if reps["pytorch"] and reps["convex"]:
         contrasts.append(
             _contrast(
@@ -864,15 +925,16 @@ def choose_estimators(*, inputs: SelectionInputs) -> Selection:
             )
         )
     else:
-        missing.append("E2: no neural-network or no convex estimator passed the gate")
+        missing.append("E2: no neural-network or no convex estimator was eligible")
     return Selection(
         selected=selected,
-        exploratory=exploratory,
+        status=status,
         survivors=tuple(survivors),
         shortlist=shortlist,
         representatives={k: v for k, v in reps.items() if v is not None},
         contrasts=tuple(contrasts),
         missing=tuple(missing),
+        s0_error=mean_error["S0"],
     )
 
 
@@ -890,7 +952,10 @@ def write_selection(*, path: Path, selection: Selection, inputs: SelectionInputs
     refuse_to_overwrite(paths=[path])
     payload = {
         "selected": selection.selected,
-        "exploratory": selection.exploratory,
+        "status": selection.status,
+        "s0_error": selection.s0_error,
+        "fallback_share_gate": FALLBACK_SHARE_GATE,
+        "fallback_share": dict(inputs.fallback_share),
         "survivors": list(selection.survivors),
         "shortlist": list(selection.shortlist),
         "representatives": dict(selection.representatives),
@@ -905,17 +970,3 @@ def write_selection(*, path: Path, selection: Selection, inputs: SelectionInputs
     temporary = path.with_name(path.name + ".tmp")
     temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     temporary.rename(path)
-
-
-def month_label(*, record: CapacityRecord, day: int) -> str:
-    """Return the `%Y-%m` label of a day index.
-
-    Args:
-        record: The record.
-        day: The day index.
-
-    Returns:
-        The label.
-    """
-    stamp: date = record.dates[day].astype("datetime64[D]").astype(object)
-    return f"{stamp.year:04d}-{stamp.month:02d}"

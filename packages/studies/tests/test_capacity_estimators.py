@@ -353,7 +353,7 @@ def test_a_record_with_mismatched_arrays_is_refused_and_reversing_twice_restores
     twice = record.reversed().reversed()
     assert np.array_equal(twice.power_mw, record.power_mw)
     assert np.array_equal(twice.dates, record.dates)
-    assert set(CHEAP_ESTIMATORS) == {*ALLOWED_DELAY_DAYS, "EM"}
+    assert set(CHEAP_ESTIMATORS) == {*ALLOWED_DELAY_DAYS, "EM", "S0"}
     name: EstimatorNameType = "NR"
     assert run_cheap_estimator(name=name, record=record).level.shape == (3, 30)
 

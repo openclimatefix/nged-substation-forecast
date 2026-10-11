@@ -26,10 +26,13 @@ from typing import Final
 import numpy as np
 import polars as pl
 from capacity_paths import (
+    ESTIMATOR_MODULES,
     ORIGINAL,
     TUNING_GRIDS,
+    check_stamp,
     claim_root,
     draw_id,
+    fingerprint,
     load_events,
     load_tuned,
     setting_name,
@@ -42,6 +45,7 @@ from studies.capacity_recovery import (
     SelectionInputs,
     choose_estimators,
     draw_primary_metric,
+    fallback_share_on_events,
     false_movement_share,
     score_events,
     write_selection,
@@ -142,6 +146,7 @@ def select(*, root: Path) -> None:
     tuning_error: dict[str, float] = {}
     selection_errors: dict[str, np.ndarray] = {}
     movement: dict[str, float] = {}
+    fallback: dict[str, float] = {}
     event_tables: list[pl.DataFrame] = []
     summary_rows: list[dict[str, object]] = []
     for estimator in estimators:
@@ -156,14 +161,28 @@ def select(*, root: Path) -> None:
         selection_errors[estimator] = np.array([draw_primary_metric(scores=t) for t in tables])
         original = scale_for(root=root, estimator=estimator, params=params, file_id=ORIGINAL)
         movement[estimator] = false_movement_share(windows=windows, original=original)
+        fallback[estimator] = float(
+            np.mean(
+                [
+                    fallback_share_on_events(
+                        events=events.draws[i],
+                        planted=scale_for(
+                            root=root, estimator=estimator, params=params, file_id=draw_id(index=i)
+                        ),
+                    )
+                    for i in range(1, len(events.draws))
+                ]
+            )
+        )
         event_tables += [t.with_columns(estimator=pl.lit(estimator)) for t in tables]
         row: dict[str, object] = {
             "estimator": estimator,
-            "family": ESTIMATOR_FAMILY[estimator],  # type: ignore[index]
+            "family": ESTIMATOR_FAMILY[estimator],
             "setting": setting_name(params=params),
             "tuning_error": tuning_error[estimator],
             "mean_selection_error": float(selection_errors[estimator].mean()),
             "false_movement": movement[estimator],
+            "fallback_share_on_event_days": fallback[estimator],
         }
         if estimator in SATELLITE_SENSITIVITY:
             sensitivity = [
@@ -183,7 +202,10 @@ def select(*, root: Path) -> None:
         summary_rows.append(row)
         _LOG.info("%s: %s", estimator, row)
     inputs = SelectionInputs(
-        tuning_error=tuning_error, selection_errors=selection_errors, false_movement=movement
+        tuning_error=tuning_error,
+        selection_errors=selection_errors,
+        false_movement=movement,
+        fallback_share=fallback,
     )
     selection = choose_estimators(inputs=inputs)
     tables_dir = root / "tables"
@@ -192,9 +214,9 @@ def select(*, root: Path) -> None:
     pl.DataFrame(summary_rows).write_parquet(tables_dir / "stage_a_summary.parquet")
     write_selection(path=outputs[0], selection=selection, inputs=inputs)
     _LOG.info(
-        "selected %s (exploratory=%s); shortlist %s",
+        "selected %s (status %s); shortlist %s",
         selection.selected,
-        selection.exploratory,
+        selection.status,
         selection.shortlist,
     )
 
@@ -212,6 +234,7 @@ def main() -> int:
     parser.add_argument("--smoke", action="store_true", help="Read and write under _smoke/.")
     arguments = parser.parse_args()
     root = claim_root(smoke=arguments.smoke)
+    check_stamp(directory=root / "tuned", stamp=fingerprint(root=root, modules=ESTIMATOR_MODULES))
     if arguments.phase == "tuning":
         tune(root=root, estimators=arguments.estimators)
     else:

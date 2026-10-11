@@ -31,7 +31,6 @@ from scipy.optimize import linprog
 
 from studies.capacity_estimators import (
     CapacityRecord,
-    PlantEstimate,
     RawEstimate,
     valid_days,
 )
@@ -437,7 +436,7 @@ def estimate_convex_plant(
     plant: int,
     params: Mapping[str, float],
     days: Sequence[int] | np.ndarray,
-) -> PlantEstimate:
+) -> RawEstimate:
     """Estimate one plant's capacity on the given days with CX1 or CX2.
 
     Args:
@@ -484,7 +483,7 @@ def estimate_convex_plant(
                 end_day=int(day),
             )
         level[day] = trace[-1]
-    return PlantEstimate(level=level, sd=None)
+    return RawEstimate(level=level, sd=None)
 
 
 def run_convex_estimator(

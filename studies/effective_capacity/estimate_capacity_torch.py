@@ -22,11 +22,15 @@ from typing import Final
 import numpy as np
 from capacity_paths import (
     CONTROL,
+    ESTIMATOR_MODULES,
     ORIGINAL,
     TUNING_GRIDS,
+    check_stamp,
     claim_root,
     draw_id,
     estimate_path,
+    estimates_dir,
+    fingerprint,
     inputs_dir,
     load_events,
     record_for,
@@ -49,6 +53,10 @@ def main() -> int:
     parser.add_argument("--smoke", action="store_true", help="Tiny run on the CPU; not a result.")
     arguments = parser.parse_args()
     root = claim_root(smoke=arguments.smoke)
+    check_stamp(
+        directory=estimates_dir(root=root),
+        stamp=fingerprint(root=root, modules=ESTIMATOR_MODULES),
+    )
     events = load_events(root=root)
     draws = [draw_id(index=i) for i in range(len(events.draws))]
     file_ids = [
@@ -57,7 +65,6 @@ def main() -> int:
         CONTROL,
         "anm_blind",
         f"{ORIGINAL}__reversed",
-        f"{CONTROL}__reversed",
     ]
     orientation = json.loads((inputs_dir(root=root) / "orientation.json").read_text())
     original = record_for(root=root, record_id=ORIGINAL)

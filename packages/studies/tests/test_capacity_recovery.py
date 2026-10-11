@@ -176,10 +176,41 @@ def test_control_steps_use_distinct_months_and_avoid_each_plants_barred_months(
         assert all(e.size == 0.3 and e.shape == "step" for e in events)
         own = {first for first, _ in (spans[m] for m in barred[0])}
         assert not own & {e.first_day for e in events if e.plant == 0}
-    with pytest.raises(ValueError, match="cannot hold"):
+    many = draw_control_steps(
+        record=long_record,
+        months_per_plant=7,
+        size=0.3,
+        scored_months=scored,
+        barred={},
+        seed=0,
+    )
+    assert len(many) == 18
+    assert len({e.first_day for e in many}) == 18
+
+
+def test_control_steps_skip_months_with_too_little_valid_data_and_a_plant_may_get_fewer(
+    long_record: CapacityRecord,
+) -> None:
+    spans = calendar_month_spans(record=long_record)
+    scored = list(spans)[60:66]
+    power = long_record.power_mw.copy()
+    thin = spans[scored[0]]
+    power[1, thin[0] : thin[0] + thin[1] - 8] = np.nan  # 8 of 30 or 31 days valid
+    ok = spans[scored[1]]
+    power[1, ok[0] : ok[0] + 3] = np.nan  # still above 80% valid
+    record = long_record.with_power(power_mw=power)
+    events = draw_control_steps(
+        record=record, months_per_plant=3, size=0.3, scored_months=scored, barred={}, seed=2
+    )
+    assert thin[0] not in {e.first_day for e in events if e.plant == 1}
+    assert len(events) == 6
+    assert len({e.first_day for e in events}) == 6
+    empty = power.copy()
+    empty[1, :] = np.nan
+    with pytest.raises(ValueError, match="no scored month with enough valid days"):
         draw_control_steps(
-            record=long_record,
-            months_per_plant=7,
+            record=long_record.with_power(power_mw=empty),
+            months_per_plant=1,
             size=0.3,
             scored_months=scored,
             barred={},
@@ -317,13 +348,26 @@ def test_a_verdict_names_which_side_of_zero_the_interval_lies_on() -> None:
     assert verdict_of(lower=-0.3, upper=0.0) == "no detectable difference"
 
 
+S0_ERROR: Final[float] = 0.10
+"""The no-skill reference's error in the selection tests: R30 and CSQ do worse than it."""
+
+
 def _inputs(
-    *, errors: dict[str, float], movement: dict[str, float], tuning: dict[str, float] | None = None
+    *,
+    errors: dict[str, float],
+    movement: dict[str, float],
+    tuning: dict[str, float] | None = None,
+    fallback: dict[str, float] | None = None,
+    s0_error: float = S0_ERROR,
 ) -> SelectionInputs:
     rng = np.random.default_rng(0)
-    draws = {name: value + 0.001 * rng.standard_normal(10) for name, value in errors.items()}
+    everything = {**errors, "S0": s0_error, "EM": 0.001}
+    draws = {name: value + 0.001 * rng.standard_normal(10) for name, value in everything.items()}
     return SelectionInputs(
-        tuning_error=tuning or dict(errors), selection_errors=draws, false_movement=movement
+        tuning_error={**(tuning or errors), "S0": s0_error, "EM": 0.001},
+        selection_errors=draws,
+        false_movement={**movement, "S0": 0.0, "EM": 0.0},
+        fallback_share={**dict.fromkeys(everything, 0.0), **(fallback or {})},
     )
 
 
@@ -343,7 +387,9 @@ def test_the_gate_comes_first_and_the_selected_estimator_is_the_lowest_surviving
     assert "CX2" not in selection.survivors
     assert "NR" in selection.survivors
     assert selection.selected == "CX1"
-    assert not selection.exploratory
+    assert selection.status == "gated"
+    assert "R30" not in selection.survivors
+    assert "EM" not in selection.shortlist
     assert set(selection.shortlist) == {"NR", "HM", "CX1"}
     assert selection.representatives == {"cheap_and_wacky": "NR", "convex": "CX1"}
     assert [c.name for c in selection.contrasts] == ["E1"]
@@ -379,20 +425,19 @@ def test_representatives_are_chosen_on_the_tuning_draw_and_contrasts_use_the_sel
     assert e2.verdict == "beats"
 
 
-def test_when_nothing_passes_the_gate_the_lowest_error_estimator_is_selected_as_exploratory() -> (
-    None
-):
+def test_when_nothing_passes_the_gate_the_best_that_beats_s0_is_an_ungated_pick() -> None:
     errors = dict(
         zip(ALL_ESTIMATORS, [0.12, 0.11, 0.05, 0.06, 0.07, 0.09, 0.04, 0.03, 0.02], strict=True)
     )
     selection = choose_estimators(
         inputs=_inputs(errors=errors, movement=dict.fromkeys(ALL_ESTIMATORS, 0.3))
     )
-    assert selection.exploratory
+    assert selection.status == "ungated_pick"
     assert selection.selected == "DP1"
     assert selection.survivors == ()
     assert selection.shortlist == ("DP1",)
-    assert len(selection.missing) == 2
+    assert [c.name for c in selection.contrasts] == ["E1", "E2"]
+    assert selection.missing == ()
 
 
 def test_selection_json_records_the_choice_and_refuses_to_overwrite(tmp_path: Path) -> None:
@@ -405,6 +450,8 @@ def test_selection_json_records_the_choice_and_refuses_to_overwrite(tmp_path: Pa
     write_selection(path=path, selection=selection, inputs=inputs)
     saved = json.loads(path.read_text())
     assert saved["selected"] == selection.selected == "DP1"
+    assert saved["status"] == "gated"
+    assert saved["s0_error"] == pytest.approx(selection.s0_error)
     assert saved["shortlist"] == list(selection.shortlist)
     assert saved["contrasts"][0]["name"] == "E1"
     assert saved["mean_selection_error"]["R30"] == pytest.approx(
@@ -415,9 +462,48 @@ def test_selection_json_records_the_choice_and_refuses_to_overwrite(tmp_path: Pa
         write_selection(path=path, selection=selection, inputs=inputs)
 
 
-def test_choosing_among_no_estimators_is_refused() -> None:
-    with pytest.raises(ValueError, match="no estimator"):
-        choose_estimators(inputs=SelectionInputs({}, {}, {}))
+def test_choosing_without_the_no_skill_reference_is_refused() -> None:
+    with pytest.raises(ValueError, match="S0"):
+        choose_estimators(inputs=SelectionInputs({}, {}, {}, {}))
+
+
+ERRORS: Final[dict[str, float]] = dict(
+    zip(ALL_ESTIMATORS, [0.12, 0.11, 0.05, 0.06, 0.07, 0.09, 0.04, 0.03, 0.02], strict=True)
+)
+
+
+def test_the_fallback_gate_excludes_an_estimator_that_falls_back_on_over_a_quarter_of_days() -> (
+    None
+):
+    quiet = dict.fromkeys(ALL_ESTIMATORS, 0.0)
+    selection = choose_estimators(
+        inputs=_inputs(errors=ERRORS, movement=quiet, fallback={"DP1": 0.26, "CX2": 0.25})
+    )
+    assert "DP1" not in selection.survivors
+    assert "CX2" in selection.survivors
+    assert selection.selected == "CX2"
+
+
+def test_a_candidate_must_beat_the_no_skill_reference_and_the_references_are_never_picked() -> None:
+    quiet = dict.fromkeys(ALL_ESTIMATORS, 0.0)
+    selection = choose_estimators(inputs=_inputs(errors=ERRORS, movement=quiet, s0_error=0.035))
+    assert set(selection.survivors) == {"CX2", "DP1"}
+    assert selection.selected == "DP1"
+    nothing = choose_estimators(inputs=_inputs(errors=ERRORS, movement=quiet, s0_error=0.01))
+    assert nothing.status == "none_beat_s0"
+    assert nothing.selected is None
+    assert nothing.shortlist == ()
+    assert nothing.survivors == ()
+
+
+def test_the_ungated_pick_still_needs_to_beat_the_reference_and_pass_the_fallback_gate() -> None:
+    moving = dict.fromkeys(ALL_ESTIMATORS, 0.4)
+    selection = choose_estimators(
+        inputs=_inputs(errors=ERRORS, movement=moving, fallback={"DP1": 0.9, "CX2": 0.9})
+    )
+    assert selection.status == "ungated_pick"
+    assert selection.selected == "CX1"
+    assert selection.shortlist == ("CX1",)
 
 
 def test_relative_capacity_error_is_zero_for_a_perfect_ratio() -> None:

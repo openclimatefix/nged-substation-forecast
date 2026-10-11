@@ -20,8 +20,10 @@ static 99th-percentile power, and the floor, and the forecast-row join reads its
 **The hindsight reference reads both sides of a target week and never the week itself.**
 `hindsight_reference_estimates` combines the forward estimate from whole days up to the day before
 the week with the same estimator run on the time-reversed record from the day after the week.
-**This module holds the record, the six estimators that are neither linear programs nor neural
-networks (R30, CSQ, NR, PR, KF, and HM), the issue-time driver, and the hindsight driver.** The
+
+**This module holds the record, the eight estimators that are neither linear programs nor neural
+networks (EM, R30, CSQ, NR, PR, KF, and HM, and the no-skill reference S0), the issue-time driver,
+and the hindsight driver.** The
 linear programs are in `studies.capacity_convex`, the neural network is in
 `studies.capacity_physics_torch`, and the planted losses, the metrics, and the selection rule are in
 `studies.capacity_recovery`.
@@ -65,14 +67,20 @@ MIN_SHAPE_SUM: Final[float] = 0.2
 LOW_SUN_CLEAR_SKY_W_M2: Final[float] = 50.0
 """Hours with less clear-sky irradiance than this are left out of ratios, where they are noise."""
 
-FamilyType = Literal["cheap", "wacky", "convex", "pytorch"]
-"""The four families of capacity estimator the study compares."""
+FamilyType = Literal["cheap", "wacky", "convex", "pytorch", "reference"]
+"""The four families of capacity estimator the study compares, and the references that are not
+candidates (the expanding maximum EM and the static power S0)."""
 
-EstimatorNameType = Literal["EM", "R30", "CSQ", "NR", "PR", "KF", "HM", "CX1", "CX2", "DP1"]
-"""The ten estimators."""
+EstimatorNameType = Literal["S0", "EM", "R30", "CSQ", "NR", "PR", "KF", "HM", "CX1", "CX2", "DP1"]
+"""The nine candidate estimators and the two references."""
+
+REFERENCE_ESTIMATORS: Final[frozenset[str]] = frozenset({"S0", "EM"})
+"""Estimators that are references for the page and never candidates for selection: S0 never moves
+(no skill), and EM is the published running maximum, which cannot follow a loss down."""
 
 ESTIMATOR_FAMILY: Final[Mapping[str, FamilyType]] = {
-    "EM": "cheap",
+    "S0": "reference",
+    "EM": "reference",
     "R30": "cheap",
     "CSQ": "cheap",
     "NR": "cheap",
@@ -169,13 +177,6 @@ class CapacityRecord:
 
 class RawEstimate(NamedTuple):
     """An estimator's level for every plant and day, using whole days up to that day."""
-
-    level: np.ndarray
-    sd: np.ndarray | None
-
-
-class PlantEstimate(NamedTuple):
-    """One plant's level and standard deviation per day."""
 
     level: np.ndarray
     sd: np.ndarray | None
@@ -294,9 +295,7 @@ def _daily_shape_ratio(*, record: CapacityRecord, plant: int, valid: np.ndarray)
     )
 
 
-def estimate_em(
-    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
-) -> PlantEstimate:
+def estimate_em(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
     """Return the running maximum of the plant's hourly power over every valid day so far.
 
     This is the published reference that the running-maximum normalisation of Dantas and Browell and
@@ -320,12 +319,25 @@ def estimate_em(
         ),
         np.nan,
     )
-    return PlantEstimate(level=np.fmax.accumulate(daily_max), sd=None)
+    return RawEstimate(level=np.fmax.accumulate(daily_max), sd=None)
 
 
-def estimate_r30(
-    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
-) -> PlantEstimate:
+def estimate_s0(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
+    """Return the plant's static power on every day: the no-skill reference that never moves.
+
+    Args:
+        record: The record.
+        plant: The plant's index.
+        params: Unused; S0 has no setting.
+
+    Returns:
+        The static 99th-percentile power, in megawatts, on every day.
+    """
+    del params
+    return RawEstimate(level=np.full(len(record.dates), record.static_p99_mw[plant]), sd=None)
+
+
+def estimate_r30(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
     """Return the rolling 30-day 99th percentile of the plant's hourly power.
 
     Args:
@@ -345,13 +357,14 @@ def estimate_r30(
     level = np.full(len(valid), np.nan)
     for day in np.flatnonzero(enough):
         level[day] = np.nanquantile(windows[day], 0.99)
-    return PlantEstimate(level=level, sd=None)
+    return RawEstimate(level=level, sd=None)
 
 
-def estimate_csq(
-    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
-) -> PlantEstimate:
-    """Return the rolling 30-day 90th percentile of power over clear-sky irradiance.
+def estimate_csq(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
+    """Return the rolling 30-day 90th percentile of power over modelled clear-sky output.
+
+    The denominator is the physics model's output under a clear sky at the plant's fitted tilt and
+    azimuth, not the horizontal irradiance, so the ratio carries no seasonal swing from the tilt.
 
     Args:
         record: The record.
@@ -363,8 +376,8 @@ def estimate_csq(
     """
     del params
     valid = valid_days(record=record)[plant]
-    clear = record.clear_sky_w_m2[plant]
-    sunny = valid[:, None] & (clear >= LOW_SUN_CLEAR_SKY_W_M2)
+    clear = record.clear_shape[plant]
+    sunny = valid[:, None] & (record.clear_sky_w_m2[plant] >= LOW_SUN_CLEAR_SKY_W_M2) & (clear > 0)
     with np.errstate(invalid="ignore", divide="ignore"):
         ratio = np.where(sunny, record.power_mw[plant] / np.where(sunny, clear, 1.0), np.nan)
     windows = _trailing_windows(values=ratio, window=30).reshape(len(valid), -1)
@@ -374,7 +387,7 @@ def estimate_csq(
         values = windows[day][np.isfinite(windows[day])]
         if len(values) >= 100:
             level[day] = np.quantile(values, 0.9)
-    return PlantEstimate(level=level, sd=None)
+    return RawEstimate(level=level, sd=None)
 
 
 def relative_energy(*, record: CapacityRecord) -> np.ndarray:
@@ -417,9 +430,7 @@ def neighbour_ratio(*, record: CapacityRecord) -> np.ndarray:
     return np.where((others_count > 0) & (others_mean > 0), ratio, np.nan)
 
 
-def estimate_nr(
-    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
-) -> PlantEstimate:
+def estimate_nr(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
     """Return the plant's 7-day energy ratio to the other plants, times its static power.
 
     Args:
@@ -431,15 +442,17 @@ def estimate_nr(
         The estimate in megawatts.
     """
     del params
-    return PlantEstimate(
+    return RawEstimate(
         level=neighbour_ratio(record=record)[plant] * record.static_p99_mw[plant], sd=None
     )
 
 
-def estimate_pr(
-    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
-) -> PlantEstimate:
-    """Return the sum of power over the sum of satellite irradiance across the latest 7 days.
+def estimate_pr(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
+    """Return the sum of power over the sum of modelled output across the latest 7 days.
+
+    The denominator is the physics model's output driven by the satellite irradiance at the plant's
+    fitted tilt and azimuth, not the horizontal irradiance, so the ratio carries no seasonal swing
+    from the tilt.
 
     Args:
         record: The record.
@@ -452,16 +465,16 @@ def estimate_pr(
     del params
     valid = valid_days(record=record)[plant]
     usable = np.broadcast_to(valid[:, None], (len(valid), HOURS_PER_DAY))
-    both = usable & np.isfinite(record.power_mw[plant]) & np.isfinite(record.cams_ghi_w_m2[plant])
+    both = usable & np.isfinite(record.power_mw[plant]) & np.isfinite(record.cams_shape[plant])
     top = np.where(both, record.power_mw[plant], 0.0).sum(axis=1)
-    bottom = np.where(both, record.cams_ghi_w_m2[plant], 0.0).sum(axis=1)
+    bottom = np.where(both, record.cams_shape[plant], 0.0).sum(axis=1)
     has_day = np.where(bottom > 0, 1.0, np.nan)
     window_days = np.nansum(_trailing_windows(values=has_day, window=7), axis=1)
     top_sum = _trailing_windows(values=top, window=7)
     bottom_sum = _trailing_windows(values=bottom, window=7)
     with np.errstate(invalid="ignore", divide="ignore"):
         level = np.nansum(top_sum, axis=1) / np.nansum(bottom_sum, axis=1)
-    return PlantEstimate(level=np.where(window_days >= 4, level, np.nan), sd=None)
+    return RawEstimate(level=np.where(window_days >= 4, level, np.nan), sd=None)
 
 
 KF_PARAMS: Final[Mapping[str, float]] = {"process_sd": 0.01, "observation_sd": 0.1}
@@ -473,9 +486,7 @@ KF_INNOVATION_CLIP: Final[float] = 3.0
 pulled back to that distance, so that one bad satellite day cannot move the level."""
 
 
-def estimate_kf(
-    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
-) -> PlantEstimate:
+def estimate_kf(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
     """Return a Kalman local-level filter on the daily log ratio of power to modelled power.
 
     The state is the logarithm of the plant's output per modelled unit of direct-current capacity,
@@ -515,7 +526,7 @@ def estimate_kf(
         if np.isfinite(state):
             level[day] = np.exp(state)
             sd[day] = level[day] * np.sqrt(variance)
-    return PlantEstimate(level=level, sd=sd)
+    return RawEstimate(level=level, sd=sd)
 
 
 HM_LEVELS: Final[tuple[float, ...]] = (1.0, 0.9, 0.75, 0.5)
@@ -529,9 +540,7 @@ HM_INITIAL_FULL_PROBABILITY: Final[float] = 0.7
 """The prior probability of the full level before the first valid day."""
 
 
-def estimate_hm(
-    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
-) -> PlantEstimate:
+def estimate_hm(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> RawEstimate:
     """Return the posterior mean capacity of a hidden Markov model over discrete capacity levels.
 
     **The model encodes that strings and inverters fail in whole units.** Each day's ratio of power
@@ -555,7 +564,7 @@ def estimate_hm(
     days = len(ratio)
     level = np.full(days, np.nan)
     if len(reference) == 0:
-        return PlantEstimate(level=level, sd=None)
+        return RawEstimate(level=level, sd=None)
     relative = ratio / np.median(reference)
     log_levels = np.log(np.asarray(HM_LEVELS))
     n_levels = len(HM_LEVELS)
@@ -576,12 +585,13 @@ def estimate_hm(
             posterior /= posterior.sum()
         if started:
             level[day] = float(posterior @ np.asarray(HM_LEVELS)) * record.static_p99_mw[plant]
-    return PlantEstimate(level=level, sd=None)
+    return RawEstimate(level=level, sd=None)
 
 
-CheapEstimatorFunction = Callable[..., PlantEstimate]
+CheapEstimatorFunction = Callable[..., RawEstimate]
 
 CHEAP_ESTIMATORS: Final[Mapping[str, CheapEstimatorFunction]] = {
+    "S0": estimate_s0,
     "EM": estimate_em,
     "R30": estimate_r30,
     "CSQ": estimate_csq,
@@ -593,6 +603,7 @@ CHEAP_ESTIMATORS: Final[Mapping[str, CheapEstimatorFunction]] = {
 """The estimators of this module, by name."""
 
 DEFAULT_PARAMS: Final[Mapping[str, Mapping[str, float]]] = {
+    "S0": {},
     "EM": {},
     "R30": {},
     "CSQ": {},

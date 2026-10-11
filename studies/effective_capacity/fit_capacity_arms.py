@@ -26,7 +26,6 @@ columns of every arm to `arm_columns.json`.
 """
 
 import argparse
-import hashlib
 import json
 import logging
 import sys
@@ -36,16 +35,19 @@ from typing import Any, Final
 import numpy as np
 import polars as pl
 from capacity_paths import (
+    ALL_MODULES,
     CONTROL,
     DERANGEMENT_SEED,
     LAG_FRAME_PATH,
     LAG_LOSSES_PATH,
     ORIGINAL,
     claim_root,
+    fingerprint,
     inputs_dir,
     load_events,
     load_tuned,
     record_for,
+    sha256_of,
     write_json_atomic,
 )
 from capacity_scores import load_raw, reference_for, scale_for
@@ -65,6 +67,7 @@ from studies.capacity_estimators import (
 )
 from studies.capacity_recovery import factor_matrix
 from studies.capacity_scaling import (
+    assert_arm_covers_frame,
     assert_constant_scale_reproduces_baseline,
     assert_refit_reproduces,
     derange_months,
@@ -81,6 +84,7 @@ from studies.checkpointed_fits import (
 )
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
+    SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
     DeviceType,
     HyperParameters,
@@ -105,7 +109,7 @@ NO_DAY_OF_YEAR_COLUMNS: Final[tuple[str, ...]] = tuple(c for c in B0_COLUMNS if 
 """B0's columns without day of year."""
 
 CONSTANT_SCALE: Final[float] = 0.37
-CONSTANT_SCALE_TOLERANCE_POINTS: Final[float] = 1e-4
+CONSTANT_SCALE_TOLERANCE_POINTS: Final[float] = 1e-3
 """The constant divisor of the constant-scale assertion, and the tolerance on the mean error."""
 
 JOIN_PROBE_ROWS: Final[int] = 6
@@ -177,7 +181,7 @@ def scale_function_for(
             level = np.stack(
                 [
                     estimate_convex_plant(
-                        name=estimator,  # type: ignore[arg-type]
+                        name=estimator,
                         record=record,
                         plant=plant,
                         params=params,
@@ -211,7 +215,7 @@ def build_scales(
     """
     events = load_events(root=root)
     selected = str(selection["selected"])
-    shortlist = [str(name) for name in selection["shortlist"]]  # type: ignore[attr-defined]
+    shortlist = [str(name) for name in selection["shortlist"]]
     scales: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     for name in shortlist:
         params = load_tuned(root=root, estimator=name)
@@ -317,10 +321,21 @@ def main() -> int:  # noqa: PLR0915
     root = claim_root(smoke=arguments.smoke)
     device: DeviceType = "cpu" if arguments.smoke else choose_device(requested=arguments.device)
     selection = json.loads((root / "selection.json").read_text())
+    if selection["selected"] is None:
+        _LOG.error("no estimator beat doing nothing (S0), so P1 is not run; this is the finding")
+        return 1
     selected = str(selection["selected"])
+    manifest = json.loads((inputs_dir(root=root) / "manifest.json").read_text())
+    if manifest["lag_frame_sha256"] != sha256_of(path=LAG_FRAME_PATH):
+        msg = "the lag frame differs from the one the inputs were built against"
+        raise RuntimeError(msg)
     events = load_events(root=root)
     record = record_for(root=root, record_id=ORIGINAL)
     frame = pl.read_parquet(LAG_FRAME_PATH)
+    published_keys = pl.read_parquet(LAG_LOSSES_PATH, columns=["site", "time"]).unique()
+    if frame.join(published_keys, on=["site", "time"], how="anti").height:
+        msg = "the lag frame holds rows the published B0 never scored"
+        raise ValueError(msg)
     if arguments.smoke:
         frame = smoke_frame(frame=frame)
     check_months_covered(frame=frame, scored_months=events.scored_months, smoke=arguments.smoke)
@@ -367,6 +382,17 @@ def main() -> int:  # noqa: PLR0915
         target_days=np.random.default_rng(1143).choice(probe_days, JOIN_PROBE_ROWS, replace=False),
         seed=11,
     )
+    used_days = np.unique(target_day_indices(record=record, rows=frame)[1])
+    recomputed = scale_function_for(
+        root=root,
+        estimator=selected,
+        params=load_tuned(root=root, estimator=selected),
+        reference=reference,
+    )(record, used_days)
+    stored = scales[f"causal__{selected}"][0][:, used_days]
+    if not np.allclose(recomputed, stored, rtol=1e-4, equal_nan=True):
+        msg = "the recomputed scale of the selected estimator differs from the stored scale"
+        raise ValueError(msg)
     _LOG.info("join probe passed")
     columns = {arm: list(B0_COLUMNS) for arm in scales} | {"b0_refit": list(B0_COLUMNS)}
     columns[f"noDOY__{selected}"] = list(NO_DAY_OF_YEAR_COLUMNS)
@@ -381,7 +407,9 @@ def main() -> int:  # noqa: PLR0915
         dataset_path=LAG_FRAME_PATH,
         arms={
             **columns,
-            "selection": [hashlib.sha256((root / "selection.json").read_bytes()).hexdigest()],
+            "selection": [sha256_of(path=root / "selection.json")],
+            "scales": [sha256_of(path=root / "scales_stage_b.npz")],
+            "code": [fingerprint(root=root, modules=ALL_MODULES)],
         },
         device=device,
     )
@@ -435,6 +463,7 @@ def main() -> int:  # noqa: PLR0915
                 ),
                 on=["site", "time"],
             )
+            assert_arm_covers_frame(losses=annotated, frame=frames[arm], seeds=SEEDS)
             results.append(annotated)
             if arm == "b0_refit" and not arguments.smoke:
                 published = pl.read_parquet(LAG_LOSSES_PATH).filter(

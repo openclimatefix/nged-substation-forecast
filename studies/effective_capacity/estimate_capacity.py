@@ -36,12 +36,16 @@ import numpy as np
 import polars as pl
 from capacity_paths import (
     CONTROL,
+    ESTIMATOR_MODULES,
     LAG_FRAME_PATH,
     ORIGINAL,
     TUNING_GRIDS,
+    check_stamp,
     claim_root,
     draw_id,
     estimate_path,
+    estimates_dir,
+    fingerprint,
     load_events,
     load_tuned,
     record_for,
@@ -77,7 +81,7 @@ SMOKE_DAYS_PER_PLANT: Final[int] = 12
 
 CONVEX: Final[tuple[str, ...]] = ("CX1", "CX2")
 CHEAP: Final[tuple[str, ...]] = tuple(
-    name for name, family in ESTIMATOR_FAMILY.items() if family in ("cheap", "wacky")
+    name for name, family in ESTIMATOR_FAMILY.items() if family in ("cheap", "wacky", "reference")
 )
 """The estimators this script runs: the linear programs, and the cheap and wacky ones."""
 
@@ -103,7 +107,7 @@ def days_for(*, root: Path, record_id: str, record: CapacityRecord, phase: str) 
         root: The output root.
         record_id: The record's identifier.
         record: The record.
-        phase: The phase, which decides how much of the original record is needed.
+        phase: The phase, which sets how much of the original record is needed.
 
     Returns:
         One sorted array of day indices per plant.
@@ -192,7 +196,7 @@ def _convex_part(
     record = record_for(root=root, record_id=record_id)
     estimate = estimate_convex_plant(
         name=name, record=record, plant=plant, params=params, days=days
-    )  # type: ignore[arg-type]
+    )
     np.save(part, estimate.level)
     return part
 
@@ -308,7 +312,7 @@ def probe_causality(*, root: Path, record: CapacityRecord) -> None:
             level=np.stack(
                 [
                     estimate_convex_plant(
-                        name=name,  # type: ignore[arg-type]
+                        name=name,
                         record=record,
                         plant=plant,
                         params=TUNING_GRIDS[name][0],
@@ -336,7 +340,7 @@ def probe_causality(*, root: Path, record: CapacityRecord) -> None:
                 level = np.stack(
                     [
                         estimate_convex_plant(
-                            name=name,  # type: ignore[arg-type]
+                            name=name,
                             record=candidate,
                             plant=plant,
                             params=params,
@@ -366,7 +370,7 @@ def resolve_job(
     Args:
         root: The output root.
         file_id: The estimates file's identifier: `original__tuning`, `original`, `drawNN`,
-            `control`, `original__reversed`, `control__reversed`, `anm_blind`, or
+            `control`, `original__reversed`, `anm_blind`, or
             `hindsight_forward`.
         phase: The phase.
         smoke: Whether to truncate the day lists.
@@ -416,7 +420,13 @@ def main() -> int:
     )
     parser.add_argument("--skip-probes", action="store_true", help="Skip the two start-up checks.")
     arguments = parser.parse_args()
+    if arguments.skip_probes and not arguments.smoke:
+        parser.error("--skip-probes is allowed only with --smoke")
     root = claim_root(smoke=arguments.smoke)
+    check_stamp(
+        directory=estimates_dir(root=root),
+        stamp=fingerprint(root=root, modules=ESTIMATOR_MODULES),
+    )
     original = record_for(root=root, record_id=ORIGINAL)
     if not arguments.skip_probes:
         check_neighbour_ratio_matches_lag_frame(record=original)
@@ -444,7 +454,6 @@ def main() -> int:
             if name in names
             for file_id in (
                 f"{ORIGINAL}__reversed",
-                f"{CONTROL}__reversed",
                 "anm_blind",
                 "hindsight_forward",
             )

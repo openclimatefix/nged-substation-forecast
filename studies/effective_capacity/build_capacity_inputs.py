@@ -471,7 +471,6 @@ def main() -> int:
             "lag_frame_rows": frame.height,
             "days": len(record.dates),
             "sites": list(record.sites),
-            "valid_day_share": None,
         },
     )
     _LOG.info("wrote %s", target)

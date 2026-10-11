@@ -19,6 +19,8 @@ from studies.capacity_estimators import CapacityRecord, RawEstimate
 from studies.capacity_recovery import PlantedEvent, calendar_month_spans, plant_losses
 from studies.sources import study_dir_for
 
+import studies as studies_package
+
 STUDY_DIR: Final[Path] = study_dir_for(study="effective_capacity")
 """The study's folder under `data/studies/per_study/`."""
 
@@ -86,11 +88,6 @@ def draw_id(*, index: int) -> str:
     return f"draw{index:02d}"
 
 
-def record_ids() -> list[str]:
-    """Return every record identifier, original first."""
-    return [ORIGINAL, *(draw_id(index=i) for i in range(len(DRAW_SEEDS))), CONTROL]
-
-
 def claim_root(*, smoke: bool) -> Path:
     """Return the output root for a run and mark it as real or smoke.
 
@@ -134,6 +131,67 @@ def sha256_of(*, path: Path) -> str:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+ESTIMATOR_MODULES: Final[tuple[str, ...]] = (
+    "capacity_estimators",
+    "capacity_convex",
+    "capacity_physics_torch",
+    "capacity_recovery",
+)
+"""The package modules whose code decides what an estimate or an event draw is."""
+
+ALL_MODULES: Final[tuple[str, ...]] = (*ESTIMATOR_MODULES, "capacity_scaling")
+"""The modules whose code decides what a fitted arm is."""
+
+
+def fingerprint(*, root: Path, modules: tuple[str, ...]) -> str:
+    """Hash the built inputs and the code that turns them into results.
+
+    Args:
+        root: The output root, whose `built/record.npz` and `built/events.json` are hashed.
+        modules: Package module names under `studies` whose source is hashed, plus this folder's
+            `capacity_paths.py` and `capacity_scores.py`.
+
+    Returns:
+        A hexadecimal digest that changes if any input file or any source file changes.
+    """
+    package = Path(studies_package.__file__).parent
+    files = [
+        *(package / f"{name}.py" for name in modules),
+        Path(__file__),
+        Path(__file__).with_name("capacity_scores.py"),
+        inputs_dir(root=root) / "record.npz",
+        inputs_dir(root=root) / "events.json",
+    ]
+    digest = hashlib.sha256()
+    for path in files:
+        digest.update(path.name.encode() + sha256_of(path=path).encode())
+    return digest.hexdigest()
+
+
+def check_stamp(*, directory: Path, stamp: str) -> None:
+    """Create a directory's stamp file, or check that an existing one matches.
+
+    Args:
+        directory: A directory of results.
+        stamp: `fingerprint`'s result.
+
+    Raises:
+        RuntimeError: If the directory holds results made from other inputs or other code, so that
+            no stale estimate, setting, or checkpoint is reused. The caller moves the directory.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "STAMP.txt"
+    if path.exists():
+        if path.read_text().strip() != stamp:
+            msg = f"{directory} was made from other inputs or code; move it to superseded/"
+            raise RuntimeError(msg)
+    elif any(directory.iterdir()):
+        msg = f"{directory} holds results and no stamp; move it to superseded/"
+        raise RuntimeError(msg)
+    else:
+        path.write_text(stamp + "\n")
 
 
 def inputs_dir(*, root: Path) -> Path:
@@ -223,7 +281,7 @@ def write_json_atomic(*, path: Path, payload: object) -> None:
 
 
 class Events:
-    """Everything `build_capacity_inputs.py` decides about the events and the windows."""
+    """Everything `build_capacity_inputs.py` fixes about the events and the windows."""
 
     def __init__(self, *, payload: dict[str, Any]) -> None:
         """Parse the events file.
@@ -261,6 +319,7 @@ def load_events(*, root: Path) -> Events:
 
 
 TUNING_GRIDS: Final[dict[str, list[dict[str, float]]]] = {
+    "S0": [{}],
     "EM": [{}],
     "R30": [{}],
     "CSQ": [{}],

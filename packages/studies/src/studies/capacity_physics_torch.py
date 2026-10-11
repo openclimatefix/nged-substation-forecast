@@ -111,7 +111,6 @@ class _Windows:
             np.nan_to_num(shape).reshape(-1, days, 24), device=device, dtype=dtype
         )
         self.mask = torch.as_tensor(usable.reshape(-1, days, 24), device=device)
-        self.valid_days = valid.reshape(-1, days).sum(axis=1)
         self.valid = torch.as_tensor(valid.reshape(-1, days), device=device)
         self.dc_prior = torch.as_tensor(np.tile(dc_prior, self.records), device=device, dtype=dtype)
         self.ac_limit = torch.as_tensor(np.tile(ac_limit, self.records), device=device, dtype=dtype)
@@ -150,7 +149,8 @@ def _fit_window(
             (batch, `WEEKS`).
         params: `quantile`, `total_variation_weight`, `learning_rate`, and `samples`.
         steps: The number of Adam steps.
-        generator: The random generator for the reparameterisation noise.
+        generator: The random generator for the reparameterisation noise, drawn once per plant
+            and shared across records.
 
     Returns:
         The fitted means, the fitted raw standard deviations, and the valid days in each window.
@@ -167,9 +167,15 @@ def _fit_window(
     for _ in range(steps):
         optimiser.zero_grad()
         sd = F.softplus(raw_sd)
+        # Common random numbers: one draw per (sample, plant, week), shared by every record in the
+        # batch, so that two records with the same data get the same estimate and a difference
+        # between the original and a planted record is not Monte Carlo noise.
         noise = torch.randn(
-            (samples, *mean.shape), generator=generator, device=mean.device, dtype=mean.dtype
-        )
+            (samples, windows.plants, WEEKS),
+            generator=generator,
+            device=mean.device,
+            dtype=mean.dtype,
+        ).repeat(1, windows.records, 1)
         log_capacity = mean[None] + sd[None] * noise
         per_day = torch.exp(log_capacity)[:, :, week_of_day]
         predicted = soft_clip(power=dc[None] * per_day[..., None] * shape[None], limit=limit[None])

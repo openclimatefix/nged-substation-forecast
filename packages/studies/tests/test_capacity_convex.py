@@ -222,7 +222,7 @@ def test_a_program_that_is_not_optimal_raises_naming_the_plant_and_day(
 def test_an_estimator_that_is_not_convex_is_refused() -> None:
     record = synthetic_record(seed=6, days=30)
     with pytest.raises(ValueError, match="not a convex estimator"):
-        estimate_convex_plant(name="PR", record=record, plant=0, params={}, days=[10])  # type: ignore[arg-type]
+        estimate_convex_plant(name="PR", record=record, plant=0, params={}, days=[10])
 
 
 def test_calibrating_a_convex_level_by_its_reference_years_median_gives_the_static_power() -> None:

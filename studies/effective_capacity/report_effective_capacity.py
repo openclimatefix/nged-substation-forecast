@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any, Final
 
@@ -50,6 +51,9 @@ from studies.capacity_explain import (
 from studies.capacity_scaling import (
     MIN_ORACLE_GAIN_POINTS,
     SCORED_COLUMN,
+    SettingResult,
+    capped_daylight_share,
+    decision_verdict,
     multiplied_forecast_scores,
     recovery_share,
 )
@@ -176,9 +180,19 @@ def stage_a(*, root: Path, report: Report) -> dict[str, Any]:
     report.heading("Detection of steps", level=3)
     report.table(detected.sort("estimator"))
     report.heading("Selection", level=3)
-    report.text(f"- selected: {selection['selected']} (exploratory: {selection['exploratory']})")
+    report.text(f"- selected: {selection['selected']} (status: {selection['status']})")
     report.text(
-        f"- survivors of the {selection['false_movement_gate']:.0%} gate: {selection['survivors']}"
+        f"- no-skill reference S0 mean recovery error: {selection['s0_error']:.4f}; "
+        "every candidate "
+        "must beat it"
+    )
+    if selection["selected"] is None:
+        report.text("- **no estimator beat doing nothing; P1 is not run. This is the finding.**")
+    if selection["status"] == "ungated_pick":
+        report.text("- no candidate passed every gate: the pick is labelled an ungated pick")
+    report.text(
+        f"- survivors of the {selection['false_movement_gate']:.0%} false-movement gate, the "
+        f"{selection['fallback_share_gate']:.0%} fallback gate, and S0: {selection['survivors']}"
     )
     report.text(f"- shortlist: {selection['shortlist']}")
     report.text(f"- representatives (tuning draw): {selection['representatives']}")
@@ -270,8 +284,8 @@ def anm_dips(*, root: Path, selection: dict[str, Any], report: Report) -> None:
     shares = [
         {
             "month": m,
-            "capped_share_of_daylight_hours": float(
-                removed[months == m].sum() / daylight[months == m].sum()
+            "capped_share_of_daylight_hours": capped_daylight_share(
+                removed=removed[months == m], daylight=daylight[months == m]
             ),
         }
         for m in events.scored_months
@@ -281,7 +295,7 @@ def anm_dips(*, root: Path, selection: dict[str, Any], report: Report) -> None:
     capped_day = removed.any(axis=1)
     recent = np.convolve(capped_day.astype(float), np.ones(7), mode="full")[: len(capped_day)] > 0
     rows = []
-    for estimator in selection["shortlist"]:  # type: ignore[attr-defined]
+    for estimator in selection["shortlist"]:
         params = load_tuned(root=root, estimator=estimator)
         aware_scale = scale_for(root=root, estimator=estimator, params=params, file_id="original")
         blind_scale = scale_for(root=root, estimator=estimator, params=params, file_id="anm_blind")
@@ -312,7 +326,8 @@ def anm_dips(*, root: Path, selection: dict[str, Any], report: Report) -> None:
 def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  # noqa: PLR0915
     """Print Stage B."""
     selected = str(selection["selected"])
-    shortlist = [str(s) for s in selection["shortlist"]]  # type: ignore[attr-defined]
+    events = load_events(root=root)
+    shortlist = [str(s) for s in selection["shortlist"]]
     frame = pl.read_parquet(LAG_FRAME_PATH)
     ours = pl.read_parquet(root / "losses_stage_b.parquet")
     keep = ["arm", "site", "time", "seed", "month", "setting", SCORED_COLUMN]
@@ -353,23 +368,15 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
             f"[{result['boot_lower']:.3f}, {result['boot_upper']:.3f}]; month t-interval "
             f"[{result['t_lower']:.3f}, {result['t_upper']:.3f}]; threshold {threshold:.3f} points"
         )
-    worth = all(r["boot_upper"] < 0 and r["difference"] <= -t for r, t in decisions.values())
-    not_worth = all(r["boot_lower"] > -t for r, t in decisions.values())
     nc2_arm = f"nc2__{selected}"
     nc2_pair = pl.concat([b0["primary"], ours.filter(pl.col("arm") == nc2_arm).select(*keep)])
     nc2 = difference(losses=nc2_pair, treatment=nc2_arm, reference="B0")
     nc2_broken = nc2["boot_upper"] < 0
-    verdict = (
-        "unresolved"
-        if nc2_broken
-        else ("worth building" if worth else "not worth building" if not_worth else "unresolved")
-    )
     report.text(
         f"- NC2 (deranged months): {nc2['difference']:.3f} points, bootstrap "
         f"[{nc2['boot_lower']:.3f}, {nc2['boot_upper']:.3f}]; "
         f"interval wholly below zero: {nc2_broken}"
     )
-    report.text(f"- **decision rule verdict: {verdict}**")
     # Power benchmark and RS (no fits).
     # 2025-08 and 2025-09 have no ratio in the audit (the ANM plant is out of the neighbour set
     # there), so the alternative ratio, which uses every neighbour with data, fills them.
@@ -408,8 +415,25 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
     report.text(f"- oracle minus B0 on planted data: {bootstrap_text(result=oracle)}")
     report.text(f"- selected minus B0 on planted data: {bootstrap_text(result=chosen)}")
     report.text(f"- selected minus B0 on real data: {real:.3f} points")
-    passed = oracle["boot_upper"] < 0
+    passed = bool(oracle["boot_upper"] < 0)
     report.text(f"- the oracle's interval lies wholly below zero (instrument can detect): {passed}")
+    verdict = decision_verdict(
+        settings=[
+            SettingResult(r["difference"], r["boot_lower"], r["boot_upper"], t)
+            for r, t in decisions.values()
+        ],
+        nc2_upper=nc2["boot_upper"],
+        control_passed=passed,
+    )
+    label = " (ungated pick)" if selection["status"] == "ungated_pick" else ""
+    report.text(f"- **decision rule verdict{label}: {verdict}**")
+    counts = Counter(e.plant for e in events.control)
+    report.text(
+        "- control steps per plant: "
+        + ", ".join(f"{site} {counts.get(i, 0)}" for i, site in enumerate(record.sites))
+    )
+    anm_months = [event.first_day for event in events.control if event.plant == events.anm_plant]
+    report.text(f"- the ANM plant's control months: {len(anm_months)}")
     share = recovery_share(
         planted_gain=-chosen["difference"], real_gain=-real, oracle_gain=-oracle["difference"]
     )
@@ -520,7 +544,6 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
     )
     report.table(by_month)
     report.table(by_plant)
-    events = load_events(root=root)
     low_site = record.sites[events.low_plant]
     low = wide.filter((pl.col("site") == low_site) & pl.col("month").is_in(events.low_months))
     low_gap = float(np.mean((low[p1_arm] - low["B0"]).to_numpy())) * POINTS
@@ -613,10 +636,12 @@ def main() -> int:
         "# Effective capacity: report" + (" (SMOKE RUN, NOT A RESULT)" if arguments.smoke else "")
     )
     selection = stage_a(root=root, report=report)
+    no_pick = selection["selected"] is None
     fallbacks(root=root, report=report)
     audit_table(root=root, report=report)
     anm_dips(root=root, selection=selection, report=report)
-    stage_b(root=root, selection=selection, report=report)
+    if not no_pick:
+        stage_b(root=root, selection=selection, report=report)
     explainability(root=root, report=report)
     path.write_text("\n".join(report.lines) + "\n")
     _LOG.info("wrote %s", path)

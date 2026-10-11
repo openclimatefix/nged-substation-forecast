@@ -15,6 +15,7 @@ nothing, and the checks that the scoring and the refit reproduce the lag study's
 """
 
 from collections.abc import Mapping, Sequence
+from typing import NamedTuple
 
 import numpy as np
 import polars as pl
@@ -329,6 +330,89 @@ def recovery_share(*, planted_gain: float, real_gain: float, oracle_gain: float)
     if oracle_gain < MIN_ORACLE_GAIN_POINTS:
         return None
     return (planted_gain - real_gain) / oracle_gain
+
+
+class SettingResult(NamedTuple):
+    """P1's paired difference at one hyperparameter setting, with the threshold it is judged by."""
+
+    difference: float
+    lower: float
+    upper: float
+    threshold: float
+
+
+def decision_verdict(
+    *, settings: Sequence[SettingResult], nc2_upper: float, control_passed: bool
+) -> str:
+    """Apply the pre-registered forecast decision rule.
+
+    All numbers are in points of capacity, and a negative difference means P1 beats B0.
+
+    - **Worth building:** at every setting the interval lies wholly below zero and the difference
+      is at or below minus the threshold.
+    - **Not worth building:** at every setting the interval's lower bound lies above minus the
+      threshold.
+    - **Unresolved:** every other outcome, and whenever the negative control's interval lies wholly
+      below zero (the scoring is then broken).
+    - **A failed positive control** turns "not worth building" into "unresolved", because an
+      instrument that cannot detect a planted loss cannot show that there is no effect.
+
+    Args:
+        settings: P1 at the primary and the sensitivity setting.
+        nc2_upper: The upper bound of the negative control's interval against B0.
+        control_passed: Whether the positive control's oracle interval lay wholly below zero.
+
+    Returns:
+        `worth building`, `not worth building`, or `unresolved`.
+    """
+    if nc2_upper < 0:
+        return "unresolved"
+    worth = all(r.upper < 0 and r.difference <= -r.threshold for r in settings)
+    not_worth = all(r.lower > -r.threshold for r in settings)
+    if worth:
+        return "worth building"
+    if not_worth and control_passed:
+        return "not worth building"
+    return "unresolved"
+
+
+def capped_daylight_share(*, removed: np.ndarray, daylight: np.ndarray) -> float:
+    """Return the share of daylight hours that the export cap removed.
+
+    Args:
+        removed: A boolean array of the hours removed as export-capped.
+        daylight: A boolean array of the same shape, true in daylight hours.
+
+    Returns:
+        The removed daylight hours over the daylight hours, NaN if there is no daylight. Night
+        hours never count, so the share cannot exceed 1.
+    """
+    total = int(daylight.sum())
+    return float((removed & daylight).sum() / total) if total else float("nan")
+
+
+def assert_arm_covers_frame(
+    *, losses: pl.DataFrame, frame: pl.DataFrame, seeds: Sequence[int]
+) -> None:
+    """Raise unless an arm scored every frame row once per seed.
+
+    Args:
+        losses: The arm's per-row losses, with `site`, `time`, and `seed`.
+        frame: The lag frame the arm was fitted on.
+        seeds: The fitting seeds.
+
+    Raises:
+        ValueError: If the row count is not `frame.height * seeds` or the keys differ.
+    """
+    if losses.height != frame.height * len(seeds):
+        msg = f"the arm scored {losses.height} rows, not {frame.height} x {len(seeds)}"
+        raise ValueError(msg)
+    expected = frame.select("site", "time").join(pl.DataFrame({"seed": list(seeds)}), how="cross")
+    keys = ["site", "time", "seed"]
+    ours = losses.select(keys).with_columns(pl.col("seed").cast(pl.Int64)).sort(keys)
+    if not ours.equals(expected.with_columns(pl.col("seed").cast(pl.Int64)).sort(keys)):
+        msg = "the arm's (site, time, seed) keys differ from the frame's"
+        raise ValueError(msg)
 
 
 def oracle_scale(*, static_p99_mw: np.ndarray, factor: np.ndarray) -> np.ndarray:
