@@ -24,6 +24,8 @@ from studies.ifs_ladder import (
     partner_control_features,
     positive_control_features,
     production_features,
+    production_with_cloud_layers_features,
+    production_with_total_cloud_features,
     rung_features,
     rung_variables,
     with_partner_features,
@@ -67,6 +69,21 @@ def test_a_control_keeps_the_base_columns_and_adds_only_permuted_copies():
 def test_the_production_reference_is_the_minimal_set_and_the_four_production_variables():
     assert production_features() == (*rung_features(rung="f0"), *PRODUCTION_VARIABLES)
     assert len(production_features()) == len(rung_features(rung="f0")) + 4
+
+
+def test_the_production_cloud_arms_are_the_production_columns_plus_the_named_cloud_columns():
+    production = production_features()
+    total = production_with_total_cloud_features()
+    layers = production_with_cloud_layers_features()
+
+    assert total == (*production, "cloud_cover")
+    assert layers == (*total, "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high")
+    assert set(layers) - set(production) == set(RUNG_ADDITIONS["f1"]) | set(RUNG_ADDITIONS["f2"])
+    for columns in (total, layers):
+        assert len(set(columns)) == len(columns)
+        assert set(production) <= set(columns)
+    assert len(total) == len(production) + 1
+    assert len(layers) == len(production) + 4
 
 
 @pytest.mark.parametrize("dropped", RUNGS[1:])

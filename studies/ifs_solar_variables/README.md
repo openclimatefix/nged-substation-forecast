@@ -25,7 +25,7 @@ adds an era column, and cuts the folds inside each of the two eras that remain
 |---|---|
 | `ifs_ladder_arms.py` | The arms, targets, planned contrasts, lead days, and paths that every other script imports. `arm_features` is the one function that says which columns each arm is shown |
 | `ifs_ladder_build_dataset.py` | Takes the ERA5 study's rows, targets, and geometry, joins the IFS forecast at each lead day, and writes one frame per lead day, one frame for the blend rows, and `checks.md` (which also holds the direct-radiation separation-model check and the hours each blend condition removes). Run it with `uv run python studies/ifs_solar_variables/ifs_ladder_build_dataset.py`. `--ens-only` writes only `dataset_blend_ens.parquet`, the blend rows with the IFS ensemble mean's two columns added (post hoc), and appends its checks to `checks.md` |
-| `ifs_ladder_fit.py` | Fits every arm out of fold. `--lead-days`, `--arms`, `--view {ladder,blend,ens,extra_sensitivity}`, `--dry-run` (prints the jobs and exits before any fit), `--target`, `--sensitivity-arms`, `--max-workers`, `--device`, and `--ignore-load` choose what runs. It checkpoints every 4 arm-settings into a `losses_<...>.parts` directory and resumes from it. Each `.parts` directory carries a `stamp.txt` holding a hash of the dataset file's size and modification time, the arms' column lists, and the device. The script raises if the stamp differs, and then the directory must be moved. `--arms` raises on a name that is not an arm of the fit |
+| `ifs_ladder_fit.py` | Fits every arm out of fold. `--lead-days`, `--arms`, `--view {ladder,blend,ens,extra_sensitivity,fp_extra}`, `--dry-run` (prints the jobs and exits before any fit), `--target`, `--sensitivity-arms`, `--max-workers`, `--device`, and `--ignore-load` choose what runs. It checkpoints every 4 arm-settings into a `losses_<...>.parts` directory and resumes from it. Each `.parts` directory carries a `stamp.txt` holding a hash of the dataset file's size and modification time, the arms' column lists, and the device. The script raises if the stamp differs, and then the directory must be moved. `--arms` raises on a name that is not an arm of the fit |
 | `ifs_ladder_report.py` | Reads the saved losses and writes `report.md` and the interval tables. `--refit-needed` prints the post hoc fits that are missing and exits. It applies the decision rules in `studies.ifs_decisions`. `--width-preview-only` reads only the ERA5 losses and writes `width_preview.md`, so the width a planned interval would have is known before any IFS fit |
 | `ifs_ladder_days.py` | The rule that chooses the clearest, most variable, and dullest day, which the charts draw and the report names by month and year |
 | `ifs_ladder_charts.py` | Draws the page's 10 figures into `docs/studies/assets/`, and logs the figures whose inputs do not exist yet |
@@ -42,6 +42,9 @@ built. The tested machinery is `studies.ifs_lead_days`, `studies.ifs_ladder`,
   `studies.ifs_ladder.RUNG_ADDITIONS` is the one list.
 - **`fp`** is the production reference: `f0` plus the four variables the production ensemble feed
   carries.
+- **`fp_f1` and `fp_f2`** are `fp` plus total cloud cover, and `fp` plus total cloud cover and the
+  three cloud layers (post hoc, fitted by the `fp_extra` view at both settings, with `fp` refitted
+  at the second setting). They have no matched negative control.
 - **`fb` and `f6b`** are `f0` and `f6` plus AIFS Single's radiation and temperature, on the blend
   rows.
 - **`control_*`** are the negative controls. Each has the columns of the arm it pads, with the new
@@ -68,6 +71,7 @@ Everything is under `data/studies/per_study/ifs_solar_variables/`.
 | `inputs/checks.md` | Row counts per farm and lead day, missing-value shares, and the era and fold table |
 | `results/losses_<view>_lead_day_<L>_<target>.parquet` | One row per (arm, setting, farm, time, seed) with the losses. The prediction is the measured target plus `signed_error_capped_mw` |
 | `results/losses_ens_lead_day_<L>_pv.parquet`, `losses_ladder_extra_lead_day_<L>_pv.parquet` | The post hoc fits: the ensemble-mean arms at both settings, and the drop-one arms at the second setting only |
+| `results/losses_ladder_fp_extra_lead_day_<L>_pv.parquet` | The post hoc cloud arms `fp_f1` and `fp_f2` at both settings, and `fp` at the second setting |
 | `results/arms_<...>.json` | Each arm's columns, the settings it was fitted at, the device, and the row count |
 | `results/report.md` | The numbers the page quotes |
 | `results/leaderboard.parquet`, `contrasts.parquet`, `splits.parquet`, `farms.parquet`, `planned_verdicts.parquet`, `priority_list.parquet`, `decisions.parquet` | The tables the charts read |

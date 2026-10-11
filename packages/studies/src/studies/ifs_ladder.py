@@ -85,6 +85,21 @@ def production_features() -> tuple[str, ...]:
     return (*rung_features(rung="f0"), *PRODUCTION_VARIABLES)
 
 
+def production_with_total_cloud_features() -> tuple[str, ...]:
+    """Return the production reference's columns and total cloud cover (the columns of `f1`)."""
+    return (*production_features(), *RUNG_ADDITIONS["f1"])
+
+
+def production_with_cloud_layers_features() -> tuple[str, ...]:
+    """Return the production reference's columns, total cloud cover, and the three cloud layers.
+
+    The columns are those of `production_with_total_cloud_features` plus the columns of `f2`, so
+    the total-cloud arm is a strict subset of this arm and the step between them is the three
+    layers alone.
+    """
+    return (*production_with_total_cloud_features(), *RUNG_ADDITIONS["f2"])
+
+
 def with_partner_features(*, rung: RungType) -> tuple[str, ...]:
     """Return a rung's columns and the second forecast's radiation and temperature."""
     return (*rung_features(rung=rung), *PARTNER_COLUMNS)
