@@ -822,7 +822,8 @@ def false_movement_figure(*, report: ReportText, text: FigureText) -> alt.VConca
         tick_values=[0, 20, 40, 60, 80, 100],
     )
     title = (
-        "On months in which no plant's capacity changed, only HYST and the references stayed still"
+        "On plant-months whose output matched the neighbouring plants', "
+        "only HYST and the references stayed still"
     )
     subtitle = [
         (

@@ -16,6 +16,7 @@ for the smoke root).
 """
 
 import argparse
+import inspect
 import json
 import logging
 import sys
@@ -29,6 +30,7 @@ import polars as pl
 from build_capacity_inputs import ORIENTATION_END
 from capacity_paths import (
     DERATED_PLAN_PATH,
+    FALSE_MOVEMENTS_PER_PLANT,
     LAG_FOLLOWUPS2_LOSSES_PATH,
     LAG_FRAME_PATH,
     LAG_LOSSES_PATH,
@@ -64,6 +66,7 @@ from studies.capacity_recovery import (
     FOOTPRINT_AFTER_DAYS,
     FOOTPRINT_BEFORE_DAYS,
     expected_factor,
+    false_movement_windows,
 )
 from studies.capacity_scaling import (
     MIN_ORACLE_GAIN_POINTS,
@@ -1082,6 +1085,15 @@ def constants(*, report: Report) -> None:
         f"- planted events: footprint of {FOOTPRINT_BEFORE_DAYS} days before and "
         f"{FOOTPRINT_AFTER_DAYS} days after the planted month"
     )
+    bounds = inspect.signature(false_movement_windows).parameters
+    report.text(
+        f"- quiet plant-months for the false-movement check: output over the neighbouring "
+        f"plants' between {bounds['lower'].default} and {bounds['upper'].default}, at most "
+        f"{FALSE_MOVEMENTS_PER_PLANT} per plant"
+    )
+    report.text(
+        "- coverage is the share of planted days whose 90% interval covers the expected factor"
+    )
     report.text(
         f"- false movement: a day moves when its estimate is more than "
         f"{FALSE_MOVEMENT_THRESHOLD:.0%} from the median of the previous "
@@ -1110,6 +1122,15 @@ def design_facts(*, root: Path, report: Report) -> None:
         f"- planted events per draw: {min(per_draw)} to {max(per_draw)} (a step, a ramp, and an "
         f"intermittent loss at each plant, except that the plant with a commissioning ramp has "
         f"room for fewer); selection draws: {len(events.draws) - 1}; tuning draws: 1"
+    )
+    hit_shares = [
+        len(event.hit_days) / event.month_days
+        for draw in events.draws
+        for event in draw
+        if event.shape == "intermittent"
+    ]
+    report.text(
+        f"- an intermittent loss hits {np.mean(hit_shares):.0%} of its month's days on average"
     )
     sizes = np.array([event.size for draw in events.draws for event in draw])
     report.text(
