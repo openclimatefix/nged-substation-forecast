@@ -8,7 +8,7 @@ scores the result against the stored `xgboost_baseline` rows.
 
 Run from the repository root:
 
-    uv run python studies/quick_wins/fit_production_arm.py [--colsample-bytree 1.0]
+    uv run python studies/quick_wins/fit_production_arm.py [--colsample-bytree 1.0] [--device cuda]
 
 A finished output is never overwritten: the script skips what exists, so a crash costs one run.
 """
@@ -76,9 +76,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--colsample-bytree", type=float, default=0.8)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     args = parser.parse_args()
 
     arm = f"colsample{args.colsample_bytree}_seed{args.seed}"
+    if args.device != "cpu":
+        arm += f"_{args.device}"
     out_dir = _output_dir(arm=arm)
     model_dir = out_dir / "model"
     forecast_dir = out_dir / "forecasts"
@@ -93,6 +96,7 @@ def main() -> None:
             **inputs.production_config().model_dump(),
             "colsample_bytree": args.colsample_bytree,
             "random_seed": args.seed,
+            "device": args.device,
         }
     )
     power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()
