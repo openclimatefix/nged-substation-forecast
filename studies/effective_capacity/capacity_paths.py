@@ -138,7 +138,7 @@ def sha256_of(*, path: Path) -> str:
 
 def inputs_dir(*, root: Path) -> Path:
     """Return the directory of the built inputs."""
-    return root / "inputs"
+    return root / "built"
 
 
 def estimates_dir(*, root: Path) -> Path:

@@ -18,7 +18,7 @@ after the final-test start, if the static power differs from the lag frame's cap
 event cannot be placed, or if the power with the export-capped hours left in differs from the
 cleaned power at a plant with no export cap.
 
-**Outputs**, under `<output-root>/inputs/`: `record.npz`, `orientation.json`, `events.json`, and
+**Outputs**, under `<output-root>/built/`: `record.npz`, `orientation.json`, `events.json`, and
 `manifest.json`.
 
 Run it with `uv run python studies/effective_capacity/build_capacity_inputs.py` (add `--smoke` to

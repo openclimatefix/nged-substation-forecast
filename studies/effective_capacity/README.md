@@ -47,10 +47,10 @@ uv run python studies/effective_capacity/report_effective_capacity.py
 
 All under `data/studies/per_study/effective_capacity/`:
 
-- `inputs/record.npz`: the record (power, the power with export-capped hours left in, irradiance,
-  modelled unit output, static power). `inputs/orientation.json`: each plant's fitted tilt, azimuth,
-  and capacities. `inputs/events.json`: the draws, the control, the real low months, and the
-  false-movement windows. `inputs/manifest.json`: the lag frame's SHA-256.
+- `built/record.npz`: the record (power, the power with export-capped hours left in, irradiance,
+  modelled unit output, static power). `built/orientation.json`: each plant's fitted tilt, azimuth,
+  and capacities. `built/events.json`: the draws, the control, the real low months, and the
+  false-movement windows. `built/manifest.json`: the lag frame's SHA-256.
 - `estimates/<estimator>/<setting>/<record>.npz`: raw daily levels (and standard deviations) of each
   estimator on each record. A linear program estimates only the days a scoring needs; other days
   are NaN.
