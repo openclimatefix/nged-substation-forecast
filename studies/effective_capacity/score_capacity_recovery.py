@@ -52,7 +52,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG: Final[logging.Logger] = logging.getLogger("score_capacity_recovery")
 
 SATELLITE_SENSITIVITY: Final[tuple[str, ...]] = ("PR", "KF", "CX2")
-"""The estimators that read satellite irradiance, whose metric is recomputed with the read lag at 3."""
+"""The estimators that read satellite irradiance, whose metric is recomputed at read lag 3."""
 
 SATELLITE_SENSITIVITY_LAG_DAYS: Final[int] = 3
 
@@ -81,7 +81,11 @@ def draw_scores(
     """
     events = load_events(root=root).draws[index]
     planted = scale_for(
-        root=root, estimator=estimator, params=params, file_id=draw_id(index=index), tuning=tuning,
+        root=root,
+        estimator=estimator,
+        params=params,
+        file_id=draw_id(index=index),
+        tuning=tuning,
         lag_days=lag_days,
     )
     original = scale_for(
@@ -165,7 +169,11 @@ def select(*, root: Path) -> None:
             sensitivity = [
                 draw_primary_metric(
                     scores=draw_scores(
-                        root=root, estimator=estimator, params=params, index=i, tuning=False,
+                        root=root,
+                        estimator=estimator,
+                        params=params,
+                        index=i,
+                        tuning=False,
                         lag_days=SATELLITE_SENSITIVITY_LAG_DAYS,
                     )
                 )
@@ -183,7 +191,12 @@ def select(*, root: Path) -> None:
     pl.concat(event_tables).write_parquet(tables_dir / "stage_a_events.parquet")
     pl.DataFrame(summary_rows).write_parquet(tables_dir / "stage_a_summary.parquet")
     write_selection(path=outputs[0], selection=selection, inputs=inputs)
-    _LOG.info("selected %s (exploratory=%s); shortlist %s", selection.selected, selection.exploratory, selection.shortlist)
+    _LOG.info(
+        "selected %s (exploratory=%s); shortlist %s",
+        selection.selected,
+        selection.exploratory,
+        selection.shortlist,
+    )
 
 
 def main() -> int:
@@ -191,7 +204,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--phase", choices=("tuning", "selection"), required=True)
     parser.add_argument(
-        "--estimators", nargs="+", default=[e for e in ESTIMATOR_FAMILY if e != "DP1"],
+        "--estimators",
+        nargs="+",
+        default=[e for e in ESTIMATOR_FAMILY if e != "DP1"],
         help="The estimators to tune (tuning phase only).",
     )
     parser.add_argument("--smoke", action="store_true", help="Read and write under _smoke/.")

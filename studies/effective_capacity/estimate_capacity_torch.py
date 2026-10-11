@@ -1,10 +1,10 @@
 """Run DP1, the variational physics estimator, on every record and both of its settings.
 
 Part of the study in <https://github.com/openclimatefix/nged-substation-forecast/issues/1143>.
-`studies.capacity_physics_torch` holds the model. Every plant and every record fits in one batch, and
-each refit warm-starts from the one before it, so a full run is a few minutes on a GPU. The records
-are the original, the 11 draws, the positive control, the ANM-blind original, and the time-reversed
-original and control (for the hindsight reference).
+`studies.capacity_physics_torch` holds the model. Every plant and every record fits in one batch,
+and each refit warm-starts from the one before it, so a full run is a few minutes on a GPU. The
+records are the original, the 11 draws, the positive control, the ANM-blind original, and the
+time-reversed original and control (for the hindsight reference).
 
 Each setting's estimates are saved as `estimates/DP1/<setting>/<record>.npz`, and a setting whose
 files all exist is skipped. `--smoke` runs every record with 20 and 5 steps on
@@ -51,7 +51,14 @@ def main() -> int:
     root = claim_root(smoke=arguments.smoke)
     events = load_events(root=root)
     draws = [draw_id(index=i) for i in range(len(events.draws))]
-    file_ids = [ORIGINAL, *draws, CONTROL, "anm_blind", f"{ORIGINAL}__reversed", f"{CONTROL}__reversed"]
+    file_ids = [
+        ORIGINAL,
+        *draws,
+        CONTROL,
+        "anm_blind",
+        f"{ORIGINAL}__reversed",
+        f"{CONTROL}__reversed",
+    ]
     orientation = json.loads((inputs_dir(root=root) / "orientation.json").read_text())
     original = record_for(root=root, record_id=ORIGINAL)
     static = original.static_p99_mw

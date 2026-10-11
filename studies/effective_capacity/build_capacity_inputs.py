@@ -1,21 +1,22 @@
 """Build the record, the planted-loss draws, and the windows the effective-capacity study uses.
 
 Part of the study in <https://github.com/openclimatefix/nged-substation-forecast/issues/1143>. The
-question is whether a time-varying capacity estimate beats one fixed number per plant when forecasting
-solar power, and which estimation technique is most promising. `docs/studies/forecasts/effective-capacity.md`
-holds the design and the results.
+question is whether a time-varying capacity estimate beats one fixed number per plant when
+forecasting solar power, and which estimation technique is most promising.
+`docs/studies/forecasts/effective-capacity.md` holds the design and the results.
 
 **The record.** For each of the 6 plants, a day-by-hour grid from 2019-09-01 to 2026-06-30 of the
-cleaned hourly power (multi-day zero runs, meter spikes, the commissioning ramp, and the export-capped
-hours removed, as the lag study cleans it), the clear-sky irradiance, the CAMS satellite irradiance,
-and the unit-capacity output that a physics model gives for each. Each plant's tilt and azimuth are
-fitted once with `studies.pv_fit.fit_plant` on data before 2024-12-01 (for the ANM plant, the 2 months
-after its commissioning ramp ends). A day is labelled by the date of its hours' midpoints.
+cleaned hourly power (multi-day zero runs, meter spikes, the commissioning ramp, and the
+export-capped hours removed, as the lag study cleans it), the clear-sky irradiance, the CAMS
+satellite irradiance, and the unit-capacity output that a physics model gives for each. Each plant's
+tilt and azimuth are fitted once with `studies.pv_fit.fit_plant` on data before 2024-12-01 (for the
+ANM plant, the 2 months after its commissioning ramp ends). A day is labelled by the date of its
+hours' midpoints.
 
 **The checks.** The build raises if the lag frame does not hold 29,445 rows, if any input is at or
 after the final-test start, if the static power differs from the lag frame's capacity column, if an
-event cannot be placed, or if the power with the export-capped hours left in differs from the cleaned
-power at a plant with no export cap.
+event cannot be placed, or if the power with the export-capped hours left in differs from the
+cleaned power at a plant with no export cap.
 
 **Outputs**, under `<output-root>/inputs/`: `record.npz`, `orientation.json`, `events.json`, and
 `manifest.json`.
@@ -29,8 +30,7 @@ import json
 import logging
 import sys
 from datetime import UTC, date, datetime, time, timedelta
-from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -261,12 +261,12 @@ def build_record() -> tuple[CapacityRecord, np.ndarray, dict[str, dict[str, floa
     last_day = final_test_cutoff().date() - timedelta(days=1)
     days = (last_day - FIRST_DAY).days + 1
     grid = hourly_grid_ends(days=days)
-    if grid.max() >= final_test_cutoff():
+    if grid.to_list()[-1] >= final_test_cutoff():
         msg = "the hour grid reaches the final-test start"
         raise ValueError(msg)
     aware = cleaned_power(aware=True)
     blind = cleaned_power(aware=False)
-    clear = hourly_clear_sky(sites=sites, first=grid.min(), last=grid.max())
+    clear = hourly_clear_sky(sites=sites, first=grid.to_list()[0], last=grid.to_list()[-1])
     cams = read_cams(min_reliability=MIN_CAMS_RELIABILITY).filter(
         pl.col("time") < final_test_cutoff()
     )
@@ -368,19 +368,22 @@ def check_against_lag_frame(*, record: CapacityRecord) -> pl.DataFrame:
     if frame.height != LAG_FRAME_ROWS:
         msg = f"the lag frame holds {frame.height} rows, not {LAG_FRAME_ROWS}"
         raise ValueError(msg)
-    if frame["time"].max() >= final_test_cutoff():
+    if frame.select(pl.col("time").max()).item() >= final_test_cutoff():
         msg = "the lag frame reaches the final-test start"
         raise ValueError(msg)
     capacity = frame.group_by("site").agg(capacity=pl.col("effective_capacity_mw").first())
     for site, expected in capacity.iter_rows():
         index = record.sites.index(site)
         if abs(record.static_p99_mw[index] - float(expected)) > 1e-6:
-            msg = f"plant {site}'s static power {record.static_p99_mw[index]} differs from the frame's {expected}"
+            msg = (
+                f"plant {site}'s static power {record.static_p99_mw[index]} "
+                f"differs from the frame's {expected}"
+            )
             raise ValueError(msg)
     return frame
 
 
-def build_events(*, record: CapacityRecord, frame: pl.DataFrame) -> dict[str, object]:
+def build_events(*, record: CapacityRecord, frame: pl.DataFrame) -> dict[str, Any]:
     """Draw the events, the control, and the false-movement windows.
 
     Args:

@@ -6,7 +6,6 @@ from typing import Final
 import numpy as np
 import polars as pl
 import pytest
-from studies import capacity_scaling
 from studies.capacity_scaling import (
     SCORED_COLUMN,
     assert_constant_scale_reproduces_baseline,
@@ -26,6 +25,8 @@ from studies.cross_validation import (
     fit_one_fold,
     out_of_fold_losses,
 )
+
+from studies import capacity_scaling
 
 FAST: Final[HyperParameters] = {
     "max_depth": 3,
@@ -165,7 +166,8 @@ def test_the_scaled_loss_columns_are_dropped_and_the_fraction_columns_kept() -> 
     )
     kept = drop_scaled_loss_columns(losses=losses)
     assert SCORED_COLUMN in kept.columns
-    assert "absolute_error_mw" not in kept.columns and "crps_capped_mw" not in kept.columns
+    assert "absolute_error_mw" not in kept.columns
+    assert "crps_capped_mw" not in kept.columns
 
 
 def test_the_constant_scale_check_passes_when_scoring_is_right_and_raises_when_it_is_not(

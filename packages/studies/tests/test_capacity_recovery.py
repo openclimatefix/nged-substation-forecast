@@ -8,7 +8,6 @@ from typing import Final
 import numpy as np
 import polars as pl
 import pytest
-from studies import capacity_recovery
 from studies.capacity_estimators import (
     FALLBACK_NONE,
     REFERENCE_END,
@@ -22,6 +21,7 @@ from studies.capacity_recovery import (
     FALSE_MOVEMENT_GATE,
     FOOTPRINT_AFTER_DAYS,
     FOOTPRINT_BEFORE_DAYS,
+    EventShapeType,
     PlantedEvent,
     SelectionInputs,
     calendar_month_spans,
@@ -45,6 +45,8 @@ from studies.capacity_recovery import (
     write_selection,
 )
 
+from studies import capacity_recovery
+
 DAYS: Final[int] = 2500
 
 
@@ -56,13 +58,13 @@ def long_record() -> CapacityRecord:
 
 def _event(
     *,
-    shape: str = "step",
+    shape: EventShapeType = "step",
     size: float = 0.2,
     first: int = 100,
     length: int = 30,
     hit: tuple[int, ...] = (),
 ) -> PlantedEvent:
-    return PlantedEvent(0, shape, size, first, length, hit)  # type: ignore[arg-type]
+    return PlantedEvent(0, shape, size, first, length, hit)
 
 
 def test_a_step_a_ramp_and_an_intermittent_loss_have_their_own_daily_factor() -> None:
@@ -169,7 +171,8 @@ def test_control_steps_use_distinct_months_and_avoid_each_plants_barred_months(
             seed=seed,
         )
         firsts = [e.first_day for e in events]
-        assert len(events) == 6 and len(set(firsts)) == 6
+        assert len(events) == 6
+        assert len(set(firsts)) == 6
         assert all(e.size == 0.3 and e.shape == "step" for e in events)
         own = {first for first, _ in (spans[m] for m in barred[0])}
         assert not own & {e.first_day for e in events if e.plant == 0}
@@ -196,9 +199,7 @@ def _scale(
     return IssueScale(original, rsd, reason), IssueScale(planted, rsd, reason)
 
 
-def test_the_primary_metric_is_the_mean_gap_to_the_expected_factor_over_the_month_and_60_days_after() -> (
-    None
-):
+def test_the_primary_metric_is_the_mean_gap_to_the_expected_factor_over_the_scored_days() -> None:
     event = _event(size=0.2, first=100, length=30)
     _, perfect = _scale(ratio=event_factor(event=event, days=DAYS)[:200])
     original, _ = _scale(ratio=np.ones(1))
@@ -338,14 +339,16 @@ def test_the_gate_comes_first_and_the_selected_estimator_is_the_lowest_surviving
     movement["CX2"] = FALSE_MOVEMENT_GATE + 1e-6
     movement["NR"] = FALSE_MOVEMENT_GATE
     selection = choose_estimators(inputs=_inputs(errors=errors, movement=movement))
-    assert "DP1" not in selection.survivors and "CX2" not in selection.survivors
+    assert "DP1" not in selection.survivors
+    assert "CX2" not in selection.survivors
     assert "NR" in selection.survivors
     assert selection.selected == "CX1"
     assert not selection.exploratory
     assert set(selection.shortlist) == {"NR", "HM", "CX1"}
     assert selection.representatives == {"cheap_and_wacky": "NR", "convex": "CX1"}
     assert [c.name for c in selection.contrasts] == ["E1"]
-    assert selection.missing and selection.missing[0].startswith("E2")
+    assert selection.missing
+    assert selection.missing[0].startswith("E2")
 
 
 def test_representatives_are_chosen_on_the_tuning_draw_and_contrasts_use_the_selection_draws() -> (
@@ -417,9 +420,7 @@ def test_choosing_among_no_estimators_is_refused() -> None:
         choose_estimators(inputs=SelectionInputs({}, {}, {}))
 
 
-def test_relative_capacity_error_is_zero_for_a_perfect_ratio_and_independent_of_the_fallback_flag() -> (
-    None
-):
+def test_relative_capacity_error_is_zero_for_a_perfect_ratio() -> None:
     event = _event(shape="ramp", size=0.3)
     ratio = event_factor(event=event, days=DAYS)[100:190]
     assert relative_capacity_error(event=event, ratio=ratio, days=DAYS) == pytest.approx(0.0)

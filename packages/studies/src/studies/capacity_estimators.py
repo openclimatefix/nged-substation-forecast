@@ -6,9 +6,11 @@ dividing by one fixed number per plant. `studies/effective_capacity/` runs it an
 
 **Every estimator here is causal: its estimate for day `d` reads only whole days up to and including
 `d`, apart from one constant per plant.** That constant is the median of the estimator's level over
-the reference year (`REFERENCE_START` to `REFERENCE_END`), which rescales the estimator to the static
-power. A day inside or before the reference year therefore sees a constant that read later days. The
-scored rows all fall after the reference year, where the constant reads only the past. The record is a day-by-hour grid per plant. A day is labelled by the date of its hours'
+the reference year (`REFERENCE_START` to `REFERENCE_END`), which rescales the estimator to the
+static power. A day inside or before the reference year therefore sees a constant that read later
+days. The scored rows all fall after the reference year, where the constant reads only the past.
+
+**The record is a day-by-hour grid per plant.** A day is labelled by the date of its hours'
 midpoints, so a power reading stamped `2025-03-02 00:00` (the hour ending at midnight) belongs to
 2025-03-01. A forecast issued at 09:00 UTC on day `T - 1` can read whole days up to `T - 2`, so
 **the capacity used for target day `T` is the estimate for day `T - 2`** (`ISSUE_LAG_DAYS`), held
@@ -18,10 +20,9 @@ static 99th-percentile power, and the floor, and the forecast-row join reads its
 **The hindsight reference reads both sides of a target week and never the week itself.**
 `hindsight_reference_estimates` combines the forward estimate from whole days up to the day before
 the week with the same estimator run on the time-reversed record from the day after the week.
-
 **This module holds the record, the six estimators that are neither linear programs nor neural
-networks (R30, CSQ, NR, PR, KF, and HM), the issue-time driver, and the hindsight driver.** The linear
-programs are in `studies.capacity_convex`, the neural network is in
+networks (R30, CSQ, NR, PR, KF, and HM), the issue-time driver, and the hindsight driver.** The
+linear programs are in `studies.capacity_convex`, the neural network is in
 `studies.capacity_physics_torch`, and the planted losses, the metrics, and the selection rule are in
 `studies.capacity_recovery`.
 """
@@ -56,10 +57,10 @@ REFERENCE_END: Final[date] = date(2024, 12, 1)
 """The day after the reference year, which is also the first day of the lag study's scored rows."""
 
 REFERENCE_STRIDE_DAYS: Final[int] = 7
-"""The reference year's median is taken over every seventh day, so slow estimators stay affordable."""
+"""The reference year's median is taken over every seventh day, to keep slow estimators cheap."""
 
 MIN_SHAPE_SUM: Final[float] = 0.2
-"""A day's ratio of power to modelled power needs at least this many full-capacity hours modelled."""
+"""A day's ratio of power to modelled power needs this many full-capacity hours modelled."""
 
 LOW_SUN_CLEAR_SKY_W_M2: Final[float] = 50.0
 """Hours with less clear-sky irradiance than this are left out of ratios, where they are noise."""
@@ -70,7 +71,7 @@ FamilyType = Literal["cheap", "wacky", "convex", "pytorch"]
 EstimatorNameType = Literal["R30", "CSQ", "NR", "PR", "KF", "HM", "CX1", "CX2", "DP1"]
 """The nine estimators."""
 
-ESTIMATOR_FAMILY: Final[Mapping[EstimatorNameType, FamilyType]] = {
+ESTIMATOR_FAMILY: Final[Mapping[str, FamilyType]] = {
     "R30": "cheap",
     "CSQ": "cheap",
     "NR": "cheap",
@@ -83,9 +84,7 @@ ESTIMATOR_FAMILY: Final[Mapping[EstimatorNameType, FamilyType]] = {
 }
 """Each estimator's family."""
 
-CALIBRATED_ESTIMATORS: Final[frozenset[EstimatorNameType]] = frozenset(
-    {"CSQ", "PR", "KF", "CX1", "CX2", "DP1"}
-)
+CALIBRATED_ESTIMATORS: Final[frozenset[str]] = frozenset({"CSQ", "PR", "KF", "CX1", "CX2", "DP1"})
 """Estimators whose raw level has arbitrary units, rescaled so that the reference year's median
 level equals the plant's static power. R30 is already in megawatts, NR is multiplied by the static
 power, and HM returns a share of the reference year's level that is also multiplied by it."""
@@ -139,8 +138,8 @@ class CapacityRecord:
             msg = f"static_p99_mw has shape {self.static_p99_mw.shape}, not ({len(self.sites)},)"
             raise ValueError(msg)
 
-    def reversed(self) -> "CapacityRecord":
-        """Return the record with its days in reverse order, for the hindsight reference's backward pass.
+    def reversed(self) -> CapacityRecord:
+        """Return the record with its days in reverse order, for the hindsight reference.
 
         Returns:
             The reversed record. Dates run backwards, so they are no longer a calendar.
@@ -155,7 +154,7 @@ class CapacityRecord:
             clear_shape=self.clear_shape[:, ::-1].copy(),
         )
 
-    def with_power(self, *, power_mw: np.ndarray) -> "CapacityRecord":
+    def with_power(self, *, power_mw: np.ndarray) -> CapacityRecord:
         """Return the record with other measured power.
 
         Args:
@@ -592,7 +591,8 @@ def run_cheap_estimator(
         function(record=record, plant=plant, params=settings) for plant in range(len(record.sites))
     ]
     level = np.stack([part.level for part in parts])
-    sd = np.stack([part.sd for part in parts]) if parts[0].sd is not None else None
+    sds = [part.sd for part in parts if part.sd is not None]
+    sd = np.stack(sds) if len(sds) == len(parts) else None
     return RawEstimate(level=level, sd=sd)
 
 

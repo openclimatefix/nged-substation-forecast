@@ -301,7 +301,7 @@ def test_a_row_reads_the_scale_of_the_day_its_hour_midpoint_falls_in() -> None:
     rows = pl.DataFrame(
         {
             "site": ["B", "A", "A"],
-            # The hour ending at 00:00 belongs to the day before; the hour ending at 01:00 to the day.
+            # The hour ending at 00:00 belongs to the day before; one ending at 01:00 to the day.
             "time": [
                 midnight.replace(day=start.day + 2),
                 midnight.replace(day=start.day + 2),

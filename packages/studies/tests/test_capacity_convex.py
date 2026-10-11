@@ -1,13 +1,11 @@
 """Tests of the linear-program capacity estimators CX1 and CX2."""
 
 import itertools
-from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Final
 
 import numpy as np
 import pytest
-from studies import capacity_convex
 from studies.capacity_convex import (
     CONVEX_DEFAULT_PARAMS,
     MIN_POINTS,
@@ -29,6 +27,8 @@ from studies.capacity_estimators import (
     synthetic_record,
     valid_days,
 )
+
+from studies import capacity_convex
 
 DAYS: Final[int] = 680
 LOSS: Final[slice] = slice(400, 460)

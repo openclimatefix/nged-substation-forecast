@@ -1,14 +1,14 @@
 """Estimate a plant's capacity with linear programs, for the study in issue #1143.
 
 **Each estimate is one linear program over the latest 60 days, solved by `scipy.optimize.linprog`
-(HiGHS).** The program fits a daily direct-current capacity trace to the plant's hourly power, with a
-fused-lasso penalty on the day-to-day change so that the trace is piecewise constant, and the
+(HiGHS).** The program fits a daily direct-current capacity trace to the plant's hourly power, with
+a fused-lasso penalty on the day-to-day change so that the trace is piecewise constant, and the
 estimate for day `d` is the trace's value on day `d`. A program reads days up to `d` only, so the
 estimate is causal.
 
 **CX1 fits one trace to the clear-sky envelope.** Power is the trace times the plant's modelled
-output under a clear sky, and a pinball loss at a high quantile makes the trace the upper envelope of
-the ratio, so that cloudy hours fall below it.
+output under a clear sky, and a pinball loss at a high quantile makes the trace the upper envelope
+of the ratio, so that cloudy hours fall below it.
 
 **CX2 fits a direct-current and an alternating-current trace to satellite-driven output.** It
 follows the roadmap's Candidate A with two departures: the alternating-current fit uses absolute
@@ -31,7 +31,6 @@ from scipy.optimize import linprog
 
 from studies.capacity_estimators import (
     CapacityRecord,
-    EstimatorNameType,
     PlantEstimate,
     RawEstimate,
     valid_days,
@@ -41,7 +40,8 @@ WINDOW_DAYS: Final[int] = 60
 """How many days, ending at the estimate's day, one program reads."""
 
 MIN_UNIT_OUTPUT: Final[float] = 0.15
-"""Hours whose modelled output per megawatt of direct-current capacity is below this are left out."""
+"""Hours whose modelled output per megawatt of direct-current capacity is below this are left
+out."""
 
 MIN_DAYS_WITH_POINTS: Final[int] = 15
 """A program needs this many days that each hold at least one usable hour."""
@@ -151,7 +151,10 @@ def _solve(
         method="highs",
     )
     if result.status != 0:
-        msg = f"the linear program for plant {plant} ending on day index {end_day} was not solved to optimality: {result.message}"
+        msg = (
+            f"the linear program for plant {plant} ending on day index {end_day} was not solved "
+            f"to optimality: {result.message}"
+        )
         raise RuntimeError(msg)
     return result.x
 
@@ -201,8 +204,9 @@ def cx1_trace(
     """Solve CX1's program and return the daily trace.
 
     Variables: the trace `c` (one per day), the positive and negative residuals of each point, and
-    the absolute day-to-day changes. Minimise the pinball loss at `quantile` of `power - unit_output
-    * c` plus `fused_weight` times the sum of the changes.
+    the absolute day-to-day changes. The objective is the pinball loss at `quantile` of each
+    point's power minus its unit output times the trace, plus `fused_weight` times the sum of the
+    changes.
 
     Args:
         points: The window's usable hours.
@@ -428,7 +432,7 @@ def cx2_objective(
 
 def estimate_convex_plant(
     *,
-    name: EstimatorNameType,
+    name: str,
     record: CapacityRecord,
     plant: int,
     params: Mapping[str, float],
@@ -485,7 +489,7 @@ def estimate_convex_plant(
 
 def run_convex_estimator(
     *,
-    name: EstimatorNameType,
+    name: str,
     record: CapacityRecord,
     params: Mapping[str, float] | None,
     days_by_plant: Sequence[Sequence[int] | np.ndarray],

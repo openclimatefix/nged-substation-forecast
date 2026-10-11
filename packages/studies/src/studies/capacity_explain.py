@@ -24,7 +24,7 @@ CRITERIA: Final[tuple[tuple[str, str], ...]] = (
     ("physical_units", "The estimator's fitted quantities are physical quantities with units"),
     (
         "attributable",
-        "A change can be attributed to a cause: soiling, a lost string, curtailment, or a weather-forecast bias",
+        "A change can be attributed to a cause: soiling, a lost string, curtailment, or bias",
     ),
     ("spread", "The estimator returns a spread, not only a value"),
     (
@@ -104,13 +104,19 @@ RUBRIC: Final[Mapping[str, Mapping[str, GradeType]]] = {
 RUBRIC_REASONS: Final[Mapping[str, str]] = {
     "R30": "reports the 30-day 99th percentile of output; no model of the cause",
     "CSQ": "reports a quantile of output per unit of clear-sky irradiance; no model of the cause",
-    "NR": "removes shared weather by comparing with the other plants, so it can say the loss is not the weather",
-    "PR": "divides out the satellite irradiance, so it can say the loss is not the weather as the satellite saw it",
+    "NR": "removes shared weather by comparing with the other plants, so a loss is not the weather",
+    "PR": "divides out the satellite irradiance, so a loss is not the weather the satellite saw",
     "KF": "an availability factor with a standard deviation; a random walk cannot separate causes",
-    "HM": "capacity is a share of whole units (strings or inverters), so a fall reads as units lost",
+    "HM": "capacity is a share of whole units (strings or inverters); a fall reads as units lost",
     "CX1": "the fused lasso gives a changepoint with a date and a size; one trace mixes causes",
-    "CX2": "separate direct-current and alternating-current traces tell a lost string from a lost inverter, and the hinge handles curtailment",
-    "DP1": "tilt, azimuth, and both capacities are physical, with a posterior; a curtailment is handled by the loss, not named",
+    "CX2": (
+        "separate direct-current and alternating-current traces tell a lost string from a lost"
+        " inverter, and the hinge handles curtailment"
+    ),
+    "DP1": (
+        "tilt, azimuth, and both capacities are physical, with a posterior; curtailment is"
+        " handled by the loss, not named"
+    ),
 }
 """One line per estimator on why it earned its grades."""
 
@@ -159,11 +165,12 @@ def fitted_physical_quantities(
         static power, a dimensionless number.
     """
     factor = scale_mw / static_p99_mw
+    ratio = orientation["dc_capacity_mw"] / orientation["ac_capacity_mw"]
     spread = "" if relative_sd is None else f" +/- {100 * relative_sd * factor:.1f} points"
     return {
         "tilt": f"{orientation['tilt_deg']:.1f} degrees",
         "azimuth": f"{orientation['azimuth_deg']:.1f} degrees clockwise from north",
-        "dc_to_ac_ratio": f"{orientation['dc_capacity_mw'] / orientation['ac_capacity_mw']:.2f} (MW per MW)",
+        "dc_to_ac_ratio": f"{ratio:.2f} (MW per MW)",
         "availability_factor": f"{100 * factor:.1f}% of the static 99th-percentile power{spread}",
         "capacity": f"{scale_mw:.2f} MW",
     }
@@ -203,7 +210,10 @@ def explanation_sentence(
         "KF": "the filtered ratio of its daily energy to the physics model's output",
         "HM": "the capacity level, as a share of whole units, that best fits its daily energy",
         "CX1": "a fused-lasso trace fitted to its output against the clear-sky envelope",
-        "CX2": "a fused-lasso direct-current trace fitted to its output against the satellite-driven physics model",
+        "CX2": (
+            "a fused-lasso direct-current trace fitted to its output against the satellite-driven"
+            " physics model"
+        ),
         "DP1": "a weekly direct-current capacity fitted through the physics model",
     }[estimator]
     spread = "" if relative_sd is None else f" (standard deviation {100 * relative_sd:.1f}%)"

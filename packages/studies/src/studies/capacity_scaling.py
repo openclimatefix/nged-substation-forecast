@@ -20,8 +20,8 @@ import numpy as np
 import polars as pl
 
 from studies.cross_validation import (
-    HyperParameters,
     DeviceType,
+    HyperParameters,
     out_of_fold_losses,
 )
 
@@ -264,7 +264,13 @@ def assert_constant_scale_reproduces_baseline(
     )
     worst = 0.0
     for column in ("absolute_error_fraction_of_capacity", SCORED_COLUMN):
-        difference = abs(float(plain[column].mean()) - float(divided[column].mean())) * 100.0
+        difference = (
+            abs(
+                float(np.mean(plain[column].to_numpy()))
+                - float(np.mean(divided[column].to_numpy()))
+            )
+            * 100.0
+        )
         worst = max(worst, difference)
         if difference > tolerance_points:
             msg = (
@@ -290,10 +296,15 @@ def assert_refit_reproduces(*, refit: pl.DataFrame, published: pl.DataFrame) -> 
     ours = refit.select(*keys, SCORED_COLUMN).sort(keys)
     theirs = published.select(*keys, SCORED_COLUMN).sort(keys)
     if ours.height != theirs.height or not ours.select(keys).equals(theirs.select(keys)):
-        msg = f"the refit scores {ours.height} rows and the published run {theirs.height}, or their keys differ"
+        msg = (
+            f"the refit scores {ours.height} rows and the published run {theirs.height}, "
+            "or their keys differ"
+        )
         raise ValueError(msg)
     if not ours[SCORED_COLUMN].equals(theirs[SCORED_COLUMN]):
-        worst = float((ours[SCORED_COLUMN] - theirs[SCORED_COLUMN]).abs().max())
+        worst = float(
+            np.max(np.abs(ours[SCORED_COLUMN].to_numpy() - theirs[SCORED_COLUMN].to_numpy()))
+        )
         msg = f"the refit differs from the published run (largest difference {worst:.3e})"
         raise ValueError(msg)
 

@@ -15,8 +15,9 @@ the estimate for day `d` reads days up to `d` only. Scoring them is `score_capac
   the ANM-blind original record, for the hindsight reference and the ANM dips.
 
 **Checks that raise** before the first estimate: a recomputed NR that differs from the lag frame's
-`rp_7d`; an estimator whose scale for a target day changes when every input from its issue day onward
-is replaced by noise (a causal probe); and, inside a linear program, a status other than optimal.
+`rp_7d`; an estimator whose scale for a target day changes when every input from its issue day
+onward is replaced by noise (a causal probe); and, inside a linear program, a status other than
+optimal.
 
 `--smoke` truncates each plant's day list to 12 days and writes under `_smoke/`. It is not a result.
 The CPU worker count is `--workers`. Run it with
@@ -263,8 +264,8 @@ def run_one(
 def check_neighbour_ratio_matches_lag_frame(*, record: CapacityRecord) -> None:
     """Raise unless the recomputed NR equals the lag frame's `rp_7d` on every row.
 
-    The lag frame's `rp_7d` for a row is the neighbour ratio at the latest whole day, two days before
-    the row's target day. Agreement on all rows also checks the causal driver's two-day lag.
+    The lag frame's `rp_7d` for a row is the neighbour ratio at the latest whole day, two days
+    before the row's target day. Agreement on all rows also checks the causal driver's two-day lag.
 
     Args:
         record: The original record.
@@ -277,7 +278,8 @@ def check_neighbour_ratio_matches_lag_frame(*, record: CapacityRecord) -> None:
     mine = neighbour_ratio(record=record)[plants, days - ISSUE_LAG_DAYS]
     theirs = frame["rp_7d"].cast(pl.Float64).fill_null(np.nan).to_numpy()
     if not np.array_equal(np.isnan(mine), np.isnan(theirs)):
-        msg = f"NR and rp_7d are null on different rows ({int((np.isnan(mine) != np.isnan(theirs)).sum())})"
+        differing = int((np.isnan(mine) != np.isnan(theirs)).sum())
+        msg = f"NR and rp_7d are null on different rows ({differing})"
         raise ValueError(msg)
     finite = ~np.isnan(mine)
     if not np.allclose(mine[finite], theirs[finite], rtol=NR_TOLERANCE, atol=1e-9):

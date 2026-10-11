@@ -42,7 +42,8 @@ def test_the_sentence_names_the_change_the_window_and_the_spread() -> None:
         earlier_days=7,
         relative_sd=None,
     )
-    assert "rose 20.0%" in rose and "standard deviation" not in rose
+    assert "rose 20.0%" in rose
+    assert "standard deviation" not in rose
 
 
 def test_fitted_quantities_carry_their_units_and_the_availability_factor() -> None:

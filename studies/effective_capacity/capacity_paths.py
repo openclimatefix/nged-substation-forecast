@@ -3,16 +3,16 @@
 Part of the study in <https://github.com/openclimatefix/nged-substation-forecast/issues/1143>.
 
 **A smoke run writes to its own directory and can never be mistaken for a real run.** `claim_root`
-writes a `RUN_KIND.txt` into the output root on first use, naming it `smoke` or `real`, and raises if
-a later run of the other kind points at the same root. A smoke root is `<study directory>/_smoke`,
-and a real run refuses any root whose path holds `_smoke`.
+writes a `RUN_KIND.txt` into the output root on first use, naming it `smoke` or `real`, and raises
+if a later run of the other kind points at the same root. A smoke root is `<study
+directory>/_smoke`, and a real run refuses any root whose path holds `_smoke`.
 """
 
 import hashlib
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 from studies.capacity_estimators import CapacityRecord, RawEstimate
@@ -193,20 +193,20 @@ def load_record(*, root: Path, anm_blind: bool = False) -> CapacityRecord:
         )
 
 
-def event_to_json(*, event: PlantedEvent) -> dict[str, object]:
+def event_to_json(*, event: PlantedEvent) -> dict[str, Any]:
     """Return an event as a JSON-ready mapping."""
     return {**asdict(event), "hit_days": list(event.hit_days)}
 
 
-def event_from_json(*, payload: dict[str, object]) -> PlantedEvent:
+def event_from_json(*, payload: dict[str, Any]) -> PlantedEvent:
     """Rebuild an event from `event_to_json`'s result."""
     return PlantedEvent(
-        plant=int(payload["plant"]),  # type: ignore[call-overload]
-        shape=payload["shape"],  # type: ignore[arg-type]
-        size=float(payload["size"]),  # type: ignore[arg-type]
-        first_day=int(payload["first_day"]),  # type: ignore[call-overload]
-        month_days=int(payload["month_days"]),  # type: ignore[call-overload]
-        hit_days=tuple(int(day) for day in payload["hit_days"]),  # type: ignore[attr-defined]
+        plant=int(payload["plant"]),
+        shape=payload["shape"],
+        size=float(payload["size"]),
+        first_day=int(payload["first_day"]),
+        month_days=int(payload["month_days"]),
+        hit_days=tuple(int(day) for day in payload["hit_days"]),
     )
 
 
@@ -225,32 +225,26 @@ def write_json_atomic(*, path: Path, payload: object) -> None:
 class Events:
     """Everything `build_capacity_inputs.py` decides about the events and the windows."""
 
-    def __init__(self, *, payload: dict[str, object]) -> None:
+    def __init__(self, *, payload: dict[str, Any]) -> None:
         """Parse the events file.
 
         Args:
             payload: The JSON the build script wrote.
         """
         self.draws: list[list[PlantedEvent]] = [
-            [event_from_json(payload=e) for e in draw]  # type: ignore[attr-defined]
-            for draw in payload["draws"]  # type: ignore[attr-defined]
+            [event_from_json(payload=e) for e in draw] for draw in payload["draws"]
         ]
-        self.control: list[PlantedEvent] = [
-            event_from_json(payload=e)
-            for e in payload["control"]  # type: ignore[attr-defined]
-        ]
+        self.control: list[PlantedEvent] = [event_from_json(payload=e) for e in payload["control"]]
         self.reserved: list[PlantedEvent] = [
-            event_from_json(payload=e)
-            for e in payload["reserved"]  # type: ignore[attr-defined]
+            event_from_json(payload=e) for e in payload["reserved"]
         ]
         self.false_movement_windows: list[tuple[int, int, int]] = [
-            (int(a), int(b), int(c))
-            for a, b, c in payload["false_movement_windows"]  # type: ignore[attr-defined]
+            (int(a), int(b), int(c)) for a, b, c in payload["false_movement_windows"]
         ]
-        self.scored_months: list[str] = list(payload["scored_months"])  # type: ignore[call-overload]
-        self.low_plant: int = int(payload["low_plant"])  # type: ignore[call-overload]
-        self.low_months: list[str] = list(payload["low_months"])  # type: ignore[call-overload]
-        self.anm_plant: int = int(payload["anm_plant"])  # type: ignore[call-overload]
+        self.scored_months: list[str] = list(payload["scored_months"])
+        self.low_plant: int = int(payload["low_plant"])
+        self.low_months: list[str] = list(payload["low_months"])
+        self.anm_plant: int = int(payload["anm_plant"])
 
 
 def load_events(*, root: Path) -> Events:

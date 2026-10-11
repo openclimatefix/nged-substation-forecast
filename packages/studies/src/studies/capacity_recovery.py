@@ -29,7 +29,6 @@ from studies.capacity_estimators import (
     REFERENCE_END,
     REFERENCE_START,
     CapacityRecord,
-    EstimatorNameType,
     FamilyType,
     IssueScale,
     valid_days,
@@ -104,7 +103,7 @@ class PlantedEvent:
 
     @property
     def scored_days(self) -> tuple[int, int]:
-        """The first day (inclusive) and last day (exclusive) of the days scored: month and after."""
+        """The first day (inclusive) and last day (exclusive) scored: the month and what follows."""
         return self.first_day, self.first_day + self.month_days + FOOTPRINT_AFTER_DAYS
 
 
@@ -610,7 +609,7 @@ def draw_primary_metric(*, scores: pl.DataFrame) -> float:
     Returns:
         The mean of `error`, which weighs every event and every plant alike.
     """
-    return float(scores["error"].mean())
+    return float(np.mean(scores["error"].to_numpy()))
 
 
 def false_movement_windows(
