@@ -41,6 +41,12 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
   seed, within each calendar year as well as overall, and a t-interval across the folds' own
   differences.
+- `correlation` — the Pearson correlation of a prediction with the measured value, with an
+  interval from resampling whole months and a seed, the same design `bootstrap` uses for an error.
+- `era5_ladder` — the ladder of ERA5 variable groups (which variable belongs to which rung, which
+  are accumulations and which are snapshots, the drop-one-group and negative-control column lists),
+  the clearness-index ratio, the weather-regime and season labels, the hour-ending mean of a
+  3-hourly aerosol series, and the check that two arms hold the same rows.
 - `blending` — combining several weather products: the climatology-permuted control columns a
   blend is compared against, and a linear stack of single-product models cross-fitted per generator,
   seed and fold.

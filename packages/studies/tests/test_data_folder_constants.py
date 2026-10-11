@@ -48,6 +48,7 @@ PRODUCT_FOLDERS: Final[dict[str, str]] = {
     "SARAH_3_PRODUCT_DIR": "downloads/observations/SARAH-3",
     "ECMWF_IFS_HRES_PRODUCT_DIR": "downloads/NWP/OPEN-METEO-PREVIOUS-RUNS/ECMWF-IFS-HRES",
     "ECMWF_IFS_SINGLE_RUNS_PRODUCT_DIR": "downloads/NWP/ECMWF-IFS-SINGLE-RUNS",
+    "ECMWF_IFS_SINGLE_RUNS_SOLAR_PRODUCT_DIR": "downloads/NWP/ECMWF-IFS-SINGLE-RUNS-SOLAR",
     "ECMWF_AIFS_PRODUCT_DIR": "downloads/NWP/ECMWF-AIFS",
     "ECMWF_AIFS_ENS_PRODUCT_DIR": "downloads/NWP/ECMWF-AIFS-ENS",
     "GEFS_WINDOW_DIR": "downloads/NWP/windows/GEFS_window_2024-11-01_None",
@@ -129,6 +130,14 @@ OLD_STUDY_FOLDERS: Final[dict[str, str]] = {
 }
 """Each study-folder constant against its folder under `data/studies/`."""
 
+IFS_LADDER_FOLDERS: Final[dict[str, str]] = {
+    "IFS_LADDER_DIR": "per_study/ifs_solar_variables",
+    "IFS_LADDER_INPUTS_DIR": "per_study/ifs_solar_variables/inputs",
+    "IFS_LADDER_RESULTS_DIR": "per_study/ifs_solar_variables/results",
+}
+"""The IFS solar-variables study's folders, which its build and fit scripts create, so they need
+not exist on disk."""
+
 NFC_BATCH_CONSTANTS: Final[frozenset[str]] = frozenset(
     constant
     for constant in OLD_STUDY_FOLDERS
@@ -142,7 +151,7 @@ HAND_WRITTEN_FOLDER_NAMES: Final[frozenset[str]] = frozenset(
         *(Path(folder).name for folder in PRODUCT_FOLDERS.values()),
         *(
             Path(folder).name
-            for constant, folder in OLD_STUDY_FOLDERS.items()
+            for constant, folder in {**OLD_STUDY_FOLDERS, **IFS_LADDER_FOLDERS}.items()
             if constant not in NFC_BATCH_CONSTANTS
         ),
         "nwp_forecast_comparison",
@@ -188,6 +197,13 @@ def test_each_previous_runs_product_has_a_folder_of_its_own_under_the_previous_r
 
 @pytest.mark.parametrize(("constant", "folder"), OLD_STUDY_FOLDERS.items())
 def test_each_study_constant_is_the_folder_the_study_has_now(constant: str, folder: str):
+    assert getattr(sources, constant) == REPO_DATA_DIR / "studies" / folder
+
+
+@pytest.mark.parametrize(("constant", "folder"), IFS_LADDER_FOLDERS.items())
+def test_each_ifs_ladder_constant_is_a_folder_of_the_study_under_per_study(
+    constant: str, folder: str
+):
     assert getattr(sources, constant) == REPO_DATA_DIR / "studies" / folder
 
 

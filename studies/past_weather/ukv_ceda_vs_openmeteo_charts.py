@@ -317,7 +317,7 @@ def lead_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
             )
         )
     return figure(
-        panels=panels,  # ty: ignore[invalid-argument-type]
+        panels=panels,
         number=4,
         title="The two archives agree most closely at lead 0 and drift apart with CEDA's lead",
         subtitle=[
@@ -369,7 +369,7 @@ def month_figure(*, records: Sequence[dict[str, Any]]) -> alt.VConcatChart:
             )
         )
     return figure(
-        panels=panels,  # ty: ignore[invalid-argument-type]
+        panels=panels,
         number=5,
         title="Month by month, any step in the difference between the archives shows",
         subtitle=[
@@ -432,7 +432,7 @@ def ratio_figure(*, ratios: pl.DataFrame) -> alt.VConcatChart:
             )
         )
     return figure(
-        panels=panels,  # ty: ignore[invalid-argument-type]
+        panels=panels,
         number=7,
         title=(
             "Before PS47 CEDA's rebuilt snapshot matches Open-Meteo's irradiance, and after it "
@@ -576,7 +576,7 @@ def absolute_figure(*, errors: pl.DataFrame) -> alt.VConcatChart:
             )
         )
     return figure(
-        panels=panels,  # ty: ignore[invalid-argument-type]
+        panels=panels,
         number=11,
         title="Every model's error is within about half a point of the others'",
         subtitle=[
@@ -629,7 +629,7 @@ def signed_error_figure(*, report: str) -> alt.VConcatChart:
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=ocf.BLACK_1).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     panel = alt.layer(bars, zero).properties(width=380, height=40 * len(order))
     return figure(
-        panels=[panel],  # ty: ignore[invalid-argument-type]
+        panels=[panel],
         number=9,
         title=(
             "A CEDA-trained wind model under-predicts by about 2 points more when given "
@@ -678,7 +678,7 @@ def step_figure(*, daily: pl.DataFrame) -> alt.VConcatChart:
     one = alt.Chart(pl.DataFrame({"y": [1.0]})).mark_rule(color=ocf.BLACK_1).encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     panel = alt.layer(shade, one, line).properties(width=PLOT_WIDTH_PX, height=170)
     return figure(
-        panels=[panel],  # ty: ignore[invalid-argument-type]
+        panels=[panel],
         number=6,
         title="Open-Meteo's wind speed steps up in two spans",
         subtitle=[
@@ -800,7 +800,7 @@ def by_lead_figure(
             )
         )
     chart = figure(
-        panels=panels,  # ty: ignore[invalid-argument-type]
+        panels=panels,
         number=8,
         title="Wind gaps grow with CEDA's lead; the solar fits disagree at lead 0",
         subtitle=[

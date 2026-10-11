@@ -63,8 +63,8 @@ whose rows are all one family has no use for the family colour, so it colours th
 instead, which the season charts use for April to September and October to March.
 """
 
-Panel = alt.LayerChart | alt.HConcatChart | alt.VConcatChart
-"""A chart `figure` can set under its caption."""
+Panel = alt.LayerChart | alt.HConcatChart | alt.VConcatChart | alt.FacetChart
+"""A chart `figure` can set under its caption, including a faceted chart of small multiples."""
 
 BetterDirectionType = Literal["negative", "positive"]
 """Which sign of difference is the better one."""
