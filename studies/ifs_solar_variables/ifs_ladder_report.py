@@ -1938,6 +1938,18 @@ def render_drop_one_rule(*, evidence: pl.DataFrame) -> list[str]:
             f"(main setting), against the smallest effect of {points(smallest)} points: it "
             f"{'reaches' if raised > smallest else 'does not reach'} the smallest effect."
         )
+        control = f2["f2_control_difference"][0]
+        if control is not None:
+            beats = raised > max(float(control), 0.0)
+            lines.append(
+                "- Applied at the main setting only, as the plan stated the rule before any "
+                f"result, the cloud layers' raise ({points(raised, signed=True)}) is "
+                f"{'more' if beats else 'not more'} than the control's "
+                f"({points(float(control), signed=True)}), so the pre-set rule "
+                f"{'recommends' if beats else 'does not recommend'} a second feed. Requiring "
+                "every fitted setting to pass was added after the first scientific review "
+                "(post hoc)."
+            )
     applied = sorted({str(value) for value in evidence["drop_one_settings"].to_list()})
     groups_by_setting = {
         setting: ", ".join(
@@ -1962,12 +1974,18 @@ def render_drop_one_rule(*, evidence: pl.DataFrame) -> list[str]:
 
 
 def render_against_production(*, contrasts: pl.DataFrame) -> list[str]:
-    """Render F1 minus FP and F2 minus FP with 95% intervals, the contrasts against production."""
+    """Render F1, F2, and F6 minus FP with 95% intervals, the contrasts against production."""
     lines = [
-        "### Total cloud and the cloud layers against the production reference (exploratory)",
+        "### Variable sets against the production reference (exploratory)",
+        "",
+        (
+            "F1 and F2 swap their cloud columns in for FP's four variables, so F1 minus FP and F2 "
+            "minus FP do not show what cloud adds to FP. F6 contains every FP column, so F6 minus "
+            "FP is the contrast that adds variables to FP."
+        ),
         "",
     ]
-    for treatment in ("f1", "f2"):
+    for treatment in ("f1", "f2", "f6"):
         for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING):
             row = one_row(
                 contrasts=contrasts,
@@ -2704,7 +2722,8 @@ def render_decisions(
         "### Whether the production forecast needs a second IFS feed",
         "",
         (
-            f"- **{'Second feed recommended' if needs_second else 'No second feed recommended'}.** "
+            f"- **{'Second feed recommended' if needs_second else 'No second feed recommended'}"
+            " (drop-one rule applied at every fitted setting, which is post hoc).** "
             "The rule: P2 is a gain after its control, or the drop-one run of the cloud layers "
             "or direct radiation finds the group carrying a gain. The drop-one part is "
             "exploratory. Boundary-layer height, the third variable the open-data feed lacks, "

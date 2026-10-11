@@ -1,72 +1,91 @@
-# A second forecast beats extra IFS variables, but not on top of the ensemble mean
+# Extra IFS variables and a second forecast for day-ahead to three-day-ahead solar power
 
-**At six solar farms in Lincolnshire, none of the extra variables in ECMWF's 9 km IFS forecast cut
-the error of day-ahead to three-day-ahead power forecasts by a resolved amount, but adding a second
-forecast (AIFS Single, ECMWF's machine-learned forecast) cut it by about 1 percentage point of
-capacity.** IFS is ECMWF's Integrated Forecasting System. The second forecast's gain is a gain over
-a single deterministic forecast, which is noisy at long leads. The IFS ensemble mean, which the
-production service reads, gives about the same gain, and adding AIFS Single to that ensemble mean
-adds only about 0.1 points, which the study cannot resolve. The page therefore does not say that the
-production service would gain 1 point from a second forecast. The study also does not recommend
-asking Dynamical.org, the production service's source of IFS ensemble forecasts, for any extra
-variable.
+**At six solar farms in Lincolnshire, adding a second weather forecast to a single 9 km forecast cut
+the error of day-ahead to three-day-ahead power forecasts by about 1 percentage point of capacity,
+but little of that gain is likely to reach the production service.** The single forecast comes from
+IFS, ECMWF's Integrated Forecasting System, and the second forecast is AIFS Single, ECMWF's
+machine-learned forecast. The production service reads a smoother input, the IFS ensemble mean,
+which averages about 50 runs of IFS started from slightly different conditions. Adding the ensemble
+mean to the single forecast gives about the same 1-point gain (post hoc). Adding AIFS Single to the
+ensemble mean lowers the error by only 0.13 points, which is unresolved (post hoc). Extra IFS
+variables lowered the error by about 0.45 points in total (exploratory), but no planned step, adding
+total cloud cover, the cloud layers, or every other variable, gave a resolved gain.
 
-![Figure 1: Change in solar farm error from adding IFS variables, the five planned
-contrasts](../assets/ifs_solar_variables_headline.svg)
+![Figure 1: Change in solar farm error from adding IFS variables or a second forecast, the five
+planned contrasts](../assets/ifs_solar_variables_headline.svg)
 
-**How to read the numbers.** Every number is a mean absolute error as a percentage of a farm's
+**How to read the numbers.** Every error is a mean absolute error as a percentage of a farm's
 capacity, and a difference of 0.1 is 0.1 percentage points of capacity, called "points". A negative
-difference is a gain. A bracket holds a 95% interval from resampling whole months, unless the text
-says 99%, the level adjusted for the five planned contrasts. A contrast is planned if the study plan
-named it before any result existed, and every other number is exploratory. The smallest improvement
-worth acting on is 0.1 points. The forecasts are the 00 UTC run of every day, and lead day L means
-the run was issued L days before the day it describes. F0 is the minimal variable set (IFS radiation
-and air temperature). F1 adds total cloud cover, F2 adds the three cloud layers, and F6 is all 20
-IFS variables. FB and F6B add AIFS Single's radiation and temperature to F0 and to F6. P1 is F1
-minus F0, P2 is F2 minus F1, P3 is F6 minus F2, P4 is FB minus F0, and P5 is F6B minus F6.
+difference is a gain, everywhere on this page. A bracket holds a 95% interval from resampling whole
+months, unless the text says 99%, the level adjusted for the five planned contrasts. A gain is
+*resolved* if its whole interval lies beyond 0.1 points, the smallest improvement worth acting on,
+and *unresolved* if the interval holds both gains larger and smaller than 0.1 points. A contrast is
+*planned* if the study plan named it before any result existed, *post hoc* if it was added after the
+first scientific review had seen results, and *exploratory* otherwise. The forecasts are the 00 UTC
+run of every day, and lead day L means the run was issued L days before the day it describes. Hours
+are labelled by their end, so 19 UTC is 18:00 to 19:00. The variable sets are F0, the minimal set
+(IFS radiation and air temperature); F1, which adds total cloud cover; F2, which adds the three
+cloud layers; and F6, all 20 IFS variables. FP is F0 plus the four variables the production
+service's IFS feed carries. FB and F6B add AIFS Single's radiation and temperature to F0 and to F6.
+A contrast such as "F1 minus F0" is the error of the first set less the error of the second. P1 is
+F1 minus F0, P2 is F2 minus F1, P3 is F6 minus F2, P4 is FB minus F0, and P5 is F6B minus F6.
 
-- **Do extra IFS variables help predict solar farm output at lead days 1 to 3?** Not by a resolved
-  amount.
+- **Do extra IFS variables help predict solar farm output at lead days 1 to 3?** Not one step at a
+  time, by a resolved amount.
   Total cloud cover (P1) lowers the error by 0.12 points, the cloud layers (P2) by 0.19 points, and
   every other variable together (P3) by 0.14 points (pooled over lead days 1 to 3, 99% intervals
-  [−0.19, −0.04], [−0.32, −0.06], and [−0.31, +0.03]). All three intervals straddle the smallest
-  improvement worth acting on (0.1 points), so all three are unresolved. Twenty-five months of data
-  cannot resolve effects this small, and a width preview from the ERA5 study's losses said so before
-  any fit.
-- **Does a second forecast help?** Yes, on top of a single deterministic forecast.
-  Adding AIFS Single's radiation and temperature to the minimal IFS set lowers the error by 1.04
-  points (P4, 99% interval [−1.42, −0.67]), and adding them to all 20 IFS variables lowers it by
-  0.79 points (P5, [−1.25, −0.44]). Both are gains at both XGBoost tuning settings and against a
-  control with the same number of columns. They use 14 months, from March 2025 to April 2026.
-- **Does a second forecast help the production service?** Not by a resolved amount.
+  [−0.19, −0.04], [−0.32, −0.06], and [−0.31, +0.03]). All three intervals straddle 0.1 points, so
+  all three are unresolved. Twenty-five months of data cannot resolve effects this small, and a
+  width preview from the ERA5 study's losses said so before any fit. All 18 extra variables together
+  (F6 minus F0) lower the error by 0.45 points (95% interval [−0.59, −0.32], exploratory), 0.29 to
+  0.54 points at the six lead days.
+- **Does a second forecast help?** Yes, on top of the single 9 km forecast.
+  Adding AIFS Single's radiation and temperature to the minimal set lowers the error by 1.04 points
+  (P4, 99% interval [−1.42, −0.67]), and adding them to all 20 IFS variables lowers it by 0.79
+  points (P5, [−1.25, −0.44]). Both are gains at both XGBoost tuning settings and against a control
+  with the same number of columns. P4 and P5 use the 14 months from March 2025 to April 2026, when
+  AIFS Single was operational.
+- **Does a second forecast help the production service?** Probably by much less, and the study
+  cannot resolve how much.
   The production service reads the IFS ensemble mean. On the same rows, adding the ensemble mean to
-  the minimal set lowers the error by 0.96 points, about as much as AIFS Single does. Adding AIFS
-  Single to the ensemble mean lowers the error by 0.13 points (post hoc, 99% interval [−0.29,
-  +0.02]), with +0.07 at lead day 1 and about −0.2 at lead days 2 and 3. The reference in P4 and P5
-  is weak: Open-Meteo's 9 km IFS radiation has a higher raw error against CAMS irradiance than AIFS
-  Single or the ensemble mean.
+  the minimal set lowers the error by 0.96 points, about as much as AIFS Single does (post hoc).
+  Adding AIFS Single to the ensemble mean lowers the error by 0.13 points (post hoc, 99% interval
+  [−0.29, +0.02]), with +0.07 at lead day 1, −0.21 at lead day 2, and −0.25 at lead day 3. The
+  single 9 km forecast has a higher raw radiation error against CAMS irradiance (the Copernicus
+  Atmosphere Monitoring Service's estimate of past sunshine) than AIFS Single or the ensemble mean.
 - **Is it worth ingesting the 12 variables that only ECMWF's MARS archive serves, or another
-  forecast?** The study does not separate the two routes for the production service.
-  The pre-set rule returns "second forecast", because P5 is a gain. That rule compares P5 with the
-  ERA5 study's P4, and neither is the gain the production service would see. The like-for-like
-  comparison is AIFS Single on top of the ensemble mean (about 0.1 points) against the 12 MARS-only
-  variables on top of 29 other ERA5 variables (0.13 points at the main setting, 99.5% interval
-  [−0.18, −0.08]), and those two are of the same size.
-- **Which variables should the production service ask Dynamical.org to add?** None, on this
-  evidence.
-  Total cloud cover ranks first: its gain over the minimal set is 0.12 points [0.04, 0.19], but its
-  gain over the four variables the production feed already carries is −0.02 points [−0.16, +0.13],
-  so it adds nothing detectable. No other group reaches the rule.
+  forecast?** The pre-set rule returns "second forecast", and this page does not act on that
+  outcome.
+  MARS is ECMWF's full archive. The ERA5 study found that 12 of ERA5's variables are available only
+  there. The pre-set rule compares P5 with the ERA5 study's gain for those 12 variables, and P5 is a
+  gain. Neither number is the gain the production service would see, because P5 is measured on the
+  single 9 km forecast and the ERA5 gain on a reanalysis. The closest comparison available is AIFS
+  Single on top of the ensemble mean (0.13 points, unresolved, post hoc) against the 12 MARS-only
+  variables on top of the 22 other ERA5 variables (0.13 points at the main setting, 99.5% interval
+  [−0.18, −0.08]). The two are of the same size, and the ERA5 gain is likely to be smaller at
+  forecast lead.
+- **Which variables should the production service ask Dynamical.org to add?** No single group has
+  earned a request, although the variables together have a gain.
+  Total cloud cover ranks first: it lowers the error by 0.12 points over the minimal set (99%
+  interval [−0.19, −0.04], unresolved). F1 scores within −0.02 points [−0.16, +0.13] of FP, but F1
+  swaps total cloud cover in for FP's four variables, so the contrast does not show what cloud adds
+  to FP. No arm adds a single group to FP. All 14 variables beyond FP together lower FP's error by
+  0.36 points (F6 minus FP, 95% interval [−0.44, −0.27], exploratory, main setting only).
 - **Does the production service need a second IFS feed, for the cloud layers or the direct beam,
-  which ECMWF's free feed lacks?** No, by the pre-set rule.
-  Removing the cloud layers from all 20 variables raises the error by 0.07 points at the main
-  setting and 0.06 at the second, below the 0.1-point smallest effect. The cloud layers lower the
-  error by 0.21 points [−0.35, −0.09] over the four production variables (exploratory, main setting
-  only), and the production feed's long-wave radiation, a cloud signal, was not tested.
+  which ECMWF's free feed lacks?** Not on this evidence, although the rule as written before any
+  result says yes.
+  The production service gets IFS from Dynamical.org, which repackages ECMWF's free open-data feed.
+  Removing the cloud layers from all 20 variables raises the error by 0.074 points at the main
+  setting, more than the shuffled control's 0.035, so the pre-set rule, applied at the one setting
+  it named, recommends a second feed. After the first scientific review, the same run at the second
+  setting gave a raise of 0.057, below its control's 0.101. Both raises are below 0.1 points.
+  Requiring both settings to agree was added after the results were seen, so this reading is post
+  hoc. The production feed also carries long-wave radiation, a cloud signal that this study did not
+  test.
 - **What can the study support?** Statements about 9 km IFS and AIFS Single forecasts at six farms
   in one county, at lead days 1 to 3, over 25 months (14 for the second forecast). Three limits
-  matter most. Every gain is measured on top of a single deterministic 9 km forecast, the farms
-  share weather, and 25 months give wide intervals.
+  matter most. Every planned gain is measured on top of a single deterministic 9 km forecast, the
+  farms share weather, and 25 months give wide intervals.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's AI
@@ -75,37 +94,45 @@ Claude reviewers have checked the method, the evidence, and the prose adversaria
 
 ## Key findings
 
-- **The forecast's error rises from 10.1% of capacity at lead day 1 to 15.4% at lead day 9 for the
-  minimal set, and every variable group's gain stays small** (F6 minus F0 is −0.39 points at lead
-  day 1 and −0.29 at lead day 9) ([Figure
-  3](#the-error-rises-with-lead-day-and-the-extra-variables-gain-little)).
-- **The ERA5 study's screen overstated the gain at forecast lead by about three times.** At lead day
-  1 on the same rows, ERA5's full set beats its minimal set by 1.20 points and the IFS full set
-  beats its minimal set by 0.39 points ([Figure 7](#the-era5-screen-overstated-the-forecast-gain)).
-- **A second forecast's gain grows with lead day because the reference degrades faster.**
-  Open-Meteo's IFS radiation error against CAMS irradiance rises by 26% from lead day 1 to 3, and
-  AIFS Single's by 18% ([Figure 10](#a-second-forecast-and-the-ensemble-mean)).
-- **One winter fold drives the lead-day-3 gain.** The only winter months of the 14 are held out
-  together, so their models train on no winter row. Without that fold, P5 at lead day 3 is −0.73
-  points, not −1.02.
+- **The forecast's error rises from about 10% of capacity at lead day 1 to about 15% at lead day 9
+  for the minimal set, and the full set lowers it by 0.29 to 0.54 points.** On the farm-hours that
+  all six lead days hold, F0's error is 10.0% at lead day 1 and 15.4% at lead day 9, and F6 minus F0
+  is −0.41 points at lead day 1 and −0.31 at lead day 9 ([Figure
+  3](#the-error-rises-with-lead-day-and-the-extra-variables-gain-little)). The contrast values in
+  the Q&A above use each lead day's own rows.
+- **At lead day 1, the cloud variables gained about half as much in the IFS forecast as in ERA5 on
+  the same rows** (exploratory): 0.33 points against 0.67. All 20 IFS variables gained 0.39 points
+  and ERA5's 34 variables 1.20 points, but those two sets hold different variables ([Figure
+  7](#the-gain-at-forecast-lead-is-smaller-than-the-era5-screen-showed)).
+- **A second forecast's gain is larger at lead days 2 and 3 than at lead day 1, and the study does
+  not establish why** (post hoc). P4 is −0.79, −1.11, and −1.22 points at lead days 1 to 3.
+  Open-Meteo's IFS radiation error against CAMS irradiance rises by 26% from lead day 1 to 3,
+  against 18% for AIFS Single and 20% for the ensemble mean. Adding the ensemble mean to F0 gives a
+  gain that does not grow with lead day (−0.96, −0.90, and −1.03 points) ([Figure
+  10](#a-second-forecast-and-the-ensemble-mean)).
+- **One winter fold enlarges the lead-day-3 gain.** The only winter months of the 14 are held out
+  together, so the model that scores them trains on no winter row. Without that fold, P5 at lead day
+  3 is −0.73 points, not −1.02.
 - **As in the ERA5 study, the full set is worse than the minimal set at low sun.** At 06, 07, 19,
   and 20 UTC, F6 is worse than F0 by 0.08 to 0.29 points ([Figure
   8](#the-gain-by-season-regime-and-hour)).
-- **The shuffled-copy controls make the error worse.** Three shuffled cloud columns made F0's error
-  0.02 points worse and the 14 shuffled columns of F6 made F2's 0.04 worse, so a wide variable set
-  starts at a disadvantage ([Figure 5](#controls)).
+- **Shuffled copies of the variables tend to make the error worse.** One shuffled cloud column made
+  F0's error 0.02 points worse and 14 shuffled columns made F2's 0.04 worse, but both intervals
+  include zero. Two shuffled copies of AIFS Single's variables made the error of F0 worse by 0.21
+  points [+0.11, +0.32], so the 14-month fits are noisy ([Figure 5](#controls)).
 
 ## Introduction
 
-**The question is which variables of ECMWF's IFS forecast, beyond its solar radiation and
-temperature, help a day-ahead to three-day-ahead solar power forecast, and whether a second weather
-forecast would do more.** The [ERA5 study](../past-weather/era5-solar-variables.md) asked which
-variables of ERA5, a reanalysis, help estimate solar output. A reanalysis is not a forecast, and the
-ERA5 study found signs that part of its gain came from ERA5's cloud fields having seen later
-observations than its solar radiation. This study repeats the question on real past forecasts at the
-lead times a forecast service would use. Three decisions depend on the answer: which variables to
-ask Dynamical.org to add, whether the production service needs a second IFS feed, and whether to
-ingest the 12 MARS-only variables or another forecast.
+**The question is which variables of IFS, beyond its solar radiation and temperature, help a
+day-ahead to three-day-ahead solar power forecast, and whether a second weather forecast would do
+more.** The [ERA5 study](../past-weather/era5-solar-variables.md) asked which variables of ERA5 help
+estimate solar output. ERA5 is a reanalysis, a weather model re-run after the event and corrected
+with observations. Some of ERA5's fields are corrected with observations taken after the hour they
+describe, so they can hold information that no forecast has. The ERA5 study found signs that part of
+its gain came from ERA5's cloud fields having seen such observations. This study repeats the
+question on real past forecasts, at the lead times a forecast service would use. Three decisions
+depend on the answer: which variables to ask Dynamical.org to add, whether the production service
+needs a second IFS feed, and whether to ingest the 12 MARS-only variables or another forecast.
 
 | Group | Adds | IFS variables (Open-Meteo names) | In ECMWF's free open-data feed |
 |---|---|---|---|
@@ -118,10 +145,12 @@ ingest the 12 MARS-only variables or another forecast.
 | F6 | surface and weather state | `surface_temperature`, `snow_depth`, `snowfall`, `precipitation`, `surface_pressure`, `wind_speed_10m`, `wind_gusts_10m` | yes |
 | FP | the production reference | F0 plus `dew_point_2m`, `surface_pressure`, `precipitation`, `wind_speed_10m` | yes |
 
-Each group F1 to F6 includes every group above it. The free feed's availability was read from
+Each variable set F1 to F6 includes every group above it. The free feed's availability was read from
 ECMWF's open-data index files for the 2026-10-09 00 UTC run. The feed carries most-unstable CAPE,
-and does not carry the surface-based CAPE that Open-Meteo serves. FP is the production feed's
-current variables, and the study reads F1, F2, and F6 against it.
+not the surface-based CAPE that Open-Meteo serves. FP is the production feed's current variables
+other than long-wave radiation. FP contains none of F1's or F2's cloud columns, so F1 minus FP and
+F2 minus FP swap variables rather than add them. The study reads F6 minus FP as the one contrast
+that adds variables to FP.
 
 ## Data and methods
 
@@ -129,52 +158,64 @@ current variables, and the study reads F1, F2, and F6 against it.
 forecasts are the 00 UTC IFS run of each day.** The rows, the targets, and the solar geometry come
 from the ERA5 study, so the cleaning rules are the same: hours that hold a zero half-hour are
 dropped, hours the network operator constrained are scored but not trained on, and output is a
-fraction of each farm's capacity (the 99th percentile of its metered output). Lead day L of an hour
-is read from the run issued L days before the hour's day, at lead 24L plus the hour of day.
+fraction of each farm's capacity (a high percentile of its metered output). Lead day L of an hour is
+read from the run issued L days before the hour's day, at forecast hour 24L plus the hour of day.
 Instantaneous variables are the mean of the values at the two ends of the hour, as the ERA5 study
 averaged ERA5's snapshots, and radiation, precipitation, snowfall, and gusts are the hour-ending
-means Open-Meteo serves. Lead days 1, 2, 3, 5, 7, and 9 are scored, and values beyond 90 hours are
-interpolated by Open-Meteo.
+means Open-Meteo serves. Open-Meteo is the archive that served the IFS forecasts. Lead days 1, 2, 3,
+5, 7, and 9 are scored. Open-Meteo interpolates values beyond forecast hour 90, which includes a few
+evening hours of lead day 3.
 
-**IFS changed cycle twice in the archive, so the study cuts folds inside two eras.** Cycle 49r1 went
-live on 2024-11-12 and cycle 50r1 on 2026-05-12. The study drops 2024-11 and 2026-05 and everything
-after, and the first era starts on 2024-03-15, so its first month is a 17-day part-month. The two
-eras hold 25 months. Each farm's rows in each era are cut into five blocks of whole months, with the
-same fold for the same hour at every lead day.
+**IFS changed model cycle twice in the archive, so the study cuts folds inside two eras.** Cycle
+49r1 went live on 2024-11-12 and cycle 50r1 on 2026-05-12. The study drops 2024-11 and 2026-05 and
+everything after, and the first era starts on 2024-03-15, so its first month is a 17-day part-month.
+The two eras hold 25 months. Each farm's rows in each era are cut into five folds, blocks of whole
+months, with the same fold for the same hour at every lead day. Every fold is scored by models
+trained on the other folds of the same farm, so every score comes from months the model never saw.
 
-**One XGBoost model per farm, lead day, and variable set is fitted.** XGBoost is a gradient-boosted
-tree model. Intervals come from resampling whole months, paired across variable sets, with one of
-the three fitting seeds drawn in each resample, 10,000 resamples for the planned contrasts and 2,000
-for the others. The planned contrasts (P1 to P5, on output only) are pooled over lead days 1 to 3
-with equal weight, at the 99% level, and both XGBoost tuning settings must agree for a verdict. A
-verdict is "gain" if the interval's upper bound is below −0.1 points, "no gain" if its lower bound
-is above −0.1, and "unresolved" otherwise. Controls give the arm's columns shuffled copies of the
-extra variables (shuffled within each farm, month, and hour of day), and a contrast must also be a
-gain against its control. A positive control adds CAMS irradiance, which must help.
+**One XGBoost model is fitted per farm, lead day, and variable set.** XGBoost is a gradient-boosted
+tree model, and it is fitted three times with different random seeds. Intervals come from resampling
+whole months, paired across variable sets, with one of the three seeds drawn in each resample,
+10,000 resamples for the planned contrasts and 2,000 for the others. The planned contrasts (P1 to
+P5) are on farm output only. They are pooled over lead days 1 to 3 with equal weight, at the 99%
+level, and both XGBoost tuning settings must agree for a verdict. A verdict is "gain" if the
+interval's upper bound is below −0.1 points, "no gain" if its lower bound is above −0.1, and
+"unresolved" otherwise. Each planned contrast has a control: a variable set with as many columns as
+the treatment, where the new variables are replaced by shuffled copies (shuffled within each farm,
+month, and hour of day). A planned contrast must also be a gain against its control. A positive
+control adds CAMS irradiance, which must help. The drop-one rule asks whether removing a group from
+the full set raises the error by more than a control with the same number of shuffled columns does.
 
-**The second forecast is AIFS Single, and P4 and P5 use 14 months.** AIFS Single became operational
-on 2025-02-25, so the blend rows start in March 2025. AIFS Single's radiation is a 6-hourly mean
-that is rebuilt hourly through a clear-sky index, and its temperature is interpolated to the hour.
-The partner's columns come from the AIFS Single store only, with no CAMS or power value in them. F0
-and F6 are refit on the blend rows, so each blend contrast compares variable sets on identical rows.
+**The second forecast is AIFS Single, and the 14 months on which it exists are called the blend
+rows.** AIFS Single became operational on 2025-02-25, so the blend rows start in March 2025. AIFS
+Single's radiation is a 6-hourly mean that is rebuilt hourly through a clear-sky index, which is
+measured sunlight divided by the sunlight a cloudless sky would give. Its temperature is
+interpolated to the hour. The partner's two columns come from the AIFS Single store only, with no
+CAMS or power value in them. F0 and F6 are refit on the blend rows, so each blend contrast compares
+variable sets on identical rows. The IFS ensemble mean added after the first scientific review is
+the forecast-comparison study's 6-hourly ensemble mean, which is coarser than the 3-hourly mean the
+production service reads.
 
 ## Results
 
 ### The data and their issues
 
 **IFS and CAMS agree on the shape of a day and disagree in detail, more at longer leads.** Figure 2
-draws IFS's radiation and cloud covers at lead days 1 and 7 against CAMS irradiance on three days at
-one farm: the clearest, most variable, and dullest by CAMS's clear-sky index.
+draws IFS's radiation at lead days 1 and 7, and its cloud covers at lead day 1, against CAMS
+irradiance on three days at one farm: the clearest, most variable, and dullest by CAMS's clear-sky
+index.
 
 ![Figure 2: IFS forecasts a day and a week ahead, against CAMS, on three
 days](../assets/ifs_solar_variables_weather.svg)
 
 ### The error rises with lead day, and the extra variables gain little
 
-**The minimal set's error rises from 10.1% of capacity at lead day 1 to 15.4% at lead day 9, and the
-full set lowers it by 0.4 to 0.6 points at most.** The full set (F6) beats the minimal set (F0) by
-0.39 points at lead day 1, 0.50 at lead day 2, 0.48 at lead day 3, 0.45 at lead day 5, 0.54 at lead
-day 7, and 0.29 at lead day 9. Those are exploratory single-lead-day numbers.
+**The minimal set's error rises from 10.0% of capacity at lead day 1 to 15.4% at lead day 9, and the
+full set lowers it by 0.29 to 0.54 points.** The full set (F6) beats the minimal set (F0) by 0.39
+points at lead day 1, 0.50 at lead day 2, 0.48 at lead day 3, 0.45 at lead day 5, 0.54 at lead day
+7, and 0.29 at lead day 9. These are exploratory numbers on each lead day's own rows. Figure 3 plots
+the farm-hours that all six lead days hold, where the gains are 0.41, 0.49, 0.47, 0.44, 0.55, and
+0.31 points.
 
 ![Figure 3: Error of F0, FP, and F6 at each lead
 day](../assets/ifs_solar_variables_lead_day_skill.svg)
@@ -183,18 +224,20 @@ day](../assets/ifs_solar_variables_lead_day_skill.svg)
 
 **Predictions follow the measured output on months the XGBoost models never saw.** Figure 4 draws
 three days at every farm, chosen separately for each farm by CAMS's clear-sky index, with each
-farm's error for four variable sets. The farms are labelled A to F.
+farm's error for four variable sets: F0, F2, FP, and F6. The farms are labelled A to F.
 
 ![Figure 4: Day-ahead predictions on months the models never saw, three days at every
 farm](../assets/ifs_solar_variables_models_work.svg)
 
 ### Controls
 
-**The positive control lowers the error by 5 points, so the method detects a large effect, and the
-shuffled controls make the error worse.** Adding CAMS irradiance to F2 gives an error of 5.0% at
-lead day 1, against 9.7% for F2. Three shuffled cloud columns make F0 worse by 0.02 points pooled,
-and 14 shuffled columns make F2 worse by 0.04 points. A planned gain must also beat its control, and
-the controls do not change any verdict.
+**The positive control lowers the error by 4.7 points at lead day 1, so the method detects a large
+effect, but the shuffled controls show only small penalties.** Adding CAMS irradiance to F2 gives an
+error of 5.0% at lead day 1, against 9.7% for F2. One shuffled total-cloud column makes F0 worse by
+0.02 points pooled over lead days 1 to 3, and 14 shuffled columns make F2 worse by 0.04 points. Both
+intervals include zero at the main setting. The partner controls on the 14 blend rows are clearer:
+two shuffled copies of AIFS Single's variables make F0 worse by 0.21 points and F6 worse by 0.09
+points. A planned gain must also beat its control, and the controls do not change any verdict.
 
 ![Figure 5: Errors of the negative and positive controls beside the arms they
 pad](../assets/ifs_solar_variables_controls.svg)
@@ -208,13 +251,15 @@ and falls with the weather.
 ![Figure 6: Error of every variable set at every lead
 day](../assets/ifs_solar_variables_leaderboard.svg)
 
-### The ERA5 screen overstated the forecast gain
+### The gain at forecast lead is smaller than the ERA5 screen showed
 
 **At lead day 1 on the same rows, ERA5's full set lowers the error by 1.20 points and IFS's full set
-by 0.39 points.** ERA5's total and layered cloud cover give 0.67 points against IFS's 0.33 points.
-The gap is consistent with ERA5's cloud fields having seen later observations than its solar
-radiation, and also with the difference between a same-hour estimate and a forecast. The page does
-not choose between them.
+by 0.39 points.** The ERA5 study's screen was its comparison of ERA5 variable sets at the same hour,
+which made no claim about forecasts. On the like-for-like cloud sets, ERA5's total and layered cloud
+cover give 0.67 points against IFS's 0.33 points, about twice as much. The two full sets hold
+different variables, 34 ERA5 variables against 20 IFS variables. The gap is consistent with ERA5's
+cloud fields having seen later observations than its solar radiation, and also with the difference
+between a same-hour estimate and a forecast. The page does not choose between them.
 
 ![Figure 7: Change in error from cloud and from every variable: IFS forecast against
 ERA5](../assets/ifs_solar_variables_era5_against_ifs.svg)
@@ -222,75 +267,86 @@ ERA5](../assets/ifs_solar_variables_era5_against_ifs.svg)
 ### The gain by season, regime, and hour
 
 **The full set is worse than the minimal set at low sun.** F6 is worse than F0 by 0.08 points at 06
-UTC, 0.16 at 07, 0.29 at 19, and 0.13 at 20 UTC, the same pattern as the ERA5 study found, which
-supports its reading that the penalty comes from the farms' low-sun output and not from the weather
-data. Figure 8 shows the gain by ERA5 cloud regime, season, and hour of day.
+UTC, 0.16 at 07, 0.29 at 19, and 0.13 at 20 UTC. The ERA5 study found the same pattern, and the
+pattern is consistent with the penalty coming from the farms' low-sun output. A wide variable set
+overfitting where the signal is weakest is equally consistent with it. Figure 8 shows the gain by
+ERA5 cloud regime, season, and hour of day, with the hour-of-day panel in percent of F0's error.
 
 ![Figure 8: Change in error by sky regime, by season, and by hour of
 day](../assets/ifs_solar_variables_regimes.svg)
 
 ### Removing one group
 
-**Removing one group from all 20 variables raises the error by at most 0.07 points, and no group
-clears the drop-one rule except at one setting.** The rule asks that removing a group raises the
-error by more than a control with the same number of shuffled columns does. Removing the cloud
-layers raises the error by 0.074 points at the main setting and 0.057 at the second, against
-controls of 0.035 and 0.101. Removing humidity, column water, and boundary-layer height raises the
-error by 0.036 points at the main setting, which passes the control by 0.002 points, and by 0.016
-points at the second setting, which fails it. The raise is 0.118 points at lead day 3 and about zero
-at lead days 1 and 2.
+**Removing one group from all 20 variables raises the error by at most 0.07 points.** The rule asks
+that removing a group raises the error by more than a control with the same number of shuffled
+columns does. Removing the cloud layers raises the error by 0.074 points at the main setting and
+0.057 at the second, against controls of 0.035 and 0.101. The rule as written before any result
+applied the test at the main setting only, where the cloud layers pass. The both-settings version is
+post hoc, and it also changes the answer for humidity, column water, and boundary-layer height. That
+group raises the error by 0.036 points at the main setting, which passes its control by 0.002
+points, and by 0.016 points at the second setting, which fails it. Its raise is 0.118 points at lead
+day 3 and about zero at lead days 1 and 2.
 
 ![Figure 9: Change in error when one group of variables is removed from all 20 IFS
 variables](../assets/ifs_solar_variables_drop_one.svg)
 
 ### A second forecast and the ensemble mean
 
-**Adding AIFS Single to Open-Meteo's single 9 km forecast lowers the error by about 1 point, and
-adding the IFS ensemble mean does the same.** Panel 1 of Figure 10 shows the three gains the third
-decision compares: P4, P5, and the ERA5 study's P4 for the MARS-only variables. Panel 2 shows the
-post hoc contrasts: AIFS Single added to the ensemble mean (−0.13 points, unresolved) and the
-ensemble mean added to F0 (−0.96 points, a gain).
+**Adding AIFS Single to the single 9 km forecast lowers the error by about 1 point, and adding the
+IFS ensemble mean does the same.** Panel 1 of Figure 10 shows the three gains the third decision
+compares: P4, P5, and the ERA5 study's gain for the MARS-only variables. Panel 2 shows the post hoc
+contrasts: AIFS Single added to the ensemble mean (−0.13 points, unresolved) and the ensemble mean
+added to F0 (−0.96 points, a gain).
 
-**The gain grows with lead day because the reference degrades faster.** Against CAMS irradiance,
-Open-Meteo's IFS 9 km radiation has a raw error of 65.7, 73.3, and 82.7 W m⁻² at lead days 1 to 3, a
-rise of 26%. AIFS Single's is 62.0, 66.9, and 73.1 (a rise of 18%), and the ensemble mean's is 61.4,
-67.6, and 74.0 (20%). A sharp point forecast is penalised twice under absolute error when cloud is
-misplaced, and a smoother forecast is not. The blend models also train on 11 months with no row of
-the same calendar month, and F0 refit on the blend rows is 0.4 to 0.7 points worse than the ladder's
-F0 on the same rows.
+**The single 9 km forecast has the highest raw radiation error of the three forecasts at every lead
+day, and its error rises fastest.** Against CAMS irradiance, Open-Meteo's IFS 9 km radiation has a
+raw error of 65.7, 73.3, and 82.7 W m⁻² at lead days 1 to 3, a rise of 26%. AIFS Single's is 62.0,
+66.9, and 73.1 (a rise of 18%), and the ensemble mean's is 61.4, 67.6, and 74.0 (20%). One possible
+explanation, which the study did not test, is that a sharp forecast is wrong twice when it puts a
+cloud in the wrong hour, and a smoother forecast hedges. The explanation does not fit the ensemble
+mean's gain, which does not grow with lead day. Each blend model trains on 11 or 12 of the 14
+months, and in ten calendar months the scored month has no training row of the same calendar month.
+F0 refit on the blend rows is 0.4 to 0.7 points worse than F0 from the main fits on the same rows,
+so P4 and P5 are measured against a reference that had less training data.
 
-**One winter fold holds the only winter months, so its models train on no winter row.** Without that
-fold, P4 pooled over lead days 1 to 3 is −1.01 points (−1.04 with it) and P5 is −0.67 points (−0.79
-with it). The direction holds in every farm and in 12 to 14 of the 14 months, and the size does not.
+**One winter fold holds the only winter months, so its models train on no winter row.** The
+fold-level differences are printed in the report: P4 and P5 are negative in each of the five folds
+at every lead day. Without the winter fold, P4 pooled over lead days 1 to 3 is −1.01 points (−1.04
+with it) and P5 is −0.67 points (−0.79 with it). The direction holds and the size does not.
 
-![Figure 10: A second forecast against the MARS-only variables: the gains the third decision
+![Figure 10: A second forecast against the MARS-only variables, the gains the third decision
 compares](../assets/ifs_solar_variables_variables_or_forecast.svg)
 
 ## Discussion: what to use
 
-- **Do not ask Dynamical.org for extra variables on this evidence.** Total cloud cover is the only
-  candidate, and it adds nothing detectable to the variables the production feed already carries
-  (−0.02 points [−0.16, +0.13]). The page cannot say that total cloud cover has no value, because 25
-  months cannot resolve a gain of 0.1 points.
-- **Do not take a second IFS feed for the cloud layers on this evidence.** The cloud layers lower
-  the error by 0.21 points over the production variables, but the drop-one test is below the
-  smallest effect and the production feed's long-wave radiation, a cloud signal, was not tested.
-- **Do not choose between the MARS-only variables and a second forecast from P5.** On the ensemble
-  mean the production service reads, a second forecast adds about 0.1 points, which is unresolved
-  and about the size of the 0.13 points the ERA5 study found for the MARS-only variables.
+- **No single variable group has earned a request to Dynamical.org, but the variables jointly have a
+  gain.** Total cloud cover is unresolved (P1), and the drop-one runs find no group that the full
+  set relies on at both settings. All 14 variables beyond FP together lower FP's error by 0.36
+  points (exploratory, main setting only). That gain is measured on top of a single 9 km forecast
+  and may be smaller on the ensemble mean. Choosing which subset to request needs fits that add each
+  group to FP, which this study did not run.
+- **Do not take a second IFS feed for the cloud layers on this evidence.** The cloud layers pass the
+  pre-set drop-one rule at the main setting only, and their raise is below 0.1 points at both
+  settings. The production feed's long-wave radiation, a cloud signal, was not tested.
+- **Do not choose between the MARS-only variables and a second forecast from P5.** The pre-set rule
+  returns "second forecast". On the ensemble mean the production service reads, a second forecast
+  adds about 0.13 points, which is unresolved and about the size of the 0.13 points the ERA5 study
+  found for the MARS-only variables. A reanalysis gains about twice what a forecast does at lead day
+  1 on the cloud sets, so the MARS-only variables' gain at forecast lead is likely below 0.13
+  points. The 3-hourly ensemble mean the production service reads may do better than the 6-hourly
+  mean used here, which would leave a second forecast even less to add.
 - **Do not read the 1-point gain as the value of AIFS Single.** The ensemble mean gives the same
-  gain over the 9 km forecast, so the gain comes from replacing a noisy forecast with a smoother
-  one.
+  gain over the 9 km forecast, so most of the gain is not specific to AIFS Single.
 
 ## Limitations
 
-- **Every gain is measured on top of a single deterministic 9 km point forecast.** A smoother
-  reference, such as the ensemble mean, leaves less for any added input to fix, so every gain here
-  is likely to be smaller in production.
-- **The production service's 3-hourly ensemble is not tested.** The ensemble mean used here is on
-  6-hourly steps, and the production feed's 3-hourly mean may do slightly better.
-- **Twenty-five months are few.** They hold perhaps 150 to 250 independent weather episodes, the
-  intervals are approximate, and the post hoc contrasts use 14 months.
+- **Every planned gain is measured on top of a single deterministic 9 km point forecast.** A
+  smoother reference, such as the ensemble mean, leaves less for any added input to fix, so every
+  planned gain here is likely to be smaller in production.
+- **The production service's 3-hourly ensemble mean is not tested.** The ensemble mean used here is
+  on 6-hourly steps.
+- **Twenty-five months are few.** The intervals resample whole months and are approximate, and the
+  contrasts on the blend rows use 14 months.
 - **The first era includes a 17-day part-month, and November is scored with no November in
   training.** The blend rows have ten calendar months with no training row of the same calendar
   month.
@@ -298,9 +354,14 @@ compares](../assets/ifs_solar_variables_variables_or_forecast.svg)
   after it are too few to cut into folds.
 - **The planned contrasts were checked against controls with the same number of columns, but the
   exploratory ones were not.** The page does not correct exploratory intervals for multiple
-  comparisons, and 33 near-the-line exploratory results have no second-setting run.
-- **Some analyses are post hoc.** The ensemble-mean contrasts, the winter-fold reading, and the
-  raw-error table were added after the first scientific review, and the report labels them.
+  comparisons, and 32 near-the-line exploratory contrasts have no second-setting run.
+- **Some analyses are post hoc.** The ensemble-mean contrasts, the winter-fold reading, the
+  raw-error table, the second-setting drop-one runs and the rule that both settings must agree, and
+  the "unresolved at the smallest effect" label on the priority list were added after the first
+  scientific review. The both-settings rule reversed the pre-set outcome of the second-feed decision
+  and removed humidity, column water, and boundary-layer height from the priority list. The report
+  labels each one. Only P1 to P5, their controls, their five verdicts, and the three decision rules
+  as written are pre-registered.
 - **ICON-EU was not tested as a second forecast.**
 
 ## Scope
@@ -310,12 +371,12 @@ km IFS and AIFS Single only, and the production service's 0.25° ensemble differ
 
 ## Data and code availability
 
-**IFS forecasts come from Open-Meteo's Single Runs archive, AIFS Single from the Dynamical.org
-store, and CAMS irradiance from the Copernicus Atmosphere Data Store.** The page contains modified
-Copernicus Atmosphere Monitoring Service information. The farms' output is private to National Grid
-Electricity Distribution (NGED) and appears only as fractions of each farm's capacity under labels A
-to F. The code is in `studies/ifs_solar_variables/` and `packages/studies/`. XGBoost runs on a
-graphics processing unit with `colsample_bytree=1`.
+**IFS forecasts come from Open-Meteo's Single Runs archive, AIFS Single and the ensemble mean from
+the Dynamical.org store, and CAMS irradiance from the Copernicus Atmosphere Data Store.** The page
+contains modified Copernicus Atmosphere Monitoring Service information. The farms' output is private
+to National Grid Electricity Distribution (NGED) and appears only as fractions of each farm's
+capacity under labels A to F. The code is in `studies/ifs_solar_variables/` and `packages/studies/`.
+XGBoost runs on a graphics processing unit with `colsample_bytree=1`.
 
 ## Reproducing the figures
 

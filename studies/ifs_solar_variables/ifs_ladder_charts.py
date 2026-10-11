@@ -218,7 +218,7 @@ CLEAR_SKY_INDEX_KEY: Final[str] = (
 Y_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 """The error axis title."""
 
-HOUR_AXIS_TITLE: Final[str] = "Hour of day (UTC; the hour ending at that time)"
+HOUR_AXIS_TITLE: Final[str] = "Hour ending (UTC)"
 """The title of every hour-of-day axis, which says which hour a label names."""
 
 
@@ -458,7 +458,8 @@ def figure_headline(
     return figure(
         panels=[panel],
         number=IFS_FIGURE_NUMBERS["headline"],
-        title="Change in solar farm error from adding IFS variables: the five planned contrasts",
+        title="Change in solar farm error from adding IFS variables or a second forecast: the five "
+        "planned contrasts",
         subtitle=[
             scope,
             (
@@ -1376,6 +1377,17 @@ def figure_variables_or_forecast(
     x_title = (
         "Mean absolute error minus the reference's (points of capacity; more negative is better)"
     )
+    production = production_relevant_rows(contrasts=contrasts)
+    shared_domain = _domain(
+        values=[
+            value
+            for frame in (gain_rows, production)
+            if frame is not None
+            for column in ("lower", "upper", "thick_lower", "thick_upper")
+            for value in frame[column].to_list()
+        ]
+        + [0.0, -smallest]
+    )
     panels = [
         dot_interval_panel(
             rows=gain_rows,
@@ -1383,9 +1395,9 @@ def figure_variables_or_forecast(
             panel_title="Panel 1: the three gains the third decision compares (planned)",
             colour=ocf.DATA_PURPLE,
             reference_rules=(0.0, -smallest),
+            domain=shared_domain,
         )
     ]
-    production = production_relevant_rows(contrasts=contrasts)
     if production is not None:
         panels.append(
             dot_interval_panel(
@@ -1394,6 +1406,7 @@ def figure_variables_or_forecast(
                 panel_title="Panel 2: a second forecast added to the ensemble mean (post hoc)",
                 colour=ocf.DATA_BLUE,
                 reference_rules=(0.0, -smallest),
+                domain=shared_domain,
             )
         )
     for lead_day in (1, 3):
@@ -1570,7 +1583,10 @@ def main() -> int:
             "variables_or_forecast",
             not contrasts.is_empty() and not board.is_empty(),
             lambda: figure_variables_or_forecast(
-                contrasts=contrasts, board=board, blend_span=blend_span, scope=scope
+                contrasts=contrasts,
+                board=board,
+                blend_span=blend_span,
+                scope=scope.replace(span, blend_span),
             ),
         ),
     ]

@@ -346,7 +346,7 @@ ARM_LABELS: Final[dict[str, str]] = {
     "f3": "F3 + direct radiation",
     "f4": "F4 + humidity, column water, boundary layer",
     "f5": "F5 + convection, visibility",
-    "f6": "F6 + surface and weather state (all 20)",
+    "f6": "F6 + surface, weather (all 20)",
     PRODUCTION_ARM: "FP production reference",
     BLEND_ARM: "FB F0 + AIFS Single",
     BLEND_FULL_ARM: "F6B F6 + AIFS Single",

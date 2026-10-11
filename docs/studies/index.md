@@ -171,10 +171,9 @@ a
   with ECMWF ENS's mean. The comparison is descriptive and uses stitched series that carry no run
   time.
 - [Which IFS forecast variables, or which second forecast, help a solar power
-  forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, none of the extra variables
-  in
-  ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved amount, and adding
-  AIFS
-  Single's radiation and temperature lowers it by about 1 point of capacity. The ensemble mean the
-  production service reads gives about the same gain, and AIFS Single adds about 0.1 points to that
-  mean, which the study cannot resolve.
+  forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, no planned step of adding
+  extra variables from ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved
+  amount, although all of them together lower it by about 0.45 points of capacity. Adding AIFS
+  Single's radiation and temperature lowers the error by about 1 point. The ensemble mean the
+  production service reads gives about the same gain, and AIFS Single adds about 0.13 points to
+  that mean, which the study cannot resolve.
