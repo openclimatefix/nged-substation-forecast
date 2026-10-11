@@ -39,7 +39,7 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Final, NamedTuple
+from typing import Final
 
 import altair as alt
 import plotting.ocf_theme as ocf
@@ -48,7 +48,15 @@ from capacity_paths import claim_root
 from contracts.settings import PROJECT_ROOT
 from studies.charts import CONTENT_WIDTH_PX, ticks, wrapped
 from studies.charts import figure as captioned_figure
-from studies.guards import refuse_to_overwrite
+from studies.report_text import (
+    BOOT_PATTERN,
+    INTERVAL_PATTERN,
+    NUMBER_PATTERN,
+    T_PATTERN,
+    Estimate,
+    ReportText,
+    estimate_in,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("effective_capacity_charts")
@@ -124,141 +132,6 @@ ESTIMATOR_TITLES: Final[dict[str, str]] = {
     "DSKF": "DSKF: deseasonalised KF",
 }
 """The name drawn above each estimator's panel."""
-
-
-class Estimate(NamedTuple):
-    """A point estimate and its interval, in points of capacity."""
-
-    point: float
-    low: float
-    high: float
-
-
-class ReportText:
-    """The study's `report.md`, with lookups that raise unless they find exactly one match."""
-
-    def __init__(self, *, path: Path) -> None:
-        """Read the report.
-
-        Args:
-            path: The report's path.
-        """
-        self.lines: list[str] = path.read_text().splitlines()
-
-    def section(self, *, heading: str) -> list[str]:
-        """Return the lines under a heading, up to the next heading.
-
-        Args:
-            heading: The heading's text, without its leading hashes.
-
-        Returns:
-            The lines.
-
-        Raises:
-            ValueError: If the heading is not found exactly once.
-        """
-        starts = [
-            index
-            for index, line in enumerate(self.lines)
-            if line.startswith("#") and line.lstrip("#").strip() == heading
-        ]
-        if len(starts) != 1:
-            msg = f"heading {heading!r} found {len(starts)} times in the report"
-            raise ValueError(msg)
-        body: list[str] = []
-        for line in self.lines[starts[0] + 1 :]:
-            if line.startswith("#"):
-                break
-            body.append(line)
-        return body
-
-    def line(self, *, heading: str, prefix: str) -> str:
-        """Return the one line under a heading that starts with a prefix.
-
-        Args:
-            heading: The heading.
-            prefix: The line's start.
-
-        Returns:
-            The line.
-
-        Raises:
-            ValueError: If no line, or more than one, matches.
-        """
-        found = [line for line in self.section(heading=heading) if line.startswith(prefix)]
-        if len(found) != 1:
-            msg = f"{len(found)} lines start with {prefix!r} under {heading!r}"
-            raise ValueError(msg)
-        return found[0]
-
-    def table(self, *, heading: str) -> pl.DataFrame:
-        """Return the first markdown table under a heading.
-
-        Args:
-            heading: The heading.
-
-        Returns:
-            The table, with cells that read as numbers as floats and `None` cells as nulls.
-
-        Raises:
-            ValueError: If the section holds no table.
-        """
-        block: list[str] = []
-        for line in self.section(heading=heading):
-            if line.startswith("|"):
-                block.append(line)
-            elif block:
-                break
-        rows = [[cell.strip() for cell in line.strip().strip("|").split("|")] for line in block]
-        if len(rows) < 3:
-            msg = f"no table under {heading!r}"
-            raise ValueError(msg)
-        header, body = rows[0], rows[2:]
-        return pl.DataFrame(
-            {name: [_cell(row[index]) for row in body] for index, name in enumerate(header)},
-            strict=False,
-        )
-
-
-def _cell(text: str) -> float | str | None:
-    """Read a table cell as a float, a null for `None`, or the text."""
-    if text == "None":
-        return None
-    try:
-        return float(text)
-    except ValueError:
-        return text
-
-
-_NUMBER: Final[str] = r"([+-]?\d+\.\d+)"
-_INTERVAL: Final[str] = rf"\[{_NUMBER}, {_NUMBER}\]"
-
-
-def estimate_in(*, line: str, pattern: str) -> Estimate:
-    """Read an estimate and an interval out of a report line.
-
-    Args:
-        line: The report line.
-        pattern: A regular expression with three groups: the point, the low end, and the high end.
-
-    Returns:
-        The estimate.
-
-    Raises:
-        ValueError: If the pattern does not match.
-    """
-    found = re.search(pattern, line)
-    if found is None:
-        msg = f"{pattern!r} does not match {line!r}"
-        raise ValueError(msg)
-    return Estimate(*(float(group) for group in found.groups()))
-
-
-T_PATTERN: Final[str] = rf"{_NUMBER} points; month t-interval {_INTERVAL}"
-"""A point and its month t-interval, as the post hoc section prints them."""
-
-BOOT_PATTERN: Final[str] = rf"{_NUMBER} points, bootstrap {_INTERVAL}"
-"""A point and its bootstrap interval, as the stage B section prints them."""
 
 
 class FigureText:
@@ -470,7 +343,7 @@ def dot_interval_panel(
         .mark_text(align="left", dx=6, fontSize=11, color=ocf.BLACK_1, aria=False)
         .encode(y=y, x=alt.X("text_x:Q", scale=scale, axis=x_axis), text="text:N")  # ty: ignore[unresolved-attribute]
     )
-    return alt.layer(*layers).properties(width=PLOT_WIDTH_PX, height=ROW_STEP_PX * rows.height)
+    return alt.LayerChart(layer=layers, width=PLOT_WIDTH_PX, height=ROW_STEP_PX * rows.height)
 
 
 def make_rows(
@@ -574,7 +447,10 @@ def headline_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart
         The figure.
     """
     p1_heading = "P1 (planned): the selected causal arm minus B0, pooled over the plants"
-    p1_pattern = rf"difference {_NUMBER} points; \*\*headline: month t-interval {_INTERVAL}\*\*"
+    p1_pattern = (
+        rf"difference {NUMBER_PATTERN} points; "
+        rf"\*\*headline: month t-interval {INTERVAL_PATTERN}\*\*"
+    )
     kf = {
         setting: estimate_in(
             line=report.line(heading=p1_heading, prefix=f"- {setting}:"), pattern=p1_pattern
@@ -1028,8 +904,8 @@ def seasonal_figure(*, root: Path, text: FigureText) -> alt.VConcatChart:
     one = (
         alt.Chart(pl.DataFrame({"y": [1.0]}))
         .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3], aria=False)
-        .encode(y="y:Q")
-    )  # ty: ignore[unresolved-attribute]
+        .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+    )
     panel = (one_plant + across + one).properties(width=CONTENT_WIDTH_PX - 90, height=210)
     title = "The Kalman filter's raw capacity level is lowest in December at every plant"
     subtitle = [
@@ -1129,7 +1005,7 @@ def low_months_figure(*, report: ReportText, text: FigureText) -> alt.VConcatCha
     Returns:
         The figure.
     """
-    pattern = rf"{_NUMBER} points on the .*?, {_NUMBER} points on every other row"
+    pattern = rf"{NUMBER_PATTERN} points on the .*?, {NUMBER_PATTERN} points on every other row"
     kf_line = report.line(
         heading="POST HOC: break-even share of low-output rows", prefix="- row-weighted"
     )
@@ -1390,7 +1266,13 @@ def explainability_figure(*, report: ReportText, text: FigureText) -> alt.VConca
                 sort=list(criteria.values()),
                 title=None,
                 axis=alt.Axis(
-                    orient="top", labelAngle=0, labelLimit=0, labelExpr="split(datum.label, ' ')"
+                    orient="top",
+                    labelAngle=0,
+                    labelLimit=0,
+                    labelExpr="split(datum.label, ' ')",
+                    labelPadding=22,
+                    ticks=False,
+                    domain=False,
                 ),
             ),
             y=alt.Y("estimator:N", sort=order, title=None),
@@ -1404,11 +1286,11 @@ def explainability_figure(*, report: ReportText, text: FigureText) -> alt.VConca
     words = (
         alt.Chart(long)
         .mark_text(fontSize=10, color=ocf.BLACK_1, aria=False)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("criterion:N", sort=list(criteria.values())),
             y=alt.Y("estimator:N", sort=order),
             text="grade:N",
-        )  # ty: ignore[unresolved-attribute]
+        )
     )
     scores = (
         alt.Chart(
@@ -1419,9 +1301,9 @@ def explainability_figure(*, report: ReportText, text: FigureText) -> alt.VConca
             )
         )
         .mark_text(align="left", fontSize=12, fontWeight="bold", color=ocf.BLACK_1, aria=False)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("estimator:N", sort=order), text="score_text:N", x=alt.value(PLOT_WIDTH_PX + 8)
-        )  # ty: ignore[unresolved-attribute]
+        )
     )
     header = (
         alt.Chart(pl.DataFrame({"t": ["Score"]}))
@@ -1481,7 +1363,10 @@ def hindsight_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChar
         pattern=BOOT_PATTERN,
     )
     why = "POST HOC: why hindsight is worse than causal"
-    boot = rf"{_NUMBER} points; month t-interval {_INTERVAL}; bootstrap 95% {_INTERVAL}"
+    boot = (
+        rf"{NUMBER_PATTERN} points; month t-interval {INTERVAL_PATTERN}; "
+        rf"bootstrap 95% {INTERVAL_PATTERN}"
+    )
 
     def bootstrap_estimate(prefix: str) -> Estimate:
         found = re.search(boot, report.line(heading=why, prefix=prefix))
@@ -1581,19 +1466,11 @@ def render_figures(*, figures: dict[int, alt.VConcatChart], output: Path) -> Non
         output: The folder for the raw SVGs and PNGs.
 
     Raises:
-        FileExistsError: If a raw or published file already exists.
         subprocess.CalledProcessError: If svgo fails.
         ValueError: If a figure is wider than the text column.
     """
     output.mkdir(exist_ok=True)
     published = {n: DOCS_ASSETS_DIR / f"{ASSET_PREFIX}{n}.svg" for n in figures}
-    refuse_to_overwrite(
-        paths=[
-            *(output / f"figure_{n}.svg" for n in figures),
-            *(output / f"figure_{n}.png" for n in figures),
-            *published.values(),
-        ]
-    )
     DOCS_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     for number, chart in figures.items():
         raw = output / f"figure_{number}.svg"
