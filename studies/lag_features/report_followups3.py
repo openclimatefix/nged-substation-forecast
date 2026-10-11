@@ -908,6 +908,45 @@ def plant_control_lines(
     return lines, table
 
 
+def did_record(*, data: Aligned, arm: str, window: str) -> dict[str, object]:
+    """Compute the difference-in-differences of an arm's gap to B0 with and without day of year.
+
+    The statistic is (arm minus B0) minus (arm-noDOY minus B0-noDOY), paired by row and seed.
+
+    Args:
+        data: The aligned series, with each arm, B0, and their `-noDOY` refits.
+        arm: The arm.
+        window: The window's name, for the record.
+
+    Returns:
+        The record, as `contrast_record` returns it.
+    """
+    without = f"{arm}{NO_DAY_OF_YEAR}"
+    boot = month_bootstrap(
+        data=data,
+        statistic=lambda d: float(
+            ((d[arm] - d["B0"]) - (d[without] - d[f"B0{NO_DAY_OF_YEAR}"])).mean()
+        ),
+    )
+    centre, t_lower, t_upper, n_months = month_t_interval(
+        difference=(data.values[arm] - data.values["B0"])
+        - (data.values[without] - data.values[f"B0{NO_DAY_OF_YEAR}"]),
+        months=data.month,
+    )
+    return {
+        "window": window,
+        "contrast": f"({arm} minus B0) minus ({arm}-noDOY minus B0-noDOY)",
+        "difference": boot["value"],
+        "boot_lower": boot["lower_95"],
+        "boot_upper": boot["upper_95"],
+        "t_centre": centre,
+        "t_lower": t_lower,
+        "t_upper": t_upper,
+        "n_months": n_months,
+        "n_rows": data.n_rows,
+    }
+
+
 def fit_sections(  # noqa: PLR0915
     *, root: Path, lead1: pl.DataFrame, fits2: pl.DataFrame, fit_path: Path
 ) -> tuple[list[str], dict[str, pl.DataFrame]]:
@@ -1099,6 +1138,16 @@ def fit_sections(  # noqa: PLR0915
                     window=window,
                 )
             )
+            doy_records.append(
+                contrast_record(
+                    data=subset,
+                    treatment=with_name,
+                    reference="B0",
+                    label=f"{arm} minus B0 (with day_of_year)",
+                    window=window,
+                )
+            )
+            doy_records.append(did_record(data=subset, arm=arm, window=window))
     tables["no_day_of_year_more"] = pl.DataFrame(doy_records)
     lines += [
         "### 2. No day of year for more arms",
