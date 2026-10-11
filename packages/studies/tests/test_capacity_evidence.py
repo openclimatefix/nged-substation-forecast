@@ -161,3 +161,50 @@ def test_the_cap_overlay_reports_the_share_of_daylight_hours_it_binds() -> None:
     assert evidence.cap_binding_share[51] == pytest.approx(0.0)
     assert evidence.cap_mean_mw is not None
     assert evidence.cap_mean_mw[50] == pytest.approx(2.0)
+
+
+def _series(*, dip: tuple[int, int, float] | None, days: int = 400) -> np.ndarray:
+    values = 1.0 + 0.03 * np.random.default_rng(8).standard_normal(days)
+    if dip is not None:
+        start, length, size = dip
+        values[start : start + length] *= 1.0 - size
+    return values
+
+
+def test_the_local_scan_brackets_a_one_month_loss_and_ignores_a_flat_series() -> None:
+    from studies.capacity_evidence import local_scan
+
+    found = local_scan(
+        clear_ratio=_series(dip=(150, 30, 0.3)), all_sky_ratio=_series(dip=(150, 30, 0.3))
+    )
+    assert len(found) == 1
+    episode = found[0]
+    assert episode.direction == "down"
+    assert abs(episode.deepest_start - 150) <= 5
+    assert episode.first_day <= 160
+    assert episode.last_day >= 170
+    assert episode.last_day - episode.first_day < 60
+    assert episode.effect == pytest.approx(-0.3, abs=0.04)
+    assert episode.all_sky_effect == pytest.approx(-0.3, abs=0.04)
+    assert local_scan(clear_ratio=_series(dip=None), all_sky_ratio=_series(dip=None)) == ()
+
+
+def test_the_local_scan_needs_enough_observations_and_lists_at_most_fifteen_episodes() -> None:
+    from studies.capacity_evidence import LOCAL_MAX_EPISODES, local_scan
+
+    sparse = _series(dip=(150, 30, 0.3))
+    sparse[100:260] = np.nan
+    assert local_scan(clear_ratio=sparse, all_sky_ratio=sparse) == ()
+    wavy = 1.0 + 0.4 * np.sign(np.sin(np.arange(2000) * 2 * np.pi / 90))
+    assert len(local_scan(clear_ratio=wavy, all_sky_ratio=wavy)) <= LOCAL_MAX_EPISODES
+
+
+def test_the_local_scan_of_a_cut_record_ignores_later_days() -> None:
+    record = _record()
+    scrambled = scramble_from_day(
+        record=record, first_day=LAST_DAY + 1, seed=3, scramble_static=True
+    )
+    assert (
+        _evidence(record=record, last_day=LAST_DAY).local_episodes
+        == _evidence(record=scrambled, last_day=LAST_DAY).local_episodes
+    )

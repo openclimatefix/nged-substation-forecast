@@ -47,6 +47,18 @@ class EstimatorPanel:
     title: str
 
 
+ROUND2_PANELS: Final[tuple[EstimatorPanel, ...]] = (
+    EstimatorPanel(key="S0", title="Static 99th-percentile power (no estimator)"),
+    EstimatorPanel(key="HYST2", title="HYST2: hold, then follow a lasting drop"),
+    EstimatorPanel(key="HM2", title="HM2: hidden Markov model over capacity levels"),
+    EstimatorPanel(key="tools_only_v1", title="Round 1 tools-only rule (changepoint list)"),
+    EstimatorPanel(key="tools_only_v2", title="Round 2 tools-only rule (local scan)"),
+    EstimatorPanel(key="llm_v1", title="Round 1 language-model labeller, hindsight"),
+    EstimatorPanel(key="llm_v2", title="Round 2 language-model labeller, hindsight"),
+    EstimatorPanel(key="llm_causal_v2", title="Round 2 language-model labeller, causal (6 months)"),
+)
+"""The eight panels of round 2's figures (post hoc), top to bottom."""
+
 ESTIMATOR_PANELS: Final[tuple[EstimatorPanel, ...]] = (
     EstimatorPanel(key="S0", title="Static 99th-percentile power (no estimator)"),
     EstimatorPanel(key="HYST2", title="HYST2: hold, then follow a lasting drop"),
@@ -211,6 +223,7 @@ def estimate_figure(
     number: str,
     title: str,
     subtitle: Sequence[str],
+    panel_set: Sequence[EstimatorPanel] = ESTIMATOR_PANELS,
 ) -> alt.VConcatChart:
     """Stack the seven estimator panels for one plant and window.
 
@@ -224,6 +237,7 @@ def estimate_figure(
         number: The figure's number on its page.
         title: The figure's title.
         subtitle: The subtitle lines.
+        panel_set: The panels to draw, top to bottom; the default is `ESTIMATOR_PANELS`.
 
     Returns:
         The figure.
@@ -234,7 +248,7 @@ def estimate_figure(
     losses = loss_windows(events=events, plant=plant, window=window)
     days = window[1] - window[0]
     panels = []
-    for index, panel in enumerate(ESTIMATOR_PANELS):
+    for index, panel in enumerate(panel_set):
         series = capacities.get(panel.key)
         rows = window_rows(maximum=maximum, capacity=series, window=window)
         has_values = series is not None and bool(np.isfinite(series[window[0] : window[1]]).any())
@@ -245,7 +259,7 @@ def estimate_figure(
                 losses=losses,
                 top_mw=top,
                 days=days,
-                show_axis=index == len(ESTIMATOR_PANELS) - 1,
+                show_axis=index == len(panel_set) - 1,
                 missing_note=None if has_values else "no estimate for this window",
             )
         )

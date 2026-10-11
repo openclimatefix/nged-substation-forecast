@@ -398,6 +398,31 @@ class BudgetGuard:
                 )
         return guard
 
+    @classmethod
+    def for_round(
+        cls, *, log_path: Path, round_usd: float, round_calls: int, round_input_tokens: int
+    ) -> Self:
+        """Start a guard for a later round that counts everything already in the log.
+
+        The study's total ceiling still holds (`COST_CEILING_USD`), and the round gets its own
+        smaller allowance on top of what was spent before it.
+
+        Args:
+            log_path: The call log, holding every earlier round's calls.
+            round_usd: The most this round may spend.
+            round_calls: The most calls this round may make, retries included.
+            round_input_tokens: The most input tokens this round may send.
+
+        Returns:
+            A guard whose totals are the log's and whose limits are the earlier totals plus the
+            round's allowance, with the cost limit never above `COST_CEILING_USD`.
+        """
+        guard = cls.from_log(log_path=log_path)
+        guard.ceiling_usd = min(COST_CEILING_USD, guard.spent_usd + round_usd)
+        guard.max_calls = guard.calls + round_calls
+        guard.max_input_tokens = guard.input_tokens + round_input_tokens
+        return guard
+
     def check(self, *, prompt: Prompt) -> None:
         """Raise before a call that could cross a ceiling.
 

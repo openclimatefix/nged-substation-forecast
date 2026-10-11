@@ -97,6 +97,56 @@ def rejection_share(*, tables: Path) -> pl.DataFrame | None:
     )
 
 
+def round2_sections(*, root: Path) -> list[str]:
+    """Return the report's round-2 sections (post hoc), or an empty list before round 2 ran.
+
+    Args:
+        root: The output root.
+
+    Returns:
+        Sections for the budget, the contrasts, the event scores, the controls, false movement,
+        the matching-candidate cases of round 1, and round 2's quoted reasons for no change.
+    """
+    tables = root / "tables_round2"
+    if not tables.exists():
+        return []
+    parts = ["# Round 2 (post hoc)\n"]
+    estimate = tables.parent / "tables" / "round2_budget_estimate.json"
+    if estimate.exists():
+        data = json.loads(estimate.read_text())
+        data.pop("groups", None)
+        parts.append(
+            _section(
+                title="Round 2 budget estimate", body=f"```json\n{json.dumps(data, indent=2)}\n```"
+            )
+        )
+    summary = event_summary(tables=tables)
+    parts.append(
+        _section(
+            title="Round 2 event scores by arm and shape (new draws 03 and 04)",
+            body="_missing_" if summary is None else _markdown(frame=summary),
+        )
+    )
+    for title, name in (
+        (
+            "Round 2 post hoc contrasts (points of capacity; negative favours the left arm)",
+            "contrasts.parquet",
+        ),
+        (
+            "Round 2 controls, and round 1's control rescored per run of adjacent months",
+            "controls.parquet",
+        ),
+        ("Round 2 false movement on the 23 quiet plant-months", "false_movement.parquet"),
+        (
+            "Round 1: planted losses with a matching candidate that the model left unmarked",
+            "matching_candidate_cases.parquet",
+        ),
+        ("Round 2: the model's note on why there was no change", "round2_no_change_notes.parquet"),
+    ):
+        parts.append(_table_section(title=title, path=tables / name))
+    return parts
+
+
 def main() -> int:  # noqa: PLR0915 - one linear script of report sections
     """Write and print the report."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -105,6 +155,10 @@ def main() -> int:  # noqa: PLR0915 - one linear script of report sections
     root = claim_root(smoke=arguments.smoke)
     tables = tables_dir(root=root)
     parts = ["# Report: can a language model label a solar plant's capacity changes?\n"]
+    parts.append(
+        "**Round 1 was planned and ran as designed. Round 2 is post hoc: its tools and prompt were "
+        "changed after round 1's draws 01 and 02, and it is judged on new draws 03 and 04.**\n"
+    )
     if arguments.smoke:
         parts.append(
             "**Smoke run: a stub model answered every prompt. Nothing here is a result.**\n"
@@ -252,6 +306,7 @@ def main() -> int:  # noqa: PLR0915 - one linear script of report sections
                 body=_markdown(frame=total),
             )
         )
+    parts += round2_sections(root=root)
     text = "\n".join(parts)
     (root / "report.md").write_text(text)
     print(text)

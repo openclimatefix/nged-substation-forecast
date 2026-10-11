@@ -34,6 +34,8 @@ from labeller_paths import (
 from studies.capacity_estimators import CapacityRecord
 from studies.capacity_evidence import CapOverlay, Evidence, PlantFit, build_evidence
 from studies.capacity_labeller import (
+    SYSTEM_PROMPT,
+    SYSTEM_PROMPT_V2,
     Answer,
     CaseKindType,
     Knot,
@@ -44,6 +46,9 @@ from studies.capacity_labeller import (
     chart_pngs,
 )
 from studies.capacity_sanity import SanityOutcome, apply_causal
+
+VersionType = Literal["v1", "v2"]
+"""Round 1 (`v1`, planned) or round 2 (`v2`, post hoc: the local scan and the softer prompt)."""
 
 ArmType = Literal["tools_llm", "raw_llm"]
 """The two arms that call the language model: with the six tools, and with weekly summaries only."""
@@ -103,17 +108,20 @@ class HindsightJob:
         record_id: The record read.
         plant: The plant's index.
         sample_index: Which sample of the same prompt.
+        version: The round: `v1` (planned) or `v2` (post hoc).
     """
 
     arm: ArmType
     record_id: RecordIdType
     plant: int
     sample_index: int
+    version: VersionType = "v1"
 
     @property
     def label(self) -> str:
         """A description for the log."""
-        return f"hindsight/{self.arm}/{self.record_id}/plant{self.plant}/s{self.sample_index}"
+        prefix = "hindsight" if self.version == "v1" else "r2/hindsight"
+        return f"{prefix}/{self.arm}/{self.record_id}/plant{self.plant}/s{self.sample_index}"
 
 
 def hindsight_jobs(*, plants: int, tools_samples: int = TOOLS_SAMPLES) -> list[HindsightJob]:
@@ -184,7 +192,12 @@ class LabellerContext:
 
     @functools.cache  # noqa: B019
     def hindsight_case(
-        self, *, record_id: RecordIdType, plant: int, kind: CaseKindType
+        self,
+        *,
+        record_id: RecordIdType,
+        plant: int,
+        kind: CaseKindType,
+        version: VersionType = "v1",
     ) -> CaseFile:
         """Return the whole-record case file of one plant, built once.
 
@@ -192,16 +205,20 @@ class LabellerContext:
             record_id: The record read.
             plant: The plant's index.
             kind: `tools` for the six tools and the two charts, `raw` for weekly summaries only.
+            version: `v2` adds the local-scan table and uses the round-2 system prompt for `tools`.
 
         Returns:
             The case file, whose knots may take any date of the record.
         """
         evidence = self.evidence(record_id=record_id, plant=plant, last_day=len(self.dates) - 1)
-        text = case_file_text(evidence=evidence, kind=kind, shown_months=None)
+        scan = version == "v2" and kind == "tools"
+        text = case_file_text(evidence=evidence, kind=kind, shown_months=None, local_scan=scan)
         images = chart_pngs(evidence=evidence, shown_months=None) if kind == "tools" else ()
         first_day, last_day = allowed_window(text=text)
         return CaseFile(
-            prompt=build_prompt(text=text, images=images),
+            prompt=build_prompt(
+                text=text, images=images, system=SYSTEM_PROMPT_V2 if scan else SYSTEM_PROMPT
+            ),
             evidence=evidence,
             first_day=first_day,
             last_day=last_day,
@@ -214,6 +231,7 @@ class LabellerContext:
         plant: int,
         issue_day: date,
         current_knots: tuple[Knot, ...],
+        version: VersionType = "v1",
     ) -> CaseFile:
         """Return the case file of one plant on one issue date.
 
@@ -222,6 +240,7 @@ class LabellerContext:
             plant: The plant's index.
             issue_day: The day the labeller is asked.
             current_knots: The estimate the previous call left.
+            version: `v2` adds the local-scan table and uses the round-2 system prompt.
 
         Returns:
             The case file, cut at the issue day minus `READABLE_LAG_DAYS`.
@@ -235,11 +254,16 @@ class LabellerContext:
             current_knots=current_knots,
             issue_day=issue_day,
             period_first=CAUSAL_PERIOD_FIRST,
+            local_scan=version == "v2",
         )
         images = chart_pngs(evidence=evidence, shown_months=CAUSAL_SHOWN_MONTHS)
         first_day, last_day = allowed_window(text=text)
         return CaseFile(
-            prompt=build_prompt(text=text, images=images),
+            prompt=build_prompt(
+                text=text,
+                images=images,
+                system=SYSTEM_PROMPT_V2 if version == "v2" else SYSTEM_PROMPT,
+            ),
             evidence=evidence,
             first_day=first_day,
             last_day=last_day,
@@ -260,7 +284,10 @@ def run_hindsight_job(
         The model's answer, before the hard checks, and the evidence it was written from.
     """
     case = context.hindsight_case(
-        record_id=job.record_id, plant=job.plant, kind="tools" if job.arm == "tools_llm" else "raw"
+        record_id=job.record_id,
+        plant=job.plant,
+        kind="tools" if job.arm == "tools_llm" else "raw",
+        version=job.version,
     )
     answer = answer_function(
         prompt=case.prompt,
@@ -297,6 +324,7 @@ def run_causal_chain(
     record_id: RecordIdType,
     plant: int,
     answer_function: AnswerFunction,
+    version: VersionType = "v1",
 ) -> list[CausalStep]:
     """Make (or read back) the six causal calls of one plant on one record, in date order.
 
@@ -305,20 +333,26 @@ def run_causal_chain(
         record_id: The record read.
         plant: The plant's index.
         answer_function: Turns the case file into a validated answer.
+        version: The round.
 
     Returns:
         One step per issue date; each call is shown the knots the previous step kept.
     """
     steps: list[CausalStep] = []
     current: tuple[Knot, ...] = ()
+    prefix = "causal" if version == "v1" else "r2/causal"
     for issue_day in CAUSAL_ISSUE_DAYS:
         case = context.causal_case(
-            record_id=record_id, plant=plant, issue_day=issue_day, current_knots=current
+            record_id=record_id,
+            plant=plant,
+            issue_day=issue_day,
+            current_knots=current,
+            version=version,
         )
         answer = answer_function(
             prompt=case.prompt,
             sample_index=0,
-            label=f"causal/{record_id}/plant{plant}/{issue_day}",
+            label=f"{prefix}/{record_id}/plant{plant}/{issue_day}",
             plant=context.sites[plant],
             first_day=case.first_day,
             last_day=case.last_day,
@@ -330,3 +364,53 @@ def run_causal_chain(
         )
         current = outcome.answer.knots
     return steps
+
+
+ROUND2_TOOLS_RECORDS: Final[tuple[RecordIdType, ...]] = ("draw03", "draw04", "original")
+"""The records round 2's tools-plus-model arm reads: the two new draws and the original."""
+
+ROUND2_V1_RECORDS: Final[tuple[RecordIdType, ...]] = ("draw03", "draw04")
+"""The new draws on which round 1's tools-plus-model arm is re-run, so v1 and v2 are paired."""
+
+ROUND2_CONTROL_RECORDS: Final[tuple[RecordIdType, ...]] = ("control2", "null")
+"""Round 2's non-adjacent positive control and the synthetic null record."""
+
+ROUND2_CAUSAL_RECORDS: Final[tuple[RecordIdType, ...]] = ("original", "draw03")
+"""The records round 2's causal role reads."""
+
+
+def round2_jobs(*, plants: int, tools_samples: int = TOOLS_SAMPLES) -> list[HindsightJob]:
+    """List round 2's hindsight and control calls in the order they run.
+
+    Args:
+        plants: The number of plants.
+        tools_samples: Samples per plant and record in the arms with the tools.
+
+    Returns:
+        v2 tools plus model on the two new draws and the original, v1 tools plus model on the two
+        new draws, the raw-summary arm on the two new draws, then the v2 controls: 36 + 24 + 12 + 12
+        calls at 6 plants and 2 samples.
+    """
+    jobs = [
+        HindsightJob("tools_llm", record_id, plant, sample, "v2")
+        for record_id in ROUND2_TOOLS_RECORDS
+        for plant in range(plants)
+        for sample in range(tools_samples)
+    ]
+    jobs += [
+        HindsightJob("tools_llm", record_id, plant, sample, "v1")
+        for record_id in ROUND2_V1_RECORDS
+        for plant in range(plants)
+        for sample in range(tools_samples)
+    ]
+    jobs += [
+        HindsightJob("raw_llm", record_id, plant, 0, "v1")
+        for record_id in ROUND2_V1_RECORDS
+        for plant in range(plants)
+    ]
+    jobs += [
+        HindsightJob("tools_llm", record_id, plant, 0, "v2")
+        for record_id in ROUND2_CONTROL_RECORDS
+        for plant in range(plants)
+    ]
+    return jobs

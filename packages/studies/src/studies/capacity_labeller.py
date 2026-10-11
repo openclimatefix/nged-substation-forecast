@@ -55,6 +55,10 @@ TOOLS_ONLY_MAX_P: Final[float] = 0.01
 TOOLS_ONLY_MIN_SIZE: Final[float] = 0.08
 """The tools-only rule ignores a changepoint smaller than this fraction."""
 
+TOOLS_V2_MAX_EPISODES: Final[int] = 5
+"""Round 2's tools-only rule marks at most this many episodes (the deepest), so that its knots,
+four to an episode and one opening knot, stay within `MAX_KNOTS`."""
+
 TOOLS_ONLY_MIN_LEVEL: Final[float] = 0.25
 TOOLS_ONLY_MAX_LEVEL: Final[float] = 1.05
 """The tools-only rule keeps each segment's level, a share of the static power, between these, so
@@ -113,6 +117,38 @@ Reply with this JSON shape only:
 "knots": [{"date": "YYYY-MM-DD", "capacity_mw": <number>, "cause": "<cause>", \
 "evidence": ["<short fact>"]}]}"""
 """The fixed system prompt, identical for every call of every arm."""
+
+
+_V2_RULE_OLD: Final[str] = "Write a knot only when several tools agree on a change that lasts."
+_V2_RULE_NEW: Final[str] = (
+    "Write a knot pair when several tools agree on a change. A loss that lasts a month or more is "
+    "a legitimate change when the local-scan table and the monthly table both show a fall of "
+    "similar size at the same dates, even if the changepoint list lists nothing there. Write the "
+    "drop and the recovery as two knot pairs."
+)
+_V2_READING_OLD: Final[str] = "- Changepoint candidates come from"
+_V2_READING_NEW: Final[str] = (
+    "- The local scan compares every 30-day window with the 30 days either side of it, on the "
+    "corrected clear-sky ratio and on the all-sky ratio of energy to modelled energy. An episode "
+    "lists the days it spans, the deepest window's fall or rise, and the all-sky figure for that "
+    "window. A one-month loss shows as a down episode with a matching fall in the monthly table. "
+    "Some episodes are noise, so check each against the monthly table.\n"
+    "- Changepoint candidates come from"
+)
+SYSTEM_PROMPT_V2: Final[str] = (
+    SYSTEM_PROMPT.replace(_V2_RULE_OLD, _V2_RULE_NEW)
+    .replace(_V2_READING_OLD, _V2_READING_NEW)
+    .replace(
+        '"no_change": <true or false>, ',
+        '"no_change": <true or false>, "note": "<one sentence on why, when there is no change>", ',
+    )
+)
+"""The round-2 system prompt: round 1's with a softened rule for losses that last a month, the local
+scan described, and a one-sentence note on why there is no change."""
+
+assert _V2_RULE_NEW in SYSTEM_PROMPT_V2
+assert "local scan" in SYSTEM_PROMPT_V2
+assert '"note"' in SYSTEM_PROMPT_V2
 
 
 class AnswerError(ValueError):
@@ -387,6 +423,75 @@ def tools_only_answer(*, evidence: Evidence, first_day: date, last_day: date) ->
     )
 
 
+def tools_only_v2_answer(*, evidence: Evidence, first_day: date, last_day: date) -> Answer:
+    """Write a knot pair at the start and the end of each local-scan episode (round 2's rule).
+
+    Each episode becomes the old level the day before it starts, the level its deepest window shows
+    (the static power times one plus the effect) on its first day, the same level on its last day,
+    and the static power the day after. The cause comes from the same decision table as round 1.
+    Only the `TOOLS_V2_MAX_EPISODES` deepest episodes are used. Episodes that overlap an earlier
+    episode's knots are skipped, and the answer opens with a knot
+    at the first date at the static power.
+
+    Args:
+        evidence: The evidence.
+        first_day: The first date a knot may take.
+        last_day: The last date a knot may take.
+
+    Returns:
+        The answer; `no_change` when the scan lists no episode.
+    """
+    static = evidence.static_p99_mw
+    knots: list[Knot] = []
+    deepest = sorted(evidence.local_episodes, key=lambda e: -abs(e.effect))[:TOOLS_V2_MAX_EPISODES]
+    for episode in sorted(deepest, key=lambda e: e.first_day):
+        start = evidence.dates[episode.first_day].astype(date)
+        end = evidence.dates[min(episode.last_day, len(evidence.dates) - 1)].astype(date)
+        if start - timedelta(days=1) <= (knots[-1].day if knots else first_day) or end >= last_day:
+            continue
+        level = min(max(1.0 + episode.effect, TOOLS_ONLY_MIN_LEVEL), TOOLS_ONLY_MAX_LEVEL)
+        change = Changepoint(
+            day_index=episode.first_day,
+            day=start,
+            direction=episode.direction,
+            size=episode.effect,
+            p_value=0.0,
+            unconfirmed=False,
+        )
+        cause = tools_only_cause(evidence=evidence, change=change)
+        note = (evidence.dates[episode.deepest_start].astype(date).isoformat(),)
+        evidence_text = (f"local scan {start} to {end} {episode.effect:+.0%}", *note)
+        knots += [
+            Knot(
+                day=start - timedelta(days=1),
+                capacity_mw=static,
+                cause=cause,
+                evidence=evidence_text,
+            ),
+            Knot(day=start, capacity_mw=static * level, cause=cause, evidence=evidence_text),
+            Knot(day=end, capacity_mw=static * level, cause=cause, evidence=evidence_text),
+            Knot(
+                day=end + timedelta(days=1), capacity_mw=static, cause=cause, evidence=evidence_text
+            ),
+        ]
+    if not knots:
+        return Answer(
+            plant=evidence.plant, first_day=first_day, last_day=last_day, no_change=True, knots=()
+        )
+    opening = Knot(
+        day=first_day, capacity_mw=static, cause="model_bias", evidence=("opening level",)
+    )
+    if knots[0].day > first_day:
+        knots.insert(0, opening)
+    return Answer(
+        plant=evidence.plant,
+        first_day=first_day,
+        last_day=last_day,
+        no_change=False,
+        knots=tuple(knots),
+    )
+
+
 def _cell(*, value: float, scale: float = 100.0) -> str:
     """Format a ratio as an integer percentage, or `-` where it is NaN."""
     return "-" if not np.isfinite(value) else str(round(value * scale))
@@ -563,6 +668,32 @@ CaseKindType = Literal["tools", "raw"]
 """Which tools a case file shows: the six tools, or only weekly energy totals and data flags."""
 
 
+def local_scan_text(*, evidence: Evidence) -> str:
+    """Write the local scan's episodes, one per line.
+
+    Args:
+        evidence: The evidence.
+
+    Returns:
+        Lines of first day, last day, direction, the deepest window's effect and start, and the
+        all-sky effect, or `none found`.
+    """
+    if not evidence.local_episodes:
+        return "none found"
+    lines = []
+    for episode in evidence.local_episodes:
+        first = evidence.dates[episode.first_day]
+        last = evidence.dates[min(episode.last_day, len(evidence.dates) - 1)]
+        all_sky = (
+            "n/a" if not np.isfinite(episode.all_sky_effect) else f"{episode.all_sky_effect:+.0%}"
+        )
+        lines.append(
+            f"{first} to {last} {episode.direction} {episode.effect:+.0%} "
+            f"(deepest window starts {evidence.dates[episode.deepest_start]}; all-sky {all_sky})"
+        )
+    return "\n".join(lines)
+
+
 def case_file_text(
     *,
     evidence: Evidence,
@@ -571,6 +702,7 @@ def case_file_text(
     current_knots: Sequence[Knot] | None = None,
     issue_day: date | None = None,
     period_first: date | None = None,
+    local_scan: bool = False,
 ) -> str:
     """Write a case file as text.
 
@@ -581,6 +713,7 @@ def case_file_text(
         current_knots: The labeller's previous estimate, for a causal call, or `None`.
         issue_day: The day the labeller is asked, for a causal call, or `None`.
         period_first: The first date a knot may take, or `None` for the first day of the data.
+        local_scan: Whether to add the local-scan table (round 2's seventh evidence table).
 
     Returns:
         The case file.
@@ -633,6 +766,8 @@ def case_file_text(
         "(W/m2).\n" + envelope_text(evidence=evidence, shown_months=shown_months),
         "## Changepoint candidates\n" + changepoint_text(evidence=evidence),
     ]
+    if local_scan:
+        parts.append("## Local scan\n" + local_scan_text(evidence=evidence))
     return "\n\n".join(parts)
 
 
@@ -770,12 +905,13 @@ class Prompt:
     images: tuple[bytes, ...]
 
 
-def build_prompt(*, text: str, images: Sequence[bytes]) -> Prompt:
+def build_prompt(*, text: str, images: Sequence[bytes], system: str = SYSTEM_PROMPT) -> Prompt:
     """Wrap a case file in the fixed system prompt, after checking it names no path under `data/`.
 
     Args:
         text: The case-file text.
         images: The chart PNGs.
+        system: The system prompt, round 1's unless a round asks for another.
 
     Returns:
         The prompt.
@@ -783,11 +919,11 @@ def build_prompt(*, text: str, images: Sequence[bytes]) -> Prompt:
     Raises:
         ValueError: If the text or the system prompt holds a path under `data/`.
     """
-    for part in (SYSTEM_PROMPT, text):
+    for part in (system, text):
         if DATA_PATH_PATTERN.search(part):
             msg = "a prompt must not name a path under data/"
             raise ValueError(msg)
-    return Prompt(system=SYSTEM_PROMPT, text=text, images=tuple(images))
+    return Prompt(system=system, text=text, images=tuple(images))
 
 
 def cache_key(*, model: str, prompt: Prompt, sample_index: int) -> str:

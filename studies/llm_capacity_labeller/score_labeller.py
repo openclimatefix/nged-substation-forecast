@@ -140,7 +140,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     plants = len(context.sites)
     model: LabellerModel = CachedOnlyModel(model_id="stub" if arguments.smoke else MODEL_ID)
     store = CallStore(directory=calls_dir(root=root), log_path=log_path(root=root))
-    guard = BudgetGuard()
+    guard = BudgetGuard(ceiling_usd=1e9, max_calls=10**9, max_input_tokens=10**12)
 
     def answer_function(
         *,

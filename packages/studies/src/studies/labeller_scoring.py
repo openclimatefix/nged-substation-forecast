@@ -21,9 +21,9 @@ from typing import Final
 import numpy as np
 import polars as pl
 
-from studies.capacity_estimators import CapacityRecord, IssueScale
+from studies.capacity_estimators import CapacityRecord, IssueScale, valid_days
 from studies.capacity_labeller import Answer, Knot, capacity_series
-from studies.capacity_recovery import PlantedEvent
+from studies.capacity_recovery import MIN_CONTROL_VALID_SHARE, PlantedEvent, calendar_month_spans
 
 EVENT_WINDOW_DAYS: Final[int] = 14
 """A drop or recovery segment counts when it starts or ends this close to the event's start or
@@ -416,3 +416,66 @@ def movement_interval(
     tail = (1.0 - confidence) / 2.0
     lower, upper = np.quantile(shares, [tail, 1.0 - tail])
     return float(per_window[:, 0].sum() / per_window[:, 1].sum()), float(lower), float(upper)
+
+
+def draw_nonadjacent_control_steps(
+    *,
+    record: CapacityRecord,
+    months_per_plant: int,
+    size: float,
+    scored_months: Sequence[str],
+    barred: Mapping[int, Sequence[str]],
+    seed: int,
+) -> list[PlantedEvent]:
+    """Plant a step of one size in a few scored months per plant, never in adjacent months.
+
+    The rule is `studies.capacity_recovery.draw_control_steps`' (distinct months across plants, only
+    months with enough valid days, a plant's own low months barred) with one addition: no two steps
+    at the same plant fall in consecutive calendar months, so each loss is a separate event to find.
+
+    Args:
+        record: The record.
+        months_per_plant: The most months to plant at each plant.
+        size: The share of power lost.
+        scored_months: The `%Y-%m` labels that are the candidates.
+        barred: For a plant index, the months it may not be planted in.
+        seed: The generator's seed.
+
+    Returns:
+        The step events in plant order then month order; a plant gets fewer steps if too few
+        non-adjacent months are eligible.
+    """
+    spans = calendar_month_spans(record=record)
+    valid = valid_days(record=record)
+    eligible = {
+        plant: [
+            month
+            for month in scored_months
+            if month in spans
+            and month not in barred.get(plant, ())
+            and valid[plant, spans[month][0] : spans[month][0] + spans[month][1]].mean()
+            >= MIN_CONTROL_VALID_SHARE
+        ]
+        for plant in range(len(record.sites))
+    }
+    rng = np.random.default_rng(seed)
+    used: set[str] = set()
+    chosen: dict[int, list[str]] = {plant: [] for plant in eligible}
+    for _ in range(months_per_plant):
+        for plant in rng.permutation(list(eligible)):
+            taken = [np.datetime64(m, "M") for m in chosen[int(plant)]]
+            free = [
+                m
+                for m in eligible[int(plant)]
+                if m not in used
+                and all(abs((np.datetime64(m, "M") - t).astype(int)) >= 2 for t in taken)
+            ]
+            if free:
+                month = str(free[int(rng.integers(len(free)))])
+                used.add(month)
+                chosen[int(plant)].append(month)
+    return [
+        PlantedEvent(plant, "step", size, spans[month][0], spans[month][1])
+        for plant in sorted(chosen)
+        for month in sorted(chosen[plant])
+    ]

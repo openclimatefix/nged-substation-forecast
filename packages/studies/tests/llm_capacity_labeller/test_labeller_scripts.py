@@ -96,3 +96,40 @@ def test_every_causal_issue_day_is_after_the_cut_off_and_the_period_starts_befor
     assert labeller_jobs.READABLE_LAG_DAYS == 2
     assert all(day > labeller_jobs.CAUSAL_PERIOD_FIRST for day in labeller_jobs.CAUSAL_ISSUE_DAYS)
     assert list(labeller_jobs.CAUSAL_ISSUE_DAYS) == sorted(labeller_jobs.CAUSAL_ISSUE_DAYS)
+
+
+def test_round_two_lists_84_hindsight_calls_with_v2_tools_first_and_pairs_v1_on_the_new_draws() -> (
+    None
+):
+    jobs = labeller_jobs.round2_jobs(plants=6)
+    assert len(jobs) == 84
+    assert {(job.version, job.record_id) for job in jobs[:36]} == {
+        ("v2", record) for record in labeller_jobs.ROUND2_TOOLS_RECORDS
+    }
+    assert {(job.version, job.arm, job.record_id) for job in jobs[36:60]} == {
+        ("v1", "tools_llm", record) for record in labeller_jobs.ROUND2_V1_RECORDS
+    }
+    assert {job.arm for job in jobs[60:72]} == {"raw_llm"}
+    assert {job.record_id for job in jobs[72:]} == set(labeller_jobs.ROUND2_CONTROL_RECORDS)
+    assert len({job.label for job in jobs}) == len(jobs)
+    assert all(job.label.startswith(("r2/", "hindsight/")) for job in jobs)
+
+
+def test_adjacent_control_months_at_one_plant_merge_into_one_run() -> None:
+    from score_round2 import merge_adjacent_events, note_of
+    from studies.capacity_recovery import PlantedEvent
+
+    events = [
+        PlantedEvent(plant=0, shape="step", size=0.3, first_day=100, month_days=30),
+        PlantedEvent(plant=0, shape="step", size=0.3, first_day=130, month_days=31),
+        PlantedEvent(plant=0, shape="step", size=0.3, first_day=300, month_days=30),
+        PlantedEvent(plant=1, shape="step", size=0.3, first_day=161, month_days=30),
+    ]
+    merged = merge_adjacent_events(events=events)
+    assert [(e.plant, e.first_day, e.month_days) for e in merged] == [
+        (0, 100, 61),
+        (0, 300, 30),
+        (1, 161, 30),
+    ]
+    assert note_of(text='x {"plant": "A", "no_change": true, "note": "flat"} y') == "flat"
+    assert note_of(text="no json") == ""

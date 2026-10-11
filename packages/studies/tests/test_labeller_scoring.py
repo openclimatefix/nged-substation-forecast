@@ -1,15 +1,17 @@
 """Tests of the planted-event scoring and the event bootstrap."""
 
 from datetime import date, timedelta
+from itertools import pairwise
 
 import numpy as np
 import polars as pl
 import pytest
 from studies.capacity_estimators import synthetic_record
 from studies.capacity_labeller import Answer, Knot
-from studies.capacity_recovery import PlantedEvent
+from studies.capacity_recovery import PlantedEvent, calendar_month_spans
 from studies.labeller_scoring import (
     answers_to_scale,
+    draw_nonadjacent_control_steps,
     effective_size,
     event_bootstrap_interval,
     false_alarms,
@@ -174,3 +176,24 @@ def test_the_bootstrap_draws_the_sample_index_with_the_event() -> None:
     assert mean == 0.0
     assert lower < 0.0 < upper
     assert upper - lower > 0.3
+
+
+def test_the_nonadjacent_control_never_plants_two_steps_in_consecutive_months_of_a_plant() -> None:
+
+    record = synthetic_record(plants=3, days=900, seed=4)
+    months = sorted(calendar_month_spans(record=record))
+    for seed in range(20):
+        events = draw_nonadjacent_control_steps(
+            record=record, months_per_plant=4, size=0.3, scored_months=months, barred={}, seed=seed
+        )
+        assert len(events) >= 9
+        assert {e.size for e in events} == {0.3}
+        for plant in range(3):
+            starts = sorted(e.first_day for e in events if e.plant == plant)
+            labels = [str(record.dates[s].astype("datetime64[M]")) for s in starts]
+            gaps = [
+                (np.datetime64(b, "M") - np.datetime64(a, "M")).astype(int)
+                for a, b in pairwise(labels)
+            ]
+            assert all(gap >= 2 for gap in gaps)
+        assert len({e.first_day for e in events}) == len(events)

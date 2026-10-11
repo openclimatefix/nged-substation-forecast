@@ -44,6 +44,7 @@ from labeller_jobs import (
     TOOLS_SAMPLES,
     AnswerFunction,
     LabellerContext,
+    VersionType,
     hindsight_jobs,
     run_causal_chain,
     run_hindsight_job,
@@ -59,12 +60,14 @@ from labeller_paths import (
 from studies.capacity_estimators import scramble_from_day
 from studies.capacity_evidence import CapOverlay, Evidence, PlantFit, build_evidence
 from studies.capacity_labeller import (
+    SYSTEM_PROMPT_V2,
     Answer,
     Prompt,
     answer_to_json,
     case_file_text,
     chart_pngs,
     tools_only_answer,
+    tools_only_v2_answer,
 )
 from studies.capacity_llm import (
     COST_CEILING_USD,
@@ -156,7 +159,7 @@ def estimate_budget(
 
 
 def assert_causal_prompts_ignore_the_future(
-    *, context: LabellerContext, record_id: RecordIdType
+    *, context: LabellerContext, record_id: RecordIdType, version: VersionType = "v1"
 ) -> None:
     """Raise if any causal prompt changes when every input after its cut-off day is noise.
 
@@ -168,6 +171,7 @@ def assert_causal_prompts_ignore_the_future(
     Args:
         context: The context.
         record_id: The record to probe.
+        version: The round whose prompts are probed.
 
     Raises:
         ValueError: Naming the plant, issue date, and what changed.
@@ -178,7 +182,11 @@ def assert_causal_prompts_ignore_the_future(
         for issue_day in CAUSAL_ISSUE_DAYS:
             last_index = context.day_index(day=issue_day) - READABLE_LAG_DAYS
             kept = context.causal_case(
-                record_id=record_id, plant=plant, issue_day=issue_day, current_knots=()
+                record_id=record_id,
+                plant=plant,
+                issue_day=issue_day,
+                current_knots=(),
+                version=version,
             )
             noisy = scramble_from_day(
                 record=record,
@@ -219,6 +227,7 @@ def assert_causal_prompts_ignore_the_future(
                 current_knots=(),
                 issue_day=issue_day,
                 period_first=CAUSAL_PERIOD_FIRST,
+                local_scan=version == "v2",
             )
             images = chart_pngs(evidence=evidence, shown_months=CAUSAL_SHOWN_MONTHS)
             if text != kept.prompt.text or images != kept.prompt.images:
@@ -257,8 +266,9 @@ def make_answer_function(
         evidence: Evidence,
     ) -> Answer:
         if lookup is not None:
+            rule = tools_only_v2_answer if prompt.system == SYSTEM_PROMPT_V2 else tools_only_answer
             lookup[prompt.text] = answer_to_json(
-                answer=tools_only_answer(evidence=evidence, first_day=first_day, last_day=last_day)
+                answer=rule(evidence=evidence, first_day=first_day, last_day=last_day)
             )
         return labelled_answer(
             store=store,

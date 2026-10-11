@@ -105,3 +105,23 @@ def test_a_panel_without_an_estimate_says_so_and_a_quiet_window_has_no_shading()
         )
     )
     assert '"type": "rect"' in shaded
+
+
+def test_a_figure_draws_the_panels_it_is_given_in_order() -> None:
+    from studies.capacity_estimate_charts import ROUND2_PANELS
+
+    record = _record()
+    figure = estimate_figure(
+        record=record,
+        plant=0,
+        window=WINDOW,
+        capacities={panel.key: np.full(DAYS, record.static_p99_mw[0]) for panel in ROUND2_PANELS},
+        events=[],
+        number="1",
+        title="t",
+        subtitle=["s"],
+        panel_set=ROUND2_PANELS,
+    ).to_dict()
+    titles = [panel["title"]["text"] for panel in figure["vconcat"]]
+    assert titles == [panel.title for panel in ROUND2_PANELS]
+    assert len(titles) == 8

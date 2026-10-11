@@ -341,3 +341,28 @@ def test_two_invalid_replies_raise_the_answer_error(data_root: Path) -> None:
             store=_store(data_root=data_root), model=model, guard=BudgetGuard(), prompt=_prompt(),
             sample_index=0, label="t", plant="A", first_day=FIRST, last_day=LAST,
         )  # fmt: skip
+
+
+def test_a_later_round_counts_the_log_and_gets_only_its_own_allowance(data_root: Path) -> None:
+    log = data_root / "log.jsonl"
+    entries = [
+        {"input_tokens": 1000, "output_tokens": 5, "cost_usd": 3.0, "model": "m"}
+        for _ in range(138)
+    ]
+    entries = entries[:3]
+    log.write_text("\n".join(json.dumps(entry) for entry in entries) + "\n")
+    guard = BudgetGuard.for_round(
+        log_path=log, round_usd=6.0, round_calls=10, round_input_tokens=5000
+    )
+    assert guard.spent_usd == 9.0
+    assert guard.ceiling_usd == 15.0
+    assert (guard.max_calls, guard.max_input_tokens) == (13, 8000)
+    guard.check(prompt=_prompt())
+    small = BudgetGuard.for_round(
+        log_path=log, round_usd=2.5, round_calls=10, round_input_tokens=5000
+    )
+    assert small.ceiling_usd == 11.5
+    with pytest.raises(BudgetExceeded, match="spent"):
+        BudgetGuard.for_round(
+            log_path=log, round_usd=1.5, round_calls=10, round_input_tokens=5000
+        ).check(prompt=_prompt())

@@ -46,14 +46,31 @@ CONTROL_SIZE: Final[float] = 0.30
 `capacity_paths.py`, which this folder may not import; `positive_control_events` checks that the
 first study's events agree."""
 
+ROUND2_DRAW_SEEDS: Final[tuple[int, int]] = (11443, 11444)
+"""The seeds of round 2's two new draws of planted losses (post hoc round, never tuned on)."""
+
+CONTROL2_SEED: Final[int] = 114303
+"""The seed of round 2's positive control, with no two steps at a plant in adjacent months."""
+
 TUNING_SEED: Final[int] = 114401
 """The seed of the cross-checks that resample events."""
 
-RecordIdType = Literal["original", "draw01", "draw02", "control", "null"]
+RecordIdType = Literal[
+    "original", "draw01", "draw02", "control", "null", "draw03", "draw04", "control2"
+]
 """The records a labeller reads: the original, the two fresh draws, the positive control, and the
 synthetic null record."""
 
-RECORD_IDS: Final[tuple[RecordIdType, ...]] = ("original", "draw01", "draw02", "control", "null")
+RECORD_IDS: Final[tuple[RecordIdType, ...]] = (
+    "original",
+    "draw01",
+    "draw02",
+    "control",
+    "null",
+    "draw03",
+    "draw04",
+    "control2",
+)
 """The runtime tuple of `RecordIdType`'s values."""
 
 
@@ -363,6 +380,22 @@ def load_fresh_draws(*, root: Path) -> list[list[PlantedEvent]]:
     return [[event_from_json(payload=e) for e in draw] for draw in payload["draws"]]
 
 
+def load_round2(*, root: Path) -> dict[str, list[list[PlantedEvent]]]:
+    """Read round 2's two new draws and its positive control.
+
+    Args:
+        root: The output root.
+
+    Returns:
+        `draws`, a list of two event lists, and `control2`, a list holding one event list.
+    """
+    payload = json.loads((built_dir(root=root) / "round2.json").read_text())
+    return {
+        "draws": [[event_from_json(payload=e) for e in draw] for draw in payload["draws"]],
+        "control2": [[event_from_json(payload=e) for e in payload["control2"]]],
+    }
+
+
 def record_for(*, root: Path, record_id: RecordIdType) -> CapacityRecord:
     """Build a record by identifier.
 
@@ -386,6 +419,8 @@ def record_for(*, root: Path, record_id: RecordIdType) -> CapacityRecord:
         return plant_losses(
             record=original, events=positive_control_events(first=load_first_events())
         )
+    if record_id in ("draw03", "draw04", "control2"):
+        return plant_losses(record=original, events=events_of(root=root, record_id=record_id))
     if record_id == "null":
         with np.load(built_dir(root=root) / "null_power.npz") as data:
             return original.with_power(power_mw=data["power_mw"].astype(np.float64))
@@ -407,4 +442,8 @@ def events_of(*, root: Path, record_id: RecordIdType) -> list[PlantedEvent]:
         return load_fresh_draws(root=root)[int(record_id[-1]) - 1]
     if record_id == "control":
         return positive_control_events(first=load_first_events())
+    if record_id in ("draw03", "draw04"):
+        return load_round2(root=root)["draws"][int(record_id[-1]) - 3]
+    if record_id == "control2":
+        return load_round2(root=root)["control2"][0]
     return []

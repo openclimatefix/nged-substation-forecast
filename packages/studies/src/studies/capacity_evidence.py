@@ -93,6 +93,32 @@ CHANGEPOINT_MAX_CANDIDATES: Final[int] = 8
 UNCONFIRMED_DAYS: Final[int] = 14
 """A candidate this close to the cut-off day is flagged unconfirmed."""
 
+LOCAL_WINDOW_DAYS: Final[int] = 30
+"""The local scan compares each window of this many days with its neighbours."""
+
+LOCAL_NEIGHBOUR_DAYS: Final[int] = 30
+"""The local scan's neighbours are this many days before and this many days after the window."""
+
+LOCAL_STEP_DAYS: Final[int] = 5
+"""The local scan moves its window by this many days."""
+
+LOCAL_MIN_WINDOW_OBS: Final[int] = 8
+LOCAL_MIN_NEIGHBOUR_OBS: Final[int] = 12
+"""The fewest clear-sky observations a window and its neighbours need."""
+
+LOCAL_MIN_EFFECT: Final[float] = 0.15
+"""A window whose median differs from its neighbours' by at least this share is flagged."""
+
+LOCAL_SPAN_SHARE: Final[float] = 0.75
+"""An episode spans the flagged windows whose effect is at least this share of its deepest."""
+
+LOCAL_FLANK_SHARE: Final[float] = 0.7
+"""An episode of the other sign within a window of a deeper one, and no deeper than this share of
+it, is taken for the flank of the deeper one and dropped."""
+
+LOCAL_MAX_EPISODES: Final[int] = 15
+"""The most episodes listed per case file, the deepest ones."""
+
 DirectionType = Literal["down", "up"]
 """The sign of a changepoint's size."""
 
@@ -149,6 +175,29 @@ class Changepoint:
 
 
 @dataclass(frozen=True)
+class LocalEpisode:
+    """One stretch where a 30-day window sits well away from its neighbours.
+
+    Attributes:
+        first_day: The index of the episode's first day.
+        last_day: The index of its last day.
+        deepest_start: The index of the first day of the deepest 30-day window.
+        direction: `down` or `up`.
+        effect: The deepest window's median over its neighbours' median, minus 1, on the corrected
+            clear-sky ratio.
+        all_sky_effect: The same on the all-sky ratio of energy to modelled energy over the
+            deepest window, or NaN where that ratio is unavailable (a cut record).
+    """
+
+    first_day: int
+    last_day: int
+    deepest_start: int
+    direction: DirectionType
+    effect: float
+    all_sky_effect: float
+
+
+@dataclass(frozen=True)
 class Evidence:
     """Everything the tools measure for one plant up to a cut-off day.
 
@@ -179,6 +228,7 @@ class Evidence:
         plateau: The 99th percentile of power over static power per month.
         clip_share: The share of daylight hours within `CLIP_TOLERANCE` of that plateau per month.
         changepoints: The candidates, newest last.
+        local_episodes: The local scan's episodes, in date order.
     """
 
     plant: str
@@ -202,6 +252,7 @@ class Evidence:
     plateau: np.ndarray
     clip_share: np.ndarray
     changepoints: tuple[Changepoint, ...]
+    local_episodes: tuple[LocalEpisode, ...] = ()
 
 
 def truncate(*, record: CapacityRecord, last_day: int) -> CapacityRecord:
@@ -536,6 +587,94 @@ def find_changepoints(*, dates: np.ndarray, values: np.ndarray) -> tuple[Changep
     return tuple(sorted((change for _, change in found), key=lambda change: change.day_index))
 
 
+def _window_effect(*, values: np.ndarray, start: int) -> tuple[float, int, int]:
+    """Return a window's median over its neighbours' median minus 1, and both observation counts."""
+    window = values[start : start + LOCAL_WINDOW_DAYS]
+    before = values[max(start - LOCAL_NEIGHBOUR_DAYS, 0) : start]
+    after = values[start + LOCAL_WINDOW_DAYS : start + LOCAL_WINDOW_DAYS + LOCAL_NEIGHBOUR_DAYS]
+    neighbours = np.concatenate([before, after])
+    window, neighbours = window[np.isfinite(window)], neighbours[np.isfinite(neighbours)]
+    if len(window) < LOCAL_MIN_WINDOW_OBS or len(neighbours) < LOCAL_MIN_NEIGHBOUR_OBS:
+        return float("nan"), len(window), len(neighbours)
+    with np.errstate(all="ignore"):
+        return float(np.median(window) / np.median(neighbours) - 1.0), len(window), len(neighbours)
+
+
+def local_scan(*, clear_ratio: np.ndarray, all_sky_ratio: np.ndarray) -> tuple[LocalEpisode, ...]:
+    """Find stretches where a 30-day window departs from the 30 days either side of it.
+
+    The window moves 5 days at a time over the corrected clear-sky ratio. A window whose median
+    differs from its neighbours' by `LOCAL_MIN_EFFECT` or more is flagged, and consecutive flagged
+    windows of one sign form an episode, and an episode of the other sign within a window length of
+    a deeper one is dropped when it is no deeper than `LOCAL_FLANK_SHARE` of it, because a window
+    beside a loss sees the loss in its neighbours. The
+    episode spans the windows whose effect is at least
+    `LOCAL_SPAN_SHARE` of the deepest, so a loss of one month is bracketed closely.
+
+    Args:
+        clear_ratio: The corrected clear-sky ratio per day, NaN where unusable.
+        all_sky_ratio: The all-sky energy over modelled energy per day (any scale), or all NaN.
+
+    Returns:
+        At most `LOCAL_MAX_EPISODES` episodes, the deepest, in date order.
+    """
+    days = len(clear_ratio)
+    starts = np.arange(0, max(days - LOCAL_WINDOW_DAYS, 0) + 1, LOCAL_STEP_DAYS)
+    effects = np.array([_window_effect(values=clear_ratio, start=int(s))[0] for s in starts])
+    flagged = np.isfinite(effects) & (np.abs(effects) >= LOCAL_MIN_EFFECT)
+    episodes: list[LocalEpisode] = []
+    index = 0
+    while index < len(starts):
+        if not flagged[index]:
+            index += 1
+            continue
+        sign = np.sign(effects[index])
+        stop = index
+        while stop + 1 < len(starts) and flagged[stop + 1] and np.sign(effects[stop + 1]) == sign:
+            stop += 1
+        run = np.arange(index, stop + 1)
+        deepest = int(run[np.argmax(np.abs(effects[run]))])
+        keep = run[np.abs(effects[run]) >= LOCAL_SPAN_SHARE * abs(effects[deepest])]
+        deepest_start = int(starts[deepest])
+        all_sky, _, _ = _window_effect(values=all_sky_ratio, start=deepest_start)
+        episodes.append(
+            LocalEpisode(
+                first_day=int(starts[keep[0]]),
+                last_day=int(starts[keep[-1]]) + LOCAL_WINDOW_DAYS - 1,
+                deepest_start=deepest_start,
+                direction="down" if sign < 0 else "up",
+                effect=float(effects[deepest]),
+                all_sky_effect=all_sky,
+            )
+        )
+        index = stop + 1
+    accepted: list[LocalEpisode] = []
+    for episode in sorted(episodes, key=lambda e: -abs(e.effect)):
+        flank = any(
+            other.direction != episode.direction
+            and abs(episode.effect) <= LOCAL_FLANK_SHARE * abs(other.effect)
+            and episode.first_day <= other.last_day + LOCAL_WINDOW_DAYS
+            and episode.last_day >= other.first_day - LOCAL_WINDOW_DAYS
+            for other in accepted
+        )
+        if not flank:
+            accepted.append(episode)
+    return tuple(sorted(accepted[:LOCAL_MAX_EPISODES], key=lambda e: e.first_day))
+
+
+def _all_sky_ratio(*, record: CapacityRecord, plant: int, gap: np.ndarray) -> np.ndarray:
+    """Return each day's measured energy over modelled energy, NaN on a gap day.
+
+    The ratio needs no fitted capacity, because the capacity is one constant per plant that the
+    scan's median comparison cancels.
+    """
+    with np.errstate(all="ignore"):
+        ratio = np.nansum(record.power_mw[plant], axis=1) / np.nansum(
+            record.cams_shape[plant], axis=1
+        )
+    return np.where(gap | ~np.isfinite(ratio), np.nan, ratio)
+
+
 def build_evidence(
     *,
     record: CapacityRecord,
@@ -615,4 +754,8 @@ def build_evidence(
         plateau=plateau,
         clip_share=clip,
         changepoints=find_changepoints(dates=cut.dates, values=clear_corrected),
+        local_episodes=local_scan(
+            clear_ratio=clear_corrected,
+            all_sky_ratio=_all_sky_ratio(record=cut, plant=plant, gap=gap),
+        ),
     )
