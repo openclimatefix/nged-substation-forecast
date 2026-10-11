@@ -34,6 +34,7 @@ import hashlib
 import json
 import logging
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
@@ -176,7 +177,7 @@ def verify_followup3_manifest(*, root: Path, smoke: bool) -> None:
         raise ValueError(msg)
 
 
-def derated_frame(*, frame: pl.DataFrame, plan: dict[str, object]) -> pl.DataFrame:
+def derated_frame(*, frame: pl.DataFrame, plan: Mapping[str, object]) -> pl.DataFrame:
     """Return the chosen plant's rows, with its derated months marked as not for training.
 
     Args:
