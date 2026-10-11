@@ -73,6 +73,7 @@ from studies.era5_ladder import (
     SKY_REGIMES,
     TOTAL_CLOUD_COVER_THRESHOLDS,
     RungType,
+    stepwise_chain,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -260,6 +261,10 @@ def _difference_unit(*, target: TargetType) -> str:
     return "percentage points of capacity" if target == "pv" else "clearness index"
 
 
+LOG_TICKS: Final[tuple[float, ...]] = (0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100)
+"""The 1-2-5 values a log-scale panel labels and draws gridlines at."""
+
+
 def _domain(*, values: Sequence[float]) -> list[float]:
     """Return an x domain that holds every value, with `DOMAIN_PADDING` of room each side."""
     low, high = min(values), max(values)
@@ -281,6 +286,7 @@ def dot_interval_panel(
     colour: str,
     reference_rules: Sequence[float] = (0.0,),
     order: Sequence[str] | None = None,
+    log_floor: float | None = None,
 ) -> Panel:
     """Draw one row per label: a dot at its estimate, a thin 95% line, and an optional thick line.
 
@@ -292,22 +298,37 @@ def dot_interval_panel(
         colour: The colour of every mark.
         reference_rules: The x values that get a dashed vertical rule, such as zero.
         order: The labels from top to bottom, or `None` for the order of `rows`.
+        log_floor: If given, draw the x axis on a log scale from this value, and raise every
+            value, interval end, and reference rule below it to it, so a share of zero is drawn
+            at the floor.
 
     Returns:
         The layered panel.
     """
     labels = list(order) if order is not None else rows["label"].to_list()
     thick = "thick_lower" in rows.columns
-    domain = _domain(
-        values=[
-            *rows["lower"].to_list(),
-            *rows["upper"].to_list(),
-            *(rows["thick_lower"].to_list() if thick else []),
-            *(rows["thick_upper"].to_list() if thick else []),
-            *reference_rules,
-        ]
+    if log_floor is not None:
+        clipped = ["value", "lower", "upper", *(["thick_lower", "thick_upper"] if thick else [])]
+        rows = rows.with_columns(pl.col(clipped).clip(lower_bound=log_floor))
+        reference_rules = [max(rule, log_floor) for rule in reference_rules]
+        domain = [log_floor, float(rows["upper"].max()) * 1.5]  # ty: ignore[invalid-argument-type]
+        scale = alt.Scale(type="log", domain=domain, nice=False)
+    else:
+        domain = _domain(
+            values=[
+                *rows["lower"].to_list(),
+                *rows["upper"].to_list(),
+                *(rows["thick_lower"].to_list() if thick else []),
+                *(rows["thick_upper"].to_list() if thick else []),
+                *reference_rules,
+            ]
+        )
+        scale = alt.Scale(domain=domain, nice=False, zero=False)
+    x_axis = (
+        alt.Axis(values=[tick for tick in LOG_TICKS if domain[0] <= tick <= domain[1]])
+        if log_floor is not None
+        else alt.Axis()
     )
-    scale = alt.Scale(domain=domain, nice=False, zero=False)
     y = alt.Y(
         "label:N",
         sort=labels,
@@ -327,7 +348,7 @@ def dot_interval_panel(
             .mark_rule(strokeWidth=6, opacity=0.35, color=colour, aria=False)
             .encode(  # ty: ignore[unresolved-attribute]
                 y=y,
-                x=alt.X("thick_lower:Q", scale=scale, title=x_title),
+                x=alt.X("thick_lower:Q", scale=scale, title=x_title, axis=x_axis),
                 x2="thick_upper:Q",
             )
         )
@@ -335,13 +356,13 @@ def dot_interval_panel(
         alt.Chart(rows)
         .mark_rule(strokeWidth=1.5, color=colour, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            y=y, x=alt.X("lower:Q", scale=scale, title=x_title), x2="upper:Q"
+            y=y, x=alt.X("lower:Q", scale=scale, title=x_title, axis=x_axis), x2="upper:Q"
         )
     )
     layers.append(
         alt.Chart(rows)
         .mark_point(filled=True, size=70, opacity=1, color=colour, aria=False)
-        .encode(y=y, x=alt.X("value:Q", scale=scale, title=x_title))  # ty: ignore[unresolved-attribute]
+        .encode(y=y, x=alt.X("value:Q", scale=scale, title=x_title, axis=x_axis))  # ty: ignore[unresolved-attribute]
     )
     return alt.layer(*layers).properties(
         width=PLOT_WIDTH_PX, height=ROW_HEIGHT_PX * len(labels), title=_title(panel_title)
@@ -495,6 +516,227 @@ def figure_leaderboard(*, board: pl.DataFrame, target: TargetType, scope: str) -
             MARS_KEY,
             *([CLEARNESS_KEY] if target == "cams" else []),
             EXPLORATORY_KEY,
+        ],
+        figure_planning=None,
+    )
+
+
+STEP_VALUE_COLUMN_PX: Final[int] = 150
+"""The width of the column that prints each step's estimate and interval beside the plot."""
+
+STEP_CHAIN_TOLERANCE: Final[float] = 1e-9
+"""How far a step chain's dot may differ from the leaderboard's error, as a fraction of capacity.
+
+Both come from the same pooled means, so they agree to rounding; a larger gap means the steps and
+the leaderboard are at different settings.
+"""
+
+
+def _signed(value: float) -> str:
+    """Format a number to two decimals with a true minus sign and an explicit plus."""
+    if round(value, 2) == 0:
+        return " 0.00"
+    return f"{value:+.2f}".replace("-", "\u2212")
+
+
+def figure_stepwise(
+    *, contrasts: pl.DataFrame, board: pl.DataFrame, scope: str
+) -> alt.TopLevelMixin:
+    """Draw each variable set's error, with each step's interval drawn from the previous dot.
+
+    The bottom row is G0, with its own error and interval. Each row above adds one group, its dot
+    sits at that variable set's error, and its line is the 95% interval of the paired difference
+    from the row below, drawn from the row below's dot.
+
+    Args:
+        contrasts: The report's contrast table.
+        board: The report's leaderboard table.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure.
+
+    Raises:
+        ValueError: If a step is missing, or the chained dots disagree with the leaderboard's
+            errors by more than `STEP_CHAIN_TOLERANCE`.
+    """
+    scale = _scale(target="pv")
+    steps = RUNGS[1:]
+    found = {
+        row["treatment"]: row
+        for row in contrasts.filter(
+            (pl.col("target") == "pv")
+            & (pl.col("setting") == PRIMARY_SETTING)
+            & (
+                (
+                    (pl.col("family") == "planned")
+                    & (pl.col("treatment") == "g1")
+                    & (pl.col("reference") == "g0")
+                )
+                | (pl.col("family") == "step")
+            )
+        ).iter_rows(named=True)
+    }
+    missing = [rung for rung in steps if rung not in found]
+    if missing:
+        msg = f"the contrast table has no step for {missing}"
+        raise ValueError(msg)
+    ladder = board.filter((pl.col("target") == "pv") & (pl.col("view") == "ladder"))
+    errors = {row["arm"]: row for row in ladder.iter_rows(named=True)}
+    base = errors["g0"]
+    chain = stepwise_chain(
+        start=base["mae"] * scale,
+        differences=[found[rung]["difference"] * scale for rung in steps],
+        lowers=[found[rung]["lower_95"] * scale for rung in steps],
+        uppers=[found[rung]["upper_95"] * scale for rung in steps],
+    )
+    for rung, value in zip(steps, chain["value"].to_list(), strict=True):
+        if abs(value - errors[rung]["mae"] * scale) > STEP_CHAIN_TOLERANCE * scale:
+            msg = f"the chained error of {rung} differs from the leaderboard's"
+            raise ValueError(msg)
+    labels = [errors[rung]["label"] for rung in RUNGS]
+    rows = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "label": [labels[0]],
+                    "reference": [None],
+                    "value": [base["mae"] * scale],
+                    "lower": [base["mae_lower"] * scale],
+                    "upper": [base["mae_upper"] * scale],
+                    "difference": [None],
+                    "text": [f"{base['mae'] * scale:.2f}% of capacity"],
+                },
+                schema_overrides={"reference": pl.Float64, "difference": pl.Float64},
+            ),
+            chain.with_columns(
+                label=pl.Series(labels[1:]),
+                difference=pl.Series([found[rung]["difference"] * scale for rung in steps]),
+            ).with_columns(
+                text=pl.format(
+                    "{} [{}, {}]",
+                    pl.col("difference").map_elements(_signed, return_dtype=pl.String),
+                    (pl.col("lower") - pl.col("reference")).map_elements(
+                        _signed, return_dtype=pl.String
+                    ),
+                    (pl.col("upper") - pl.col("reference")).map_elements(
+                        _signed, return_dtype=pl.String
+                    ),
+                )
+            ),
+        ],
+        how="diagonal_relaxed",
+    )
+    order = list(reversed(labels))
+    domain = _domain(values=[*rows["lower"].to_list(), *rows["upper"].to_list()])
+    scale_x = alt.Scale(domain=domain, nice=False, zero=False)
+    axis_title = f"Mean absolute error ({_error_unit(target='pv')}; smaller is better)"
+    y = alt.Y(
+        "label:N",
+        sort=order,
+        title=None,
+        axis=alt.Axis(labelLimit=LABEL_WIDTH_PX, labelPadding=6, domain=False, ticks=False),
+    )
+    connectors = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "x": [float(step["reference"])] * 2,
+                    "label": [labels[index], labels[index + 1]],
+                    "order": [0, 1],
+                    "group": [index] * 2,
+                }
+            )
+            for index, step in enumerate(chain.iter_rows(named=True))
+        ]
+    )
+    colour = TARGET_COLOURS["pv"]
+    layers = [
+        alt.Chart(connectors)
+        .mark_line(color=ocf.TEXT, strokeDash=[2, 3], strokeWidth=1, opacity=0.6, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=scale_x, title=axis_title),
+            y=y,
+            detail="group:N",
+            order="order:Q",
+        ),
+        alt.Chart(rows.filter(pl.col("reference").is_null()))
+        .mark_rule(strokeWidth=1.5, color=colour, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title), x2="upper:Q"
+        ),
+        alt.Chart(rows.filter(pl.col("reference").is_not_null()))
+        .mark_rule(strokeWidth=3.5, color=ocf.BRAND_ORANGE, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title), x2="upper:Q"
+        ),
+        alt.Chart(rows)
+        .mark_point(filled=True, size=70, opacity=1, color=colour, aria=False)
+        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
+        alt.Chart(rows.filter(pl.col("reference").is_not_null()))
+        .mark_point(
+            shape="diamond",
+            filled=False,
+            size=45,
+            strokeWidth=1.2,
+            color=ocf.TEXT,
+            yOffset=7,
+            aria=False,
+        )
+        .encode(y=y, x=alt.X("reference:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
+        alt.Chart(
+            pl.DataFrame(
+                {"label": labels, "text": rows["text"].to_list(), "x": [domain[1]] * len(labels)}
+            )
+        )
+        .mark_text(
+            align="left",
+            dx=10,
+            fontSize=10,
+            font="monospace",
+            color=ocf.TEXT,
+            clip=False,
+            aria=False,
+        )
+        .encode(y=y, x=alt.X("x:Q", scale=scale_x), text="text:N"),  # ty: ignore[unresolved-attribute]
+    ]
+    panel = alt.layer(*layers).properties(
+        width=PLOT_WIDTH_PX - STEP_VALUE_COLUMN_PX,
+        height=ROW_HEIGHT_PX * len(labels),
+        title=alt.TitleParams(
+            [
+                "Each row adds one group to the row below.",
+                "Right column: that step in points of capacity, with its 95% interval.",
+            ],
+            anchor="start",
+            fontSize=ocf.font_size(style="Body Large", body_px=11),
+        ),
+    )
+    return figure(
+        panels=[panel],
+        number="7c",
+        title="Error of each variable set, with the interval of each step from the row below",
+        subtitle=[
+            scope,
+            (
+                "Purple dot: the mean absolute error of that variable set (% of capacity; smaller "
+                "is better)."
+            ),
+            "Hollow diamond: the error of the row below, which is the zero of this row's step.",
+            (
+                "Thin purple line on G0: 95% interval of G0's own error. Orange line on every "
+                "other row: 95% interval of that step alone, from resampling whole months, drawn "
+                "from the diamond. An orange line is not the uncertainty of its dot's position."
+            ),
+            (
+                "A minus sign in the right column means the error fell. A step depends on the "
+                "order in which the groups were added."
+            ),
+            *ARM_KEY_LINES[:-1],
+            (
+                "The G1 step was planned in advance. Every other step is exploratory and not "
+                "corrected for multiple comparisons."
+            ),
         ],
         figure_planning=None,
     )
@@ -699,6 +941,9 @@ COLUMN_WORDS: Final[dict[str, str]] = {
 }
 """What each column is called on the importance figure, with its ERA5 short name in brackets."""
 
+IMPORTANCE_LOG_FLOOR: Final[float] = 0.05
+"""The smallest share (%) the log-scale importance panels draw; a smaller share is drawn here."""
+
 TOP_COLUMNS: Final[int] = 20
 """How many columns the first importance panel shows."""
 
@@ -793,17 +1038,21 @@ def figure_importance(*, shares: pl.DataFrame, target: TargetType, scope: str) -
     panels = [
         dot_interval_panel(
             rows=top,
-            x_title=f"Share of total gain (%) in the full set, {TOP_COLUMNS} largest columns",
+            x_title=(
+                f"Share of total gain (%, log scale) in the full set, {TOP_COLUMNS} largest columns"
+            ),
             panel_title="Columns of the full set (G9), refitted with shuffled copies",
             colour=TARGET_COLOURS[target],
             reference_rules=(noise_line,),
+            log_floor=IMPORTANCE_LOG_FLOOR,
         ),
         dot_interval_panel(
             rows=by_group,
-            x_title="Share of total gain (%), summed over each group's columns",
+            x_title="Share of total gain (%, log scale), summed over each group's columns",
             panel_title="Groups, with shuffled copies as one more group",
             colour=TARGET_COLOURS[target],
             reference_rules=(),
+            log_floor=IMPORTANCE_LOG_FLOOR,
         ),
         dot_interval_panel(
             rows=models,
@@ -826,6 +1075,11 @@ def figure_importance(*, shares: pl.DataFrame, target: TargetType, scope: str) -
             "input, not the CAMS target).",
             f"Dashed rule, first panel: the largest shuffled copy's share ({noise_line:.1f}%).",
             "Share of total gain: how much of the model's fit a column accounts for.",
+            (
+                "The first two panels use a log scale, with gridlines at 1, 2, and 5 times each "
+                f"power of ten. A share below {IMPORTANCE_LOG_FLOOR:g}% is drawn at "
+                f"{IMPORTANCE_LOG_FLOOR:g}%."
+            ),
             "Shuffled copies are the same columns shuffled across hours, so they show the share",
             "that noise alone earns. Gain is measured on the training data and splits credit",
             "between correlated columns.",
@@ -1840,6 +2094,7 @@ def main() -> int:
             chart=figure_leaderboard(board=board, target=target, scope=scope),
             name=f"leaderboard_{target}",
         )
+    save(chart=figure_stepwise(contrasts=contrasts, board=board, scope=scope), name="stepwise_pv")
     for name, chart in (
         (
             "days",
