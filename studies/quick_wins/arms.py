@@ -12,6 +12,7 @@ from typing import Final
 
 import quick_wins_inputs as inputs
 from cleaning_rules import CleaningRule
+from extra_features import WEEKLY_ANALOGUE_COLUMNS
 
 GENERATOR_TYPES: Final[frozenset[str]] = frozenset({"PV", "Wind"})
 """Series types driven by weather alone, for which power lags and weekday columns carry little."""
@@ -121,6 +122,11 @@ def lean_wind_only(series_type: str) -> tuple[str, ...]:
     return lean_generators(series_type) if series_type == "Wind" else PRODUCTION_COLUMNS
 
 
+def with_weekly_analogues(series_type: str) -> tuple[str, ...]:
+    """Show every series the production columns and the manual heuristic's inputs."""
+    return (*PRODUCTION_COLUMNS, *WEEKLY_ANALOGUE_COLUMNS)
+
+
 def with_lead_time(series_type: str) -> tuple[str, ...]:
     """Show every series the production columns and the forecast lead time."""
     return (*PRODUCTION_COLUMNS, "nwp_lead_time_hours")
@@ -153,6 +159,9 @@ class Arm:
         min_child_weight: XGBoost's `min_child_weight`; production uses 1.
         pooled_by_type: Whether one booster per series type is fitted on every series of that type,
             with each series' power divided by its training capacity, instead of one per series.
+        quantile_levels: Quantile levels of a `reg:quantileerror` booster. The forecast is every
+            ensemble member crossed with every level, a sample of the predictive distribution.
+        train_last_months: Train only on the last this many months of the training window.
         pooled_site_id: Whether a pooled booster is also shown the series identifier as a number.
         extra_cleaning: Further cleaning rules applied together with `cleaning`.
     """
@@ -170,7 +179,21 @@ class Arm:
     min_child_weight: int = 1
     pooled_by_type: bool = False
     pooled_site_id: bool = False
+    quantile_levels: tuple[float, ...] | None = None
+    train_last_months: int | None = None
 
+
+def needs_weekly_analogues(arm: Arm) -> bool:
+    """Whether any series type's columns include the weekly analogue columns."""
+    return any(
+        column in WEEKLY_ANALOGUE_COLUMNS
+        for series_type in ("PV", "Wind", "Disaggregated Demand", "Raw Flow", "BESS", "Biofuel")
+        for column in arm.columns(series_type)
+    )
+
+
+QUANTILE_LEVELS: Final[tuple[float, ...]] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+"""The quantile levels the quantile arms fit, so the pinball losses sum to a coarse CRPS."""
 
 CHOSEN_CLEANING: Final[CleaningRule] = "new_meter_settling"
 """The cleaning rule round 0 chose, which every later arm applies (see the report's round 0)."""
@@ -325,6 +348,32 @@ TRAINING_ARMS: Final[tuple[Arm, ...]] = (
         pooled_site_id=True,
     ),
     Arm(
+        name="g1_heuristic_inputs",
+        cleaning=CHOSEN_CLEANING,
+        family="features",
+        description="Production columns plus the manual heuristic's inputs: 6 weekly analogues "
+        "and their mean, median, minimum, and maximum.",
+        columns=with_weekly_analogues,
+    ),
+    Arm(
+        name="e1_quantile",
+        cleaning=CHOSEN_CLEANING,
+        family="training",
+        description="Nine quantile levels with the pinball loss, a proxy for training on CRPS.",
+        objective="reg:quantileerror",
+        quantile_levels=QUANTILE_LEVELS,
+    ),
+    *(
+        Arm(
+            name=f"f1_train_last_{months}_months",
+            cleaning=CHOSEN_CLEANING,
+            family="training",
+            description=f"Train on only the last {months} months of the training window.",
+            train_last_months=months,
+        )
+        for months in (6, 9, 12)
+    ),
+    Arm(
         name="c2_early_stopping",
         cleaning=CHOSEN_CLEANING,
         family="training",
@@ -400,16 +449,28 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
         min_child_weight=max(p.min_child_weight for p in parts),
         pooled_by_type=any(p.pooled_by_type for p in parts),
         pooled_site_id=any(p.pooled_site_id for p in parts),
+        quantile_levels=next(
+            (p.quantile_levels for p in reversed(parts) if p.quantile_levels), None
+        ),
+        train_last_months=next(
+            (p.train_last_months for p in reversed(parts) if p.train_last_months), None
+        ),
     )
 
 
 _A3W = next(a for a in FEATURE_ARMS if a.name == "a3w_lean_wind_only")
 _D3 = next(a for a in TRAINING_ARMS if a.name == "d3_pooled_with_site_id")
+_E1 = next(a for a in TRAINING_ARMS if a.name == "e1_quantile")
 _C1 = next(a for a in FEATURE_ARMS if a.name == "c1_lead_time")
 _C2 = next(a for a in TRAINING_ARMS if a.name == "c2_early_stopping")
 _C4 = next(a for a in TRAINING_ARMS if a.name == "c4_absolute_error")
 
 ROUND2_ARMS: Final[tuple[Arm, ...]] = (
+    combine(
+        name="r2_e1_c1_a3w_d3",
+        parts=(_C1, _A3W, _D3, _E1),
+        description="Quantile training with the lead-time column, lean wind columns, and pooling.",
+    ),
     combine(
         name="r2_c4_c2_c1_a3w_d3",
         parts=(_C4, _C2, _C1, _A3W, _D3),

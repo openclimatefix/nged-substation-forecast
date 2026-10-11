@@ -222,3 +222,66 @@ def add_extra_features(
         half_hour_of_day=(local.dt.hour() * 2 + local.dt.minute() // 30).cast(pl.Int16),
         day_of_year=local.dt.ordinal_day().cast(pl.Int16),
     ).select(*frame.columns, *EXTRA_FEATURE_NAMES)
+
+
+WEEKLY_ANALOGUE_WEEKS: Final[int] = 6
+"""How many weekly analogues the manual heuristic reads, 1 to 6 weeks back."""
+
+WEEKLY_ANALOGUE_COLUMNS: Final[tuple[str, ...]] = (
+    *(f"power_lag_{week}w" for week in range(1, WEEKLY_ANALOGUE_WEEKS + 1)),
+    "weekly_analogue_mean",
+    "weekly_analogue_median",
+    "weekly_analogue_min",
+    "weekly_analogue_max",
+)
+"""The columns `add_weekly_analogue_features` adds, the inputs of `manual_heuristic` and their
+summary statistics. A column is null where the observation was not yet known when the forecast was
+issued."""
+
+
+def add_weekly_analogue_features(*, frame: pl.DataFrame, power: pl.DataFrame) -> pl.DataFrame:
+    """Add the power observed at the same weekday and time 1 to 6 weeks earlier, and its statistics.
+
+    Each analogue is the observation `week` weeks before the valid time. It is null when that
+    observation time is later than the forecast's initialisation time, the same rule that nulls
+    the production power lags, so no analogue uses an observation the forecast could not have had.
+    The statistics (mean, median, minimum, maximum) ignore the null analogues.
+
+    Args:
+        frame: Rows with `time_series_id`, `valid_time`, and `power_fcst_init_time`.
+        power: Observed power with `time_series_id`, `time`, and `power`.
+
+    Returns:
+        `frame` with the columns in `WEEKLY_ANALOGUE_COLUMNS` added, in the same row order.
+    """
+    observed = power.select("time_series_id", "time", "power").unique(
+        subset=["time_series_id", "time"], keep="any"
+    )
+    order = "__row"
+    out = frame.with_row_index(order)
+    for week in range(1, WEEKLY_ANALOGUE_WEEKS + 1):
+        shifted = observed.select(
+            "time_series_id",
+            (pl.col("time") + pl.duration(weeks=week)).alias("valid_time"),
+            pl.col("power").alias(f"power_lag_{week}w"),
+        )
+        out = out.join(shifted, on=["time_series_id", "valid_time"], how="left").with_columns(
+            pl.when(
+                pl.col("valid_time") - pl.duration(weeks=week) <= pl.col("power_fcst_init_time")
+            )
+            .then(pl.col(f"power_lag_{week}w"))
+            .otherwise(None)
+            .cast(pl.Float32)
+            .alias(f"power_lag_{week}w")
+        )
+    lags = [f"power_lag_{week}w" for week in range(1, WEEKLY_ANALOGUE_WEEKS + 1)]
+    return (
+        out.sort(order)
+        .with_columns(
+            weekly_analogue_mean=pl.mean_horizontal(lags),
+            weekly_analogue_median=pl.concat_list(lags).list.median(),
+            weekly_analogue_min=pl.min_horizontal(lags),
+            weekly_analogue_max=pl.max_horizontal(lags),
+        )
+        .drop(order)
+    )

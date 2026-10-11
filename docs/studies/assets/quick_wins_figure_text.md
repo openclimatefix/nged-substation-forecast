@@ -4,10 +4,10 @@
 
 Plots: Fold mid_2025_to_mid_2026: CRPS and MAE (% of capacity) of every arm, all series types, all leads, with 95% month-resampled intervals; baselines and production as lines; a third panel compares calibrated and uncalibrated CRPS.
 
-Title: Figure 1: The best arm's CRPS is 10.0% of capacity, against 11.3% for production with cleaning, but still above the manual heuristic's 7.2%
+Title: Figure 1: The best arm's CRPS is 9.9% of capacity, against 11.3% for production with cleaning, but still above the manual heuristic's 7.2%
 
 Subtitle lines:
-- Each dot is an arm's mean score over 31 series (solar, wind, demand, battery, and biofuel) and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Each score is a share of the series' own effective capacity.
+- Each dot is an arm's mean score over 31 series (solar, wind, demand, battery, and biofuel) and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; average of seeds 0, 1, 2. Each score is a share of the series' own effective capacity.
 - Each line is the 95% interval from resampling whole months. Month-to-month swings are shared by all arms, so overlapping intervals can hide a real gap (see Figure 2).
 - Every arm is trained on one XGBoost model per series from the same weather; arms differ only in the one change in the label.
 - Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stop is early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, and pooled is one model per series type with a site identifier.
@@ -45,7 +45,7 @@ Plots: Paired differences in CRPS and MAE (percentage points of capacity) betwee
 Title: Figure 2: 7 of 12 round 1 ideas lower CRPS reliably; the largest, "Per type, with site identifier", lowers it by 0.8 points of capacity
 
 Subtitle lines:
-- Each dot is the paired difference between an arm and production with cleaning in mean score, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Zero means no change.
+- Each dot is the paired difference between an arm and production with cleaning in mean score, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; average of seeds 0, 1, 2. Zero means no change.
 - Each line is the 95% interval from resampling whole months with the same months drawn for both arms. A line that excludes zero is a reliable difference.
 
 Panel titles:
@@ -73,7 +73,7 @@ Plots: Paired difference in CRPS (percentage points of capacity) from production
 Title: Figure 3: The largest gains are in wind farms: abs. loss, stop, lead, wind, pooled lowers their CRPS by 3.6 points of capacity
 
 Subtitle lines:
-- Each dot is the paired difference in mean CRPS between an arm and production with cleaning, within one type of series, over 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Zero means no change.
+- Each dot is the paired difference in mean CRPS between an arm and production with cleaning, within one type of series, over 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; average of seeds 0, 1, 2. Zero means no change.
 - Each line is the 95% interval from resampling whole months. Battery storage (1 series) and biofuel (1 series) are in the all-series figures but not drawn here.
 - The best round 2 arm combines absolute-error loss, early stopping, the lead-time column, lean wind columns, and one model per series type with a site identifier.
 - (post hoc) marks an arm chosen after seeing earlier results; unmarked arms were planned.
@@ -104,7 +104,7 @@ Plots: Paired differences in CRPS and MAE (percentage points of capacity) betwee
 Title: Figure 4: Combining ideas lowers CRPS by up to 1.4 points of capacity, at every lead
 
 Subtitle lines:
-- Each dot is the paired difference between an arm and production with cleaning in mean score, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Zero means no change.
+- Each dot is the paired difference between an arm and production with cleaning in mean score, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; average of seeds 0, 1, 2. Zero means no change.
 - Each line is the 95% interval from resampling whole months. Days 0 to 2 are forecasts up to 72 hours after the run starts; days 3 to 10 are 72 to 264 hours.
 - The first row, absolute-error loss, is the best round 1 arm; each later row adds ideas.
 - The horizontal axis has the same range as Figure 2.
@@ -134,7 +134,7 @@ Plots: Paired differences in CRPS and MAE (percentage points of capacity) betwee
 Title: Figure 5: Dropping each new meter's first 6 weeks lowers CRPS by 0.3 points of capacity, and only 2 series change
 
 Subtitle lines:
-- Each dot is the paired difference between a cleaning rule and production, which uses the minimal cleaning already in the stored power table, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; seed 0. Rules change only the training data. Zero means no change.
+- Each dot is the paired difference between a cleaning rule and production, which uses the minimal cleaning already in the stored power table, over 31 series and 53 weekly ECMWF ensemble (ENS) forecast runs, scored from July 2025 to June 2026; average of seeds 0, 1, 2. Rules change only the training data. Zero means no change.
 - Each line is the 95% interval from resampling whole months. Dropping the first 6 months of each series was also tried but removes a whole series, so it was not scored.
 - The chosen rule, drop new-meter settling, removes the 6 weeks after a demand meter first reads live. It was written after seeing the results of the other rules.
 

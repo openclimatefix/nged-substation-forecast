@@ -170,3 +170,37 @@ def test_repeated_valid_times_keep_their_rows_and_order():
     out = add_extra_features(frame=frame, metadata=_metadata(latitude=53.0, longitude=0.0))
     assert out["ensemble_member"].to_list() == [0, 1, 2, 3, 4]
     assert out["cos_zenith"].n_unique() == 1
+
+
+def test_weekly_analogues_are_null_until_the_observation_was_known():
+    """An analogue after the forecast's initialisation time is null, and the statistics skip it."""
+    from datetime import UTC, datetime, timedelta
+
+    from extra_features import add_weekly_analogue_features
+
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    times = [start + timedelta(weeks=week) for week in range(8)]
+    power = pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1] * 8, dtype=pl.Int32),
+            "time": pl.Series(times, dtype=pl.Datetime("us", "UTC")),
+            "power": pl.Series([float(10 * (week + 1)) for week in range(8)], dtype=pl.Float32),
+        }
+    )
+    valid = times[7]
+    frame = pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
+            "valid_time": pl.Series([valid, valid], dtype=pl.Datetime("us", "UTC")),
+            # The first forecast is issued 10 days before, so the 1-week analogue is not yet known.
+            "power_fcst_init_time": pl.Series(
+                [valid - timedelta(days=10), valid - timedelta(days=1)],
+                dtype=pl.Datetime("us", "UTC"),
+            ),
+        }
+    )
+    out = add_weekly_analogue_features(frame=frame, power=power)
+    assert out["power_lag_1w"].to_list() == [None, 70.0]
+    assert out["power_lag_2w"].to_list() == [60.0, 60.0]
+    assert out["weekly_analogue_max"].to_list() == [60.0, 70.0]
+    assert out["weekly_analogue_mean"][0] == pytest.approx(40.0)

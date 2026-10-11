@@ -18,6 +18,7 @@ from typing import Final
 import arms as arm_definitions
 import build_frames
 import cleaning_rules
+import extra_features
 import numpy as np
 import polars as pl
 import quick_wins_inputs as inputs
@@ -64,7 +65,11 @@ def pooled_inputs(*, frame: pl.DataFrame, scale: float, arm: arm_definitions.Arm
     The power lags are divided by the series' capacity, like the target, and the series identifier
     is added when the arm asks for it.
     """
-    lags = [c for c in frame.columns if c in arm_definitions.LAG_COLUMNS]
+    lags = [
+        c
+        for c in frame.columns
+        if c in arm_definitions.LAG_COLUMNS or c in extra_features.WEEKLY_ANALOGUE_COLUMNS
+    ]
     frame = frame.with_columns(pl.col(c) / scale for c in lags)
     if arm.pooled_site_id:
         frame = frame.with_columns(site_id=pl.col("time_series_id").cast(pl.Float32))
@@ -116,6 +121,11 @@ def _training_rows(
         .filter(pl.col("power").is_not_null())
         .join(types, on="time_series_id")
     )
+    if arm.train_last_months is not None:
+        frame = frame.filter(
+            pl.col("valid_time")
+            > pl.lit(window.train_end).dt.offset_by(f"-{arm.train_last_months}mo")
+        )
     kept = frame
     for rule in (arm.cleaning, *arm.extra_cleaning):
         if rule == "none":
@@ -148,6 +158,7 @@ def _parameters(*, arm: arm_definitions.Arm, device: str, seed: int) -> dict[str
         "device": device,
         "objective": arm.objective,
         "seed": seed,
+        **({"quantile_alpha": np.array(arm.quantile_levels)} if arm.quantile_levels else {}),
     }
 
 
@@ -255,6 +266,25 @@ def _fit_boosters(
     return boosters
 
 
+def _quantile_sample(
+    *, keys: pl.DataFrame, rows: pl.DataFrame, predicted: np.ndarray
+) -> pl.DataFrame:
+    """Cross every ensemble member with every quantile level, as one sample per valid time.
+
+    The result has `len(levels)` rows per input row. Its `ensemble_member` numbers each (member,
+    level) pair, so the fair CRPS of the sample scores the predictive distribution that the
+    quantile booster gives under each member's weather.
+    """
+    levels = predicted.shape[1]
+    repeated = keys.select(pl.all().repeat_by(levels).explode())
+    member = rows["ensemble_member"].cast(pl.Int32).to_numpy()
+    codes = (member[:, None] * levels + np.arange(levels)[None, :]).ravel()
+    return repeated.with_columns(
+        ensemble_member=pl.Series(codes, dtype=pl.Int32),
+        power_fcst=pl.Series(predicted.ravel().astype(np.float32)),
+    )
+
+
 def _predict_and_score(
     *,
     boosters: dict[int, tuple[xgb.Booster, list[str], float]],
@@ -264,12 +294,15 @@ def _predict_and_score(
     actuals: pl.DataFrame,
     capacity: pl.DataFrame,
     arm: arm_definitions.Arm,
+    analogue_power: pl.DataFrame | None,
 ) -> pl.DataFrame:
     """Predict every ensemble member of each cached run, write the forecasts, and score them."""
     (out_dir / "forecasts").mkdir(parents=True, exist_ok=True)
     parts = []
     for path in sorted((build_frames.frames_dir(fold_id=fold_id) / "val").glob("init=*.parquet")):
         frame = pl.read_parquet(path).join(types, on="time_series_id")
+        if analogue_power is not None:
+            frame = extra_features.add_weekly_analogue_features(frame=frame, power=analogue_power)
         pieces = []
         for (series_id,), series_rows in frame.group_by("time_series_id"):
             booster, columns, scale = boosters[int(series_id)]
@@ -279,22 +312,26 @@ def _predict_and_score(
                 else series_rows
             )
             matrix = xgb.DMatrix(feature_matrix(frame=shown, columns=columns))
-            pieces.append(
-                series_rows.select(
-                    "time_series_id",
-                    "power_fcst_init_time",
-                    "nwp_init_time",
-                    "valid_time",
-                    "ensemble_member",
-                ).with_columns(
-                    power_fcst=pl.Series(booster.predict(matrix) * scale, dtype=pl.Float32)
-                )
+            keys = series_rows.select(
+                "time_series_id", "power_fcst_init_time", "nwp_init_time", "valid_time"
             )
+            predicted = booster.predict(matrix) * scale
+            if arm.quantile_levels:
+                pieces.append(_quantile_sample(keys=keys, rows=series_rows, predicted=predicted))
+            else:
+                pieces.append(
+                    keys.with_columns(
+                        ensemble_member=series_rows["ensemble_member"],
+                        power_fcst=pl.Series(predicted, dtype=pl.Float32),
+                    )
+                )
         forecasts = pl.concat(pieces)
-        if forecasts.height != frame.height:
+        width = len(arm.quantile_levels or (1,))
+        if forecasts.height != frame.height * width:
             msg = f"{path.name}: predicted {forecasts.height:,} rows for {frame.height:,}"
             raise ValueError(msg)
-        forecasts.write_parquet(out_dir / "forecasts" / path.name)
+        if not arm.quantile_levels:
+            forecasts.write_parquet(out_dir / "forecasts" / path.name)
         parts.append(per_run_scores(forecasts=forecasts, actuals=actuals))
     return normalised_by_capacity(scores=pl.concat(parts), capacity=capacity)
 
@@ -322,6 +359,16 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
     )
 
     training, counts = _training_rows(arm=arm, window=window, types=types)
+    analogue_power = None
+    if arm_definitions.needs_weekly_analogues(arm):
+        analogue_power = (
+            scan_cleaned_power(
+                settings.cleaned_power_time_series_data_path, settings.storage_options
+            )
+            .select("time_series_id", "time", "power")
+            .collect()
+        )
+        training = extra_features.add_weekly_analogue_features(frame=training, power=analogue_power)
     boosters = _fit_boosters(training=training, arm=arm, window=window, device=device, seed=seed)
     if set(boosters) != set(series_ids):
         msg = f"{arm.name}: trained {len(boosters)} of {len(series_ids)} series"
@@ -336,6 +383,7 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
         actuals=actuals,
         capacity=capacity,
         arm=arm,
+        analogue_power=analogue_power,
     )
     counts.write_parquet(out_dir / "train_rows.parquet")
     scores.write_parquet(scores_path.with_suffix(".tmp"))
