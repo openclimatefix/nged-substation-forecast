@@ -441,3 +441,38 @@ def round3_jobs(*, plants: int, samples: int = TOOLS_SAMPLES) -> list[HindsightJ
         for plant in range(plants)
         for sample in range(samples)
     ]
+
+
+ROUND4_GRID_RECORDS: Final[tuple[RecordIdType, ...]] = ("grid01", "grid02", "grid03", "grid04")
+"""The mid-difficulty grid: 30% for 90 days (`grid01`, `grid02`) and 60% for 30 days (the rest)."""
+
+ROUND4_DRAW_RECORDS: Final[tuple[RecordIdType, ...]] = (
+    "draw07",
+    "draw08",
+    "draw09",
+    "draw10",
+    "draw11",
+    "draw12",
+    "draw13",
+    "draw14",
+)
+"""The eight further fresh draws, pooled with round 3's for the headline."""
+
+
+def round4_jobs(*, plants: int, samples: int = TOOLS_SAMPLES) -> list[HindsightJob]:
+    """List round 4's calls in the order they run: the grid, then the eight draws.
+
+    Args:
+        plants: The number of plants.
+        samples: Samples per plant and record.
+
+    Returns:
+        Round 2's tools-plus-model arm (version `v2`, frozen) on the four grid records and then the
+        eight draws: 48 + 96 calls at 6 plants and 2 samples.
+    """
+    return [
+        HindsightJob("tools_llm", record_id, plant, sample, "v2")
+        for record_id in (*ROUND4_GRID_RECORDS, *ROUND4_DRAW_RECORDS)
+        for plant in range(plants)
+        for sample in range(samples)
+    ]

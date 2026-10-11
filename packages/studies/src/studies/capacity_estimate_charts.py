@@ -2,16 +2,17 @@
 
 Part of the study in <https://github.com/openclimatefix/nged-substation-forecast/issues/1147>.
 `estimate_figure` stacks one panel per estimator on the same axes: the daily maximum of the plant's
-measured hourly power in megawatts as grey dots, the estimator's capacity in megawatts as a line on
-top, and the planted-loss windows shaded.
+measured hourly power as grey dots, the estimator's capacity as a line on top, and the
+planted-loss windows shaded. **Both are drawn as a share of the plant's static power, never in
+megawatts**, because one metered generator's output in megawatts must not be published.
 
 **The time axis counts days from the first day shown and never carries a calendar date.** A
 metered generator's output on known dates can be matched to public generation data, so the axis
 reads "day of the window" and the figure's text gives no date. The marks carry no accessibility text
 (`aria=False`), which Vega would otherwise fill with each point's value.
 
-**Every panel shares one vertical range**, from zero to 15% above the larger of the plant's static
-power and the highest daily maximum in the window, so the estimators can be compared by eye.
+**Every panel shares one vertical range**, from zero to 15% above the larger of 1 (the static
+power) and the highest daily maximum in the window, so the estimators can be compared by eye.
 """
 
 from collections.abc import Mapping, Sequence
@@ -102,7 +103,8 @@ def window_rows(
         window: The first day index (inclusive) and the last (exclusive).
 
     Returns:
-        Rows with `day` (1 for the first day shown), `maximum_mw`, and `capacity_mw` (null where the
+        Rows with `day` (1 for the first day shown), `maximum_share`, and `capacity_share` (null
+            where the
         estimator has no value).
     """
     start, stop = window
@@ -111,8 +113,8 @@ def window_rows(
     return pl.DataFrame(
         {
             "day": days - start + 1,
-            "maximum_mw": maximum[start:stop],
-            "capacity_mw": capacity_values,
+            "maximum_share": maximum[start:stop],
+            "capacity_share": capacity_values,
         }
     ).with_columns(pl.all().fill_nan(None))
 
@@ -178,7 +180,9 @@ def panel_chart(
         ),
     )
     y = alt.Y(
-        "maximum_mw:Q", scale=alt.Scale(domain=[0, top_mw]), axis=alt.Axis(title="MW", tickCount=3)
+        "maximum_share:Q",
+        scale=alt.Scale(domain=[0, top_mw]),
+        axis=alt.Axis(title="share of static power", tickCount=3),
     )
     width = CONTENT_WIDTH_PX - 90
     layers: list[alt.Chart] = []
@@ -189,16 +193,16 @@ def panel_chart(
             .encode(x="start_day:Q", x2="end_day:Q")  # ty: ignore[unresolved-attribute]
         )
     layers.append(
-        alt.Chart(rows.drop_nulls("maximum_mw"))
+        alt.Chart(rows.drop_nulls("maximum_share"))
         .mark_point(size=9, color="#8a8a8a", filled=True, opacity=0.8, aria=False)
         .encode(x=x, y=y)  # ty: ignore[unresolved-attribute]
     )
-    line_rows = rows.drop_nulls("capacity_mw")
+    line_rows = rows.drop_nulls("capacity_share")
     if line_rows.height:
         layers.append(
             alt.Chart(line_rows)
             .mark_line(color=ocf.BRAND_ORANGE, strokeWidth=2, clip=True, aria=False)
-            .encode(x=x, y=alt.Y("capacity_mw:Q", scale=alt.Scale(domain=[0, top_mw])))  # ty: ignore[unresolved-attribute]
+            .encode(x=x, y=alt.Y("capacity_share:Q", scale=alt.Scale(domain=[0, top_mw])))  # ty: ignore[unresolved-attribute]
         )
     if missing_note is not None:
         layers.append(
@@ -231,7 +235,8 @@ def estimate_figure(
         record: The record whose power is drawn (planted or original).
         plant: The plant's index.
         window: The first day index (inclusive) and the last (exclusive).
-        capacities: Each estimator's capacity per day in megawatts, by `EstimatorPanel.key`; a
+        capacities: Each estimator's capacity per day in megawatts, by `EstimatorPanel.key`, which
+            the function divides by the plant's static power; a
             missing key or `None` draws the data alone with a note.
         events: The planted events of the record, whose windows are shaded; empty for the original.
         number: The figure's number on its page.
@@ -242,14 +247,16 @@ def estimate_figure(
     Returns:
         The figure.
     """
-    maximum = daily_maximum(record=record, plant=plant)
+    static = float(record.static_p99_mw[plant])
+    maximum = daily_maximum(record=record, plant=plant) / static
     in_window = maximum[window[0] : window[1]]
-    top = HEADROOM * max(float(record.static_p99_mw[plant]), float(np.nanmax(in_window)))
+    top = HEADROOM * max(1.0, float(np.nanmax(in_window)))
     losses = loss_windows(events=events, plant=plant, window=window)
     days = window[1] - window[0]
     panels = []
     for index, panel in enumerate(panel_set):
-        series = capacities.get(panel.key)
+        raw = capacities.get(panel.key)
+        series = None if raw is None else raw / static
         rows = window_rows(maximum=maximum, capacity=series, window=window)
         has_values = series is not None and bool(np.isfinite(series[window[0] : window[1]]).any())
         panels.append(

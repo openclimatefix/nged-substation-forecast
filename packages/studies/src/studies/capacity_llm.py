@@ -58,9 +58,11 @@ TOKENS_PER_IMAGE: Final[int] = 800
 MODEL_ID: Final[str] = "claude-sonnet-5-5"
 """The model every real call requests."""
 
-PER_CALL_BUDGET_USD: Final[float] = 1.0
-"""The command-line tool's own per-call cap. The guard projects the next call at this cost or the
-largest cost seen, whichever is larger, so the run cannot reach `COST_CEILING_USD`."""
+PER_CALL_BUDGET_USD: Final[float] = 0.25
+"""The command-line tool's own per-call cap, about 3.5 times the dearest of the 342 calls of
+rounds 1 to 3 (US$0.07). The guard projects the next call at this cost or the largest cost seen,
+whichever is larger, so the run cannot reach `COST_CEILING_USD`. Rounds 1 to 3 used a cap of
+US$1."""
 
 CALL_TIMEOUT_SECONDS: Final[int] = 900
 """How long one call may take."""

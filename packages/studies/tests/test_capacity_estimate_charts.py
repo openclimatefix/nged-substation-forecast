@@ -61,8 +61,8 @@ def test_window_rows_count_days_from_one_and_leave_a_missing_estimator_null() ->
     maximum = np.arange(DAYS, dtype=float)
     rows = window_rows(maximum=maximum, capacity=None, window=(10, 14))
     assert rows["day"].to_list() == [1, 2, 3, 4]
-    assert rows["maximum_mw"].to_list() == [10.0, 11.0, 12.0, 13.0]
-    assert rows["capacity_mw"].null_count() == 4
+    assert rows["maximum_share"].to_list() == [10.0, 11.0, 12.0, 13.0]
+    assert rows["capacity_share"].null_count() == 4
 
 
 def test_only_the_plants_own_overlapping_events_are_shaded_and_clipped_to_the_window() -> None:
@@ -125,3 +125,30 @@ def test_a_figure_draws_the_panels_it_is_given_in_order() -> None:
     titles = [panel["title"]["text"] for panel in figure["vconcat"]]
     assert titles == [panel.title for panel in ROUND2_PANELS]
     assert len(titles) == 8
+
+
+def test_a_figure_is_drawn_as_a_share_of_static_power_and_never_in_megawatts() -> None:
+    record = _record()
+    static = float(record.static_p99_mw[0])
+    spec = _figure(events=[])
+    text = json.dumps(spec)
+    assert "share of static power" in text
+    assert " MW" not in text
+    assert '"MW"' not in text
+    top = max(
+        layer["encoding"]["y"]["scale"]["domain"][1]
+        for panel in spec["vconcat"]
+        for layer in panel["layer"]
+        if "scale" in layer.get("encoding", {}).get("y", {})
+    )
+    assert top < 3.0
+    assert top > 1.0
+    assert static > 3.0 or static > 0.0
+    values = [
+        row["maximum_share"]
+        for dataset in spec["datasets"].values()
+        for row in dataset
+        if "maximum_share" in row and row["maximum_share"] is not None
+    ]
+    assert values
+    assert max(values) < 3.0

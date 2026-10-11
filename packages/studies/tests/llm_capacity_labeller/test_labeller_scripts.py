@@ -149,3 +149,20 @@ def test_the_easy_case_and_the_new_draws_have_their_own_events() -> None:
     assert labeller_paths.EASY_DAYS == 90
     assert set(labeller_paths.ROUND3_DRAW_SEEDS).isdisjoint(labeller_paths.ROUND2_DRAW_SEEDS)
     assert set(labeller_paths.ROUND3_DRAW_SEEDS).isdisjoint({11441, 11442})
+
+
+def test_round_four_lists_144_calls_grid_first_with_the_frozen_v2_arm() -> None:
+    jobs = labeller_jobs.round4_jobs(plants=6)
+    assert len(jobs) == 144
+    assert {(job.version, job.arm) for job in jobs} == {("v2", "tools_llm")}
+    assert {job.record_id for job in jobs[:48]} == set(labeller_jobs.ROUND4_GRID_RECORDS)
+    assert {job.record_id for job in jobs[48:]} == set(labeller_jobs.ROUND4_DRAW_RECORDS)
+    assert len({job.label for job in jobs}) == len(jobs)
+
+
+def test_round_four_seeds_are_new_and_the_grid_has_two_designs() -> None:
+    used = {11441, 11442, 11443, 11444, 11445, 11446}
+    assert set(labeller_paths.ROUND4_DRAW_SEEDS).isdisjoint(used)
+    assert len(labeller_paths.ROUND4_DRAW_SEEDS) == 8
+    assert labeller_paths.GRID_DESIGNS == ((0.3, 90), (0.6, 30))
+    assert len(labeller_paths.GRID_SEEDS) == 4

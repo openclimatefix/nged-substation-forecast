@@ -57,9 +57,10 @@ def test_the_guard_raises_before_two_million_input_tokens() -> None:
 
 
 def test_the_guard_projects_the_next_call_at_the_per_call_cap_and_stops_at_equality() -> None:
-    guard = BudgetGuard(ceiling_usd=3.0, spent_usd=1.99)
+    cap = capacity_llm.PER_CALL_BUDGET_USD
+    guard = BudgetGuard(ceiling_usd=3.0, spent_usd=3.0 - cap - 0.01)
     guard.check(prompt=_prompt())
-    guard = BudgetGuard(ceiling_usd=3.0, spent_usd=2.0)
+    guard = BudgetGuard(ceiling_usd=3.0, spent_usd=3.0 - cap)
     with pytest.raises(BudgetExceeded, match="spent"):
         guard.check(prompt=_prompt())
 

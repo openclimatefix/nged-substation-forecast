@@ -448,3 +448,14 @@ the exploratory forecast fits (3 seeds, 5 folds, primary setting only).
   is exploratory. An easy case (a 60% loss for 90 days from a random day, two records, 2 samples) is
   run with the same arm. Round 3 allowance: US$3 on top of US$6.97. Neither an Opus run nor a
   matched-filter tool is part of this study; both go in the proposed follow-up.
+- **Round 4 pre-registration (post hoc, written before any round 4 call, after science review 2):**
+  (a) a mid-difficulty grid, post hoc: two records each of a 30% loss lasting 90 days and of a 60%
+  loss lasting 30 days, at every plant from a random day, built like the easy case, with the round 2
+  tools-plus-model arm (version 2, 2 samples, hindsight). (b) Eight further fresh draws (07 to 14,
+  seeds 11447 to 11454) with the same arm and the amended step check frozen exactly as
+  pre-registered for round 3. The headline pools draws 05 to 14 (round 3's two draws and these
+  eight), and round 3 is reported alone beside the pooled figure. Hit-rate intervals use events with
+  at least one hit as the unit. No weekly-summary version-2 arm, no stronger deterministic
+  baseline, and no larger model: all three go in the proposed follow-up. Allowance: US$4 on top of
+  the US$8.39 spent, with the guard projecting each next call at a US$0.25 cap (the dearest call so
+  far cost US$0.07). The grid runs first, so a stop on the guard cuts the last draws.

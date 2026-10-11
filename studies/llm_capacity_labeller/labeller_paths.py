@@ -62,6 +62,15 @@ EASY_SIZE: Final[float] = 0.6
 EASY_DAYS: Final[int] = 90
 """The easy case: a loss of this share of power, lasting this many days, starting on any day."""
 
+ROUND4_DRAW_SEEDS: Final[tuple[int, ...]] = tuple(11447 + index for index in range(8))
+"""The seeds of the eight further fresh draws (07 to 14), pooled with round 3's for the headline."""
+
+GRID_DESIGNS: Final[tuple[tuple[float, int], ...]] = ((0.3, 90), (0.6, 30))
+"""The mid-difficulty grid's two designs: a 30% loss lasting 90 days, and a 60% loss lasting 30."""
+
+GRID_SEEDS: Final[tuple[int, ...]] = (114306, 114307, 114308, 114309)
+"""Two seeds per grid design: `grid01` and `grid02` plant the first design, the rest the second."""
+
 TUNING_SEED: Final[int] = 114401
 """The seed of the cross-checks that resample events."""
 
@@ -78,6 +87,18 @@ RecordIdType = Literal[
     "draw06",
     "easy01",
     "easy02",
+    "draw07",
+    "draw08",
+    "draw09",
+    "draw10",
+    "draw11",
+    "draw12",
+    "draw13",
+    "draw14",
+    "grid01",
+    "grid02",
+    "grid03",
+    "grid04",
 ]
 """The records a labeller reads: the original, the two fresh draws, the positive control, and the
 synthetic null record."""
@@ -95,6 +116,18 @@ RECORD_IDS: Final[tuple[RecordIdType, ...]] = (
     "draw06",
     "easy01",
     "easy02",
+    "draw07",
+    "draw08",
+    "draw09",
+    "draw10",
+    "draw11",
+    "draw12",
+    "draw13",
+    "draw14",
+    "grid01",
+    "grid02",
+    "grid03",
+    "grid04",
 )
 """The runtime tuple of `RecordIdType`'s values."""
 
@@ -437,6 +470,22 @@ def load_round3(*, root: Path) -> dict[str, list[list[PlantedEvent]]]:
     }
 
 
+def load_round4(*, root: Path) -> dict[str, list[list[PlantedEvent]]]:
+    """Read the eight further fresh draws and the four mid-difficulty grid records.
+
+    Args:
+        root: The output root.
+
+    Returns:
+        `draws` (eight event lists, draws 07 to 14) and `grid` (four event lists).
+    """
+    payload = json.loads((built_dir(root=root) / "round4.json").read_text())
+    return {
+        key: [[event_from_json(payload=e) for e in record] for record in payload[key]]
+        for key in ("draws", "grid")
+    }
+
+
 def record_for(*, root: Path, record_id: RecordIdType) -> CapacityRecord:
     """Build a record by identifier.
 
@@ -460,7 +509,7 @@ def record_for(*, root: Path, record_id: RecordIdType) -> CapacityRecord:
         return plant_losses(
             record=original, events=positive_control_events(first=load_first_events())
         )
-    if record_id in ("draw03", "draw04", "control2", "draw05", "draw06", "easy01", "easy02"):
+    if record_id not in ("original", "draw01", "draw02", "control", "null"):
         return plant_losses(record=original, events=events_of(root=root, record_id=record_id))
     if record_id == "null":
         with np.load(built_dir(root=root) / "null_power.npz") as data:
@@ -491,4 +540,8 @@ def events_of(*, root: Path, record_id: RecordIdType) -> list[PlantedEvent]:  # 
         return load_round3(root=root)["draws"][int(record_id[-1]) - 5]
     if record_id in ("easy01", "easy02"):
         return load_round3(root=root)["easy"][int(record_id[-1]) - 1]
+    if record_id.startswith("grid"):
+        return load_round4(root=root)["grid"][int(record_id[-1]) - 1]
+    if record_id.startswith("draw") and int(record_id[-2:]) >= 7:
+        return load_round4(root=root)["draws"][int(record_id[-2:]) - 7]
     return []

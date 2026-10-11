@@ -56,9 +56,9 @@ DAYS_AFTER: Final[int] = 60
 
 SUBTITLE: Final[tuple[str, ...]] = (
     (
-        "Grey dots: the highest hourly power of each day, in megawatts (MW). Orange line: the "
-        "estimator's capacity in MW, which should sit near the top of the dots and drop where "
-        "capacity is lost."
+        "Grey dots: the highest hourly power of each day, as a share of the plant's static "
+        "power. Orange line: the estimator's capacity, also as a share of static power, which "
+        "should sit near the top of the dots and drop where capacity is lost."
     ),
     "Every panel uses one vertical range. Day 1 is the first day shown; no dates are given.",
 )
@@ -169,10 +169,7 @@ def main() -> int:
             ),
             events=events,
             number=number,
-            title=(
-                f"{note}Each estimator on a planted {shape} loss of {event.size:.0%} "
-                f"at plant {record.sites[event.plant]}"
-            ),
+            title=(f"{note}Each estimator on a planted {shape} loss of {event.size:.0%} "),
             subtitle=(*SUBTITLE, "Blue shading: the month in which the loss was planted."),
             panel_set=panel_set,
         )
@@ -187,10 +184,7 @@ def main() -> int:
         ),
         events=[],
         number="3",
-        title=(
-            f"{note}Each estimator on a quiet stretch of the real record "
-            f"at plant {original.sites[plant]}"
-        ),
+        title=(f"{note}Each estimator on a quiet stretch of the real record "),
         subtitle=(
             *SUBTITLE,
             "No loss was planted; the capacity should stay near the top of the dots.",
