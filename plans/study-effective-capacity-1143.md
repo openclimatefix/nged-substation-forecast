@@ -318,8 +318,9 @@ report script prints them with a reason for each:
 
 KF and DP1 report their fitted physical quantities (tilt and azimuth in degrees, the direct-current
 to alternating-current ratio, an availability factor over time with its standard deviation). The
-report script prints one explanation sentence per estimator for a planted event and for each of the
-three real low months of the low-output plant, with no plant label beside those dates. The rubric
+report script prints a table of each estimator's estimated change, against the 30 days before, 20
+days into every planted event of the tuning draw (median and range) and in each of the three real
+low months of the low-output plant, with no plant label anywhere. The rubric
 adds no estimator and no fit, and it takes no part in the selection rule.
 
 ### Exploratory additions
@@ -461,6 +462,30 @@ model.** The final page's "Groundwork for version 2" paragraph can draw on these
   across plants in the same weather.
 
 - **Literature hook for the Introduction and Discussion:** cite the works in the Literature section with the link on the author-year label, and say which estimator stands for which published method.
+
+**What the forecast contrast can and cannot say on this record (review wording for the page).**
+
+- **The instrument cannot return "worth building" for any estimator on this record.** Only 3
+  low-output plant-months of 106 (2.8%, or 1.9% of rows) are the kind of loss the estimators exist
+  to correct, and the selected arm would need about 6.5% of rows to be such plant-months to beat
+  B0 overall. The negative result is about this record, not about capacity estimation.
+- **The agile Kalman filter (KF) improves the 3 low plant-months by about 5 points and worsens
+  every other row by about 0.4 points (0.84 points from December to February).** The two effects
+  are the row-weighted figures in the report's post hoc section.
+- **The raw KF level has a seasonal shape caused by the physics model** (the December level is
+  0.71 to 0.88 of each plant's median). The planted-loss ratio cancels that shape, so Stage A's
+  tuning rewarded agility and the false-movement gate penalised it. DSKF removes the shape and does
+  not fix the false movement; HYST passes the 10% gate on the real windows.
+
+**POST HOC additions (not pre-registered; they leave the selection, the ungated pick, and the
+verdict unchanged).** DSKF (KF divided by a cross-plant day-of-year profile built only from earlier
+calendar years; the record's first calendar year has no profile and falls back to the static
+power), HYST (hold the static power until a deseasonalised drop of more than 10% lasts 7 days,
+follow it, release after 7 recovered days), Stage B arms for them and for HM, CX2, NR, PR, CX1,
+and DP1, the winter split, the break-even share, the capacity-only bound against the decision rule,
+the gate sensitivity, E1 and E2 without the gate, and the hindsight explanation. Each is labelled
+POST HOC in code and report. The explanation sentences are replaced by tables of the estimated
+change across all planted events and in each real low month.
 
 ## Open decisions for the maintainer
 

@@ -20,6 +20,7 @@ import json
 import logging
 import sys
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
@@ -32,7 +33,6 @@ from capacity_paths import (
     LAG_LOSSES_PATH,
     OUTPUT_RATIOS_PATH,
     claim_root,
-    inputs_dir,
     load_events,
     load_tuned,
     record_for,
@@ -42,12 +42,8 @@ from capacity_scores import scale_for
 from scipy import stats
 from studies.bootstrap import bootstrap_difference
 from studies.capacity_estimators import ESTIMATOR_FAMILY, scale_for_rows
-from studies.capacity_explain import (
-    CRITERIA,
-    explanation_sentence,
-    fitted_physical_quantities,
-    rubric_table,
-)
+from studies.capacity_explain import CRITERIA, rubric_table
+from studies.capacity_recovery import expected_factor
 from studies.capacity_scaling import (
     MIN_ORACLE_GAIN_POINTS,
     SCORED_COLUMN,
@@ -143,6 +139,25 @@ def difference(*, losses: pl.DataFrame, treatment: str, reference: str) -> dict[
     }
 
 
+def reading(*, result: dict[str, float]) -> str:
+    """Name a difference's direction from its month t-interval, noting a borderline reading.
+
+    Args:
+        result: `difference`'s result, where a positive difference means the treatment is worse.
+
+    Returns:
+        `worse`, `better`, or `no detectable difference` by the month t-interval, with
+        `, borderline` added where the bootstrap interval excludes zero but the t-interval does not.
+    """
+    if result["t_lower"] > 0:
+        return "worse"
+    if result["t_upper"] < 0:
+        return "better"
+    boot_excludes = result["boot_lower"] > 0 or result["boot_upper"] < 0
+    direction = "worse" if result["difference"] > 0 else "better"
+    return f"{direction}, borderline" if boot_excludes else "no detectable difference"
+
+
 def bootstrap_text(*, result: dict[str, float]) -> str:
     """Return a difference's point estimate and bootstrap interval as text."""
     return (
@@ -209,7 +224,7 @@ def stage_a(*, root: Path, report: Report) -> dict[str, Any]:
 
 
 def fallbacks(*, root: Path, report: Report) -> None:
-    """Print the share of scored days on each fallback, per estimator and plant."""
+    """Print the share of scored days on each fallback, per estimator, with no plant labels."""
     record = record_for(root=root, record_id="original")
     days = np.unique(scored_days(record=record, events=load_events(root=root)))
     rows = []
@@ -220,17 +235,17 @@ def fallbacks(*, root: Path, report: Report) -> None:
             params=load_tuned(root=root, estimator=estimator),
             file_id="original",
         )
-        for plant, site in enumerate(record.sites):
-            reason = scale.fallback_reason[plant, days]
-            rows.append(
-                {
-                    "estimator": estimator,
-                    "plant": site,
-                    "short_history": float((reason == 1).mean()),
-                    "null_estimate": float((reason == 2).mean()),
-                }
-            )
-    report.heading("Fallback shares on the scored days (original record)")
+        reason = scale.fallback_reason[:, days]
+        null_by_plant = (reason == 2).mean(axis=1)
+        rows.append(
+            {
+                "estimator": estimator,
+                "short_history_mean_over_plants": float((reason == 1).mean()),
+                "null_estimate_mean_over_plants": float(null_by_plant.mean()),
+                "null_estimate_largest_plant": float(null_by_plant.max()),
+            }
+        )
+    report.heading("Fallback shares on the scored days (original record, plants pooled)")
     report.table(pl.DataFrame(rows))
 
 
@@ -364,9 +379,10 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
         threshold = THRESHOLD_SHARE * float(np.mean(b0[setting][SCORED_COLUMN].to_numpy())) * POINTS
         decisions[setting] = (result, threshold)
         report.text(
-            f"- {setting}: difference {result['difference']:.3f} points; bootstrap 95% "
-            f"[{result['boot_lower']:.3f}, {result['boot_upper']:.3f}]; month t-interval "
-            f"[{result['t_lower']:.3f}, {result['t_upper']:.3f}]; threshold {threshold:.3f} points"
+            f"- {setting}: difference {result['difference']:.3f} points; **headline: month "
+            f"t-interval [{result['t_lower']:.3f}, {result['t_upper']:.3f}]**; bootstrap 95% "
+            f"[{result['boot_lower']:.3f}, {result['boot_upper']:.3f}]; threshold "
+            f"{threshold:.3f} points; reading: {reading(result=result)}"
         )
     nc2_arm = f"nc2__{selected}"
     nc2_pair = pl.concat([b0["primary"], ours.filter(pl.col("arm") == nc2_arm).select(*keep)])
@@ -429,11 +445,9 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
     report.text(f"- **decision rule verdict{label}: {verdict}**")
     counts = Counter(e.plant for e in events.control)
     report.text(
-        "- control steps per plant: "
-        + ", ".join(f"{site} {counts.get(i, 0)}" for i, site in enumerate(record.sites))
+        "- control steps per plant (sorted, no labels): "
+        + ", ".join(str(n) for n in sorted(counts.get(i, 0) for i in range(len(record.sites))))
     )
-    anm_months = [event.first_day for event in events.control if event.plant == events.anm_plant]
-    report.text(f"- the ANM plant's control months: {len(anm_months)}")
     share = recovery_share(
         planted_gain=-chosen["difference"], real_gain=-real, oracle_gain=-oracle["difference"]
     )
@@ -519,7 +533,8 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
         )
     # Month and plant.
     report.heading(
-        "Month-by-month and plant-by-plant differences (selected minus B0, primary)", level=3
+        "Month-by-month and plant-by-plant differences (selected minus B0, primary, unweighted)",
+        level=3,
     )
     pair = pl.concat(
         [
@@ -542,85 +557,384 @@ def stage_b(*, root: Path, selection: dict[str, Any], report: Report) -> None:  
         .agg(difference_points=(pl.col(p1_arm) - pl.col("B0")).mean() * POINTS)
         .sort("site")
     )
-    report.table(by_month)
-    report.table(by_plant)
-    low_site = record.sites[events.low_plant]
-    low = wide.filter((pl.col("site") == low_site) & pl.col("month").is_in(events.low_months))
-    low_gap = float(np.mean((low[p1_arm] - low["B0"]).to_numpy())) * POINTS
+    report.text("Unweighted: each plant-month counts once, whatever its number of rows.")
+    report.table(by_month.rename({"difference_points": "unweighted_difference_points"}))
     report.text(
-        f"- the three low-output plant-months together: {low_gap:.3f} points (plant label withheld)"
+        "Unweighted by plant, sorted from the largest difference, with no plant labels: "
+        + ", ".join(
+            f"{v:.3f}" for v in sorted(by_plant["difference_points"].to_list(), reverse=True)
+        )
+    )
+    both = _paired_rows(losses=pair, treatment=p1_arm, reference="B0")
+    low_site = record.sites[events.low_plant]
+    low_mask = (pl.col("site") == low_site) & pl.col("month").is_in(events.low_months)
+    low_gap = _mean(both.filter(low_mask)["diff"]) * POINTS
+    report.text(
+        f"- the three low-output plant-months together, row weighted: {low_gap:.3f} points "
+        "(plant label withheld)"
+    )
+    posthoc(
+        root=root,
+        report=report,
+        context=PostHocContext(
+            ours=ours,
+            b0=b0,
+            keep=keep,
+            frame=frame,
+            selected=selected,
+            events=events,
+            record=record,
+            both=both,
+            low_mask=low_mask,
+            nc2_upper=nc2["boot_upper"],
+            control_passed=passed,
+        ),
     )
 
 
-def explainability(*, root: Path, report: Report) -> None:
-    """Print the rubric and one explanation per estimator for a planted event and the low months."""
-    events = load_events(root=root)
-    record = record_for(root=root, record_id="original")
-    orientation = json.loads((inputs_dir(root=root) / "orientation.json").read_text())
-    report.heading("Explainability")
-    rubric = rubric_table()
-    report.text("Criteria: " + "; ".join(f"{key} = {question}" for key, question in CRITERIA))
-    report.table(rubric)
-    event = next(e for e in events.draws[0] if e.shape == "step")
-    site = record.sites[event.plant]
-    day = event.first_day + 20
-    report.heading("A planted step in the tuning draw", level=3)
-    report.text(f"Plant {site}, step of {event.size:.0%} starting {record.dates[event.first_day]}.")
-    for estimator in ESTIMATOR_FAMILY:
-        params = load_tuned(root=root, estimator=estimator)
-        planted = scale_for(root=root, estimator=estimator, params=params, file_id="draw00")
-        report.text(
-            "- "
-            + explanation_sentence(
-                estimator=estimator,
-                when=str(record.dates[day]),
-                scale_mw=float(planted.scale_mw[event.plant, day]),
-                earlier_scale_mw=float(planted.scale_mw[event.plant, event.first_day - 1]),
-                earlier_days=day - (event.first_day - 1),
-                relative_sd=None
-                if np.isnan(planted.relative_sd[event.plant, day])
-                else float(planted.relative_sd[event.plant, day]),
-                where=f"plant {site}",
+@dataclass(frozen=True)
+class PostHocContext:
+    """What the post hoc sections read from `stage_b`."""
+
+    ours: pl.DataFrame
+    b0: dict[str, pl.DataFrame]
+    keep: list[str]
+    frame: pl.DataFrame
+    selected: str
+    events: Any
+    record: Any
+    both: pl.DataFrame
+    low_mask: pl.Expr
+    nc2_upper: float
+    control_passed: bool
+
+
+WINTER_MONTHS: Final[tuple[str, ...]] = ("12", "01", "02")
+"""The calendar months of the winter split."""
+
+POSTHOC_LABEL: Final[str] = "POST HOC"
+
+
+def _paired_rows(*, losses: pl.DataFrame, treatment: str, reference: str) -> pl.DataFrame:
+    """Return every row's treatment and reference loss and their difference (a fraction)."""
+    return (
+        losses.filter(pl.col("arm") == treatment)
+        .select("site", "time", "seed", "month", treatment=pl.col(SCORED_COLUMN))
+        .join(
+            losses.filter(pl.col("arm") == reference).select(
+                "site", "time", "seed", reference=pl.col(SCORED_COLUMN)
+            ),
+            on=["site", "time", "seed"],
+        )
+        .with_columns(diff=pl.col("treatment") - pl.col("reference"))
+    )
+
+
+def _arm_vs_b0(*, context: PostHocContext, arm_losses: pl.DataFrame, arm: str) -> dict[str, float]:
+    """Return an arm's primary-setting difference from B0."""
+    pair = pl.concat([context.b0["primary"], arm_losses.select(*context.keep)])
+    return difference(losses=pair, treatment=arm, reference="B0")
+
+
+def _mean(values: pl.Series) -> float:
+    """Return a series' mean as a float."""
+    return float(np.mean(values.to_numpy()))
+
+
+def _interval_text(*, result: dict[str, float]) -> str:
+    return (
+        f"{result['difference']:.3f} points; month t-interval "
+        f"[{result['t_lower']:.3f}, {result['t_upper']:.3f}]; bootstrap 95% "
+        f"[{result['boot_lower']:.3f}, {result['boot_upper']:.3f}]; {reading(result=result)}"
+    )
+
+
+def plant_months(rows: pl.DataFrame) -> int:
+    """Return how many distinct plant-months the rows cover."""
+    return rows.select(pl.struct("site", "month").n_unique()).item()
+
+
+def posthoc(*, root: Path, report: Report, context: PostHocContext) -> None:  # noqa: PLR0915
+    """Print every analysis that was not pre-registered, each labelled POST HOC."""
+    ours, b0, keep = context.ours, context.b0, context.keep
+    selected = context.selected
+    arm = f"causal__{selected}"
+    report.heading(f"{POSTHOC_LABEL}: analyses beyond the pre-registered ones")
+    report.text(
+        f"**Everything in this section is {POSTHOC_LABEL}. None of it changes the pre-registered "
+        "selection or the verdict.**"
+    )
+    chosen = ours.filter((pl.col("arm") == arm) & (pl.col("setting") == "primary")).select(*keep)
+    pair = pl.concat([b0["primary"], chosen])
+    # Winter split.
+    report.heading(f"{POSTHOC_LABEL}: winter against the other months (selected minus B0)", level=3)
+    is_winter = pl.col("month").str.slice(5, 2).is_in(list(WINTER_MONTHS))
+    for label, part in (
+        ("December to February", pair.filter(is_winter)),
+        ("the other months", pair.filter(~is_winter)),
+    ):
+        months = part["month"].n_unique()
+        result = difference(losses=part, treatment=arm, reference="B0")
+        report.text(f"- {label} ({months} months, row weighted): {_interval_text(result=result)}")
+    # Break-even.
+    both = context.both
+    low = both.filter(context.low_mask)
+    rest = both.filter(~context.low_mask)
+    gap_low, gap_rest = _mean(low["diff"]), _mean(rest["diff"])
+    break_even = gap_rest / (gap_rest - gap_low)
+    report.heading(f"{POSTHOC_LABEL}: break-even share of low-output rows", level=3)
+    report.text(
+        f"- row-weighted selected-minus-B0 gap: {gap_low * POINTS:.3f} points on the low-output "
+        f"plant-months, {gap_rest * POINTS:.3f} points on every other row"
+    )
+    report.text(
+        f"- the selected arm beats B0 overall only if more than {break_even:.1%} of rows are "
+        f"low-output plant-months; here the share is {low.height / both.height:.1%} "
+        "of rows and "
+        f"{plant_months(low) / plant_months(both):.1%} of plant-months "
+        f"({plant_months(low)} of {plant_months(both)})"
+    )
+    # Capacity-only bound against the same rule.
+    report.heading(
+        f"{POSTHOC_LABEL}: the capacity-only neighbour-ratio bound against the same decision rule",
+        level=3,
+    )
+    ratios = pl.read_parquet(OUTPUT_RATIOS_PATH).select(
+        "site", "month", ratio=pl.coalesce("ratio", "ratio_alt")
+    )
+    factor = context.frame.join(ratios, on=["site", "month"], how="left", maintain_order="left")[
+        "ratio"
+    ].to_numpy()
+    results = []
+    for setting in ("primary", "sensitivity"):
+        baseline = published_b0(setting=setting)
+        bound = multiplied_forecast_scores(
+            baseline_losses=baseline, frame=context.frame, factor=factor
+        ).with_columns(arm=pl.lit("capacity_only_bound"), setting=pl.lit(setting))
+        bound_pair = pl.concat([b0[setting], bound.select(*keep)])
+        result = difference(losses=bound_pair, treatment="capacity_only_bound", reference="B0")
+        threshold = THRESHOLD_SHARE * float(np.mean(b0[setting][SCORED_COLUMN].to_numpy())) * POINTS
+        results.append(
+            SettingResult(
+                result["difference"], result["boot_lower"], result["boot_upper"], threshold
             )
         )
-        if estimator in ("KF", "DP1"):
-            quantities = fitted_physical_quantities(
-                orientation=orientation[site],
-                scale_mw=float(planted.scale_mw[event.plant, day]),
-                static_p99_mw=float(record.static_p99_mw[event.plant]),
-                relative_sd=None
-                if np.isnan(planted.relative_sd[event.plant, day])
-                else float(planted.relative_sd[event.plant, day]),
+        report.text(f"- {setting}: {_interval_text(result=result)}; threshold {threshold:.3f}")
+    verdict = decision_verdict(
+        settings=results, nc2_upper=context.nc2_upper, control_passed=context.control_passed
+    )
+    report.text(
+        f"- the pre-registered rule applied to the bound, with the selected arm's negative control "
+        f"and positive control: **{verdict}**"
+    )
+    # The low-output plant's neighbouring months.
+    report.heading(f"{POSTHOC_LABEL}: the low-output plant around March 2026", level=3)
+    low_plant = context.record.sites[context.events.low_plant]
+    rows = []
+    for month in ("2026-02", "2026-03", "2026-04"):
+        selected_rows = both.filter((pl.col("site") == low_plant) & (pl.col("month") == month))
+        rows.append(
+            {
+                "month": month,
+                "B0_error_points": _mean(selected_rows["reference"]) * POINTS,
+                "selected_error_points": _mean(selected_rows["treatment"]) * POINTS,
+                "rows": selected_rows.height,
+            }
+        )
+    report.table(pl.DataFrame(rows))
+    # Hindsight.
+    report.heading(f"{POSTHOC_LABEL}: why hindsight is worse than causal", level=3)
+    hind = f"hindsight__{selected}"
+    hind_rows = _paired_rows(
+        losses=ours.filter(pl.col("setting") == "primary").select(*keep),
+        treatment=hind,
+        reference=arm,
+    )
+    monthly = (
+        hind_rows.group_by("site", "month")
+        .agg(gap=pl.col("diff").mean(), rows=pl.len())
+        .sort("gap", descending=True)
+    )
+    worst = monthly.head(2)
+    report.text(
+        "- the two plant-months with the largest hindsight-minus-causal gap (labels withheld): "
+        + ", ".join(f"{g * POINTS:.1f} points" for g in worst["gap"].to_list())
+    )
+    keys = pl.struct("site", "month")
+    worst_keys = worst.select(keys.alias("k"))["k"].to_list()
+    drop = ~keys.is_in(worst_keys)
+    for label, part in (
+        ("all plant-months", ours.filter(pl.col("setting") == "primary")),
+        (
+            "without those two plant-months",
+            ours.filter(pl.col("setting") == "primary").filter(drop),
+        ),
+    ):
+        pair_h = pl.concat(
+            [
+                part.filter(pl.col("arm") == hind).select(*keep),
+                part.filter(pl.col("arm") == arm).select(*keep),
+            ]
+        )
+        result = difference(losses=pair_h, treatment=hind, reference=arm)
+        report.text(f"- {hind} minus {arm}, {label}: {_interval_text(result=result)}")
+    earlier = [
+        (site, f"{int(month[:4]) - 1}{month[4:]}")
+        for site, month in zip(worst["site"].to_list(), worst["month"].to_list(), strict=True)
+    ]
+    for name in (arm, hind):
+        scaled = ours.filter((pl.col("arm") == name) & (pl.col("setting") == "primary"))
+        year_before = scaled.filter(
+            pl.struct("site", "month").is_in(
+                [{"site": site, "month": month} for site, month in earlier]
             )
-            report.text(f"  - {estimator} fitted quantities: {quantities}")
-    report.heading("The three real low months of the low-output plant (label withheld)", level=3)
-    spans = {
-        m: np.flatnonzero(record.dates.astype("datetime64[M]").astype(str) == m)
-        for m in events.low_months
-    }
-    for month, indices in spans.items():
-        middle = int(indices[len(indices) // 2])
-        for estimator in ESTIMATOR_FAMILY:
-            scale = scale_for(
-                root=root,
-                estimator=estimator,
-                params=load_tuned(root=root, estimator=estimator),
-                file_id="original",
+        )
+        report.text(
+            f"- {name}: mean scaled power (power over the arm's scale, a fraction) is "
+            f"{_mean(scaled.filter(context.low_mask)['actual_scaled']):.3f} in the low-output "
+            f"plant-months and {_mean(year_before['actual_scaled']):.3f} in the same plant one "
+            "year before the two worst plant-months"
+        )
+    report.text(
+        "- reading: the hindsight scale is lower than the causal scale in those earlier months, "
+        "so the training rows there are divided by a smaller number and carry larger targets, and "
+        "the day-of-year column is consistent with the fitted trees carrying them into the same "
+        "calendar months a year later. The floor is not the cause. The arm works as defined, so "
+        "the page calls hindsight a reference, not a bound."
+    )
+    # New arms.
+    path = root / "losses_stage_b_posthoc.parquet"
+    if path.exists():
+        report.heading(
+            f"{POSTHOC_LABEL}: other estimators as Stage B arms (primary setting)", level=3
+        )
+        extra = pl.read_parquet(path)
+        scales = np.load(root / "scales_stage_b_posthoc.npz")
+        summary = pl.read_parquet(root / "tables" / "posthoc_stage_a.parquet")
+        movement = dict(
+            zip(summary["estimator"], summary["false_movement_real_windows"], strict=True)
+        )
+        rows = []
+        for name in sorted(extra["arm"].unique().to_list()):
+            estimator = name.removeprefix("posthoc_causal__")
+            arm_losses = extra.filter(pl.col("arm") == name).select(*keep)
+            result = _arm_vs_b0(context=context, arm_losses=arm_losses, arm=name)
+            rs_factor = scale_for_rows(
+                record=context.record, scale_mw=scales[name], rows=context.frame
             )
-            earlier = int(indices[0])
-            sd = scale.relative_sd[events.low_plant, middle]
-            report.text(
-                "- "
-                + explanation_sentence(
-                    estimator=estimator,
-                    when=month,
-                    scale_mw=float(scale.scale_mw[events.low_plant, middle]),
-                    earlier_scale_mw=float(scale.scale_mw[events.low_plant, earlier]),
-                    earlier_days=middle - earlier,
-                    relative_sd=None if np.isnan(sd) else float(sd),
-                    where="the low-output plant",
+            rs = multiplied_forecast_scores(
+                baseline_losses=published_b0(setting="primary"),
+                frame=context.frame,
+                factor=rs_factor,
+            ).with_columns(arm=pl.lit("RS"), setting=pl.lit("primary"))
+            rs_result = _arm_vs_b0(context=context, arm_losses=rs, arm="RS")
+            rows.append(
+                {
+                    "estimator": estimator,
+                    "fit_minus_B0_points": result["difference"],
+                    "fit_t_lower": result["t_lower"],
+                    "fit_t_upper": result["t_upper"],
+                    "fit_boot_lower": result["boot_lower"],
+                    "fit_boot_upper": result["boot_upper"],
+                    "RS_minus_B0_points": rs_result["difference"],
+                    "RS_t_lower": rs_result["t_lower"],
+                    "RS_t_upper": rs_result["t_upper"],
+                    "false_movement_23_windows": movement.get(estimator),
+                }
+            )
+        report.table(pl.DataFrame(rows))
+        report.text(
+            "RS is B0's forecast times the estimator's scale over its training-row mean (no fit)."
+        )
+        stage_a_table = pl.read_parquet(root / "tables" / "posthoc_stage_a.parquet")
+        report.heading(f"{POSTHOC_LABEL}: Stage A recovery and false movement", level=3)
+        report.table(stage_a_table)
+
+
+def _scale_changes(*, scale: np.ndarray, plant: int, first: int, day: int) -> float:
+    """Return the relative change from the median of the 30 days before `first` to `day`."""
+    baseline = float(np.nanmedian(scale[plant, max(first - 30, 0) : first]))
+    return float(scale[plant, day] / baseline - 1.0)
+
+
+def explainability(*, root: Path, report: Report) -> None:
+    """Print the rubric, each estimator's change across all planted events, and the low months."""
+    events = load_events(root=root)
+    record = record_for(root=root, record_id="original")
+    report.heading("Explainability")
+    report.table(rubric_table())
+    report.text("Criteria: " + "; ".join(f"{key} = {question}" for key, question in CRITERIA))
+    report.heading(
+        "Estimated change 20 days into each planted event, against the 30 days before it", level=3
+    )
+    rows = []
+    for estimator in ESTIMATOR_FAMILY:
+        planted = scale_for(
+            root=root,
+            estimator=estimator,
+            params=load_tuned(root=root, estimator=estimator),
+            file_id="draw00",
+        )
+        estimated, expected = [], []
+        for event in events.draws[0]:
+            day = event.first_day + 20
+            estimated.append(
+                _scale_changes(
+                    scale=planted.scale_mw, plant=event.plant, first=event.first_day, day=day
                 )
             )
+            expected.append(float(expected_factor(event=event, days=len(record.dates))[day] - 1.0))
+        rows.append(
+            {
+                "estimator": estimator,
+                "events": len(estimated),
+                "median_estimated_change": float(np.median(estimated)),
+                "lowest_estimated_change": float(np.min(estimated)),
+                "highest_estimated_change": float(np.max(estimated)),
+                "median_planted_change": float(np.median(expected)),
+            }
+        )
+    report.table(pl.DataFrame(rows))
+    report.heading(
+        "Estimated change in each real low month, against the 30 days before it", level=3
+    )
+    rows = []
+    months = record.dates.astype("datetime64[M]").astype(str)
+    for estimator in ESTIMATOR_FAMILY:
+        scale = scale_for(
+            root=root,
+            estimator=estimator,
+            params=load_tuned(root=root, estimator=estimator),
+            file_id="original",
+        )
+        row: dict[str, object] = {"estimator": estimator}
+        for number, month in enumerate(events.low_months, start=1):
+            indices = np.flatnonzero(months == month)
+            row[f"low month {number}"] = _scale_changes(
+                scale=scale.scale_mw,
+                plant=events.low_plant,
+                first=int(indices[0]),
+                day=int(indices[len(indices) // 2]),
+            )
+        rows.append(row)
+    report.table(pl.DataFrame(rows))
+    fitted = pl.read_parquet(root / "tables" / "fitted_quantities.parquet")
+    report.heading("Fitted physical quantities of KF and DP1 (plant labels withheld)", level=3)
+    report.table(
+        fitted.drop("plant")
+        .sort("estimator", "tilt_deg")
+        .select(
+            "estimator",
+            "tilt_deg",
+            "azimuth_deg",
+            "ac_limit_mw",
+            "fitted_dc_capacity_mw",
+            "series",
+            "series_min_mw",
+            "series_median_mw",
+            "series_max_mw",
+        )
+    )
 
 
 def main() -> int:

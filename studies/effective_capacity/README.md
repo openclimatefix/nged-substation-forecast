@@ -23,6 +23,7 @@ overwrites a finished output.
 | `estimate_capacity_torch.py` | GPU. Runs DP1 at both settings on every record. |
 | `score_capacity_recovery.py` | Chooses each estimator's setting on the tuning draw (`--phase tuning`), then scores the selection draws, applies the false-movement gate, and writes `selection.json` (`--phase selection`). Fits no XGBoost model. |
 | `fit_capacity_arms.py` | GPU. Runs the constant-scale assertion, the 90-fit reproduction of B0, the forecast-row join probe, and then every Stage B arm, with checkpoints. |
+| `posthoc_capacity.py`, `fit_posthoc_arms.py` | POST HOC, not pre-registered. Estimate DSKF and HYST from the tuned Kalman filter's levels and score them in Stage A; then fit Stage B arms `posthoc_causal__<estimator>` for them and for HM, CX2, NR, PR, CX1, and DP1 (`--phase estimates`, then `--phase stage_a`, then the arm fitter). They never change the selection or the verdict. |
 | `report_effective_capacity.py` | Prints every table and number the page quotes into `report.md`, with the explainability rubric and examples. |
 
 ## Run order
