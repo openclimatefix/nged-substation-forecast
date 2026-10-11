@@ -123,6 +123,9 @@ class Arm:
     colsample_bytree: float = 1.0
 
 
+CHOSEN_CLEANING: Final[CleaningRule] = "new_meter_settling"
+"""The cleaning rule round 0 chose, which every later arm applies (see the report's round 0)."""
+
 REFERENCE_ARMS: Final[tuple[Arm, ...]] = (
     Arm(
         name="production_colsample0.8",
@@ -133,7 +136,14 @@ REFERENCE_ARMS: Final[tuple[Arm, ...]] = (
     Arm(
         name="production",
         family="reference",
-        description="Production with colsample_bytree 1.0, the control for every contrast.",
+        description="Production with colsample_bytree 1.0, the control for round 0.",
+    ),
+    Arm(
+        name="production_cleaned",
+        family="reference",
+        description="Production with colsample_bytree 1.0 and the chosen cleaning: the control for "
+        "every round 1 and later contrast.",
+        cleaning=CHOSEN_CLEANING,
     ),
 )
 
@@ -200,24 +210,28 @@ CLEANING_ARMS: Final[tuple[Arm, ...]] = (
 FEATURE_ARMS: Final[tuple[Arm, ...]] = (
     Arm(
         name="a1_generators_without_lags",
+        cleaning=CHOSEN_CLEANING,
         family="features",
         description="PV and wind lose the power lags and weekday columns.",
         columns=generators_without_lags,
     ),
     Arm(
         name="a2_per_type_physics",
+        cleaning=CHOSEN_CLEANING,
         family="features",
         description="A1 plus solar columns for PV, wind components for wind, heating for demand.",
         columns=per_type_physics,
     ),
     Arm(
         name="c1_lead_time",
+        cleaning=CHOSEN_CLEANING,
         family="features",
         description="Production columns plus the forecast lead time.",
         columns=with_lead_time,
     ),
     Arm(
         name="c7_calendar",
+        cleaning=CHOSEN_CLEANING,
         family="features",
         description="Demand-like series gain holiday and raw ordinal time columns.",
         columns=with_calendar,
@@ -227,18 +241,21 @@ FEATURE_ARMS: Final[tuple[Arm, ...]] = (
 TRAINING_ARMS: Final[tuple[Arm, ...]] = (
     Arm(
         name="c2_early_stopping",
+        cleaning=CHOSEN_CLEANING,
         family="training",
         description="Number of trees chosen on the last six training weeks.",
         early_stopping=True,
     ),
     Arm(
         name="c3_recency_weights",
+        cleaning=CHOSEN_CLEANING,
         family="training",
         description="Training rows lose half their weight every 120 days of age.",
         recency_half_life_days=120.0,
     ),
     Arm(
         name="c4_absolute_error",
+        cleaning=CHOSEN_CLEANING,
         family="training",
         description="Absolute-error objective instead of squared error.",
         objective="reg:absoluteerror",

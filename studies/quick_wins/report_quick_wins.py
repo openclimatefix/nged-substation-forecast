@@ -25,7 +25,7 @@ from report_tables import markdown_table
 METRICS: Final[dict[str, str]] = {"crps": "crps_norm", "mae": "abs_error_norm"}
 """The two reported metrics, by name, and the per-row column each is read from."""
 
-REFERENCES: Final[tuple[str, ...]] = ("production", "production_colsample0.8")
+REFERENCES: Final[tuple[str, ...]] = ("production_cleaned", "production", "production_colsample0.8")
 """The arms every other arm is contrasted with: production at colsample 1.0, and as stored."""
 
 
