@@ -122,7 +122,7 @@ def main() -> None:
         train.write_parquet(train_path.with_suffix(".tmp"))
         train_path.with_suffix(".tmp").rename(train_path)
         print(
-            f"train: {train.height:,} rows x {train.width} cols in {time.monotonic() - started:.0f} s"
+            f"train: {train.height:,} rows, {train.width} cols, {time.monotonic() - started:.0f} s"
         )
 
     for init_time in inputs.sample_init_times(window=window):
