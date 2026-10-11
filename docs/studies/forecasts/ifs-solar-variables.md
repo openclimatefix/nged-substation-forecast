@@ -478,12 +478,12 @@ variables](../assets/ifs_solar_variables_variables_or_forecast.svg)
   ladder arms only.
 - **Some analyses are post hoc.** Several analyses were added after the first scientific review: the
   FP cloud contrasts, the ensemble-mean contrasts, the winter-fold reading, the raw-error table, the
-  second-setting drop-one runs and the rule that both settings must agree for the drop-one test (the plan required agreement
-  for P1 to P5 only), and the "unresolved at the smallest effect" label on the priority list. The
-  both-settings rule reversed the pre-set outcome of the second-feed decision and removed humidity,
-  column water, and boundary-layer height from the priority list. The report labels each post hoc
-  analysis. Only P1 to P5, their controls, their five verdicts, and the three decision rules as
-  written were fixed in the plan before any result existed.
+  second-setting drop-one runs and the rule that both settings must agree for the drop-one test (the
+  plan required agreement for P1 to P5 only), and the "unresolved at the smallest effect" label on
+  the priority list. The both-settings rule reversed the pre-set outcome of the second-feed decision
+  and removed humidity, column water, and boundary-layer height from the priority list. The report
+  labels each post hoc analysis. Only P1 to P5, their controls, their five verdicts, and the three
+  decision rules as written were fixed in the plan before any result existed.
 - **ICON-EU was not tested as a second forecast.**
 
 ## Scope
