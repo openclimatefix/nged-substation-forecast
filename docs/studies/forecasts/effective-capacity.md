@@ -39,7 +39,7 @@ overall only above 6.5% of rows, and would reach the threshold only at about 9.7
 7](#the-kalman-filter-cut-error-by-about-5-points-in-3-low-plant-months-and-added-04-points-elsewhere)).
 
 **Which techniques look most promising?** For forecast error, HYST had the lowest point estimate of
-the 9 post hoc arms, −0.081 points [−0.216, +0.015] at the primary setting and −0.113 points
+the 8 post hoc arms, −0.081 points [−0.216, +0.015] at the primary setting and −0.113 points
 [−0.260, +0.004] at the second, and HM (+0.004 [−0.223, +0.320]), PR (+0.093 [−0.088, +0.268]), and
 CX2 (+0.175 [−0.024, +0.330]) were also indistinguishable from B0 (Figure 1). For recovering a
 planted loss, the Kalman filter had the smallest error (1.86 points against 5.02 for doing nothing),
@@ -446,7 +446,7 @@ can see. Whether a time-varying capacity table is worth building as a fault sign
 and the forecast contrast does not decide it.
 
 **HYST is the estimator this study suggests testing next, as a hypothesis and not a
-recommendation.** HYST had the lowest point estimate of the 9 post hoc arms (HM, PR, and CX2 were
+recommendation.** HYST had the lowest point estimate of the 8 post hoc arms (HM, PR, and CX2 were
 also indistinguishable from B0), it lowered the error in the 3 low plant-months by 3.550 points, and
 it moved on 2.6% of days. HYST was designed after the results, so its small gain carries a winner's
 curse (the best of several options tried looks better than it is). HYST's favourable looks were all

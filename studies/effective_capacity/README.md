@@ -5,12 +5,12 @@ Stage A plants known capacity losses in six solar plants' measured power and ask
 estimators (and two references, S0 and EM) to find them, with no forecast in the loop. Stage B
 divides the lag-features study's baseline forecast (B0) by the one causal estimator that a rule
 fixed in advance selects, and scores it in megawatts over each plant's fixed 99th-percentile power.
-The design is in `plans/study-effective-capacity-1143.md`, and the results are on the study's page,
-[Is a daily capacity estimate worth building for day-ahead solar
-forecasts?](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/effective-capacity/).
+The design is in `plans/study-effective-capacity-1143.md` in git history (pull request #1144), and
+the results are on [the study
+page](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/effective-capacity/).
 
-**Every script takes `--smoke`, which reads and writes under `<study directory>/_smoke/` and is not a
-result.** `capacity_paths.claim_root` marks each root `real` or `smoke` and raises if a run of the
+**Every script takes `--smoke`, which reads and writes under `<study directory>/_smoke/` and is not
+a result.** `capacity_paths.claim_root` marks each root `real` or `smoke` and raises if a run of the
 other kind points at it, so a smoke checkpoint cannot be mistaken for a real one. No script
 overwrites a finished output.
 
@@ -29,9 +29,9 @@ overwrites a finished output.
 | `effective_capacity_charts.py` | Draws the page's 11 figures from `report.md` (see below). |
 
 `effective_capacity_charts.py` reads `report.md` and two tables that the report script saves
-(`tables/example_event.parquet` and `tables/kf_seasonal_shape.parquet`). With `--text-only` it writes
-`figure_text.txt` and stops. A render writes SVG and PNG under `figures/` and publishes svgo-optimised
-SVGs to `docs/studies/assets/`.
+(`tables/example_event.parquet` and `tables/kf_seasonal_shape.parquet`). With `--text-only` it
+writes `figure_text.txt` and stops. A render writes SVG and PNG under `figures/` and publishes
+svgo-optimised SVGs to `docs/studies/assets/`.
 
 ## Run order
 
@@ -61,8 +61,8 @@ All under `data/studies/per_study/effective_capacity/`:
   and capacities. `built/events.json`: the draws, the control, the real low months, and the
   false-movement windows. `built/manifest.json`: the lag frame's SHA-256.
 - `estimates/<estimator>/<setting>/<record>.npz`: raw daily levels (and standard deviations) of each
-  estimator on each record. A linear program estimates only the days a scoring needs; other days
-  are NaN.
+  estimator on each record. A linear program estimates only the days a scoring needs; other days are
+  NaN.
 - `tuned/tuned_<estimator>.json`, `selection.json`, `tables/stage_a_*.parquet`: Stage A.
 - `scales_stage_b.npz`, `arm_columns.json`, `losses_stage_b.parquet`, `checkpoints/`: Stage B.
   `losses_stage_b.parquet` holds each arm's per-row losses in fractions of the static power, the
