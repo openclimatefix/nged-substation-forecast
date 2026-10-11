@@ -10,9 +10,9 @@ gain. The cloud groups are largely interchangeable with the other variables. How
 between the groups therefore depends on the order in which the study added them. ERA5's cloud fields
 come from its analysis, which has absorbed observations made after the short forecasts that give
 ERA5's solar radiation started. Part of the gain from the cloud fields may therefore be a timing
-advantage that a real forecast lacks. The page does not say that a forecast would gain as much. A
-follow-up study tests whether a forecast does, using forecasts from ECMWF's Integrated Forecasting
-System (IFS) at the lead times a live forecast would use.
+advantage that a real forecast lacks. The page does not say that a forecast would gain as much. [A
+follow-up study](../forecasts/ifs-solar-variables.md) tests whether a forecast does, using forecasts
+from ECMWF's Integrated Forecasting System (IFS) at the lead times a live forecast would use.
 
 ![Figure 1: Change in error from adding ERA5 variables, for each of the ten planned
 contrasts](../assets/era5_solar_variables_headline.svg)
@@ -29,49 +29,46 @@ ERA5 variable studied. P0 is G9 minus G0, P1 is G1 minus G0, P2 is G2 minus G0, 
 and P4 is G9 minus G9 without 12 variables that we call MARS-only, defined below.
 
 - **Which ERA5 variables help estimate solar farm output?** Cloud cover first, then the later groups
-  in smaller steps.
-  Adding total cloud cover (G1) lowers the error from 9.22% to 8.89% of capacity (−0.32 points,
-  99.5% interval [−0.41, −0.25]). Adding the cloud layers as well (G2) lowers the error by 0.59
-  points [−0.72, −0.48], or 6.4%. Adding every variable (G9) lowers the error by 1.14 points [−1.31,
-  −0.98], or 12.4%. All three planned contrasts, P1, P2, and P0, beat the smallest improvement worth
-  acting on (Figure 1). The full set lowers the error at every farm, by 9% to 15% (Figure 6).
+  in smaller steps. Adding total cloud cover (G1) lowers the error from 9.22% to 8.89% of capacity
+  (−0.32 points, 99.5% interval [−0.41, −0.25]). Adding the cloud layers as well (G2) lowers the
+  error by 0.59 points [−0.72, −0.48], or 6.4%. Adding every variable (G9) lowers the error by 1.14
+  points [−1.31, −0.98], or 12.4%. All three planned contrasts, P1, P2, and P0, beat the smallest
+  improvement worth acting on (Figure 1). The full set lowers the error at every farm, by 9% to 15%
+  (Figure 6).
 - **Do the ERA5 variables beyond the cloud layers help?** Yes, but the credit cannot be split
-  cleanly.
-  Going from G2 to G9 lowers the error by a further 0.55 points (95% interval [−0.65, −0.46]). Cloud
-  water and cloud base height give the largest single step (0.33 points). The later groups each
-  change the error by between +0.03 points (snow and albedo, which make the error worse) and −0.07
-  points. Removing any one group from the full set raises the error by at most 0.07 points, probably
-  because the groups carry overlapping information (Figures 7 and 10).
-- **Is it worth fetching the 12 MARS-only variables?** Unresolved.
-  ERA5 provides all 12 through the Climate Data Store. For ECMWF's operational IFS forecast, we
-  found them in its Meteorological Archival and Retrieval System (MARS) and not in its free
-  open-data feed or in Open-Meteo's, although we did not check every variable (see Discussion). The
-  study trained every planned contrast at two XGBoost tuning settings, a main setting and a second,
-  more heavily regularised setting. The rule fixed before the results was to recommend a pilot fetch
-  if the 99.5% interval of P4 lay wholly below −0.1 points at both settings, and to recommend
-  against if it lay wholly above. The 12 variables lower the error by 0.13 points (99.5% interval
-  [−0.18, −0.08]) at the main setting and by 0.11 points ([−0.15, −0.06]) at the second setting.
-  Both intervals straddle −0.1, so the rule gives no recommendation. The gain is about the size of
-  the threshold, so settling the question would need a much longer record than the study has. The
-  follow-up IFS study compares this gain with the gain from adding a second weather model's
-  forecast.
-- **Does the gain hold on the satellite irradiance target?** In relative terms, yes.
-  The second target is the CAMS clearness index: irradiance from the CAMS satellite service divided
-  by the irradiance at the top of the atmosphere. The CAMS irradiance is a satellite-derived
-  estimate with its own errors, so this target measures agreement with CAMS and not accuracy. The
-  full set lowers the CAMS error by 14.5%, against 12.4% for output. The CAMS verdicts look weaker
-  only because the smallest improvement worth acting on for the CAMS target (0.01) is about 10% of
-  the CAMS error, while the smallest improvement for output (0.1 points) is about 1% of the output
-  error.
+  cleanly. Going from G2 to G9 lowers the error by a further 0.55 points (95% interval [−0.65,
+  −0.46]). Cloud water and cloud base height give the largest single step (0.33 points). The later
+  groups each change the error by between +0.03 points (snow and albedo, which make the error worse)
+  and −0.07 points. Removing any one group from the full set raises the error by at most 0.07
+  points, probably because the groups carry overlapping information (Figures 7 and 10).
+- **Is it worth fetching the 12 MARS-only variables?** Unresolved. ERA5 provides all 12 through the
+  Climate Data Store. For ECMWF's operational IFS forecast, we found them in its Meteorological
+  Archival and Retrieval System (MARS) and not in its free open-data feed or in Open-Meteo's,
+  although we did not check every variable (see Discussion). The study trained every planned
+  contrast at two XGBoost tuning settings, a main setting and a second, more heavily regularised
+  setting. The rule fixed before the results was to recommend a pilot fetch if the 99.5% interval of
+  P4 lay wholly below −0.1 points at both settings, and to recommend against if it lay wholly above.
+  The 12 variables lower the error by 0.13 points (99.5% interval [−0.18, −0.08]) at the main
+  setting and by 0.11 points ([−0.15, −0.06]) at the second setting. Both intervals straddle −0.1,
+  so the rule gives no recommendation. The gain is about the size of the threshold, so settling the
+  question would need a much longer record than the study has. The [follow-up IFS
+  study](../forecasts/ifs-solar-variables.md) compares this gain with the gain from adding a second
+  weather model's forecast.
+- **Does the gain hold on the satellite irradiance target?** In relative terms, yes. The second
+  target is the CAMS clearness index: irradiance from the CAMS satellite service divided by the
+  irradiance at the top of the atmosphere. The CAMS irradiance is a satellite-derived estimate with
+  its own errors, so this target measures agreement with CAMS and not accuracy. The full set lowers
+  the CAMS error by 14.5%, against 12.4% for output. The CAMS verdicts look weaker only because the
+  smallest improvement worth acting on for the CAMS target (0.01) is about 10% of the CAMS error,
+  while the smallest improvement for output (0.1 points) is about 1% of the output error.
 - **Does aerosol help?** Not detectably. Across all hours, the data rule out a gain of 0.1 points.
   In clear and dusty hours, where aerosol should matter most, the hours are too few to show whether
   aerosol helps.
 - **Does the extra detail help the XGBoost model say how uncertain it is?** Not by the test fixed in
-  advance.
-  A second XGBoost model fits the 10% to 90% quantiles, giving an interval that should hold 80% of
-  outcomes. The intervals contain fewer outcomes as variables are added, and at the same coverage
-  one fixed-width interval is no wider than the quantile fits' intervals. A score for the whole
-  predicted distribution (CRPS) improves, in line with the better central estimate.
+  advance. A second XGBoost model fits the 10% to 90% quantiles, giving an interval that should hold
+  80% of outcomes. The intervals contain fewer outcomes as variables are added, and at the same
+  coverage one fixed-width interval is no wider than the quantile fits' intervals. A score for the
+  whole predicted distribution (CRPS) improves, in line with the better central estimate.
 - **What can the study support?** Statements about ERA5 at six farms in one county from September
   2019 to June 2026. Three limits matter most. ERA5 is not a forecast, the farms share weather, and
   the order in which variables were added affects how credit is split.
@@ -398,10 +395,11 @@ paper that corrected ERA5 irradiance over Europe with humidity predictors.
   error by only 0.01 to 0.02 points. Cloud water and cloud base height give a further 0.33 points
   but are MARS-only. The cloud layers are in Open-Meteo's IFS service, and the page did not find
   them in ECMWF's free open-data feed. Whether a forecast gains the same is untested here, and the
-  follow-up IFS study tests that question.
+  [follow-up IFS study](../forecasts/ifs-solar-variables.md) tests that question.
 - **Do not decide on the 12 MARS-only variables from this page.** The gain of 0.11 to 0.13 points is
   real and may or may not exceed 0.1 points. The question is whether another weather model's
-  forecast would give more, and the follow-up IFS study measures that.
+  forecast would give more, and the [follow-up IFS study](../forecasts/ifs-solar-variables.md)
+  measures that.
 - **Check which groups a forecast supplier can deliver before ranking them.** On 2026-10-10, ECMWF's
   [free open-data page](https://www.ecmwf.int/en/forecasts/datasets/open-data) listed total cloud
   cover, 2 m dew point, total column water vapour, 10 m wind, skin temperature, snow depth,
