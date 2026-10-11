@@ -14,7 +14,7 @@ reference year that calibrates the estimators.
 """
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -49,7 +49,7 @@ FOOTPRINT_BEFORE_DAYS: Final[int] = 30
 FOOTPRINT_AFTER_DAYS: Final[int] = 60
 """The days before an event's month and after it that its footprint covers."""
 
-MIN_VALID_SHARE: Final[float] = 0.7
+MIN_VALID_SHARE: Final[float] = 0.5
 """A footprint needs at least this share of valid days at its plant."""
 
 MIN_HISTORY_DAYS: Final[int] = 60
@@ -227,6 +227,106 @@ def _footprints_clash(*, first: PlantedEvent, second: PlantedEvent) -> bool:
     return overlap(month_first, second.footprint) or overlap(month_second, first.footprint)
 
 
+DRAW_RETRIES: Final[int] = 60
+"""How many times a draw restarts its search before it gives up."""
+
+SEARCH_BUDGET: Final[int] = 20000
+"""How many assignments one backtracking search tries before it gives up and restarts."""
+
+
+def _eligible_spans(
+    *,
+    record: CapacityRecord,
+    plant: int,
+    lowest: int,
+    reserved: Sequence[PlantedEvent],
+) -> list[tuple[int, int]]:
+    """List the calendar months in which an event at `plant` obeys every rule but the other draws.
+
+    Args:
+        record: The record.
+        plant: The plant's index.
+        lowest: The earliest day index a month may start on.
+        reserved: Events that already exist.
+
+    Returns:
+        (first day, number of days) of each eligible month.
+    """
+    days = len(record.dates)
+    valid = valid_days(record=record)[plant]
+    reference = (record.dates >= np.datetime64(REFERENCE_START)) & (
+        record.dates < np.datetime64(REFERENCE_END)
+    )
+    first_valid = int(np.argmax(valid)) if valid.any() else days
+    eligible = []
+    for first_day, month_days in calendar_month_spans(record=record).values():
+        probe = PlantedEvent(plant, "step", 0.0, first_day, month_days)
+        start, stop = probe.footprint
+        if first_day < max(lowest, first_valid + MIN_HISTORY_DAYS) or start < 0 or stop > days:
+            continue
+        if reference[start:stop].any() or valid[start:stop].mean() < MIN_VALID_SHARE:
+            continue
+        if any(_footprints_clash(first=probe, second=other) for other in reserved):
+            continue
+        eligible.append((first_day, month_days))
+    return eligible
+
+
+def _assign_months(
+    *,
+    wanted: Sequence[tuple[int, EventShapeType]],
+    domains: dict[tuple[int, EventShapeType], list[tuple[int, int]]],
+    rng: np.random.Generator,
+) -> dict[tuple[int, EventShapeType], tuple[int, int]] | None:
+    """Give every wanted (plant, shape) a month so that no two events break the footprint rules.
+
+    A backtracking search with forward checking, trying the variable with the fewest options first
+    and its options in random order.
+
+    Args:
+        wanted: The (plant, shape) pairs.
+        domains: Each pair's eligible months.
+        rng: The generator.
+
+    Returns:
+        The assignment, or `None` if the search spends `SEARCH_BUDGET` tries without finding one.
+    """
+    budget = [SEARCH_BUDGET]
+
+    def clash(plant: int, span: tuple[int, int], other_plant: int, other: tuple[int, int]) -> bool:
+        return _footprints_clash(
+            first=PlantedEvent(plant, "step", 0.0, *span),
+            second=PlantedEvent(other_plant, "step", 0.0, *other),
+        )
+
+    def search(
+        assigned: dict[tuple[int, EventShapeType], tuple[int, int]],
+        remaining: dict[tuple[int, EventShapeType], list[tuple[int, int]]],
+    ) -> dict[tuple[int, EventShapeType], tuple[int, int]] | None:
+        if not remaining:
+            return assigned
+        variable = min(remaining, key=lambda v: len(remaining[v]))
+        options = list(remaining[variable])
+        rng.shuffle(options)
+        for span in options:
+            budget[0] -= 1
+            if budget[0] < 0:
+                return None
+            narrowed = {
+                other: [s for s in domain if not clash(variable[0], span, other[0], s)]
+                for other, domain in remaining.items()
+                if other != variable
+            }
+            if any(not domain for domain in narrowed.values()):
+                continue
+            found = search({**assigned, variable: span}, narrowed)
+            if found is not None:
+                return found
+        return None
+
+    return search({}, {variable: list(domains[variable]) for variable in wanted})
+
+
 def draw_events(
     *,
     record: CapacityRecord,
@@ -234,58 +334,83 @@ def draw_events(
     reserved: Sequence[PlantedEvent] = (),
     earliest_first_day: Mapping[int, int] | None = None,
     shapes: Sequence[EventShapeType] = EVENT_SHAPES,
+    may_have_fewer: Collection[int] = (),
 ) -> list[PlantedEvent]:
     """Draw one event of each shape at every plant, obeying the footprint rules.
 
+    **The rules pack tightly: any two events, at any plants, end up at least 60 days apart.** A
+    random placement therefore fails often, so the months come from a backtracking search that
+    tries a different random order on each restart. The result is a function of the seed alone.
+
     Args:
         record: The record.
-        seed: The generator's seed; one draw of the study has one seed.
+        seed: The draw's seed.
         reserved: Events that already exist (the real low months, as steps) and so block their
             footprints, though they are not returned.
-        earliest_first_day: For a plant, the earliest day index an event's month may start, such
-            as the day its commissioning ramp ends plus `MIN_HISTORY_DAYS`.
+        earliest_first_day: For a plant, the earliest day index an event's month may start.
         shapes: The shapes to plant at each plant.
+        may_have_fewer: Plants that may get fewer events than shapes, because too few of their
+            days are valid for every event to fit (the ANM plant's export cap removes its summer
+            hours). Each such plant still gets at least one.
 
     Returns:
         The events, in plant order then shape order.
 
     Raises:
-        ValueError: If an event cannot be placed in `MAX_PLACEMENT_ATTEMPTS` random tries.
+        ValueError: If `DRAW_RETRIES` restarts all fail to place the events.
     """
-    rng = np.random.default_rng(seed)
-    days = len(record.dates)
-    valid = valid_days(record=record)
-    months = list(calendar_month_spans(record=record).values())
-    reference = (
-        (record.dates >= np.datetime64(REFERENCE_START)) & (record.dates < np.datetime64(REFERENCE_END))
-    )
-    placed: list[PlantedEvent] = []
-    for plant in range(len(record.sites)):
-        first_valid = int(np.argmax(valid[plant])) if valid[plant].any() else days
-        lowest = max(first_valid + MIN_HISTORY_DAYS, (earliest_first_day or {}).get(plant, 0))
-        for shape in rng.permutation(np.array(shapes, dtype=object)):
-            for _ in range(MAX_PLACEMENT_ATTEMPTS):
-                first_day, month_days = months[int(rng.integers(len(months)))]
-                size = float(rng.uniform(*SIZE_RANGE))
-                hit = ()
-                if shape == "intermittent":
-                    hit = tuple(sorted(rng.permutation(month_days)[: month_days // 2].tolist()))
-                candidate = PlantedEvent(plant, shape, size, first_day, month_days, hit)
-                start, stop = candidate.footprint
-                if first_day < lowest or start < 0 or stop > days:
-                    continue
-                if reference[start:stop].any():
-                    continue
-                if valid[plant, start:stop].mean() < MIN_VALID_SHARE:
-                    continue
-                if any(_footprints_clash(first=candidate, second=other) for other in (*placed, *reserved)):
-                    continue
-                placed.append(candidate)
-                break
-            else:
-                msg = f"cannot place a {shape} event at plant {record.sites[plant]} for seed {seed}"
-                raise ValueError(msg)
-    return placed
+    plants = range(len(record.sites))
+    domains = {
+        (plant, shape): _eligible_spans(
+            record=record,
+            plant=plant,
+            lowest=(earliest_first_day or {}).get(plant, 0),
+            reserved=reserved,
+        )
+        for plant in plants
+        for shape in shapes
+    }
+    for attempt in range(DRAW_RETRIES):
+        rng = np.random.default_rng([seed, attempt])
+        shapes_by_plant = {p: list(rng.permutation(np.array(shapes, dtype=object))) for p in plants}
+        lowest_kept = 1 if may_have_fewer else len(shapes)
+        for kept in range(len(shapes), lowest_kept - 1, -1):
+            wanted = [
+                (plant, shape)
+                for plant in plants
+                for shape in shapes_by_plant[plant][: kept if plant in may_have_fewer else len(shapes)]
+            ]
+            assignment = _assign_months(wanted=wanted, domains=domains, rng=rng)
+            if assignment is not None:
+                return _events_from(assignment=assignment, rng=rng)
+    msg = f"cannot place the events for seed {seed}"
+    raise ValueError(msg)
+
+
+def _events_from(
+    *, assignment: Mapping[tuple[int, EventShapeType], tuple[int, int]], rng: np.random.Generator
+) -> list[PlantedEvent]:
+    """Give each assigned month a size and, for an intermittent loss, its hit days.
+
+    Args:
+        assignment: Each (plant, shape)'s month.
+        rng: The generator.
+
+    Returns:
+        The events in plant order then shape order.
+    """
+    events = []
+    for (plant, shape), (first_day, month_days) in sorted(
+        assignment.items(), key=lambda item: (item[0][0], EVENT_SHAPES.index(item[0][1]))
+    ):
+        size = float(rng.uniform(*SIZE_RANGE))
+        hit = (
+            tuple(sorted(rng.permutation(month_days)[: month_days // 2].tolist()))
+            if shape == "intermittent"
+            else ()
+        )
+        events.append(PlantedEvent(plant, shape, size, first_day, month_days, hit))
+    return events
 
 
 def draw_control_steps(

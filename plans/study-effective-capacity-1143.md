@@ -254,6 +254,26 @@ dependency, and the lag study used the same threshold.
   minus its real-data gain, over the oracle's gain. **This control (18 planted plant-months) is far
   stronger than the real case (3)**, so passing shows the instrument works, not that P1 has power.
 
+### Explainability
+
+**The maintainer wants the capacity estimator to be explainable, so every estimator is graded on a
+fixed rubric before any result exists.** Each estimator gets a grade (yes, partly, or no) on five
+criteria, by reading its code and outputs. The grades are in `studies.capacity_explain` and the
+report script prints them with a reason for each:
+
+1. An operator can be told in one sentence why the capacity fell on a given day.
+2. The fitted quantities are physical quantities with units.
+3. A change can be attributed to a cause: soiling, a lost string, curtailment, or a weather-forecast
+   bias.
+4. The estimator returns a spread, not only a value.
+5. The estimator can be differentiated through, for joint fitting with other models.
+
+KF and DP1 report their fitted physical quantities (tilt and azimuth in degrees, the direct-current
+to alternating-current ratio, an availability factor over time with its standard deviation). The
+report script prints one explanation sentence per estimator for a planted event and for each of the
+three real low months of the low-output plant, with no plant label beside those dates. The rubric
+adds no estimator and no fit, and it takes no part in the selection rule.
+
 ### Exploratory additions
 
 - the other 3 shortlisted arms, and each hindsight-reference arm against its causal arm;
@@ -365,6 +385,26 @@ estimation (checked). Verification: the CLAUDE.md set, `pytest --run-studies` wi
 see a slightly cleaner history than a live service; the planted loss multiplies all power, clipping
 plateau included, so it is a proportional block loss of DC and AC together. A pure DC loss at a
 clipping plant, where CX2 and DP1 would differ from the rest, is the unplanted case.
+
+## Discussion hooks
+
+**Groundwork for version 2: what DP1 needs to become a component of a larger differentiable
+model.** The final page's "Groundwork for version 2" paragraph can draw on these notes.
+
+- **Inputs:** satellite-driven (later, forecast) global horizontal irradiance per hour, the plant's
+  coordinates, and a window of measured power. The tilt, azimuth, and alternating-current limit are
+  fixed from an orientation fit, not learned jointly.
+- **Outputs:** a weekly direct-current capacity trace with a normal posterior (a mean and a standard
+  deviation per week). A larger model would take the trace and the physics output as its inputs.
+- **Differentiable now:** the physics chain from irradiance to power (Erbs split is outside the
+  graph, see below), the soft clip, the pinball reconstruction loss, the Kullback-Leibler term, and
+  the total-variation penalty, all in PyTorch.
+- **Not differentiable or not yet joint:** the Erbs split of irradiance and the solar position come
+  from `pvlib` in NumPy, so gradients stop at the irradiance; the orientation fit is a separate
+  SciPy fit; the refit schedule is a loop of independent windows, not one joint fit over the record.
+- **Needed for joint fitting:** the physics inputs as tensors (a port of the Erbs split and the
+  plane-of-array chain), one objective over the whole record, and a prior that ties the weekly trace
+  across plants in the same weather.
 
 ## Open decisions for the maintainer
 

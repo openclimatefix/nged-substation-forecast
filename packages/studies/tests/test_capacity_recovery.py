@@ -138,7 +138,7 @@ def test_a_reserved_event_and_an_earliest_day_keep_the_draw_away(long_record: Ca
 
 
 def test_a_draw_that_cannot_place_an_event_raises(long_record: CapacityRecord) -> None:
-    with pytest.raises(ValueError, match="cannot place a"):
+    with pytest.raises(ValueError, match="cannot place the events"):
         draw_events(record=long_record, seed=0, earliest_first_day={0: DAYS})
 
 
@@ -366,3 +366,16 @@ def test_relative_capacity_error_is_zero_for_a_perfect_ratio_and_independent_of_
     ratio = event_factor(event=event, days=DAYS)[100:190]
     assert relative_capacity_error(event=event, ratio=ratio, days=DAYS) == pytest.approx(0.0)
     assert FALLBACK_NONE == 0
+
+
+def test_a_plant_with_little_valid_data_may_get_fewer_events_but_never_none(
+    long_record: CapacityRecord,
+) -> None:
+    power = long_record.power_mw.copy()
+    power[2, :2200] = np.nan
+    sparse = long_record.with_power(power_mw=power)
+    with pytest.raises(ValueError, match="cannot place the events"):
+        draw_events(record=sparse, seed=1)
+    events = draw_events(record=sparse, seed=1, may_have_fewer=[2])
+    assert 1 <= sum(e.plant == 2 for e in events) < 3
+    assert sum(e.plant == 0 for e in events) == 3
