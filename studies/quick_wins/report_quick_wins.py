@@ -6,7 +6,7 @@ the continuous ranked probability score (CRPS) and the mean absolute error (MAE)
 mean, each as a fraction of the series' effective capacity (so the MAE is the NMAE) and in MW.
 Intervals resample whole validation months, paired across arms.
 
-    uv run python studies/quick_wins/report_quick_wins.py [--fold mid_2025_to_mid_2026] [--seed 0]
+    uv run python studies/quick_wins/report_quick_wins.py [--fold ...] [--seeds 0 1 2]
 """
 
 import argparse
@@ -43,12 +43,38 @@ def _filtered(
     return rows
 
 
-def _arm_scores(*, fold_id: str, seed: int) -> dict[str, pl.DataFrame]:
+def _arm_scores(*, fold_id: str, seeds: list[int]) -> dict[str, pl.DataFrame]:
+    """Read each arm's scores, averaging the per-row scores over seeds.
+
+    An arm is kept only if every seed in `seeds` has scored it. The scores, not the forecasts, are
+    averaged, so each seed's own spread stays in the number.
+    """
     found = {}
     for name, arm in arm_definitions.ALL_ARMS.items():
-        path = fit_arms.arm_dir(fold_id=fold_id, arm=arm, seed=seed) / "scores.parquet"
-        if path.exists():
-            found[name] = pl.read_parquet(path)
+        paths = [
+            fit_arms.arm_dir(fold_id=fold_id, arm=arm, seed=seed) / "scores.parquet"
+            for seed in seeds
+        ]
+        if not all(path.exists() for path in paths):
+            continue
+        frames = [pl.read_parquet(path) for path in paths]
+        if len(frames) == 1:
+            found[name] = frames[0]
+            continue
+        keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
+        found[name] = (
+            pl.concat(frames)
+            .group_by(keys)
+            .agg(
+                pl.col("lead_hours").first(),
+                pl.col("effective_capacity_mw").first(),
+                pl.col("horizon_slice").first(),
+                pl.col("crps", "abs_error", "crps_norm", "abs_error_norm").mean(),
+                n_seeds=pl.len(),
+            )
+            .filter(pl.col("n_seeds") == len(frames))
+            .drop("n_seeds")
+        )
     return found
 
 
@@ -56,7 +82,7 @@ def main() -> None:
     """Write the level and contrast tables for every fitted arm."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fold", default=inputs.FOLD_A)
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seeds", type=int, nargs="+", default=[0])
     args = parser.parse_args()
 
     settings = Settings()
@@ -64,7 +90,8 @@ def main() -> None:
     types = pl.DataFrame(
         inputs.series_metadata(settings=settings, time_series_ids=series_ids)
     ).select("time_series_id", pl.col("time_series_type").cast(pl.String))
-    scores = _arm_scores(fold_id=args.fold, seed=args.seed)
+    scores = _arm_scores(fold_id=args.fold, seeds=args.seeds)
+    tag = "seeds" + "".join(str(seed) for seed in args.seeds)
     if not scores:
         msg = "no arm has scores yet"
         raise SystemExit(msg)
@@ -125,9 +152,9 @@ def main() -> None:
                         )
     levels = pl.DataFrame(level_rows)
     contrasts = pl.DataFrame(contrast_rows)
-    levels.write_parquet(out_dir / f"levels_seed{args.seed}.parquet")
-    contrasts.write_parquet(out_dir / f"contrasts_seed{args.seed}.parquet")
-    _write_report(levels=levels, contrasts=contrasts, path=out_dir / f"report_seed{args.seed}.md")
+    levels.write_parquet(out_dir / f"levels_{tag}.parquet")
+    contrasts.write_parquet(out_dir / f"contrasts_{tag}.parquet")
+    _write_report(levels=levels, contrasts=contrasts, path=out_dir / f"report_{tag}.md")
 
 
 def _write_report(*, levels: pl.DataFrame, contrasts: pl.DataFrame, path: Path) -> None:
