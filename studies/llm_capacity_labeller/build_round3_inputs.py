@@ -1,8 +1,8 @@
-"""Build round 3's fresh draws (05 and 06) and the easy-case records (post hoc).
+"""Build round 3's fresh draws (05 and 06, pre-registered) and the easy-case records (post hoc).
 
 Part of the study in <https://github.com/openclimatefix/nged-substation-forecast/issues/1147>.
-**Round 3 is post hoc and is the only evaluation of the amended step check**, which accepts a knot
-pair when the local scan or the changepoint list has a candidate within 14 days (see
+**Round 3's draws are the only evaluation of the pre-registered amended step check**, which
+accepts a knot pair when the local scan or the changepoint list has a candidate within 14 days (see
 `studies.capacity_sanity.check_steps`). The amended check, its test, and this design were committed
 before any round 3 call was made. Round 3 keeps the round 2 tools, prompt, and samples frozen.
 

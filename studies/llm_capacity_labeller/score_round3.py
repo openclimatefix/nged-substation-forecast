@@ -16,11 +16,12 @@ script makes no model call: it rebuilds each prompt and reads the answer from th
   difference and the number of events a one-point effect would need.
 - `noise_floor.parquet`, `notes_tally.json`, and `real_low_months_round2.parquet`.
 
-**Round 3 (post hoc; the only evaluation of the amended check).** Round 2's tools, prompt, and
-samples are frozen. The amended step check (`check_steps(local_scan_candidates=True)`) was written
-down and tested before any round 3 call. It is evaluated on fresh draws 05 and 06. Replaying draws
-03 and 04 through it is exploratory. The easy case (a 60% loss for 90 days from a random day, two
-records) asks whether the model follows a clear signal at all.
+**Round 3 (the amended check is pre-registered and evaluated once; the easy case is post hoc).**
+Round 2's tools, prompt, and samples are frozen. The amended step check
+(`check_steps(local_scan_candidates=True)`) was written down and tested before any round 3 call. It
+is evaluated on fresh draws 05 and 06. Replaying draws 03 and 04 through it is exploratory. The easy
+case (a 60% loss for 90 days from a random day, two records) asks whether the model follows a clear
+signal at all.
 """
 
 import argparse
@@ -261,7 +262,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
         ),
         (
             "round 3",
-            "post hoc",
+            "pre-registered (amended check)",
             ROUND3_DRAWS,
             [
                 ("static_v1", 1, ("none",)),

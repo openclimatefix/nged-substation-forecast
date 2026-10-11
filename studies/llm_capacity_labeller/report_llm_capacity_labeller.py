@@ -161,7 +161,9 @@ def round3_sections(*, root: Path) -> list[str]:
     tables = root / "tables_round3"
     if not tables.exists():
         return []
-    parts = ["# Round 3 and the re-scores (post hoc)\n"]
+    parts = [
+        "# Rounds 3 and 4, the easy case, and the re-scores (post hoc, bar the amended check)\n"
+    ]
     for title, folder, name in (
         ("Hit rates with Wilson 95% intervals, by round and by check", tables, "hit_rates.parquet"),
         (
@@ -227,7 +229,10 @@ def main() -> int:  # noqa: PLR0915 - one linear script of report sections
     parts = ["# Report: can a language model label a solar plant's capacity changes?\n"]
     parts.append(
         "**Round 1 was planned and ran as designed. Round 2 is post hoc: its tools and prompt were "
-        "changed after round 1's draws 01 and 02, and it is judged on new draws 03 and 04.**\n"
+        "changed after round 1's draws 01 and 02, and it is judged on new draws 03 and 04. In "
+        "round "
+        "3 only the amended step check was pre-registered; the easy case, round 4, and the "
+        "re-scores are post hoc.**\n"
     )
     if arguments.smoke:
         parts.append(
