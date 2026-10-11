@@ -1184,7 +1184,8 @@ def figure_stepwise(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
         title=alt.TitleParams(
             [
                 "Each row adds one group to the row below.",
-                "Right column: that step in points of capacity, with its 95% interval.",
+                "Right column: each step in points of capacity, with its 95% interval.",
+                "F0 shows its own error.",
             ],
             anchor="start",
             fontSize=ocf.font_size(style="Body Large", body_px=11),
@@ -1207,7 +1208,11 @@ def figure_stepwise(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
                 "order in which the groups were added."
             ),
             *ARM_KEY_LINES,
-            EXPLORATORY_KEY,
+            (
+                "The F1 and F2 steps are the planned contrasts P1 and P2, whose 99% intervals "
+                "are in Figure 1. Every other step is exploratory and not corrected for multiple "
+                "comparisons."
+            ),
         ],
         figure_planning=None,
     )

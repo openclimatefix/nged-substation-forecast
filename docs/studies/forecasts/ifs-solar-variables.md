@@ -315,14 +315,15 @@ variable set's error rises and falls with the weather.
 ![Figure 6: Error of every variable set at every lead
 day](../assets/ifs_solar_variables_leaderboard.svg)
 
-**Figure 6b draws the same ladder as a chain of steps, each measured from the row below.** Each
-orange line is the 95% interval of one step's paired difference, drawn from the dot of the row
-below, so it is a fair interval for that step. It is not the uncertainty of the step's dot, and the
-intervals of different steps must not be added, because the same months are resampled for every
-step. Pooled over lead days 1 to 3, the cloud steps (F1 and F2) lower the error by 0.12 and 0.19
-points, and no later step lowers it by more than 0.10 points. The F6 step raises it by 0.04 points.
-Every step depends on the order in which the groups were added, and every step apart from F1 is
-exploratory.
+**Pooled over lead days 1 to 3, the two cloud steps lower the error most, by 0.12 points (F1) and
+0.19 points (F2), and no later step lowers the error by more than 0.10 points.** Figure 6b shows
+variable sets F0 to F6 as a chain of steps. Each orange line is the 95% interval of one step's
+paired difference, drawn from the dot of the row below, so the interval compares each variable set
+with the one before on the same months. The orange line is not the uncertainty of the step's dot,
+and the intervals of different steps must not be added, because the same months are resampled for
+every step. The F6 step raises the error by 0.04 points. The F1 and F2 steps are the planned
+contrasts P1 and P2, and their 99% intervals are in Figure 1. Every other step is exploratory. Every
+step depends on the order in which the groups were added.
 
 ![Figure 6b: Error of each variable set, with the interval of each step from the row
 below](../assets/ifs_solar_variables_stepwise.svg)
