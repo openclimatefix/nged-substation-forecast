@@ -1,7 +1,9 @@
 """Tests for how arms merge their differences from production."""
 
 import arms
+import polars as pl
 import pytest
+from fit_arms import feature_matrix
 
 
 def test_a_later_part_that_keeps_a_column_does_not_restore_one_an_earlier_part_removed():
@@ -70,3 +72,15 @@ def test_every_arm_other_than_the_stored_reference_uses_full_column_sampling():
     for arm in arms.ALL_ARMS.values():
         expected = 0.8 if arm.name == "production_colsample0.8" else 1.0
         assert arm.colsample_bytree == pytest.approx(expected), arm.name
+
+
+def test_an_enum_column_is_coded_by_its_position_and_nulls_stay_null():
+    """Monday is 0 and Sunday is 6 in every frame, whatever values the frame holds."""
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    frame = pl.DataFrame(
+        {"local_day_of_week": pl.Series(["Sunday", "Monday"]).cast(pl.Enum(days)), "x": [1, None]}
+    )
+    matrix = feature_matrix(frame=frame, columns=["local_day_of_week", "x"])
+    assert matrix["local_day_of_week"].to_list() == [6.0, 0.0]
+    assert matrix["x"].to_list() == [1.0, None]
+    assert matrix.dtypes == [pl.Float32, pl.Float32]

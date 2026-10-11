@@ -42,6 +42,23 @@ MIN_TREES: Final[int] = 10
 """Fewest trees an early-stopped series is refitted with."""
 
 
+def feature_matrix(*, frame: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
+    """Select the columns as Float32, coding an Enum column by the position of its value.
+
+    This is production's coding (`xgboost_forecaster.forecaster._prepare_features`): the weekday
+    column is an Enum, and its position in the declared list is the same in every frame. Nulls stay
+    null, which XGBoost reads as missing.
+    """
+    return frame.select(
+        [
+            pl.col(c).to_physical().cast(pl.Float32)
+            if isinstance(frame.schema[c], pl.Enum)
+            else pl.col(c).cast(pl.Float32)
+            for c in columns
+        ]
+    )
+
+
 def arm_dir(*, fold_id: str, arm: arm_definitions.Arm, seed: int) -> Path:
     """Return the directory holding one arm's forecasts and scores."""
     return inputs.OUTPUT_ROOT / "arms" / fold_id / f"{arm.name}_seed{seed}"
@@ -147,7 +164,7 @@ def _fit_series(
 ) -> xgb.Booster:
     """Fit one series' booster, with early stopping and a refit when the arm asks for it."""
     params = _parameters(arm=arm, device=device, seed=seed)
-    features = group.select(columns).cast(pl.Float32)
+    features = feature_matrix(frame=group, columns=columns)
     label = group["power"].cast(pl.Float32)
     weights = _weights(group=group, arm=arm, window=window)
     rounds = N_TREES
@@ -199,7 +216,7 @@ def _predict_and_score(
         pieces = []
         for (series_id,), series_rows in frame.group_by("time_series_id"):
             booster, columns = boosters[int(series_id)]
-            matrix = xgb.DMatrix(series_rows.select(columns).cast(pl.Float32))
+            matrix = xgb.DMatrix(feature_matrix(frame=series_rows, columns=columns))
             pieces.append(
                 series_rows.select(
                     "time_series_id",
