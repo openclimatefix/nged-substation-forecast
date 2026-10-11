@@ -75,7 +75,7 @@ from studies.era5_ladder import (
     SKY_REGIMES,
     TOTAL_CLOUD_COVER_THRESHOLDS,
 )
-from studies.ifs_ladder import GROUP_NAMES, RUNGS
+from studies.ifs_ladder import RUNGS
 from studies.ifs_lead_days import LEAD_DAYS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -152,9 +152,8 @@ ARM_KEY_LINES: Final[tuple[str, ...]] = (
     (
         "F0: IFS radiation and air temperature. Each set adds to the one before. F1: total cloud "
         "cover. F2: low, mid, and high cloud cover. F3: direct radiation. F4: dew point, column "
-        "water vapour, boundary-layer height. F5: convective energy (CAPE), convective "
-        "inhibition, visibility. F6 (all 20 IFS variables): surface temperature, snow, "
-        "precipitation, pressure, wind, gusts."
+        "water vapour, boundary-layer height. F5: convective energy (CAPE), inhibition, "
+        "visibility. F6 (all 20 IFS variables): surface and weather variables."
     ),
     "IFS: ECMWF's 9 km forecast, 00 UTC run, read at a lead day.",
 )
@@ -220,6 +219,10 @@ Y_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 
 HOUR_AXIS_TITLE: Final[str] = "Hour ending (UTC)"
 """The title of every hour-of-day axis, which says which hour a label names."""
+
+
+X_AXIS: Final[alt.Axis] = alt.Axis(tickCount=7, labelOverlap=True)
+"""The x axis of a dot-and-interval panel, with ticks far enough apart to read."""
 
 
 def _domain(*, values: Sequence[float]) -> list[float]:
@@ -302,7 +305,7 @@ def dot_interval_panel(
             .mark_rule(strokeWidth=6, opacity=0.35, color=colour, aria=False)
             .encode(  # ty: ignore[unresolved-attribute]
                 y=y,
-                x=alt.X("thick_lower:Q", scale=scale, title=axis_title),
+                x=alt.X("thick_lower:Q", scale=scale, title=axis_title, axis=X_AXIS),
                 x2="thick_upper:Q",
             )
         )
@@ -310,19 +313,19 @@ def dot_interval_panel(
         alt.Chart(rows)
         .mark_rule(strokeWidth=1.5, color=colour, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            y=y, x=alt.X("lower:Q", scale=scale, title=axis_title), x2="upper:Q"
+            y=y, x=alt.X("lower:Q", scale=scale, title=axis_title, axis=X_AXIS), x2="upper:Q"
         )
     )
     layers.append(
         alt.Chart(rows)
         .mark_point(filled=True, size=70, opacity=1, color=colour, aria=False)
-        .encode(y=y, x=alt.X("value:Q", scale=scale, title=axis_title))  # ty: ignore[unresolved-attribute]
+        .encode(y=y, x=alt.X("value:Q", scale=scale, title=axis_title, axis=X_AXIS))  # ty: ignore[unresolved-attribute]
     )
     if markers is not None:
         layers.append(
             alt.Chart(markers)
             .mark_point(filled=False, size=60, strokeWidth=1.5, color=colour, yOffset=7, aria=False)
-            .encode(y=y, x=alt.X("value:Q", scale=scale, title=axis_title))  # ty: ignore[unresolved-attribute]
+            .encode(y=y, x=alt.X("value:Q", scale=scale, title=axis_title, axis=X_AXIS))  # ty: ignore[unresolved-attribute]
         )
     return alt.layer(*layers).properties(
         width=PLOT_WIDTH_PX, height=ROW_HEIGHT_PX * len(labels), title=_title(panel_title)
@@ -649,6 +652,7 @@ def figure_lead_day_skill(*, board: pl.DataFrame, scope: str) -> alt.TopLevelMix
         scale=alt.Scale(domain=list(arms), range=[ARM_COLOURS[arm] for arm in arms]),
         legend=alt.Legend(
             title=None,
+            labelLimit=300,
             labelExpr=" : ".join(f"datum.value == '{arm}' ? '{ARM_LABELS[arm]}'" for arm in arms)
             + " : datum.value",
         ),
@@ -1124,6 +1128,7 @@ def _split_panel(*, splits: pl.DataFrame, kind: str, order: Sequence[str]) -> Pa
         ),
         legend=alt.Legend(
             title=None,
+            labelLimit=300,
             labelExpr=" : ".join(f"datum.value == '{arm}' ? '{name}'" for arm, name in contrasts)
             + " : datum.value",
         ),
@@ -1257,13 +1262,13 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     """
     pairs = [(f"{DROP_PREFIX}{rung}", F6_ARM) for rung in RUNGS[1:]]
     selected = pick(contrasts=contrasts, family="drop_one", pairs=pairs, scope="pooled 1-3")
-    labels = [f"Without {GROUP_NAMES[rung]} ({rung.upper()})" for rung in RUNGS[1:]]
+    labels = [ARM_LABELS[f"{DROP_PREFIX}{rung}"] for rung in RUNGS[1:]]
     rows = contrast_rows(rows=selected, label=pl.Series(labels))
     panel = dot_interval_panel(
         rows=rows,
         x_title=(
-            "Mean absolute error minus the full set's (points of capacity; positive means the "
-            "group helped)"
+            "Mean absolute error minus the full set's (points of capacity; positive means "
+            "removing the group raised the error)"
         ),
         panel_title="Lead days 1 to 3, pooled",
         colour=ocf.BRAND_ORANGE,
@@ -1277,8 +1282,8 @@ def figure_drop_one(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
             (
                 "Dot: estimate. Line: 95% interval from resampling whole months. Dashed rule: no "
                 "difference. Each row is the error of F6 without the variables that one group "
-                "adds, minus the error of F6. Error: mean absolute error. Positive means the "
-                "group helped."
+                "adds, minus the error of F6. Error: mean absolute error. Positive means "
+                "removing the group raised the error."
             ),
             *ARM_KEY_LINES,
             LEAD_DAY_KEY,
@@ -1521,9 +1526,10 @@ def main() -> int:
         span = "the study's months"
         weather_days = farm_days = pl.DataFrame()
     scope = (
-        f"Six NGED solar farms, daylight hours, {span}. IFS: ECMWF's forecast via Open-Meteo. "
-        "CAMS: satellite irradiance service."
+        f"Six solar farms of National Grid Electricity Distribution (NGED), daylight hours, "
+        f"{span}. IFS: ECMWF's forecast via Open-Meteo."
     )
+    cams_scope = scope + " CAMS: the Copernicus satellite irradiance service."
     blend_span = (
         f"{_month_name(str(blend['month'].min()))} to {_month_name(str(blend['month'].max()))}"
         if not blend.is_empty()
@@ -1543,7 +1549,7 @@ def main() -> int:
                 near=near,
                 far=far,
                 days=weather_days,
-                scope=scope.replace("Six NGED solar farms", "One NGED solar farm"),
+                scope=cams_scope.replace("Six solar farms", "One solar farm"),
             ),
         ),
         (
@@ -1559,13 +1565,13 @@ def main() -> int:
                 losses=pl.read_parquet(losses_path),
                 days=farm_days,
                 farms=farms,
-                scope=scope,
+                scope=cams_scope,
             ),
         ),
         (
             "controls",
             not contrasts.is_empty(),
-            lambda: figure_controls(contrasts=contrasts, scope=scope),
+            lambda: figure_controls(contrasts=contrasts, scope=cams_scope),
         ),
         ("leaderboard", not board.is_empty(), lambda: figure_leaderboard(board=board, scope=scope)),
         (

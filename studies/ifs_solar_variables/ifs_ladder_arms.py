@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
 from studies.ifs_ladder import (
-    GROUP_NAMES,
     RUNG_ADDITIONS,
     RUNGS,
     cloud_cover_control_features,
@@ -339,12 +338,22 @@ list's exploratory rule needs at both settings.
 CAMS_ARMS: Final[tuple[str, ...]] = ("f0", "f2", F6_ARM)
 """The only arms fitted on the exploratory CAMS target."""
 
+DROP_SHORT_NAMES: Final[dict[str, str]] = {
+    "f1": "total cloud",
+    "f2": "cloud layers",
+    "f3": "direct",
+    "f4": "humidity",
+    "f5": "convection",
+    "f6": "surface",
+}
+"""The short name of each group on a drop-one row label, which has room for about 30 characters."""
+
 ARM_LABELS: Final[dict[str, str]] = {
     "f0": "F0 minimal (radiation, temperature)",
     "f1": "F1 + total cloud",
     "f2": "F2 + cloud layers",
     "f3": "F3 + direct radiation",
-    "f4": "F4 + humidity, column water, boundary layer",
+    "f4": "F4 + humidity group",
     "f5": "F5 + convection, visibility",
     "f6": "F6 + surface, weather (all 20)",
     PRODUCTION_ARM: "FP production reference",
@@ -363,7 +372,10 @@ ARM_LABELS: Final[dict[str, str]] = {
     CONTROL_HUMIDITY_ARM: "Control: F2 + shuffled F4 variables",
     CONTROL_CONVECTION_ARM: "Control: F2 + shuffled F5 variables",
     POSITIVE_CONTROL_ARM: "Positive control: F2 + CAMS",
-    **{f"{DROP_PREFIX}{rung}": f"F6 without {GROUP_NAMES[rung]}" for rung in RUNGS[1:]},
+    **{
+        f"{DROP_PREFIX}{rung}": f"All 20 less {rung.upper()} {DROP_SHORT_NAMES[rung]}"
+        for rung in RUNGS[1:]
+    },
     **{f"{ERA5_PREFIX}{rung}": f"ERA5 {rung.upper()}" for rung in ERA5_COMPARISON_RUNGS},
 }
 """The words each arm carries on a chart and in the report."""
