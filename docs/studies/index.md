@@ -32,28 +32,22 @@ regions or climates, so a result may not hold elsewhere.
 
 - [How many Balancing Mechanism Units in Great Britain are solar?](solar-bmu-census.md) — a census
   of the BMUs whose settled output follows the sun, found because no field in the BMU register says
-  which units are solar. The study finds 12 single-site solar BMUs at 11 sites, 8 of those sites
-  with
+  which units are solar. The study finds 12 single-site solar BMUs at 11 sites, 8 of those sites with
   storage built or planned, reports 26 aggregate BMUs apart, and sets the five published capacity
   figures side by side.
 
 - [Can solar be separated from an aggregate Balancing Mechanism Unit?](solar-bmu-disaggregation.md)
-  — a physical solar plant fitted to four-hour changes in output recovers the solar part of
-  synthetic
+  — a physical solar plant fitted to four-hour changes in output recovers the solar part of synthetic
   aggregates of real BMUs beside wind and gas, and finds solar in the supplier BMUs.
 
-- [Can solar be separated from a battery in an aggregate Balancing Mechanism
-  Unit?](battery-pv-separation.md)
+- [Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?](battery-pv-separation.md)
   — on synthetic aggregates of a real solar BMU and a real battery BMU, a joint model of solar and a
-  battery with a state-of-charge limit has a solar error of 14.8% of the solar part's
-  99th-percentile
+  battery with a state-of-charge limit has a solar error of 14.8% of the solar part's 99th-percentile
   output, against 27.2% for a solar-only fit. With a demand-like part added the model overshoots the
   solar capacity, and on the 25 real aggregate BMUs its 1.1 to 1.2 GW is not validated.
 
-- [How well can a primary substation's half-hourly flow reveal an unmetered
-  battery?](unmetered-battery-capacity.md)
-  — a simulated merchant battery that follows the day-ahead price in the estimator's own way is
-  found
+- [How well can a primary substation's half-hourly flow reveal an unmetered battery?](unmetered-battery-capacity.md)
+  — a simulated merchant battery that follows the day-ahead price in the estimator's own way is found
   from about 10% of a primary's 99th-percentile flow, with 3 of 36 blocks flagged falsely. Real
   public batteries and NGED battery A are not found at any size tested, the intervals of a battery
   that follows another rule hold the truth far less often than stated, and the screen of eight
@@ -65,8 +59,7 @@ regions or climates, so a result may not hold elsewhere.
   forecast's CRPS by 1.1%, and the planned output of other companies' batteries lowers it by 1.3%
   1 hour ahead. The registers list 8 embedded storage BMUs against 176 connected storage rows in
   NGED's area, and cannot say how many rows the 8 stand for. All numbers are provisional.
-- [Do INDDEM and INDGEN line up with the GSP groups of NGED's licence
-  areas?](indgen-inddem-and-gsp-take.md)
+- [Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?](indgen-inddem-and-gsp-take.md)
   — Elexon's indicated demand and generation series sum the Physical Notifications of every
   Balancing Mechanism Unit for the national total and 17 transmission boundaries. An issue reaches
   15 to 42 hours ahead, the zones recover from the boundaries to within rounding, and the sum of the
@@ -113,10 +106,8 @@ the
   archived UKV's temperature is 0.124 K closer than ERA5's, so the planned rule gives UKV, but the
   advantage falls from 0.250 K at lead 0 to 0.035 K at lead 5. At six solar farms the choice of
   temperature moves power error by no more than 0.009 points (95% interval, whole row set).
-- [Do CEDA's and Open-Meteo's archives of UKV give the same power
-  forecasts?](past-weather/ukv-ceda-vs-openmeteo.md)
-  — at the nine metered farms over 23 months, the two archives agree closely at the start of each
-  run
+- [Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?](past-weather/ukv-ceda-vs-openmeteo.md)
+  — at the nine metered farms over 23 months, the two archives agree closely at the start of each run
   (a mean absolute temperature difference of 0.098 K, and Open-Meteo's wind speed about 3% lower).
   An XGBoost model of wind power trained on CEDA's archive loses 0.441 points of capacity [+0.286,
   +0.600] when given Open-Meteo's wind, a level bias that rescaling the speed mostly removes. CEDA's
@@ -152,8 +143,7 @@ a
   GEFS, and ICON-EU cannot be separated from it. A blend of ENS, ICON-EU, and IFS 0.25° lowers the
   wind error but shows no detectable solar gain at a lead a 09:00 UTC service could use.
 - [Which single weather forecast should be added to ECMWF's ensemble mean
-  first?](forecasts/blends-with-ens.md) — at the 6 solar farms and 3 wind farms, adding ICON-EU at
-  the
+  first?](forecasts/blends-with-ens.md) — at the 6 solar farms and 3 wind farms, adding ICON-EU at the
   optimistic lead (exploratory; an upper bound on a live service's gain) lowers the wind error at
   day 1 by 0.58 points of capacity [0.48, 0.69]; AIFS Single
   is the one product the page can name for solar, at day 2, by 0.33 [0.18, 0.48]. Elsewhere AIFS
