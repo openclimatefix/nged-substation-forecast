@@ -80,7 +80,8 @@ to 0.04 and 0.05 points, with intervals that include zero ([Figure
 
 **Do lags help at the longest leads?** Weekly statistics lowered the error by 0.45 points [−0.74,
 −0.16] at day 14 (exploratory). A 50/50 blend of the baseline with a climatology built only from
-earlier years lowered it by 1.16 points [−1.50, −0.80], so no lag arm beat that simpler fix ([Figure
+earlier years lowered it by 1.16 points [−1.50, −0.80] (post hoc), so no lag arm beat that simpler
+fix ([Figure
 14](#blending-the-baseline-with-climatology-lowers-long-lead-error-more-than-any-lag-arm-shown-does)).
 
 **Can lagged inputs describe each plant to an XGBoost model shared by many plants?** Partly (post
@@ -117,7 +118,7 @@ hundreds of plants.
 - **At day 14 the baseline XGBoost model, trained on 18 months, scores worse than a climatology
   built from up to 6 earlier years, and a random-day lag gains too.** The baseline scored 15.35
   points against 14.18, and a random-day lag lowered the error by 0.07 to 0.12 points depending on
-  the draw ([Figure
+  the draw (post hoc, [Figure
   13](#at-lead-day-14-the-baseline-is-12-points-worse-than-climatology-from-earlier-years-and-a-random-day-lag-gains-too)).
 - **Too many hours fall outside both ends of the forecast band: 14.0% below the 10% quantile and
   17.0% above the 90% quantile, for the baseline and the lag alike** (post hoc, [Figure
@@ -196,32 +197,32 @@ study measures that effect with random-day lag columns instead (see [Figure
 | W7 | weekly statistics | the minimum, maximum, and mean of the same hour over the last 7 whole days |
 | Q30 | 30-day percentiles | the 30-day 90th percentile and median of the same hour |
 | CK | clipping ceiling | the plant's running 99.5th percentile and 60-day maximum of power, and the share of clear hours near that ceiling |
-| TF | transfer ratio | the 30-day ratio of power to forecast irradiance |
-| AN | analogue ensemble | the mean, the forecast clear-sky index, and the spread of the power, rescaled by the Haurwitz clear-sky model's irradiance, on the 5 of the last 30 days whose forecast clear-sky index was closest to the target's |
+| TF | transfer ratio | the 30-day ratio of power to forecast irradiance, and that ratio times the target hour's forecast irradiance |
+| AN | analogue ensemble | on the 5 of the last 30 days whose forecast clear-sky index was closest to the target's: the mean and spread of their power, each rescaled by the Haurwitz clear-sky model's irradiance, and their mean forecast clear-sky index |
 | PC | satellite ratio | the 7-day ratio of power to CAMS satellite irradiance, and the 30-day ratio of CAMS to forecast irradiance |
-| S2, S3 | two-step forecasts | the output and residuals of a first-stage XGBoost model (S2 at the lag hour, S3 averaged over 1, 7, and 30 days) |
+| S2, S3 | two-step forecasts | S2: L1 plus first-stage XGBoost forecasts for the target hour and the lag hour, and the first-stage residual at the lag hour. S3: the first-stage mean residual over the last 1, 7, and 30 days |
 | RP | relative output | the plant's recent energy relative to the other plants |
 | T1 | days since start | days since the record began, which lets trees interpolate a test month's level from the months on both sides |
 | KS | combination | L1, IM, W7, Q30, TF, S3, and RP together |
 | N1, N2 | random-day controls | one random day 8 to 28 days earlier (N1), or one from months not being scored (N2), in place of the lag |
 
-The follow-up runs added these arms, named where they first appear: the daily shape (DT, two 30-day
-columns: how far the plant's power curve sits earlier or later in the day than clear-sky irradiance,
-and the share of energy produced in hours when clear-sky irradiance is low); a plant code (a column
-identifying the plant); the fingerprint (TF, DT, and CK together); PC2 (PC with a 2-day wait for
-CAMS); CL (B0 plus the climatology as a column); two- and three-column random-day controls (N2-2 and
-N2-3); B0 and other arms without the day of the year; and blends of B0 or W7 with a climatology.
-Post-model corrections need no fit: rescalings of B0's forecast by recent error, and a clamp at the
-clipping ceiling. Every window except N2's random day is anchored at the issue day, and the build
-asserts and probes that no window reads data after the issue time. PC's 30-day ratio of CAMS to
-forecast irradiance contains no power, so part of PC's and TF's gain may correct the weather
-forecast's bias and not track the plant. The live service does not ingest CAMS, so PC would need a
-new data feed.
+The first run also fitted the daily shape (DT, two 30-day columns: how far the plant's power curve
+sits earlier or later in the day than clear-sky irradiance, and the share of energy produced in
+hours when clear-sky irradiance is low), a plant code (a column identifying the plant), the
+fingerprint (TF, DT, and CK together). The follow-up runs added PC2 (PC with a 2-day wait for CAMS),
+CL (B0 plus the climatology as a column), two- and three-column random-day controls (N2-2 and N2-3),
+B0 and other arms without the day of the year, and blends of B0 or W7 with a climatology. Post-model
+corrections need no fit: rescalings of B0's forecast by recent error, quantiles of recent residuals
+added to B0's forecast, and a clamp at the clipping ceiling. Every window except N2's random day is
+anchored at the issue day, and the build asserts and probes that no window reads data after the
+issue time. PC's 30-day ratio of CAMS to forecast irradiance contains no power, so part of PC's and
+TF's gain may correct the weather forecast's bias and not track the plant. The live service does not
+ingest CAMS, so PC would need a new data feed.
 
 **The screen chose the analogue ensemble before any planned comparison was run.** The screen scores
 each arm on the first 10 months and chooses the arm with the lowest error among 11 arms eligible for
-the choice (the fitted lag arms other than B0, L1, L2, S2, N1, N2, and the arms that cannot ship or
-cannot be refitted).
+the choice. Those are the 17 arms other than B0, without L1, L2, S2, N1, and N2 (which the planned
+comparisons use anyway) and without T1 (which interpolates between months and could not run live).
 
 **The five planned comparisons** are:
 
@@ -269,7 +270,8 @@ power, each lasting 4 to 12 weeks. An arm's recovery share is its gain over B0 o
 planted loss, minus its gain on the original data, divided by the oracle's gain. The oracle's gain
 is itself uncertain, so a share's interval is wide and unstable where the oracle's gain is small.
 The months with the planted loss are also one random draw. The study has not established why the
-plant-steps control's oracle gains about a quarter as much as the month-level control's oracle.
+plant-steps control's oracle gains about a quarter as much as the month-level control's oracle at a
+10% loss.
 
 **Cleaning.** Outage, commissioning-ramp, and export-cap hours are dropped from targets and lags.
 The cleaning rule that drops every hour of a run of 24 or more zero hours looks at later hours. A
@@ -287,24 +289,28 @@ month.
 ![Figure 2: Measured power against forecast irradiance, and against the lag. Two scatter
 panels.](../assets/lag_features_figure_2.svg)
 
-### Each lag column reads only data from before the issue time, and first-stage forecasts never train on the months they predict
+### How each lag column is read for one target day
 
 ![Figure 3: How each lag column is read for one target day.](../assets/lag_features_figure_3.svg)
+
+### The first-stage forecasts never train on the months they are scored on
 
 ![Figure 4: The first-stage forecasts never train on the months they are scored
 on.](../assets/lag_features_figure_4.svg)
 
-### The XGBoost models follow measured power
+### Day-ahead forecasts against measured power in three weeks chosen by rule
 
 ![Figure 5: Day-ahead forecasts against measured power in three weeks chosen by
 rule.](../assets/lag_features_figure_5.svg)
+
+### Each arm's error at each plant, and its gain over the baseline there
 
 ![Figure 6: Each arm's error at each plant, and its gain over the baseline
 there.](../assets/lag_features_figure_6.svg)
 
 ### No planned comparison found the lag changing day-ahead error
 
-| Comparison | Reference value | 2% threshold | Primary setting (99% interval) | Sensitivity setting (99% interval) | Rules out a gain that large |
+| Comparison | Reference value, primary setting | 2% threshold, primary setting | Primary setting (99% interval) | Sensitivity setting (99% interval) | Rules out a gain that large |
 |---|---|---|---|---|---|
 | P1, the lag minus B0 | 8.93 | 0.18 | −0.001 [−0.075, +0.073] | +0.012 [−0.043, +0.058] | yes |
 | P2, the chosen arm minus the lag, 8 months | 8.39 | 0.17 | +0.012 [−0.243, +0.278] | −0.088 [−0.356, +0.164] | no |
@@ -328,10 +334,11 @@ lag.](../assets/lag_features_figure_7.svg)
 **A random-day lag changes the error as much as the real lag does.** The shuffled-lag control N2
 minus B0 is +0.011 points [−0.025, +0.051], and the lag minus N2 is −0.013 points [−0.066, +0.037]
 (exploratory). Two extra random-day lags raised B0's error by 0.038 points [−0.005, +0.085], and
-three by 0.033 [−0.024, +0.092] (post hoc), so extra columns alone cost about 0.03 to 0.04 points.
-The planted-loss control detects no recovery by the lag at 2%, 5%, or 10%: the lag minus B0 is
-−0.036 points [−0.126, +0.049] at 10%, where the oracle changes the error by −0.392 points [−0.708,
-−0.052] (99% intervals, post hoc).
+three by 0.033 [−0.024, +0.092] (post hoc), so extra columns alone may raise the error by up to
+about 0.04 points, although neither interval excludes zero. The planted-loss control detects no
+recovery by the lag at 2%, 5%, or 10%: the lag minus B0 is −0.036 points [−0.126, +0.049] at 10%
+(the first run, exploratory), where the oracle changes the error by −0.392 points [−0.708, −0.052]
+(post hoc; both intervals 99%).
 
 ### For a 10% loss at every plant, the satellite ratio recovers 74% of the oracle's gain; one day's lag, 9%
 
@@ -359,9 +366,10 @@ biased upward.](../assets/lag_features_figure_9.svg)
 
 **The analogue ensemble had the lowest error in the screen (8.97 points against 9.20 for B0), and
 beat B0 by 0.231 points [−0.392, −0.102] in the paired comparison.** The analogue ensemble was the
-best of 11 eligible arms, so some of that gain is a winner's curse. Six arms were worse than B0: L2
-by 0.105, RP by 0.130, S2 by 0.132, CK by 0.156, CTX7 by 0.246, and S3 by 0.286 points (exploratory
-95% intervals; about 1 of the 17 arms would reach statistical significance by chance).
+best of 11 eligible arms, so some of that gain is a winner's curse. Six arms were worse than B0 by a
+statistically significant amount: L2 by 0.105, RP by 0.130, S2 by 0.132, CK by 0.156, CTX7 by 0.246,
+and S3 by 0.286 points (post hoc 95% intervals; with 17 paired comparisons, about 1 would reach
+statistical significance by chance).
 
 ### On the 8 unselected months, three level-tracking inputs gained most; the analogue ensemble did not
 
@@ -383,6 +391,10 @@ the 8 months fall before February 2026, when the CAMS latency was 2 days. PC2 ga
 [−0.554, −0.012] on the same 8 months, against 0.234 for PC (the difference is −0.006 points
 [−0.062, +0.059]).
 
+**A perfect monthly rescale applied in hindsight gains 0.35 to 0.44 points on the 8 months, which is
+a bound for monthly corrections only.** The 0.35 to 0.44 points is the gain from a perfect monthly
+scale and not a ceiling for finer corrections.
+
 ### One plant's 3 low-output training months carry most of the satellite ratio's and weekly statistics' gains
 
 ![Figure 11: One plant's 3 low-output training months carry most of the satellite ratio's and weekly
@@ -399,30 +411,33 @@ baseline is given the day of the year, so it learned the low March and under-for
 March. The inputs that see the plant's recent output corrected that error.
 
 **Against a baseline without the day of the year, none of the satellite ratio, weekly statistics, or
-transfer ratio gained over 18 months.** Their gains were +0.02, +0.04, and +0.06 points, with
-intervals that include zero. Dropping the day of the year from the baseline lowered its error in
-that plant-month by 3.96 points, and over all 18 months by 0.117 points [−0.308, +0.063].
+transfer ratio gained over 18 months.** Their errors minus the baseline's were +0.02, +0.04, and
++0.06 points (slightly worse), with intervals that include zero. Dropping the day of the year from
+the baseline lowered its error in that plant-month by 3.96 points, and over all 18 months by 0.117
+points [−0.308, +0.063].
 
 **Removing the plant's 3 low-output months from its training lowered the baseline's error in that
-plant-month by 5.17 points and removed most of the two inputs' gains.** The 5.17 varies between 4.74
-and 5.81 across fitting seeds. A single month gives no interval over months. The gain of the
-satellite ratio in that plant-month fell from 6.19 to 0.50 points and of weekly statistics from 4.61
-to 0.57. Across all 6 plants the 8-month gains fell from 0.234 to 0.040 points for the satellite
-ratio (95% interval [−0.141, +0.040]) and from 0.165 to 0.046 for weekly statistics ([−0.137,
-+0.047]), and the transfer ratio's from 0.141 to 0.109. The 30-day percentiles' gain did not change:
-−0.081 points [−0.127, −0.048] on the 8 months and −0.062 [−0.109, −0.013] on all 18.
+plant-month by 5.17 points and removed most of the satellite ratio's and weekly statistics' gains.**
+The 5.17 varies between 4.74 and 5.81 across fitting seeds. A single month gives no interval over
+months. The gain of the satellite ratio in that plant-month fell from 6.19 to 0.50 points and of
+weekly statistics from 4.61 to 0.57. Across all 6 plants the 8-month gains fell from 0.234 to 0.040
+points for the satellite ratio (95% interval [−0.141, +0.040]) and from 0.165 to 0.046 for weekly
+statistics ([−0.137, +0.047]), and the transfer ratio's from 0.141 to 0.109. The 30-day percentiles'
+gain did not change: −0.081 points [−0.127, −0.048] on the 8 months and −0.062 [−0.109, −0.013] on
+all 18.
 
 **A month counted as low-output when the plant produced less than 80% of the other plants' output,
-and the same 3 months qualify however the ratio is computed.** With the hours at which the plant and
-at least 2 other plants are scored, the same 3 months fall below 80%.
+and the same 3 months qualify under both ratios computed.** The ratio was computed over the hours at
+which all 6 plants are scored, and again over the hours at which the plant and at least 2 other
+plants are scored. No other way of computing the ratio was tried.
 
 **The plant and its 3 months were chosen after the first run's results were known, from the whole
-record including one of the scored months, so removing the 3 months is an after-the-fact cleaning
-that a live service could make only once a month had ended.** The refit tests whether low-output
-training months explain the plant-month's error. It does not estimate what a live forecast would
-gain. A live service would also have trained on the low March a year earlier, so the baseline's
-error in that plant-month is not only an artefact of cross-validation. Whether a live service would
-make an error of the same size was not tested.
+record including the 8 unselected months on which the gains are scored, so removing the 3 months is
+an after-the-fact cleaning that a live service could make only once a month had ended.** The refit
+tests whether low-output training months explain the plant-month's error. It does not estimate what
+a live forecast would gain. A live service would also have trained on the low March a year earlier,
+so the baseline's error in that plant-month is not only an artefact of cross-validation. Whether a
+live service would make an error of the same size was not tested.
 
 **Against random-day controls of the same width, the satellite ratio, the transfer ratio, the 30-day
 percentiles, and weekly statistics still gained 0.07 to 0.10 points over 18 months with the dominant
@@ -431,13 +446,9 @@ plant-month left out of scoring.** The satellite ratio minus the 2-column contro
 −0.057], and weekly statistics minus the 3-column control −0.070 [−0.125, −0.017]. The gain over the
 baseline is what a service would see. The gain over a random-day control of the same width estimates
 what an input's information adds once the extra columns are allowed for, from one random draw per
-width. Both gains are below the 0.18-point threshold. Both gains are also biased towards zero,
-because the removed plant-month, in which these inputs gained most, was chosen after the results
-were known.
-
-**A perfect monthly rescale applied in hindsight gains 0.35 to 0.44 points on the 8 months, which is
-a bound for monthly corrections only.** It is the gain from a perfect monthly scale and not a
-ceiling for finer corrections.
+width. Both gains are below the 0.18-point threshold. The satellite ratio's and the weekly
+statistics' gains are also biased towards zero, because the removed plant-month, in which these two
+inputs gained most, was chosen after the results were known.
 
 ### Month by month, the paired difference from the baseline at the day-ahead lead
 
@@ -446,17 +457,17 @@ lead.](../assets/lag_features_figure_12.svg)
 
 **At lead-days 0 and 1, no lag arm beat B0 by more than 0.1 points except the analogue ensemble.**
 The analogue ensemble gained 0.164 points [−0.281, −0.044] at day 1, over 18 months that include the
-10 on which it was selected. Four arms (CK, CTX7, RP, and S3) were worse by 0.12 to 0.19 points. At
-lead-day 2 the lag raised the error by 0.080 points [+0.015, +0.147] (exploratory, one of many such
-rows). With ECMWF's single high-resolution forecast (IFS HRES) as the weather input, the same
-contrast was −0.027 points [−0.101, +0.047].
+10 on which it was selected. Four arms (CK, CTX7, RP, and S3) were worse by 0.12 to 0.19 points.
+
+### With IFS HRES as the weather input, the single-lag null also holds
 
 **With IFS HRES as the weather input, the single-lag null also holds (post hoc).** IFS HRES is
-ECMWF's single forecast, which since Cycle 50r1 on 2026-05-12 is the ENS control member. The lag
-minus B0 was +0.014 points [−0.030, +0.053] at lead-day 1 and −0.027 [−0.101, +0.047] at lead-day 2,
-on the same rows. B0's error was 9.86 with IFS HRES against 8.95 with the ENS mean. That difference
-is not a ranking of the products, because an ensemble mean is smoother than a single forecast and
-usually scores lower on absolute error.
+ECMWF's single high-resolution forecast. Since Cycle 50r1 on 2026-05-12, [that single forecast is
+the ENS control member](../../background/weather-products-survey.md). The lag minus B0 was +0.014
+points [−0.030, +0.053] at lead-day 1 and −0.027 [−0.101, +0.047] at lead-day 2, on the same rows.
+B0's error was 9.86 with IFS HRES against 8.95 with the ENS mean. That difference is not a ranking
+of the products, because an ensemble mean is smoother than a single forecast and usually scores
+lower on absolute error.
 
 ### At lead-day 14 the baseline is 1.2 points worse than climatology from earlier years, and a random-day lag gains too
 
@@ -471,12 +482,14 @@ months was not distinguishable from the baseline at day 14 (−0.73 points [−1
 rows). Most of the gap therefore reflects how much history each forecast has and not the ENS mean
 alone, and the study does not separate history depth from the ENS mean.
 
-**At days 10 and 14, weekly statistics and the 30-day percentiles gain 0.20 to 0.45 points, and only
-the weekly-statistics gain at day 14 is distinguishable from a random-day control of the same width
-(exploratory).** Weekly statistics gain 0.45 points [−0.74, −0.16] at day 14 on all rows and 0.20
+**At days 10 and 14, weekly statistics and the 30-day percentiles gain 0.20 to 0.45 points
+(exploratory).** Only weekly statistics were tested against a random-day control of the same width
+at those leads. The 30-day percentiles were not, so their gain cannot be separated from the effect
+of extra columns. Weekly statistics gain 0.45 points [−0.74, −0.16] at day 14 on all rows and 0.20
 points [−0.37, −0.004] at day 10, and the 30-day percentiles 0.22 points [−0.34, −0.10] at day 10
 and 0.22 points [−0.35, −0.07] at day 14. Weekly statistics minus the 3-column control is −0.058
-points [−0.173, +0.048] at day 10 and −0.275 [−0.508, −0.048] at day 14.
+points [−0.173, +0.048] at day 10 and −0.275 [−0.508, −0.048] at day 14. At lead-day 2 the lag
+raised the error by 0.080 points [+0.015, +0.147] (exploratory, one of many such rows).
 
 ### Blending the baseline with climatology lowers long-lead error more than any lag arm shown does
 
@@ -579,9 +592,9 @@ only once it has ended, and needs other plants nearby.
 
 **The 30-day percentiles are the one lagged input worth a planned test.** Of the arms tested, they
 gave the most consistent small gain, about 0.06 points (0.7% of the baseline's error), far below the
-threshold. The gain did not show in either planted-loss control. Against a baseline without the day
-of the year the gain fell to 0.04 points [−0.12, +0.05], so the 30-day percentiles are a hypothesis
-to test and not a recommendation.
+threshold. The gain did not show in either planted-loss control. With both the baseline and the
+30-day percentiles arm stripped of the day of the year, the gain fell to 0.04 points [−0.12, +0.05],
+so the 30-day percentiles are a hypothesis to test and not a recommendation.
 
 **At days 10 to 14, test a blend with a climatology built from earlier years before testing lag
 inputs.** The blend beat every lag arm shown in Figure 14 at those leads and needs no extra data
