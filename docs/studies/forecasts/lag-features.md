@@ -51,8 +51,8 @@ statistics gained 0.23 and 0.17 points over the baseline on the 8 months not use
 intervals that exclude zero, post hoc, but t-intervals over the 8 months include zero), and most of
 that gain came from one plant in one month. Removing that plant's three low-output months from its
 training cut the two gains to 0.04 and 0.05 points, with intervals that include zero ([Figure
-11](#removing-one-plants-three-low-output-months-from-its-training-removes-the-satellite-ratios-and-weekly-statistics-gains)).
-The 30-day percentiles kept a steady gain of about 0.06 points, below the threshold.
+11](#dropping-one-plants-three-low-output-months-from-training-removes-pcs-and-w7s-gains)). The
+30-day percentiles kept a steady gain of about 0.06 points, below the threshold.
 
 **Do lags help at the longest leads?** Weekly statistics lowered the error by 0.45 points [−0.74,
 −0.16] at day 14 (exploratory), but a 50/50 blend of the baseline with climatology built only from
@@ -98,7 +98,7 @@ plants.
   other five relative to their output, but in the same month a year earlier and in 2024-12 and
   2026-04 it produced about two thirds to three quarters as much, and the baseline, which carries
   day of year, had learned the low March (post hoc, [Figure
-  11](#removing-one-plants-three-low-output-months-from-its-training-removes-the-satellite-ratios-and-weekly-statistics-gains)).
+  11](#dropping-one-plants-three-low-output-months-from-training-removes-pcs-and-w7s-gains)).
 - **At day 14 the baseline XGBoost model's error is above that of climatology built from earlier
   years, and a random-day lag gains too.** The baseline scored 15.35 points against 14.18 for that
   climatology, and a random-day lag lowered the error by 0.07 to 0.12 points depending on the draw
@@ -127,7 +127,7 @@ days before the target day for a day-ahead forecast.
 
 | Input | Grid | Lead read | Plant data read | Delay assumed |
 |---|---|---|---|---|
-| ENS mean of ECMWF's 51 members | 0.25° | the 00 UTC run, lead-days 0, 1, 2, 3, 5, 7, 10, and 14 | power up to the issue time (09:00 UTC on the run's day; 00 UTC at lead-day 0) | none: the live service reads NGED power from an S3 bucket [updated every 6 hours](../roadmap/data-sources.md), which the study ignores |
+| ENS mean of ECMWF's 51 members | 0.25° | the 00 UTC run, lead-days 0, 1, 2, 3, 5, 7, 10, and 14 | power up to the issue time (09:00 UTC on the run's day; 00 UTC at lead-day 0) | none: the live service reads NGED power from an S3 bucket [updated every 6 hours](../../roadmap/data-sources.md), which the study ignores |
 | CAMS satellite irradiance (one input, PC) | point service | whole days before the issue day | the previous day is available at 09:00 UTC | 1 day (the service's latency since February 2026) |
 
 ## Data and methods
@@ -208,8 +208,8 @@ the month-level control's is not established.
 and the rule that drops every hour of a run of 24 or more zero hours looks at later hours, so a
 backtest lag inside such a run is cleaner than a live service's. The cleaning kept whole months in
 which one plant produced a fraction of its usual output (see [Figure
-11](#removing-one-plants-three-low-output-months-from-its-training-removes-the-satellite-ratios-and-weekly-statistics-gains)),
-so the study cannot say whether a lag helps when a plant is partly offline in the scored month.
+11](#dropping-one-plants-three-low-output-months-from-training-removes-pcs-and-w7s-gains)), so the
+study cannot say whether a lag helps when a plant is partly offline in the scored month.
 
 ## Results
 
@@ -285,7 +285,7 @@ intervals include zero and the satellite ratio's is borderline. Selecting them n
 selection, labelled post hoc. A version of the satellite ratio that waits two days for CAMS gains
 0.240 points [−0.554, −0.012] on the same 8 months, as 0.234 did with a one-day wait.
 
-### Removing one plant's three low-output months from its training removes the satellite ratio's and weekly statistics' gains
+### Dropping one plant's three low-output months from training removes PC's and W7's gains
 
 ![Figure 11: Removing one plant's three low-output months from its training removes the satellite
 ratio's and weekly statistics' gains (post hoc).](../assets/lag_features_figure_11.svg)
