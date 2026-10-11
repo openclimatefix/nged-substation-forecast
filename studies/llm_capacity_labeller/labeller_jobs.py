@@ -414,3 +414,30 @@ def round2_jobs(*, plants: int, tools_samples: int = TOOLS_SAMPLES) -> list[Hind
         for plant in range(plants)
     ]
     return jobs
+
+
+ROUND3_EASY_RECORDS: Final[tuple[RecordIdType, ...]] = ("easy01", "easy02")
+"""The two easy-case records (post hoc): a 60% loss lasting 90 days at every plant."""
+
+ROUND3_DRAW_RECORDS: Final[tuple[RecordIdType, ...]] = ("draw05", "draw06")
+"""The fresh draws on which the amended step check is evaluated once (post hoc)."""
+
+
+def round3_jobs(*, plants: int, samples: int = TOOLS_SAMPLES) -> list[HindsightJob]:
+    """List round 3's calls in the order they run: the easy case, then the fresh draws.
+
+    Args:
+        plants: The number of plants.
+        samples: Samples per plant and record.
+
+    Returns:
+        Round 2's tools-plus-model arm (version `v2`, frozen) on the two easy records and the two
+        fresh draws: 24 + 24 calls at 6 plants and 2 samples. The original record's answers are
+        round 2's, already cached.
+    """
+    return [
+        HindsightJob("tools_llm", record_id, plant, sample, "v2")
+        for record_id in (*ROUND3_EASY_RECORDS, *ROUND3_DRAW_RECORDS)
+        for plant in range(plants)
+        for sample in range(samples)
+    ]

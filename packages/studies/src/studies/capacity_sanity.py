@@ -108,20 +108,40 @@ def check_bounds(*, knots: tuple[Knot, ...], static_p99_mw: float) -> list[Failu
     ]
 
 
-def check_steps(*, knots: tuple[Knot, ...], evidence: Evidence) -> list[Failure]:
-    """Return a failure for each step that no changepoint candidate supports.
+def local_boundary_days(*, evidence: Evidence) -> list[date]:
+    """Return the dates on which a local-scan episode starts or ends."""
+    last = len(evidence.dates) - 1
+    return [
+        evidence.dates[index].astype(date)
+        for episode in evidence.local_episodes
+        for index in (episode.first_day, min(episode.last_day + 1, last))
+    ]
+
+
+def check_steps(
+    *, knots: tuple[Knot, ...], evidence: Evidence, local_scan_candidates: bool = False
+) -> list[Failure]:
+    """Return a failure for each step that no candidate supports.
+
+    **The amended check (round 3) also accepts a step when a local-scan episode starts or ends
+    within `CANDIDATE_WINDOW_DAYS` of it, with no test of size.** It was written down before round 3
+    ran, and a step the changepoint list supports still needs the size tolerance.
 
     Args:
         knots: The knots in date order.
         evidence: The evidence, whose candidates are the support.
+        local_scan_candidates: Whether local-scan episode boundaries count as candidates.
 
     Returns:
         One failure per unsupported step, dated at the knot that ends the step.
     """
     failures = []
+    boundaries = local_boundary_days(evidence=evidence) if local_scan_candidates else []
     for before, after in pairwise(knots):
         step = after.capacity_mw / before.capacity_mw - 1.0
         if abs(step) < STEP_MINIMUM:
+            continue
+        if any(abs((day - after.day).days) <= CANDIDATE_WINDOW_DAYS for day in boundaries):
             continue
         near = [
             change
@@ -237,7 +257,9 @@ def _drop(*, answer: Answer, days: set[date]) -> Answer:
     return replace(answer, knots=kept, no_change=not kept)
 
 
-def apply_hindsight(*, answer: Answer, evidence: Evidence) -> SanityOutcome:
+def apply_hindsight(
+    *, answer: Answer, evidence: Evidence, local_scan_candidates: bool = False
+) -> SanityOutcome:
     """Drop the failing knots of a hindsight answer, and record each failure.
 
     Checks 1, 2, and 4 mark knots; every marked knot is dropped. Check 3 then drops, one at a time,
@@ -246,13 +268,16 @@ def apply_hindsight(*, answer: Answer, evidence: Evidence) -> SanityOutcome:
     Args:
         answer: The labeller's answer.
         evidence: The evidence it was written from.
+        local_scan_candidates: Whether the amended step check applies (see `check_steps`).
 
     Returns:
         The outcome, with `fell_back` False.
     """
     failures = [
         *check_bounds(knots=answer.knots, static_p99_mw=evidence.static_p99_mw),
-        *check_steps(knots=answer.knots, evidence=evidence),
+        *check_steps(
+            knots=answer.knots, evidence=evidence, local_scan_candidates=local_scan_candidates
+        ),
         *check_anm(knots=answer.knots, evidence=evidence),
     ]
     current = _drop(answer=answer, days={f.day for f in failures if f.day is not None})
@@ -274,19 +299,24 @@ def apply_hindsight(*, answer: Answer, evidence: Evidence) -> SanityOutcome:
     return SanityOutcome(answer=current, failures=tuple(failures), fell_back=False)
 
 
-def apply_causal(*, answer: Answer, evidence: Evidence) -> SanityOutcome:
+def apply_causal(
+    *, answer: Answer, evidence: Evidence, local_scan_candidates: bool = False
+) -> SanityOutcome:
     """Replace a causal answer by the static power if any check fails.
 
     Args:
         answer: The labeller's answer.
         evidence: The evidence it was written from.
+        local_scan_candidates: Whether the amended step check applies (see `check_steps`).
 
     Returns:
         The outcome. On any failure the answer has no knots and `fell_back` is True.
     """
     failures = [
         *check_bounds(knots=answer.knots, static_p99_mw=evidence.static_p99_mw),
-        *check_steps(knots=answer.knots, evidence=evidence),
+        *check_steps(
+            knots=answer.knots, evidence=evidence, local_scan_candidates=local_scan_candidates
+        ),
         *check_reproduces(knots=answer.knots, evidence=evidence, window_days=CAUSAL_WINDOW_DAYS),
         *check_anm(knots=answer.knots, evidence=evidence),
     ]

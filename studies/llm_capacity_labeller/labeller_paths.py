@@ -52,11 +52,32 @@ ROUND2_DRAW_SEEDS: Final[tuple[int, int]] = (11443, 11444)
 CONTROL2_SEED: Final[int] = 114303
 """The seed of round 2's positive control, with no two steps at a plant in adjacent months."""
 
+ROUND3_DRAW_SEEDS: Final[tuple[int, int]] = (11445, 11446)
+"""The seeds of round 3's two fresh draws, used only to test the amended step check."""
+
+EASY_SEEDS: Final[tuple[int, int]] = (114304, 114305)
+"""The seeds of the two easy-case records."""
+
+EASY_SIZE: Final[float] = 0.6
+EASY_DAYS: Final[int] = 90
+"""The easy case: a loss of this share of power, lasting this many days, starting on any day."""
+
 TUNING_SEED: Final[int] = 114401
 """The seed of the cross-checks that resample events."""
 
 RecordIdType = Literal[
-    "original", "draw01", "draw02", "control", "null", "draw03", "draw04", "control2"
+    "original",
+    "draw01",
+    "draw02",
+    "control",
+    "null",
+    "draw03",
+    "draw04",
+    "control2",
+    "draw05",
+    "draw06",
+    "easy01",
+    "easy02",
 ]
 """The records a labeller reads: the original, the two fresh draws, the positive control, and the
 synthetic null record."""
@@ -70,6 +91,10 @@ RECORD_IDS: Final[tuple[RecordIdType, ...]] = (
     "draw03",
     "draw04",
     "control2",
+    "draw05",
+    "draw06",
+    "easy01",
+    "easy02",
 )
 """The runtime tuple of `RecordIdType`'s values."""
 
@@ -396,6 +421,22 @@ def load_round2(*, root: Path) -> dict[str, list[list[PlantedEvent]]]:
     }
 
 
+def load_round3(*, root: Path) -> dict[str, list[list[PlantedEvent]]]:
+    """Read round 3's two fresh draws and the two easy-case records.
+
+    Args:
+        root: The output root.
+
+    Returns:
+        `draws` and `easy`, each a list of two event lists.
+    """
+    payload = json.loads((built_dir(root=root) / "round3.json").read_text())
+    return {
+        key: [[event_from_json(payload=e) for e in record] for record in payload[key]]
+        for key in ("draws", "easy")
+    }
+
+
 def record_for(*, root: Path, record_id: RecordIdType) -> CapacityRecord:
     """Build a record by identifier.
 
@@ -419,7 +460,7 @@ def record_for(*, root: Path, record_id: RecordIdType) -> CapacityRecord:
         return plant_losses(
             record=original, events=positive_control_events(first=load_first_events())
         )
-    if record_id in ("draw03", "draw04", "control2"):
+    if record_id in ("draw03", "draw04", "control2", "draw05", "draw06", "easy01", "easy02"):
         return plant_losses(record=original, events=events_of(root=root, record_id=record_id))
     if record_id == "null":
         with np.load(built_dir(root=root) / "null_power.npz") as data:
@@ -428,7 +469,7 @@ def record_for(*, root: Path, record_id: RecordIdType) -> CapacityRecord:
     raise ValueError(msg)
 
 
-def events_of(*, root: Path, record_id: RecordIdType) -> list[PlantedEvent]:
+def events_of(*, root: Path, record_id: RecordIdType) -> list[PlantedEvent]:  # noqa: PLR0911
     """Return the planted events of a record.
 
     Args:
@@ -446,4 +487,8 @@ def events_of(*, root: Path, record_id: RecordIdType) -> list[PlantedEvent]:
         return load_round2(root=root)["draws"][int(record_id[-1]) - 3]
     if record_id == "control2":
         return load_round2(root=root)["control2"][0]
+    if record_id in ("draw05", "draw06"):
+        return load_round3(root=root)["draws"][int(record_id[-1]) - 5]
+    if record_id in ("easy01", "easy02"):
+        return load_round3(root=root)["easy"][int(record_id[-1]) - 1]
     return []

@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import date, timedelta
 
 import numpy as np
-from studies.capacity_evidence import Changepoint, Evidence, PlantFit
+from studies.capacity_evidence import Changepoint, Evidence, LocalEpisode, PlantFit
 from studies.capacity_labeller import Answer, Knot
 from studies.capacity_sanity import (
     apply_causal,
@@ -264,3 +264,51 @@ def _evidence_of_length(*, ratio: np.ndarray) -> Evidence:
         stuck=np.zeros(length, dtype=bool), clear_raw=ratio, clear_corrected=ratio,
         shared=nans, own=nans, neighbour=nans, energy_mwh=nans, modelled_mwh=nans,
     )  # fmt: skip
+
+
+def _local_episode(*, first: int, last: int) -> LocalEpisode:
+    return LocalEpisode(
+        first_day=first, last_day=last, deepest_start=first, direction="down", effect=-0.3,
+        all_sky_effect=float("nan"),
+    )  # fmt: skip
+
+
+def test_the_amended_step_check_accepts_only_steps_near_a_local_episode_boundary() -> None:
+    evidence = replace(_evidence(), local_episodes=(_local_episode(first=100, last=129),))
+    start = (_knot(index=99, capacity=10.0), _knot(index=100, capacity=7.0))
+    end = (_knot(index=129, capacity=7.0), _knot(index=131, capacity=10.0))
+    far = (_knot(index=179, capacity=10.0), _knot(index=180, capacity=7.0))
+    assert check_steps(knots=start, evidence=evidence)
+    assert check_steps(knots=start, evidence=evidence, local_scan_candidates=True) == []
+    assert check_steps(knots=end, evidence=evidence, local_scan_candidates=True) == []
+    assert check_steps(knots=far, evidence=evidence, local_scan_candidates=True)
+    near_edge = (_knot(index=113, capacity=10.0), _knot(index=114, capacity=7.0))
+    just_over = (_knot(index=114, capacity=10.0), _knot(index=115, capacity=7.0))
+    assert check_steps(knots=near_edge, evidence=evidence, local_scan_candidates=True) == []
+    assert check_steps(knots=just_over, evidence=evidence, local_scan_candidates=True)
+
+
+def test_the_amended_check_leaves_the_changepoint_size_tolerance_in_force() -> None:
+    evidence = replace(
+        _evidence(changes=(_change(index=100, size=-0.05),)),
+        local_episodes=(_local_episode(first=150, last=179),),
+    )
+    knots = (_knot(index=99, capacity=10.0), _knot(index=100, capacity=8.0))
+    assert check_steps(knots=knots, evidence=evidence, local_scan_candidates=True)
+
+
+def test_the_amended_policies_keep_a_local_scan_step_the_original_drops() -> None:
+    drop = np.ones(DAYS)
+    drop[100:130] = 0.7
+    evidence = replace(_evidence(ratio=drop), local_episodes=(_local_episode(first=100, last=129),))
+    knots = (
+        _knot(index=0, capacity=10.0), _knot(index=99, capacity=10.0),
+        _knot(index=100, capacity=7.0),
+        _knot(index=129, capacity=7.0), _knot(index=130, capacity=10.0),
+    )  # fmt: skip
+    answer = _answer(*knots)
+    assert apply_causal(answer=answer, evidence=evidence).fell_back
+    assert not apply_causal(answer=answer, evidence=evidence, local_scan_candidates=True).fell_back
+    assert len(apply_hindsight(answer=answer, evidence=evidence).answer.knots) < len(knots)
+    amended = apply_hindsight(answer=answer, evidence=evidence, local_scan_candidates=True)
+    assert len(amended.answer.knots) == len(knots)

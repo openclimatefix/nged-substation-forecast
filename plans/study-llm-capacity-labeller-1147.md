@@ -438,3 +438,13 @@ the exploratory forecast fits (3 seeds, 5 folds, primary setting only).
   on why there is no change, and is judged on two new draws (seeds 11443 and 11444) with a positive
   control that has no two steps at a plant in adjacent months. Round 1's model arm is re-run on
   those draws so the versions are paired. Spend: US$3.93 for 156 calls, US$6.97 in all.
+- **Round 3 pre-registration (post hoc, written before any round 3 call):** the amended step check
+  accepts a knot pair when the local scan or the changepoint list has a candidate within 14 days
+  (`check_steps(local_scan_candidates=True)`: a local-scan episode start or end within 14 days is
+  enough, with no size test; a changepoint candidate keeps its size tolerance). Everything else is
+  frozen: round 2's tools, prompt, 2 samples, bounds, variance and cap checks. It is evaluated once,
+  on fresh draws 05 and 06 (seeds 11445 and 11446), with the original record's round 2 answers for
+  pairing, and it is the only evaluation of the amended check; replaying draws 03 and 04 through it
+  is exploratory. An easy case (a 60% loss for 90 days from a random day, two records, 2 samples) is
+  run with the same arm. Round 3 allowance: US$3 on top of US$6.97. Neither an Opus run nor a
+  matched-filter tool is part of this study; both go in the proposed follow-up.
