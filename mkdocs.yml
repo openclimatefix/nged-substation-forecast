@@ -122,6 +122,7 @@ nav:
           - "Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?": studies/forecasts/ukv-ceda-blends.md
           - "How do Open-Meteo's ensemble-mean products compare for solar and wind power?": studies/forecasts/ensemble-means.md
           - "Does a same-hour power lag improve a day-ahead solar forecast?": studies/forecasts/lag-features.md
+          - "Is a daily capacity estimate worth building for day-ahead solar forecasts?": studies/forecasts/effective-capacity.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md

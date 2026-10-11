@@ -5,8 +5,9 @@ Stage A plants known capacity losses in six solar plants' measured power and ask
 estimators (and two references, S0 and EM) to find them, with no forecast in the loop. Stage B
 divides the lag-features study's baseline forecast (B0) by the one causal estimator that a rule
 fixed in advance selects, and scores it in megawatts over each plant's fixed 99th-percentile power.
-The design is in `plans/study-effective-capacity-1143.md` and the results will be on the study's
-page under `docs/studies/forecasts/`.
+The design is in `plans/study-effective-capacity-1143.md`, and the results are on the study's page,
+[Is a daily capacity estimate worth building for day-ahead solar
+forecasts?](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/effective-capacity/).
 
 **Every script takes `--smoke`, which reads and writes under `<study directory>/_smoke/` and is not a
 result.** `capacity_paths.claim_root` marks each root `real` or `smoke` and raises if a run of the
@@ -25,6 +26,12 @@ overwrites a finished output.
 | `fit_capacity_arms.py` | GPU. Runs the constant-scale assertion, the 90-fit reproduction of B0, the forecast-row join probe, and then every Stage B arm, with checkpoints. |
 | `posthoc_capacity.py`, `fit_posthoc_arms.py` | POST HOC, not pre-registered. Estimate DSKF and HYST from the tuned Kalman filter's levels and score them in Stage A; then fit Stage B arms `posthoc_causal__<estimator>` for them and for HM, CX2, NR, PR, CX1, and DP1 (`--phase estimates`, then `--phase stage_a`, then the arm fitter). They never change the selection or the verdict. |
 | `report_effective_capacity.py` | Prints every table and number the page quotes into `report.md`, with the explainability rubric and examples. |
+| `effective_capacity_charts.py` | Draws the page's 11 figures from `report.md` (see below). |
+
+`effective_capacity_charts.py` reads `report.md` and two tables that the report script saves
+(`tables/example_event.parquet` and `tables/kf_seasonal_shape.parquet`). With `--text-only` it writes
+`figure_text.txt` and stops. A render writes SVG and PNG under `figures/` and publishes svgo-optimised
+SVGs to `docs/studies/assets/`.
 
 ## Run order
 
@@ -61,3 +68,7 @@ All under `data/studies/per_study/effective_capacity/`:
   `losses_stage_b.parquet` holds each arm's per-row losses in fractions of the static power, the
   scale, and the scaled actual.
 - `report.md`: every number the page quotes.
+- `tables/`: the Stage A tables, the fitted quantities, the post hoc Stage A tables, and the two
+  tables the figures read.
+- `figure_text.txt` and `figures/`: the figure text and the renders.
+- `superseded/`: earlier versions of `report.md`.
