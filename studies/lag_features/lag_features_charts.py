@@ -78,6 +78,9 @@ from studies.guards import refuse_to_overwrite
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("lag_features_charts")
 
+THRESHOLD_SHARE: Final[float] = 0.02
+"""The decision threshold, as a share of the reference arm's own error."""
+
 NOMINAL_COVERAGE: Final[float] = 0.8
 """The share of hours a 10% to 90% interval should hold."""
 
@@ -390,6 +393,7 @@ def _intervals_chart(
     verdicts: pl.DataFrame | None = None,
     x_domain: list[float] | None = None,
     width_offset: int = 260,
+    extra: alt.Chart | None = None,
 ) -> alt.LayerChart:
     """Draw dots with interval lines against a zero rule, one row per `y` value.
 
@@ -405,6 +409,7 @@ def _intervals_chart(
         x_domain: Optional lower and upper end of the x axis.
         width_offset: How much narrower than the text column the plot area is drawn, to leave room
             for the row labels and so that the whole figure is as wide as its caption.
+        extra: Optional further layer drawn on the same rows, such as threshold ticks.
 
     Returns:
         The layered chart.
@@ -433,6 +438,8 @@ def _intervals_chart(
         shape=alt.Shape(f"{shape}:N", legend=None),
     )
     layers = rule + lines + dots
+    if extra is not None:
+        layers = layers + extra
     if verdicts is not None:
         words = (
             alt.Chart(verdicts)
@@ -476,16 +483,41 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         lower=pl.col("lower") * PERCENTAGE_POINTS,
         upper=pl.col("upper") * PERCENTAGE_POINTS,
     )
+    rows = rows.with_columns(
+        threshold=THRESHOLD_SHARE * pl.col("reference_value") * PERCENTAGE_POINTS
+    )
     span = float(rows["upper"].max()) - float(rows["lower"].min())  # ty: ignore[invalid-argument-type]
     verdicts = (
         rows.group_by("label", maintain_order=True)
         .agg(
             verdict=pl.col("combined_verdict").first().fill_null("not both settings"),
-            x=pl.col("upper").max(),
+            x=pl.max_horizontal(pl.col("upper").max(), pl.col("threshold").max()),
         )
         .with_columns(x=pl.col("x") + 0.02 * span)
     )
+    thresholds = (
+        rows.filter(pl.col("setting") == "primary")
+        .select("label", threshold=pl.col("threshold"))
+        .with_columns(sign=pl.lit([-1.0, 1.0]))
+        .explode("sign")
+        .with_columns(x=pl.col("sign") * pl.col("threshold"))
+    )
+    ticks = (
+        alt.Chart(thresholds)
+        .mark_tick(color=ocf.BLACK_1, thickness=1.5, size=26, aria=False)
+        .encode(y=alt.Y("label:N", sort=None), x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
+    excluded: list[str] = [
+        str(contrast)
+        for (contrast,), part in rows.group_by("contrast", maintain_order=True)
+        if bool((part["lower"] > -part["threshold"]).all())
+    ]
+    claim(
+        holds=excluded == ["P1", "P3", "P4", "P5"],
+        what="the 99% intervals of P1, P3, P4, and P5 exclude the 2% threshold at both settings",
+    )
     domain = [float(rows["lower"].min()) - 0.05 * span, float(rows["upper"].max()) + 0.55 * span]  # ty: ignore[invalid-argument-type]
+    excluded_text = ", ".join(excluded)
     x_title = (
         "Change in error, treatment minus reference (percentage points of capacity; "
         "more negative is better)"
@@ -507,8 +539,13 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         ),
         (
             "Dot: estimate at each hyperparameter setting. Line: 99% interval from resampling "
-            "whole months. Zero: no change. The words at the right of a row give the verdict "
-            "from both settings."
+            "whole months. Zero: no change. Ticks: the 2% decision threshold, minus and "
+            "plus 2% of the reference arm's own error."
+        ),
+        (
+            "The words at the right of a row give the verdict from both settings. "
+            "'Unresolved' is the planned rule's verdict: no gain shown. The 99% intervals of "
+            f"{excluded_text} exclude the 2% threshold at both settings (a post hoc reading)."
         ),
     ]
     footnote = [
@@ -547,6 +584,7 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
                 verdicts=verdicts,
                 x_domain=domain,
                 width_offset=205,
+                extra=ticks,
             )
         ],
         number=1,
@@ -1030,9 +1068,10 @@ def sweep_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConca
     claim(holds=better.height == 1, what="exactly one arm's paired interval is below zero")
     claim(holds=worse.height >= 1, what="some arms' paired intervals are above zero")
     best = better.row(0, named=True)
+    claim(holds=best["arm"] == "AN", what="the arm that beat B0 is the one the screen picked")
     title = (
-        f"Only {best['arm']} clearly beat B0 in the screening months, by "
-        f"{abs(best['difference']):.2f} points; {worse.height} arms clearly lost to it"
+        f"The screen picked {best['arm']} on these months, so its "
+        f"{abs(best['difference']):.2f}-point gain over B0 is biased upward"
     )
     without = contrasts.filter((pl.col("arm") == best["arm"]) & (pl.col("rows") != "all rows")).row(
         0, named=True
@@ -1047,7 +1086,8 @@ def sweep_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConca
         (
             "Each fitted arm's mean absolute error minus B0's over the first 10 of the 18 scored "
             "months, in percentage points of capacity; negative beats B0. Dot: estimate. Line: "
-            "95% interval of the paired difference from resampling whole months and a seed."
+            "95% interval of the paired difference from resampling whole months and a seed. "
+            f"Only {best['arm']} clearly beat B0, and {worse.height} arms clearly lost to it."
         ),
         (
             "A screen, not a test: it picks an arm for the later months. Green: the interval is "
@@ -2076,8 +2116,9 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
         (
             "Each dot is one arm in one control at one shift size: its error gain over B0, "
             "net of its gain on the unshifted data, divided by the oracle's gain (0: none, 1: all "
-            "of it). The oracle is B0 given the true shift factor, the most any lag feature "
-            "could gain. Line: 95% interval from resampling whole months and a seed."
+            "of it). The oracle is B0 given the true shift factor, which is what knowing the "
+            "shift exactly gains a tree model. Line: 95% interval from resampling whole months and "
+            "a seed."
         ),
         (
             "Dashed lines: no gain (0) and the oracle's gain (1). A pair is shown only where the "

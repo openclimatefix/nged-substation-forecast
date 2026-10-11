@@ -903,7 +903,11 @@ def past_only_climatology(*, rows: pl.DataFrame, hourly: pl.DataFrame) -> pl.Dat
 
 
 def climatology_section(
-    *, first_path: Path, root: Path, hourly: pl.DataFrame
+    *,
+    first_path: Path,
+    root: Path,
+    hourly: pl.DataFrame,
+    keep: dict[int, pl.DataFrame] | None = None,
 ) -> tuple[list[str], pl.DataFrame]:
     """Score B0, W7 and their 50/50 blends with climatology, past-only and as saved.
 
@@ -911,6 +915,8 @@ def climatology_section(
         first_path: The first run's losses.
         root: The output root.
         hourly: The cleaned hourly power.
+        keep: If given, filled with each lead-day's per-row scored losses of every arm scored, for
+            a later report that pairs two of them.
 
     Returns:
         The report lines and a table with one row per (lead-day, arm).
@@ -999,6 +1005,8 @@ def climatology_section(
                 .with_columns(arm=pl.lit(arm))
             )
         scored = pl.concat(scored_parts)
+        if keep is not None:
+            keep[lead] = scored
         for arm in predictions:
             mean_error = _mean(scored.filter(pl.col("arm") == arm))
             interval = (

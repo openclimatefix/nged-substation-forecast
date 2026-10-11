@@ -160,6 +160,26 @@ numbers the review asked for. The IFS HRES frames come from the existing `ifs_si
 option. The PC step-control fits use their own frames, because round 1's step frames lack PC's
 columns.
 
+## Round 3: the third science review's follow-ups
+
+The third science review suspected that the plant-month dominating the 8 unselected months is a
+derated plant in the training data. Everything is post hoc and sits under `ens_mean/followups3/`.
+
+```bash
+uv run python studies/lag_features/followup3_plan.py        # chooses the plant and months by rule
+uv run python studies/lag_features/report_followups3.py     # no fit: writes the `_nofit` report
+uv run python studies/lag_features/fit_followups3.py --dry-run
+uv run python studies/lag_features/fit_followups3.py --device cuda --max-workers 4
+# Afterwards, move the `_nofit` report and tables to `followups3/superseded/`, then re-run:
+uv run python studies/lag_features/report_followups3.py
+```
+
+| Script | What it does |
+|---|---|
+| `followup3_plan.py` | Names the plant with the largest B0 error in one of the 8 unselected months, and its derated months (output below 80% of the other plants', on the hours all six are scored), without naming either in code. |
+| `fit_followups3.py` | B0, PC, W7, TF, and Q30 refitted on that plant with its derated months removed from training only (75 fits, by marking the rows `constrained`), and L1, Q30, AN, and N2-2 refitted without `day_of_year` (360 fits). No new column is built, so the first run's anchors and leak probe stand. |
+| `report_followups3.py` | The output-ratio audit, the width-matched null contrasts, the month-cluster t-intervals, PC, W7, and TF against B0 without day of year, the same-rows comparison at lead-day 14, the cleaning rules that look at later hours, the equivalence table with t-intervals, and the two fit blocks. |
+
 ## Choices the plan did not settle
 
 - **The lag source** is NGED's hourly power with the multi-day zero runs, meter spikes, commissioning
