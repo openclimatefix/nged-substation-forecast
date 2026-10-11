@@ -7,8 +7,11 @@ from cleaning_rules import (
     commissioning_ramp,
     first_months_after_first_nonzero,
     isolated_zeros,
+    new_meter_settling,
+    pv_dropouts,
     rows_to_drop,
     spikes,
+    switching_days,
 )
 
 START = datetime(2025, 1, 1, tzinfo=UTC)
@@ -150,3 +153,71 @@ def test_the_ramp_rule_runs_through_rows_to_drop_with_the_frame_the_fit_script_b
         train_start=START,
     )
     assert set(dropped["time_series_id"].to_list()) == {1}
+
+
+def _types(*, ids: list[int], type_name: str) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "time_series_id": pl.Series(ids, dtype=pl.Int32),
+            "time_series_type": [type_name] * len(ids),
+        }
+    )
+
+
+def test_new_meter_settling_drops_the_weeks_after_the_first_live_day_only_for_late_meters():
+    """A meter that goes live on day 3 loses days 0 to 45; an always-live meter loses nothing."""
+    late = _series(series_id=1, values=[0.0] * 48 * 3 + [10.0] * 48 * 100)
+    steady = _series(series_id=2, values=[10.0] * 48 * 103)
+    dropped = new_meter_settling(power=pl.concat([late, steady]), train_start=START)
+    assert set(dropped["time_series_id"].to_list()) == {1, 2}
+    live_from = START + timedelta(days=3)
+    late_dropped = dropped.filter(pl.col("time_series_id") == 1)["time"]
+    assert late_dropped.max() == live_from + timedelta(weeks=6) - timedelta(minutes=30)
+    steady_dropped = dropped.filter(pl.col("time_series_id") == 2)["time"]
+    assert steady_dropped.max() == START + timedelta(weeks=6) - timedelta(minutes=30)
+
+
+def test_new_meter_settling_ignores_a_series_that_never_has_a_live_run():
+    """A solar-shaped series (dark half of each day) has no anchor and loses nothing."""
+    day = [0.0] * 16 + [10.0] * 16 + [0.0] * 16
+    power = _series(series_id=1, values=day * 100)
+    assert new_meter_settling(power=power, train_start=START).height == 0
+
+
+def test_pv_dropouts_need_the_peers_to_be_producing():
+    """A zero at the peers' noon is dropped; a zero at the peers' night is not."""
+    noon = [10.0] * 10
+    one = _series(series_id=1, values=[0.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0])
+    one_night = _series(
+        series_id=1, values=[10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 0.0]
+    )
+    peers = [_series(series_id=pid, values=[*noon[:9], 0.0]) for pid in (2, 3)]
+    dropped = pv_dropouts(
+        power=pl.concat([one, *peers]), types=_types(ids=[1, 2, 3], type_name="PV")
+    )
+    assert dropped.filter(pl.col("time_series_id") == 1)["time"].to_list() == [START]
+    night = pv_dropouts(
+        power=pl.concat([one_night, *peers]), types=_types(ids=[1, 2, 3], type_name="PV")
+    )
+    assert night.height == 0
+
+
+def test_switching_days_drop_a_run_that_the_peers_do_not_share():
+    """A 5-day 50% step in one demand series is dropped, a 2-day step and a shared step are not."""
+    days = 200
+    peer_values = [10.0] * 48 * days
+    stepped = [10.0] * 48 * 100 + [15.0] * 48 * 5 + [10.0] * 48 * 95
+    short = [10.0] * 48 * 100 + [15.0] * 48 * 2 + [10.0] * 48 * 98
+    power = pl.concat(
+        [
+            _series(series_id=1, values=stepped),
+            _series(series_id=2, values=short),
+            _series(series_id=3, values=peer_values),
+            _series(series_id=4, values=peer_values),
+        ]
+    )
+    dropped = switching_days(
+        power=power, types=_types(ids=[1, 2, 3, 4], type_name="Disaggregated Demand")
+    )
+    assert set(dropped["time_series_id"].to_list()) == {1}
+    assert dropped.height == 48 * 5

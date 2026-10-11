@@ -24,6 +24,9 @@ CleaningRule = Literal[
     "isolated_zeros",
     "spikes",
     "commissioning_ramp",
+    "new_meter_settling",
+    "pv_dropouts",
+    "switching_days",
 ]
 """The training-data cleaning rules a round 0 arm can use."""
 
@@ -36,6 +39,9 @@ CLEANING_RULES: Final[tuple[CleaningRule, ...]] = (
     "isolated_zeros",
     "spikes",
     "commissioning_ramp",
+    "new_meter_settling",
+    "pv_dropouts",
+    "switching_days",
 )
 
 ZERO_NEIGHBOUR_FRACTION: Final[float] = 0.01
@@ -61,6 +67,32 @@ RAMP_ROLLING_DAYS: Final[int] = 14
 
 RAMP_MIN_PEERS: Final[int] = 2
 """The ramp rule needs at least this many other series of the same type to form a reference."""
+
+SETTLING_LEVEL_FRACTION: Final[float] = 0.05
+"""A reading counts as live if its magnitude exceeds this fraction of the series' capacity."""
+
+SETTLING_RUN_HALF_HOURS: Final[int] = 48
+"""A meter is live once this many consecutive half-hours are live."""
+
+SETTLING_WEEKS: Final[int] = 6
+"""Weeks dropped after a meter first goes live."""
+
+DROPOUT_OWN_FRACTION: Final[float] = 0.02
+"""A generator has dropped out if it reads below this fraction of its capacity."""
+
+DROPOUT_PEER_FRACTION: Final[float] = 0.25
+"""A dropout is confirmed if the median of its same-type peers reads above this fraction of
+their capacity at the same half-hour."""
+
+SWITCHING_WINDOW_DAYS: Final[int] = 61
+"""Width of the centred rolling median that gives a demand series' usual daily level."""
+
+SWITCHING_EXCESS: Final[float] = 0.25
+"""A day is a switching day if its relative deviation from the usual level exceeds the median
+deviation of the other demand series by more than this."""
+
+SWITCHING_MIN_RUN_DAYS: Final[int] = 3
+"""Switching days count only in runs of at least this many consecutive days."""
 
 HALF_HOURS_PER_DAY: Final[int] = 48
 """Half-hourly readings in a day."""
@@ -232,6 +264,153 @@ def commissioning_ramp(*, power: pl.DataFrame, types: pl.DataFrame) -> pl.DataFr
     )
 
 
+def new_meter_settling(*, power: pl.DataFrame, train_start: datetime) -> pl.DataFrame:
+    """Drop the weeks after a meter first reads live, for series that go live late.
+
+    A series is live from the first of `SETTLING_RUN_HALF_HOURS` consecutive half-hours whose
+    magnitude exceeds `SETTLING_LEVEL_FRACTION` of its capacity (the P99 of its readings inside the
+    training window). Every half-hour from the start of the record to `SETTLING_WEEKS` weeks after
+    that instant is dropped. A series that never has such a run (a solar farm, which is dark at
+    night) has no anchor and loses nothing.
+
+    Args:
+        power: Readings of every series, from the start of the record to the end of the training
+            window.
+        train_start: The first instant of the training window.
+
+    Returns:
+        The `(time_series_id, time)` pairs to drop.
+    """
+    capacity = training_capacity(power=power.filter(pl.col("time") >= train_start))
+    ordered = power.sort("time_series_id", "time").join(capacity, on="time_series_id")
+    live = (pl.col("power").abs() > SETTLING_LEVEL_FRACTION * pl.col("capacity")).fill_null(False)
+    run_end = (
+        live.cast(pl.Int32).rolling_sum(window_size=SETTLING_RUN_HALF_HOURS).over("time_series_id")
+        == SETTLING_RUN_HALF_HOURS
+    )
+    anchors = (
+        ordered.filter(run_end)
+        .group_by("time_series_id")
+        .agg(live_from=pl.col("time").min().dt.offset_by(f"-{SETTLING_RUN_HALF_HOURS * 30 - 30}m"))
+        .with_columns(cutoff=pl.col("live_from").dt.offset_by(f"{SETTLING_WEEKS}w"))
+    )
+    return (
+        power.join(anchors, on="time_series_id")
+        .filter(pl.col("time") < pl.col("cutoff"))
+        .select("time_series_id", "time")
+    )
+
+
+def pv_dropouts(*, power: pl.DataFrame, types: pl.DataFrame) -> pl.DataFrame:
+    """Drop half-hours where a generator reads near zero while its same-type peers are producing.
+
+    Only PV and Wind are judged. The peer reference is the median of the other series of the same
+    type, each as a fraction of its own capacity, at the same half-hour, and needs at least
+    `RAMP_MIN_PEERS` peers.
+
+    Args:
+        power: Readings of every series, inside the training window.
+        types: Columns `time_series_id` and `time_series_type`.
+
+    Returns:
+        The `(time_series_id, time)` pairs to drop.
+    """
+    capacity = training_capacity(power=power)
+    generators = (
+        power.join(types, on="time_series_id")
+        .filter(pl.col("time_series_type").is_in(["PV", "Wind"]))
+        .join(capacity, on="time_series_id")
+        .filter(pl.col("capacity") > 0)
+        .with_columns(relative=pl.col("power") / pl.col("capacity"))
+        .select("time_series_id", "time_series_type", "time", "relative")
+    )
+    peers = (
+        generators.join(generators, on=["time_series_type", "time"], suffix="_peer")
+        .filter(pl.col("time_series_id") != pl.col("time_series_id_peer"))
+        .group_by("time_series_id", "time")
+        .agg(
+            peer_level=pl.col("relative_peer").median(),
+            n_peers=pl.len(),
+            relative=pl.col("relative").first(),
+        )
+    )
+    return peers.filter(
+        (pl.col("n_peers") >= RAMP_MIN_PEERS)
+        & (pl.col("relative") < DROPOUT_OWN_FRACTION)
+        & (pl.col("peer_level") > DROPOUT_PEER_FRACTION)
+    ).select("time_series_id", "time")
+
+
+def switching_days(*, power: pl.DataFrame, types: pl.DataFrame) -> pl.DataFrame:
+    """Drop runs of days on which a demand series steps away from its usual level alone.
+
+    The usual level is a centred `SWITCHING_WINDOW_DAYS`-day rolling median of the daily mean. A
+    day's deviation is its relative distance from that level. The deviation of the other demand
+    series that day, taken as their median, cancels weather and holidays. A day is a switching day
+    if the series' deviation exceeds the others' by more than `SWITCHING_EXCESS`, and only runs of
+    `SWITCHING_MIN_RUN_DAYS` or more consecutive such days are dropped. Series whose usual level is
+    under `SETTLING_LEVEL_FRACTION` of their capacity are not judged.
+
+    Args:
+        power: Readings of every series, inside the training window.
+        types: Columns `time_series_id` and `time_series_type`.
+
+    Returns:
+        The `(time_series_id, time)` pairs to drop.
+    """
+    capacity = training_capacity(power=power)
+    daily = (
+        power.join(types, on="time_series_id")
+        .filter(pl.col("time_series_type") == "Disaggregated Demand")
+        .join(capacity, on="time_series_id")
+        .with_columns(day=pl.col("time").dt.offset_by("-1m").dt.truncate("1d"))
+        .group_by("time_series_id", "day")
+        .agg(mean=pl.col("power").mean(), n=pl.len(), capacity=pl.col("capacity").first())
+        .filter(pl.col("n") >= MIN_HALF_HOURS_FOR_A_DAY)
+        .sort("time_series_id", "day")
+        .with_columns(
+            usual=pl.col("mean")
+            .rolling_median(
+                window_size=SWITCHING_WINDOW_DAYS,
+                center=True,
+                min_samples=SWITCHING_WINDOW_DAYS // 2,
+            )
+            .over("time_series_id")
+        )
+        .filter(pl.col("usual").abs() > SETTLING_LEVEL_FRACTION * pl.col("capacity"))
+        .with_columns(deviation=pl.col("mean") / pl.col("usual") - 1)
+    )
+    peers = daily.join(daily, on="day", suffix="_peer").filter(
+        pl.col("time_series_id") != pl.col("time_series_id_peer")
+    )
+    flagged = (
+        peers.group_by("time_series_id", "day")
+        .agg(
+            peer_deviation=pl.col("deviation_peer").median(),
+            deviation=pl.col("deviation").first(),
+            n_peers=pl.len(),
+        )
+        .filter(pl.col("n_peers") >= RAMP_MIN_PEERS)
+        .with_columns(
+            switching=(pl.col("deviation") - pl.col("peer_deviation")).abs() > SWITCHING_EXCESS
+        )
+        .sort("time_series_id", "day")
+        .with_columns(
+            run_id=(pl.col("switching") != pl.col("switching").shift(1))
+            .cum_sum()
+            .over("time_series_id")
+        )
+        .with_columns(run_days=pl.len().over("time_series_id", "run_id"))
+        .filter(pl.col("switching") & (pl.col("run_days") >= SWITCHING_MIN_RUN_DAYS))
+        .select("time_series_id", "day")
+    )
+    return (
+        power.with_columns(day=pl.col("time").dt.offset_by("-1m").dt.truncate("1d"))
+        .join(flagged, on=["time_series_id", "day"])
+        .select("time_series_id", "time")
+    )
+
+
 def rows_to_drop(
     *,
     rule: CleaningRule,
@@ -241,10 +420,11 @@ def rows_to_drop(
 ) -> pl.DataFrame:
     """Return the `(time_series_id, time)` pairs a named rule drops from training.
 
-    Every rule except the first-months rules judges only readings inside the training window
-    (`time >= train_start`), so a fold whose validation period precedes its training window cannot
-    leak that period into a threshold. The first-months rules need the whole history before the
-    window end, because a series is new when it first reads above zero, not when training starts.
+    Every rule except the first-months and new-meter rules judges only readings inside the
+    training window (`time >= train_start`), so a fold whose validation period precedes its
+    training window cannot leak that period into a threshold. Those two rules need the whole
+    history before the window end, because a series is new when it first reads above zero, not when
+    training starts.
 
     Args:
         rule: One of `CLEANING_RULES`.
@@ -267,6 +447,13 @@ def rows_to_drop(
         dropped = isolated_zeros(power=in_window)
     elif rule == "spikes":
         dropped = spikes(power=in_window)
+    elif rule == "new_meter_settling":
+        dropped = new_meter_settling(power=power, train_start=train_start)
+        dropped = dropped.filter(pl.col("time") >= train_start)
+    elif rule == "pv_dropouts":
+        dropped = pv_dropouts(power=in_window, types=types)
+    elif rule == "switching_days":
+        dropped = switching_days(power=in_window, types=types)
     else:
         dropped = commissioning_ramp(power=in_window, types=types)
     return dropped.unique()

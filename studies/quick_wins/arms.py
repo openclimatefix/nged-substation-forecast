@@ -170,6 +170,31 @@ CLEANING_ARMS: Final[tuple[Arm, ...]] = (
         description="Drop the days before a solar or wind farm reaches its peers' relative level.",
         cleaning="commissioning_ramp",
     ),
+    Arm(
+        name="clean_new_meter_settling",
+        family="cleaning",
+        description="Drop the 6 weeks after a meter first reads live (post hoc rule).",
+        cleaning="new_meter_settling",
+    ),
+    Arm(
+        name="clean_pv_dropouts",
+        family="cleaning",
+        description="Drop PV and wind half-hours near zero while peers produce (post hoc).",
+        cleaning="pv_dropouts",
+    ),
+    Arm(
+        name="clean_switching_days",
+        family="cleaning",
+        description="Drop runs of days a demand series steps away from its peers (post hoc).",
+        cleaning="switching_days",
+    ),
+    Arm(
+        name="clean_combined",
+        family="cleaning",
+        description="Meter settling, commissioning ramp, PV dropouts, and switching days together.",
+        cleaning="new_meter_settling",
+        extra_cleaning=("commissioning_ramp", "pv_dropouts", "switching_days"),
+    ),
 )
 
 FEATURE_ARMS: Final[tuple[Arm, ...]] = (
