@@ -1050,6 +1050,9 @@ def explainability(*, root: Path, report: Report) -> None:
 EXAMPLE_STEP_SIZE: Final[float] = 0.30
 """The planted step the example figure draws is the selection draw's step closest to this size."""
 
+PROFILE_FALLBACK_SHARE: Final[float] = 0.5
+"""An event has no seasonal profile when DSKF fell back on this share of its scored days or more."""
+
 EXAMPLE_DAYS_BEFORE: Final[int] = 30
 """How many days before the planted step the example figure starts."""
 
@@ -1116,6 +1119,96 @@ def design_facts(*, root: Path, report: Report) -> None:
     report.text(f"- record: {len(record.dates)} days")
 
 
+def events_without_profile(*, root: Path) -> set[tuple[int, int, int]]:
+    """Return the selection-draw events on which DSKF and HYST have no seasonal profile.
+
+    DSKF divides by a profile built only from earlier calendar years, so near the start of the
+    record it falls back to the static power, and HYST then holds the static power too. An event
+    is without a profile when DSKF fell back on at least half of its scored days.
+
+    Args:
+        root: The output root.
+
+    Returns:
+        (draw index, plant index, first day) of each such event.
+    """
+    events = load_events(root=root)
+    without: set[tuple[int, int, int]] = set()
+    for index, draw in enumerate(events.draws):
+        if index == 0:
+            continue
+        fell_back = scale_for(
+            root=root, estimator="DSKF", params={}, file_id=draw_id(index=index)
+        ).fallback_reason
+        for event in draw:
+            start, stop = event.scored_days
+            if float(np.mean(fell_back[event.plant, start:stop] != 0)) >= PROFILE_FALLBACK_SHARE:
+                without.add((index, event.plant, event.first_day))
+    return without
+
+
+def hyst_detection(*, root: Path, report: Report) -> None:
+    """Print how often HYST, DSKF, and KF detected planted steps, with and without a profile."""
+    events = load_events(root=root)
+    without = events_without_profile(root=root)
+    table = pl.read_parquet(root / "tables" / "posthoc_stage_a_events.parquet")
+    first_days = {
+        (index, event.plant, event.shape, event.size): event.first_day
+        for index, draw in enumerate(events.draws)
+        for event in draw
+    }
+    flagged = table.with_columns(
+        without_profile=pl.struct("draw", "plant", "shape", "size").map_elements(
+            lambda row: (
+                (
+                    row["draw"],
+                    row["plant"],
+                    first_days[(row["draw"], row["plant"], row["shape"], row["size"])],
+                )
+                in without
+            ),
+            return_dtype=pl.Boolean,
+        )
+    )
+    report.heading(f"{POSTHOC_LABEL}: HYST and DSKF detection, with and without a seasonal profile")
+    total = flagged.filter(pl.col("estimator") == "S0").height
+    report.text(
+        f"- selection-draw events: {total}; without a profile (DSKF fell back on at least "
+        f"{PROFILE_FALLBACK_SHARE:.0%} of the scored days): "
+        f"{flagged.filter((pl.col('estimator') == 'S0') & pl.col('without_profile')).height}"
+    )
+    rows = []
+    for estimator in ("HYST", "DSKF", "KF", "S0"):
+        mine = flagged.filter(pl.col("estimator") == estimator)
+        for label, part in (
+            ("all events", mine),
+            ("events with a profile", mine.filter(~pl.col("without_profile"))),
+        ):
+            steps = part.filter(pl.col("shape") == "step")
+            rows.append(
+                {
+                    "estimator": estimator,
+                    "events": label,
+                    "n_events": part.height,
+                    "mean_error": float(part["error"].mean()),  # ty: ignore[invalid-argument-type]
+                    "n_steps": steps.height,
+                    "steps_detected": int(steps["delay"].is_not_null().sum()),
+                    "steps_detected_share": float(steps["delay"].is_not_null().mean()),  # ty: ignore[invalid-argument-type]
+                }
+            )
+    report.table(pl.DataFrame(rows))
+    missed = flagged.filter(
+        (pl.col("estimator") == "HYST")
+        & (pl.col("shape") == "step")
+        & pl.col("delay").is_null()
+        & ~pl.col("without_profile")
+    )
+    report.text(
+        f"- HYST steps missed although a profile existed: {missed.height}, with sizes "
+        f"{', '.join(f'{size:.0%}' for size in sorted(missed['size'].to_list()))}"
+    )
+
+
 def example_event(*, root: Path, report: Report) -> None:
     """Print and save one planted step, and every estimator's scale ratio across it.
 
@@ -1125,12 +1218,13 @@ def example_event(*, root: Path, report: Report) -> None:
     """
     events = load_events(root=root)
     days = len(record_for(root=root, record_id="original").dates)
+    without = events_without_profile(root=root)
     candidates = [
         (abs(event.size - EXAMPLE_STEP_SIZE), index, event)
         for index, draw in enumerate(events.draws)
         if index > 0
         for event in draw
-        if event.shape == "step"
+        if event.shape == "step" and (index, event.plant, event.first_day) not in without
     ]
     _, draw_index, event = min(candidates, key=lambda item: (item[0], item[1]))
     first, last = event.first_day - EXAMPLE_DAYS_BEFORE, event.scored_days[1]
@@ -1160,7 +1254,8 @@ def example_event(*, root: Path, report: Report) -> None:
     table.write_parquet(path)
     report.heading("Example planted step (the figure of one planted step)")
     report.text(
-        f"- rule: the selection draw's step closest to {EXAMPLE_STEP_SIZE:.0%}; this one is a "
+        f"- rule: the selection draw's step closest to {EXAMPLE_STEP_SIZE:.0%} among those with a "
+        f"seasonal profile (see the HYST detection section); this one is a "
         f"{event.size:.1%} loss lasting {event.month_days} days, from draw {draw_index}; days "
         f"are counted from its first day, and its plant is not named"
     )
@@ -1247,6 +1342,7 @@ def main() -> int:
     explainability(root=root, report=report)
     constants(report=report)
     design_facts(root=root, report=report)
+    hyst_detection(root=root, report=report)
     example_event(root=root, report=report)
     kf_seasonal_shape(root=root, report=report)
     path.write_text("\n".join(report.lines) + "\n")
