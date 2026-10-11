@@ -423,7 +423,7 @@ estimation (checked). Verification: the CLAUDE.md set, `pytest --run-studies` wi
 
 **Limitations the page states:** training rows are divided by the estimate of their own day, which
 for a window estimator reads the power of earlier held-out months; that is not leakage into the
-scored row, because each training row predicts only its own power, but it is a stated limitation.
+scored row, because each training row predicts only its own power, but it is a stated limitation. KF, CX1, and CX2 still sat at their grid edges on the tuning draw, because tuning rewards agility on recovery error, and the selection phase's false-movement gate penalises that agility.
 The ANM plant's reference-year calibration rests on about 8 sampled days from 2 months (October and
 November 2024), and NR's neighbour mean includes the ANM plant, whose export-capped hours are
 removed. The constant-scale assertion's tolerance is 1e-3 points, not 1e-4, because 500 boosting
