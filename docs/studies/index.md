@@ -175,6 +175,11 @@ a
   estimator exists to repair. The Kalman filter recovered a planted capacity loss best of 13
   estimators but chased the December low in its own level, and a post hoc rule that holds the static
   capacity until a drop lasts 7 days did not raise the error.
+- [Can a language model label a solar plant's capacity changes?](forecasts/llm-capacity-labeller.md)
+  — with six deterministic evidence tools, Claude Sonnet 5.5 found 0 of 32 planted one-month losses
+  and the 30% positive control failed its gate, so the planned contrasts are untested. In post hoc
+  rounds with an amended check, it hit 18 of 129 one-month losses (14%) and every one of 12 losses
+  of 60% lasting 90 days, against 13 of 129 and 1 of 12 for a fixed rule.
 - [Which IFS forecast variables, or which second forecast, help a solar power
   forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, no planned step of adding
   extra variables from ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved
