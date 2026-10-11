@@ -308,7 +308,8 @@ def dot_interval_panel(
     labels = list(order) if order is not None else rows["label"].to_list()
     thick = "thick_lower" in rows.columns
     if log_floor is not None:
-        rows = rows.with_columns(pl.col("value", "lower", "upper").clip(lower_bound=log_floor))
+        clipped = ["value", "lower", "upper", *(["thick_lower", "thick_upper"] if thick else [])]
+        rows = rows.with_columns(pl.col(clipped).clip(lower_bound=log_floor))
         reference_rules = [max(rule, log_floor) for rule in reference_rules]
         domain = [log_floor, float(rows["upper"].max()) * 1.5]  # ty: ignore[invalid-argument-type]
         scale = alt.Scale(type="log", domain=domain, nice=False)
@@ -717,18 +718,25 @@ def figure_stepwise(
         title="Error of each variable set, with the interval of each step from the row below",
         subtitle=[
             scope,
-            "Purple dot: the mean absolute error of that variable set (% of capacity; lower is",
-            "better).",
+            (
+                "Purple dot: the mean absolute error of that variable set (% of capacity; smaller "
+                "is better)."
+            ),
             "Hollow diamond: the error of the row below, which is the zero of this row's step.",
-            "Thin purple line on G0: 95% interval of G0's own error. Orange line on every other",
-            "row: 95% interval of that step alone, from resampling whole months, drawn from the",
-            "diamond.",
-            "An orange line is not the uncertainty of its dot's position.",
-            "A minus sign in the right column means the error fell. A step depends on the order in",
-            "which the groups were added.",
+            (
+                "Thin purple line on G0: 95% interval of G0's own error. Orange line on every "
+                "other row: 95% interval of that step alone, from resampling whole months, drawn "
+                "from the diamond. An orange line is not the uncertainty of its dot's position."
+            ),
+            (
+                "A minus sign in the right column means the error fell. A step depends on the "
+                "order in which the groups were added."
+            ),
             *ARM_KEY_LINES[:-1],
-            "The G1 step was planned in advance. Every other step is exploratory and not corrected",
-            "for multiple comparisons.",
+            (
+                "The G1 step was planned in advance. Every other step is exploratory and not "
+                "corrected for multiple comparisons."
+            ),
         ],
         figure_planning=None,
     )
@@ -1067,8 +1075,11 @@ def figure_importance(*, shares: pl.DataFrame, target: TargetType, scope: str) -
             "input, not the CAMS target).",
             f"Dashed rule, first panel: the largest shuffled copy's share ({noise_line:.1f}%).",
             "Share of total gain: how much of the model's fit a column accounts for.",
-            "The first two panels use a log scale: each gridline is 10 times the one before, and a",
-            f"share below {IMPORTANCE_LOG_FLOOR:g}% is drawn at {IMPORTANCE_LOG_FLOOR:g}%.",
+            (
+                "The first two panels use a log scale, with gridlines at 1, 2, and 5 times each "
+                f"power of ten. A share below {IMPORTANCE_LOG_FLOOR:g}% is drawn at "
+                f"{IMPORTANCE_LOG_FLOOR:g}%."
+            ),
             "Shuffled copies are the same columns shuffled across hours, so they show the share",
             "that noise alone earns. Gain is measured on the training data and splits credit",
             "between correlated columns.",
