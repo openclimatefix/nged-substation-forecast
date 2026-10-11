@@ -365,6 +365,9 @@ def main() -> int:
     named: tuple[str, ...] | None = (
         None if arguments.sensitivity_arms is None else tuple(arguments.sensitivity_arms)
     )
+    if view == "extra_sensitivity" and named is not None and arguments.arms is not None:
+        msg = "in the extra_sensitivity view, give --sensitivity-arms or --arms, not both"
+        raise ValueError(msg)
     extra = () if view == "extra_sensitivity" or named is None else named
     only_arms = arguments.arms
     if view == "extra_sensitivity" and only_arms is None:
