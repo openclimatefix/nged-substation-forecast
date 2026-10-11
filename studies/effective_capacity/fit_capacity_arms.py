@@ -298,12 +298,13 @@ def check_months_covered(
     """Raise if a scored month is absent from the frame, or a planted plant-month has no row.
 
     A plant may lack rows in a scored month the frame never held for it (the active-network-
-    management plant has none in 2 of the 18 months), but no planted loss may fall there.
+    management plant has none in 2 of the 18 months), but no planted control step may fall there.
 
     Args:
         frame: The lag frame.
         scored_months: The 18 scored months.
-        planted: `planted_plant_months`' result over every draw and the control.
+        planted: `planted_plant_months`' result over the positive control's steps, the only planted
+            losses Stage B fits.
         sites: The record's plant labels, in index order.
         smoke: Whether the frame is a smoke sample, where only the month list is checked.
 
@@ -356,9 +357,7 @@ def main() -> int:  # noqa: PLR0915
     check_months_covered(
         frame=frame,
         scored_months=events.scored_months,
-        planted=planted_plant_months(
-            events=[e for draw in events.draws for e in draw] + events.control, dates=record.dates
-        ),
+        planted=planted_plant_months(events=events.control, dates=record.dates),
         sites=tuple(record.sites),
         smoke=arguments.smoke,
     )
