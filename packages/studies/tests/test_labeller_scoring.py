@@ -110,9 +110,7 @@ def test_answers_without_knots_scale_to_the_static_power() -> None:
     assert np.allclose(scale.scale_mw, record.static_p99_mw[:, None])
 
 
-def test_the_bootstrap_interval_excludes_zero_for_a_clear_difference_and_includes_it_for_noise() -> (
-    None
-):
+def test_the_bootstrap_interval_excludes_zero_for_a_clear_difference_not_for_noise() -> None:
     rng = np.random.default_rng(0)
     clear = -0.03 + 0.005 * rng.standard_normal((33, 2))
     mean, lower, upper = event_bootstrap_interval(differences=clear, confidence=0.975, seed=1)
@@ -135,3 +133,15 @@ def test_the_synthetic_null_record_keeps_the_gaps_and_resamples_the_quiet_days()
     again = synthetic_null_record(record=record, windows=windows, seed=3)
     assert np.array_equal(null.power_mw, again.power_mw, equal_nan=True)
     assert isinstance(pl.DataFrame(), pl.DataFrame)
+
+
+def test_movement_counts_days_away_from_the_trailing_median_and_resamples_windows() -> None:
+    from studies.labeller_scoring import movement_by_window, movement_interval
+
+    scale = np.full((1, 300), 10.0)
+    scale[0, 200:210] = 8.0
+    counts = movement_by_window(windows=[(0, 195, 20), (0, 100, 20)], scale_mw=scale)
+    assert counts.tolist() == [[10.0, 20.0], [0.0, 20.0]]
+    share, lower, upper = movement_interval(per_window=counts, confidence=0.975, seed=1)
+    assert share == 0.25
+    assert lower <= share <= upper

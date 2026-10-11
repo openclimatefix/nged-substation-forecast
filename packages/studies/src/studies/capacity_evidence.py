@@ -283,7 +283,7 @@ def clear_sky_ratio(
         little modelled output.
     """
     usable = _usable_hours(record=record, plant=plant, bad_day=bad_day)
-    with np.errstate(invalid="ignore", divide="ignore"):
+    with np.errstate(all="ignore"):
         index = record.cams_ghi_w_m2[plant] / record.clear_sky_w_m2[plant]
     clear = usable & (index >= CLEAR_SKY_INDEX_MINIMUM)
     top = np.where(clear, record.power_mw[plant], 0.0).sum(axis=1)

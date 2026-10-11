@@ -83,9 +83,7 @@ def test_a_knot_at_one_point_two_times_the_static_power_fails_the_bounds() -> No
     assert check_bounds(knots=(_knot(index=5, capacity=1.9),), static_p99_mw=STATIC)
 
 
-def test_a_twenty_percent_step_fails_against_a_five_percent_candidate_and_passes_against_twenty() -> (
-    None
-):
+def test_a_twenty_percent_step_fails_against_a_five_percent_candidate_not_a_twenty_one() -> None:
     knots = (_knot(index=99, capacity=10.0), _knot(index=100, capacity=8.0))
     small = _evidence(changes=(_change(index=100, size=-0.05),))
     matching = _evidence(changes=(_change(index=102, size=-0.19),))

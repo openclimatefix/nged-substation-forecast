@@ -28,9 +28,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Final, Protocol
-
-from contracts.settings import PROJECT_ROOT
+from typing import Final, Protocol, Self
 
 from studies.capacity_labeller import (
     Answer,
@@ -39,6 +37,7 @@ from studies.capacity_labeller import (
     cache_key,
     parse_answer,
 )
+from studies.sources import REPO_DATA_DIR
 
 COST_CEILING_USD: Final[float] = 15.0
 """The most the run may spend, in US dollars, as the command-line tool reports cost."""
@@ -310,6 +309,31 @@ class BudgetGuard:
     input_tokens: int = 0
     largest_call_usd: float = field(default=0.0)
 
+    @classmethod
+    def from_log(cls, *, log_path: Path) -> Self:
+        """Start a guard from what an earlier run already spent, so a resumed run cannot overspend.
+
+        Args:
+            log_path: The call log, which may not exist yet.
+
+        Returns:
+            A guard whose totals are the log's cost, calls, input tokens, and largest cost.
+        """
+        guard = cls()
+        if log_path.exists():
+            for line in log_path.read_text().splitlines():
+                entry = json.loads(line)
+                guard.record(
+                    reply=ModelReply(
+                        text="",
+                        input_tokens=int(entry["input_tokens"]),
+                        output_tokens=int(entry["output_tokens"]),
+                        cost_usd=float(entry["cost_usd"]),
+                        model=str(entry["model"]),
+                    )
+                )
+        return guard
+
     def check(self, *, prompt: Prompt) -> None:
         """Raise before a call that could cross a ceiling.
 
@@ -351,7 +375,7 @@ class BudgetGuard:
 
 
 def assert_under_data(*, path: Path) -> None:
-    """Raise unless a path lies under the project's `data/` directory.
+    """Raise unless a path lies under the repository's `data/` directory (`REPO_DATA_DIR`).
 
     Args:
         path: The path.
@@ -360,8 +384,8 @@ def assert_under_data(*, path: Path) -> None:
         ValueError: If the path is elsewhere, because the log pairs plant letters with dates and
             must stay in the private data store.
     """
-    if (PROJECT_ROOT / "data").resolve() not in path.resolve().parents:
-        msg = f"{path} is not under {PROJECT_ROOT / 'data'}; the labeller log must stay there"
+    if REPO_DATA_DIR.resolve() not in path.resolve().parents:
+        msg = f"{path} is not under {REPO_DATA_DIR}; the labeller log must stay there"
         raise ValueError(msg)
 
 

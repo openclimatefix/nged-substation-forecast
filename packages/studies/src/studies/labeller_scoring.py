@@ -359,3 +359,60 @@ def synthetic_null_record(
         synthetic = np.clip(modelled * (1.0 + np.nan_to_num(chosen, nan=0.0)), 0.0, None)
         power[plant] = np.where(np.isfinite(record.power_mw[plant]), synthetic, np.nan)
     return record.with_power(power_mw=power)
+
+
+MOVEMENT_THRESHOLD: Final[float] = 0.05
+"""A day moves when the capacity is more than this share from its trailing median."""
+
+MOVEMENT_TRAILING_DAYS: Final[int] = 90
+"""The trailing days whose median a day's capacity is compared with."""
+
+
+def movement_by_window(
+    *, windows: Sequence[tuple[int, int, int]], scale_mw: np.ndarray
+) -> np.ndarray:
+    """Count, per quiet plant-month, the days whose capacity moves from its trailing median.
+
+    The rule is `studies.capacity_recovery.false_movement_share`'s, without its fallback clause
+    (a knot series has no fallback), so the first study's gate and threshold carry over.
+
+    Args:
+        windows: The quiet plant-months as (plant, first day, number of days) triples.
+        scale_mw: The capacity on each day, shape (plants, days).
+
+    Returns:
+        An array of shape (windows, 2): days that moved, and days in the window.
+    """
+    rows = []
+    for plant, first, length in windows:
+        series = scale_mw[plant]
+        moved = 0
+        for day in range(first, first + length):
+            trailing = float(np.median(series[day - MOVEMENT_TRAILING_DAYS : day]))
+            moved += int(abs(series[day] / trailing - 1.0) > MOVEMENT_THRESHOLD)
+        rows.append((moved, length))
+    return np.array(rows, dtype=float)
+
+
+def movement_interval(
+    *, per_window: np.ndarray, confidence: float, seed: int, resamples: int = BOOTSTRAP_RESAMPLES
+) -> tuple[float, float, float]:
+    """Return the false-movement share and its interval from resampling the plant-months.
+
+    Args:
+        per_window: `movement_by_window`'s result, optionally stacked over samples as shape
+            (samples, windows, 2) and averaged by the caller into (windows, 2).
+        confidence: The two-sided coverage.
+        seed: The generator's seed.
+        resamples: The number of resamples.
+
+    Returns:
+        The share, then the lower and upper ends of the interval.
+    """
+    rng = np.random.default_rng(seed)
+    count = len(per_window)
+    picks = rng.integers(0, count, size=(resamples, count))
+    shares = per_window[picks, 0].sum(axis=1) / per_window[picks, 1].sum(axis=1)
+    tail = (1.0 - confidence) / 2.0
+    lower, upper = np.quantile(shares, [tail, 1.0 - tail])
+    return float(per_window[:, 0].sum() / per_window[:, 1].sum()), float(lower), float(upper)

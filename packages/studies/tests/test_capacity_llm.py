@@ -5,7 +5,6 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-import studies.capacity_llm as capacity_llm
 from studies.capacity_labeller import AnswerError, Prompt, build_prompt
 from studies.capacity_llm import (
     BudgetExceeded,
@@ -20,6 +19,8 @@ from studies.capacity_llm import (
     parse_stream,
     stream_message,
 )
+
+from studies import capacity_llm
 
 FIRST = date(2024, 1, 1)
 LAST = date(2024, 12, 31)
@@ -127,7 +128,7 @@ def test_the_command_disables_every_tool_and_every_source_of_instructions() -> N
 
 @pytest.fixture
 def data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setattr(capacity_llm, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(capacity_llm, "REPO_DATA_DIR", tmp_path / "data")
     (tmp_path / "data").mkdir()
     return tmp_path / "data"
 

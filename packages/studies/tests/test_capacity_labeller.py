@@ -36,7 +36,7 @@ def _knot(*, day: date, capacity: float, cause: str = "degradation") -> dict[str
 def _reply(
     *, knots: list[dict[str, object]], no_change: bool | None = None, plant: str = "A"
 ) -> str:
-    import json  # noqa: PLC0415
+    import json
 
     return json.dumps(
         {
