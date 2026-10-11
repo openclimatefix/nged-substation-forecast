@@ -167,6 +167,14 @@ a
   a planted power loss that weekly statistics or satellite irradiance partly recover, and the gains
   of those inputs came mostly from one plant's low-output months in the training data. At lead days
   10 to 14, blending the baseline with an earlier-years climatology beat every lag arm.
+- [Is a daily capacity estimate worth building for day-ahead solar
+  forecasts?](forecasts/effective-capacity.md) — at 6 solar plants over 18 months, dividing power
+  by a Kalman filter's daily estimate of each plant's capacity raised the day-ahead error by 0.255
+  points of capacity [+0.004, +0.563] against a baseline of 8.93, so the study plan's rule reads
+  "not worth building", although only 3 of 106 plant-months are the low-output kind of loss that an
+  estimator exists to repair. The Kalman filter recovered a planted capacity loss best of 13
+  estimators but chased the December low in its own level, and a post hoc rule that holds the static
+  capacity until a drop lasts 7 days did not raise the error.
 - [Which IFS forecast variables, or which second forecast, help a solar power
   forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, no planned step of adding
   extra variables from ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved
