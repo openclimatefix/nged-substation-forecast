@@ -69,6 +69,7 @@ from ifs_ladder_arms import (
     ERA5_P4_RESULTS_NAME,
     ERA5_PREFIX,
     F6_ARM,
+    FP_EXTRA_CONTRASTS,
     METRIC,
     PLANNED_CONTRAST_COUNT,
     PLANNED_CONTRASTS,
@@ -314,6 +315,13 @@ class Fits:
                 self.losses[("ladder", "pv", lead_day)] = merge_extra_arms(
                     main=self.losses[("ladder", "pv", lead_day)], extra=extra
                 )
+        self.fp_extra: dict[int, pl.DataFrame] = {}
+        for lead_day in PLANNED_LEAD_DAYS:
+            key = FitKey(view="fp_extra", lead_day=lead_day, target="pv")
+            fp_extra = read_losses(key=key)
+            if fp_extra is not None:
+                self.fp_extra[lead_day] = fp_extra
+                self.arms[("fp_extra", "pv", lead_day)] = json.loads(arms_path(key=key).read_text())
         for lead_day in LEAD_DAYS:
             if lead_day_dataset_path(lead_day=lead_day).exists():
                 self.datasets[lead_day] = pl.read_parquet(lead_day_dataset_path(lead_day=lead_day))
@@ -354,6 +362,39 @@ class Fits:
                 day: pl.concat(
                     [ens[day], blend[day].filter(pl.col("arm") == "f0").select(ens[day].columns)],
                     how="vertical_relaxed",
+                )
+                for day in lead_days
+            }
+        )
+
+    def fp_with_cloud(self, *, lead_days: Sequence[int]) -> pl.DataFrame | None:
+        """Return the stacked losses of `fp`, `fp_f1`, and `fp_f2`, at both settings.
+
+        The `fp_extra` view holds `fp_f1` and `fp_f2` at both settings and `fp` at the second
+        setting. The `ladder` view holds `fp` at the main setting, on the same rows. The ladder
+        view's losses are left as they are, so no pre-existing contrast sees the new fits.
+
+        Args:
+            lead_days: The lead days to stack.
+
+        Returns:
+            The stacked losses, or `None` if the `fp_extra` view was not fitted.
+
+        Raises:
+            ValueError: If some but not all of the lead days were fitted in either view.
+        """
+        extra = {day: self.fp_extra[day] for day in lead_days if day in self.fp_extra}
+        if not extra:
+            return None
+        main = self.get(view="ladder", target="pv", lead_days=lead_days)
+        missing = sorted(set(lead_days) - set(extra)) + sorted(set(lead_days) - set(main))
+        if missing:
+            msg = f"lead days {missing} are not fitted in the fp_extra or the ladder view"
+            raise ValueError(msg)
+        return stack_lead_days(
+            losses_by_lead_day={
+                day: merge_extra_arms(
+                    main=main[day].filter(pl.col("arm") == PRODUCTION_ARM), extra=extra[day]
                 )
                 for day in lead_days
             }
@@ -633,6 +674,37 @@ def blend_without_winter_rows(*, fits: Fits) -> list[dict[str, object]]:
     return rows
 
 
+def fp_cloud_rows(*, fits: Fits) -> list[dict[str, object]]:
+    """Compute the post hoc cloud contrasts that add to the production reference.
+
+    Pooled over lead days 1 to 3 the rows carry the 95% and the 99% interval; each lead day alone
+    carries the 95% interval. The family is `fp_cloud`. The contrasts have no matched negative
+    control, and are exploratory.
+
+    Args:
+        fits: Every fit.
+
+    Returns:
+        The rows at both settings, or no rows if the `fp_extra` view was not fitted.
+    """
+    rows: list[dict[str, object]] = []
+    scopes: list[tuple[str, Sequence[int]]] = [
+        ("pooled 1-3", PLANNED_LEAD_DAYS),
+        *((f"lead day {day}", (day,)) for day in PLANNED_LEAD_DAYS),
+    ]
+    for scope, days in scopes:
+        add_pairs(
+            rows=rows,
+            losses=fits.fp_with_cloud(lead_days=days),
+            target="pv",
+            family="fp_cloud",
+            scope=scope,
+            pairs=FP_EXTRA_CONTRASTS,
+            adjusted=scope == "pooled 1-3",
+        )
+    return rows
+
+
 def post_hoc_rows(*, fits: Fits) -> list[dict[str, object]]:
     """Compute the production-relevant contrasts, which were added after the first review.
 
@@ -874,7 +946,7 @@ def settings_verdict(
 
     Args:
         contrasts: The contrast table.
-        family: `planned` or `planned_control`.
+        family: `planned`, `planned_control`, or `fp_cloud`.
         treatment: The treatment arm.
         reference: The reference arm or control.
 
@@ -2207,6 +2279,118 @@ def render_post_hoc_production(*, fits: Fits, contrasts: pl.DataFrame) -> list[s
     return lines
 
 
+def render_fp_cloud(*, fits: Fits, contrasts: pl.DataFrame) -> list[str]:
+    """Render the post hoc cloud arms that add to the production reference.
+
+    Args:
+        fits: Every fit.
+        contrasts: The contrast table.
+
+    Returns:
+        The section's lines, or a line saying the analysis is not yet fitted.
+    """
+    lines = [
+        "## Which cloud group to add to the production reference (post hoc, exploratory)",
+        "",
+        (
+            "`fp` is the minimal set plus the four variables the production ensemble feed carries. "
+            "`fp_f1` adds total cloud cover to `fp`, and `fp_f2` adds total cloud cover and the "
+            "three cloud layers (low, middle, high). `fp_f1` is a strict subset of `fp_f2`, so "
+            "`fp_f2` minus `fp_f1` is the effect of the three layers alone. The arms hold 1 and 4 "
+            "more columns than `fp`, and have no matched negative control, so a gain cannot be "
+            "told apart from what extra columns produce from nothing (the controls of P1 and P2 "
+            "measure that for the ladder arms). The three contrasts were added after the first "
+            "scientific review, are post hoc and exploratory, and are read by the plan's verdict "
+            "formula for information only. A negative difference is a gain."
+        ),
+        "",
+    ]
+    stacked = fits.fp_with_cloud(lead_days=PLANNED_LEAD_DAYS)
+    if stacked is None:
+        return [*lines, f"{POST_HOC_NOT_FITTED}: losses_ladder_fp_extra_lead_day_*_pv.parquet.", ""]
+    errors = (
+        stacked.group_by("arm", "setting", "lead_day")
+        .agg(pl.col(METRIC).mean())
+        .sort("arm", "setting", "lead_day")
+    )
+    lines += [
+        "### Mean absolute error of each arm (points of capacity)",
+        "",
+        table(
+            rows=[
+                [str(row["arm"]), str(row["setting"]), str(row["lead_day"]), points(row[METRIC])]
+                for row in errors.iter_rows(named=True)
+            ],
+            header=["arm", "setting", "lead day", "mean absolute error"],
+        ),
+        "",
+        "### Contrasts (points of capacity; the 99% interval is given for the pooled scope)",
+        "",
+    ]
+    rows = []
+    for treatment, reference in FP_EXTRA_CONTRASTS:
+        for scope in ("pooled 1-3", *(f"lead day {day}" for day in PLANNED_LEAD_DAYS)):
+            for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING):
+                row = one_row(
+                    contrasts=contrasts,
+                    family="fp_cloud",
+                    treatment=treatment,
+                    reference=reference,
+                    setting=setting,
+                    scope=scope,
+                )
+                if row is None:
+                    continue
+                pooled = scope == "pooled 1-3"
+                rows.append(
+                    [
+                        f"{treatment} minus {reference}",
+                        scope,
+                        setting,
+                        points(row["difference"], signed=True),  # ty: ignore[invalid-argument-type]
+                        interval(row["lower_95"], row["upper_95"]),  # ty: ignore[invalid-argument-type]
+                        interval(row["lower_adjusted"], row["upper_adjusted"])  # ty: ignore[invalid-argument-type]
+                        if pooled
+                        else "n/a",
+                        str(row["verdict_adjusted"]) if pooled else "n/a",
+                    ]
+                )
+    lines += [
+        table(
+            rows=rows,
+            header=[
+                "contrast",
+                "scope",
+                "setting",
+                "difference (points)",
+                "95% interval",
+                f"{ADJUSTED_LEVEL_PERCENT:g}% interval",
+                "verdict at 99% (smallest effect 0.1 points)",
+            ],
+        ),
+        "",
+        "### Verdicts by the plan's formula, both settings combined (post hoc, for information)",
+        "",
+        table(
+            rows=[
+                [
+                    f"{treatment} minus {reference}",
+                    settings_verdict(
+                        contrasts=contrasts,
+                        family="fp_cloud",
+                        treatment=treatment,
+                        reference=reference,
+                    ),
+                ]
+                for treatment, reference in FP_EXTRA_CONTRASTS
+            ],
+            header=["contrast", "verdict at both settings"],
+        ),
+        "",
+    ]
+    return lines
+
+
 def render_by_fold(*, fits: Fits, contrasts: pl.DataFrame) -> list[str]:
     """Render P4 and P5 by blend fold, and pooled and by lead day without the winter fold.
 
@@ -2448,6 +2632,7 @@ def render_arms(*, fits: Fits) -> list[str]:
         ("ladder", "pv", 5),
         ("ladder", "cams", 1),
         ("blend", "pv", 1),
+        ("fp_extra", "pv", 1),
     ):
         info = fits.arms.get((view, target, lead_day))
         if info is None:
@@ -2818,6 +3003,8 @@ def render_report(
         render_contrasts(contrasts=contrasts, families=["planned", "planned_control"]),
         *render_post_hoc_production(fits=fits, contrasts=contrasts),
         "",
+        *render_fp_cloud(fits=fits, contrasts=contrasts),
+        "",
         *render_by_fold(fits=fits, contrasts=contrasts),
         "",
         *render_raw_errors(fits=fits),
@@ -2905,6 +3092,7 @@ def report_refit_needed() -> int:
     print("build:  ifs_ladder_build_dataset.py --ens-only")
     print("fit:    ifs_ladder_fit.py --view ens --lead-days 1 2 3")
     print("fit:    ifs_ladder_fit.py --view extra_sensitivity --lead-days 1 2 3")
+    print("fit:    ifs_ladder_fit.py --view fp_extra --lead-days 1 2 3")
     return 0
 
 
@@ -2937,6 +3125,7 @@ def main() -> int:
         *planned_rows(fits=fits),
         *exploratory_rows(fits=fits),
         *post_hoc_rows(fits=fits),
+        *fp_cloud_rows(fits=fits),
         *era5_p4_rows(),
     ]
     contrasts = pl.DataFrame(contrast_rows, infer_schema_length=None)

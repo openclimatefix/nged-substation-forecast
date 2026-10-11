@@ -53,6 +53,8 @@ from ifs_ladder_arms import (
     DROP_PREFIX,
     ERA5_COMPARISON_LEAD_DAY,
     F6_ARM,
+    FP_F1_ARM,
+    FP_F2_ARM,
     IFS_FIGURE_NUMBERS,
     PLANNED_CONTRASTS,
     POSITIVE_CONTROL_ARM,
@@ -1218,6 +1220,185 @@ def figure_stepwise(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     )
 
 
+FP_CLOUD_VALUE_COLUMN_PX: Final[int] = 200
+"""The width of the right-hand text column of the FP cloud figure, wide enough for a unit."""
+
+FP_CLOUD_RUNGS: Final[tuple[str, ...]] = (PRODUCTION_ARM, FP_F1_ARM, FP_F2_ARM)
+"""The rows of the FP cloud figure from bottom to top: FP, then FP plus each cloud group."""
+
+
+def figure_fp_cloud(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin:
+    """Draw FP and two FP-plus-cloud variable sets, with each step's interval from the row below.
+
+    The main setting's pooled error is a purple dot and the second setting's a hollow ring on the
+    same row. Each step's 95% interval, at the main setting, is drawn from the row below's dot.
+
+    Args:
+        contrasts: The report's contrast table.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure.
+
+    Raises:
+        ValueError: If a step is missing at either setting, or the steps do not chain.
+    """
+    pairs = list(zip(FP_CLOUD_RUNGS[1:], FP_CLOUD_RUNGS[:-1], strict=True))
+    scale = PERCENTAGE_POINTS
+    by_setting: dict[str, pl.DataFrame] = {
+        setting: pick(
+            contrasts=contrasts,
+            family="fp_cloud",
+            pairs=pairs,
+            scope=STEPWISE_SCOPE,
+            setting=setting,
+        )
+        for setting in (PRIMARY_SETTING, SENSITIVITY_SETTING)
+    }
+    levels: dict[str, list[float]] = {}
+    for setting, found in by_setting.items():
+        level = found["reference_mean"][0] * scale
+        levels[setting] = [level]
+        for row in found.iter_rows(named=True):
+            if abs(row["reference_mean"] * scale - levels[setting][-1]) > 1e-4:
+                msg = f"the {setting} steps do not chain: {row['treatment']} - {row['reference']}"
+                raise ValueError(msg)
+            levels[setting].append(levels[setting][-1] + row["difference"] * scale)
+    main = by_setting[PRIMARY_SETTING]
+    labels = [ARM_LABELS[rung] for rung in FP_CLOUD_RUNGS]
+    steps_only = pl.DataFrame(
+        {
+            "label": labels[1:],
+            "reference": levels[PRIMARY_SETTING][:-1],
+            "lower": [
+                ref + low * scale
+                for ref, low in zip(levels[PRIMARY_SETTING][:-1], main["lower_95"], strict=True)
+            ],
+            "upper": [
+                ref + up * scale
+                for ref, up in zip(levels[PRIMARY_SETTING][:-1], main["upper_95"], strict=True)
+            ],
+        }
+    )
+    texts = [f"{levels[PRIMARY_SETTING][0]:.2f}% of capacity"] + [
+        f"{_signed(row['difference'] * scale)} pts "
+        f"[{_signed(row['lower_95'] * scale)}, {_signed(row['upper_95'] * scale)}]"
+        for row in main.iter_rows(named=True)
+    ]
+    dots = pl.DataFrame({"label": labels, "value": levels[PRIMARY_SETTING], "text": texts})
+    rings = pl.DataFrame({"label": labels, "value": levels[SENSITIVITY_SETTING]})
+    connectors = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "x": [reference] * 2,
+                    "label": [labels[index], labels[index + 1]],
+                    "order": [0, 1],
+                    "group": [index] * 2,
+                }
+            )
+            for index, reference in enumerate(levels[PRIMARY_SETTING][:-1])
+        ]
+    )
+    domain = _domain(
+        values=[
+            *steps_only["lower"].to_list(),
+            *steps_only["upper"].to_list(),
+            *levels[PRIMARY_SETTING],
+            *levels[SENSITIVITY_SETTING],
+        ]
+    )
+    scale_x = alt.Scale(domain=domain, nice=False, zero=False)
+    axis_title = "Mean absolute error (% of capacity; smaller is better)"
+    x_axis = alt.Axis(tickCount=4)
+    y = alt.Y(
+        "label:N",
+        sort=list(reversed(labels)),
+        title=None,
+        axis=alt.Axis(labelLimit=LABEL_WIDTH_PX, labelPadding=6, domain=False, ticks=False),
+    )
+    layers = [
+        alt.Chart(connectors)
+        .mark_line(color=ocf.TEXT, strokeDash=[2, 3], strokeWidth=1, opacity=0.6, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=scale_x, title=axis_title, axis=x_axis),
+            y=y,
+            detail="group:N",
+            order="order:Q",
+        ),
+        alt.Chart(steps_only)
+        .mark_rule(strokeWidth=3.5, color=ocf.BRAND_ORANGE, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title, axis=x_axis), x2="upper:Q"
+        ),
+        alt.Chart(dots)
+        .mark_point(filled=True, size=70, opacity=1, color=ocf.DATA_PURPLE, aria=False)
+        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title, axis=x_axis)),  # ty: ignore[unresolved-attribute]
+        alt.Chart(rings)
+        .mark_point(
+            filled=False, size=70, strokeWidth=1.5, color=ocf.DATA_PURPLE, yOffset=9, aria=False
+        )
+        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title, axis=x_axis)),  # ty: ignore[unresolved-attribute]
+        alt.Chart(dots.with_columns(x=pl.lit(domain[1])))
+        .mark_text(
+            align="left",
+            dx=10,
+            fontSize=10,
+            font="monospace",
+            color=ocf.TEXT,
+            clip=False,
+            aria=False,
+        )
+        .encode(y=y, x=alt.X("x:Q", scale=scale_x), text="text:N"),  # ty: ignore[unresolved-attribute]
+    ]
+    panel = alt.layer(*layers).properties(
+        width=PLOT_WIDTH_PX - FP_CLOUD_VALUE_COLUMN_PX,
+        height=ROW_HEIGHT_PX * len(labels),
+        title=alt.TitleParams(
+            [
+                "Each row adds one cloud group to the row below.",
+                "Right column: each step in points (pts) of capacity, with its 95% interval.",
+                "FP shows its own error.",
+            ],
+            anchor="start",
+            fontSize=ocf.font_size(style="Body Large", body_px=11),
+        ),
+    )
+    return figure(
+        panels=[panel],
+        number="9b",
+        title="Error of the production reference with total cloud and cloud layers added",
+        subtitle=[
+            scope,
+            (
+                "Post hoc, exploratory: added after the first results, with no negative control. "
+                "Not corrected for multiple comparisons."
+            ),
+            (
+                "Filled purple dot: mean absolute error with the main XGBoost model settings, "
+                "pooled over lead days 1 to 3. Hollow ring, drawn just under its row's dot: the "
+                "same with the second settings, a check that the result does not depend on them."
+            ),
+            (
+                "Orange line: 95% interval of that step alone at the main settings, from "
+                "resampling whole months, drawn from the row below's dot, which is the step's "
+                "zero. The page's verdicts use 99% intervals, given in its text."
+            ),
+            (
+                "A minus sign in the right column means the error fell. The axis does not start "
+                "at zero. Each added row has more input variables: FP has 13, FP + total cloud 14, "
+                "FP + total cloud + layers 17."
+            ),
+            PRODUCTION_KEY,
+            (
+                "Total cloud: the model also gets total cloud cover. Layers: it also gets low, "
+                "mid, and high cloud cover, which ECMWF's free open-data feed does not carry."
+            ),
+        ],
+        figure_planning=None,
+    )
+
+
 def figure_era5_against_ifs(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin:
     """Draw ERA5's gain from each group beside IFS's gain, at lead day 1, on the same rows.
 
@@ -1784,6 +1965,11 @@ def main() -> int:
             "stepwise",
             not contrasts.is_empty(),
             lambda: figure_stepwise(contrasts=contrasts, scope=scope),
+        ),
+        (
+            "fp_cloud",
+            not contrasts.is_empty(),
+            lambda: figure_fp_cloud(contrasts=contrasts, scope=scope),
         ),
         (
             "era5_against_ifs",
