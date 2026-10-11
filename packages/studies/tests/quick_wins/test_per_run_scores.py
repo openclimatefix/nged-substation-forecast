@@ -181,7 +181,7 @@ def test_missing_capacity_raises():
 
 
 def test_lead_bands_use_their_own_rows_and_all_uses_every_row():
-    """A 1 h, a 60 h, and a 100 h lead: `days 0 to 2` sees the first two, `days 3 to 10` the third."""
+    """Leads of 1 h, 60 h, and 100 h: `days 0 to 2` sees the first two, `days 3 to 10` the third."""
     rows = pl.DataFrame(
         {
             "time_series_id": [1, 1, 1],
@@ -237,7 +237,7 @@ def test_slice_means_equal_compute_metrics_per_horizon_slice():
 
 
 def test_duplicate_actuals_leave_compute_metrics_and_the_wrapper_in_agreement():
-    """A duplicated observation changes neither the wrapper nor `compute_metrics`, and they agree."""
+    """A duplicated observation changes neither `compute_metrics` nor the wrapper."""
     rng = np.random.default_rng(6)
     forecasts = _forecasts(rng=rng)
     actuals = pl.concat([_actuals(forecasts=forecasts, rng=rng)] * 2)

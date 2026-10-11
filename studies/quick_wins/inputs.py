@@ -68,6 +68,29 @@ def fold_window(*, fold_id: str = FOLD_A) -> FoldWindow:
     )
 
 
+FOLD_B: Final[str] = "backwards_2025_07_to_2026_06"
+"""The robustness fold: train on the leaderboard fold's validation year, validate on the months
+before its training window ended. It is not in `conf/cv/default.yaml` and never feeds the
+leaderboard."""
+
+
+def backwards_fold_window() -> FoldWindow:
+    """Return fold B, which trains on 2025-07 to 2026-06 and validates on 2024-04 to 2025-06."""
+    forward = fold_window()
+    return FoldWindow(
+        fold_id=FOLD_B,
+        train_start=forward.val_start,
+        train_end=forward.val_end,
+        val_start=forward.train_start,
+        val_end=forward.train_end,
+    )
+
+
+def window_for(*, fold_id: str) -> FoldWindow:
+    """Return the windows of fold A or fold B by name."""
+    return backwards_fold_window() if fold_id == FOLD_B else fold_window(fold_id=fold_id)
+
+
 def sample_init_times(*, window: FoldWindow) -> list[datetime]:
     """Return the ECMWF initialisation times every arm is scored on.
 
