@@ -1239,16 +1239,19 @@ def example_event(*, root: Path, report: Report) -> None:
         ratio = (
             planted.scale_mw[event.plant, first:last] / original.scale_mw[event.plant, first:last]
         )
+        estimated = planted.fallback_reason[event.plant, first:last] == 0
         rows += [
             {
                 "estimator": estimator,
                 "day": int(day - event.first_day),
-                "ratio": float(value),
+                "ratio": float(value) if has_estimate else None,
                 "planted_factor": float(factor),
             }
-            for day, value, factor in zip(range(first, last), ratio, truth, strict=True)
+            for day, value, factor, has_estimate in zip(
+                range(first, last), ratio, truth, estimated, strict=True
+            )
         ]
-    table = pl.DataFrame(rows)
+    table = pl.DataFrame(rows, schema_overrides={"ratio": pl.Float64})
     path = root / "tables" / "example_event.parquet"
     refuse_to_overwrite(paths=[path])
     table.write_parquet(path)
@@ -1258,6 +1261,10 @@ def example_event(*, root: Path, report: Report) -> None:
         f"seasonal profile (see the HYST detection section); this one is a "
         f"{event.size:.1%} loss lasting {event.month_days} days, from draw {draw_index}; days "
         f"are counted from its first day, and its plant is not named"
+    )
+    report.text(
+        "- a day on which an estimator fell back to the static power (the convex programmes are "
+        "solved only for the days a scoring needs) has no ratio and is left blank"
     )
     report.text(f"- file: {path.name}, {table.height} rows")
 

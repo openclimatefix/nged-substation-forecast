@@ -713,17 +713,26 @@ def headline_figure(*, report: ReportText, text: FigureText) -> alt.VConcatChart
     return render_caption(panels=[key, panel], number=1, title=title, subtitle=subtitle)
 
 
-def step_figure(*, root: Path, text: FigureText) -> alt.VConcatChart:
+def step_figure(*, root: Path, report: ReportText, text: FigureText) -> alt.VConcatChart:
     """Figure 2: what each estimator reports across one planted step.
 
     Args:
         root: The output root.
+        report: The report.
         text: The text collector.
 
     Returns:
         The figure.
     """
     traces = pl.read_parquet(root / "tables" / "example_event.parquet")
+    rule = report.line(
+        heading="Example planted step (the figure of one planted step)", prefix="- rule"
+    )
+    found = re.search(r"this one is a ([\d.]+)% loss lasting (\d+) days", rule)
+    if found is None:
+        msg = f"no size and length in {rule!r}"
+        raise ValueError(msg)
+    size, length = float(found.group(1)), int(found.group(2))
     order = list(ESTIMATOR_TITLES)
     order = [
         name for name in order if name in set(traces["estimator"].to_list()) and name != "DSKF"
@@ -784,17 +793,20 @@ def step_figure(*, root: Path, text: FigureText) -> alt.VConcatChart:
         )
     )
     title = (
-        "On one planted 30% step, only some estimators follow the loss, and some move without it"
+        f"On one planted {size:.0f}% step, most estimators followed the loss within days, "
+        "and S0 and EM never did"
     )
     subtitle = [
         (
-            "One planted loss, the same in every panel: a step that cuts one plant's power for "
-            "31 days, starting on day 0. Each panel draws the capacity an estimator reports for "
-            "the plant with the loss, divided by what it reports without the loss."
+            "One planted loss, the same in every panel: a step that cuts one plant's power by "
+            f"{size:.0f}% for {length} days, starting on day 0. Each panel draws the capacity an "
+            "estimator reports for the plant with the loss, divided by what it reports without "
+            "the loss."
         ),
         (
             "A forecast for day T reads whole days up to day T−2. Before day 0 both runs read "
-            "the same power, so the ratio is exactly 1."
+            "the same power, so the ratio is exactly 1. The convex programmes are solved only "
+            "from the step on, so their lines start there."
         ),
     ]
     text.add(
@@ -1548,7 +1560,7 @@ def build_figures(*, root: Path, text: FigureText) -> dict[int, alt.VConcatChart
     report = ReportText(path=root / "report.md")
     return {
         1: headline_figure(report=report, text=text),
-        2: step_figure(root=root, text=text),
+        2: step_figure(root=root, report=report, text=text),
         3: recovery_figure(report=report, text=text),
         4: false_movement_figure(report=report, text=text),
         5: seasonal_figure(root=root, text=text),
