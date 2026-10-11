@@ -19,6 +19,7 @@ import argparse
 import inspect
 import json
 import logging
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ from capacity_paths import (
     LAG_FRAME_PATH,
     LAG_LOSSES_PATH,
     OUTPUT_RATIOS_PATH,
+    TUNING_GRIDS,
     claim_root,
     draw_id,
     load_events,
@@ -1348,6 +1350,68 @@ def kf_seasonal_shape(*, root: Path, report: Report) -> None:
     report.text(f"- the file: {path.name}")
 
 
+def review_additions(*, root: Path, report: Report) -> None:
+    """Print the break-even to the threshold, day-of-year contrasts, grid edges, and the gate."""
+    text = "\n".join(report.lines)
+    found = re.search(
+        r"row-weighted selected-minus-B0 gap: ([-\d.]+) points on the low-output plant-months, "
+        r"([-\d.]+) points on every other row",
+        text,
+    )
+    errors = {
+        (arm, "primary"): float(value)
+        for arm, value in re.findall(r"\| (B0|causal__KF|noDOY__KF) \| primary \| ([\d.]+)", text)
+    }
+    errors[("B0-noDOY", "primary")] = float(
+        re.search(r"\| B0-noDOY \(no day of year, static\) \| ([\d.]+)", text).group(1)  # ty: ignore[unresolved-attribute]
+    )
+    report.heading("Review additions (post hoc arithmetic on the printed numbers)")
+    if found is not None:
+        low, rest = float(found.group(1)), float(found.group(2))
+        threshold = THRESHOLD_SHARE * errors[("B0", "primary")]
+        share = (threshold + rest) / (-low + rest)
+        report.text(
+            f"- the selected arm would reach the {threshold:.3f}-point threshold only if "
+            f"{share:.1%} of rows were low-output plant-months (assuming the gaps above transfer), "
+            "and its interval would also have to lie wholly below zero"
+        )
+    no_doy = errors[("B0-noDOY", "primary")]
+    report.text(
+        f"- day of year (primary): B0-noDOY minus B0 {no_doy - errors[('B0', 'primary')]:.3f} "
+        f"points; noDOY__KF minus B0-noDOY {errors[('noDOY__KF', 'primary')] - no_doy:.3f} points; "
+        f"causal__KF minus B0 {errors[('causal__KF', 'primary')] - errors[('B0', 'primary')]:.3f}"
+    )
+    report.heading("Tuned settings against their grids", level=3)
+    for estimator in ("KF", "HM", "CX1", "CX2", "DP1"):
+        chosen = load_tuned(root=root, estimator=estimator)
+        edges = []
+        for key, value in chosen.items():
+            values = sorted({grid[key] for grid in TUNING_GRIDS[estimator]})
+            if len(values) > 1 and value in (values[0], values[-1]):
+                edges.append(
+                    f"{key}={value:g} at the {'lowest' if value == values[0] else 'highest'}"
+                )
+        report.text(f"- {estimator}: {chosen}; at a grid edge: {', '.join(edges) or 'none'}")
+    selection = json.loads((root / "selection.json").read_text())
+    candidates = {
+        name: share
+        for name, share in selection["false_movement"].items()
+        if ESTIMATOR_FAMILY[name] != "reference"
+    }
+    closest = min(candidates, key=lambda name: candidates[name])
+    report.heading("Gate sensitivity", level=3)
+    report.text(
+        f"- the candidate with the lowest false-movement share is {closest} at "
+        f"{candidates[closest]:.1%}, so no candidate passes a gate of 30% either"
+    )
+    plan = json.loads(DERATED_PLAN_PATH.read_text())
+    report.text(
+        f"- the low-output plant's ratio file lists {len(plan['ratio_by_month'])} of the "
+        f"{len(load_events(root=root).scored_months)} scored months; a plant-month is low-output "
+        f"below a neighbour ratio of {plan.get('threshold', 'unknown')}"
+    )
+
+
 def main() -> int:
     """Write `report.md`."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1373,6 +1437,7 @@ def main() -> int:
     hyst_detection(root=root, report=report)
     example_event(root=root, report=report)
     kf_seasonal_shape(root=root, report=report)
+    review_additions(root=root, report=report)
     path.write_text("\n".join(report.lines) + "\n")
     _LOG.info("wrote %s", path)
     return 0
