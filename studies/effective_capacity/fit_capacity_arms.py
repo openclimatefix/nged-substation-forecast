@@ -65,7 +65,7 @@ from studies.capacity_estimators import (
     scale_for_rows,
     target_day_indices,
 )
-from studies.capacity_recovery import factor_matrix
+from studies.capacity_recovery import factor_matrix, planted_plant_months
 from studies.capacity_scaling import (
     assert_arm_covers_frame,
     assert_constant_scale_reproduces_baseline,
@@ -287,16 +287,28 @@ def arm_frame(
     )
 
 
-def check_months_covered(*, frame: pl.DataFrame, scored_months: list[str], smoke: bool) -> None:
-    """Raise if a scored month has no row at a plant in the frame.
+def check_months_covered(
+    *,
+    frame: pl.DataFrame,
+    scored_months: list[str],
+    planted: set[tuple[int, str]],
+    sites: tuple[str, ...],
+    smoke: bool,
+) -> None:
+    """Raise if a scored month is absent from the frame, or a planted plant-month has no row.
+
+    A plant may lack rows in a scored month the frame never held for it (the active-network-
+    management plant has none in 2 of the 18 months), but no planted loss may fall there.
 
     Args:
         frame: The lag frame.
         scored_months: The 18 scored months.
+        planted: `planted_plant_months`' result over every draw and the control.
+        sites: The record's plant labels, in index order.
         smoke: Whether the frame is a smoke sample, where only the month list is checked.
 
     Raises:
-        ValueError: If a scored month is missing from the frame, or from a plant's rows.
+        ValueError: If a scored month is missing from the frame, or a planted loss has no rows.
     """
     held = set(frame["month"].unique().to_list())
     if held != set(scored_months):
@@ -305,9 +317,12 @@ def check_months_covered(*, frame: pl.DataFrame, scored_months: list[str], smoke
         )
         raise ValueError(msg)
     if not smoke:
-        counts = frame.group_by("site").agg(months=pl.col("month").n_unique())
-        if counts["months"].to_numpy().min() < len(scored_months):
-            msg = "a plant has no rows in some scored month"
+        present = set(zip(frame["site"].to_list(), frame["month"].to_list(), strict=True))
+        missing = sorted(
+            (plant, month) for plant, month in planted if (sites[plant], month) not in present
+        )
+        if missing:
+            msg = f"planted losses fall in plant-months with no rows: {missing}"
             raise ValueError(msg)
 
 
@@ -338,7 +353,15 @@ def main() -> int:  # noqa: PLR0915
         raise ValueError(msg)
     if arguments.smoke:
         frame = smoke_frame(frame=frame)
-    check_months_covered(frame=frame, scored_months=events.scored_months, smoke=arguments.smoke)
+    check_months_covered(
+        frame=frame,
+        scored_months=events.scored_months,
+        planted=planted_plant_months(
+            events=[e for draw in events.draws for e in draw] + events.control, dates=record.dates
+        ),
+        sites=tuple(record.sites),
+        smoke=arguments.smoke,
+    )
     primary: HyperParameters = (
         {**PRIMARY_HYPER_PARAMETERS, "num_boost_round": SMOKE_ROUNDS}
         if arguments.smoke

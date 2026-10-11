@@ -133,6 +133,21 @@ def event_factor(*, event: PlantedEvent, days: int) -> np.ndarray:
     return factor
 
 
+def planted_plant_months(
+    *, events: Sequence[PlantedEvent], dates: np.ndarray
+) -> set[tuple[int, str]]:
+    """Return the (plant index, calendar month) pairs that planted events cover.
+
+    Args:
+        events: Planted events, such as every draw's events and the control's steps.
+        dates: The record's dates, as `datetime64[D]`.
+
+    Returns:
+        Each pair as the plant index and a `YYYY-MM` string.
+    """
+    return {(e.plant, str(dates[e.first_day].astype("datetime64[M]"))) for e in events}
+
+
 def expected_factor(*, event: PlantedEvent, days: int) -> np.ndarray:
     """Return the factor an estimator can be expected to find on each day.
 

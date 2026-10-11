@@ -39,6 +39,7 @@ from studies.capacity_recovery import (
     gate_sensitivity,
     interval_coverage,
     plant_losses,
+    planted_plant_months,
     posthoc_contrasts,
     relative_capacity_error,
     score_events,
@@ -553,3 +554,12 @@ def test_the_post_hoc_contrasts_need_no_gate_and_compare_the_neural_network_to_c
     assert (e2.name, e2.treatment, e2.reference) == ("E2_posthoc", "DP1", "CX2")
     assert e2.verdict == "loses"
     assert choose_estimators(inputs=inputs).selected == "CX2"
+
+
+def test_planted_plant_months_name_the_plant_and_calendar_month_of_each_event() -> None:
+    dates = np.arange(np.datetime64("2025-01-01"), np.datetime64("2025-06-01"))
+    events = [
+        PlantedEvent(plant=2, shape="step", size=0.1, first_day=31, month_days=28),
+        PlantedEvent(plant=0, shape="ramp", size=0.1, first_day=0, month_days=31),
+    ]
+    assert planted_plant_months(events=events, dates=dates) == {(2, "2025-02"), (0, "2025-01")}
