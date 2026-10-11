@@ -2,6 +2,17 @@
 
 Draft plan, branch to be renamed when the issue exists. No issue or PR yet (awaiting approval).
 
+## Context: the auto-research infrastructure does not exist yet
+
+The v0.3 plan for an LLM agent that runs experiments (trusted submit command, protected scorer,
+hypothesis store, leakage test; issues #958, #1031, #1038) is not built, and rolling-origin folds
+(#960) are not designed. This study is therefore a manual precursor. It does not build, call, or
+depend on any of that infrastructure, and its scores are never leaderboard submissions. Two
+consequences: the study's fold B is an ad hoc robustness check, not a stand-in for the #960 design;
+and the page ends with a list of which ideas were cheap and which looked worth sending to the agent,
+as evidence for the screening decision in #1038. The study reads the validation year directly, which
+is allowed for a study but is exactly the access issue #958 plans to bar from agent sessions.
+
 ## Question
 
 Which cheap changes to the XGBoost forecast, using only data the production system already holds
