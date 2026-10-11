@@ -148,8 +148,8 @@ ARM_KEY: Final[dict[str, str]] = {
     "N2-3": "three random-day lags, as wide as W7",
     "T1": (
         "days since the record began. Month-block folds interleave, so trees can interpolate a "
-        "scored month's level from months on both sides; its gain is what interpolation buys, "
-        "never drift a live forecast could use"
+        "scored month's level from months on both sides; its gain comes from that interpolation "
+        "and is not drift a live forecast could use"
     ),
     "CL": "B0 plus the climatology as a column",
     "W7+CL": "W7 plus the climatology as a column",
@@ -526,6 +526,11 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     )
     domain = [float(rows["lower"].min()) - 0.05 * span, float(rows["upper"].max()) + 1.3 * span]  # ty: ignore[invalid-argument-type]
     excluded_text = f"{', '.join(excluded[:-1])}, and {excluded[-1]}"
+    not_excluded = [
+        str(c) for c in rows["contrast"].unique(maintain_order=True) if c not in excluded
+    ]
+    others_name = ", ".join(not_excluded)
+    others_text = f"{others_name}'s interval"
     x_title = (
         "Change in error, treatment minus reference (percentage points of capacity; "
         "more negative is better)"
@@ -566,11 +571,12 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
             "(0.1 to 0.9)."
         ),
         (
-            "The planned rule labels each contrast 'unresolved' when its interval includes zero; "
-            "the rule has no outcome for 'any gain is smaller than the threshold', so the ruling "
-            f"out is a post hoc reading. {excluded_text} are 99% confidence intervals wholly "
-            "between the ticks at both settings; the threshold is 2% of the reference arm's own "
-            "error."
+            f"At both settings, the 99% confidence intervals of {excluded_text} lie wholly between "
+            f"the ticks. {others_text} reaches past a tick, so {others_name} rules out nothing. "
+            f"The "
+            'planned rule labels each contrast "unresolved" when its interval includes zero. The '
+            'planned rule has no outcome for "any gain is smaller than the threshold", so the '
+            "words at the right of each row are a post hoc reading."
         ),
         SHARED_TERMS["setting"],
         arm_key("B0", "L1", "L2", "S2", "AN"),
@@ -805,10 +811,10 @@ def control_figure(*, tables: Path, followup_tables: Path, text: FigureText) -> 
             "change. "
             "Months being scored are the months the fitted forecasts are tested on."
         ),
-        "All rows are exploratory.",
         (
-            "Oracle rows are post hoc, from round 1's rebuilt month-level control; L1 rows are "
-            "the first run's."
+            "The L1, N1, and N2 rows are exploratory, from the first run. The oracle rows are "
+            "post hoc: written after the first run's results were known, on a rebuilt version of "
+            "the planted-loss test."
         ),
         arm_key("B0", "L1", "N1", "N2"),
     ]
@@ -1428,8 +1434,9 @@ def coverage_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart | Non
             "Bottom: the mean width of the forecast band, in percentage points of capacity."
         ),
         (
-            "Forecast sky is the weather forecast's clear-sky index: its irradiance relative to "
-            "clear sky."
+            "Each group of bars is one range of forecast sky (clear, mixed, cloudy, or all hours): "
+            "the weather forecast's clear-sky index, its irradiance as a share of clear-sky "
+            "irradiance."
         ),
     ]
     footnote = [
@@ -1806,6 +1813,17 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
     )
     n_low = int(months.filter(pl.col("derated")).height)
     n_missing = audit.height - months.height
+    n_low_unselected = int(
+        months.filter(pl.col("derated") & (pl.col("month") >= P2_FIRST_MONTH)).height
+    )
+    still_scored = (
+        f"The {NUMBER_WORDS[n_low_unselected]} orange month among the 8 unselected months is "
+        "still scored."
+        if n_low_unselected == 1
+        else f"The {n_low_unselected} orange months among the 8 unselected months are still scored."
+        if n_low_unselected
+        else "None of the orange months is among the 8 unselected months."
+    )
     ratio_title = "One plant's output relative to the other plants' (1 = equal)"
     role_scale = alt.Scale(
         domain=[ROLE_LOW, ROLE_DOMINANT, ROLE_OTHER],
@@ -1899,17 +1917,19 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
     )
     claim(holds=n_low == 3, what="the plant has three low-output months")
     title = (
-        f"Dropping one plant's {NUMBER_WORDS[n_low]} low-output months from training removes "
-        "the satellite ratio's and weekly statistics' gains"
+        f"One plant's {n_low} low-output training months carry most of the satellite ratio's "
+        "and weekly statistics' gains"
     )
     pc, w7, tf, q30 = (by_arm[a] for a in ("PC", "W7", "TF", "Q30"))
     subtitle = [
         (
             "Top: one plant's mean capacity-normalised output as a share of the other five "
             "plants' mean capacity-normalised output, on the hours at which all six plants are "
-            "scored, by month. Dashed line: 0.8, the plant at 80% of the others' output. "
-            "Orange: the months below the dashed line. Black: the month in which B0's error is "
-            "largest among the 8 months not used to screen the arms (the 8 unselected months)."
+            "scored, by month. Dashed line: 0.8, the plant at 80% of the other five plants' "
+            "output. "
+            "Orange: the months below the dashed line. Black: the month in which B0's error at "
+            "this plant is largest among the 8 months not used to screen the arms (the 8 "
+            "unselected months)."
         ),
         (
             "Bottom: each arm's mean absolute error minus B0's on the 8 unselected months, over "
@@ -1917,7 +1937,7 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
             "confidence interval "
             "from resampling months and the three training seeds. Blue: all months in training. "
             "Purple: the orange months removed from that one plant's training, for each arm and "
-            "for B0 alike; the months are still scored."
+            f"for B0 alike. {still_scored}"
         ),
         (
             "Error minus B0's, with all months in training then with the low-output months "
@@ -1935,9 +1955,11 @@ def derated_figure(*, tables3: Path, text: FigureText) -> alt.VConcatChart:
     footnote = [
         (
             "The plant and the months were chosen after the first run, from the whole record, "
-            "including the 8 unselected months this figure scores. The refit tests whether "
-            "low-output training months explain B0's error in the black month. It does not "
-            "estimate a gain a live forecast would see. The top panel leaves out the "
+            "including the 8 unselected months this figure scores. The refit tests whether the "
+            "arms' gains come from B0's large error in the black month, an error that the "
+            "plant's low-output training months could cause; if they do, removing those months "
+            "from training shrinks the gains. The refit does not estimate a gain a live forecast "
+            "would see. The top panel leaves out the "
             f"{n_missing} months that have no hour at which all six plants are scored."
         ),
         forecasts_statement(runs="three training runs (fitting seeds)"),
@@ -2348,8 +2370,8 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
     resolved = int((steps["lower"] > 0).sum())
     name = TITLE_NAMES[best]
     title = (
-        f"{name[0].upper()}{name[1:]} recovers {shares[best]:.0%} of a planted 10% power loss "
-        f"across all plants; one day's lag recovers {shares['L1']:.0%}"
+        f"For a 10% loss at every plant, {name} recovers {shares[best]:.0%} of the oracle's "
+        f"gain; one day's lag, {shares['L1']:.0%}"
     )
     step_oracle = sorted(
         {abs(float(v)) * PERCENTAGE_POINTS for v in steps["oracle_difference"].to_list()}
@@ -2359,14 +2381,13 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
         (
             "Each dot is one arm in one control at one shift size: its error gain over B0, "
             "net of its gain on the unshifted data, divided by the oracle's gain (0: none, 1: all "
-            "of it). The oracle is B0 given the true shift factor; its gain is what knowing the "
-            "shift exactly gains a tree model. Line: 95% confidence interval from resampling "
-            "whole months "
-            "and a seed."
+            "of it). The oracle is B0 given the true shift factor. The oracle's gain is the error "
+            "reduction a tree model gets from knowing the shift exactly. Line: 95% confidence "
+            "interval from resampling whole months and a seed."
         ),
         (
-            "Dashed lines: no gain (0) and the oracle's gain (1). A pair is shown only where the "
-            "oracle's own 99% confidence interval excludes zero. "
+            "Dashed lines: no gain (0) and the oracle's gain (1). A control and shift size are "
+            "shown only where the oracle's own 99% confidence interval excludes zero. "
             f"In the plant-steps control, {resolved} of {steps.height} shares have an interval "
             "wholly above zero."
         ),
@@ -2375,14 +2396,14 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
         (
             "A control is a planted-loss test: the forecasts are re-fitted on a synthetic "
             "target in which measured power is cut by the shift (5% or 10%). In the month-level "
-            "control, the cut applies in 9 of the 18 scored months and a random half of the "
-            "others. In the plant-steps control, each plant's power is cut for a random 4 to 12 "
-            "weeks. An arm's standing gain on the unshifted data is subtracted so that it is not "
-            "counted as recovery. The month-level control cuts every plant in the same months, so "
-            "it cannot tell an input that tracks one plant's level from one that tracks a change "
-            "shared by every plant. The per-plant control's oracle gains are statistically "
-            f"detectable but small ({step_oracle_text} points), so its shares have wide "
-            "intervals."
+            "control, the cut applies in 9 of the 18 scored months and in a random half of the "
+            "months used only for training. In the plant-steps control, each plant's power is "
+            "cut for a random 4 to 12 weeks. An arm's standing gain on the unshifted data is "
+            "subtracted so that it is not counted as recovery. The month-level control cuts "
+            "every plant in the same months, so the month-level control cannot tell an input "
+            "that tracks one plant's level from an input that tracks a change shared by every "
+            "plant. The plant-steps control's oracle gains are statistically detectable but "
+            f"small ({step_oracle_text} points), so its shares have wide intervals."
         ),
         POST_HOC,
         arm_key("B0", *order),
@@ -2629,14 +2650,15 @@ def followup_unselected_figure(
         what="most of PC's and W7's gain comes from one plant-month and the rest includes zero",
     )
     concentration = (
-        "Most of PC's and W7's gain on these months comes from one plant in one month; without "
-        f"it the 8-month gains are PC {without['PC']['difference'] * PERCENTAGE_POINTS:+.3f}, "
-        f"W7 {without['W7']['difference'] * PERCENTAGE_POINTS:+.3f}, TF "
-        f"{without['TF']['difference'] * PERCENTAGE_POINTS:+.3f} (95% confidence intervals "
-        f"include zero)."
+        "Most of PC's and W7's gain on these months comes from one plant in one month; "
+        "without that plant-month the 8-month gains are PC "
+        f"{without['PC']['difference'] * PERCENTAGE_POINTS:+.3f}, W7 "
+        f"{without['W7']['difference'] * PERCENTAGE_POINTS:+.3f}, and TF "
+        f"{without['TF']['difference'] * PERCENTAGE_POINTS:+.3f} points (95% confidence "
+        "intervals include zero)."
     )
     title = (
-        "On the 8 unscreened months, three level-tracking inputs gained most; "
+        "On the 8 unselected months, three level-tracking inputs gained most; "
         "the analogue ensemble did not"
     )
     subtitle = [
@@ -2647,17 +2669,18 @@ def followup_unselected_figure(
             "whole months. Zero is B0."
         ),
         (
-            "Black rows use all 8 months; blue and orange rows split them by era. An era of 3 "
-            "or 5 months gives a percentile interval that is unreliable and can be too narrow; "
-            "read the era rows as point estimates."
+            "Black rows use all 8 months; blue and orange rows split the 8 months by era. An era "
+            "of 3 or 5 months gives a percentile interval that is unreliable and can be too "
+            "narrow. Read the era rows as point estimates."
         ),
     ]
     footnote = [
         (
-            "An era is one of the three blocks of months the matched-lead study cuts its folds "
-            "in (boundaries at 2025-10 and 2026-02). Neither boundary marks a change to the "
-            "ensemble forecast. The study has no 2026-01, so the later era starts at 2026-02. "
-            "Lead-day 1 is the forecast for the day after the day it is issued. "
+            "An era is one of the three blocks of months that this study's folds are cut in "
+            "(boundaries 2025-10 and 2026-02), taken from an earlier study of the same plants. "
+            "Neither boundary marks a change to the ECMWF ensemble weather forecast. The study "
+            "has no 2026-01, so the middle era shown ends at 2025-12. Lead-day 1 is the forecast "
+            "for the day after the day it is issued. "
             f"The primary hyperparameter setting is {PRIMARY_SETTING}."
         ),
         (
@@ -2666,8 +2689,9 @@ def followup_unselected_figure(
         ),
         concentration,
         (
-            "These three arms were picked on the same 8 months they are scored on, so their "
-            "gains here are biased upward, as AN's was."
+            "PC, W7, and TF are the three level-tracking inputs: each follows the plant's recent "
+            "output level. These three arms were picked on the same 8 months they are scored on, "
+            "so their gains here are biased upward, as AN's gain on the 10 screening months was."
         ),
         POST_HOC,
         arm_key("B0", *overall["arm"].to_list()),
@@ -2733,8 +2757,8 @@ def followup_hit_rate_figure(*, tables: Path, text: FigureText) -> alt.VConcatCh
         what="both tails' quantiles hit away from their levels, on the over-confident side",
     )
     title = (
-        "The baseline's and the lag's forecast bands are too narrow: too many hours fall "
-        f"outside their {low:.0%} and {high:.0%} quantiles"
+        "Both forecast bands are too narrow: too many hours fall below the "
+        f"{low:.0%} or above the {high:.0%} quantile"
     )
     subtitle = [
         (
