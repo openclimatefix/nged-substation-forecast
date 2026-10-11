@@ -7,7 +7,7 @@ series' type: the generator types are `PV` and `Wind`, and every other type is a
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Final
 
 import inputs
@@ -121,7 +121,6 @@ class Arm:
     recency_half_life_days: float | None = None
     early_stopping: bool = False
     colsample_bytree: float = 1.0
-    notes: dict[str, str] = field(default_factory=dict)
 
 
 REFERENCE_ARMS: Final[tuple[Arm, ...]] = (
@@ -231,13 +230,15 @@ chosen, by `combine`."""
 def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
     """Build an arm that merges the differences from production of several arms.
 
-    The merge takes, per setting, the value from the last part that changes it. Column policies are
-    merged by taking the longest list a part offers for each type and keeping its order, so a
-    combination of the lead-time arm and the physics arm shows both sets of added columns.
+    Each part's difference from production is the set of columns it removes and the set it adds,
+    for each series type. A combination removes every column any part removes and adds every column
+    any part adds, so a later part that merely keeps a column cannot undo an earlier removal. The
+    cleaning rules of all parts apply together. Each other setting takes the value of the last part
+    that changes it from production's.
 
     Args:
         name: The combination's name.
-        parts: Arms to merge, in order.
+        parts: Arms to merge.
         description: One line for the page.
 
     Returns:
@@ -245,15 +246,18 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
     """
 
     def columns(series_type: str) -> tuple[str, ...]:
-        merged: list[str] = list(PRODUCTION_COLUMNS)
+        removed: set[str] = set()
+        added: list[str] = []
         for part in parts:
             offered = part.columns(series_type)
-            merged = [c for c in merged if c in offered]
-            merged += [c for c in offered if c not in merged]
-        return tuple(merged)
+            removed |= set(PRODUCTION_COLUMNS) - set(offered)
+            added += [c for c in offered if c not in PRODUCTION_COLUMNS and c not in added]
+        kept = [c for c in PRODUCTION_COLUMNS if c not in removed]
+        return (*kept, *added)
 
     cleaning_rules = [rule for part in parts for rule in (part.cleaning, *part.extra_cleaning)]
     distinct_rules = tuple(dict.fromkeys(rule for rule in cleaning_rules if rule != "none"))
+    objectives = [p.objective for p in parts if p.objective != "reg:squarederror"]
     return Arm(
         name=name,
         family="combination",
@@ -261,7 +265,7 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
         columns=columns,
         cleaning=distinct_rules[0] if distinct_rules else "none",
         extra_cleaning=distinct_rules[1:],
-        objective=parts[-1].objective if parts else "reg:squarederror",
+        objective=objectives[-1] if objectives else "reg:squarederror",
         recency_half_life_days=next(
             (p.recency_half_life_days for p in reversed(parts) if p.recency_half_life_days), None
         ),

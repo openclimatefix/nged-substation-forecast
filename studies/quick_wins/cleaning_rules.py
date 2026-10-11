@@ -10,6 +10,7 @@ Every rule takes a frame of one or more series' readings with columns `time_seri
 `power`, and returns the `(time_series_id, time)` pairs to drop.
 """
 
+from datetime import datetime
 from typing import Final, Literal
 
 import polars as pl
@@ -206,7 +207,9 @@ def commissioning_ramp(*, power: pl.DataFrame, types: pl.DataFrame) -> pl.DataFr
         if not isinstance(settled, float) or settled <= 0:
             continue
         rolling = group.with_columns(
-            smooth=pl.col("ratio").rolling_median(window_size=RAMP_ROLLING_DAYS, min_samples=1)
+            smooth=pl.col("ratio").rolling_median(
+                window_size=RAMP_ROLLING_DAYS, min_samples=RAMP_ROLLING_DAYS
+            )
         )
         reached = rolling.filter(pl.col("smooth") >= RAMP_SETTLED_FRACTION * settled)
         if reached.height == 0:
@@ -229,26 +232,41 @@ def commissioning_ramp(*, power: pl.DataFrame, types: pl.DataFrame) -> pl.DataFr
     )
 
 
-def rows_to_drop(*, rule: CleaningRule, power: pl.DataFrame, types: pl.DataFrame) -> pl.DataFrame:
+def rows_to_drop(
+    *,
+    rule: CleaningRule,
+    power: pl.DataFrame,
+    types: pl.DataFrame,
+    train_start: datetime,
+) -> pl.DataFrame:
     """Return the `(time_series_id, time)` pairs a named rule drops from training.
+
+    Every rule except the first-months rules judges only readings inside the training window
+    (`time >= train_start`), so a fold whose validation period precedes its training window cannot
+    leak that period into a threshold. The first-months rules need the whole history before the
+    window end, because a series is new when it first reads above zero, not when training starts.
 
     Args:
         rule: One of `CLEANING_RULES`.
-        power: Readings of every series, up to the end of the training window.
+        power: Readings of every series, from the start of the record to the end of the training
+            window.
         types: Columns `time_series_id` and `time_series_type`.
+        train_start: The first instant of the training window.
 
     Returns:
         The pairs to drop, with no duplicates.
     """
+    in_window = power.filter(pl.col("time") >= train_start)
     if rule == "none":
         dropped = power.head(0).select("time_series_id", "time")
     elif rule.startswith("first_"):
         months = int(rule.split("_")[1])
         dropped = first_months_after_first_nonzero(power=power, months=months)
+        dropped = dropped.filter(pl.col("time") >= train_start)
     elif rule == "isolated_zeros":
-        dropped = isolated_zeros(power=power)
+        dropped = isolated_zeros(power=in_window)
     elif rule == "spikes":
-        dropped = spikes(power=power)
+        dropped = spikes(power=in_window)
     else:
-        dropped = commissioning_ramp(power=power, types=types)
+        dropped = commissioning_ramp(power=in_window, types=types)
     return dropped.unique()

@@ -116,6 +116,37 @@ def test_rows_to_drop_none_drops_nothing_and_names_dispatch_to_their_rule():
     types = pl.DataFrame(
         {"time_series_id": pl.Series([1], dtype=pl.Int32), "time_series_type": ["PV"]}
     )
-    assert rows_to_drop(rule="none", power=power, types=types).height == 0
-    two = rows_to_drop(rule="first_2_months", power=power, types=types)
+    assert rows_to_drop(rule="none", power=power, types=types, train_start=START).height == 0
+    two = rows_to_drop(rule="first_2_months", power=power, types=types, train_start=START)
     assert two.height == (datetime(2025, 3, 1, tzinfo=UTC) - START) // timedelta(minutes=30)
+
+
+def test_rules_other_than_the_first_months_ignore_readings_before_the_training_window():
+    """A spike before `train_start` is not dropped, and does not set the capacity threshold."""
+    before = _series(series_id=1, values=[10.0] * 10 + [900.0] + [10.0] * 10)
+    train_start = START + timedelta(hours=20)
+    during = _series(series_id=1, values=[10.0] * 5 + [90.0] + [10.0] * 5, start=train_start)
+    types = pl.DataFrame(
+        {"time_series_id": pl.Series([1], dtype=pl.Int32), "time_series_type": ["PV"]}
+    )
+    dropped = rows_to_drop(
+        rule="spikes", power=pl.concat([before, during]), types=types, train_start=train_start
+    )
+    assert dropped["time"].to_list() == [train_start + timedelta(minutes=30 * 5)]
+
+
+def test_the_ramp_rule_runs_through_rows_to_drop_with_the_frame_the_fit_script_builds():
+    """`rows_to_drop` accepts `time_series_id` and `time_series_type` columns, as `fit_arms` builds."""
+    days = 200
+    peers = [_series(series_id=pid, values=[10.0] * 48 * days) for pid in (2, 3)]
+    ramp = _series(series_id=1, values=[2.0] * 48 * 70 + [10.0] * 48 * (days - 70))
+    types = pl.DataFrame(
+        {"time_series_id": pl.Series([1, 2, 3], dtype=pl.Int32), "time_series_type": ["PV"] * 3}
+    )
+    dropped = rows_to_drop(
+        rule="commissioning_ramp",
+        power=pl.concat([ramp, *peers]),
+        types=types,
+        train_start=START,
+    )
+    assert set(dropped["time_series_id"].to_list()) == {1}

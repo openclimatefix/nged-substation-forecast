@@ -65,7 +65,9 @@ def _training_drops(
         .select("time_series_id", "time", "power")
         .collect()
     )
-    dropped = cleaning_rules.rows_to_drop(rule=rule, power=power, types=types)
+    dropped = cleaning_rules.rows_to_drop(
+        rule=rule, power=power, types=types, train_start=window.train_start
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     dropped.write_parquet(path)
     return dropped
@@ -107,6 +109,7 @@ def _training_rows(
 
 
 def _parameters(*, arm: arm_definitions.Arm, device: str, seed: int) -> dict[str, object]:
+    """Return the XGBoost parameters: production's, with the arm's column subsampling."""
     return {
         "eta": LEARNING_RATE,
         "max_depth": MAX_DEPTH,
@@ -122,10 +125,15 @@ def _parameters(*, arm: arm_definitions.Arm, device: str, seed: int) -> dict[str
 def _weights(
     *, group: pl.DataFrame, arm: arm_definitions.Arm, window: inputs.FoldWindow
 ) -> np.ndarray | None:
+    """Return row weights that halve every `recency_half_life_days`, scaled to mean 1.
+
+    Scaling to mean 1 keeps `min_child_weight` meaning what it means for unweighted rows.
+    """
     if arm.recency_half_life_days is None:
         return None
     age_days = (window.train_end - group["valid_time"]).dt.total_seconds() / 86400
-    return np.power(0.5, age_days.to_numpy() / arm.recency_half_life_days)
+    weights = np.power(0.5, age_days.to_numpy() / arm.recency_half_life_days)
+    return weights / weights.mean()
 
 
 def _fit_series(
@@ -145,13 +153,21 @@ def _fit_series(
     rounds = N_TREES
     if arm.early_stopping:
         cutoff = window.train_end - EARLY_STOPPING_HOLDOUT
-        is_fit = (group["valid_time"] <= cutoff).to_numpy()
+        is_fit = group["valid_time"] <= cutoff
+        if is_fit.all() or not is_fit.any():
+            msg = "early stopping needs rows both before and after the hold-out cutoff"
+            raise ValueError(msg)
+        fit_mask, hold_mask = is_fit.to_numpy(), (~is_fit).to_numpy()
         fit = xgb.DMatrix(
             features.filter(is_fit),
             label=label.filter(is_fit),
-            weight=None if weights is None else weights[is_fit],
+            weight=None if weights is None else weights[fit_mask],
         )
-        hold = xgb.DMatrix(features.filter(~is_fit), label=label.filter(~is_fit))
+        hold = xgb.DMatrix(
+            features.filter(~is_fit),
+            label=label.filter(~is_fit),
+            weight=None if weights is None else weights[hold_mask],
+        )
         probe = xgb.train(
             params,
             fit,
@@ -194,6 +210,9 @@ def _predict_and_score(
                 ).with_columns(power_fcst=pl.Series(booster.predict(matrix), dtype=pl.Float32))
             )
         forecasts = pl.concat(pieces)
+        if forecasts.height != frame.height:
+            msg = f"{path.name}: predicted {forecasts.height:,} rows for {frame.height:,}"
+            raise ValueError(msg)
         forecasts.write_parquet(out_dir / "forecasts" / path.name)
         parts.append(per_run_scores(forecasts=forecasts, actuals=actuals))
     return normalised_by_capacity(scores=pl.concat(parts), capacity=capacity)
@@ -212,7 +231,7 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
     series_ids = inputs.eligible_series_ids(settings=settings, fold_id=inputs.FOLD_A)
     metadata = inputs.series_metadata(settings=settings, time_series_ids=series_ids)
     types = pl.DataFrame(metadata).select(
-        "time_series_id", pl.col("time_series_type").cast(pl.String).alias("series_type")
+        "time_series_id", pl.col("time_series_type").cast(pl.String)
     )
     capacity = pl.DataFrame(inputs.effective_capacity(settings=settings))
     actuals = (
@@ -224,7 +243,7 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
     training, counts = _training_rows(arm=arm, window=window, types=types)
     boosters: dict[int, tuple[xgb.Booster, list[str]]] = {}
     for (series_id,), group in training.group_by("time_series_id"):
-        series_type = group["series_type"][0]
+        series_type = group["time_series_type"][0]
         columns = list(arm.columns(series_type))
         booster = _fit_series(
             group=group, columns=columns, arm=arm, window=window, device=device, seed=seed
