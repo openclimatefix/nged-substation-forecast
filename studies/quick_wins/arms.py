@@ -313,3 +313,30 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
         ),
         early_stopping=any(p.early_stopping for p in parts),
     )
+
+
+_C1 = next(a for a in FEATURE_ARMS if a.name == "c1_lead_time")
+_C2 = next(a for a in TRAINING_ARMS if a.name == "c2_early_stopping")
+_C4 = next(a for a in TRAINING_ARMS if a.name == "c4_absolute_error")
+
+ROUND2_ARMS: Final[tuple[Arm, ...]] = (
+    combine(
+        name="r2_c4_c2",
+        parts=(_C4, _C2),
+        description="Absolute-error objective with early stopping.",
+    ),
+    combine(
+        name="r2_c4_c1",
+        parts=(_C4, _C1),
+        description="Absolute-error objective with the lead-time column.",
+    ),
+    combine(
+        name="r2_c4_c2_c1",
+        parts=(_C4, _C2, _C1),
+        description="Absolute-error objective, early stopping, and the lead-time column.",
+    ),
+)
+"""Round 2: the round 1 arms that beat `production_cleaned` with intervals clear of zero, in a
+ladder. Chosen by judgement after reading the round 1 table (post hoc)."""
+
+ALL_ARMS.update({arm.name: arm for arm in ROUND2_ARMS})
