@@ -47,6 +47,7 @@ Run it with `uv run python studies/lag_features/lag_features_charts.py`.
 """
 
 import argparse
+import json
 import logging
 import math
 import subprocess
@@ -510,14 +511,14 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
     excluded: list[str] = [
         str(contrast)
         for (contrast,), part in rows.group_by("contrast", maintain_order=True)
-        if bool((part["lower"] > -part["threshold"]).all())
+        if bool(((part["lower"] > -part["threshold"]) & (part["upper"] < part["threshold"])).all())
     ]
     claim(
         holds=excluded == ["P1", "P3", "P4", "P5"],
-        what="the 99% intervals of P1, P3, P4, and P5 exclude the 2% threshold at both settings",
+        what="the 99% intervals of P1, P3, P4, and P5 lie between the ticks at both settings",
     )
     domain = [float(rows["lower"].min()) - 0.05 * span, float(rows["upper"].max()) + 0.55 * span]  # ty: ignore[invalid-argument-type]
-    excluded_text = ", ".join(excluded)
+    excluded_text = f"{', '.join(excluded[:-1])}, and {excluded[-1]}"
     x_title = (
         "Change in error, treatment minus reference (percentage points of capacity; "
         "more negative is better)"
@@ -544,8 +545,9 @@ def headline_figure(*, tables: Path, text: FigureText) -> alt.VConcatChart:
         ),
         (
             "The words at the right of a row give the verdict from both settings. "
-            "'Unresolved' is the planned rule's verdict: no gain shown. The 99% intervals of "
-            f"{excluded_text} exclude the 2% threshold at both settings (a post hoc reading)."
+            "'unresolved' is the planned rule's verdict: no gain shown. "
+            f"The 99% intervals of {excluded_text} lie wholly between the ticks at both "
+            "settings (a post hoc reading)."
         ),
     ]
     footnote = [
@@ -982,12 +984,15 @@ SCREEN_WORSE: Final[str] = "Above zero (worse than B0)"
 """The three verdicts the screen figure colours an arm's paired interval by."""
 
 
-def sweep_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConcatChart:
+def sweep_figure(
+    *, tables: Path, tables2: Path, shortlist: Path, text: FigureText
+) -> alt.VConcatChart:
     """Figure 9: the paired screen of every fitted arm against B0, with the CRPS corrections.
 
     Args:
         tables: The report's tables directory.
         tables2: The round-2 report's tables directory.
+        shortlist: The first run's `shortlist.json`, whose `x` is the arm the screen picked.
         text: The text collector.
 
     Returns:
@@ -1068,7 +1073,8 @@ def sweep_figure(*, tables: Path, tables2: Path, text: FigureText) -> alt.VConca
     claim(holds=better.height == 1, what="exactly one arm's paired interval is below zero")
     claim(holds=worse.height >= 1, what="some arms' paired intervals are above zero")
     best = better.row(0, named=True)
-    claim(holds=best["arm"] == "AN", what="the arm that beat B0 is the one the screen picked")
+    picked = str(json.loads(shortlist.read_text())["x"])
+    claim(holds=best["arm"] == picked, what="the arm that beat B0 is the one the screen picked")
     title = (
         f"The screen picked {best['arm']} on these months, so its "
         f"{abs(best['difference']):.2f}-point gain over B0 is biased upward"
@@ -2116,9 +2122,9 @@ def followup_controls_figure(*, tables2: Path, text: FigureText) -> alt.VConcatC
         (
             "Each dot is one arm in one control at one shift size: its error gain over B0, "
             "net of its gain on the unshifted data, divided by the oracle's gain (0: none, 1: all "
-            "of it). The oracle is B0 given the true shift factor, which is what knowing the "
-            "shift exactly gains a tree model. Line: 95% interval from resampling whole months and "
-            "a seed."
+            "of it). The oracle is B0 given the true shift factor; its gain is what knowing the "
+            "shift exactly gains a tree model. Line: 95% interval from resampling whole months "
+            "and a seed."
         ),
         (
             "Dashed lines: no gain (0) and the oracle's gain (1). A pair is shown only where the "
@@ -2637,7 +2643,12 @@ def main() -> int:
         "2_data": data_figure(root=root, product=product, text=text, smoke=smoke),
         "7_controls": control_figure(tables=tables, followup_tables=followup_tables, text=text),
         "5_three_weeks": models_work_figure(root=root, product=product, text=text, smoke=smoke),
-        "9_screen": sweep_figure(tables=tables, tables2=tables2, text=text),
+        "9_screen": sweep_figure(
+            tables=tables,
+            tables2=tables2,
+            shortlist=directory / f"checkpoints{suffix}" / "shortlist.json",
+            text=text,
+        ),
         "12_by_lead": by_lead_figure(tables=tables, tables2=tables2, text=text),
     }
     optional = {

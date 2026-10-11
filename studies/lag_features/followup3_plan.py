@@ -51,6 +51,9 @@ DERATED_RATIO_BELOW: Final[float] = 0.8
 PLANTS_SCORED: Final[int] = 6
 """The ratio uses only hours at which every plant has a scored row."""
 
+MIN_ALTERNATIVE_PLANTS: Final[int] = 3
+"""The alternative ratio uses the hours at which the plant and at least two others are scored."""
+
 
 def followup3_dir(*, root: Path) -> Path:
     """Return the folder every round-3 output lives in.
@@ -77,7 +80,7 @@ def plan_path(*, root: Path) -> Path:
 
 
 def output_ratios(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Return each plant's output as a share of the other plants', by month.
+    """Return each plant's output as a share of the other plants', by month, two ways.
 
     Args:
         frame: The lead-day 1 frame, with `site`, `time`, `month`, `power_mw` and
@@ -86,19 +89,31 @@ def output_ratios(*, frame: pl.DataFrame) -> pl.DataFrame:
     Returns:
         `site`, `month`, `hours` (the hours at which all plants are scored), `plant` (the plant's
         mean capacity-normalised output on them), `others` (the mean of the other plants' mean)
-        and `ratio`.
+        and `ratio`; and `n_alt` and `ratio_alt`, the same on the hours at which the plant and at
+        least two others are scored, with the others the plants scored at that hour.
     """
     rows = frame.select(
         "site", "time", "month", x=pl.col("power_mw") / pl.col("effective_capacity_mw")
     )
     totals = rows.group_by("time").agg(n=pl.len(), total=pl.col("x").sum())
-    joined = rows.join(totals, on="time").filter(pl.col("n") == PLANTS_SCORED)
-    return (
-        joined.with_columns(others=(pl.col("total") - pl.col("x")) / (pl.col("n") - 1))
+    joined = rows.join(totals, on="time").with_columns(
+        others=(pl.col("total") - pl.col("x")) / (pl.col("n") - 1)
+    )
+    strict = (
+        joined.filter(pl.col("n") == PLANTS_SCORED)
         .group_by("site", "month")
         .agg(hours=pl.len(), plant=pl.col("x").mean(), others=pl.col("others").mean())
         .with_columns(ratio=pl.col("plant") / pl.col("others"))
-        .sort("site", "month")
+    )
+    alternative = (
+        joined.filter(pl.col("n") >= MIN_ALTERNATIVE_PLANTS)
+        .group_by("site", "month")
+        .agg(n_alt=pl.len(), plant_alt=pl.col("x").mean(), others_alt=pl.col("others").mean())
+        .with_columns(ratio_alt=pl.col("plant_alt") / pl.col("others_alt"))
+        .select("site", "month", "n_alt", "ratio_alt")
+    )
+    return strict.join(alternative, on=["site", "month"], how="full", coalesce=True).sort(
+        "site", "month"
     )
 
 
@@ -134,14 +149,22 @@ def choose_plan(*, losses: pl.DataFrame, frame: pl.DataFrame) -> dict[str, objec
         ValueError: If the plant has no derated month, which would make the fit meaningless.
     """
     site = dominant_plant(losses=losses)
-    ratios = output_ratios(frame=frame).filter(pl.col("site") == site).drop_nulls("ratio")
+    all_ratios = output_ratios(frame=frame).filter(pl.col("site") == site)
+    ratios = all_ratios.drop_nulls("ratio")
     months = sorted(ratios.filter(pl.col("ratio") < DERATED_RATIO_BELOW)["month"].to_list())
+    months_alt = sorted(
+        all_ratios.drop_nulls("ratio_alt")
+        .filter(pl.col("ratio_alt") < DERATED_RATIO_BELOW)["month"]
+        .to_list()
+    )
     if not months:
         msg = f"plant {site} has no month below {DERATED_RATIO_BELOW:.0%} of the others' output"
         raise ValueError(msg)
     return {
         "site": site,
         "months": months,
+        "months_alternative": months_alt,
+        "selection_robust": months == months_alt,
         "threshold": DERATED_RATIO_BELOW,
         "ratio_by_month": dict(
             zip(ratios["month"].to_list(), ratios["ratio"].to_list(), strict=True)

@@ -17,6 +17,8 @@ first run's lead-day 1 frame, whose columns carry the first run's anchor asserti
    `out_of_fold_losses` already drops from training and keeps for scoring, so every row is scored
    as before and no row's features change. The saved losses carry that marked flag. Each arm is
    compared with B0 fitted the same way.
+   A control, B0 on that plant's rows with nothing marked (15 fits), shows whether a refit on one
+   plant's frame reproduces the first run's B0 at that plant.
 2. **No day of year for more arms** (360 fits): L1, Q30, AN, and N2-2 without `day_of_year` (the
    `-noDOY` suffix), each at all six plants, to be paired with its own fit with `day_of_year` and
    with B0-noDOY (round 2's fit).
@@ -80,6 +82,14 @@ DERATED_KEY: Final[str] = "derated"
 DERATED_SCOPE: Final[str] = "fu3_derated"
 """The scope the derated-months fits are saved under."""
 
+PLANT_KEY: Final[str] = "plant_control"
+"""The key of the one-plant frame with nothing marked."""
+
+PLANT_CONTROL_SCOPE: Final[str] = "fu3_plant_control"
+"""The scope of the control: B0 on the chosen plant's rows with no month removed, which should
+reproduce the first run's B0 at that plant and so shows whether a refit on this machine, as one
+plant's frame, matches the first run's fit."""
+
 
 def followup3_fits() -> list[Fit]:
     """Return every round-3 fit, in the order they run.
@@ -89,6 +99,7 @@ def followup3_fits() -> list[Fit]:
     """
     lead = FULL_SWEEP_LEAD_DAY
     fits = [Fit(DERATED_KEY, DERATED_SCOPE, lead, arm, "primary", False) for arm in DERATED_ARMS]
+    fits.append(Fit(PLANT_KEY, PLANT_CONTROL_SCOPE, lead, "B0", "primary", False))
     fits += [
         Fit(LEAD1_KEY, "fu3_lead1", lead, f"{arm}{NO_DAY_OF_YEAR_SUFFIX}", "primary", False)
         for arm in NO_DAY_OF_YEAR_ARMS
@@ -105,7 +116,7 @@ def fits_in(*, fit: Fit) -> int:
     Returns:
         15 for a derated-months arm (one plant x 5 folds x 3 seeds), otherwise 90 (six plants).
     """
-    plants = 1 if fit.scope == DERATED_SCOPE else PLANTS
+    plants = 1 if fit.scope in {DERATED_SCOPE, PLANT_CONTROL_SCOPE} else PLANTS
     return plants * N_FOLDS * len(SEEDS)
 
 
@@ -120,6 +131,9 @@ def fit_count_lines(*, fits: list[Fit]) -> list[str]:
     """
     groups = {
         "1. derated-months exclusion": [f for f in fits if f.scope == DERATED_SCOPE],
+        "1b. control: B0 on the plant with nothing removed": [
+            f for f in fits if f.scope == PLANT_CONTROL_SCOPE
+        ],
         "2. no day of year for more arms": [f for f in fits if f.scope == "fu3_lead1"],
     }
     lines = []
@@ -209,7 +223,11 @@ def read_frames(*, root: Path, smoke: bool) -> dict[str, pl.DataFrame]:
     if smoke:
         lead1 = smoke_subsample(frame=lead1)
     plan = json.loads(plan_path(root=root).read_text())
-    return {LEAD1_KEY: lead1, DERATED_KEY: derated_frame(frame=lead1, plan=plan)}
+    return {
+        LEAD1_KEY: lead1,
+        DERATED_KEY: derated_frame(frame=lead1, plan=plan),
+        PLANT_KEY: lead1.filter(pl.col("site") == plan["site"]),
+    }
 
 
 def require_inputs(*, root: Path) -> None:

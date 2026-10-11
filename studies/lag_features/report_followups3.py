@@ -52,10 +52,11 @@ from report_followups2 import (
     climatology_section,
     dominant_plant_month,
     mean_difference,
+    month_bootstrap,
     read_losses,
     wide,
 )
-from report_lag_features import P2_FIRST_MONTH, paired_interval
+from report_lag_features import P2_FIRST_MONTH, PERCENTAGE_POINTS, paired_interval
 from scipy import stats
 from studies.guards import refuse_to_overwrite
 
@@ -191,6 +192,7 @@ def record_rows(*, records: list[dict[str, object]], extra: list[str]) -> list[l
             str(r["contrast"]),
             _pp(float(r["difference"])),  # ty: ignore[invalid-argument-type]
             _interval(float(r["boot_lower"]), float(r["boot_upper"])),  # ty: ignore[invalid-argument-type]
+            _pp(float(r["t_centre"])),  # ty: ignore[invalid-argument-type]
             _interval(float(r["t_lower"]), float(r["t_upper"])),  # ty: ignore[invalid-argument-type]
             str(r["n_months"]),
         ]
@@ -202,10 +204,12 @@ CONTRAST_HEADER: Final[list[str]] = [
     "Contrast",
     "Difference (pp)",
     "95% bootstrap interval (pp)",
+    "Centre of the t-interval (pp)",
     "95% t-interval (pp)",
     "Months",
 ]
-"""The columns `record_rows` fills after the extra keys."""
+"""The columns `record_rows` fills after the extra keys. The t-interval's centre is the unweighted
+mean of the monthly means, which can differ from the row-weighted difference beside it."""
 
 
 def windows_and_exclusions(
@@ -259,7 +263,9 @@ def output_ratio_section(
     plan = json.loads(plan_path(root=root).read_text())
     site = str(plan["site"])
     ratios = pl.read_parquet(followup3_dir(root=root) / f"output_ratios_{PRODUCT}.parquet")
-    mine = ratios.filter(pl.col("site") == site).select("month", "hours", "ratio")
+    mine = ratios.filter(pl.col("site") == site).select(
+        "month", "hours", "ratio", "n_alt", "ratio_alt"
+    )
     cells = lead1.filter((pl.col("site") == site) & (pl.col("arm") == "B0")).select(
         "month",
         "seed",
@@ -307,11 +313,23 @@ def output_ratio_section(
             "`day_of_year`."
         ),
         "",
+        (
+            "The selection of derated months is "
+            + (
+                "robust to the alternative ratio: the same months fall below the threshold."
+                if plan["selection_robust"]
+                else "not robust to the alternative ratio: the alternative gives "
+                f"{', '.join(plan['months_alternative'])}."
+            )
+        ),
+        "",
         *_table(
             header=[
                 "Month",
                 "Output ratio",
                 "Hours at which all six are scored",
+                "Alternative ratio (the plant and at least two others)",
+                "Hours of the alternative",
                 "Derated",
                 "B0 error",
                 "B0-noDOY error",
@@ -324,6 +342,8 @@ def output_ratio_section(
                     r["month"],
                     "" if r["ratio"] is None else f"{r['ratio']:.3f}",
                     "" if r["hours"] is None else str(r["hours"]),
+                    "" if r["ratio_alt"] is None else f"{r['ratio_alt']:.3f}",
+                    "" if r["n_alt"] is None else str(r["n_alt"]),
                     "yes" if r["derated"] else "",
                     _pp(r["b0_error"], signed=False),
                     _pp(r["nodoy_error"], signed=False),
@@ -563,7 +583,11 @@ def cleaning_lines() -> list[str]:
             "spike filter (`studies.pv_dataset.drop_outages_and_spikes`)",
             "one hour",
             "none (the hour alone)",
-            "an hour above 1.5 times the plant's effective capacity.",
+            _cell(
+                "an hour above 1.5 times the plant's effective capacity. The threshold is a ",
+                "constant of the whole record (each plant's last recorded capacity) and removes ",
+                "no rows today: the largest hourly power is 1.38 times capacity.",
+            ),
         ],
         [
             "zero-run rule (`studies.pv_dataset.drop_outages_and_spikes`)",
@@ -596,14 +620,18 @@ def cleaning_lines() -> list[str]:
             ),
             _cell(
                 "an hour in which the operator had moved the cap off the connection limit ",
-                "(one plant); the lag source drops these hours.",
+                "(one plant); the lag source drops these hours. The connection limit is the ",
+                "largest cap in the plant's whole record.",
             ),
         ],
         [
             "hourly average (`studies.power.hourly_from_half_hourly`)",
             "the two half-hours ending in the hour",
             "none beyond the hour",
-            "not a flag: the hour is the mean of its two half-hours.",
+            _cell(
+                "not a flag: the hour is the mean of its two half-hours, and an hour missing ",
+                "either half-hour is dropped.",
+            ),
         ],
         [
             "read cut-off (`studies.power.scan_power`)",
@@ -697,7 +725,190 @@ def equivalence_t_section(*, root: Path) -> tuple[list[str], pl.DataFrame]:
 # --- Round 3's fits ------------------------------------------------------------------------------
 
 
-def fit_sections(
+def gap_windows(
+    *, eight: list[str], all_months: list[str], dominant_month: str, derated_months: list[str]
+) -> list[tuple[str, list[str]]]:
+    """Return the windows the chosen plant's gaps are tabulated on.
+
+    Args:
+        eight: The 8 unselected months.
+        all_months: All 18 scored months.
+        dominant_month: The month of the dominant plant-month.
+        derated_months: The chosen plant's derated months.
+
+    Returns:
+        (name, months) pairs.
+    """
+    return [
+        ("8 unselected months", eight),
+        ("all 18 months", all_months),
+        ("the dominant plant-month alone", [dominant_month]),
+        (
+            "scored without the derated months, all 18 months",
+            [m for m in all_months if m not in derated_months],
+        ),
+        (
+            "scored without the derated months, 8 unselected months",
+            [m for m in eight if m not in derated_months],
+        ),
+    ]
+
+
+def gap_section(
+    *, plant: Aligned, windows: list[tuple[str, list[str]]]
+) -> tuple[list[str], pl.DataFrame]:
+    """Tabulate each arm's gap to B0 at the chosen plant from both fits, and the change in it.
+
+    The gap is the arm minus B0 fitted the same way. The change is the gap with the derated
+    months removed from training minus the gap with all training months, paired by row and seed.
+
+    Args:
+        plant: The chosen plant's series `<arm>_all` and `<arm>_der`.
+        windows: (name, months) pairs.
+
+    Returns:
+        The report lines and a table with one row per (window, arm).
+    """
+    records = []
+    for window, months in windows:
+        subset = plant.in_months(months=months)
+        if subset.n_rows == 0:
+            continue
+        for arm in DERATED_ARMS:
+            gap_all = mean_difference(data=subset, treatment=f"{arm}_all", reference="B0_all")
+            gap_der = mean_difference(data=subset, treatment=f"{arm}_der", reference="B0_der")
+            change = month_bootstrap(
+                data=subset,
+                statistic=lambda d, arm=arm: float(
+                    ((d[f"{arm}_der"] - d["B0_der"]) - (d[f"{arm}_all"] - d["B0_all"])).mean()
+                ),
+            )
+            records.append(
+                {
+                    "window": window,
+                    "arm": arm,
+                    "gap_all": gap_all["value"],
+                    "gap_all_lower": gap_all["lower_95"],
+                    "gap_all_upper": gap_all["upper_95"],
+                    "gap_derated": gap_der["value"],
+                    "gap_derated_lower": gap_der["lower_95"],
+                    "gap_derated_upper": gap_der["upper_95"],
+                    "change": change["value"],
+                    "change_lower": change["lower_95"],
+                    "change_upper": change["upper_95"],
+                    "n_months": len(months),
+                    "n_rows": subset.n_rows,
+                }
+            )
+    table = pl.DataFrame(records)
+    lines = [
+        "### The chosen plant's gap to B0 from both fits, and the change in it",
+        "",
+        (
+            "The gap is each arm minus B0 fitted the same way, with all training months and with "
+            "the derated months removed from training. The change is (gap with the derated "
+            "months removed) minus (gap with all months), paired by row and seed, with a 95% "
+            "interval from resampling months and a seed. A window of one month has only the seed "
+            "to resample, so its interval is narrow and does not describe month-to-month "
+            "variation."
+        ),
+        "",
+        *_table(
+            header=[
+                "Rows scored (the chosen plant)",
+                "Months",
+                "Arm",
+                "Gap, all training (pp)",
+                "Interval (pp)",
+                "Gap, derated months removed (pp)",
+                "Interval (pp)",
+                "Change in the gap (pp)",
+                "Interval (pp)",
+            ],
+            rows=[
+                [
+                    r["window"],
+                    str(r["n_months"]),
+                    r["arm"],
+                    _pp(r["gap_all"]),
+                    _interval(r["gap_all_lower"], r["gap_all_upper"]),
+                    _pp(r["gap_derated"]),
+                    _interval(r["gap_derated_lower"], r["gap_derated_upper"]),
+                    _pp(r["change"]),
+                    _interval(r["change_lower"], r["change_upper"]),
+                ]
+                for r in table.iter_rows(named=True)
+            ],
+        ),
+    ]
+    return lines, table
+
+
+def plant_control_lines(
+    *, first: pl.DataFrame, control: pl.DataFrame
+) -> tuple[list[str], pl.DataFrame]:
+    """Compare the control refit with the first run's B0 at the chosen plant.
+
+    Args:
+        first: The first run's lead-day 1 losses at the chosen plant.
+        control: The control's losses: B0 on the chosen plant's rows with nothing removed.
+
+    Returns:
+        The report lines and a one-row table of the differences.
+    """
+    pair = (
+        first.filter(pl.col("arm") == "B0")
+        .select(
+            "site", "time", "seed", loss_first=pl.col(METRIC), prediction_first=pl.col("prediction")
+        )
+        .join(
+            control.filter(pl.col("arm") == "B0").select(
+                "site",
+                "time",
+                "seed",
+                loss_control=pl.col(METRIC),
+                prediction_control=pl.col("prediction"),
+            ),
+            on=["site", "time", "seed"],
+            how="inner",
+        )
+        .with_columns(
+            loss_difference=(pl.col("loss_control") - pl.col("loss_first")).abs(),
+            prediction_difference=(pl.col("prediction_control") - pl.col("prediction_first")).abs(),
+        )
+    )
+    stats_row = pair.select(
+        rows=pl.len(),
+        rows_differing=(pl.col("prediction_difference") > 0).sum(),
+        max_prediction_difference_mw=pl.col("prediction_difference").max(),
+        max_loss_difference_pp=pl.col("loss_difference").max() * PERCENTAGE_POINTS,
+        mean_loss_difference_pp=pl.col("loss_difference").mean() * PERCENTAGE_POINTS,
+    )
+    table = stats_row
+    row = table.row(0, named=True)
+    verdict = (
+        "bit for bit identical to the first run's B0 at the plant, so the refits are paired with "
+        "the first run's fits without error"
+        if row["rows_differing"] == 0
+        else (
+            f"not bit for bit: {row['rows_differing']} of {row['rows']} predictions differ, by "
+            f"at most {row['max_prediction_difference_mw']:.2e} MW, which is a mean absolute "
+            f"loss difference of {row['mean_loss_difference_pp']:.2e} pp"
+        )
+    )
+    lines = [
+        "### Control: B0 on the chosen plant with nothing removed",
+        "",
+        (
+            f"The control refit is {verdict}. This shows whether a refit on the chosen plant's "
+            "rows alone matches the first run's B0 at that plant."
+        ),
+        "",
+    ]
+    return lines, table
+
+
+def fit_sections(  # noqa: PLR0915
     *, root: Path, lead1: pl.DataFrame, fits2: pl.DataFrame, fit_path: Path
 ) -> tuple[list[str], dict[str, pl.DataFrame]]:
     """Report the two fit blocks, or say that the fits have not run.
@@ -721,7 +932,7 @@ def fit_sections(
         ], {}
     plan = json.loads(plan_path(root=root).read_text())
     site = str(plan["site"])
-    fits = read_losses(path=fit_path, scopes=["fu3_derated", "fu3_lead1"])
+    fits = read_losses(path=fit_path, scopes=["fu3_derated", "fu3_lead1", "fu3_plant_control"])
     derated = fits.filter(pl.col("scope") == "fu3_derated").drop("scope")
     tables: dict[str, pl.DataFrame] = {}
     lines: list[str] = []
@@ -834,6 +1045,23 @@ def fit_sections(
             ),
             "",
         ]
+    gap_lines, gap_table = gap_section(
+        plant=plant,
+        windows=gap_windows(
+            eight=eight,
+            all_months=sorted(set(lead1["month"].to_list())),
+            dominant_month=b0_month,
+            derated_months=list(plan["months"]),
+        ),
+    )
+    tables["derated_gaps"] = gap_table
+    lines += gap_lines
+    control_lines, control_table = plant_control_lines(
+        first=lead1.filter(pl.col("site") == site),
+        control=fits.filter(pl.col("scope") == "fu3_plant_control"),
+    )
+    tables["plant_control"] = control_table
+    lines += control_lines
     # 2. No day of year for more arms.
     nodoy = fits.filter(pl.col("scope") == "fu3_lead1").drop("scope")
     arms = NO_DOY_ARMS_ROUND3
