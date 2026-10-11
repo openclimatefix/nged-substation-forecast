@@ -276,6 +276,8 @@ def main() -> None:
     )
     lines += ["## Against `production` (as the study's control without cleaning)", ""]
     _contrast_tables(lines=lines, fold=inputs.FOLD_A, tag="seeds012", reference="production")
+    lines += ["## Fold A, seed 0 only (arms fitted on one seed), against `production_cleaned`", ""]
+    _contrast_tables(lines=lines, fold=inputs.FOLD_A, tag="seeds0", reference="production_cleaned")
     _seed_spread(lines=lines)
     lines += ["## Fold B (robustness), against `production_cleaned`", ""]
     for tag in ("seeds01", "seeds0"):

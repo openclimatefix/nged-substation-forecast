@@ -187,6 +187,6 @@ a
   CRPS from 11.6% to 10.0% of capacity and the mean absolute error from 12.3% to 10.8%: the
   absolute-error objective, early stopping, a lead-time column, leaner wind-farm columns, one
   booster per series type with a site identifier, and dropping a new meter's first weeks. Rescaling
-  the ensemble spread lowers the CRPS by a further 1.4 to 1.9 points, although the production
+  the ensemble spread lowers the CRPS by a further 1.3 to 1.9 points, although the production
   ensemble's 10% to 90% band holds the outcome only 10% of the time. Removing power lags from solar
   and wind farms raised their error.
