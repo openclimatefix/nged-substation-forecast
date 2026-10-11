@@ -105,8 +105,25 @@ def _check_same_rows(*, tables: tuple[MonthlyTable, ...]) -> None:
 
 def _level(*, totals: np.ndarray, counts: np.ndarray, weights: np.ndarray) -> np.ndarray:
     """Return the metric under month weights: the mean over series of each series' mean."""
-    per_series = (totals @ weights.T) / (counts @ weights.T)
-    return per_series.mean(axis=0)
+    denominator = counts @ weights.T
+    per_series = np.divide(
+        totals @ weights.T,
+        denominator,
+        out=np.full(denominator.shape, np.nan),
+        where=denominator > 0,
+    )
+    return np.nanmean(per_series, axis=0)
+
+
+def _monthly_means(*, table: MonthlyTable) -> np.ndarray:
+    """Return each month's mean over the series that have rows in that month."""
+    per_series = np.divide(
+        table.totals,
+        table.counts,
+        out=np.full(table.counts.shape, np.nan),
+        where=table.counts > 0,
+    )
+    return np.nanmean(per_series, axis=0)
 
 
 def _month_draws(*, n_months: int) -> np.ndarray:
@@ -133,7 +150,7 @@ def level_interval(*, table: MonthlyTable) -> Interval:
     estimate = float(
         _level(totals=table.totals, counts=table.counts, weights=np.ones((1, len(table.months))))[0]
     )
-    monthly = (table.totals / table.counts).mean(axis=0)
+    monthly = _monthly_means(table=table)
     t_lower, t_upper = _t_interval(monthly=monthly)
     return Interval(
         estimate=estimate,
@@ -158,9 +175,7 @@ def difference_interval(*, arm: MonthlyTable, reference: MonthlyTable) -> Interv
         _level(totals=arm.totals, counts=arm.counts, weights=ones)[0]
         - _level(totals=reference.totals, counts=reference.counts, weights=ones)[0]
     )
-    monthly = (arm.totals / arm.counts).mean(axis=0) - (reference.totals / reference.counts).mean(
-        axis=0
-    )
+    monthly = _monthly_means(table=arm) - _monthly_means(table=reference)
     t_lower, t_upper = _t_interval(monthly=monthly)
     return Interval(
         estimate=estimate,
