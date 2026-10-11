@@ -50,7 +50,6 @@ from labeller_paths import (
     claim_root,
     events_of,
     load_first_record,
-    log_path,
     tables_dir,
     write_json_atomic,
 )
@@ -139,7 +138,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     context = LabellerContext(root=root)
     plants = len(context.sites)
     model: LabellerModel = CachedOnlyModel(model_id="stub" if arguments.smoke else MODEL_ID)
-    store = CallStore(directory=calls_dir(root=root), log_path=log_path(root=root))
+    store = CallStore(directory=calls_dir(root=root), log_path=root / "scoring_misses.jsonl")
     guard = BudgetGuard(ceiling_usd=1e9, max_calls=10**9, max_input_tokens=10**12)
 
     def answer_function(

@@ -147,6 +147,71 @@ def round2_sections(*, root: Path) -> list[str]:
     return parts
 
 
+def round3_sections(*, root: Path) -> list[str]:
+    """Return round 3's sections and the re-scores of rounds 1 and 2, or an empty list.
+
+    Args:
+        root: The output root.
+
+    Returns:
+        Sections for the hit rates with Wilson intervals, the placebo hit rates, the hit rates by
+        planted size, the robust contrast intervals, round 3's contrast, the noise floor, the tally
+        of round 2's notes, the candidate coverage of round 1, and the real low months.
+    """
+    tables = root / "tables_round3"
+    if not tables.exists():
+        return []
+    parts = ["# Round 3 and the re-scores (post hoc)\n"]
+    for title, folder, name in (
+        ("Hit rates with Wilson 95% intervals, by round and by check", tables, "hit_rates.parquet"),
+        (
+            "Placebo hit rates: null-record answers scored against each draw's event dates",
+            tables,
+            "placebo.parquet",
+        ),
+        (
+            "Hit rates by planted size, real and placebo (round 2 draws)",
+            tables,
+            "size_bands.parquet",
+        ),
+        (
+            "Contrasts with intervals that resample events, and calendar months, with the powering",
+            tables,
+            "contrasts_robust.parquet",
+        ),
+        (
+            "Round 3: the amended-check model against the tools-only rule on fresh draws 05 and 06",
+            tables,
+            "round3_contrast.parquet",
+        ),
+        (
+            "Noise floor: the mean absolute difference between the two samples",
+            tables,
+            "noise_floor.parquet",
+        ),
+        (
+            "Round 1 candidate coverage: events with a candidate near the start and the end",
+            root / "tables_round2",
+            "candidate_coverage.parquet",
+        ),
+        (
+            "Round 2 series on the real low months, share of static power (opinion, not truth)",
+            tables,
+            "real_low_months_round2.parquet",
+        ),
+    ):
+        parts.append(_table_section(title=title, path=folder / name))
+    tally = tables / "notes_tally.json"
+    if tally.exists():
+        parts.append(
+            _section(
+                title="Round 2 notes on why there was no change: tally",
+                body=f"```json\n{tally.read_text()}\n```",
+            )
+        )
+    return parts
+
+
 def main() -> int:  # noqa: PLR0915 - one linear script of report sections
     """Write and print the report."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -307,6 +372,7 @@ def main() -> int:  # noqa: PLR0915 - one linear script of report sections
             )
         )
     parts += round2_sections(root=root)
+    parts += round3_sections(root=root)
     text = "\n".join(parts)
     (root / "report.md").write_text(text)
     print(text)

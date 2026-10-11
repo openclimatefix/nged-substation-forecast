@@ -177,8 +177,9 @@ a
   capacity until a drop lasts 7 days did not raise the error.
 - [Can a language model label a solar plant's capacity changes?](forecasts/llm-capacity-labeller.md)
   — with six deterministic evidence tools, Claude Sonnet 5.5 found 0 of 32 planted one-month losses
-  and the 30% positive control failed its gate, so the planned contrasts are untested. A post hoc
-  local scan lifted the model to 8 of 68 hits on 34 new planted losses, no better than a fixed rule.
+  and the 30% positive control failed its gate, so the planned contrasts are untested. In post hoc
+  rounds it marked 6% to 12% of new small losses (2 of 68 after the hard checks in round 2), but 23
+  of 24 answers on a 60% loss lasting 90 days, where a fixed rule marked 1 of 12.
 - [Which IFS forecast variables, or which second forecast, help a solar power
   forecast?](forecasts/ifs-solar-variables.md) — at the 6 solar farms, no planned step of adding
   extra variables from ECMWF's 9 km IFS forecast lowers the error at lead days 1 to 3 by a resolved

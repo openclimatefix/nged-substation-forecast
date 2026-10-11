@@ -48,7 +48,6 @@ from labeller_paths import (
     calls_dir,
     claim_root,
     events_of,
-    log_path,
     write_json_atomic,
 )
 from score_labeller import CachedOnlyModel
@@ -83,6 +82,7 @@ from studies.labeller_scoring import (
     movement_by_window,
     movement_interval,
     score_draw,
+    score_event,
     segments_of,
 )
 
@@ -151,7 +151,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
     dates = context.dates
     first_day, last_day = dates[0].astype(date), dates[-1].astype(date)
     model_id = "stub" if arguments.smoke else MODEL_ID
-    store = CallStore(directory=calls_dir(root=root), log_path=log_path(root=root))
+    store = CallStore(directory=calls_dir(root=root), log_path=root / "scoring_misses.jsonl")
     guard = BudgetGuard(ceiling_usd=1e9, max_calls=10**9, max_input_tokens=10**12)
     model = CachedOnlyModel(model_id=model_id)
 
@@ -320,6 +320,20 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                     errors[(arm, sample, after)] = np.concatenate(per_draw) * 100.0
     if score_rows:
         pl.concat(score_rows).write_parquet(out / "event_scores.parquet")
+    np.savez_compressed(
+        out / "errors.npz",
+        months=np.array(
+            [
+                str(dates[e.first_day].astype("datetime64[M]"))
+                for record_id in NEW_DRAWS
+                for e in events_of(root=root, record_id=record_id)
+            ]
+        ),
+        **{
+            f"{arm}|{sample}|{int(after)}": values
+            for (arm, sample, after), values in errors.items()
+        },  # ty: ignore[invalid-argument-type]
+    )
 
     def matrix(*, arm: str, after: bool) -> np.ndarray | None:
         samples = arms[arm]
@@ -473,6 +487,7 @@ def main() -> int:  # noqa: PLR0912, PLR0915
 
     # Round 1's matching-candidate cases, with the candidate lines and the answer.
     cases = []
+    coverage: list[dict[str, object]] = []
     for record_id in OLD_DRAWS:
         for event in events_of(root=root, record_id=record_id):
             case = context.hindsight_case(record_id=record_id, plant=event.plant, kind="tools")
@@ -494,7 +509,29 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                 if abs(s.change) > 0.03
                 and min(abs(s.start - event.first_day), abs(s.end - event.first_day)) <= 14
             ]
-            if near and not marked:
+            end_near = [
+                c
+                for c in case.evidence.changepoints
+                if c.direction == "up"
+                and abs(c.day_index - (event.first_day + event.month_days)) <= 14
+            ]
+            tools_hit = score_event(
+                event=event,
+                segments=segments_of(
+                    knots=tools_only(version="v1", record_id=record_id)[event.plant].knots,
+                    dates=dates,
+                ),
+            ).hit
+            coverage.append(
+                {
+                    "events": 1,
+                    "down_candidate_near_start": bool(near),
+                    "up_candidate_near_end": bool(end_near),
+                    "model_marked": bool(marked),
+                    "tools_only_hit": tools_hit,
+                }
+            )
+            if near:
                 cases.append(
                     {
                         "record": record_id,
@@ -504,9 +541,9 @@ def main() -> int:  # noqa: PLR0912, PLR0915
                         "candidates_near_start": "; ".join(
                             f"{c.day} {c.size:+.0%} p={c.p_value:.3f}" for c in near
                         ),
-                        "answer": "no change"
-                        if answer.no_change
-                        else f"{len(answer.knots)} knots elsewhere",
+                        "model_marked": bool(marked),
+                        "tools_only_hit": tools_hit,
+                        "answer": "no change" if answer.no_change else f"{len(answer.knots)} knots",
                     }
                 )
     pl.DataFrame(
@@ -517,9 +554,12 @@ def main() -> int:  # noqa: PLR0912, PLR0915
             "shape": pl.String,
             "size": pl.Float64,
             "candidates_near_start": pl.String,
+            "model_marked": pl.Boolean,
+            "tools_only_hit": pl.Boolean,
             "answer": pl.String,
         },
     ).write_parquet(out / "matching_candidate_cases.parquet")
+    pl.DataFrame(coverage).sum().write_parquet(out / "candidate_coverage.parquet")
     pl.DataFrame(
         notes,
         schema={"record": pl.String, "plant": pl.String, "sample": pl.Int64, "note": pl.String},

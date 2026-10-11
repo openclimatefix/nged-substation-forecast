@@ -133,3 +133,19 @@ def test_adjacent_control_months_at_one_plant_merge_into_one_run() -> None:
     ]
     assert note_of(text='x {"plant": "A", "no_change": true, "note": "flat"} y') == "flat"
     assert note_of(text="no json") == ""
+
+
+def test_round_three_lists_48_calls_easy_case_first_all_with_the_frozen_v2_arm() -> None:
+    jobs = labeller_jobs.round3_jobs(plants=6)
+    assert len(jobs) == 48
+    assert {(job.version, job.arm) for job in jobs} == {("v2", "tools_llm")}
+    assert {job.record_id for job in jobs[:24]} == set(labeller_jobs.ROUND3_EASY_RECORDS)
+    assert {job.record_id for job in jobs[24:]} == set(labeller_jobs.ROUND3_DRAW_RECORDS)
+    assert len({job.label for job in jobs}) == len(jobs)
+
+
+def test_the_easy_case_and_the_new_draws_have_their_own_events() -> None:
+    assert labeller_paths.EASY_SIZE == 0.6
+    assert labeller_paths.EASY_DAYS == 90
+    assert set(labeller_paths.ROUND3_DRAW_SEEDS).isdisjoint(labeller_paths.ROUND2_DRAW_SEEDS)
+    assert set(labeller_paths.ROUND3_DRAW_SEEDS).isdisjoint({11441, 11442})
