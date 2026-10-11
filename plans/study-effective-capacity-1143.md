@@ -232,6 +232,11 @@ contrast is scored on the draw that chose it. A contrast reads "beats" when its 
 above, and "no detectable difference" otherwise; in the last case, the page ranks the families
 descriptively on detection delay, false movement, and operability.
 
+**The tuning grids of KF, HM, CX1, and CX2 were widened after the first tuning pass,** because
+that pass's winners sat at a grid edge: KF process_sd gained 0.04 and 0.08, HM stay_probability
+gained 0.9 and 0.8, and CX1 and CX2 fused_weight gained 1 and 0.3. The widening used the tuning
+draw only.
+
 **Each estimator is tuned on the tuning draw only, never on a forecast error, and the selection
 rule is fixed now:** after the gates, the lowest primary metric over the 10 selection draws, averaged
 over all events and all 6 plants. The best surviving estimator of each other family joins the

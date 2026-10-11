@@ -318,6 +318,11 @@ def load_events(*, root: Path) -> Events:
     return Events(payload=json.loads(path.read_text()))
 
 
+# The KF, HM, CX1, and CX2 grids were widened after the first tuning pass, because that pass's
+# winners sat at an edge of the grid (the largest KF process_sd, the smallest HM stay_probability,
+# and the smallest CX1 and CX2 fused_weight). The widening used the tuning draw only, so it leaks
+# nothing from the selection draws. The other tuned values (KF and HM observation_sd, CX quantile,
+# CX2 hinge_weight) are each a single fixed value, so none can sit at an edge.
 TUNING_GRIDS: Final[dict[str, list[dict[str, float]]]] = {
     "S0": [{}],
     "EM": [{}],
@@ -325,12 +330,14 @@ TUNING_GRIDS: Final[dict[str, list[dict[str, float]]]] = {
     "CSQ": [{}],
     "NR": [{}],
     "PR": [{}],
-    "KF": [{"process_sd": sd, "observation_sd": 0.1} for sd in (0.005, 0.01, 0.02)],
-    "HM": [{"stay_probability": stay, "observation_sd": 0.15} for stay in (0.95, 0.98, 0.995)],
-    "CX1": [{"quantile": 0.9, "fused_weight": weight} for weight in (3.0, 10.0, 30.0)],
+    "KF": [{"process_sd": sd, "observation_sd": 0.1} for sd in (0.005, 0.01, 0.02, 0.04, 0.08)],
+    "HM": [
+        {"stay_probability": stay, "observation_sd": 0.15} for stay in (0.8, 0.9, 0.95, 0.98, 0.995)
+    ],
+    "CX1": [{"quantile": 0.9, "fused_weight": weight} for weight in (0.3, 1.0, 3.0, 10.0, 30.0)],
     "CX2": [
         {"quantile": 0.7, "fused_weight": weight, "hinge_weight": 1.0}
-        for weight in (3.0, 10.0, 30.0)
+        for weight in (0.3, 1.0, 3.0, 10.0, 30.0)
     ],
     "DP1": [
         {
