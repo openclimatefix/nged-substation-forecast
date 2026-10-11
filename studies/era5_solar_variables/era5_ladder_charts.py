@@ -261,6 +261,10 @@ def _difference_unit(*, target: TargetType) -> str:
     return "percentage points of capacity" if target == "pv" else "clearness index"
 
 
+LOG_TICKS: Final[tuple[float, ...]] = (0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100)
+"""The 1-2-5 values a log-scale panel labels and draws gridlines at."""
+
+
 def _domain(*, values: Sequence[float]) -> list[float]:
     """Return an x domain that holds every value, with `DOMAIN_PADDING` of room each side."""
     low, high = min(values), max(values)
@@ -282,6 +286,7 @@ def dot_interval_panel(
     colour: str,
     reference_rules: Sequence[float] = (0.0,),
     order: Sequence[str] | None = None,
+    log_floor: float | None = None,
 ) -> Panel:
     """Draw one row per label: a dot at its estimate, a thin 95% line, and an optional thick line.
 
@@ -293,22 +298,36 @@ def dot_interval_panel(
         colour: The colour of every mark.
         reference_rules: The x values that get a dashed vertical rule, such as zero.
         order: The labels from top to bottom, or `None` for the order of `rows`.
+        log_floor: If given, draw the x axis on a log scale from this value, and raise every
+            value, interval end, and reference rule below it to it, so a share of zero is drawn
+            at the floor.
 
     Returns:
         The layered panel.
     """
     labels = list(order) if order is not None else rows["label"].to_list()
     thick = "thick_lower" in rows.columns
-    domain = _domain(
-        values=[
-            *rows["lower"].to_list(),
-            *rows["upper"].to_list(),
-            *(rows["thick_lower"].to_list() if thick else []),
-            *(rows["thick_upper"].to_list() if thick else []),
-            *reference_rules,
-        ]
+    if log_floor is not None:
+        rows = rows.with_columns(pl.col("value", "lower", "upper").clip(lower_bound=log_floor))
+        reference_rules = [max(rule, log_floor) for rule in reference_rules]
+        domain = [log_floor, float(rows["upper"].max()) * 1.5]  # ty: ignore[invalid-argument-type]
+        scale = alt.Scale(type="log", domain=domain, nice=False)
+    else:
+        domain = _domain(
+            values=[
+                *rows["lower"].to_list(),
+                *rows["upper"].to_list(),
+                *(rows["thick_lower"].to_list() if thick else []),
+                *(rows["thick_upper"].to_list() if thick else []),
+                *reference_rules,
+            ]
+        )
+        scale = alt.Scale(domain=domain, nice=False, zero=False)
+    x_axis = (
+        alt.Axis(values=[tick for tick in LOG_TICKS if domain[0] <= tick <= domain[1]])
+        if log_floor is not None
+        else alt.Axis()
     )
-    scale = alt.Scale(domain=domain, nice=False, zero=False)
     y = alt.Y(
         "label:N",
         sort=labels,
@@ -328,7 +347,7 @@ def dot_interval_panel(
             .mark_rule(strokeWidth=6, opacity=0.35, color=colour, aria=False)
             .encode(  # ty: ignore[unresolved-attribute]
                 y=y,
-                x=alt.X("thick_lower:Q", scale=scale, title=x_title),
+                x=alt.X("thick_lower:Q", scale=scale, title=x_title, axis=x_axis),
                 x2="thick_upper:Q",
             )
         )
@@ -336,13 +355,13 @@ def dot_interval_panel(
         alt.Chart(rows)
         .mark_rule(strokeWidth=1.5, color=colour, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            y=y, x=alt.X("lower:Q", scale=scale, title=x_title), x2="upper:Q"
+            y=y, x=alt.X("lower:Q", scale=scale, title=x_title, axis=x_axis), x2="upper:Q"
         )
     )
     layers.append(
         alt.Chart(rows)
         .mark_point(filled=True, size=70, opacity=1, color=colour, aria=False)
-        .encode(y=y, x=alt.X("value:Q", scale=scale, title=x_title))  # ty: ignore[unresolved-attribute]
+        .encode(y=y, x=alt.X("value:Q", scale=scale, title=x_title, axis=x_axis))  # ty: ignore[unresolved-attribute]
     )
     return alt.layer(*layers).properties(
         width=PLOT_WIDTH_PX, height=ROW_HEIGHT_PX * len(labels), title=_title(panel_title)
@@ -914,6 +933,9 @@ COLUMN_WORDS: Final[dict[str, str]] = {
 }
 """What each column is called on the importance figure, with its ERA5 short name in brackets."""
 
+IMPORTANCE_LOG_FLOOR: Final[float] = 0.05
+"""The smallest share (%) the log-scale importance panels draw; a smaller share is drawn here."""
+
 TOP_COLUMNS: Final[int] = 20
 """How many columns the first importance panel shows."""
 
@@ -1008,17 +1030,21 @@ def figure_importance(*, shares: pl.DataFrame, target: TargetType, scope: str) -
     panels = [
         dot_interval_panel(
             rows=top,
-            x_title=f"Share of total gain (%) in the full set, {TOP_COLUMNS} largest columns",
+            x_title=(
+                f"Share of total gain (%, log scale) in the full set, {TOP_COLUMNS} largest columns"
+            ),
             panel_title="Columns of the full set (G9), refitted with shuffled copies",
             colour=TARGET_COLOURS[target],
             reference_rules=(noise_line,),
+            log_floor=IMPORTANCE_LOG_FLOOR,
         ),
         dot_interval_panel(
             rows=by_group,
-            x_title="Share of total gain (%), summed over each group's columns",
+            x_title="Share of total gain (%, log scale), summed over each group's columns",
             panel_title="Groups, with shuffled copies as one more group",
             colour=TARGET_COLOURS[target],
             reference_rules=(),
+            log_floor=IMPORTANCE_LOG_FLOOR,
         ),
         dot_interval_panel(
             rows=models,
@@ -1041,6 +1067,8 @@ def figure_importance(*, shares: pl.DataFrame, target: TargetType, scope: str) -
             "input, not the CAMS target).",
             f"Dashed rule, first panel: the largest shuffled copy's share ({noise_line:.1f}%).",
             "Share of total gain: how much of the model's fit a column accounts for.",
+            "The first two panels use a log scale: each gridline is 10 times the one before, and a",
+            f"share below {IMPORTANCE_LOG_FLOOR:g}% is drawn at {IMPORTANCE_LOG_FLOOR:g}%.",
             "Shuffled copies are the same columns shuffled across hours, so they show the share",
             "that noise alone earns. Gain is measured on the training data and splits credit",
             "between correlated columns.",
