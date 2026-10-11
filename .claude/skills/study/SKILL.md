@@ -440,6 +440,45 @@ the story without the prose around it.
   absolute error in its row label instead.
 - **A chart of differences from one reference cannot show whether two other rows differ.** Put the
   planned paired contrasts in a second panel below it.
+- **Draw a ladder of added variable groups as a chain of paired steps, beside the leaderboard.**
+  This is the one exception to "show paired differences, not each arm's level": the chain draws
+  each rung's level and a paired interval together, and the leaderboard stays for the absolute
+  errors and the correlations. A leaderboard of the ladder gives each rung's error with an interval
+  that mostly reflects the weather's month-to-month swing, which every rung shares. Draw the rungs
+  as rows from the smallest set at the bottom to the largest at the top, with each dot at that
+  rung's error. Draw each row's interval as the 95% interval of the paired step from the row below,
+  positioned from the row below's dot, so the interval is the uncertainty of the difference and its
+  width is the same wherever it sits. Mark the row below's dot on each row (a hollow diamond,
+  offset a few pixels so that it does not hide under the dot), join the two with a dotted line, and
+  print each step and its interval in a column to the right of the plot, headed by a panel title.
+  Draw the base row's own interval in a different colour and thickness from the steps' intervals,
+  and say in the subtitle that a step's interval is not the uncertainty of its dot's position,
+  because a reader will otherwise read every line as a level interval. Say in the subtitle that the
+  steps depend on the order in which the groups were added. Say in the page text that the steps'
+  intervals must not be added, because the same months are resampled for every step.
+  `studies.era5_ladder.stepwise_chain` places the chain, and `figure_stepwise` in
+  `studies/era5_solar_variables/era5_ladder_charts.py` is the pattern. The chart raises if its
+  chained dots differ from the leaderboard's errors, so the two figures cannot disagree.
+- **Put a share that spans orders of magnitude on a log axis.** A chart of each column's share of
+  XGBoost's total gain (its feature importance) squeezes most columns against zero beside the one
+  or two columns that dominate. Use a log x axis labelled at 1, 2, and 5 times each power of ten,
+  set a floor just below the smallest share worth showing, draw any smaller share at the floor, and
+  say in the subtitle that the axis is logarithmic and where the floor is. Keep the dashed line
+  that marks the share of the largest shuffled column, because on a log axis the distance from that
+  line shows how many times a column's share exceeds the noise share. A panel of a few rows whose
+  shares are all large, which a log axis would bunch together, stays linear.
+  `dot_interval_panel(log_floor=...)` in the ERA5 study's chart script draws a log panel.
+- **Use one sign convention in every figure of a page, and say it in words in each.** If a
+  negative difference is an improvement in the headline chart, never draw "positive means the
+  group helped" in another figure of the same page. Flip the sign of the plotted quantity instead,
+  and write which direction is better in the axis title.
+- **Keep the subtitle above a figure short enough that the plot is visible without scrolling.**
+  Define a term in the subtitle only if the figure draws it (never define CAMS in a figure that
+  does not plot CAMS, and describe the ladder's groups only in figures that name them), define each
+  term once, and put the sentence that explains how to read the marks beside the plot, as a panel
+  title. Shorten the row labels so that none truncates (about 30 characters at the chart's label
+  width). Where the hour-of-day axis titles of neighbouring facets overlap, shorten the title to
+  "Hour ending (UTC)". Render every figure to PNG and look at it before committing.
 - **Take every number a chart shares with the page from the report**, so the chart cannot disagree
   with the page.
 - **Show a product-type legend only where a chart holds more than one product type.** Where a chart
