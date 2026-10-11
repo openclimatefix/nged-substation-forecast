@@ -179,9 +179,9 @@ def multiplied_forecast_scores(
         Per-row losses with `site`, `time`, `month`, `fold`, `seed`, and `SCORED_COLUMN`, in the
         baseline's rows.
     """
-    keyed = frame.select("site", "time", "fold", "constrained", "cap_mw", "effective_capacity_mw").with_columns(
-        factor=pl.Series(factor, dtype=pl.Float64)
-    )
+    keyed = frame.select(
+        "site", "time", "fold", "constrained", "cap_mw", "effective_capacity_mw"
+    ).with_columns(factor=pl.Series(factor, dtype=pl.Float64))
     folds = sorted(keyed["fold"].unique().to_list())
     training_means = pl.concat(
         [
@@ -205,9 +205,9 @@ def multiplied_forecast_scores(
         "month",
         "fold",
         "seed",
-        ((capped - pl.col("actual")).abs() / pl.col("effective_capacity_mw").cast(pl.Float64)).alias(
-            SCORED_COLUMN
-        ),
+        (
+            (capped - pl.col("actual")).abs() / pl.col("effective_capacity_mw").cast(pl.Float64)
+        ).alias(SCORED_COLUMN),
     )
 
 

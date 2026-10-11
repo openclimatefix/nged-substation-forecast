@@ -125,7 +125,9 @@ def event_factor(*, event: PlantedEvent, days: int) -> np.ndarray:
     if event.shape == "step":
         factor[month] = 1.0 - event.size
     elif event.shape == "ramp":
-        factor[month] = 1.0 - event.size * np.arange(event.month_days) / max(event.month_days - 1, 1)
+        factor[month] = 1.0 - event.size * np.arange(event.month_days) / max(
+            event.month_days - 1, 1
+        )
     else:
         hit = np.asarray(event.hit_days, dtype=int) + event.first_day
         factor[hit] = 1.0 - event.size
@@ -200,7 +202,9 @@ def calendar_month_spans(*, record: CapacityRecord) -> dict[str, tuple[int, int]
     for month in np.unique(months):
         indices = np.flatnonzero(months == month)
         first_of_month = month.astype("datetime64[D]")
-        length = int(((month + np.timedelta64(1, "M")).astype("datetime64[D]") - first_of_month).astype(int))
+        length = int(
+            ((month + np.timedelta64(1, "M")).astype("datetime64[D]") - first_of_month).astype(int)
+        )
         if record.dates[indices[0]] == first_of_month and len(indices) == length:
             spans[str(month)] = (int(indices[0]), length)
     return spans
@@ -217,6 +221,7 @@ def _footprints_clash(*, first: PlantedEvent, second: PlantedEvent) -> bool:
         True if they share a plant and their footprints overlap, or they are at different plants and
         either one's month overlaps the other's footprint.
     """
+
     def overlap(a: tuple[int, int], b: tuple[int, int]) -> bool:
         return a[0] < b[1] and b[0] < a[1]
 
@@ -378,7 +383,9 @@ def draw_events(
             wanted = [
                 (plant, shape)
                 for plant in plants
-                for shape in shapes_by_plant[plant][: kept if plant in may_have_fewer else len(shapes)]
+                for shape in shapes_by_plant[plant][
+                    : kept if plant in may_have_fewer else len(shapes)
+                ]
             ]
             assignment = _assign_months(wanted=wanted, domains=domains, rng=rng)
             if assignment is not None:
@@ -450,8 +457,12 @@ def draw_control_steps(
     rng = np.random.default_rng(seed)
     for _ in range(MAX_PLACEMENT_ATTEMPTS):
         order = rng.permutation(list(scored_months))[: plants * months_per_plant]
-        assignment = {p: list(order[p * months_per_plant : (p + 1) * months_per_plant]) for p in range(plants)}
-        if all(month not in barred.get(p, ()) for p, chosen in assignment.items() for month in chosen):
+        assignment = {
+            p: list(order[p * months_per_plant : (p + 1) * months_per_plant]) for p in range(plants)
+        }
+        if all(
+            month not in barred.get(p, ()) for p, chosen in assignment.items() for month in chosen
+        ):
             return [
                 PlantedEvent(plant, "step", size, spans[month][0], spans[month][1])
                 for plant, chosen in assignment.items()
@@ -566,7 +577,9 @@ def score_events(
                 "shape": event.shape,
                 "size": event.size,
                 "error": relative_capacity_error(event=event, ratio=ratio, days=days),
-                "delay": detection_delay(event=event, ratio=ratio) if event.shape == "step" else None,
+                "delay": detection_delay(event=event, ratio=ratio)
+                if event.shape == "step"
+                else None,
                 "coverage": interval_coverage(
                     event=event,
                     ratio=ratio,
@@ -627,9 +640,9 @@ def false_movement_windows(
     rng = np.random.default_rng(seed)
     windows: list[tuple[int, int, int]] = []
     for plant, site in enumerate(record.sites):
-        quiet = ratios.filter(
-            (pl.col("site") == site) & pl.col("ratio").is_between(lower, upper)
-        )["month"].to_list()
+        quiet = ratios.filter((pl.col("site") == site) & pl.col("ratio").is_between(lower, upper))[
+            "month"
+        ].to_list()
         quiet = [month for month in quiet if month in spans]
         chosen = rng.permutation(quiet)[:per_plant] if quiet else []
         windows += [(plant, *spans[str(month)]) for month in sorted(chosen)]
@@ -654,9 +667,7 @@ def false_movement_days(*, windows: Sequence[tuple[int, int, int]]) -> list[np.n
     ]
 
 
-def false_movement_share(
-    *, windows: Sequence[tuple[int, int, int]], original: IssueScale
-) -> float:
+def false_movement_share(*, windows: Sequence[tuple[int, int, int]], original: IssueScale) -> float:
     """Return the share of window days on which the estimate moves falsely.
 
     A day moves falsely when the estimate for it is more than `FALSE_MOVEMENT_THRESHOLD` away from
@@ -737,7 +748,9 @@ def t_interval(*, differences: np.ndarray, confidence: float) -> tuple[float, fl
     """
     n = len(differences)
     mean = float(np.mean(differences))
-    half_width = float(stats.t.ppf(0.5 + confidence / 2.0, df=n - 1) * np.std(differences, ddof=1) / np.sqrt(n))
+    half_width = float(
+        stats.t.ppf(0.5 + confidence / 2.0, df=n - 1) * np.std(differences, ddof=1) / np.sqrt(n)
+    )
     return mean, mean - half_width, mean + half_width
 
 

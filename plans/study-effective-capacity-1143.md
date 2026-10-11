@@ -60,6 +60,23 @@ have run; next is the `study` skill's full sequence, including the mutation pass
    the ANM comparison is exploratory.
 6. **The forecast decision rule has an equivalence outcome**, which the lag study's rule lacked.
 
+## Literature
+
+**The project's [energy-forecasting review](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/#3-estimating-the-effective-capacity-of-metered-generators) names the published methods, and each estimator here corresponds to one.** CX1 and CX2 are the linear-programme counterpart of the quadratic optimisation of [Viotti et al. (2026)](https://doi.org/10.1002/we.70136), who fit a capacity time series against a capacity factor simulated from weather and a power curve. DP1 follows the differentiable-physics route of [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) (capacity as a fitted bound with uncertainty) and [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344) (a physical model fitted to metered power). KF is a sequential Bayesian update like the one the honourable-mention team used in [Authen et al. (2026)](https://doi.org/10.5617/nmi.13106). PR divides power by irradiance as [RdTools](https://doi.org/10.5281/zenodo.1210316) does. CSQ is a quantile of clear-sky-normalised output, the idea behind [Meyers et al. (2020)](https://doi.org/10.1109/JPHOTOV.2019.2957646). R30 is the rolling relative of the running maximum of [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079). NR and HM have no published precedent that the review found.
+
+**Four published methods are not tested.** The running maximum itself is the reference that Viotti et al. quote their numbers against, and a ratchet cannot follow a loss downwards. The Solar Data Tools pipeline and StatisticalClearSky would add dependencies to `uv.lock` (departure 4). Joint estimation with the forecast ([Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)) needs a different forecaster, and this study keeps the lag study's. Per-park power curves ([Authen et al. (2026)](https://doi.org/10.5617/nmi.13106)) are for wind.
+
+**Departures from the review's recommendation, and results our controls respect.**
+
+- The review proposes running Viotti et al. against Solar Data Tools on the project's sites. This study runs a linear programme instead of either (departure 4).
+- Viotti et al. score capacity recovery and forecast error separately, and find that the variant that recovers capacity best is not the variant that forecasts best. Stage A scores recovery and Stage B scores the forecast, and the page reports both.
+- Viotti et al. validate on synthetic capacity steps planted in real data, and warn that turbine outages near a step confound the score and that about a quarter of their cases show an erroneous step at the record's end. The planted-loss design here does the same, the ratio of planted to original estimate cancels real outages, and the footprint rule keeps events away from the record's edges.
+- Their de-rating case (a loss in the 30 days after a step) is the one their paper answers worst, and Stage A's ramp and intermittent losses are that case.
+- [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421) found that tracking a varying bound on its own gained 2.43%, which they call not significant. The 2% decision threshold sits at the same order, so "unresolved" is a likely forecast verdict.
+- [Dantas and Browell (2026)](https://doi.org/10.1002/we.70079) drop curtailed half-hours using published bid volumes. NGED's active-network-management log is a noisy label, so this study removes the hours where the export cap binds (as the lag study does) and shows the ANM-blind estimate beside the ANM-aware one.
+- No ground truth exists for real effective capacity, so Stage A's evidence is planted losses only, and the three real low months are descriptive.
+- [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) found an adaptive model absorbing a removed regional capacity, a caution that normalisation may not earn its place.
+
 ## The facts this plan rests on
 
 - **Rows:** `data/studies/per_study/lag_features/ens_mean/lag_frame_ens_mean_day1.parquet`, 29,445
@@ -405,6 +422,8 @@ model.** The final page's "Groundwork for version 2" paragraph can draw on these
 - **Needed for joint fitting:** the physics inputs as tensors (a port of the Erbs split and the
   plane-of-array chain), one objective over the whole record, and a prior that ties the weekly trace
   across plants in the same weather.
+
+- **Literature hook for the Introduction and Discussion:** cite the works in the Literature section with the link on the author-year label, and say which estimator stands for which published method.
 
 ## Open decisions for the maintainer
 

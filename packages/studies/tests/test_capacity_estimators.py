@@ -97,11 +97,15 @@ def test_an_estimate_for_day_d_ignores_every_input_after_day_d(name: str) -> Non
     scrambled_from = scramble_from_day(record=record, first_day=day, seed=1)
     original = run_cheap_estimator(name=name, record=record).level[:, day]
     assert np.array_equal(
-        original, run_cheap_estimator(name=name, record=scrambled_after).level[:, day], equal_nan=True
+        original,
+        run_cheap_estimator(name=name, record=scrambled_after).level[:, day],
+        equal_nan=True,
     )
     # The probe is able to fail: noise from day d itself does change the estimate for day d.
     assert not np.array_equal(
-        original, run_cheap_estimator(name=name, record=scrambled_from).level[:, day], equal_nan=True
+        original,
+        run_cheap_estimator(name=name, record=scrambled_from).level[:, day],
+        equal_nan=True,
     )
 
 
@@ -162,11 +166,14 @@ def test_a_null_estimate_and_a_short_history_fall_back_and_are_counted() -> None
 def test_the_scale_is_never_below_a_fifth_of_the_static_power() -> None:
     record = synthetic_record(seed=7)
     level = np.full((3, DAYS), 1e-6)
-    scale = issue_time_estimates(record=record, raw=RawEstimate(level=level, sd=None), reference=None)
+    scale = issue_time_estimates(
+        record=record, raw=RawEstimate(level=level, sd=None), reference=None
+    )
     floor = FLOOR_SHARE_OF_STATIC * record.static_p99_mw
     assert scale.scale_mw[:, 400] == pytest.approx(floor)
     above = issue_time_estimates(
-        record=record, raw=RawEstimate(level=np.broadcast_to(floor[:, None] * 2, (3, DAYS)), sd=None),
+        record=record,
+        raw=RawEstimate(level=np.broadcast_to(floor[:, None] * 2, (3, DAYS)), sd=None),
         reference=None,
     )
     assert above.scale_mw[:, 400] == pytest.approx(2 * floor)
@@ -252,7 +259,9 @@ def test_the_hindsight_reference_never_reads_the_target_week_but_reads_its_neigh
         altered_before[:, week_first - 7 : week_first] *= 0.3
         same = hindsight(record.with_power(power_mw=altered_week), name)
         different = hindsight(record.with_power(power_mw=altered_before), name)
-        assert np.allclose(original[:, week_first : week_last + 1], same[:, week_first : week_last + 1])
+        assert np.allclose(
+            original[:, week_first : week_last + 1], same[:, week_first : week_last + 1]
+        )
         assert not np.allclose(
             original[:, week_first : week_last + 1], different[:, week_first : week_last + 1]
         )
@@ -293,7 +302,11 @@ def test_a_row_reads_the_scale_of_the_day_its_hour_midpoint_falls_in() -> None:
         {
             "site": ["B", "A", "A"],
             # The hour ending at 00:00 belongs to the day before; the hour ending at 01:00 to the day.
-            "time": [midnight.replace(day=start.day + 2), midnight.replace(day=start.day + 2), midnight.replace(day=start.day + 2, hour=1)],
+            "time": [
+                midnight.replace(day=start.day + 2),
+                midnight.replace(day=start.day + 2),
+                midnight.replace(day=start.day + 2, hour=1),
+            ],
         }
     ).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
     plants, days = target_day_indices(record=record, rows=rows)
@@ -308,12 +321,18 @@ def test_a_row_for_an_unknown_plant_or_a_day_outside_the_record_is_refused() -> 
     stamp = datetime(2023, 6, 5, 12, tzinfo=UTC)
     with pytest.raises(ValueError, match="lacks"):
         target_day_indices(
-            record=record, rows=pl.DataFrame({"site": ["Z"], "time": [stamp]}).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
+            record=record,
+            rows=pl.DataFrame({"site": ["Z"], "time": [stamp]}).with_columns(
+                pl.col("time").dt.replace_time_zone("UTC")
+            ),
         )
     far = datetime(2030, 1, 1, tzinfo=UTC)
     with pytest.raises(ValueError, match="outside"):
         target_day_indices(
-            record=record, rows=pl.DataFrame({"site": ["A"], "time": [far]}).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
+            record=record,
+            rows=pl.DataFrame({"site": ["A"], "time": [far]}).with_columns(
+                pl.col("time").dt.replace_time_zone("UTC")
+            ),
         )
 
 
@@ -336,3 +355,10 @@ def test_a_record_with_mismatched_arrays_is_refused_and_reversing_twice_restores
     assert set(CHEAP_ESTIMATORS) == set(ALLOWED_DELAY_DAYS)
     name: EstimatorNameType = "NR"
     assert run_cheap_estimator(name=name, record=record).level.shape == (3, 30)
+
+
+def test_a_longer_lag_reads_an_older_estimate() -> None:
+    record = synthetic_record(seed=17)
+    raw = run_cheap_estimator(name="NR", record=record)
+    three = issue_time_estimates(record=record, raw=raw, reference=None, lag_days=3).scale_mw
+    assert three[0, 500] == pytest.approx(raw.level[0, 497])

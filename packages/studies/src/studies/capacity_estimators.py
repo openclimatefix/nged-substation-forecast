@@ -294,7 +294,9 @@ def _daily_shape_ratio(*, record: CapacityRecord, plant: int, valid: np.ndarray)
     )
 
 
-def estimate_r30(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> PlantEstimate:
+def estimate_r30(
+    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
+) -> PlantEstimate:
     """Return the rolling 30-day 99th percentile of the plant's hourly power.
 
     Args:
@@ -317,7 +319,9 @@ def estimate_r30(*, record: CapacityRecord, plant: int, params: Mapping[str, flo
     return PlantEstimate(level=level, sd=None)
 
 
-def estimate_csq(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> PlantEstimate:
+def estimate_csq(
+    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
+) -> PlantEstimate:
     """Return the rolling 30-day 90th percentile of power over clear-sky irradiance.
 
     Args:
@@ -333,7 +337,7 @@ def estimate_csq(*, record: CapacityRecord, plant: int, params: Mapping[str, flo
     clear = record.clear_sky_w_m2[plant]
     sunny = valid[:, None] & (clear >= LOW_SUN_CLEAR_SKY_W_M2)
     with np.errstate(invalid="ignore", divide="ignore"):
-        ratio = np.where(sunny, record.power_mw[plant] / clear, np.nan)
+        ratio = np.where(sunny, record.power_mw[plant] / np.where(sunny, clear, 1.0), np.nan)
     windows = _trailing_windows(values=ratio, window=30).reshape(len(valid), -1)
     days = _trailing_windows(values=valid.astype(float), window=30)
     level = np.full(len(valid), np.nan)
@@ -371,21 +375,22 @@ def neighbour_ratio(*, record: CapacityRecord) -> np.ndarray:
         An array of shape (plants, days) with NaN where the ratio is null.
     """
     rolled = np.stack(
-        [
-            _rolling_mean(values=row, window=7, min_count=5)
-            for row in relative_energy(record=record)
-        ]
+        [_rolling_mean(values=row, window=7, min_count=5) for row in relative_energy(record=record)]
     )
     finite = np.isfinite(rolled)
     others_count = finite.sum(axis=0)[None, :] - finite
-    others_total = np.where(finite, rolled, 0.0).sum(axis=0)[None, :] - np.where(finite, rolled, 0.0)
+    others_total = np.where(finite, rolled, 0.0).sum(axis=0)[None, :] - np.where(
+        finite, rolled, 0.0
+    )
     with np.errstate(invalid="ignore", divide="ignore"):
         others_mean = others_total / np.where(others_count > 0, others_count, np.nan)
         ratio = rolled / others_mean
     return np.where((others_count > 0) & (others_mean > 0), ratio, np.nan)
 
 
-def estimate_nr(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> PlantEstimate:
+def estimate_nr(
+    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
+) -> PlantEstimate:
     """Return the plant's 7-day energy ratio to the other plants, times its static power.
 
     Args:
@@ -402,7 +407,9 @@ def estimate_nr(*, record: CapacityRecord, plant: int, params: Mapping[str, floa
     )
 
 
-def estimate_pr(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> PlantEstimate:
+def estimate_pr(
+    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
+) -> PlantEstimate:
     """Return the sum of power over the sum of satellite irradiance across the latest 7 days.
 
     Args:
@@ -437,7 +444,9 @@ KF_INNOVATION_CLIP: Final[float] = 3.0
 pulled back to that distance, so that one bad satellite day cannot move the level."""
 
 
-def estimate_kf(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> PlantEstimate:
+def estimate_kf(
+    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
+) -> PlantEstimate:
     """Return a Kalman local-level filter on the daily log ratio of power to modelled power.
 
     The state is the logarithm of the plant's output per modelled unit of direct-current capacity,
@@ -454,9 +463,7 @@ def estimate_kf(*, record: CapacityRecord, plant: int, params: Mapping[str, floa
     """
     process_variance = params["process_sd"] ** 2
     observation_variance = params["observation_sd"] ** 2
-    ratio = _daily_shape_ratio(
-        record=record, plant=plant, valid=valid_days(record=record)
-    )
+    ratio = _daily_shape_ratio(record=record, plant=plant, valid=valid_days(record=record))
     observations = np.where(ratio > 0, np.log(np.where(ratio > 0, ratio, 1.0)), np.nan)
     days = len(observations)
     level = np.full(days, np.nan)
@@ -493,7 +500,9 @@ HM_INITIAL_FULL_PROBABILITY: Final[float] = 0.7
 """The prior probability of the full level before the first valid day."""
 
 
-def estimate_hm(*, record: CapacityRecord, plant: int, params: Mapping[str, float]) -> PlantEstimate:
+def estimate_hm(
+    *, record: CapacityRecord, plant: int, params: Mapping[str, float]
+) -> PlantEstimate:
     """Return the posterior mean capacity of a hidden Markov model over discrete capacity levels.
 
     **The model encodes that strings and inverters fail in whole units.** Each day's ratio of power
@@ -579,7 +588,9 @@ def run_cheap_estimator(
     """
     function = CHEAP_ESTIMATORS[name]
     settings = DEFAULT_PARAMS[name] if params is None else params
-    parts = [function(record=record, plant=plant, params=settings) for plant in range(len(record.sites))]
+    parts = [
+        function(record=record, plant=plant, params=settings) for plant in range(len(record.sites))
+    ]
     level = np.stack([part.level for part in parts])
     sd = np.stack([part.sd for part in parts]) if parts[0].sd is not None else None
     return RawEstimate(level=level, sd=sd)
@@ -600,9 +611,7 @@ def reference_levels(*, raw: RawEstimate, record: CapacityRecord) -> np.ndarray:
         return np.full(len(record.sites), np.nan)
     values = raw.level[:, days]
     with np.errstate(all="ignore"):
-        return np.array(
-            [np.nanmedian(row) if np.isfinite(row).any() else np.nan for row in values]
-        )
+        return np.array([np.nanmedian(row) if np.isfinite(row).any() else np.nan for row in values])
 
 
 def calibrate(
@@ -621,9 +630,7 @@ def calibrate(
     if reference is None:
         return raw
     factor = (record.static_p99_mw / reference)[:, None]
-    return RawEstimate(
-        level=raw.level * factor, sd=None if raw.sd is None else raw.sd * factor
-    )
+    return RawEstimate(level=raw.level * factor, sd=None if raw.sd is None else raw.sd * factor)
 
 
 def _history_counts(*, record: CapacityRecord) -> np.ndarray:
@@ -676,7 +683,11 @@ def _lagged(*, values: np.ndarray, lag: int) -> np.ndarray:
 
 
 def issue_time_estimates(
-    *, record: CapacityRecord, raw: RawEstimate, reference: np.ndarray | None
+    *,
+    record: CapacityRecord,
+    raw: RawEstimate,
+    reference: np.ndarray | None,
+    lag_days: int = ISSUE_LAG_DAYS,
 ) -> IssueScale:
     """Return the scale a forecast for each target day divides by.
 
@@ -689,16 +700,18 @@ def issue_time_estimates(
         record: The record.
         raw: The estimator's raw estimate, whose day `d` read days up to `d` only.
         reference: `reference_levels`' result, or `None` for an estimator already in megawatts.
+        lag_days: How many days before the target day the estimate is read; 3 gives the sensitivity
+            in which satellite irradiance is read one day less fresh.
 
     Returns:
         The scale, its relative standard deviation, and the fallback reason, for every plant and
         target day.
     """
     calibrated = calibrate(raw=raw, record=record, reference=reference)
-    history = _lagged(values=_history_counts(record=record).astype(float), lag=ISSUE_LAG_DAYS)
+    history = _lagged(values=_history_counts(record=record).astype(float), lag=lag_days)
     return _finalise(
-        level=_lagged(values=calibrated.level, lag=ISSUE_LAG_DAYS),
-        sd=None if calibrated.sd is None else _lagged(values=calibrated.sd, lag=ISSUE_LAG_DAYS),
+        level=_lagged(values=calibrated.level, lag=lag_days),
+        sd=None if calibrated.sd is None else _lagged(values=calibrated.sd, lag=lag_days),
         history=np.nan_to_num(history, nan=0.0),
         static=record.static_p99_mw,
     )
@@ -832,7 +845,9 @@ def _combine_sides(
     return combined, combined_sd, support
 
 
-def target_day_indices(*, record: CapacityRecord, rows: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+def target_day_indices(
+    *, record: CapacityRecord, rows: pl.DataFrame
+) -> tuple[np.ndarray, np.ndarray]:
     """Return each row's plant index and target-day index in the record.
 
     A row's target day is the date of its hour's midpoint, which is 30 minutes before its label.
@@ -865,7 +880,9 @@ def target_day_indices(*, record: CapacityRecord, rows: pl.DataFrame) -> tuple[n
     return plants, days
 
 
-def scale_for_rows(*, record: CapacityRecord, scale_mw: np.ndarray, rows: pl.DataFrame) -> np.ndarray:
+def scale_for_rows(
+    *, record: CapacityRecord, scale_mw: np.ndarray, rows: pl.DataFrame
+) -> np.ndarray:
     """Return the scale for each forecast row, read at the row's plant and target day.
 
     Args:
@@ -934,7 +951,9 @@ def assert_scale_ignores_the_issue_day_onward(
             np.array([target]),
         )
         if not np.array_equal(original, scrambled, equal_nan=True):
-            moved = int(np.flatnonzero(~np.isclose(original[:, 0], scrambled[:, 0], equal_nan=True))[0])
+            moved = int(
+                np.flatnonzero(~np.isclose(original[:, 0], scrambled[:, 0], equal_nan=True))[0]
+            )
             msg = (
                 f"the scale for plant {record.sites[moved]} on target day index {int(target)} "
                 "changed when inputs from its issue day onward were replaced by noise"
@@ -981,10 +1000,7 @@ def synthetic_record(
     factor = np.ones((plants, days)) if capacity_factor is None else capacity_factor
     shape = ghi / 1000.0 * 1.1
     power = (
-        sizes[:, None, None]
-        * factor[:, :, None]
-        * shape
-        * (1.0 + 0.04 * rng.standard_normal(grid))
+        sizes[:, None, None] * factor[:, :, None] * shape * (1.0 + 0.04 * rng.standard_normal(grid))
     )
     power = np.clip(power, 0.0, None)
     static = np.array([np.quantile(power[p][power[p] > 0], 0.99) for p in range(plants)])

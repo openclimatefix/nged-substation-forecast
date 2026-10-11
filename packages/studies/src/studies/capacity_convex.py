@@ -102,10 +102,7 @@ def window_points(
     power = record.power_mw[plant, days] / record.static_p99_mw[plant]
     shape = unit_output[days]
     usable = (
-        valid[days][:, None]
-        & np.isfinite(power)
-        & np.isfinite(shape)
-        & (shape >= MIN_UNIT_OUTPUT)
+        valid[days][:, None] & np.isfinite(power) & np.isfinite(shape) & (shape >= MIN_UNIT_OUTPUT)
     )
     day_index, hour_index = np.nonzero(usable)
     if len(day_index) < MIN_POINTS or len(np.unique(day_index)) < MIN_DAYS_WITH_POINTS:
@@ -118,8 +115,14 @@ def window_points(
 
 
 def _solve(
-    *, cost: np.ndarray, upper: sparse.spmatrix, upper_rhs: np.ndarray, equal: sparse.spmatrix,
-    equal_rhs: np.ndarray, plant: str, end_day: int
+    *,
+    cost: np.ndarray,
+    upper: sparse.spmatrix,
+    upper_rhs: np.ndarray,
+    equal: sparse.spmatrix,
+    equal_rhs: np.ndarray,
+    plant: str,
+    end_day: int,
 ) -> np.ndarray:
     """Solve a linear program with non-negative variables, raising unless it is optimal.
 
@@ -153,7 +156,9 @@ def _solve(
     return result.x
 
 
-def _fused_rows(*, offset: int, tv_offset: int, n_days: int, total: int) -> tuple[sparse.csr_matrix, np.ndarray]:
+def _fused_rows(
+    *, offset: int, tv_offset: int, n_days: int, total: int
+) -> tuple[sparse.csr_matrix, np.ndarray]:
     """Return the inequality rows tying a trace's day-to-day change to its fused-lasso variables.
 
     Args:
@@ -166,7 +171,9 @@ def _fused_rows(*, offset: int, tv_offset: int, n_days: int, total: int) -> tupl
         The matrix (two rows per change) and its zero right-hand side.
     """
     steps = np.arange(n_days - 1)
-    rows = np.concatenate([2 * steps, 2 * steps, 2 * steps, 2 * steps + 1, 2 * steps + 1, 2 * steps + 1])
+    rows = np.concatenate(
+        [2 * steps, 2 * steps, 2 * steps, 2 * steps + 1, 2 * steps + 1, 2 * steps + 1]
+    )
     cols = np.concatenate(
         [
             offset + steps + 1,
@@ -211,20 +218,33 @@ def cx1_trace(
     n = len(points.day)
     total = n_days + 2 * n + (n_days - 1)
     cost = np.concatenate(
-        [np.zeros(n_days), np.full(n, quantile), np.full(n, 1.0 - quantile), np.full(n_days - 1, fused_weight)]
+        [
+            np.zeros(n_days),
+            np.full(n, quantile),
+            np.full(n, 1.0 - quantile),
+            np.full(n_days - 1, fused_weight),
+        ]
     )
     point = np.arange(n)
     equal = sparse.coo_matrix(
         (
             np.concatenate([points.unit_output, np.ones(n), -np.ones(n)]),
-            (np.concatenate([point, point, point]), np.concatenate([points.day, n_days + point, n_days + n + point])),
+            (
+                np.concatenate([point, point, point]),
+                np.concatenate([points.day, n_days + point, n_days + n + point]),
+            ),
         ),
         shape=(n, total),
     ).tocsr()
     upper, upper_rhs = _fused_rows(offset=0, tv_offset=n_days + 2 * n, n_days=n_days, total=total)
     return _solve(
-        cost=cost, upper=upper, upper_rhs=upper_rhs, equal=equal, equal_rhs=points.power,
-        plant=plant, end_day=end_day,
+        cost=cost,
+        upper=upper,
+        upper_rhs=upper_rhs,
+        equal=equal,
+        equal_rhs=points.power,
+        plant=plant,
+        end_day=end_day,
     )[:n_days]
 
 
@@ -314,7 +334,16 @@ def cx2_traces(
     free_output, clip_output = points.unit_output[free], points.unit_output[clipped]
     equal = sparse.coo_matrix(
         (
-            np.concatenate([free_output, np.ones(n_free), -np.ones(n_free), np.ones(n_clip), np.ones(n_clip), -np.ones(n_clip)]),
+            np.concatenate(
+                [
+                    free_output,
+                    np.ones(n_free),
+                    -np.ones(n_free),
+                    np.ones(n_clip),
+                    np.ones(n_clip),
+                    -np.ones(n_clip),
+                ]
+            ),
             (
                 np.concatenate([free_index] * 3 + [n_free + clip_index] * 3),
                 np.concatenate(
@@ -342,13 +371,22 @@ def cx2_traces(
         ),
         shape=(n_clip, total),
     ).tocsr()
-    fused_dc, _ = _fused_rows(offset=offsets["dc"], tv_offset=offsets["tv_dc"], n_days=n_days, total=total)
-    fused_ac, _ = _fused_rows(offset=offsets["ac"], tv_offset=offsets["tv_ac"], n_days=n_days, total=total)
+    fused_dc, _ = _fused_rows(
+        offset=offsets["dc"], tv_offset=offsets["tv_dc"], n_days=n_days, total=total
+    )
+    fused_ac, _ = _fused_rows(
+        offset=offsets["ac"], tv_offset=offsets["tv_ac"], n_days=n_days, total=total
+    )
     upper = sparse.vstack([hinge_rows, fused_dc, fused_ac]).tocsr()
     upper_rhs = np.zeros(upper.shape[0])
     solution = _solve(
-        cost=cost, upper=upper, upper_rhs=upper_rhs, equal=equal, equal_rhs=equal_rhs,
-        plant=plant, end_day=end_day,
+        cost=cost,
+        upper=upper,
+        upper_rhs=upper_rhs,
+        equal=equal,
+        equal_rhs=equal_rhs,
+        plant=plant,
+        end_day=end_day,
     )
     return solution[:n_days], solution[n_days : 2 * n_days]
 
@@ -381,7 +419,8 @@ def cx2_objective(
     pinball = np.where(residual >= 0, quantile * residual, (quantile - 1.0) * residual).sum()
     plateau = np.abs(points.power[clipped] - ac_trace[points.day[clipped]]).sum()
     hinge = np.maximum(
-        0.0, ac_trace[points.day[clipped]] - points.unit_output[clipped] * dc_trace[points.day[clipped]]
+        0.0,
+        ac_trace[points.day[clipped]] - points.unit_output[clipped] * dc_trace[points.day[clipped]],
     ).sum()
     penalty = np.abs(np.diff(dc_trace)).sum() + np.abs(np.diff(ac_trace)).sum()
     return float(pinball + plateau + hinge_weight * hinge + fused_weight * penalty)

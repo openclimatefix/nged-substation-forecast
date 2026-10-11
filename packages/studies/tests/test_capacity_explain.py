@@ -23,21 +23,36 @@ def test_every_estimator_has_a_grade_for_every_criterion_and_a_reason() -> None:
 
 def test_the_sentence_names_the_change_the_window_and_the_spread() -> None:
     sentence = explanation_sentence(
-        estimator="KF", when="2025-03-14", scale_mw=4.0, earlier_scale_mw=5.0, earlier_days=28,
-        relative_sd=0.05, where="the low-output plant",
+        estimator="KF",
+        when="2025-03-14",
+        scale_mw=4.0,
+        earlier_scale_mw=5.0,
+        earlier_days=28,
+        relative_sd=0.05,
+        where="the low-output plant",
     )
     assert "fell 20.0% in 28 days to 4.00 MW" in sentence
     assert "standard deviation 5.0%" in sentence
     assert "2025-03-14" in sentence
     rose = explanation_sentence(
-        estimator="R30", when="d", scale_mw=6.0, earlier_scale_mw=5.0, earlier_days=7, relative_sd=None
+        estimator="R30",
+        when="d",
+        scale_mw=6.0,
+        earlier_scale_mw=5.0,
+        earlier_days=7,
+        relative_sd=None,
     )
     assert "rose 20.0%" in rose and "standard deviation" not in rose
 
 
 def test_fitted_quantities_carry_their_units_and_the_availability_factor() -> None:
     quantities = fitted_physical_quantities(
-        orientation={"tilt_deg": 25.0, "azimuth_deg": 179.0, "dc_capacity_mw": 7.0, "ac_capacity_mw": 5.0},
+        orientation={
+            "tilt_deg": 25.0,
+            "azimuth_deg": 179.0,
+            "dc_capacity_mw": 7.0,
+            "ac_capacity_mw": 5.0,
+        },
         scale_mw=4.5,
         static_p99_mw=6.0,
         relative_sd=0.1,

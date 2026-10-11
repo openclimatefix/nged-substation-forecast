@@ -17,24 +17,87 @@ GradeType = Literal["yes", "partly", "no"]
 """A rubric grade."""
 
 CRITERIA: Final[tuple[tuple[str, str], ...]] = (
-    ("one_sentence", "An operator can be told in one sentence why the capacity fell on a given day"),
+    (
+        "one_sentence",
+        "An operator can be told in one sentence why the capacity fell on a given day",
+    ),
     ("physical_units", "The estimator's fitted quantities are physical quantities with units"),
-    ("attributable", "A change can be attributed to a cause: soiling, a lost string, curtailment, or a weather-forecast bias"),
+    (
+        "attributable",
+        "A change can be attributed to a cause: soiling, a lost string, curtailment, or a weather-forecast bias",
+    ),
     ("spread", "The estimator returns a spread, not only a value"),
-    ("differentiable", "The estimator can be differentiated through, for joint fitting with other models"),
+    (
+        "differentiable",
+        "The estimator can be differentiated through, for joint fitting with other models",
+    ),
 )
 """The rubric's five criteria: a key and the question the grader answers."""
 
 RUBRIC: Final[Mapping[str, Mapping[str, GradeType]]] = {
-    "R30": {"one_sentence": "yes", "physical_units": "partly", "attributable": "no", "spread": "no", "differentiable": "no"},
-    "CSQ": {"one_sentence": "yes", "physical_units": "partly", "attributable": "no", "spread": "no", "differentiable": "no"},
-    "NR": {"one_sentence": "yes", "physical_units": "partly", "attributable": "partly", "spread": "no", "differentiable": "no"},
-    "PR": {"one_sentence": "yes", "physical_units": "partly", "attributable": "partly", "spread": "no", "differentiable": "no"},
-    "KF": {"one_sentence": "yes", "physical_units": "yes", "attributable": "partly", "spread": "yes", "differentiable": "partly"},
-    "HM": {"one_sentence": "yes", "physical_units": "yes", "attributable": "partly", "spread": "partly", "differentiable": "no"},
-    "CX1": {"one_sentence": "partly", "physical_units": "partly", "attributable": "partly", "spread": "no", "differentiable": "partly"},
-    "CX2": {"one_sentence": "yes", "physical_units": "yes", "attributable": "yes", "spread": "no", "differentiable": "partly"},
-    "DP1": {"one_sentence": "yes", "physical_units": "yes", "attributable": "partly", "spread": "yes", "differentiable": "yes"},
+    "R30": {
+        "one_sentence": "yes",
+        "physical_units": "partly",
+        "attributable": "no",
+        "spread": "no",
+        "differentiable": "no",
+    },
+    "CSQ": {
+        "one_sentence": "yes",
+        "physical_units": "partly",
+        "attributable": "no",
+        "spread": "no",
+        "differentiable": "no",
+    },
+    "NR": {
+        "one_sentence": "yes",
+        "physical_units": "partly",
+        "attributable": "partly",
+        "spread": "no",
+        "differentiable": "no",
+    },
+    "PR": {
+        "one_sentence": "yes",
+        "physical_units": "partly",
+        "attributable": "partly",
+        "spread": "no",
+        "differentiable": "no",
+    },
+    "KF": {
+        "one_sentence": "yes",
+        "physical_units": "yes",
+        "attributable": "partly",
+        "spread": "yes",
+        "differentiable": "partly",
+    },
+    "HM": {
+        "one_sentence": "yes",
+        "physical_units": "yes",
+        "attributable": "partly",
+        "spread": "partly",
+        "differentiable": "no",
+    },
+    "CX1": {
+        "one_sentence": "partly",
+        "physical_units": "partly",
+        "attributable": "partly",
+        "spread": "no",
+        "differentiable": "partly",
+    },
+    "CX2": {
+        "one_sentence": "yes",
+        "physical_units": "yes",
+        "attributable": "yes",
+        "spread": "no",
+        "differentiable": "partly",
+    },
+    "DP1": {
+        "one_sentence": "yes",
+        "physical_units": "yes",
+        "attributable": "partly",
+        "spread": "yes",
+        "differentiable": "yes",
+    },
 }
 """Each estimator's grades, from reading its code. The reasons are in the table below."""
 
@@ -75,7 +138,11 @@ def rubric_table() -> pl.DataFrame:
 
 
 def fitted_physical_quantities(
-    *, orientation: Mapping[str, float], scale_mw: float, static_p99_mw: float, relative_sd: float | None
+    *,
+    orientation: Mapping[str, float],
+    scale_mw: float,
+    static_p99_mw: float,
+    relative_sd: float | None,
 ) -> dict[str, str]:
     """Describe a plant's fitted physical quantities with units, on one day.
 

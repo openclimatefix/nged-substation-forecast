@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
-from studies.capacity_estimators import CapacityRecord
-from studies.capacity_recovery import PlantedEvent
+from studies.capacity_estimators import CapacityRecord, RawEstimate
+from studies.capacity_recovery import PlantedEvent, calendar_month_spans, plant_losses
 from studies.sources import study_dir_for
 
 STUDY_DIR: Final[Path] = study_dir_for(study="effective_capacity")
@@ -264,3 +264,157 @@ def load_events(*, root: Path) -> Events:
     """
     path = inputs_dir(root=root) / "events.json"
     return Events(payload=json.loads(path.read_text()))
+
+
+TUNING_GRIDS: Final[dict[str, list[dict[str, float]]]] = {
+    "R30": [{}],
+    "CSQ": [{}],
+    "NR": [{}],
+    "PR": [{}],
+    "KF": [{"process_sd": sd, "observation_sd": 0.1} for sd in (0.005, 0.01, 0.02)],
+    "HM": [{"stay_probability": stay, "observation_sd": 0.15} for stay in (0.95, 0.98, 0.995)],
+    "CX1": [{"quantile": 0.9, "fused_weight": weight} for weight in (3.0, 10.0, 30.0)],
+    "CX2": [
+        {"quantile": 0.7, "fused_weight": weight, "hinge_weight": 1.0}
+        for weight in (3.0, 10.0, 30.0)
+    ],
+    "DP1": [
+        {
+            "quantile": 0.7,
+            "total_variation_weight": weight,
+            "learning_rate": 0.05,
+            "samples": 4.0,
+            "first_steps": 300.0,
+            "later_steps": 80.0,
+        }
+        for weight in (5.0, 20.0)
+    ],
+}
+"""Each estimator's settings. The tuning draw alone chooses among them, never a forecast error."""
+
+
+def setting_name(*, params: dict[str, float]) -> str:
+    """Return a file-name-safe name for a setting.
+
+    Args:
+        params: The estimator's settings.
+
+    Returns:
+        `default` for no settings, else the keys and values joined, such as
+        `fused_weight=10_quantile=0.9`.
+    """
+    if not params:
+        return "default"
+    return "_".join(f"{key}={value:g}" for key, value in sorted(params.items()))
+
+
+def estimate_path(*, root: Path, estimator: str, setting: str, record_id: str) -> Path:
+    """Return the file holding one estimator's raw estimates on one record.
+
+    Args:
+        root: The output root.
+        estimator: The estimator's name.
+        setting: `setting_name`'s result.
+        record_id: A record identifier, such as `draw03` or `original__reversed`.
+
+    Returns:
+        The `.npz` path.
+    """
+    return estimates_dir(root=root) / estimator / setting / f"{record_id}.npz"
+
+
+def tuned_path(*, root: Path, estimator: str) -> Path:
+    """Return the file recording which setting the tuning draw chose for an estimator."""
+    return root / "tuned" / f"tuned_{estimator}.json"
+
+
+def load_tuned(*, root: Path, estimator: str) -> dict[str, float]:
+    """Read the setting the tuning draw chose.
+
+    Args:
+        root: The output root.
+        estimator: The estimator's name.
+
+    Returns:
+        The settings.
+
+    Raises:
+        FileNotFoundError: If the tuning has not run, naming the script that runs it.
+    """
+    path = tuned_path(root=root, estimator=estimator)
+    if not path.exists():
+        msg = f"{path} is missing; run score_capacity_recovery.py --phase tuning first"
+        raise FileNotFoundError(msg)
+    return json.loads(path.read_text())["params"]
+
+
+def save_estimate(*, path: Path, level: np.ndarray, sd: np.ndarray | None) -> None:
+    """Write raw estimates atomically.
+
+    Args:
+        path: The `.npz` file.
+        level: The level, shape (plants, days).
+        sd: The standard deviation, or `None`.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp.npz")
+    np.savez_compressed(temporary, level=level, sd=np.empty((0,)) if sd is None else sd)
+    temporary.rename(path)
+
+
+def load_estimate(*, path: Path) -> RawEstimate:
+    """Read raw estimates.
+
+    Args:
+        path: The `.npz` file.
+
+    Returns:
+        The raw estimate.
+    """
+    with np.load(path) as data:
+        sd = data["sd"]
+        return RawEstimate(level=data["level"], sd=sd if sd.size else None)
+
+
+def record_for(*, root: Path, record_id: str) -> CapacityRecord:
+    """Build a record by identifier.
+
+    Args:
+        root: The output root.
+        record_id: `original`, `anm_blind`, `control`, `draw00` to `draw10`, each optionally with a
+            `__reversed` suffix.
+
+    Returns:
+        The record, with its losses planted and its days reversed as the identifier says.
+    """
+    reversed_record = record_id.endswith("__reversed")
+    base_id = record_id.removesuffix("__reversed")
+    events = load_events(root=root)
+    if base_id == "anm_blind":
+        record = load_record(root=root, anm_blind=True)
+    else:
+        record = load_record(root=root)
+        if base_id == CONTROL:
+            record = plant_losses(record=record, events=events.control)
+        elif base_id.startswith("draw"):
+            record = plant_losses(record=record, events=events.draws[int(base_id[4:])])
+        elif base_id != ORIGINAL:
+            msg = f"unknown record identifier {record_id}"
+            raise ValueError(msg)
+    return record.reversed() if reversed_record else record
+
+
+def scored_days(*, record: CapacityRecord, events: Events) -> np.ndarray:
+    """Return the day indices of every scored month of the lag frame.
+
+    Args:
+        record: The record.
+        events: The events file.
+
+    Returns:
+        The sorted day indices.
+    """
+    spans = calendar_month_spans(record=record)
+    return np.concatenate(
+        [np.arange(spans[m][0], spans[m][0] + spans[m][1]) for m in events.scored_months]
+    )

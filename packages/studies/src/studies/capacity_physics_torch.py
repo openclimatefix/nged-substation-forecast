@@ -116,7 +116,9 @@ class _Windows:
         self.dc_prior = torch.as_tensor(np.tile(dc_prior, self.records), device=device, dtype=dtype)
         self.ac_limit = torch.as_tensor(np.tile(ac_limit, self.records), device=device, dtype=dtype)
 
-    def window(self, *, end_day: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, np.ndarray]:
+    def window(
+        self, *, end_day: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, np.ndarray]:
         """Return the tensors of the 63 days ending at `end_day` and the valid days in each.
 
         Args:
@@ -165,7 +167,9 @@ def _fit_window(
     for _ in range(steps):
         optimiser.zero_grad()
         sd = F.softplus(raw_sd)
-        noise = torch.randn((samples, *mean.shape), generator=generator, device=mean.device, dtype=mean.dtype)
+        noise = torch.randn(
+            (samples, *mean.shape), generator=generator, device=mean.device, dtype=mean.dtype
+        )
         log_capacity = mean[None] + sd[None] * noise
         per_day = torch.exp(log_capacity)[:, :, week_of_day]
         predicted = soft_clip(power=dc[None] * per_day[..., None] * shape[None], limit=limit[None])

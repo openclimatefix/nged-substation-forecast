@@ -71,7 +71,9 @@ def test_a_scaled_frame_divides_the_three_megawatt_columns_by_the_rows_own_scale
     scaled = scaled_frame(frame=frame, scale_mw=scale)
     assert scaled["capacity_scale_mw"].to_numpy() == pytest.approx(scale)
     for column in ("power_mw", "effective_capacity_mw"):
-        assert scaled[column].to_numpy() == pytest.approx(frame[column].to_numpy() / scale, rel=1e-6)
+        assert scaled[column].to_numpy() == pytest.approx(
+            frame[column].to_numpy() / scale, rel=1e-6
+        )
     cap = frame["cap_mw"].fill_null(np.nan).to_numpy()
     assert np.allclose(scaled["cap_mw"].fill_null(np.nan).to_numpy(), cap / scale, equal_nan=True)
     assert scaled["cap_mw"].null_count() == frame["cap_mw"].null_count() > 0
@@ -89,7 +91,9 @@ def test_a_scale_that_is_not_positive_or_has_the_wrong_length_is_refused() -> No
         scaled_frame(frame=frame, scale_mw=np.ones(21))
 
 
-def test_scoring_a_scaled_arm_equals_the_multiplied_back_megawatt_error_over_the_static_power() -> None:
+def test_scoring_a_scaled_arm_equals_the_multiplied_back_megawatt_error_over_the_static_power() -> (
+    None
+):
     frame = _frame()
     rng = np.random.default_rng(5)
     scale = rng.uniform(2.5, 7.0, frame.height)
@@ -106,13 +110,17 @@ def test_scoring_a_scaled_arm_equals_the_multiplied_back_megawatt_error_over_the
     )
     scale_row = losses["capacity_scale_mw"].to_numpy()
     actual_mw = losses["power_mw"].to_numpy() * scale_row
-    prediction_mw = (losses["power_mw"].to_numpy() + losses["signed_error_mw"].to_numpy()) * scale_row
+    prediction_mw = (
+        losses["power_mw"].to_numpy() + losses["signed_error_mw"].to_numpy()
+    ) * scale_row
     cap_mw = losses["cap_mw"].fill_null(np.nan).to_numpy() * scale_row
     capped_mw = np.minimum(prediction_mw, np.where(np.isnan(cap_mw), np.inf, cap_mw))
     expected = np.abs(actual_mw - capped_mw) / STATIC_P99_MW
     assert (np.isfinite(cap_mw)).any()
     assert losses[SCORED_COLUMN].to_numpy() == pytest.approx(expected, rel=1e-9, abs=1e-12)
-    assert (capped_mw < prediction_mw - 1e-9).any(), "no prediction was clamped, so the cap is untested"
+    assert (capped_mw < prediction_mw - 1e-9).any(), (
+        "no prediction was clamped, so the cap is untested"
+    )
 
 
 def test_the_ranked_probability_score_scales_with_the_row_scale_and_the_clamp() -> None:
@@ -221,7 +229,10 @@ def test_a_refit_must_equal_the_published_scores_bit_for_bit() -> None:
 
 
 def test_a_derangement_leaves_no_month_with_its_own_scale_and_no_low_month_on_a_low_month() -> None:
-    months = {0: [f"2025-{m:02d}" for m in range(1, 10)], 1: [f"2025-{m:02d}" for m in range(1, 10)]}
+    months = {
+        0: [f"2025-{m:02d}" for m in range(1, 10)],
+        1: [f"2025-{m:02d}" for m in range(1, 10)],
+    }
     low = {0: ["2025-01", "2025-03", "2025-04"]}
     for seed in range(20):
         donors = derange_months(months_by_plant=months, low_months=low, seed=seed)

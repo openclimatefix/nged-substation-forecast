@@ -166,7 +166,12 @@ def site_cube(
 
 
 def unit_output(
-    *, ghi_w_m2: np.ndarray, grid: pl.Series, parameters: PlantParameters, latitude: float, longitude: float
+    *,
+    ghi_w_m2: np.ndarray,
+    grid: pl.Series,
+    parameters: PlantParameters,
+    latitude: float,
+    longitude: float,
 ) -> np.ndarray:
     """Return the hourly output of a plant of unit direct-current capacity under a given sky.
 
@@ -253,7 +258,7 @@ def build_record() -> tuple[CapacityRecord, np.ndarray, dict[str, dict[str, floa
     """
     sites = pv_sites().sort("site")
     labels = sites["site"].to_list()
-    last_day = (final_test_cutoff().date() - timedelta(days=1))
+    last_day = final_test_cutoff().date() - timedelta(days=1)
     days = (last_day - FIRST_DAY).days + 1
     grid = hourly_grid_ends(days=days)
     if grid.max() >= final_test_cutoff():
@@ -262,7 +267,9 @@ def build_record() -> tuple[CapacityRecord, np.ndarray, dict[str, dict[str, floa
     aware = cleaned_power(aware=True)
     blind = cleaned_power(aware=False)
     clear = hourly_clear_sky(sites=sites, first=grid.min(), last=grid.max())
-    cams = read_cams(min_reliability=MIN_CAMS_RELIABILITY).filter(pl.col("time") < final_test_cutoff())
+    cams = read_cams(min_reliability=MIN_CAMS_RELIABILITY).filter(
+        pl.col("time") < final_test_cutoff()
+    )
     capped_sites = set(
         blind.join(aware, on=["site", "time"], how="anti")["site"].unique().to_list()
     )
@@ -271,8 +278,12 @@ def build_record() -> tuple[CapacityRecord, np.ndarray, dict[str, dict[str, floa
     for row in sites.iter_rows(named=True):
         site, latitude, longitude = row["site"], row["latitude"], row["longitude"]
         power.append(site_cube(table=aware, site=site, column="power_mw", grid=grid, days=days))
-        power_blind.append(site_cube(table=blind, site=site, column="power_mw", grid=grid, days=days))
-        if site not in capped_sites and not np.array_equal(power[-1], power_blind[-1], equal_nan=True):
+        power_blind.append(
+            site_cube(table=blind, site=site, column="power_mw", grid=grid, days=days)
+        )
+        if site not in capped_sites and not np.array_equal(
+            power[-1], power_blind[-1], equal_nan=True
+        ):
             msg = f"plant {site} has no export-cap record, yet its ANM-blind power differs"
             raise ValueError(msg)
         clear_cube.append(
@@ -306,7 +317,11 @@ def build_record() -> tuple[CapacityRecord, np.ndarray, dict[str, dict[str, floa
         cams_shape.append(
             to_cube(
                 values=unit_output(
-                    ghi_w_m2=ghi_flat, grid=grid, parameters=unit, latitude=latitude, longitude=longitude
+                    ghi_w_m2=ghi_flat,
+                    grid=grid,
+                    parameters=unit,
+                    latitude=latitude,
+                    longitude=longitude,
                 ),
                 days=days,
             )
@@ -314,7 +329,11 @@ def build_record() -> tuple[CapacityRecord, np.ndarray, dict[str, dict[str, floa
         clear_shape.append(
             to_cube(
                 values=unit_output(
-                    ghi_w_m2=clear_flat, grid=grid, parameters=unit, latitude=latitude, longitude=longitude
+                    ghi_w_m2=clear_flat,
+                    grid=grid,
+                    parameters=unit,
+                    latitude=latitude,
+                    longitude=longitude,
                 ),
                 days=days,
             )
@@ -424,7 +443,9 @@ def main() -> int:
     root = claim_root(smoke=arguments.smoke)
     target = inputs_dir(root=root)
     target.mkdir(parents=True, exist_ok=True)
-    outputs = [target / name for name in ("record.npz", "orientation.json", "events.json", "manifest.json")]
+    outputs = [
+        target / name for name in ("record.npz", "orientation.json", "events.json", "manifest.json")
+    ]
     refuse_to_overwrite(paths=outputs)
     record, power_blind, orientation = build_record()
     frame = check_against_lag_frame(record=record)
@@ -432,7 +453,9 @@ def main() -> int:
         events = build_events(record=record, frame=frame)
     except ValueError:
         # Keep the record for diagnosis, under a name that no later run mistakes for a result.
-        save_record(path=target / "record_failed_events.npz", record=record, power_anm_blind=power_blind)
+        save_record(
+            path=target / "record_failed_events.npz", record=record, power_anm_blind=power_blind
+        )
         raise
     save_record(path=outputs[0], record=record, power_anm_blind=power_blind)
     write_json_atomic(path=outputs[1], payload=orientation)

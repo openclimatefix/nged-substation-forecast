@@ -51,7 +51,9 @@ def test_it_recovers_a_planted_direct_current_capacity_and_its_loss() -> None:
     assert estimate.sd is not None and np.isfinite(estimate.sd[1, 316])
 
 
-def test_days_before_the_first_full_window_have_no_estimate_and_the_level_is_held_between_refits() -> None:
+def test_days_before_the_first_full_window_have_no_estimate_and_the_level_is_held_between_refits() -> (
+    None
+):
     record = synthetic_record(days=DAYS, seed=3)
     estimate = _run(record, sizes=_sizes(3))
     assert np.isnan(estimate.level[:, : WINDOW_DAYS - 1]).all()

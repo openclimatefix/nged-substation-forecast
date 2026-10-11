@@ -33,7 +33,9 @@ from studies.capacity_estimators import (
 DAYS: Final[int] = 680
 LOSS: Final[slice] = slice(400, 460)
 LOSS_PLANT: Final[int] = 1
-EVALUATION_DAYS: Final[np.ndarray] = np.array([380, 398, 402, 410, 420, 440, 459, 462, 470, 480, 500])
+EVALUATION_DAYS: Final[np.ndarray] = np.array(
+    [380, 398, 402, 410, 420, 440, 459, 462, 470, 480, 500]
+)
 
 
 @pytest.fixture(scope="module")
@@ -168,8 +170,12 @@ def test_the_cx2_hinge_requires_the_direct_current_output_to_reach_the_alternati
     free_dc, free_ac = cx2_traces(points=points, hinge_weight=0.0, **kwargs)
     held_dc, held_ac = cx2_traces(points=points, hinge_weight=50.0, **kwargs)
     clipped = classify_clipped(points=points)
-    shortfall = held_ac[points.day[clipped]] - points.unit_output[clipped] * held_dc[points.day[clipped]]
-    free_shortfall = free_ac[points.day[clipped]] - points.unit_output[clipped] * free_dc[points.day[clipped]]
+    shortfall = (
+        held_ac[points.day[clipped]] - points.unit_output[clipped] * held_dc[points.day[clipped]]
+    )
+    free_shortfall = (
+        free_ac[points.day[clipped]] - points.unit_output[clipped] * free_dc[points.day[clipped]]
+    )
     assert free_shortfall.max() > 1e-3
     assert shortfall.max() < 1e-6
 
@@ -210,9 +216,7 @@ def test_a_program_that_is_not_optimal_raises_naming_the_plant_and_day(
         lambda *args, **kwargs: SimpleNamespace(status=2, message="infeasible", x=None),
     )
     with pytest.raises(RuntimeError, match=r"plant Q .* day index 77"):
-        cx1_trace(
-            points=points, quantile=0.9, fused_weight=1.0, plant="Q", end_day=77, n_days=5
-        )
+        cx1_trace(points=points, quantile=0.9, fused_weight=1.0, plant="Q", end_day=77, n_days=5)
 
 
 def test_an_estimator_that_is_not_convex_is_refused() -> None:
