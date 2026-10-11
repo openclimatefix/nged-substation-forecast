@@ -58,7 +58,7 @@ issue dates. A causal case file prints the static power of the readings up to th
 the plant's fitted tilt, azimuth, and capacity, because those were fitted on the whole record.
 
 **The four hard checks.** Bounds (0.2 to 1.1 times the static power); a step that a changepoint
-candidate supports (round 3's amended check also accepts a scan episode starting or ends within 14
+candidate supports (round 3's amended check also accepts a scan episode starting or ending within 14
 days, with no size test); a variance of the corrected ratio that the estimate does not raise; and
 consistency with the export cap. A causal estimate that fails any check becomes the static power; a
 hindsight estimate loses only the failing knots.
