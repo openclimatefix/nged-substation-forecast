@@ -73,6 +73,7 @@ from studies.era5_ladder import (
     SKY_REGIMES,
     TOTAL_CLOUD_COVER_THRESHOLDS,
     RungType,
+    stepwise_chain,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -495,6 +496,195 @@ def figure_leaderboard(*, board: pl.DataFrame, target: TargetType, scope: str) -
             MARS_KEY,
             *([CLEARNESS_KEY] if target == "cams" else []),
             EXPLORATORY_KEY,
+        ],
+        figure_planning=None,
+    )
+
+
+STEP_VALUE_COLUMN_PX: Final[int] = 150
+"""The width of the column that prints each step's estimate and interval beside the plot."""
+
+STEP_CHAIN_TOLERANCE: Final[float] = 0.0005
+"""How far a step chain's end may differ from the leaderboard's error (0.05 points of capacity)."""
+
+
+def _signed(value: float) -> str:
+    """Format a number to two decimals with a true minus sign and an explicit plus."""
+    if round(value, 2) == 0:
+        return "0.00"
+    return f"{value:+.2f}".replace("-", "\u2212")
+
+
+def figure_stepwise(
+    *, contrasts: pl.DataFrame, board: pl.DataFrame, scope: str
+) -> alt.TopLevelMixin:
+    """Draw each variable set's error, with each step's interval drawn from the previous dot.
+
+    The bottom row is G0, with its own error and interval. Each row above adds one group, its dot
+    sits at that variable set's error, and its line is the 95% interval of the paired difference
+    from the row below, drawn from the row below's dot.
+
+    Args:
+        contrasts: The report's contrast table.
+        board: The report's leaderboard table.
+        scope: The line naming the farms, hours, and span.
+
+    Returns:
+        The figure.
+
+    Raises:
+        ValueError: If a step is missing, or the chained dots disagree with the leaderboard's
+            errors by more than `STEP_CHAIN_TOLERANCE`.
+    """
+    scale = _scale(target="pv")
+    steps = RUNGS[1:]
+    found = {
+        row["treatment"]: row
+        for row in contrasts.filter(
+            (pl.col("target") == "pv")
+            & (pl.col("setting") == PRIMARY_SETTING)
+            & (
+                (
+                    (pl.col("family") == "planned")
+                    & (pl.col("treatment") == "g1")
+                    & (pl.col("reference") == "g0")
+                )
+                | (pl.col("family") == "step")
+            )
+        ).iter_rows(named=True)
+    }
+    missing = [rung for rung in steps if rung not in found]
+    if missing:
+        msg = f"the contrast table has no step for {missing}"
+        raise ValueError(msg)
+    ladder = board.filter((pl.col("target") == "pv") & (pl.col("view") == "ladder"))
+    errors = {row["arm"]: row for row in ladder.iter_rows(named=True)}
+    base = errors["g0"]
+    chain = stepwise_chain(
+        start=base["mae"] * scale,
+        differences=[found[rung]["difference"] * scale for rung in steps],
+        lowers=[found[rung]["lower_95"] * scale for rung in steps],
+        uppers=[found[rung]["upper_95"] * scale for rung in steps],
+    )
+    for rung, value in zip(steps, chain["value"].to_list(), strict=True):
+        if abs(value - errors[rung]["mae"] * scale) > STEP_CHAIN_TOLERANCE * scale:
+            msg = f"the chained error of {rung} differs from the leaderboard's"
+            raise ValueError(msg)
+    labels = [errors[rung]["label"] for rung in RUNGS]
+    rows = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "label": [labels[0]],
+                    "reference": [None],
+                    "value": [base["mae"] * scale],
+                    "lower": [base["mae_lower"] * scale],
+                    "upper": [base["mae_upper"] * scale],
+                    "difference": [None],
+                    "text": [f"{base['mae'] * scale:.2f}% of capacity"],
+                },
+                schema_overrides={"reference": pl.Float64, "difference": pl.Float64},
+            ),
+            chain.with_columns(
+                label=pl.Series(labels[1:]),
+                difference=pl.Series([found[rung]["difference"] * scale for rung in steps]),
+            ).with_columns(
+                text=pl.format(
+                    "{} [{}, {}]",
+                    pl.col("difference").map_elements(_signed, return_dtype=pl.String),
+                    (pl.col("lower") - pl.col("reference")).map_elements(
+                        _signed, return_dtype=pl.String
+                    ),
+                    (pl.col("upper") - pl.col("reference")).map_elements(
+                        _signed, return_dtype=pl.String
+                    ),
+                )
+            ),
+        ],
+        how="diagonal_relaxed",
+    )
+    order = list(reversed(labels))
+    domain = _domain(values=[*rows["lower"].to_list(), *rows["upper"].to_list()])
+    scale_x = alt.Scale(domain=domain, nice=False, zero=False)
+    axis_title = f"Mean absolute error ({_error_unit(target='pv')}; smaller is better)"
+    y = alt.Y(
+        "label:N",
+        sort=order,
+        title=None,
+        axis=alt.Axis(labelLimit=LABEL_WIDTH_PX, labelPadding=6, domain=False, ticks=False),
+    )
+    connectors = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "x": [float(step["reference"])] * 2,
+                    "label": [labels[index], labels[index + 1]],
+                    "order": [0, 1],
+                    "group": [index] * 2,
+                }
+            )
+            for index, step in enumerate(chain.iter_rows(named=True))
+        ]
+    )
+    colour = TARGET_COLOURS["pv"]
+    layers = [
+        alt.Chart(connectors)
+        .mark_line(color=ocf.TEXT, strokeDash=[2, 3], strokeWidth=1, opacity=0.6, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=scale_x, title=axis_title),
+            y=y,
+            detail="group:N",
+            order="order:Q",
+        ),
+        alt.Chart(rows)
+        .mark_rule(strokeWidth=1.5, color=colour, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title), x2="upper:Q"
+        ),
+        alt.Chart(rows)
+        .mark_point(filled=True, size=70, opacity=1, color=colour, aria=False)
+        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
+        alt.Chart(rows.filter(pl.col("reference").is_not_null()))
+        .mark_point(
+            shape="diamond", filled=False, size=45, strokeWidth=1.2, color=ocf.TEXT, aria=False
+        )
+        .encode(y=y, x=alt.X("reference:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
+        alt.Chart(
+            pl.DataFrame(
+                {"label": labels, "text": rows["text"].to_list(), "x": [domain[1]] * len(labels)}
+            )
+        )
+        .mark_text(
+            align="left",
+            dx=10,
+            fontSize=10,
+            font="monospace",
+            color=ocf.TEXT,
+            clip=False,
+            aria=False,
+        )
+        .encode(y=y, x=alt.X("x:Q", scale=scale_x), text="text:N"),  # ty: ignore[unresolved-attribute]
+    ]
+    panel = alt.layer(*layers).properties(
+        width=PLOT_WIDTH_PX - STEP_VALUE_COLUMN_PX,
+        height=ROW_HEIGHT_PX * len(labels),
+        title=_title("Each row adds one group to the row below"),
+    )
+    return figure(
+        panels=[panel],
+        number="7c",
+        title="Error of each variable set, with the interval of each step from the row below",
+        subtitle=[
+            scope,
+            f"Dot: the error of that variable set at the {SETTINGS_PHRASE}. Hollow diamond: the",
+            "error of the row below, which is this row's zero.",
+            "G0 line: 95% interval of its own error. Every other line: 95% interval of the step",
+            "from the row below, from resampling whole months, drawn from the row below's dot.",
+            "Right column: the step in points of capacity (negative is a gain) and its interval.",
+            "A step's interval says nothing about how uncertain the dot's position is.",
+            *ARM_KEY_LINES[:-1],
+            "Only the G1 step is planned (P1); every other step is exploratory and uncorrected for",
+            "multiple comparisons. A step depends on the order in which the groups were added.",
         ],
         figure_planning=None,
     )
@@ -1840,6 +2030,7 @@ def main() -> int:
             chart=figure_leaderboard(board=board, target=target, scope=scope),
             name=f"leaderboard_{target}",
         )
+    save(chart=figure_stepwise(contrasts=contrasts, board=board, scope=scope), name="stepwise_pv")
     for name, chart in (
         (
             "days",

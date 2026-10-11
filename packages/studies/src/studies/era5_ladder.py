@@ -320,6 +320,65 @@ def gain_shares(*, total_gain: Mapping[str, float], features: Sequence[str]) -> 
     return {name: total_gain.get(name, 0.0) / total for name in features}
 
 
+def stepwise_chain(
+    *,
+    start: float,
+    differences: Sequence[float],
+    lowers: Sequence[float],
+    uppers: Sequence[float],
+) -> pl.DataFrame:
+    """Place a chain of paired steps on one absolute axis, each step's zero at the previous dot.
+
+    Each step is the paired difference between two neighbouring rungs, with the interval of that
+    difference. A step's interval describes the uncertainty of the difference alone, so it is
+    drawn from the previous rung's dot, not from the origin: the interval is the same width wherever
+    it is drawn.
+
+    Args:
+        start: The first rung's own value, on the absolute axis.
+        differences: Each step's estimate, in the order the steps are taken.
+        lowers: The lower end of each step's interval, as a difference.
+        uppers: The upper end of each step's interval, as a difference.
+
+    Returns:
+        One row per step with `reference` (the previous dot, the step's zero), `value` (the
+        step's dot, which is `reference` plus the step's difference), `lower`, and `upper`, all on
+        the absolute axis.
+
+    Raises:
+        ValueError: If `differences`, `lowers`, and `uppers` differ in length, or a step's interval
+            does not hold its estimate.
+    """
+    if not len(differences) == len(lowers) == len(uppers):
+        msg = "differences, lowers, and uppers must have one entry per step"
+        raise ValueError(msg)
+    if any(
+        not lower <= value <= upper
+        for value, lower, upper in zip(differences, lowers, uppers, strict=True)
+    ):
+        msg = "every step's interval must hold its estimate"
+        raise ValueError(msg)
+    references: list[float] = []
+    position = start
+    for difference in differences:
+        references.append(position)
+        position += difference
+    return pl.DataFrame(
+        {
+            "reference": references,
+            "value": [
+                reference + value for reference, value in zip(references, differences, strict=True)
+            ],
+            "lower": [
+                reference + lower for reference, lower in zip(references, lowers, strict=True)
+            ],
+            "upper": [
+                reference + upper for reference, upper in zip(references, uppers, strict=True)
+            ],
+        }
+    )
+
+
 def negative_control_columns() -> tuple[str, ...]:
     """Return the columns the negative control permutes: everything `g3` to `g9` adds.
 

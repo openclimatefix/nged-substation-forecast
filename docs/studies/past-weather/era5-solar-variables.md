@@ -243,6 +243,18 @@ output](../assets/era5_solar_variables_leaderboard_pv.svg)
 ![Figure 7b: Error and correlation of every variable set for the CAMS clearness
 index](../assets/era5_solar_variables_leaderboard_cams.svg)
 
+**Chaining the paired steps shows which groups carry the gain, with an interval suited to each
+difference.** Figure 7c draws the same errors as Figure 7 for the farms' output, but each row's line
+is the 95% interval of the step from the row below, drawn from the row below's dot. Total cloud
+cover (G1), the cloud layers (G2), and cloud water and cloud base height (G4) lower the error by
+0.32, 0.27, and 0.33 points, and every other step changes it by 0.07 points or less. A step's
+interval says nothing about the uncertainty of the dot's position, so the intervals of different
+rows should not be added. Only the G1 step is planned, and each step depends on the order in which
+the groups were added.
+
+![Figure 7c: Error of each variable set, with the interval of each step from the row
+below](../assets/era5_solar_variables_stepwise_pv.svg)
+
 ### The gain is similar in every season and ERA5 cloud regime
 
 **The full set lowers the error by 11% to 14% of the farms' output error in every season and in

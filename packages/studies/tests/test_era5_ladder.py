@@ -31,6 +31,7 @@ from studies.era5_ladder import (
     season_of_month,
     sky_regime,
     sky_regime_from_cloud_cover,
+    stepwise_chain,
     without_mars_only_features,
 )
 
@@ -540,3 +541,30 @@ def test_the_pairing_guard_checks_every_arm_not_only_the_second():
 
     with pytest.raises(ValueError, match="'g0' and 'g9'"):
         raise_unless_same_rows(losses=losses, arms=["g0", "g5", "g9"])
+
+
+def test_stepwise_chain_puts_each_zero_at_the_previous_dot() -> None:
+    chain = stepwise_chain(
+        start=9.0, differences=[-0.5, -0.25], lowers=[-0.75, -0.5], uppers=[-0.25, 0.25]
+    )
+
+    assert chain["reference"].to_list() == pytest.approx([9.0, 8.5])
+    assert chain["value"].to_list() == pytest.approx([8.5, 8.25])
+    assert chain["lower"].to_list() == pytest.approx([8.25, 8.0])
+    assert chain["upper"].to_list() == pytest.approx([8.75, 8.75])
+
+
+def test_stepwise_chain_keeps_each_interval_width_unchanged() -> None:
+    chain = stepwise_chain(
+        start=5.0, differences=[-1.0, 2.0, -0.5], lowers=[-1.5, 1.0, -0.75], uppers=[-0.5, 3.5, 0.0]
+    )
+
+    widths = (chain["upper"] - chain["lower"]).to_list()
+    assert widths == pytest.approx([1.0, 2.5, 0.75])
+
+
+def test_stepwise_chain_rejects_unequal_lengths_and_an_interval_missing_its_estimate() -> None:
+    with pytest.raises(ValueError, match="one entry per step"):
+        stepwise_chain(start=1.0, differences=[0.1, 0.2], lowers=[0.0], uppers=[0.2, 0.3])
+    with pytest.raises(ValueError, match="hold its estimate"):
+        stepwise_chain(start=1.0, differences=[0.5], lowers=[0.6], uppers=[0.7])
