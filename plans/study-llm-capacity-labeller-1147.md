@@ -102,10 +102,12 @@ distinction, and the page says so as a limitation.
 
 ### Part 3: the LLM
 
-**Model: Claude Sonnet 5.5 (`claude-sonnet-5-5`), temperature 1.0.** A Fable or Opus labeller would
-probably read a case file better; the page states that as a limitation only. **Temperature 1.0 is
-used because repeated samples are meant to differ; if the API accepts a lower value for a
-deterministic-looking arm, the plan keeps 1.0 for both LLM arms so they share one noise level.**
+**Model: Claude Sonnet 5.5 (`claude-sonnet-5-5`), at the command-line tool's default sampling.** A
+Fable or Opus labeller would probably read a case file better; the page states that as a limitation
+only. `claude -p` has no temperature flag, so every arm shares the default noise level, and repeated
+samples differ because the model samples (the sample index is part of the cache key, so a second
+sample is a second call and not a cache hit). The log records the exact model name, the flags, and
+the command-line tool's version.
 
 **Output schema** (JSON, validated by a Pydantic model that also enforces knots in strictly
 increasing date order and inside the record):
@@ -231,14 +233,17 @@ replaces every input after the issue day minus 2 with noise and asserts that pro
 bytes are unchanged, run once per record before any real call (the pattern is
 `capacity_estimators.assert_scale_ignores_the_issue_day_onward`).
 
-**How the model is called.** The default is the Anthropic SDK run as `uv run --with anthropic`:
-no tools, a fixed system prompt, and an explicit temperature, with no change to `pyproject.toml`
-(`anthropic` is not in `uv.lock`, checked). It needs an API key, which is a maintainer decision
-(credentials and money). `claude -p` from a worktree loads CLAUDE.md and memory, has Read and Bash
-tools (so it could open `built/events.json` and the draw seeds), and cannot set temperature; if it is
-used, it runs from an empty temporary directory with all tools disabled and no settings or memory.
-A test asserts that no prompt contains a path under `data/`. The first step is a 2-call probe that
-also measures one full hindsight case file's tokens.
+**How the model is called.** The route is `claude -p` (Claude Code's print mode), run from an empty
+temporary working directory with every tool disabled (`--tools ""`), no settings sources, no
+slash commands or skills, no MCP servers, no session persistence, and a fixed system prompt that
+replaces the default one. It needs no API key and no new dependency. The `anthropic` SDK route is
+dropped because it would need an API key and a change to `pyproject.toml`, and the maintainer
+declined both. Images go in as base64 `image` blocks on the `stream-json` input format. The
+command-line tool reports token counts and a cost for every call, and the budget guard reads them.
+A test asserts that no prompt contains a path under `data/`, and the empty directory means the
+model has no file to open even if it were given a path. The first step is a 2-call probe (done:
+see the probe results in the page's methods) that checks images, token counts, the model flag,
+and the reported cost.
 
 ## Code layout and tests
 
@@ -284,9 +289,15 @@ it is, unchanged.
 - **`docs/studies/forecasts/llm-capacity-labeller.md`:** a figure-led page per the study skill, with
   a short section on what this iteration implies for the next iteration and for wind, linking back
   to the first page; the `mkdocs.yml` nav gains the entry.
-- **`docs/studies/forecasts/effective-capacity.md`:** one forward link in its Discussion;
-  The roadmap page `docs/roadmap/capacity-estimation.md` is outside the autonomous-merge paths, so
-  a pointer there is listed as a maintainer decision and not made.
+- **`docs/studies/forecasts/effective-capacity.md`:** one forward link in its Discussion. The
+  roadmap page `docs/roadmap/capacity-estimation.md` is not part of this PR: the maintainer adds
+  any pointer there.
+- **The new page ends with two short sections.** A discussion of other places in the NGED project's
+  data pipeline where a language model could help, each as one or two sentences with the
+  deterministic-tools-first pattern, what could go wrong (non-determinism, leakage, cost), and what
+  the live service would need (cached, logged, with a guarded fallback to the non-LLM path, per
+  `docs/design-philosophy/inherent-stability.md`); speculation is labelled as such. Then a
+  proposed follow-up study, as the study skill asks.
 - **`studies/llm_capacity_labeller/README.md`** and the `studies/README.md` index row.
 
 ## Verification commands
@@ -318,19 +329,14 @@ Records: the original plus 2 fresh draws, so 3.
 
 **The C1 to C3 calls (hindsight and controls) run first**, so a guard stop hits the causal run.
 
-**Tokens (estimates, re-made from the probe before the first real batch).** A whole-record
-hindsight case file with tools is about 20,000 input tokens: the hour-of-day table alone is about
-6,000, the other tables 8,000, 2 PNG charts about 1,600 each, and the prompt 2,000 (a daily ratio
-list could reach 20,000 to 40,000, so the case file is monthly). Raw ablation: about 10,000. Causal
-(trailing 12 monthly rows): about 8,000. Output is 2,000 for a hindsight call with tools, 1,500 for
-the other hindsight and causal calls, which allows for thinking. That gives 48 x 20,000 + 18 x
-10,000 + 72 x 8,000 = **1.72M input** and 48 x 2,000 + 90 x 1,500 = **0.23M output** tokens. The
-guard stops at 2.0M input and 0.30M output.
-
-**Cost.** At an assumed US$3 per million input and US$15 per million output tokens (from memory, not
-checked against current pricing): about **US$8.6** planned and **US$10.5** at the guard. The stated
-ceiling is **US$12**, which needs the maintainer's approval before the first real call, after the
-probe's token counts replace these estimates.
+**Cost ceiling: US$15, enforced by a hard guard.** The guard sums the cost the command-line tool
+reports for each call and refuses a call when the running total plus the largest single-call cost
+so far would reach US$15. It also stops at 150 calls. **The probe measured** (two calls, US$0.054
+in total): the command-line tool bills a prompt as cache-creation input at about US$4 per million
+tokens, and numeric tables cost about 1.4 characters per token (an 18,016-character table was
+12,557 tokens). The planned cost is re-estimated from those figures and a built case file's size
+before the first real batch (`run_labeller.py --phase estimate`); **if the re-estimate exceeds
+US$15, the causal role is cut first, then the sample counts, and the cut is recorded.**
 
 **Compute slots** (from the Study MAIN COORDINATOR): 8 CPU cores briefly for Part 1 tuning and
 scoring; 2 cores for case-file building; 1 core while the calls run; then GPU plus 4 CPU cores for
@@ -338,21 +344,15 @@ the exploratory forecast fits (3 seeds, 5 folds, primary setting only).
 
 ## Open decisions
 
-1. **API key and route:** the default is the Anthropic SDK through `uv run --with anthropic`, which
-   needs an API key (credentials and money). `claude -p` is the fallback, only from an empty
-   directory with tools disabled. Adding `anthropic` to `pyproject.toml` ends the autonomous-merge
-   condition.
-2. **Spend ceiling:** US$12 stated, about US$8.6 planned, re-estimated after the probe. Approval is
-   needed before the first real call.
-3. **Thresholds** (-1.0 point for C1 and C2, 1.1 x P99 upper bound, 14-day window, 5-point step
+1. **Model route and spend (decided by the maintainer):** `claude -p` from an empty directory with
+   tools disabled, no API key, no new dependency; ceiling US$15 with a hard guard.
+2. **Thresholds** (-1.0 point for C1 and C2, 1.1 x P99 upper bound, 14-day window, 5-point step
    tolerance) are plan choices. Recommendation: fix now and report sensitivity on the tuning draw
    only.
-4. **Only 2 fresh draws (about 33 events)** give wide intervals, and the 6-month causal run is
+3. **Only 2 fresh draws (about 33 events)** give wide intervals, and the 6-month causal run is
    exploratory. Recommendation: accept, and say that a null result is a finding about sample size.
-5. **Planted losses last one month** while real ones persist. Recommendation: keep the first study's
+4. **Planted losses last one month** while real ones persist. Recommendation: keep the first study's
    shapes, and add a persistent step as a post hoc arm only if budget remains.
-6. **Roadmap pointer** in `docs/roadmap/capacity-estimation.md` is outside the autonomous-merge
-   paths. Recommendation: the maintainer adds it after merge.
 
 ## Review triage (simplicity review)
 
