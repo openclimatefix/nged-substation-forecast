@@ -5,7 +5,8 @@ so a month-resampled interval cannot be drawn from its output. This module runs 
 per-forecast-run collapse that `compute_metrics` runs, and returns one row per
 `(time_series_id, power_fcst_init_time, valid_time)` instead. It borrows the fair-CRPS and
 horizon-slice expressions from `ml_core.metrics` so the two cannot drift apart, and the tests check
-that its means equal `compute_metrics` on the same frames.
+that its means equal `compute_metrics` on the same frames. Importing those two private
+expressions is deliberate: a copy would drift from the leaderboard's definition.
 """
 
 from typing import Final
@@ -24,6 +25,36 @@ FORECAST_COLUMNS: Final[tuple[str, ...]] = (
 
 SCORE_KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
 """The key of one row of `per_run_scores`: one forecast run for one valid time of one series."""
+
+
+LEAD_BAND_ORDER: Final[tuple[str, ...]] = ("all", "days 0 to 2", "days 3 to 10")
+"""The lead-time bands the study reports, `all` first.
+
+`days 0 to 2` holds leads under 72 hours and `days 3 to 10` holds leads from 72 up to 264 hours.
+Leads from 264 hours up belong to `all` only.
+"""
+
+
+def lead_band_means(*, scores: pl.DataFrame) -> pl.DataFrame:
+    """Mean CRPS and MAE per series within each band of `LEAD_BAND_ORDER`.
+
+    Args:
+        scores: The output of `per_run_scores`, with the columns of `normalised_by_capacity`.
+
+    Returns:
+        One row per `(time_series_id, lead_band)` with `crps`, `mae`, and `nmae`.
+    """
+    bands = {
+        "all": pl.lit(value=True),
+        "days 0 to 2": pl.col("lead_hours") < 72,
+        "days 3 to 10": (pl.col("lead_hours") >= 72) & (pl.col("lead_hours") < 264),
+    }
+    return pl.concat(
+        [
+            leaderboard_means(scores=scores.filter(condition)).with_columns(lead_band=pl.lit(band))
+            for band, condition in bands.items()
+        ]
+    )
 
 
 def per_run_scores(*, forecasts: pl.DataFrame, actuals: pl.DataFrame) -> pl.DataFrame:
@@ -81,6 +112,9 @@ def normalised_by_capacity(*, scores: pl.DataFrame, capacity: pl.DataFrame) -> p
     Raises:
         ValueError: If any scored series has no capacity row.
     """
+    if capacity["time_series_id"].n_unique() != capacity.height:
+        msg = "capacity must hold exactly one row per series"
+        raise ValueError(msg)
     joined = scores.join(
         capacity.select("time_series_id", "effective_capacity_mw"),
         on="time_series_id",

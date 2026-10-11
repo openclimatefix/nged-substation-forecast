@@ -15,10 +15,13 @@ A finished output is never overwritten: the script skips what exists, so a crash
 
 import argparse
 import time
+from datetime import datetime
 from pathlib import Path
 
 import inputs
+import patito as pt
 import polars as pl
+from contracts.power_schemas import TimeSeriesMetadata
 from contracts.settings import Settings
 from ml_core.features._parsed_features import ParsedFeatures
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
@@ -26,6 +29,46 @@ from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 def _output_dir(*, arm: str) -> Path:
     return inputs.OUTPUT_ROOT / "production_arm" / arm
+
+
+def _predict_run(
+    *,
+    forecaster: XGBoostForecaster,
+    settings: Settings,
+    metadata: pt.DataFrame[TimeSeriesMetadata],
+    window: inputs.FoldWindow,
+    init_time: datetime,
+) -> pl.DataFrame:
+    """Predict every ensemble member of one ECMWF run over its valid times inside the window."""
+    config = forecaster.model_params
+    power, nwp = inputs.engineering_inputs(
+        settings=settings,
+        time_series_ids=forecaster.trained_time_series_ids,
+        metadata=metadata,
+        window_start=window.val_start,
+        window_end=min(window.val_end, init_time + inputs.MAX_NWP_LEAD),
+        init_time_start=init_time,
+        init_time_end=init_time,
+        power_lookback=ParsedFeatures.from_strings(config.selected_features).max_power_lag(),
+    )
+    features = forecaster.feature_engineer.engineer(
+        selected_features=config.selected_features,
+        power_time_series=power,
+        time_series_metadata=metadata,
+        nwp=nwp,
+    )
+    forecasts = forecaster.predict(features, fold_id=window.fold_id)
+    if forecasts.height == 0:
+        msg = f"the run initialised at {init_time} produced no forecast rows"
+        raise ValueError(msg)
+    return forecasts.select(
+        "time_series_id",
+        "power_fcst_init_time",
+        "nwp_init_time",
+        "valid_time",
+        "ensemble_member",
+        "power_fcst",
+    )
 
 
 def main() -> None:
@@ -56,6 +99,9 @@ def main() -> None:
 
     if (model_dir / "meta.json").exists():
         forecaster = XGBoostForecaster.load(model_dir)
+        if forecaster.model_params != config:
+            msg = f"{model_dir} was trained with a different configuration than this run asks for"
+            raise ValueError(msg)
         print(f"loaded {model_dir}")
     else:
         started = time.monotonic()
@@ -76,6 +122,13 @@ def main() -> None:
             nwp=nwp,
         )
         forecaster.train(features, series_ids)
+        untrained = sorted(set(series_ids) - set(forecaster.trained_time_series_ids))
+        if untrained:
+            # The booster trainer drops a series with no usable training rows, as production does.
+            # The report checks that the stored experiment dropped the same series.
+            print(f"WARNING: {len(untrained)} eligible series were not trained: {untrained}")
+        for stale in forecast_dir.glob("*.parquet"):
+            stale.unlink()
         forecaster.save(model_dir)
         print(
             f"trained {len(forecaster.trained_time_series_ids)} boosters "
@@ -87,35 +140,22 @@ def main() -> None:
         if path.exists():
             continue
         started = time.monotonic()
-        power, nwp = inputs.engineering_inputs(
+        forecasts = _predict_run(
+            forecaster=forecaster,
             settings=settings,
-            time_series_ids=forecaster.trained_time_series_ids,
             metadata=metadata,
-            window_start=window.val_start,
-            window_end=window.val_end,
-            init_time_start=init_time,
-            init_time_end=init_time,
-            power_lookback=power_lookback,
+            window=window,
+            init_time=init_time,
         )
-        features = forecaster.feature_engineer.engineer(
-            selected_features=config.selected_features,
-            power_time_series=power,
-            time_series_metadata=metadata,
-            nwp=nwp,
-        )
-        forecasts = forecaster.predict(features, fold_id=window.fold_id)
-        forecasts.select(
-            "time_series_id",
-            "power_fcst_init_time",
-            "nwp_init_time",
-            "valid_time",
-            "ensemble_member",
-            "power_fcst",
-        ).write_parquet(path.with_suffix(".tmp"))
+        forecasts.write_parquet(path.with_suffix(".tmp"))
         path.with_suffix(".tmp").rename(path)
         print(
             f"{init_time:%Y-%m-%d}: {forecasts.height:,} rows in {time.monotonic() - started:.0f} s"
         )
+    n_files = len(list(forecast_dir.glob("*.parquet")))
+    if n_files != len(inputs.sample_init_times(window=window)):
+        msg = f"{n_files} forecast files for {len(inputs.sample_init_times(window=window))} runs"
+        raise ValueError(msg)
     print(pl.scan_parquet(forecast_dir / "*.parquet").select(pl.len()).collect().item(), "rows")
 
 
