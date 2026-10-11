@@ -17,7 +17,9 @@ Adding the ensemble mean to the single forecast gives about the same 1-point gai
 AIFS Single to the ensemble mean lowers the error by only 0.13 points, which is too uncertain to
 call a gain (post hoc). Extra IFS variables lowered the error by about 0.45 points in total
 (exploratory). No planned step gave a resolved gain: adding total cloud cover, adding the cloud
-layers, and adding every other variable each left the gain unresolved.
+layers, and adding every other variable each left the gain unresolved. On top of FP, the production
+reference, total cloud cover lowers the error by 0.13 points (unresolved) and total cloud cover plus
+the three cloud layers by 0.28 points (a gain), both post hoc.
 
 ![Figure 1: Change in solar farm error from adding IFS variables or a second forecast, the five
 planned contrasts](../assets/ifs_solar_variables_headline.svg)
@@ -94,20 +96,18 @@ is F6B minus F6.
   interval runs from −0.29 to +0.02. The ERA5 gain may be smaller at forecast lead. The ratio behind
   that statement, about twice as much from ERA5's cloud variables as from IFS's, was measured for
   the cloud variables at lead day 1 only.
-- **Which variables should the production service ask Dynamical.org to add?** No single group has a
-  gain large enough to justify a request, and the gain of all the extra variables together is
-  exploratory and mostly not available in the free feed. The priority list ranks the groups of
-  variables that the free open-data feed carries, first by the evidence class of their gain and then
-  by its size. Total cloud cover is the only free-feed group with a single-step contrast (P1): it
-  lowers the error by 0.12 points over the minimal set (99% interval [−0.19, −0.04], unresolved).
-  The cloud layers show a larger gain (P2, 0.19 points), but the free feed does not carry them, and
-  P2 is measured over F1 whereas P1 is measured over F0, so the two are on different bases. F1
-  differs from FP by −0.02 points (F1 minus FP, 95% interval [−0.16, +0.13]). F1 swaps total cloud
-  cover in for FP's four variables, so the F1-minus-FP contrast does not show what cloud adds to FP.
-  No variable set adds a single group to FP. All 14 variables beyond FP together lower FP's error by
-  0.36 points (F6 minus FP, 95% interval [−0.44, −0.27], exploratory, main setting only). That gain
-  is for all 14 variables, 8 of which the free open-data feed that Dynamical.org repackages does
-  not carry. No fit measured the subset that the free feed carries.
+- **Which variables should the production service ask Dynamical.org to add?** The production
+  service should request total cloud cover first, which here means the one group in the free
+  open-data feed that was tested on top of FP, on post hoc evidence. Added to FP, total cloud cover
+  lowers the error by 0.13 points at the main setting and 0.15 at the second (pooled over lead days
+  1 to 3, 99% intervals [−0.18, −0.07] and [−0.22, −0.09], unresolved). Adding the three cloud
+  layers as well lowers the error by 0.28 and 0.27 points (99% intervals [−0.39, −0.18] and [−0.38,
+  −0.16], a gain at both settings). The layers' own step, from FP plus total cloud cover, is 0.15
+  and 0.11 points (unresolved). The free open-data feed that Dynamical.org repackages does not carry
+  the layers. These contrasts are post hoc, so they carry the caveats listed under Limitations
+  ([Figure 9b](#which-cloud-variables-to-add-to-the-production-reference)). All 14 variables beyond
+  FP together lower FP's error by 0.36 points (F6 minus FP, 95% interval [−0.44, −0.27],
+  exploratory, main setting only), and 8 of those 14 are not in the free feed.
 - **Does the production service need a second IFS feed, for the cloud layers or the direct beam,
   which ECMWF's free open-data subset does not carry?** Not on this evidence, although the rule as
   written before any result says yes. The production service gets IFS from Dynamical.org, which
@@ -189,9 +189,13 @@ availability was read from ECMWF's open-data index files for the 2026-10-09 00 U
 carries `mucape`, a different convective available potential energy (CAPE) diagnostic from the
 `cape` field Open-Meteo serves.
 
-**F6 minus FP is the one contrast that adds variables to FP.** FP is the production feed's current
+**Three contrasts add variables to FP: F6 minus FP (exploratory), (FP + total cloud) minus FP, and
+(FP + total cloud + layers) minus FP (both post hoc).** FP is the production feed's current
 variables other than long-wave radiation. FP contains none of F1's or F2's cloud columns, so F1
-minus FP and F2 minus FP swap variables rather than add them.
+minus FP and F2 minus FP swap variables rather than add them. A column is an input variable given
+to an XGBoost model, and the columns include sun position and calendar variables beside the weather
+variables. FP has 13 columns. FP + total cloud adds F1's column to FP, and FP + total cloud + layers
+adds F1's and F2's four columns. Both were fitted at both XGBoost tuning settings.
 
 ## Data and methods
 
@@ -373,6 +377,24 @@ between the settings, so neither a pass nor a fail is resolved.
 ![Figure 9: Change in error when one group of variables is removed from all 20 IFS
 variables](../assets/ifs_solar_variables_drop_one.svg)
 
+### Which cloud variables to add to the production reference
+
+**Request total cloud cover from Dynamical.org first, as the one free-feed group tested on FP and
+on unresolved evidence of 0.13 to 0.15 points.** Added to FP, total cloud cover lowers the error by
+0.13 points at the main setting and 0.15 at the second (99% intervals [−0.18, −0.07] and [−0.22,
+−0.09], unresolved). Adding the three cloud layers as well lowers the error by 0.28 and 0.27 points
+(99% upper bounds −0.18 and −0.16, a gain at both settings). The layers' own step is 0.15 and 0.11
+points (unresolved), and the free open-data feed does not carry the layers. The drop-one result
+under "Removing one variable group from the full set" still governs the second-feed decision,
+because that rule asks whether the full set relies on the layers and the layers' own step is
+unresolved here. These
+contrasts are post hoc and exploratory, and have no negative control (a fit padded with shuffled
+copies of the same inputs) to show how much of a gain extra columns produce alone. Figure 9b draws
+95% step intervals at the main setting, and the 99% intervals that set the verdicts are in the text.
+
+![Figure 9b: Error of the production reference with total cloud and cloud layers added, with the
+interval of each step from the row below](../assets/ifs_solar_variables_fp_cloud.svg)
+
 ### A second forecast and the ensemble mean
 
 **Adding AIFS Single to the single 9 km forecast lowers the error by about 1 point, and adding the
@@ -409,17 +431,19 @@ variables](../assets/ifs_solar_variables_variables_or_forecast.svg)
 
 ## Discussion: what to use
 
-- **No single variable group has a gain large enough to justify a request to Dynamical.org, and the
-  gain of the variables together is exploratory and mostly not available in the free feed.** Total
-  cloud cover is unresolved (P1), and the drop-one runs find no group that the full set relies on at
-  both settings. All 14 variables beyond FP together lower FP's error by 0.36 points (exploratory,
-  main setting only). Eight of those 14 variables are not carried by the free open-data feed that
-  Dynamical.org repackages, and no fit measured the subset that the free feed carries. The gain is
-  measured on top of a single 9 km forecast and may be smaller on the ensemble mean. Choosing which
-  subset to request needs fits that add each group to FP, which this study did not run.
+- **Request total cloud cover from Dynamical.org first, and treat the evidence as post hoc.** Added
+  to FP, total cloud cover lowers the error by 0.13 points (unresolved), and total cloud cover with
+  the three cloud layers by 0.28 points (a gain at both settings). The layers are not in the free
+  open-data feed that Dynamical.org repackages, so the 0.28-point gain needs a source other than the
+  free feed. All 14 variables beyond FP together lower FP's error by 0.36 points (exploratory, main
+  setting only), and 8 of those 14 are not carried by the free feed. The gains are measured on top
+  of a single 9 km forecast and may be smaller on the ensemble mean. No fit measured the other
+  groups of the free feed added to FP one at a time.
 - **Do not take a second IFS feed for the cloud layers on this evidence.** The cloud layers pass the
   pre-set drop-one rule at the main setting only, and their raise is below 0.1 points at both
-  settings. The production feed's long-wave radiation, a cloud signal, was not tested.
+  settings. Their gain on top of FP is unresolved at 99% (the layers' own step is 0.15 and 0.11
+  points), so the page does not treat it as established. The production feed's long-wave radiation,
+  a cloud signal, was not tested.
 - **Do not choose between the MARS-only variables and a second forecast from P5.** The pre-set rule
   returns "second forecast". On the ensemble mean the production service reads, a second forecast
   adds about 0.13 points, which is unresolved. That point estimate equals the 0.13 points the ERA5
@@ -452,14 +476,17 @@ variables](../assets/ifs_solar_variables_variables_or_forecast.svg)
   exploratory ones were not.** The page does not correct exploratory intervals for multiple
   comparisons, and does not count its exploratory contrasts. Of the exploratory contrasts, 32 lie
   near the 0.1-point line and have no second-setting run.
+- **The contrasts that add cloud variables to FP compare variable sets with different column
+  counts.** FP + total cloud has 14 columns and FP + total cloud + layers 17, against FP's 13, and no
+  negative control pads FP with shuffled copies of the same columns. The controls of P1 and P2 show
+  the penalty for the ladder variable sets only.
 - **Some analyses are post hoc.** Several analyses were added after the first scientific review: the
-  ensemble-mean contrasts, the winter-fold reading, the raw-error table, the second-setting drop-one
-  runs and the rule that both settings must agree for the drop-one test (the plan required agreement
-  for P1 to P5 only), and the "unresolved at the smallest effect" label on the priority list. The
-  both-settings rule reversed the pre-set outcome of the second-feed decision and removed humidity,
-  column water, and boundary-layer height from the priority list. The report labels each post hoc
-  analysis. Only P1 to P5, their controls, their five verdicts, and the three decision rules as
-  written were fixed in the plan before any result existed.
+  contrasts that add cloud variables to FP, the ensemble-mean contrasts, the winter-fold reading,
+  the raw-error table, the second-setting drop-one runs, and the rule that both settings must agree
+  for the drop-one test (the plan required agreement for P1 to P5 only). The both-settings rule
+  reversed the pre-set outcome of the second-feed decision. The report labels each post hoc analysis.
+  Only P1 to P5, their controls, their five verdicts, and the three decision rules as written were
+  fixed in the plan before any result existed.
 - **ICON-EU was not tested as a second forecast.**
 
 ## Scope

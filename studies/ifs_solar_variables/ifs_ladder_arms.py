@@ -32,6 +32,8 @@ from studies.ifs_ladder import (
     partner_control_features,
     positive_control_features,
     production_features,
+    production_with_cloud_layers_features,
+    production_with_total_cloud_features,
     rung_features,
     with_partner_features,
 )
@@ -53,15 +55,16 @@ TARGETS: Final[tuple[TargetType, ...]] = ("pv", "cams")
 TARGET_COLUMNS: Final[dict[TargetType, str]] = {"pv": "power_mw", "cams": "cams_clearness_index"}
 """The column each target's XGBoost models predict."""
 
-ViewType = Literal["ladder", "blend", "ens", "extra_sensitivity"]
+ViewType = Literal["ladder", "blend", "ens", "extra_sensitivity", "fp_extra"]
 """Which rows and arms a fit uses.
 
 `ladder` fits every kept row. `blend` fits the blend rows that AIFS Single also covers. `ens` fits
 the post hoc production-relevant arms on the same blend rows with the IFS ensemble mean added.
-`extra_sensitivity` fits further ladder arms at the second hyperparameter setting only.
+`extra_sensitivity` fits further ladder arms at the second hyperparameter setting only. `fp_extra`
+fits the post hoc cloud arms that add to `fp`, on the ladder rows, at both settings.
 """
 
-VIEWS: Final[tuple[ViewType, ...]] = ("ladder", "blend", "ens", "extra_sensitivity")
+VIEWS: Final[tuple[ViewType, ...]] = ("ladder", "blend", "ens", "extra_sensitivity", "fp_extra")
 """The views, in the order the fit script runs them."""
 
 VIEW_FILE_STEMS: Final[dict[ViewType, str]] = {
@@ -69,6 +72,7 @@ VIEW_FILE_STEMS: Final[dict[ViewType, str]] = {
     "blend": "blend",
     "ens": "ens",
     "extra_sensitivity": "ladder_extra",
+    "fp_extra": "ladder_fp_extra",
 }
 """The word that names a view in its losses and arms files."""
 
@@ -153,6 +157,11 @@ POST_HOC_ARMS: Final[tuple[str, ...]] = (
     F0_E_ARM,
 )
 """The arms of the `ens` view, all added after the first scientific review (post hoc)."""
+
+FP_F1_ARM: Final[str] = "fp_f1"
+"""The post hoc arm `fp` plus total cloud cover (the columns of `f1`)."""
+FP_F2_ARM: Final[str] = "fp_f2"
+"""The post hoc arm `fp` plus total cloud cover and the three cloud layers."""
 
 F6_ARM: Final[str] = "f6"
 """The arm given every IFS variable."""
@@ -314,6 +323,17 @@ The reference `f0` of the second contrast is fitted in the `blend` view, on the 
 arms of the `ens` view.
 """
 
+FP_EXTRA_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    (FP_F1_ARM, PRODUCTION_ARM),
+    (FP_F2_ARM, PRODUCTION_ARM),
+    (FP_F2_ARM, FP_F1_ARM),
+)
+"""The post hoc (treatment, reference) contrasts of the `fp_extra` view, in the order they print.
+
+All are exploratory and have no matched negative control: `fp_f1` and `fp_f2` hold 1 and 4 more
+columns than `fp`, and no arm pads `fp` with permuted copies of the same columns.
+"""
+
 DROP_ONE_SECOND_SETTING_ARMS: Final[tuple[str, ...]] = ("drop_f2", "drop_f4")
 """The drop-one arms fitted at the second setting by default, which the priority list needs."""
 
@@ -359,6 +379,8 @@ ARM_LABELS: Final[dict[str, str]] = {
     PRODUCTION_ARM: "FP production reference",
     BLEND_ARM: "FB F0 + AIFS Single",
     BLEND_FULL_ARM: "F6B F6 + AIFS Single",
+    FP_F1_ARM: "FP + total cloud",
+    FP_F2_ARM: "FP + total cloud + layers",
     CONTROL_CLOUD_COVER_ARM: "Control: F0 + shuffled total cloud",
     CONTROL_CLOUD_LAYERS_ARM: "Control: F1 + shuffled layers",
     CONTROL_LATER_GROUPS_ARM: "Control: F2 + shuffled F3 to F6",
@@ -569,6 +591,15 @@ def arm_features(
             CONTROL_E0_PARTNER_ARM: ens_partner_control_features(),
             F0_E_ARM: f0_with_ens_features(),
         }
+    if view == "fp_extra":
+        if target != "pv" or lead_day not in PLANNED_LEAD_DAYS:
+            msg = f"the fp_extra view holds the pv target at lead days {PLANNED_LEAD_DAYS} only"
+            raise ValueError(msg)
+        return {
+            PRODUCTION_ARM: production_features(),
+            FP_F1_ARM: production_with_total_cloud_features(),
+            FP_F2_ARM: production_with_cloud_layers_features(),
+        }
     if view == "extra_sensitivity":
         if target != "pv" or lead_day not in PLANNED_LEAD_DAYS:
             msg = f"the extra_sensitivity view holds the pv target at lead days {PLANNED_LEAD_DAYS}"
@@ -605,13 +636,21 @@ def settings_for(
 
     Returns:
         The second setting alone in the extra-sensitivity view, and both settings in the `ens`
-        view. Otherwise the primary setting, and the second setting as well for the arms of
-        `SENSITIVITY_ARMS` and `extra` at the planned lead days (and in the blend view).
+        view. In the `fp_extra` view, both settings for the new arms and the second setting alone
+        for `fp`, whose main-setting fit is in the `ladder` view. Otherwise the primary setting,
+        and the second setting as well for the arms of `SENSITIVITY_ARMS` and `extra` at the
+        planned lead days (and in the blend view).
     """
     if view == "extra_sensitivity":
         return [SENSITIVITY_SETTING]
     if view == "ens":
         return [PRIMARY_SETTING, SENSITIVITY_SETTING]
+    if view == "fp_extra":
+        return (
+            [SENSITIVITY_SETTING]
+            if arm == PRODUCTION_ARM
+            else [PRIMARY_SETTING, SENSITIVITY_SETTING]
+        )
     both = (arm in SENSITIVITY_ARMS or arm in extra) and (
         view == "blend" or lead_day in PLANNED_LEAD_DAYS
     )
@@ -627,4 +666,5 @@ def fit_keys() -> list[FitKey]:
     keys += [
         FitKey(view="extra_sensitivity", lead_day=day, target="pv") for day in PLANNED_LEAD_DAYS
     ]
+    keys += [FitKey(view="fp_extra", lead_day=day, target="pv") for day in PLANNED_LEAD_DAYS]
     return keys

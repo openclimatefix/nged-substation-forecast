@@ -19,14 +19,18 @@ exploratory and fits only `CAMS_ARMS`, with a capacity of 1, no export cap, and 
 hour. The `blend` view fits the minimal and full IFS arms with and without AIFS Single's radiation
 and temperature, on the blend rows of lead days 1 to 3, and their padding controls.
 
-**Two views were added after the first scientific review, and both are post hoc.** The `ens` view
+**Three views were added after the first scientific review, and all are post hoc.** The `ens` view
 fits `e0`, `e_a`, `control_e0_partner`, and `f0_e` (`ifs_ladder_arms.POST_HOC_ARMS`), the arms that
 add AIFS Single, or the IFS ensemble mean the production service reads, to the blend rows. It reads
 `dataset_blend_ens.parquet`, fits lead days 1 to 3 on the output target at both settings, and
 writes `losses_ens_lead_day_{L}_pv.parquet`. The `extra_sensitivity` view fits the arms named by
 `--sensitivity-arms` (by default `drop_f2` and `drop_f4`) at the second setting only, on the
 ladder rows of lead days 1 to 3, and writes `losses_ladder_extra_lead_day_{L}_pv.parquet`, so that
-the drop-one rule can be applied at both settings. `--dry-run` prints each fit's jobs and exits
+the drop-one rule can be applied at both settings. The `fp_extra` view fits `fp_f1` and `fp_f2`
+(`fp` plus total cloud, and plus total cloud and the three cloud layers) at both settings, and `fp`
+at the second setting only, on the ladder rows of lead days 1 to 3, and writes
+`losses_ladder_fp_extra_lead_day_{L}_pv.parquet`. It is post hoc too, and its `fp` primary-setting
+fit is the one already in the `ladder` view. `--dry-run` prints each fit's jobs and exits
 before any fit, and without reading a dataset.
 
 **The hyperparameter settings.** Every arm is fitted at `PRIMARY_HYPER_PARAMETERS`. The arms of
