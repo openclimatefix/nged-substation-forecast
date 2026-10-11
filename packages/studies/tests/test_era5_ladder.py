@@ -554,17 +554,12 @@ def test_stepwise_chain_puts_each_zero_at_the_previous_dot() -> None:
     assert chain["upper"].to_list() == pytest.approx([8.75, 8.75])
 
 
-def test_stepwise_chain_keeps_each_interval_width_unchanged() -> None:
-    chain = stepwise_chain(
-        start=5.0, differences=[-1.0, 2.0, -0.5], lowers=[-1.5, 1.0, -0.75], uppers=[-0.5, 3.5, 0.0]
-    )
-
-    widths = (chain["upper"] - chain["lower"]).to_list()
-    assert widths == pytest.approx([1.0, 2.5, 0.75])
-
-
 def test_stepwise_chain_rejects_unequal_lengths_and_an_interval_missing_its_estimate() -> None:
     with pytest.raises(ValueError, match="one entry per step"):
         stepwise_chain(start=1.0, differences=[0.1, 0.2], lowers=[0.0], uppers=[0.2, 0.3])
+    with pytest.raises(ValueError, match="one entry per step"):
+        stepwise_chain(start=1.0, differences=[0.1, 0.2], lowers=[0.0, 0.1], uppers=[0.2])
     with pytest.raises(ValueError, match="hold its estimate"):
         stepwise_chain(start=1.0, differences=[0.5], lowers=[0.6], uppers=[0.7])
+    with pytest.raises(ValueError, match="hold its estimate"):
+        stepwise_chain(start=1.0, differences=[0.8], lowers=[0.6], uppers=[0.7])

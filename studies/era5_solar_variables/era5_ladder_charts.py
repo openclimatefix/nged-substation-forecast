@@ -504,14 +504,18 @@ def figure_leaderboard(*, board: pl.DataFrame, target: TargetType, scope: str) -
 STEP_VALUE_COLUMN_PX: Final[int] = 150
 """The width of the column that prints each step's estimate and interval beside the plot."""
 
-STEP_CHAIN_TOLERANCE: Final[float] = 0.0005
-"""How far a step chain's end may differ from the leaderboard's error (0.05 points of capacity)."""
+STEP_CHAIN_TOLERANCE: Final[float] = 1e-9
+"""How far a step chain's dot may differ from the leaderboard's error, as a fraction of capacity.
+
+Both come from the same pooled means, so they agree to rounding; a larger gap means the steps and
+the leaderboard are at different settings.
+"""
 
 
 def _signed(value: float) -> str:
     """Format a number to two decimals with a true minus sign and an explicit plus."""
     if round(value, 2) == 0:
-        return "0.00"
+        return " 0.00"
     return f"{value:+.2f}".replace("-", "\u2212")
 
 
@@ -636,8 +640,13 @@ def figure_stepwise(
             detail="group:N",
             order="order:Q",
         ),
-        alt.Chart(rows)
+        alt.Chart(rows.filter(pl.col("reference").is_null()))
         .mark_rule(strokeWidth=1.5, color=colour, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title), x2="upper:Q"
+        ),
+        alt.Chart(rows.filter(pl.col("reference").is_not_null()))
+        .mark_rule(strokeWidth=3.5, color=ocf.BRAND_ORANGE, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title), x2="upper:Q"
         ),
@@ -646,7 +655,13 @@ def figure_stepwise(
         .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
         alt.Chart(rows.filter(pl.col("reference").is_not_null()))
         .mark_point(
-            shape="diamond", filled=False, size=45, strokeWidth=1.2, color=ocf.TEXT, aria=False
+            shape="diamond",
+            filled=False,
+            size=45,
+            strokeWidth=1.2,
+            color=ocf.TEXT,
+            yOffset=7,
+            aria=False,
         )
         .encode(y=y, x=alt.X("reference:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
         alt.Chart(
@@ -668,7 +683,14 @@ def figure_stepwise(
     panel = alt.layer(*layers).properties(
         width=PLOT_WIDTH_PX - STEP_VALUE_COLUMN_PX,
         height=ROW_HEIGHT_PX * len(labels),
-        title=_title("Each row adds one group to the row below"),
+        title=alt.TitleParams(
+            [
+                "Each row adds one group to the row below.",
+                "Right column: that step in points of capacity, with its 95% interval.",
+            ],
+            anchor="start",
+            fontSize=ocf.font_size(style="Body Large", body_px=11),
+        ),
     )
     return figure(
         panels=[panel],
@@ -676,15 +698,18 @@ def figure_stepwise(
         title="Error of each variable set, with the interval of each step from the row below",
         subtitle=[
             scope,
-            f"Dot: the error of that variable set at the {SETTINGS_PHRASE}. Hollow diamond: the",
-            "error of the row below, which is this row's zero.",
-            "G0 line: 95% interval of its own error. Every other line: 95% interval of the step",
-            "from the row below, from resampling whole months, drawn from the row below's dot.",
-            "Right column: the step in points of capacity (negative is a gain) and its interval.",
-            "A step's interval says nothing about how uncertain the dot's position is.",
+            "Purple dot: the mean absolute error of that variable set (% of capacity; lower is",
+            "better).",
+            "Hollow diamond: the error of the row below, which is the zero of this row's step.",
+            "Thin purple line on G0: 95% interval of G0's own error. Orange line on every other",
+            "row: 95% interval of that step alone, from resampling whole months, drawn from the",
+            "diamond.",
+            "An orange line is not the uncertainty of its dot's position.",
+            "A minus sign in the right column means the error fell. A step depends on the order in",
+            "which the groups were added.",
             *ARM_KEY_LINES[:-1],
-            "Only the G1 step is planned (P1); every other step is exploratory and uncorrected for",
-            "multiple comparisons. A step depends on the order in which the groups were added.",
+            "The G1 step was planned in advance. Every other step is exploratory and not corrected",
+            "for multiple comparisons.",
         ],
         figure_planning=None,
     )
