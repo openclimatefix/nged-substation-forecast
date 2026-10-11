@@ -324,8 +324,8 @@ arms of the `ens` view.
 """
 
 FP_EXTRA_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
-    (FP_F1_ARM, "fp"),
-    (FP_F2_ARM, "fp"),
+    (FP_F1_ARM, PRODUCTION_ARM),
+    (FP_F2_ARM, PRODUCTION_ARM),
     (FP_F2_ARM, FP_F1_ARM),
 )
 """The post hoc (treatment, reference) contrasts of the `fp_extra` view, in the order they print.

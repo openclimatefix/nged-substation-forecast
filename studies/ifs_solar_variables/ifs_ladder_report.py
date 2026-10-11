@@ -946,7 +946,7 @@ def settings_verdict(
 
     Args:
         contrasts: The contrast table.
-        family: `planned` or `planned_control`.
+        family: `planned`, `planned_control`, or `fp_cloud`.
         treatment: The treatment arm.
         reference: The reference arm or control.
 
