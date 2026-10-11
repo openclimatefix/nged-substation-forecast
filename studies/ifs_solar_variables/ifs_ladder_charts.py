@@ -1220,6 +1220,9 @@ def figure_stepwise(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     )
 
 
+FP_CLOUD_VALUE_COLUMN_PX: Final[int] = 200
+"""The width of the right-hand text column of the FP cloud figure, wide enough for a unit."""
+
 FP_CLOUD_RUNGS: Final[tuple[str, ...]] = (PRODUCTION_ARM, FP_F1_ARM, FP_F2_ARM)
 """The rows of the FP cloud figure from bottom to top: FP, then FP plus each cloud group."""
 
@@ -1278,7 +1281,7 @@ def figure_fp_cloud(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
         }
     )
     texts = [f"{levels[PRIMARY_SETTING][0]:.2f}% of capacity"] + [
-        f"{_signed(row['difference'] * scale)} "
+        f"{_signed(row['difference'] * scale)} pts "
         f"[{_signed(row['lower_95'] * scale)}, {_signed(row['upper_95'] * scale)}]"
         for row in main.iter_rows(named=True)
     ]
@@ -1307,6 +1310,7 @@ def figure_fp_cloud(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     )
     scale_x = alt.Scale(domain=domain, nice=False, zero=False)
     axis_title = "Mean absolute error (% of capacity; smaller is better)"
+    x_axis = alt.Axis(tickCount=4)
     y = alt.Y(
         "label:N",
         sort=list(reversed(labels)),
@@ -1317,7 +1321,7 @@ def figure_fp_cloud(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
         alt.Chart(connectors)
         .mark_line(color=ocf.TEXT, strokeDash=[2, 3], strokeWidth=1, opacity=0.6, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("x:Q", scale=scale_x, title=axis_title),
+            x=alt.X("x:Q", scale=scale_x, title=axis_title, axis=x_axis),
             y=y,
             detail="group:N",
             order="order:Q",
@@ -1325,16 +1329,16 @@ def figure_fp_cloud(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
         alt.Chart(steps_only)
         .mark_rule(strokeWidth=3.5, color=ocf.BRAND_ORANGE, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title), x2="upper:Q"
+            y=y, x=alt.X("lower:Q", scale=scale_x, title=axis_title, axis=x_axis), x2="upper:Q"
         ),
         alt.Chart(dots)
         .mark_point(filled=True, size=70, opacity=1, color=ocf.DATA_PURPLE, aria=False)
-        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
+        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title, axis=x_axis)),  # ty: ignore[unresolved-attribute]
         alt.Chart(rings)
         .mark_point(
-            filled=False, size=70, strokeWidth=1.5, color=ocf.DATA_PURPLE, yOffset=7, aria=False
+            filled=False, size=70, strokeWidth=1.5, color=ocf.DATA_PURPLE, yOffset=9, aria=False
         )
-        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title)),  # ty: ignore[unresolved-attribute]
+        .encode(y=y, x=alt.X("value:Q", scale=scale_x, title=axis_title, axis=x_axis)),  # ty: ignore[unresolved-attribute]
         alt.Chart(dots.with_columns(x=pl.lit(domain[1])))
         .mark_text(
             align="left",
@@ -1348,12 +1352,12 @@ def figure_fp_cloud(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
         .encode(y=y, x=alt.X("x:Q", scale=scale_x), text="text:N"),  # ty: ignore[unresolved-attribute]
     ]
     panel = alt.layer(*layers).properties(
-        width=PLOT_WIDTH_PX - STEP_VALUE_COLUMN_PX,
+        width=PLOT_WIDTH_PX - FP_CLOUD_VALUE_COLUMN_PX,
         height=ROW_HEIGHT_PX * len(labels),
         title=alt.TitleParams(
             [
                 "Each row adds one cloud group to the row below.",
-                "Right column: each step in points of capacity, with its 95% interval.",
+                "Right column: each step in points (pts) of capacity, with its 95% interval.",
                 "FP shows its own error.",
             ],
             anchor="start",
@@ -1363,31 +1367,33 @@ def figure_fp_cloud(*, contrasts: pl.DataFrame, scope: str) -> alt.TopLevelMixin
     return figure(
         panels=[panel],
         number="9b",
-        title="Adding cloud variables to the production reference lowers the error",
+        title="Error of the production reference with total cloud and cloud layers added",
         subtitle=[
             scope,
             (
-                "Post hoc, exploratory: added after the first results, with no matched negative "
-                "control."
+                "Post hoc, exploratory: added after the first results, with no negative control. "
+                "Not corrected for multiple comparisons."
             ),
             (
-                "Filled purple dot: mean absolute error at the main XGBoost tuning setting, pooled "
-                "over lead days 1 to 3. Hollow ring: the same at the second setting."
+                "Filled purple dot: mean absolute error with the main XGBoost model settings, "
+                "pooled over lead days 1 to 3. Hollow ring, drawn just under its row's dot: the "
+                "same with the second settings, a check that the result does not depend on them."
             ),
             (
-                "Orange line: 95% interval of that step alone at the main setting, from "
-                "resampling whole months, drawn from the row below's dot, which is the step's zero."
+                "Orange line: 95% interval of that step alone at the main settings, from "
+                "resampling whole months, drawn from the row below's dot, which is the step's "
+                "zero. The page's verdicts use 99% intervals, given in its text."
             ),
             (
-                "A minus sign in the right column means the error fell. Each added row holds more "
-                "columns: FP has 13, FP + total cloud 14, FP + total cloud + layers 17."
+                "A minus sign in the right column means the error fell. The axis does not start "
+                "at zero. Each added row has more input variables: FP has 13, FP + total cloud 14, "
+                "FP + total cloud + layers 17."
             ),
             PRODUCTION_KEY,
             (
-                "Total cloud is the F1 column and the layers are the F2 columns (low, mid, high "
-                "cloud cover). Cloud layers are not in ECMWF's free open-data feed."
+                "Total cloud: the model also gets total cloud cover. Layers: it also gets low, "
+                "mid, and high cloud cover, which ECMWF's free open-data feed does not carry."
             ),
-            "Interval not corrected for multiple comparisons.",
         ],
         figure_planning=None,
     )
