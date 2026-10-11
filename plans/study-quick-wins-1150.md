@@ -142,7 +142,50 @@ they share months. The final round-2 winner is therefore confirmed on fold B and
 
 Every other number is exploratory. Anything added after a first look is labelled post hoc.
 
-## Round 1 — ideas one at a time, each against the production arm
+## Round 0 — training-data cleaning (added at the maintainer's request)
+
+**Question.** Production trains on the cleaned power table (`cleaned_power_time_series`, the
+unflagged rows of `flag_nged_power`), which does minimal cleaning. Does stronger cleaning of the
+*training target* lower the error? The maintainer's first idea is to drop each series' first few
+months after its first non-zero reading. The maintainer also notes that NGED's data shows no
+stuck values, so stuck-value rules are not tried.
+
+**Design.** Only the training rows change. Every cleaning arm is scored against the identical
+validation actuals and rows as production (the existing cleaned table), so the arms stay
+comparable and cleaning cannot flatter itself by removing hard validation hours. Rules are applied
+to the engineered training frame by dropping `(series, valid_time)` rows; power lags still read the
+raw cleaned table, as in production. Each rule is a pure function of the series' own history before
+`train_end`, so no validation information reaches the training set.
+
+**Arms (tinkering allowed, listed here so the page can say what was tried):**
+
+| ID | Rule | Applies to |
+|---|---|---|
+| R0 | Production: no extra cleaning | all |
+| R1 | Drop the first N months after the first non-zero reading, for N in 1, 2, 3, 6 | all |
+| R2 | Drop isolated exact-zero half-hours (a zero with non-zero neighbours) | all |
+| R3 | Drop gross outliers: readings beyond k times the series' effective capacity, or beyond a robust band around the series' own hour-of-week median, for k and band width read from the training data only | all |
+| R4 | Drop commissioning ramps and level shifts found by comparing each series' monthly mean output with its own long-run level (generators) | PV, wind |
+| R5 | The best-looking combination of the above, chosen on fold A | all |
+
+Unscored extras for the page's data-cleaning section: how many training rows each rule removes per
+series type, plots of what was removed for one example per type (anonymised, normalised by
+capacity, no generator names), and a check that the validation rows are untouched.
+
+**Selection.** The cleaning rules chosen on fold A become "the cleaning" for the rest of the study,
+so round 1 to 3 arms run on cleaned training data. The leaderboard keeps both references: the
+original production forecast (R0) and production with the chosen cleaning (R5 or best single rule),
+and reports every later arm against both. Fold B repeats the cleaning comparison in round 3.
+
+**Planned contrast P0:** the chosen cleaning (R5, fixed before fold B is scored) against R0, CRPS
+and MAE, fold B deciding. The ladder of R1 to R4 is exploratory.
+
+**Page section.** "What the data cleaning showed": the table of rules with rows removed and
+paired differences against R0 with intervals, the plots, and a recommendation on which rule to
+move into the production cleaning step, with the limits (six PV and three wind series; one
+validation year).
+
+## Round 1 — ideas one at a time, each against production and against production with the chosen cleaning
 
 **Column rule.** Phase 0 reproduces production at its stored `colsample_bytree` of 0.8. Every
 round 1 contrast then runs against a second control, "production at `colsample_bytree` 1.0", and
