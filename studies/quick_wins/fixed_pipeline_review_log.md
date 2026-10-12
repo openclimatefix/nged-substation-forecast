@@ -110,3 +110,9 @@ The accepted provenance improvement records the fitted script and dependency has
 the reviewer checked those fields against the fitter manifest and cleared the addition.
 Shares are normalized per booster, then averaged equally across series and six fold/seed refits.
 The reported range is refit variability, not an interval or evidence that a feature helps.
+
+The separate importance-chart script received a fresh pre-execution review. It validates the
+complete 24-feature public aggregates, preserves zeros on a linear axis, exports exact figure
+text before rendering, and describes its ranges as refit variability. Concrete text reviews and
+PNG inspection remain required. The same reviewer cleared the serial corrected-fit queue, with
+execution conditional on full wind readiness, all four completed frame builds and a free GPU.
