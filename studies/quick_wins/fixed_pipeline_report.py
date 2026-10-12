@@ -8,8 +8,10 @@ scores. Saved private losses remain read only.
 
 import argparse
 import hashlib
+import io
 import json
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Any, Final
 
@@ -18,6 +20,13 @@ import polars as pl
 from scipy import stats
 
 KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
+TRAINING_KEYS: Final[tuple[str, ...]] = (
+    "time_series_id",
+    "power_fcst_init_time",
+    "nwp_init_time",
+    "valid_time",
+    "ensemble_member",
+)
 METRICS: Final[tuple[str, ...]] = (
     "crps_norm",
     "abs_error_norm",
@@ -360,12 +369,83 @@ def _absolute_scores(*, runs: dict[str, dict[int, pl.DataFrame]]) -> list[dict[s
     return levels
 
 
-def _check_training_pair(*, a_root: Path, b_root: Path, match_counts: bool) -> None:
+@cache
+def _canonical_training_keys(
+    *, path: Path, pinned_sha256: str, file_state: tuple[int, int, int, int]
+) -> dict[str, Any]:
+    if _sha256(path=path) != pinned_sha256:
+        raise ValueError("referenced training file fingerprint mismatch")
+    keys = pl.read_parquet(path, columns=list(TRAINING_KEYS))
+    expected = pl.Schema(
+        {
+            "time_series_id": pl.Int32,
+            "power_fcst_init_time": pl.Datetime("us", "UTC"),
+            "nwp_init_time": pl.Datetime("us", "UTC"),
+            "valid_time": pl.Datetime("us", "UTC"),
+            "ensemble_member": pl.Int8,
+        }
+    )
+    if keys.schema != expected or keys.null_count().sum_horizontal().item():
+        raise ValueError("training key schema differs from the exact non-null frozen schema")
+    if keys.is_duplicated().any() or not keys.equals(keys.sort(*TRAINING_KEYS)):
+        raise ValueError("training forecast keys must be unique and stored in sorted order")
+    buffer = io.BytesIO()
+    keys.rechunk().write_ipc(buffer)
+    if _file_state(path=path) != file_state:
+        raise ValueError("referenced training file changed while verifying its keys")
+    return {
+        "train_sha256": pinned_sha256,
+        "canonical_key_sha256": hashlib.sha256(buffer.getvalue()).hexdigest(),
+        "rows": keys.height,
+        "schema": {name: str(dtype) for name, dtype in keys.schema.items()},
+        "key_columns": list(TRAINING_KEYS),
+        "sorted_unique": True,
+        "canonicalisation": "original row order, exact types, rechunked Arrow IPC",
+    }
+
+
+def _file_state(*, path: Path) -> tuple[int, int, int, int]:
+    state = path.stat()
+    return state.st_dev, state.st_ino, state.st_size, state.st_mtime_ns
+
+
+def _verified_training_keys(*, frames: Path, fit_manifest: dict[str, Any]) -> dict[str, Any]:
+    root = frames.resolve()
+    manifest_bytes = (root / "manifest.json").read_bytes()
+    manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+    if manifest_sha != fit_manifest["input_manifest_sha256"]:
+        raise ValueError("provided frame manifest differs from the fit's pinned input manifest")
+    if json.loads(manifest_bytes) != fit_manifest["input_manifest"]:
+        raise ValueError("provided frame manifest differs from the fit's embedded input manifest")
+    path = root / "train.parquet"
+    summary = _canonical_training_keys(
+        path=path,
+        pinned_sha256=fit_manifest["input_manifest"]["files"]["train.parquet"],
+        file_state=_file_state(path=path),
+    )
+    return {"frame_manifest_sha256": manifest_sha, **summary}
+
+
+def _check_training_pair(
+    *,
+    a_root: Path,
+    b_root: Path,
+    match_counts: bool,
+    a_frames: Path | None = None,
+    b_frames: Path | None = None,
+) -> None:
     a_manifest = json.loads((a_root / "manifest.json").read_text())
     b_manifest = json.loads((b_root / "manifest.json").read_text())
     a_training = a_manifest["input_manifest"]["frames"]["train.parquet"]
     b_training = b_manifest["input_manifest"]["frames"]["train.parquet"]
-    if a_training["key_sha256"] != b_training["key_sha256"]:
+    if (a_frames is None) != (b_frames is None):
+        raise ValueError("paired canonical training verification requires both frame roots")
+    if a_frames is not None and b_frames is not None:
+        a_keys = _verified_training_keys(frames=a_frames, fit_manifest=a_manifest)
+        b_keys = _verified_training_keys(frames=b_frames, fit_manifest=b_manifest)
+        if a_keys["canonical_key_sha256"] != b_keys["canonical_key_sha256"]:
+            raise ValueError("contrast has different canonical raw training forecast keys")
+    elif a_training["key_sha256"] != b_training["key_sha256"]:
         raise ValueError("contrast has different raw training forecast keys")
     if a_manifest["recipe"] == b_manifest["recipe"] or match_counts:
         for root in (a_root, b_root):
@@ -386,6 +466,7 @@ def _interaction_inputs(
     specification: dict[str, Any],
     runs: dict[str, dict[int, pl.DataFrame]],
     fit_roots: dict[tuple[str, int], Path],
+    frame_roots: dict[tuple[str, int], Path] | None = None,
 ) -> dict[str, dict[int, pl.DataFrame]]:
     roles = ("combined", "radiation", "wind", "old")
     if len({specification[role] for role in roles}) != 4:
@@ -406,6 +487,8 @@ def _interaction_inputs(
                 a_root=fit_roots[(specification["combined"], seed)],
                 b_root=root,
                 match_counts=True,
+                a_frames=(frame_roots or {}).get((specification["combined"], seed)),
+                b_frames=(frame_roots or {}).get((specification[role], seed)),
             )
     if len(identities) != 1:
         raise ValueError("interaction requires the same recipe, setting, device and padding")
@@ -437,8 +520,11 @@ def _interaction_rows(
     specification: dict[str, Any],
     runs: dict[str, dict[int, pl.DataFrame]],
     fit_roots: dict[tuple[str, int], Path],
+    frame_roots: dict[tuple[str, int], Path] | None = None,
 ) -> list[dict[str, Any]]:
-    arms = _interaction_inputs(specification=specification, runs=runs, fit_roots=fit_roots)
+    arms = _interaction_inputs(
+        specification=specification, runs=runs, fit_roots=fit_roots, frame_roots=frame_roots
+    )
     output = []
     for group in specification.get("groups", GROUPS):
         for band in specification.get("bands", BANDS):
@@ -480,7 +566,9 @@ def _interaction_rows(
     return output
 
 
-def _support_note(*, interactions: bool, source_eras: bool) -> str:
+def _support_note(
+    *, interactions: bool, source_eras: bool, canonical_training: bool = False
+) -> str:
     text = (
         "A bootstrap draw omits a series when none of its supported months were drawn; "
         "remaining series retain equal weight. Support columns report month coverage, "
@@ -498,6 +586,13 @@ def _support_note(*, interactions: bool, source_eras: bool) -> str:
             "Source-era selections use recorded nwp_init_time before/from 13 November 2024 00Z. "
             "These descriptive availability-era comparisons have different seasons and "
             "training exposure; they do not identify a causal upgrade effect.\n"
+        )
+    if canonical_training:
+        text += (
+            "Training pairing verifies pinned frame manifests and training-file hashes, then "
+            "compares exact ordered, typed row keys after rechunking for canonical IPC hashing. "
+            "Arrow chunk boundaries alone can change serialized key hashes without changing rows. "
+            "This verification changes neither training rows nor fitted artifacts.\n"
         )
     return text
 
@@ -519,6 +614,22 @@ def _forecast_provenance(*, runs: list[dict[str, Any]]) -> dict[str, str]:
     return sources
 
 
+def _training_provenance(*, runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "label": run["label"],
+            "seed": run["seed"],
+            "frames": str(Path(run["frames"]).resolve()),
+            **_verified_training_keys(
+                frames=Path(run["frames"]),
+                fit_manifest=json.loads((Path(run["path"]) / "manifest.json").read_text()),
+            ),
+        }
+        for run in runs
+        if "frames" in run
+    ]
+
+
 def main() -> None:
     """Write every absolute score and prespecified paired contrast into a reproducible report."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -534,6 +645,11 @@ def main() -> None:
     public_features = []
     parameters = []
     fit_roots = {(run["label"], int(run["seed"])): Path(run["path"]) for run in spec["runs"]}
+    frame_roots = {
+        (run["label"], int(run["seed"])): Path(run["frames"])
+        for run in spec["runs"]
+        if "frames" in run
+    }
     for run in spec["runs"]:
         manifest = json.loads((Path(run["path"]) / "manifest.json").read_text())
         features.append({"label": run["label"], "seed": run["seed"], "manifest": manifest})
@@ -566,6 +682,8 @@ def main() -> None:
                 a_root=fit_roots[(comparison["left"], seed)],
                 b_root=fit_roots[(comparison["right"], seed)],
                 match_counts=bool(comparison.get("match_training_counts", False)),
+                a_frames=frame_roots.get((comparison["left"], seed)),
+                b_frames=frame_roots.get((comparison["right"], seed)),
             )
         for group in comparison.get("groups", GROUPS):
             for band in comparison.get("bands", BANDS):
@@ -598,7 +716,9 @@ def main() -> None:
                 )
     for interaction in spec.get("interactions", []):
         contrasts.extend(
-            _interaction_rows(specification=interaction, runs=runs, fit_roots=fit_roots)
+            _interaction_rows(
+                specification=interaction, runs=runs, fit_roots=fit_roots, frame_roots=frame_roots
+            )
         )
     args.output.mkdir(parents=True, exist_ok=False)
     provenance = {
@@ -613,6 +733,7 @@ def main() -> None:
         "bootstrap_seed": BOOTSTRAP_SEED,
         "resamples": RESAMPLES,
         "verified_forecast_sources": _forecast_provenance(runs=spec["runs"]),
+        "verified_training_keys": _training_provenance(runs=spec["runs"]),
     }
     (args.output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     level_frame, contrast_frame = pl.DataFrame(levels), pl.DataFrame(contrasts)
@@ -635,6 +756,7 @@ def main() -> None:
     text += _support_note(
         interactions=bool(spec.get("interactions")),
         source_eras=any("source_era" in run for run in spec["runs"]),
+        canonical_training=bool(frame_roots),
     )
     text += (
         "The t-interval uses equal-month means, a different estimand "
