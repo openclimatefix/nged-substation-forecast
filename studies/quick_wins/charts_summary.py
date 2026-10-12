@@ -853,11 +853,13 @@ def figure_1(*, context: Context) -> Figure:
         ),
         (
             "Each line is the 95% interval from resampling whole months. Month-to-month swings are "
-            "shared by all arms, so overlapping intervals can hide a real gap (see Figure 2)."
+            "shared by all arms, so overlapping intervals can hide a real gap (see Figure 2). Each "
+            "dashed vertical line is the score of the named reference: the manual heuristic, "
+            "climatology (the typical power at that time of day and year), or production as stored."
         ),
         (
-            "Every arm is trained on one XGBoost model per series from the same weather; arms differ "
-            "only in the one change in the label."
+            "Every arm is an XGBoost model fitted to the same weather data; arms differ only in "
+            "the changes named in the label."
         ),
         ROUND2_LEGEND,
     ]
@@ -964,6 +966,9 @@ CONTRAST_X: Final[str] = (
 )
 ZERO_LABEL: Final[str] = "same as production with cleaning"
 BETTER_LABEL: Final[str] = "better than production with cleaning"
+SHORT_ZERO_LABEL: Final[str] = "no change"
+SHORT_BETTER_LABEL: Final[str] = "better"
+"""Figure 3's wide axis leaves no room for the long labels; its axis title gives the full meaning."""
 
 
 def _round1_and_round2_domain(*, context: Context) -> tuple[float, float]:
@@ -1211,10 +1216,14 @@ def figure_3(*, context: Context) -> Figure:
     domain = _domain(frames=list(blocks.values()))
     biggest = max(blocks, key=lambda t: -min(blocks[t]["difference"]))
     best_arm = blocks[biggest].sort("difference").row(0, named=True)
+    best_name = (
+        "the best round 2 arm"
+        if best_arm["arm"] == context.best_round2
+        else f'"{ARM_LABELS[best_arm["arm"]].lower()}"'
+    )
     title = (
         f"The largest gains are in {TYPE_LABELS[biggest].lower()}: "
-        f"{ARM_LABELS[best_arm['arm']].lower()} lowers their CRPS by "
-        f"{-best_arm['difference']:.1f} points of capacity"
+        f"{best_name} lowers their CRPS by {-best_arm['difference']:.1f} points of capacity"
     )
     subtitle = [
         (
@@ -1249,7 +1258,7 @@ def figure_3(*, context: Context) -> Figure:
             )
         ],
         legend=[f"Kind of change: {k}" for k in KIND_ORDER[1:]],
-        annotations=[ZERO_LABEL, f"← {BETTER_LABEL}", ROUND2_LEGEND],
+        annotations=[SHORT_ZERO_LABEL, f"← {SHORT_BETTER_LABEL}", ROUND2_LEGEND],
     )
 
     def draw() -> alt.TopLevelMixin:
@@ -1262,13 +1271,13 @@ def figure_3(*, context: Context) -> Figure:
                     rows=rows.with_columns(condition=pl.Series(kinds)),
                     x_domain=domain,
                     x_title=x_crps if index == len(blocks) - 1 else "",
-                    zero_label=ZERO_LABEL,
-                    better_label=BETTER_LABEL,
+                    zero_label=SHORT_ZERO_LABEL,
+                    better_label=SHORT_BETTER_LABEL,
                     panel_title=panel_titles[index],
                     figure_planning="exploratory",
                     condition_key=index == 0,
                     reference_labels=index == 0,
-                    row_step_px=24,
+                    row_step_px=30,
                     **_kind_args(kinds=kinds_all),  # ty: ignore[invalid-argument-type]
                 )
             )
@@ -1388,10 +1397,10 @@ def figure_5(*, context: Context) -> Figure | None:
     panel_crps = "CRPS: scores the whole ensemble"
     panel_mae = "MAE: scores the ensemble mean only"
     panel_series = (
-        f"Change for each of the {changed.height} series whose forecast changed "
-        f"({unchanged} other series are exactly unchanged)"
+        f"Change for the {changed.height} series whose forecast changed "
+        f"({unchanged} others did not change)"
     )
-    x_series = "Change from production for one series (percentage points of that series' capacity)"
+    x_series = "Change from production for one series (percentage points of that series' capacity"
     rows_label = {
         row["label"]: (
             f"{row['label']} ({removed.get(row['time_series_id'], 0):,} half-hours removed)"
@@ -1413,7 +1422,9 @@ def figure_5(*, context: Context) -> Figure | None:
         ),
         (
             "The chosen rule, drop new-meter settling, removes the 6 weeks after a demand meter first "
-            "reads live. It was written after seeing the results of the other rules."
+            "reads live. It was written after seeing the results of the other rules. In the bottom "
+            "panel, a series is named by its type and its rank by capacity within the type "
+            "(Demand 1 is the largest)."
         ),
     ]
     text = FigureText(
@@ -1433,7 +1444,7 @@ def figure_5(*, context: Context) -> Figure | None:
             charts.axis_title_with_direction(
                 x_title=x_mae, better_label=better, better_direction="negative"
             ),
-            x_series + " (smaller is better)",
+            x_series + "; smaller is better)",
         ],
         legend=["Change in CRPS (blue)", "Change in MAE (orange)"],
         annotations=[
@@ -1483,7 +1494,7 @@ def figure_5(*, context: Context) -> Figure | None:
                         DOMAIN_STEP * (int(low / DOMAIN_STEP) - 1),
                         DOMAIN_STEP * (int(high / DOMAIN_STEP) + 1),
                     ),
-                    x_title=x_series + " (smaller is better)",
+                    x_title=x_series + "; smaller is better)",
                     panel_title=panel_series,
                     colours={"Change in CRPS": ocf.DATA_BLUE, "Change in MAE": ocf.BRAND_ORANGE},
                     legend_title=None,
@@ -1535,7 +1546,9 @@ def figure_6(*, context: Context) -> Figure | None:
         (
             f"Scored only on the {context.calibration_runs} forecast runs after the first 8, which "
             f"are left out while history builds up; {context.scope}; seed {context.calibration_seed}. "
-            "Panels a use the two arms named in the panel titles."
+            "Panels a use the two arms named in the panel titles; the second arm combines "
+            "absolute-error loss, early stopping, the lead-time column, lean wind columns, and one "
+            "model per type with a site identifier."
         ),
         (
             "In panel a, a dot is the share of outcomes that fell inside the ensemble's 10% to 90% "
@@ -1555,7 +1568,7 @@ def figure_6(*, context: Context) -> Figure | None:
         plots=(
             "Share of outcomes inside the ensemble's 10% to 90% band before and after spread "
             "calibration (a), and the paired change in CRPS from calibrating, by series type (b), "
-            "for production with cleaning and the best round 2 arm."
+            "for production with cleaning and the best point-forecast round 2 arm."
         ),
         title=title,
         subtitle=subtitle,

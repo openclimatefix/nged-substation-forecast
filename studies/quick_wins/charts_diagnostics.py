@@ -9,11 +9,12 @@ chart is rendered, replacing only these two figures' sections. Figure 13 is comp
 per-row scores (the mean over rows per series, then over the series of a type, as the leaderboard
 does); Figure 14 reads the contrasts the report script wrote.
 
-    uv run python studies/quick_wins/charts_diagnostics.py [--seed 0] [--text-only]
+    uv run python studies/quick_wins/charts_diagnostics.py [--seeds 0 1 2] [--text-only]
 """
 
 import argparse
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 import altair as alt
@@ -100,6 +101,13 @@ class Figure:
     chart: alt.TopLevelMixin
 
 
+def _seeds_text(*, seeds: list[int]) -> str:
+    """Name the random seeds the XGBoost scores average over."""
+    if len(seeds) == 1:
+        return f"scores of one random seed (seed {seeds[0]})"
+    return f"average over random seeds {', '.join(str(seed) for seed in seeds)}"
+
+
 def _type_means(*, scored: pl.DataFrame, types: pl.DataFrame) -> pl.DataFrame:
     """Mean over rows per series, then over the series of each type, per lead band."""
     band = (
@@ -131,8 +139,11 @@ def _type_means(*, scored: pl.DataFrame, types: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def lead_band_scores(*, seed: int) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Return every model's lead-band means on the rows all five models scored, and the types."""
+def lead_band_scores(*, seeds: list[int]) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Return every model's lead-band means on the rows all five models scored, and the types.
+
+    The XGBoost arms' means are averaged over `seeds`; the two baselines have no seed.
+    """
     settings = Settings()
     series_ids = inputs.eligible_series_ids(settings=settings, fold_id=inputs.FOLD_A)
     types = pl.DataFrame(
@@ -146,21 +157,31 @@ def lead_band_scores(*, seed: int) -> tuple[pl.DataFrame, pl.DataFrame]:
         )
         for name in (HEURISTIC, CLIMATOLOGY)
     }
-    for arm in (CLEANED, BEST_POINT, BEST_QUANTILE):
-        frames[arm] = pl.read_parquet(
+    arm_frames = {
+        (arm, seed): pl.read_parquet(
             inputs.OUTPUT_ROOT / "arms" / FOLD / f"{arm}_seed{seed}" / "scores.parquet"
         )
+        for arm in (CLEANED, BEST_POINT, BEST_QUANTILE)
+        for seed in seeds
+    }
     shared = None
-    for frame in frames.values():
+    for frame in (*frames.values(), *arm_frames.values()):
         shared = frame.select(KEYS) if shared is None else shared.join(frame.select(KEYS), on=KEYS)
     assert shared is not None
-    rows = pl.concat(
-        [
-            _type_means(scored=frame.join(shared, on=KEYS), types=types).with_columns(
-                model=pl.lit(name)
-            )
-            for name, frame in frames.items()
-        ]
+    per_seed = [
+        _type_means(scored=frame.join(shared, on=KEYS), types=types).with_columns(
+            model=pl.lit(name)
+        )
+        for name, frame in frames.items()
+    ]
+    per_seed += [
+        _type_means(scored=frame.join(shared, on=KEYS), types=types).with_columns(model=pl.lit(arm))
+        for (arm, _seed), frame in arm_frames.items()
+    ]
+    rows = (
+        pl.concat(per_seed)
+        .group_by("time_series_type", "band", "model")
+        .agg(pl.col("mae", "crps").mean())
     )
     return rows, types
 
@@ -206,9 +227,9 @@ def _facet(*, data: pl.DataFrame, title: str) -> alt.FacetChart:
     )
 
 
-def figure_13(*, seed: int) -> Figure:
+def figure_13(*, seeds: list[int]) -> Figure:
     """Build Figure 13: lead-band MAE and CRPS of the heuristic, climatology, and XGBoost arms."""
-    rows, types = lead_band_scores(seed=seed)
+    rows, types = lead_band_scores(seeds=seeds)
     counts = dict(types.group_by("time_series_type").len().iter_rows())
     counts["all"] = types.height
     tidy = (
@@ -275,7 +296,7 @@ def figure_13(*, seed: int) -> Figure:
             "percentage of the series' own effective capacity; zero is a perfect forecast. "
             "The last column averages all 31 series. The scores come from 53 weekly ECMWF "
             "ensemble forecast runs, July 2025 to June 2026 (fold A), on the rows that all five "
-            f"models scored. XGBoost models were trained with one random seed (seed {seed}). "
+            f"models scored. XGBoost scores are the {_seeds_text(seeds=seeds)}. "
             "No intervals are shown."
         ),
         (
@@ -317,10 +338,13 @@ def figure_13(*, seed: int) -> Figure:
     return Figure(text=text, chart=chart)
 
 
-def figure_14(*, seed: int) -> Figure:
+def figure_14(*, seeds: list[int]) -> Figure:
     """Build Figure 14: CRPS against months of training data, as a difference from 15 months."""
     contrasts = pl.read_parquet(
-        inputs.OUTPUT_ROOT / "report" / FOLD / f"contrasts_seeds{seed}.parquet"
+        inputs.OUTPUT_ROOT
+        / "report"
+        / FOLD
+        / ("contrasts_seeds" + "".join(map(str, seeds)) + ".parquet")
     ).filter(
         pl.col("reference") == CLEANED,
         pl.col("lead_band") == "all",
@@ -414,7 +438,7 @@ def figure_14(*, seed: int) -> Figure:
         (
             "Each vertical line is a 95% interval from resampling whole months of the validation "
             "year, July 2025 to June 2026 (53 weekly forecast runs, fold A), with the same months "
-            f"drawn for both arms. Models were trained with one random seed (seed {seed}). A "
+            f"drawn for both arms. Scores are the {_seeds_text(seeds=seeds)}. A "
             "shorter window drops whole seasons from the training data. The first column also "
             "includes the one battery and the one biofuel series."
         ),
@@ -448,10 +472,11 @@ def figure_14(*, seed: int) -> Figure:
 def main() -> None:
     """Write the text of Figures 13 and 14, then render them."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seeds", type=int, nargs="+", default=[0])
+    parser.add_argument("--png-dir", type=Path, default=None, help="also write PNG renders here")
     parser.add_argument("--text-only", action="store_true")
     args = parser.parse_args()
-    figures = {13: figure_13(seed=args.seed), 14: figure_14(seed=args.seed)}
+    figures = {13: figure_13(seeds=args.seeds), 14: figure_14(seeds=args.seeds)}
     examples.write_text_sections(texts=[figure.text for figure in figures.values()])
     print(f"wrote {examples.TEXT_FILE}")
     if args.text_only:
@@ -459,6 +484,9 @@ def main() -> None:
     for number, figure in figures.items():
         path = examples.save(chart=figure.chart, number=number)
         print(f"wrote {path}")
+        if args.png_dir is not None:
+            args.png_dir.mkdir(parents=True, exist_ok=True)
+            figure.chart.save(args.png_dir / f"quick_wins_figure_{number}.png", scale_factor=2)
 
 
 if __name__ == "__main__":

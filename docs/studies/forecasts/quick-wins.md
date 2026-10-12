@@ -1,18 +1,19 @@
-# Cheap changes lowered the production XGBoost forecast's CRPS by about a third at 31 NGED series, mostly by fixing its ensemble spread
+# Quantile training and other cheap changes lowered the production XGBoost forecast's probabilistic error by about a third at 31 NGED series
 
-**A combination of four cheap changes to the production XGBoost forecast lowered its CRPS from 11.3%
-to 7.9% of capacity, and its mean absolute error from 12.1% to 10.7%, over a validation year at 31
-series in NGED's trial area.** The biggest gain came from training with quantile loss, which gives
-each of the 51 ensemble members a spread of its own: that change alone lowered CRPS by 2.4 points.
-Rescaling the members' spread with factors learned from past outcomes lowered it by 1.3 to 1.9
-points. The combination adds leaner columns for wind farms, a forecast-lead-time column, and one
-XGBoost model per series type with a site identifier. Two other planned changes, the absolute-error
-objective and early stopping, each lowered CRPS by about 0.4 points on their own. The study chose
-quantile training, the wind columns, and pooling after seeing the first results, so their gains are
-biased upward, and the page labels them "post hoc". After the changes, the point forecast beats the
-`manual_heuristic` baseline at days 0 to 2 and ties it at days 3 to 10, and the CRPS still sits
-above the heuristic's from day 3 on. Removing the power lags from solar and wind farms, which the
-maintainer expected to help, made both worse.
+**A combination of four cheap changes to the production XGBoost forecast lowered its continuous
+ranked probability score (CRPS) from 11.3% to 7.9% of capacity, and its mean absolute error (MAE)
+from 12.1% to 10.7%, over a validation year at 31 series in the trial area of National Grid
+Electricity Distribution (NGED).** The four changes are quantile training, a forecast-lead-time
+column, leaner columns for wind farms, and one XGBoost model per series type with a site identifier.
+Quantile training gives each of the 51 ensemble members a spread of its own, and lowered CRPS by 2.4
+points on its own. Rescaling the members' spread with factors learned from past outcomes is a
+separate fifth change for point forecasts, and lowered CRPS by 1.3 to 1.9 points. Two other planned
+changes, the absolute-error objective and early stopping, each lowered CRPS by about 0.4 points on
+their own. The study chose quantile training, the wind columns, and pooling after seeing the first
+results, so their gains are biased upward, and the page labels them "post hoc". After the changes,
+the point forecast beats the `manual_heuristic` baseline at days 0 to 2 and ties it at days 3 to 10,
+and the CRPS still sits above the heuristic's from day 3 on. Removing the power lags from solar and
+wind farms, which the plan asked about, made both worse.
 
 ![Figure 1: The best arm's CRPS is 7.9% of capacity, against 11.3% for production with cleaning and
 7.2% for the manual heuristic.](../assets/quick_wins_figure_1.svg)
@@ -35,6 +36,15 @@ maintainer expected to help, made both worse.
 - **Fold A:** the leaderboard fold. Training uses April 2024 to June 2025, and the 12 scored months
   run from July 2025 to June 2026. **Fold B:** the same 31 series trained on July 2025 to June 2026
   and scored from April 2024 to June 2025.
+- **Round, seed, control:** round 0 compared cleaning rules, round 1 tried ideas one at a time,
+  round 2 combined the winners, and round 3 repeated the key arms on more seeds and on fold B. A
+  seed changes the random row subsampling. The control for later arms is production with cleaning,
+  and the control member is the ensemble's unperturbed run.
+- **Reading the tables:** `[a, b]` is the 95% interval from resampling whole months, and "12 of 12
+  months" counts the months in which the arm beat its reference. P0 to P3 are the four planned
+  contrasts (see the Introduction).
+- **ERA5:** the European Centre for Medium-Range Weather Forecasts' reanalysis, an estimate of past
+  weather.
 - **Planned, post hoc:** a planned arm was in the plan approved before any fit. A post hoc arm or
   rule came later, after earlier results or after reading the training data.
 - **`manual_heuristic`:** the baseline forecaster that treats the power at the same weekday and time
@@ -45,7 +55,7 @@ maintainer expected to help, made both worse.
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
 > AI model (for this page, Claude Sonnet 5.5 and Claude Opus 5.5). Independent Claude reviewers
 > checked the method, the numbers, and the prose. The study had one scientific-validity review by
-> Claude Opus 5.5, where the study skill asks for two.
+> Claude Opus 5.5, where the study's own rules ask for two.
 
 ## Key findings
 
@@ -55,29 +65,34 @@ maintainer expected to help, made both worse.
   and its MAE of 12.1% is also above the heuristic's 11.0%.
 - **Quantile training lowered CRPS by 2.4 points, and combined with three other changes by 3.5.**
   The combination scores a CRPS of 7.85% [7.43, 8.24] and an MAE of 10.74% on fold A, averaged over
-  three seeds, and a CRPS 3.44 points lower than production on fold B. That is the lowest CRPS in
-  the study, 0.6 points above the heuristic's. Quantile training takes about 8 times longer.
+  three seeds, and a CRPS 3.44 points lower than production on fold B. That is the lowest CRPS among
+  the arms fitted with three seeds, and 0.6 points above the heuristic's. One arm fitted with one
+  seed, which adds the heuristic's weekly inputs, scores 7.63%. Of the 3.5 points, about 1.3 come
+  from a better point forecast (the MAE falls by 1.35) and about 2.2 from the spread. Quantile
+  training takes about 8 times longer.
 - **The point forecast is good at short leads and loses its edge from day 3.** At days 0 to 2 the
-  best arm's MAE is 9.5% against the heuristic's 11.3%, and for wind farms 10.0% against 19.2%. At
-  days 3 to 10 the two tie (10.8% and 10.9%), and from day 11 the heuristic is ahead (11.1% against
-  11.8%).
+  best point-forecast arm's MAE is 9.5% against the heuristic's 11.3%, and for wind farms 10.0%
+  against 19.2%. These are point estimates, and the study computed no paired interval against the
+  heuristic. At days 3 to 10 the two tie (10.8% and 10.9%), and from day 11 the heuristic is ahead
+  (11.1% against 11.8%).
 - **The absolute-error objective and early stopping are the two best planned single ideas.** The
   objective lowers CRPS by 0.42 points [−0.48, −0.37] and early stopping by 0.38 points [−0.52,
   −0.24], against production with cleaning (fold A, three seeds).
-- **Leaner columns for wind farms lower wind CRPS by 3.3 points, and the same cut hurts solar.**
-  Removing the power lags from solar and wind farms raised both errors.
+- **Leaner columns for wind farms lower wind CRPS by 3.3 points, and the same cut hurts solar.** A
+  similar cut for solar farms, and removing the power lags from solar and wind farms, raised their
+  errors.
 - **Rescaling the ensemble spread lowers CRPS by 1.9 points for production and 1.3 to 1.4 points for
   the best point-forecast arm (post hoc).** The rescaled forecast still scores worse than the
   heuristic.
-- **More training months help little beyond 12, and the heuristic's inputs help demand substations a
-  little.** Cutting the training window from 15 to 12 months raises CRPS by 0.07 points [−0.01,
-  0.14], and to 6 months by 0.48. Showing the model the 6 weekly analogue observations the heuristic
-  uses lowers CRPS by 0.24 points [−0.39, −0.07].
+- **More training months help little beyond 12, and the heuristic's weekly inputs help demand
+  substations a little.** Cutting the training window from 15 to 12 months raises CRPS by 0.07
+  points [−0.01, 0.14], and to 6 months by 0.48. Showing the model the 6 weekly analogue
+  observations the heuristic uses lowers CRPS by 0.24 points [−0.39, −0.07].
 - **Cleaning the training data matters for 2 of 31 series.** Dropping the 6 weeks after a new meter
   first reads live lowers CRPS by 0.31 points. Rules for zeros, spikes, dropouts, switching days,
   and commissioning ramps changed it by 0.07 points or less.
 
-## Why the XGBoost forecast scores worse than the heuristic, and what to try next
+## Why the XGBoost forecast scores worse than the heuristic
 
 **The evidence supports four answers, each with a limit.**
 
@@ -87,23 +102,25 @@ maintainer expected to help, made both worse.
   not close the gap: the best arm with rescaled spread scores 8.9% on later runs, against the
   heuristic's 7.4% on the same runs.
 - **Should we train on CRPS?** Quantile loss is the nearest cheap proxy, and it helped on both folds
-  and on every series type. The study did not train on CRPS itself, which needs a custom objective
-  or a neural network, and it did not measure whether the 9 quantile levels are the right number.
+  and on every series type except the single biofuel generator. The study did not train on CRPS
+  itself, which needs a custom objective or a neural network, and it did not measure whether the 9
+  quantile levels are the right number.
 - **Is the feature pipeline broken?** The study found no sign of it, and did not audit it. The point
   forecast beats the heuristic by 1.8 points of MAE at days 0 to 2, which a pipeline that mis-joined
-  the weather would not do. Some columns still mislead the model: removing 5 to 8 columns that wind
-  farms or solar farms cannot use lowered wind CRPS by 3.3 points.
+  the weather would not do. Some columns still mislead the model: removing 8 columns that wind farms
+  cannot use lowered wind CRPS by 3.3 points, although the matching 11-column cut for solar farms
+  raised solar CRPS by 0.26 points.
 - **Do we need more years, or an ERA5 first stage?** The study cannot say. Over the 15 months
   available, a longer window helps with diminishing returns: removing the oldest 3 months raises
   CRPS by 0.07 points on fold A. The 15 months hold one winter, so the gain from a second winter, or
   from pre-training on ERA5 and then learning the weather forecasts' errors, is untested.
 
-**Two quick tests of "give XGBoost what the heuristic has" are in the results.** A combination of
+**Three tests of "give XGBoost what the heuristic has" are in the results.** First, a combination of
 the heuristic's members with the XGBoost members lowered CRPS against XGBoost alone but scored worse
-than the heuristic alone, so the study found no sign that the two forecasts carry complementary
-information. A climatology column was not tested, because a climatological mean computed from the
-training window includes each training row itself, so the follow-up needs a leave-one-week-out
-construction.
+than the heuristic alone. Second, showing XGBoost the heuristic's six weekly analogue observations
+lowered CRPS by 0.24 points. Third, a climatology column was not tested, because a climatological
+mean computed from the training window includes each training row itself, so the follow-up needs a
+leave-one-week-out construction.
 
 ## Recommendations for the production forecast
 
@@ -118,19 +135,19 @@ months, one seed) beside it. Each effect is in points of capacity.
 | 3 | Train with quantile loss at 9 levels instead of squared error, and score every member times every level | post hoc | −2.39 [−2.52, −2.27], 12 of 12 | −2.60 [−2.74, −2.46], 15 of 15 | Training takes about 8 times longer; the forecast becomes 51 × 9 values |
 | 4 | Show wind farms fewer columns (drop weekday, radiation, dew point, precipitation type, time of year) | post hoc | −0.32 [−0.38, −0.26], 12 of 12 (wind alone −3.3) | −0.35 [−0.45, −0.25], 15 of 15 | One column list |
 | 5 | Add the forecast lead time in hours as a column | planned | −0.05 [−0.08, −0.03], 10 of 12 | −0.08 [−0.11, −0.05], 15 of 15 | Small, and a small effect |
-| 6 | Rescale each series' ensemble spread by a factor fitted on past outcomes, for the point-forecast arms | planned idea, post hoc form | −1.9 for production with cleaning, −1.3 to −1.4 for the best point arm (CRPS only) | −1.9 and −1.3 (seed 0) | A post-processing step and a state file |
+| 6 | Rescale each series' ensemble spread by a factor fitted on past outcomes, for the point-forecast arms | planned idea, post hoc form | −1.9 for production with cleaning, −1.3 to −1.4 for the best point arm (CRPS only) | −1.95 and −1.3 (seed 0) | A post-processing step and a state file |
 | 7 | One XGBoost model per series type, with a site identifier | post hoc | −0.82 [−0.96, −0.69], 12 of 12 | −0.51 [−0.81, −0.28], 15 of 15; adds nothing to the best point arm | A new training layout |
 | 8 | Drop the 6 weeks after a meter first reads live from training | post hoc | −0.31 [−0.62, −0.06], 9 of 12 (2 series) | No effect by construction | A rule in the cleaning step |
 
 **The four changes together score a CRPS of 7.85% on fold A, 3.50 points [−3.71, −3.28] below
-production with cleaning and 3.7 points below the stored production configuration.** The combination
-is quantile training (3), the lead-time column (5), the wind-farm columns (4), and the pooled layout
-with a site identifier (7), with the cleaning rule (8) in the control. Rows 1, 2, and 6 do not
-combine with it: quantile training replaces the objective, and the rescaling applies to the
-point-forecast arms. The best point-forecast arm combines rows 1, 2, 4, 5, and 7 and scores 9.95%
-[9.41, 10.42], 1.40 points below production with cleaning. Fold B shows no gain from pooling on top
-of the other point-forecast changes (−1.16 against −1.23), so the pooled layout is the least certain
-row.
+production with cleaning and 3.7 points below the study's refit of the stored production
+configuration.** The combination is quantile training (3), the lead-time column (5), the wind-farm
+columns (4), and the pooled layout with a site identifier (7), with the cleaning rule (8) already in
+the control. The study did not try rows 1, 2, and 6 with quantile training, which replaces the
+objective, or rescale the quantile arm. The best point-forecast arm combines rows 1, 2, 4, 5, and 7
+and scores 9.95% [9.41, 10.42], 1.40 points below production with cleaning. Fold B shows no gain
+from pooling on top of the other point-forecast changes (−1.16 against −1.23), so the pooled layout
+is the least certain row.
 
 **Production's `colsample_bytree` of 0.8 scored 0.10 points better than 1.0 on fold A and 0.07
 points better on fold B.** Every contrast on this page uses 1.0, so that arms with different numbers
@@ -153,15 +170,15 @@ forecasts and NGED power. It scores CRPS and MAE and benchmarks every arm agains
 the study, the aim widened from finding quick wins to diagnosing why the XGBoost forecast scores
 worse than the heuristic, so the page answers that too.
 
-**This is a looser study than the study skill's default.** The arms were tried in rounds. Round 0
-compared ways of cleaning the training data. Round 1 tried ideas one at a time. Round 2 combined the
-ideas that won. Round 3 repeated the key arms with two more seeds and on a backwards-in-time fold.
-After each round, the next round's arms were chosen by judgement, and a later diagnostic round added
-quantile training, a learning curve, the heuristic's inputs, and a blend with the heuristic's
-members. The plan named four planned contrasts: the chosen cleaning against no cleaning (P0), the
-round 2 combination against production on fold B (P1), per-type physics columns for solar farms only
-(P2), and spread calibration against the same forecast unrescaled (P3). Their results are in the
-results below. Every other number is exploratory.
+**This is a looser study than this repository's study standard.** The arms were tried in rounds.
+Round 0 compared ways of cleaning the training data. Round 1 tried ideas one at a time. Round 2
+combined the ideas that won. Round 3 repeated the key arms with two more seeds and on a
+backwards-in-time fold. After each round, the next round's arms were chosen by judgement, and a
+later diagnostic round added quantile training, a learning curve, the heuristic's inputs, and a
+blend with the heuristic's members. The plan named four planned contrasts: the chosen cleaning
+against no cleaning (P0), the round 2 combination against production on fold B (P1), per-type
+physics columns for solar farms only (P2), and spread calibration against the same forecast
+unrescaled (P3). Their results are in the results below. Every other number is exploratory.
 
 ## Data and methods
 
@@ -173,7 +190,7 @@ substations, 4 raw-flow substations, 1 battery, and 1 biofuel generator. The stu
 the leaderboard scorer, so every score is the study's own. The stored production forecast scores a
 CRPS of 6.33 MW on these runs. The refit on the GPU scores 6.27 MW, which is 0.2% below the CPU
 refit's 6.29 MW and 0.15% below the lowest stored retrain, slightly outside the stored runs' range.
-The CPU refit is inside that range. Every arm here used the GPU.
+The CPU refit is inside that range. Every arm here was fitted on a GPU.
 
 **Every arm is the production recipe with one named difference.** Production fits one XGBoost model
 per series, with 24 columns, 500 trees, learning rate 0.05, depth 6, row subsampling 0.8, and
@@ -193,8 +210,8 @@ from 12 months is too narrow, so the months-better count matters. The report als
 over the monthly differences.
 
 **Three fitting seeds measure the noise of the fit, and it is small.** Across seeds the CRPS of any
-arm varies by at most 0.04 points, against differences of 0.05 to 3.5 points. The seed changes row
-subsampling only. Fold B was fitted with one seed for every arm.
+arm varies by at most 0.05 points, against differences of 0.05 to 3.5 points. The seed changes row
+subsampling only. Fold B was fitted with one seed for most arms and two for four of them.
 
 **Fold B is a robustness check.** It trains on the validation year and scores the 15 months before
 the training window, with the same 31 series. Some demand meters did not exist in the early months,
@@ -251,7 +268,7 @@ the loss at days 0 to 2 comes mostly from shorter leads, which that study did no
 every lead.](../assets/quick_wins_figure_4.svg)
 
 **The ladder was chosen by judgement from the round 1 table.** The absolute-error objective with
-early stopping lowers CRPS by 0.62 points. Adding the lead-time column makes 0.65 points, and adding
+early stopping lowers CRPS by 0.63 points. Adding the lead-time column makes 0.65 points, and adding
 the wind-farm column cut makes 0.73 points. Adding the pooled layout makes 1.40 points on fold A. On
 fold B, the point-forecast ladder without pooling reaches 1.23 points and pooling adds nothing
 (1.16). The lowering holds in both lead bands: on fold B the best arm lowers CRPS by 1.75 points at
@@ -261,15 +278,13 @@ without pooling.
 
 ### Round 0: data cleaning, chosen before every later round
 
-**A Claude Sonnet subagent explored the training window (April 2024 to June 2025) and reported what
-looked wrong, and the plan had already named four rules.** The plan named the first-N-months,
-isolated-zero, spike, and commissioning-ramp rules. The exploration added three more (new-meter
-settling, solar and wind dropouts, and switching days), written after reading only the training
-months. Two demand meters started in early 2025 and were noisy for about 6 weeks. Three demand
-series had switching steps of 30 to 37% that lasted days. One solar farm was commissioned in stages
-over about 6 months. Five solar farms had single-series dropouts while their peers produced. One
-demand series looked sign-reversed, and one biofuel generator changed from switching on and off to
-idling.
+**Seven rules were tried, four named in the plan and three written after an exploratory read of the
+training window.** The plan named the first-N-months, isolated-zero, spike, and commissioning-ramp
+rules. A read of the training months (April 2024 to June 2025) only, with no validation data, led to
+three more: new-meter settling, solar and wind dropouts, and switching days. The read flagged
+late-starting meters, multi-day steps in some demand series, a staged solar commissioning, and solar
+dropouts while the other farms produced. The notes of that read are not part of the report, so the
+page quotes only what each rule drops.
 
 ![Figure 5: Dropping each new meter's first 6 weeks lowers CRPS by 0.3 points of capacity, and only
 2 series change.](../assets/quick_wins_figure_5.svg)
@@ -277,16 +292,18 @@ idling.
 **Only the new-meter rule changed a score, and only at 2 demand series.** The rule drops every
 half-hour up to 6 weeks after a series first has 48 consecutive half-hours above 5% of its capacity.
 It removes 4,747 training half-hours from 2 demand series, and lowers the mean CRPS by 0.31 points
-[−0.62, −0.06] (9 of 12 months) against production (P0, fold A). The other 29 series are unchanged.
-The first-1, first-2, and first-3-months rules scored −0.07, +0.03, and −0.07 points with intervals
-that include zero, and the first-6-months rule drops a whole new series so could not be scored. The
-isolated-zero and spike rules changed CRPS by 0.00 and +0.01 points. The commissioning-ramp rule
-removed 8,866 half-hours of one solar farm and raised the error by 0.02 points [0.01, 0.04]; the
-study did not test why. The solar-dropout and switching-day rules scored −0.01 and −0.07 points, and
-the combination of the new-meter, ramp, dropout, and switching rules scored −0.25 points [−0.52,
-−0.02]. We chose the new-meter rule as the cleaning for every later arm. Its value is for series the
-system will meet in future, because the two series it helps began in early 2025. It was written
-after reading the training months (post hoc), and fold B cannot test it.
+[−0.62, −0.06] (9 of 12 months) against production (P0, fold A). The t-interval over the monthly
+differences, [−0.61, +0.02], includes zero. The other 29 series are unchanged. The first-1, first-2,
+and first-3-months rules scored −0.07, +0.03, and −0.07 points with intervals that include zero, and
+the first-6-months rule, which removes 19,839 half-hours from 4 series, could not be scored because
+it leaves one demand series with no training rows. The isolated-zero and spike rules changed CRPS by
+0.00 and +0.01 points. The commissioning-ramp rule removed 8,866 half-hours of one solar farm and
+raised the error by 0.02 points [0.01, 0.04]; the study did not test why. The solar-dropout and
+switching-day rules scored −0.01 and −0.07 points, and the combination of the new-meter, ramp,
+dropout, and switching rules scored −0.25 points [−0.52, −0.02]. We chose the new-meter rule as the
+cleaning for every later arm. Its value is for series the system will meet in future, because the
+two series it helps began in early 2025. It was written after reading the training months (post
+hoc), and fold B cannot test it.
 
 ### Quantile training: the spread and the point forecast improve together
 
@@ -297,10 +314,10 @@ single gain.** To score it, every ensemble member is crossed with every level, s
 −2.46]. Every series type gains: −1.69 for demand, −2.30 for solar, −4.38 for wind, and −4.52 for
 raw flow. Adding the lead-time column, the wind-farm columns, and pooling with a site identifier
 gives the best arm, a CRPS of 7.85% and an MAE of 10.74%, and −3.44 points [−3.98, −3.00] on fold B.
-Adding the heuristic's inputs to that arm lowered CRPS by a further 0.2 points on seed 0 (7.63%) and
-by 0.2 on fold B, within the noise of one seed. The costs are that training takes about 8 times
-longer (see the compute section), and that the 9 levels and the equal weighting of the 459 values
-are untuned.
+Adding the heuristic's weekly inputs to that arm lowered CRPS by a further 0.2 points on seed 0
+(7.63%) and on fold B. The study computed no paired interval between the two arms, so that gain is
+untested. The costs are that training takes about 8 times longer (see the compute section), and that
+the 9 levels and the equal weighting of the 459 values are untuned.
 
 ### Calibration: the ensemble spread is far too narrow
 
@@ -350,7 +367,7 @@ it.](../assets/quick_wins_figure_11.svg)
 ![Figure 12: Error by lead day for production and the best
 combination.](../assets/quick_wins_figure_12.svg)
 
-### Where the XGBoost forecast beats the heuristic, and where it does not
+### Comparing with the heuristic: lead times, a blend, its inputs, and training length
 
 ![Figure 13: XGBoost beats the manual heuristic at days 0 to 2 for solar, wind, and raw-flow
 substations, and is usually behind it from day 3.](../assets/quick_wins_figure_13.svg)
@@ -366,13 +383,15 @@ lead: its CRPS is 5.7% to 5.8% against 6.4% to 7.4% for the best quantile arm.
 the runs where the heuristic has a forecast, production with cleaning scores 11.33%, the heuristic
 7.21%, and a 64-member blend 9.97%. With each heuristic member repeated 4 times, the blend scores
 8.52%. For the best point arm the blend scores 8.93% and 7.92%. The blend is better than XGBoost
-alone because it widens the spread, but worse than the heuristic alone, so the study found no sign
-of complementary information.
+alone, and worse than the heuristic alone except for wind farms, where the equal-weight blend with
+the best point arm scores 12.5% against 13.0% for the heuristic. The study did not test why the
+blend beats XGBoost alone, and it blended only seed 0 of production with cleaning and of the best
+point arm.
 
-**Showing XGBoost the heuristic's inputs helped demand substations a little.** Adding the 6 weekly
-analogue observations and their mean, median, minimum, and maximum lowered CRPS by 0.24 points
-[−0.39, −0.07] (9 of 12 months), and by 0.45 points [−0.69, −0.21] for demand, with the same sign on
-fold B (−0.60 overall, −0.94 for demand). It raised solar CRPS by 0.12 points on fold A.
+**Showing XGBoost the heuristic's weekly inputs helped demand substations a little.** Adding the 6
+weekly analogue observations and their mean, median, minimum, and maximum lowered CRPS by 0.24
+points [−0.39, −0.07] (9 of 12 months), and by 0.45 points [−0.69, −0.21] for demand, with the same
+sign on fold B (−0.60 overall, −0.94 for demand). It raised solar CRPS by 0.12 points on fold A.
 
 ![Figure 14: Over all series types, more months of training data lower the CRPS, and the last 3
 months add the least.](../assets/quick_wins_figure_14.svg)
@@ -455,8 +474,8 @@ CRPS differences against production with cleaning.
 ## Limitations
 
 - **The scope is 31 NGED series in the trial area, scored for one year and a backwards fold of 15
-  months.** The 6 solar farms share a box 25 km across, and the 3 wind farms share their weather. A
-  wind result rests on 3 farms.
+  months.** The 6 solar farms are close together and share their weather, and so do the 3 wind
+  farms. A wind result rests on 3 farms.
 - **The two folds are not independent.** Fold B uses the same series, and weather regimes recur.
 - **Several ideas and every combination arm were chosen after the first results.** The gain of the
   winning arm on fold A is biased upward. Fold B repeats the direction at a similar size.

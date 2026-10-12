@@ -69,10 +69,10 @@ BEST_ROUND_2: Final[str] = "r2_c4_c2_c1_a3w_d3"
 ARM_LABELS: Final[dict[str, str]] = {
     PRODUCTION: "Production as stored",
     CLEANED: "Production, cleaned training data",
-    "c4_absolute_error": "C4: absolute-error loss",
-    "a3w_lean_wind_only": "A3w: lean wind columns (post hoc)",
-    "d3_pooled_with_site_id": "D3: pooled with site identifier (post hoc)",
-    BEST_ROUND_2: "Best round 2 arm (post hoc)",
+    "c4_absolute_error": "Absolute-error loss",
+    "a3w_lean_wind_only": "Lean wind columns (post hoc)",
+    "d3_pooled_with_site_id": "One model per type, with site identifier (post hoc)",
+    BEST_ROUND_2: "Best point-forecast round 2 arm (post hoc)",
 }
 """The legend entry of each arm. One entry per arm is used in every figure."""
 
@@ -599,13 +599,13 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
         )
     wide = data.pivot(on="line", index=["time_series_type", "day"], values="error")
     assert (wide[ARM_LABELS[BEST_ROUND_2]] < wide[ARM_LABELS[PRODUCTION]]).all(), (
-        "figure 12's title says the best round 2 arm is lower at every lead day"
+        "figure 12's title says the best point-forecast round 2 arm is lower at every lead day"
     )
     text = FigureText(
         number=12,
         title=(
-            "The best round 2 arm has a lower error than production at every lead day, for all "
-            "four series types"
+            "The best point-forecast round 2 arm has a lower error than production at every lead "
+            "day, for all four series types"
         ),
         subtitle=[
             (
@@ -616,8 +616,10 @@ def lead_day_figure(*, context: Context) -> tuple[FigureText, alt.VConcatChart]:
             ),
             (
                 "Day 1 is the first 24 hours after a run's initialisation time. Leads of 11 days "
-                "and more are left out. The best round 2 arm was chosen after seeing round 1 "
-                "(post hoc)."
+                "and more are left out. The best point-forecast round 2 arm combines the "
+                "absolute-error loss, early stopping, the forecast lead-time column, lean wind "
+                "columns, and one model per series type with a site identifier; it was chosen "
+                "after seeing round 1 (post hoc)."
             ),
         ],
         panel_titles=panel_titles,
