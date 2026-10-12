@@ -40,6 +40,11 @@ observations, code and dependencies are fingerprinted. Both folds use the same e
 Every observed outcome precedes 1 July 2026. Native forecast context is retained for engineering;
 the engineered rows are then clipped to the fold windows.
 
+Capacity snapshot 1 is the full-history 99th percentile of absolute power, and can include later
+observations. It is a common scoring denominator only: fitting, cleaning, lag construction and
+pooled training scales do not use it. Normalised results are retrospective comparisons conditional
+on this frozen snapshot.
+
 ## Execution
 
 Set `DATA_PATH_INTERNAL`, `DATA_PATH_DELIVERY` and `REPO_DATA_DIR` to the local data root.
@@ -83,7 +88,9 @@ exchangeable weather members; its diagnostic fair CRPS must not decide a cross-r
 Coverage is percent of cases; normalised losses are percentages of capacity.
 
 Primary estimates weight series equally. Intervals resample whole valid-time months and one paired
-fitting seed. The separately reported equal-month t-interval targets a different estimand. Three
+fitting seed. The central estimate averages three refits; the bootstrap interval includes variation
+from an individual refit. The separately reported equal-month t-interval averages the refits within
+each month before estimating month-to-month variation and uses equal month weights. Three
 seeds and the retrospective second fold guard against a lucky refit; the second hyperparameter
 setting checks robustness. Weekly sampled scores are study diagnostics. A leaderboard claim
 requires a separate exact-reference-key submission through the official scorer.
