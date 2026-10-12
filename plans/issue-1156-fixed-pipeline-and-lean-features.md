@@ -245,3 +245,13 @@ were accepted: the bootstrap interval represents months and an individual fitted
 three-seed central estimate, while the equal-month t-interval conditions on each month's seed
 average. Fold B wind point estimates agree; the interval conclusions differ. The draft now states
 these distinctions. Pending combined, wind and feature results still need the second fresh review.
+
+**The next feature queues passed fresh static review before any fit or completed-data preflight.**
+They contain 78 equal-width wind additions/domain guards/negative controls, 18 explicit unpadded
+controls, and a separately callable six-fit first solar rung. They verify completed cleaned/lean
+controls and immutable hashes, reject existing targets, and fit serially. The root reviewer added
+a request for the same data-root and MLflow environment as the earlier queue; the author fixed it
+and the reviewer rechecked it. No later solar rung runs without its registered gain decision.
+One process deviation occurred: the author ran the helper's registry-only list mode before fresh
+review. It read no study data, performed no fit and produced no published result. That output is
+not evidence for a study number; all data preflights and fits remain gated on the cleared review.
