@@ -207,6 +207,30 @@ def test_midpoint_index_final_shape_and_missing_gap_isolation() -> None:
     assert_frame_equal(_resample(missing).filter(after_gap), _resample(changed).filter(after_gap))
 
 
+def test_absent_window_isolates_member_when_other_member_has_complete_support() -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start,
+        leads=list(range(0, 25, 3)),
+        short_wave=[None, 10.0, 30.0, 200.0, 250.0, 300.0, 400.0, 50.0, 0.0],
+    )
+    missing = native.filter(pl.col("valid_time") != start + timedelta(hours=12))
+    complete_member = native.with_columns(ensemble_member=pl.lit(50, dtype=pl.Int64))
+    combined = pl.concat([missing, complete_member])
+    changed = combined.with_columns(
+        pl.when(
+            (pl.col("ensemble_member") == 0) & (pl.col("valid_time") == start + timedelta(hours=9))
+        )
+        .then(800.0)
+        .otherwise(pl.col(SHORT_WAVE))
+        .alias(SHORT_WAVE)
+    )
+    after_gap = (pl.col("ensemble_member") == 0) & (
+        pl.col("valid_time") > start + timedelta(hours=12)
+    )
+    assert_frame_equal(_resample(combined).filter(after_gap), _resample(changed).filter(after_gap))
+
+
 def test_dark_tiny_denominator_and_cropped_first_window() -> None:
     start = datetime(2026, 12, 21, tzinfo=UTC)
     native = _native(start=start, leads=[0, 3, 6, 9, 12], short_wave=[None, 0.0, 0.4, 10.0, 50.0])
