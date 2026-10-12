@@ -57,12 +57,12 @@ rows in `power_forecasts` under the experiment name `study/<study name>`, and sc
 leaderboard scope. Before the script writes anything, it refuses a file whose `(time_series_id,
 power_fcst_init_time, valid_time, ensemble_member)` keys differ from the keys of the reference
 experiment that `conf/cv/default.yaml` names for the same fold. A study therefore cannot raise its
-score by leaving out the rows it forecasts worst, or by choosing its own ensemble members. The script checks which rows the file
-holds, not how the forecast was made. A reviewer must therefore confirm that the study fitted only
-on observations up to the fold's `train_end`, and used later observations only as lags earlier than
-each forecast's initialisation time. The script logs every attempt, scored or refused, and tags the
-study's fold run with the number of attempts at the fold so far. The `metrics` asset repeats the
-row-key check when it scores the study. Every leaderboard skill
+score by leaving out the rows it forecasts worst, or by choosing its own ensemble members. The
+script checks which rows the file holds, not how the forecast was made. A reviewer must therefore
+confirm that the study fitted only on observations up to the fold's `train_end`, and used later
+observations only as lags earlier than each forecast's initialisation time. The script logs every
+attempt, scored or refused, and tags the study's fold run with the number of attempts at the fold so
+far. The `metrics` asset repeats the row-key check when it scores the study. Every leaderboard skill
 number on a study page must trace to a `forecast_metrics` row. The `study/` prefix keeps a study's
 forecasts out of the promotion candidates, and lets a reader filter the study experiments out of the
 leaderboard.
