@@ -48,8 +48,8 @@ best-estimate, not a guarantee.
 - [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent
   searching for improvements to the XGBoost forecasting model in two phases: studies run overnight
   from a plan agreed the day before, then a careful search in which the agent runs as a separate
-  Unix user that never sees the leaderboard's validation window. The page also gives what published
-  research agents found. A person re-implements every idea that survives either phase.
+  Unix user that never sees the leaderboard's validation window. The page also summarises what
+  published research agents found. A person re-implements every idea that survives either phase.
 - [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate estimators
   of the time-varying effective capacity of metered generators: a [convex

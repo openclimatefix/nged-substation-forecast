@@ -3,11 +3,11 @@
 > **Status: 🚧 Phase 1 under way; phase 2 planned.** Phase 1, in which Claude runs studies overnight
 > and posts their scores to the leaderboard, is tracked in [issue #1031 (Tracking: phase 1 of
 > agentic ML research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1031) in
-> the v0.3 milestone. Phase 2, the careful search this page's design describes, is tracked in
-> [issue #1169 (Tracking: phase 2 of agentic ML
+> the v0.3 milestone. Phase 2, the careful search that the rest of this page describes, is tracked
+> in [issue #1169 (Tracking: phase 2 of agentic ML
 > research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1169) in the v0.5
 > milestone. Phase 2 starts once an XGBoost model beats `manual_heuristic` on the continuous ranked
-> probability score (CRPS), and none of its infrastructure is built yet.
+> probability score (CRPS), and none of phase 2's infrastructure is built yet.
 
 **We plan to have a large language model (LLM) agent search for improvements to this project's
 XGBoost forecasting model, in two phases.** Flexpectation is the forecasting system this project
@@ -16,10 +16,10 @@ XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, wh
 Claude runs studies overnight from a plan that the maintainer and Claude agreed the previous day. In
 phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the list of
 ideas for improving the XGBoost forecasting model, so that people implement properly only the
-promising ideas. In phase 2, the agent implements each idea, scores each implementation, and
-combines the ideas that help, in the style of [Karpathy's
-autoresearch](https://github.com/karpathy/autoresearch), with no human in the loop. In neither phase
-does the agent write production code.
+promising ideas. The phase 2 agent implements each idea, scores each implementation, and combines
+the ideas that help, in the style of [Karpathy's
+autoresearch](https://github.com/karpathy/autoresearch), with no human in the loop during a round.
+In neither phase does the agent write production code.
 
 **Every forecasting experiment here is trained on one stretch of past data and scored on a later
 stretch, the validation window, that the training never saw.** A training stretch paired with its
@@ -204,28 +204,29 @@ XGBoost model, and those gains are large next to noise and selection bias. In th
 wins](../studies/forecasts/quick-wins.md) study, quantile training alone lowered CRPS by 2.4
 percentage points of capacity.
 
-**Phase 1 assumes the agent is honest.** The scorer keeps the checks that catch honest mistakes,
-such as a study that scores fewer rows than the reference experiment, and drops the checks that
-exist only to stop deliberate cheating ([issue #1129 (Remove the scorer checks that only stop
-deliberate cheating)](https://github.com/openclimatefix/nged-substation-forecast/issues/1129)). Each
-study's adversarial reviews look for broken and leaky implementations, as the `study` skill already
-requires.
+**Phase 1 assumes Claude is honest.** The leaderboard scorer will keep the checks that catch honest
+mistakes, such as a study that scores fewer rows than the reference experiment, and will drop the
+checks that exist only to stop deliberate cheating ([issue #1129 (Remove the scorer checks that only
+stop deliberate cheating)](https://github.com/openclimatefix/nged-substation-forecast/issues/1129)).
+Each study's adversarial reviews look for broken and leaky implementations, as the `study` skill
+already requires.
 
 **Phase 1 runs on a daily rhythm.** During the day, the maintainer and Claude read the latest
 results and agree the next study plan. Overnight, a Claude session runs the plan with the `study`
-skill, on the current data, as the maintainer's own Unix user. Within a budget the plan sets, the
-agent may add arms that combine the night's winners, and each arm the plan did not name is labelled
-post hoc. The next day's discussion decides which ideas to keep. The ideas worth keeping are
+skill, on the current data, as the maintainer's own Unix user. Within a budget the plan sets, Claude
+may add arms that combine the night's winners, and each arm the plan did not name is labelled post
+hoc. The next day's discussion decides which ideas to keep. The ideas worth keeping are
 re-implemented in production in reviewed pull requests.
 
-**Each study posts its scores to the leaderboard as a `study/` experiment** ([issue #1168 (Make the
-study skill post scores to the leaderboard and run studies
+**Each study will post its scores to the leaderboard as a `study/` experiment** ([issue #1168 (Make
+the study skill post scores to the leaderboard and run studies
 overnight)](https://github.com/openclimatefix/nged-substation-forecast/issues/1168)). The `study/`
 prefix labels the rows, and promotion to production never picks a `study/` run.
 
 **A `study/` score on the leaderboard fold is biased low, because the study chose its arms on that
-fold.** The bias is small next to phase 1's gains. Once the gains shrink to tenths of a point, the
-bias could pass for a gain, and phase 2 therefore moves the search off the leaderboard fold.
+fold.** The bias is likely to be small next to gains as large as the Quick wins study found. Once
+the gains shrink to tenths of a percentage point of capacity, the bias could pass for a gain, and
+phase 2 therefore moves the search off the leaderboard fold.
 
 ## Phase 2: a careful search with the validation data hidden
 

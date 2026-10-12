@@ -456,8 +456,8 @@ for [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 w
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of
 which our own fold already meets in length but not in independence. The winner's reported skill will
 grow more optimistically biased over time, because hundreds of experiments are planned. Each study
-that posts a `study/` score on the leaderboard fold adds to the bias, because the study chose its
-arms on that fold. In phase 2 of the search that [Experiments run by an LLM agent](auto-research.md)
+that posts a score to the leaderboard as a `study/` experiment adds to the bias, because the study
+chose its arms on the leaderboard fold. In phase 2 of the search that [Experiments run by an LLM agent](auto-research.md)
 describes, a large language model (LLM) agent screens ideas on folds that end before the leaderboard
 fold's validation window, but each finalist the maintainer scores on the leaderboard fold still adds
 to the bias. Our own fold is small in effective sample size rather than in row count, because
