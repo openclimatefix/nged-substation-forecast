@@ -28,8 +28,8 @@ carries new prose, then stops at step 9 with no adversarial pass. If you reach t
 
 **How many of the three reviews below to run** comes from that sizing: all three for a complex issue,
 none for a simple one, and between zero and three for a medium one — your choice, under the rules
-in `plan-issue` step 3. Step 5 runs first; what the diff touches decides whether steps 6 and 7
-follow.
+in `plan-issue` step 3. Step 5 runs first. Step 6 follows if the sizing called for it. Step 7
+follows only if the sizing called for it and the diff changes production logic.
 
 When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it these steps up front
 — a report back after step 1 is not finished work.
@@ -76,7 +76,7 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
     needs a Team or Enterprise plan, and the local command does not read `REVIEW.md`. The local
     review runs as a background sub-agent and reports correctness bugs. Triage its findings, fix
     the genuine ones, re-run the step-3 commands, then commit and push the fixes as a separate
-    commit. This pass is not one of the two reviews, so it does not count towards the sizing. Say
+    commit. This pass is not one of the three reviews, so it does not count towards the sizing. Say
     in the PR body whether it ran.
 
     **Every review pass gets its own commit, pushed at once.** The implementation is committed and
@@ -113,10 +113,10 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
 6. **Second adversarial review: correctness.** Run this if the sizing called for it, after step 5
    has been triaged and pushed, so the reviewer reads the diff that is left. Spawn *another* new
    sub-agent, this time Opus, because a missed bug costs more than the extra tokens. Give it the PR
-   number and the record of which step-5 simplifications were accepted and which rejected, and no
-   account of your reasoning. It tries to refute the PR's claims, as in step 5. Tailor the brief to
-   the issue: name the failure modes most worth attacking — the risky claim, a behaviour change
-   hiding inside a refactor, whether each new test would actually have failed on `main`.
+   number and the list of step-5 findings you rejected, without your reasons for rejecting them, so
+   that it can judge each one afresh. It tries to refute the PR's claims, as in step 5. Tailor the
+   brief to the issue: name the failure modes most worth attacking — the risky claim, a behaviour
+   change hiding inside a refactor, whether each new test would actually have failed on `main`.
 
 7. **Third adversarial review: mutation testing.** Run this if the sizing called for it, and only
    where the diff changes production logic that the tests cover. A change to docs, skills, config

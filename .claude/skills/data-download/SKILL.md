@@ -205,7 +205,7 @@ checkpointed downloader is likely to need.
 ## Get an adversarial review before a download script's first real run
 
 **Run every not-yet-executed download script through a fresh adversarial review before its first
-real run, however small the script**, like the first diff review under `implement-issue` — a second
+real run, however small the script**, like the correctness review under `implement-issue` — a second
 reader with no stake in the code finding what the author is too close to see, and with network
 access and permission to make one small real fetch, not just a static read of the diff. The reviewer
 should check for four kinds of fault, each of which wastes a real request or corrupts output

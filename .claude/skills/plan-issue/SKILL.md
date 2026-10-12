@@ -121,7 +121,8 @@ the same reply that you are taking this path, and open it with `Implementing:` r
 `Planning:` prefix from step 1a.
 
 **Complex — the full routine**: a plan, both plan reviews below, and all three diff reviews in
-`implement-issue`. An issue is complex when any of these hold:
+`implement-issue` (the mutation pass only where the diff changes production logic). An issue is
+complex when any of these hold:
 
 - It adds or changes a Patito model, a Delta table, an asset, or anything else about what gets
   stored.
