@@ -4,6 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.bootstrap import (
+    BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
     BootstrapInterval,
     blend_verdict,
@@ -14,9 +15,13 @@ from studies.bootstrap import (
     bootstrap_row_difference,
     bootstrap_year_change,
     bracket_verdict,
+    calendar_balanced_difference,
+    calendar_month_sums,
+    calendar_weights,
     combine_setting_verdicts,
     fold_t_interval,
     per_fold_differences,
+    weighted_mean,
 )
 
 # Months hold unequal numbers of rows, so a resample that lost the pairing on `seed`, or drew rows
@@ -731,3 +736,118 @@ def test_more_resamples_than_the_default_are_drawn_when_asked():
     )
 
     assert more != default
+
+
+# One seed, three `YYYY-MM` months. January 2024 holds 1 and 3, January 2025 holds 5, 5, 5 and 5,
+# and February 2024 holds 10. January's six rows have mean 4 and February's one row has mean 10, so
+# the balanced estimate is (4 + 10) / 2 = 7, where the mean over all seven rows is 34 / 7.
+UNEQUAL_DIFFERENCES = np.array([[1.0, 3.0, 5.0, 5.0, 5.0, 5.0, 10.0]])
+UNEQUAL_MONTHS = np.array(["2024-01"] * 2 + ["2025-01"] * 4 + ["2024-02"])
+
+
+def test_calendar_month_sums_sorts_months_and_reads_the_calendar_month_from_the_label():
+    differences = np.array([[1.0, 2.0, 4.0, 8.0], [10.0, 20.0, 40.0, 80.0]])
+    months = np.array(["2025-02", "2024-12", "2025-02", "2024-12"])
+
+    sums, counts, calendar = calendar_month_sums(differences=differences, months=months)
+
+    np.testing.assert_array_equal(sums, [[10.0, 5.0], [100.0, 50.0]])
+    np.testing.assert_array_equal(counts, [2.0, 2.0])
+    np.testing.assert_array_equal(calendar, [12, 2])
+
+
+def test_calendar_weights_sum_to_one_per_calendar_month_across_years():
+    counts = np.array([2.0, 4.0, 1.0])
+    calendar = np.array([1, 1, 2])
+
+    weights = calendar_weights(counts=counts, calendar=calendar)
+
+    np.testing.assert_allclose(weights, [1 / 6, 1 / 6, 1.0])
+
+
+def test_calendar_balanced_estimate_weights_each_calendar_month_equally_not_each_row():
+    estimate, low, high, n_calendar = calendar_balanced_difference(
+        differences=UNEQUAL_DIFFERENCES, months=UNEQUAL_MONTHS
+    )
+
+    assert estimate == pytest.approx(7.0)
+    assert n_calendar == 2
+    assert low <= estimate <= high
+
+
+def test_calendar_balanced_estimate_averages_the_seeds():
+    differences = np.vstack([UNEQUAL_DIFFERENCES, UNEQUAL_DIFFERENCES + 2.0])
+
+    estimate, _, _, _ = calendar_balanced_difference(differences=differences, months=UNEQUAL_MONTHS)
+
+    assert estimate == pytest.approx(8.0)
+
+
+def test_a_draw_keeps_the_weights_of_the_whole_window_when_months_repeat_or_are_missing():
+    sums, counts, calendar = calendar_month_sums(
+        differences=UNEQUAL_DIFFERENCES, months=UNEQUAL_MONTHS
+    )
+    weights = calendar_weights(counts=counts, calendar=calendar)
+
+    def draw(*drawn: int) -> float:
+        return weighted_mean(sums=sums[0], counts=counts, weights=weights, drawn=np.array(drawn))
+
+    # Months sort as `2024-01`, `2024-02`, `2025-01`. Drawing the first two, January's 2 rows weigh
+    # 1/6 each, so (4/6 + 10) / (2/6 + 1) = 8. Weights rebuilt from the draw alone would give
+    # (2 + 10) / 2 = 6.
+    assert draw(0, 1) == pytest.approx(8.0)
+    # Both Januaries, no February: the draw is January's mean, not January's mean over two calendar
+    # months.
+    assert draw(0, 2) == pytest.approx(4.0)
+    # A repeated month counts twice in the numerator and the denominator:
+    # (2 * 4/6 + 10) / (2 * 2/6 + 1) = 6.8.
+    assert draw(0, 0, 1) == pytest.approx(6.8)
+
+
+def test_calendar_balanced_interval_matches_a_row_by_row_resample_of_the_same_draws(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    # Two resamples, so every resample sets a percentile and one dropped or added moves both.
+    n_resamples = 2
+    monkeypatch.setattr("studies.bootstrap.N_BOOTSTRAP_RESAMPLES", n_resamples)
+    # Fifteen `YYYY-MM` months of 1 to 3 rows, so the draws take many distinct values.
+    labels = [f"2024-{month:02d}" for month in range(1, 13)] + ["2025-01", "2025-02", "2025-03"]
+    rows_per_label = [1 + (index % 3) for index in range(len(labels))]
+    months = np.repeat(labels, rows_per_label)
+    differences = np.random.default_rng(3).normal(size=(2, len(months)))
+    rows_per_calendar_month = {
+        month: sum(
+            n for label, n in zip(labels, rows_per_label, strict=True) if label[-2:] == month
+        )
+        for month in {label[-2:] for label in labels}
+    }
+    weight_by_row = np.array([1 / rows_per_calendar_month[label[-2:]] for label in months])
+    draws = np.random.default_rng(BOOTSTRAP_SEED)
+    expected = []
+    for _ in range(n_resamples):
+        seed_index = draws.integers(0, 2)
+        drawn_labels = [labels[index] for index in draws.integers(0, len(labels), size=len(labels))]
+        rows = np.concatenate([np.flatnonzero(months == label) for label in drawn_labels])
+        expected.append(
+            (differences[seed_index, rows] * weight_by_row[rows]).sum() / weight_by_row[rows].sum()
+        )
+    expected_low, expected_high = np.percentile(expected, q=(2.5, 97.5))
+
+    _, low, high, _ = calendar_balanced_difference(differences=differences, months=months)
+
+    assert low == pytest.approx(expected_low)
+    assert high == pytest.approx(expected_high)
+
+
+def test_calendar_balanced_interval_spans_only_the_seeds_when_one_month_exists():
+    differences = np.array([[1.0, 2.0, 6.0], [2.0, 3.0, 7.0]])
+    months = np.array(["2024-05"] * 3)
+
+    estimate, low, high, n_calendar = calendar_balanced_difference(
+        differences=differences, months=months
+    )
+
+    assert n_calendar == 1
+    assert estimate == pytest.approx(3.5)
+    assert low == pytest.approx(3.0)
+    assert high == pytest.approx(4.0)

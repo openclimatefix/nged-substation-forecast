@@ -650,3 +650,99 @@ def combine_setting_verdicts(
         `primary` if the two settings agree, else `unresolved`.
     """
     return primary if primary == sensitivity else unresolved
+
+
+def calendar_month_sums(
+    *, differences: np.ndarray, months: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sum each month's differences, per seed, and count each month's rows.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label, `YYYY-MM`.
+
+    Returns:
+        The per-seed sums, shape (n_seeds, n_months); each month's row count; and each month's
+        calendar month (1 to 12). Months are in sorted order.
+    """
+    unique_months, month_index = np.unique(months, return_inverse=True)
+    sums = np.stack(
+        [
+            np.bincount(month_index, weights=seed_differences, minlength=len(unique_months))
+            for seed_differences in differences
+        ]
+    )
+    counts = np.bincount(month_index, minlength=len(unique_months)).astype(float)
+    calendar = np.array([int(str(label)[-2:]) for label in unique_months])
+    return sums, counts, calendar
+
+
+def calendar_weights(*, counts: np.ndarray, calendar: np.ndarray) -> np.ndarray:
+    """Weight each `YYYY-MM` month by 1 over the rows of its calendar month in the whole window.
+
+    Args:
+        counts: Each `YYYY-MM` month's row count.
+        calendar: Each month's calendar month (1 to 12).
+
+    Returns:
+        One weight per `YYYY-MM` month. Every row of a calendar month carries the same weight, and
+        the weights of one calendar month's rows sum to 1, so the weights of all rows sum to the
+        number of calendar months.
+    """
+    rows_per_calendar_month = np.bincount(calendar, weights=counts, minlength=13)
+    return 1.0 / rows_per_calendar_month[calendar]
+
+
+def weighted_mean(
+    *, sums: np.ndarray, counts: np.ndarray, weights: np.ndarray, drawn: np.ndarray
+) -> float:
+    """Return the weighted mean difference over the rows of the drawn months.
+
+    Args:
+        sums: One seed's per-month difference sums.
+        counts: Each month's row count.
+        weights: `calendar_weights`'s result.
+        drawn: The indices of the months drawn, repeats allowed.
+
+    Returns:
+        The sum of the weighted differences over the sum of the weights of the drawn rows.
+    """
+    return float((sums[drawn] * weights[drawn]).sum() / (counts[drawn] * weights[drawn]).sum())
+
+
+def calendar_balanced_difference(
+    *, differences: np.ndarray, months: np.ndarray
+) -> tuple[float, float, float, int]:
+    """Weight each calendar month equally, and interval the result by resampling whole months.
+
+    Each row carries a fixed weight, 1 over the rows of its calendar month in the whole window.
+    The estimate is the weighted mean of the differences over every row and every seed, which equals
+    the mean over calendar months (January to December) of each calendar month's mean difference.
+    The interval draws a seed, then draws whole `YYYY-MM` months with replacement, the same draws as
+    `studies.bootstrap`, and recomputes the weighted mean over the drawn rows with the same fixed
+    weights. The weights do not change with the draw, so a draw that misses a calendar month is not
+    averaged over fewer calendar months, and the resampled estimates stay centred on the estimate.
+    The bounds are the 2.5th and 97.5th percentiles of the resampled estimates.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label, `YYYY-MM`.
+
+    Returns:
+        The estimate, the lower and upper bounds, and the number of calendar months averaged.
+    """
+    sums, counts, calendar = calendar_month_sums(differences=differences, months=months)
+    weights = calendar_weights(counts=counts, calendar=calendar)
+    estimate = weighted_mean(
+        sums=sums.mean(axis=0), counts=counts, weights=weights, drawn=np.arange(len(counts))
+    )
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, differences.shape[0])
+        drawn = generator.integers(0, len(counts), size=len(counts))
+        resampled[resample] = weighted_mean(
+            sums=sums[seed_index], counts=counts, weights=weights, drawn=drawn
+        )
+    low, high = np.percentile(resampled, q=(2.5, 97.5))
+    return estimate, float(low), float(high), len(np.unique(calendar))
