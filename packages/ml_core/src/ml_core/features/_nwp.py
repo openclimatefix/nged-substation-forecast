@@ -141,7 +141,8 @@ def _upsample_nwp_to_half_hourly(
     """Resample weather to half-hours within each independent run/member/series.
 
     Radiation is a mean over the native interval ending at its timestamp, so its dedicated
-    path reconstructs backward half-hour means and conserves each complete native window's energy.
+    path conserves each short-wave window's energy and evaluates long-wave PCHIP through interval
+    midpoint means at half-hour midpoints.
     Source-missing radiation windows stay null. Other numeric fields use point interpolation and
     categories use forward fill; both retain their existing interior-null filling behavior.
     Radiation policy and explanatory plots:
