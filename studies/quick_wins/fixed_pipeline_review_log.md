@@ -87,3 +87,8 @@ Optional era selections recover exact NWP initialisation times from the hash-ver
 saved forecast inventory, cover every scored key, and preserve source-time pairing. They use
 the recorded 13 November 2024 availability boundary and remain descriptive because season and
 training exposure differ. Reports without an era selection retain their existing calculations.
+
+Before Part 1b fitting, a fresh reviewer cleared the recipe inventory's synthetic preparation,
+historical feature order, cuts/additions and duplicate padding. Accepted provenance additions
+hash the production feature YAML and pooled encoder source and identify the site identifier as
+Float32 numeric. The inventory reads no study observations and fits no models.
