@@ -265,3 +265,112 @@ findings and triage.
 The proposed follow-up is a production PR for interval-aware radiation resampling and circular
 wind interpolation, with feature-path equivalence and energy controls; allow roughly two to three
 engineering days, then repeat the same forecast contrasts on its actual engineered outputs.
+
+## Production implementation handoff
+
+**Implement the confirmed resampling faults first, then the windchill guard and availability
+monitoring.** The order below reflects the diagnostic evidence and implementation dependencies. The
+forecast experiments are still running, so the order is not a final ranking of forecast-score
+improvements. The next session should read this section alongside the generated diagnostic report in
+`studies/production_feature_faults/results/diagnostics.md` and the completed score reports when
+available.
+
+### 1. Give radiation an interval-aware resampler
+
+**Replace point interpolation of short-wave interval means in
+`packages/ml_core/src/ml_core/features/_nwp.py`.** On the synthetic probe’s complete interior day,
+point interpolation shifts the radiation-weighted mean time by 1.25 hours for 3-hour inputs and 2.75
+hours for 6-hour inputs. Both reconstructions preserve that day’s energy. Use the study’s
+clear-sky-index candidate as a design reference: divide native radiation means by clear-sky means
+over the same intervals, interpolate the ratios at interval midpoints, and multiply by clear-sky
+means over the target half-hours. Define the production policy for native-interval energy
+explicitly. Implement the production helper in a reviewed production package; production code must
+not import `studies`. The candidate can change individual interval totals; copying the candidate
+does not establish energy conservation.
+
+Respect the interval ending at each timestamp and its actual width, including the three-hour to
+six-hour transition. Treat short-wave separately from long-wave and precipitation rates, whose
+interval means need suitable conservative resampling without a solar shape. Long-wave is absent from
+the current forecast recipe, so its correction has no direct forecast effect here.
+
+**Gotchas:** a dark endpoint can legitimately label an interval containing daylight; do not zero
+native values solely from the endpoint’s solar elevation. Handle low clear-sky denominators, missing
+native samples, the first supported interval, and trailing boundaries explicitly. Preserve source
+missingness separately from newly inserted grid points. Read original native inputs for
+implementation and regression checks: the study reconstructs native-grid values from engineered
+caches, where interpolation may already have filled a native null. Keep interpolation within each
+series, weather run, and ensemble member. Review the continuous-variable classification’s storage,
+rounding, and dashboard callers before changing shared behaviour.
+
+### 2. Interpolate wind on the circle
+
+**Correct both 10 m and 100 m bearings in the same resampling path.** Numeric interpolation between
+350° and 10° passes through south; the shortest path crosses north. Around 3–7% of eligible inserted
+bearings differ from shortest-arc reconstruction by more than 1° in this audit.
+
+Prefer interpolating wind components and deriving speed and bearing afterwards. Components are
+currently converted to speed and direction in
+`packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py`; decide whether to
+retain components or reconstruct them internally from the stored speed and direction. Preserve the
+meteorological “from” convention and units at both heights.
+
+**Gotchas:** vector interpolation changes speed as well as direction. The study’s shortest-arc
+experiment holds speed fixed, so its score difference does not estimate the complete vector change.
+Specify behaviour for calm wind, opposing vectors, exactly 180° separation, missing inputs, and
+unsupported boundaries. Changing the tree model’s direction encoding is a separate experiment;
+weekday sine and cosine already exist, so there is no missing cyclic-weekday feature to repair.
+
+### 3. Guard the windchill formula
+
+**Apply the domain guard in `packages/ml_core/src/ml_core/features/_parsed_features.py`.** The
+cached expression matches the code, but about 53–59% of finite validation inputs fall outside its
+stated domain. Use the studied policy: evaluate windchill at air temperature at most 10°C and wind
+speed at least 4.8 km/h; otherwise return air temperature when both inputs are present.
+
+**Gotchas:** the stored wind speed is in metres per second; convert units before checking the
+threshold. Preserve missing inputs, including a missing wind speed in warm conditions. Test both
+threshold equalities. The unrestricted expression may be useful to XGBoost as a nonlinear transform,
+so improved physical semantics do not guarantee an improved forecast score.
+
+### 4. Track precipitation availability and investigate recoverable gaps
+
+**Add per-run availability monitoring and document the historical precipitation-type boundary.**
+Early training months have no precipitation type, whereas forward validation has complete coverage.
+Backfill only if a source with compatible categorical meanings and timestamp conventions is
+available. A masking experiment cannot measure the benefit of obtaining missing history.
+
+**Gotchas:** missing precipitation type does not mean “no precipitation”. Do not interpolate
+precipitation-type category codes as numbers or fill them across weather-run boundaries. Evaluate
+any backfill or feature-policy change on both availability eras; the backwards study fold is a
+stress test, not prospective validation.
+
+### 5. Preserve temperature information and the power-lag leakage guard
+
+**Continue retaining native temperature samples wherever the source provides them.** The current
+production upsampler retains those sample times. Deliberately thinning the checked 3-hour samples to
+6 hours reduces mean daily range by about 0.86°C; this emulation does not demonstrate a production
+thinning defect. Interpolation cannot restore unobserved extrema. Any diurnal reconstruction needs a
+separate evaluation.
+
+**Monitor absent power observations separately from failed lag joins.** Every checked eligible
+two-week lag matched its source value or had no source observation. There is no demonstrated lag
+join defect to patch. Retain `_nullify_leaky_lags` in
+`packages/ml_core/src/ml_core/features/_lags.py`: an observation at or after issuance is ineligible.
+Do not forward fill gaps to conceal missing history. Preserve the distinction between weather-run
+initialisation, publication delay, forecast issuance, and target time in regression tests.
+
+### Acceptance checks before deployment
+
+**Validate the actual production feature paths, regenerate affected feature caches, and retrain
+before assessing forecast gains.** Add regression cases for radiation timing and interval energy,
+wind wrap and calm/opposing vectors, windchill thresholds and nulls, and the lag equality boundary.
+Check native and inserted timestamps, the three-hour to six-hour transition, all ensemble members,
+and group isolation. Compare bulk feature generation with single-run inference on real cases; this
+study has not yet established their equivalence.
+
+Repeat the baseline and corrected comparisons on those actual engineered outputs with identical
+forecast cases, three fitting seeds, and whole-month uncertainty intervals. Keep correction effects
+separate where possible. Update the variable-convention documentation with the chosen boundary,
+missingness, and conservation policies. The rough estimate of 2 to 3 engineering days above covers
+the initial radiation and wind work and its checks. Broader backfilling or new diurnal
+reconstruction models require separate estimates.
