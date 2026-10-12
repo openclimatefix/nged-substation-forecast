@@ -570,7 +570,7 @@ CRPS differences against production with cleaning.
   sample is a subset of the leaderboard's runs.
 - **Nothing was fitted at `colsample_bytree` 0.8 except the production arm.**
 - **The quantile arms use 9 untuned levels and weight every member and level equally,** and the
-  study did not check how well the resulting 459-value distribution is calibrated.
+  resulting 459-value distribution is too narrow (57% coverage of a nominal 80% band).
 - **Calibration by rescaling is evaluated for CRPS only,** on the later 45 of 53 runs, and rescaling
   the weather ensemble's spread does not make the forecast a proper predictive distribution.
 - **One demand series reads negative throughout and has a large error,** so the mean over series is

@@ -48,9 +48,6 @@ SVGO_COMMAND: Final[tuple[str, ...]] = (
 )
 """The command `CLAUDE.md` prescribes for shrinking an exported chart."""
 
-FIGURE_NUMBERS: Final[tuple[int, ...]] = (1, 2, 3, 4, 5, 6)
-"""The figures this script owns."""
-
 PERCENT: Final[float] = 100.0
 """Converts a fraction of capacity into a percentage of capacity."""
 
@@ -266,11 +263,6 @@ DUMMY_FAMILY: Final = "weather model"
 
 ROW_STEP_PX: Final[int] = 18
 """The height of a leaderboard row in pixels."""
-
-POST_HOC_LINE: Final[str] = (
-    "(post hoc) marks an arm or rule chosen after seeing earlier results; a bold (planned) row was "
-    "written into the study plan beforehand."
-)
 
 
 @dataclass

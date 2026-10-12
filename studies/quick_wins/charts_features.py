@@ -679,7 +679,9 @@ def figure_18(*, summary: pl.DataFrame) -> Figure:
             {
                 "feature": row["feature"],
                 "column": f"{dataset} {key}",
-                "label": _number(value=row[key]),
+                "label": "hidden"
+                if row["feature"].startswith("power_lag")
+                else _number(value=row[key]),
             }
             for key in ("min", "median", "max")
         )
@@ -740,7 +742,7 @@ def figure_18(*, summary: pl.DataFrame) -> Figure:
         ),
         (
             "The lower panel gives each column's minimum, median, and maximum. The power lags "
-            "are in megawatts, so their range mixes series of different sizes."
+            "are not shown, because their range in megawatts would reveal single generators' sizes."
         ),
     ]
     text = examples.FigureText(

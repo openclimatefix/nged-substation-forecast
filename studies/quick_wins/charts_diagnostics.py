@@ -66,7 +66,6 @@ TYPE_LABELS: Final[dict[str, str]] = {
     "Raw Flow": "Raw Flow series",
     "all": "All types",
 }
-GROUP_NAMES: Final[dict[str, str]] = {"all": "all types", **{t: t for t in TYPE_ORDER[:-1]}}
 
 PANEL_WIDTH_PX: Final[int] = 78
 PANEL_HEIGHT_PX: Final[int] = 125

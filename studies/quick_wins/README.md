@@ -23,7 +23,7 @@ skips any arm whose scores already exist.
 | `blend_heuristic.py` | A post hoc diagnostic: scores the XGBoost members mixed with the stored `manual_heuristic` members. |
 | `report_quick_wins.py` | Month-resampled intervals and paired contrasts for every arm, printed into `report_*.md` and saved as parquet files. |
 | `report_summary.py`, `report_compute.py` | Print every table the page quotes into `summary.md`, and the training-time table into `compute.md`. |
-| `charts_summary.py`, `charts_examples.py`, `charts_diagnostics.py` | The page's figures 1 to 14. |
+| `charts_summary.py`, `charts_examples.py`, `charts_diagnostics.py`, `charts_features.py` | The page's figures 1 to 18. |
 
 ## Commands
 

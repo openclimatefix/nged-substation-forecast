@@ -484,7 +484,7 @@ Title: Figure 18: Half the training rows lack the precipitation type; the power 
 Subtitle:
 - All 31 series. Training: the control member of the 15-month training window. Validation: all 51 ensemble members of the 53 weekly runs, July 2025 to June 2026 (fold A). The upper panel shades each cell by its share of null or NaN values: white is none and orange is all.
 - The precipitation type is null in the first 7 months of the training window, because the stored ECMWF runs of those months carry none. A power lag is null once its lag is no longer than the lead, and also wherever the power history has a gap (6% at 336 hours, days 0-2).
-- The lower panel gives each column's minimum, median, and maximum. The power lags are in megawatts, so their range mixes series of different sizes.
+- The lower panel gives each column's minimum, median, and maximum. The power lags are not shown, because their range in megawatts would reveal single generators' sizes.
 
 Panel titles:
 - Share of values that are null or NaN, by lead band (days 0-2: under 72 hours; days 3-10: 72 to 263 hours; days 11+: 264 hours and more)

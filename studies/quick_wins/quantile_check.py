@@ -37,8 +37,6 @@ COVERAGE_BANDS: Final[dict[str, tuple[float, float]]] = {
 }
 """The central bands whose coverage is reported, by label, as lower and upper quantile levels."""
 
-NOMINAL: Final[dict[str, float]] = {"10-90": 0.8, "5-95": 0.9}
-
 
 def _run_rows(*, forecasts: pl.DataFrame, actuals: pl.DataFrame) -> pl.DataFrame:
     """Score one run's sample, its control-member quantiles alone, and the band coverage."""

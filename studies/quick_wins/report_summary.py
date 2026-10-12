@@ -29,22 +29,6 @@ BASELINES: Final[dict[str, str]] = {
 }
 """Stored experiments scored on the same sampled runs, by display name and scores file."""
 
-KEY_ARMS: Final[tuple[str, ...]] = (
-    "production_colsample0.8",
-    "production",
-    "production_cleaned",
-    "c4_absolute_error",
-    "c2_early_stopping",
-    "c1_lead_time",
-    "a3w_lean_wind_only",
-    "d3_pooled_with_site_id",
-    "r2_c4_c2_c1",
-    "r2_c4_c2_c1_a3w",
-    "r2_c4_c2_c1_a3w_d3",
-    "r2_c4_c1_a3w_d3",
-)
-"""The arms fitted on three seeds on fold A and on fold B."""
-
 
 def _read(*, fold: str, kind: str, tag: str) -> pl.DataFrame | None:
     path = REPORT_DIR / fold / f"{kind}_{tag}.parquet"

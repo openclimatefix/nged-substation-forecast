@@ -94,9 +94,6 @@ deviation of the other demand series by more than this."""
 SWITCHING_MIN_RUN_DAYS: Final[int] = 3
 """Switching days count only in runs of at least this many consecutive days."""
 
-HALF_HOURS_PER_DAY: Final[int] = 48
-"""Half-hourly readings in a day."""
-
 MIN_HALF_HOURS_FOR_A_DAY: Final[int] = 40
 """A day counts toward the ramp rule only if it has this many half-hourly readings."""
 

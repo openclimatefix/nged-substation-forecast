@@ -188,10 +188,9 @@ a
   production service reads gives about the same gain, and AIFS Single adds about 0.13 points to
   that mean, which the study cannot resolve.
 - [Which cheap changes lower the production XGBoost forecast's error?](forecasts/quick-wins.md) — at
-  31 NGED series over one validation year, six changes to the production training recipe lower the
-  CRPS from 11.6% to 10.0% of capacity and the mean absolute error from 12.3% to 10.8%: the
-  absolute-error objective, early stopping, a lead-time column, leaner wind-farm columns, one
-  booster per series type with a site identifier, and dropping a new meter's first weeks. Rescaling
-  the ensemble spread lowers the CRPS by a further 1.3 to 1.9 points, although the production
-  ensemble's 10% to 90% band holds the outcome only 10% of the time. Removing power lags from solar
-  and wind farms raised their error.
+  31 NGED series over one validation year, four changes to the production training recipe (quantile
+  training, a lead-time column, leaner wind-farm columns, and one booster per series type) lower
+  the CRPS from 11.3% to 7.9% of capacity, against 7.2% for the manual heuristic. The production
+  ensemble's 10% to 90% band holds the outcome only 10% of the time, and rescaling its spread
+  lowers the CRPS by 1.3 to 1.9 points. The absolute-error objective and early stopping each lower
+  it by about 0.4 points. Removing power lags from solar and wind farms raised their error.
