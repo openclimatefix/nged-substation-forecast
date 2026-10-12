@@ -643,6 +643,9 @@ def _dot_panel(
         x_format: Format of the tick labels.
         key_title: Where given, colours are drawn literally (outside the figure's shared colour
             scale) and a key with this title sits above the panel; `legend_title` is then ignored.
+
+    Returns:
+        The dot panel, a layered chart with the optional key concatenated above it.
     """
     labels = list(dict.fromkeys(rows["label"].to_list()))
     data = rows.with_columns(pl.col("value").round(3))

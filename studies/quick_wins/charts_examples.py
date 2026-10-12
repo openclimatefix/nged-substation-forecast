@@ -238,6 +238,9 @@ def choose_runs(*, actual_by_run: pl.DataFrame) -> dict[str, datetime]:
 
     Args:
         actual_by_run: One row per run with `power_fcst_init_time` and `mean_actual`.
+
+    Returns:
+        The initialisation time of the `lowest`, `median`, and `highest` run.
     """
     ranked = actual_by_run.sort("mean_actual", "power_fcst_init_time")
     return {

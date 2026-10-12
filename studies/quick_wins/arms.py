@@ -150,6 +150,7 @@ class Arm:
         description: One line saying how the arm differs from production, for the page.
         columns: The column policy.
         cleaning: The training-data cleaning rule, or `"none"` for production's.
+        extra_cleaning: Further cleaning rules applied together with `cleaning`.
         objective: The XGBoost objective.
         recency_half_life_days: Training rows lose half their weight every this many days of age,
             counted back from the end of the training window; `None` weights rows equally.
@@ -159,11 +160,10 @@ class Arm:
         min_child_weight: XGBoost's `min_child_weight`; production uses 1.
         pooled_by_type: Whether one booster per series type is fitted on every series of that type,
             with each series' power divided by its training capacity, instead of one per series.
+        pooled_site_id: Whether a pooled booster is also shown the series identifier as a number.
         quantile_levels: Quantile levels of a `reg:quantileerror` booster. The forecast is every
             ensemble member crossed with every level, a sample of the predictive distribution.
         train_last_months: Train only on the last this many months of the training window.
-        pooled_site_id: Whether a pooled booster is also shown the series identifier as a number.
-        extra_cleaning: Further cleaning rules applied together with `cleaning`.
     """
 
     name: str
