@@ -123,3 +123,10 @@ intervals, so the chart invents none. An accepted sizing blocker now reserves th
 column within the 680-pixel figure. An accepted provenance addition hashes shared chart/theme
 sources and records rendering-library versions. The reviewer cleared both fixes before text
 export. Concrete figure-text reviews and rendered inspection remain pending.
+
+A fresh reproducibility review textually reconstructed all three runtime treatments from pinned
+PR package diffs and the published integration patch. Every one of the 71 package Python source
+files matched the source-hash inventory and actual study runtimes. No target source was executed.
+Accepted command hardening checks the repository root and required patch, stops on errors and
+rejects an existing reconstruction directory. The reviewer cleared that addition. Source matches
+remain distinct from data, dependency, hardware and numerical-output provenance.

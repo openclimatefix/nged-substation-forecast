@@ -16,7 +16,8 @@ PR 1167 at `38025f4eab457b9605b8c124006609869dbfca0d` and PR 1166 at
 `0f094c356da82e75c4014664ad7fb33fe1df8b7f`. Runtime worktrees apply only their relevant contracts
 and feature-engineering package changes to that base. They do not change this study branch's
 production packages. `PYTHONPATH` selects the runtime before Python starts; no script changes
-the import path.
+the import path. The [runtime reconstruction instructions](fixed_pipeline_runtime/README.md) and
+source-hash manifest reproduce these package sources from the pinned commits.
 
 | Treatment | Feature implementation | Wind archive |
 | --- | --- | --- |
@@ -48,19 +49,27 @@ jobs serially. Use a new output namespace, separate from the original `quick_win
 1. Run `fixed_pipeline_frames.py` with an explicit treatment, fold, code revision, archive path
    and all Delta snapshots. Its manifest records the complete inventory and refuses incompatible
    reuse. A pilot build is not accepted for fitting.
-2. Run `fixed_pipeline_fit.py` once per recipe, seed, device, setting and padding policy. It
+2. Run `fixed_pipeline_recipe_inventory.py` before feature fitting to print exact cuts, additions,
+   duplicate padding and numeric pooled-site encoding without reading observations.
+3. Run `fixed_pipeline_fit.py` once per recipe, seed, device, setting and padding policy. It
    verifies the complete scheduled validation inventory, writes private models and forecasts,
    then writes completion hashes. An incomplete fit requires diagnosis and a new output directory.
-3. Give `fixed_pipeline_report.py` a JSON specification containing labelled fit paths and planned
-   contrasts. Its public aggregate report includes each pinball level and actual feature lists.
 4. Run `fixed_pipeline_input_audit.py` on completed, paired frame directories. Its changed-row
    counts, domain screens and timing correlations are input diagnostics, not forecast improvements.
-5. Give `fixed_pipeline_charts.py` an explicit report-backed figure specification. Export text
-   first with `--text-only`; review that text before rendering with `--reviewed-text`. Inspect the
-   PNG rendered from each optimised SVG before copying publication assets into the docs.
+5. Give `fixed_pipeline_report.py` a JSON specification containing labelled fit paths and planned
+   contrasts. Its public aggregate report includes each pinball level and actual feature lists.
+   Give each run an explicit `frames` path so the pairing guard verifies the pinned frame and
+   compares canonical training keys independently of Arrow chunk layout.
 6. Use `fixed_pipeline_tables.py` to select and format public aggregate report rows for the page.
    Its JSON specification names exact sources, filters and columns. It performs no estimation,
    refuses existing output directories and records source, specification, script and output hashes.
+7. Give `fixed_pipeline_charts.py` an explicit report-backed figure specification. Export text
+   first with `--text-only`; review that text before rendering with `--reviewed-text`. Inspect the
+   PNG rendered from each optimised SVG before copying publication assets into the docs.
+8. Run `fixed_pipeline_importance.py` on the six combined full-feature point-control fits to
+   describe per-booster normalized training gain. Use `fixed_pipeline_importance_charts.py` with
+   the same text-review gate for its figure. Its ranges describe refit variability, not uncertainty
+   about a feature's benefit.
 
 Raw frame exports, models, row-level scores and manifests containing private identifiers stay
 under the private study data directory. Public reports contain type aggregates and feature names.
