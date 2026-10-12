@@ -92,3 +92,14 @@ Before Part 1b fitting, a fresh reviewer cleared the recipe inventory's syntheti
 historical feature order, cuts/additions and duplicate padding. Accepted provenance additions
 hash the production feature YAML and pooled encoder source and identify the site identifier as
 Float32 numeric. The inventory reads no study observations and fits no models.
+
+### Canonical training-key guard
+
+The radiation report refused its first pairing because the frame builder's IPC digest includes
+Arrow chunk layout. An independent audit found exact schema, row order and key values in both
+folds despite differing chunk boundaries. Completed manifests and fits remain unchanged.
+The reporter now accepts explicit frame paths, verifies the fit-pinned manifest and training-file
+hash, and compares canonically rechunked five-column training keys. It still rejects missing,
+duplicate, reordered or genuinely different keys and differing cleaned-training counts.
+A fresh review by `reference_results_science_review` found no blockers before execution
+(commit `4f1def67`). The fallback serialized-key guard remains strict when frame paths are absent.
