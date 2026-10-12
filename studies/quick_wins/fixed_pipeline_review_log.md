@@ -116,3 +116,10 @@ complete 24-feature public aggregates, preserves zeros on a linear axis, exports
 text before rendering, and describes its ranges as refit variability. Concrete text reviews and
 PNG inspection remain required. The same reviewer cleared the serial corrected-fit queue, with
 execution conditional on full wind readiness, all four completed frame builds and a free GPU.
+
+A fresh pre-execution review of the Part 2 coverage chart accepted its report binding, sample
+selection and mean-only dots. The absolute diagnostic does not report coverage confidence
+intervals, so the chart invents none. An accepted sizing blocker now reserves the standard label
+column within the 680-pixel figure. An accepted provenance addition hashes shared chart/theme
+sources and records rendering-library versions. The reviewer cleared both fixes before text
+export. Concrete figure-text reviews and rendered inspection remain pending.
