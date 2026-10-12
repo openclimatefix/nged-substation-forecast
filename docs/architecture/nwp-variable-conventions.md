@@ -111,8 +111,7 @@ can fill interior source nulls; radiation preserves its source-missing windows.
 
 `Nwp.continuous_var_names()` remains the numeric-variable set used by storage rounding and dashboard
 plots. Resampling dispatch excludes both radiation columns locally, without changing that shared
-classification. Wind wrap and precipitation interval handling remain separate production work;
-temperature's native resolution remains an information limit.
+classification.
 
 ### Wind direction is interpolated across the 0°/360° wrap
 

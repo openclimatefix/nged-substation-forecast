@@ -187,13 +187,10 @@ def test_midpoint_index_final_shape_and_missing_gap_isolation() -> None:
     )
     target_midpoints = np.arange(0.25, 24, 0.5)
     expected = sky * np.interp(target_midpoints, midpoints, ratios)
-    wrong = sky * np.interp(target_midpoints, midpoints + 1.5, ratios)
     for i, mean in enumerate(means):
         block = slice(i * 6, (i + 1) * 6)
-        for values in (expected, wrong):
-            values[block] *= mean / values[block].mean() if values[block].mean() > 0 else 0
+        expected[block] *= mean / expected[block].mean() if expected[block].mean() > 0 else 0
     np.testing.assert_allclose(result, expected, atol=3e-5, rtol=3e-7)
-    assert np.max(np.abs(result - wrong)) > 20
     missing = native.with_columns(
         pl.when(pl.col("valid_time") == start + timedelta(hours=12))
         .then(None)

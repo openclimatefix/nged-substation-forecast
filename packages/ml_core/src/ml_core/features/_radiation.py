@@ -12,7 +12,7 @@ from math import pi
 from typing import Final
 
 import polars as pl
-from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, NwpModelId
+from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS
 
 SHORT_WAVE: Final[str] = "downward_short_wave_radiation_flux_surface"
 LONG_WAVE: Final[str] = "downward_long_wave_radiation_flux_surface"
@@ -124,8 +124,6 @@ def _native_targets(*, native: pl.LazyFrame, group_cols: list[str]) -> pl.LazyFr
         .join(schedule, on="_lead", how="inner")
         .rename({"valid_time": "_window_end"})
     )
-    if "nwp_model_id" in native.collect_schema():
-        windows = windows.filter(pl.col("nwp_model_id") == NwpModelId.ECMWF_ENS_0_25_degree.name)
     windows = windows.with_columns(
         _window_start=pl.col("_window_end") - pl.duration(minutes=pl.col("_width_minutes")),
         _anchor_second=pl.col("_window_end").dt.epoch("s") - pl.col("_width_minutes") * 30,

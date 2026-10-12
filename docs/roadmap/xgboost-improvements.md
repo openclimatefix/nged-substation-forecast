@@ -599,9 +599,7 @@ already-upsampled columns.
 NOAA geometry and Haurwitz interval means in `ml_core.features._radiation`. Extract a shared helper
 when these derived features become a second caller, retaining matching backward-window denominators.
 
-**(b) Short-wave resampling is implemented.** Its [permanent policy](../architecture/nwp-variable-conventions.md#radiation-resampling)
-uses midpoint indices, daylight blocks and native-window conservation. Long-wave uses a separate
-thermal policy, without solar shaping. Derive physics features from these half-hourly outputs.
+**(b) Derive physics features from the [half-hourly radiation outputs](../architecture/nwp-variable-conventions.md#radiation-resampling).**
 
 **(c) Derived features, computed from the upsampled columns:**
 
