@@ -13,7 +13,8 @@ their own. The study chose quantile training, the wind columns, and pooling afte
 results, so their gains are biased upward, and the page labels them "post hoc". After the changes,
 the point forecast beats the `manual_heuristic` baseline at days 0 to 2 and ties it at days 3 to 10,
 and the CRPS still sits above the heuristic's from day 3 on. Removing the power lags from solar and
-wind farms, which the plan asked about, made both worse.
+wind farms, which the plan asked about, made both worse. For solar, that differs from the
+lag-features study's day-ahead result (see Round 1).
 
 ![Figure 1: The best arm's CRPS is 7.9% of capacity, against 11.3% for production with cleaning and
 7.2% for the manual heuristic.](../assets/quick_wins_figure_1.svg)
@@ -271,6 +272,13 @@ these ways:
 - **Rows:** half-hourly rows including night here, hourly daylight rows there.
 - **Model:** one XGBoost model per series with 24 columns here.
 
+Three candidate explanations remain untested. First, production's 24-hour lag is blanked at leads of
+24 hours or more, so at day-ahead only the 48-hour, 168-hour, and 336-hour lags are available, and
+the 168-hour and 336-hour lags may carry weekly regime information that the one 2-day lag does not.
+Second, the lag-features study scored the ensemble mean by MAE, while this study scored CRPS over 51
+members, where a lag may mainly sharpen the members' spread. Third, the solar result here rests on 6
+farms in one weather region, as the lag-features result does, so neither is a statement about a
+seventh plant. A follow-up should run both setups on identical rows and score both by MAE and CRPS.
 This study cannot say which difference explains the gap. The earlier arm that also removed the
 weekday columns gave almost the same losses (solar +0.27, wind +1.38), so the weekday columns are
 not the cause. Do not remove the lags in production on the strength of the lag study.
@@ -486,6 +494,11 @@ CRPS differences against production with cleaning.
   years help.
 - **A climatology column,** built so that a training row's own value never enters its own
   climatological mean.
+- **Plant information for pooled models:** the transfer ratio (power over forecast irradiance) and
+  daily shape from [the lag-features study](lag-features.md) in place of a raw site number. That
+  study found the clipping ceiling raised the error for plants left out of training.
+- **Issuing the control member's quantiles directly,** with or without the members' spread, because
+  the 9 control quantiles scored better than the 459-value crossed sample.
 - **Training on CRPS itself,** with a custom objective or a neural network.
 - **A residual-based predictive distribution:** draw each member's value as the point forecast plus
   a sample of past residuals for the series, season, and lead.
