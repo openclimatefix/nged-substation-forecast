@@ -27,8 +27,8 @@ carries new prose, then stops at step 9 with no adversarial pass. If you reach t
 `plan-issue` step 3, and say which size you picked before you start.
 
 **How many of the two reviews below to run** comes from that sizing: both for a complex issue, none
-for a simple one, and between zero and two for a medium one, under the rules in `plan-issue` step 3.
-Running only one means running step 5, not step 7.
+for a simple one, and between zero and two for a medium one — your choice, under the rules in
+`plan-issue` step 3. Running only one means running step 5, not step 7.
 
 When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it these steps up front
 — a report back after step 1 is not finished work.
@@ -56,11 +56,13 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
    `packages/studies/` or `studies/`), plus (if docs were touched) `uv run pymarkdown scan -r docs
    README.md CLAUDE.md packages/*/README.md` and `uv run mkdocs build --strict`.
 
-    For a medium or complex issue, also run `/code-review medium` in the session. This is the local
-    review, which works on a personal Max plan; the managed GitHub service and its `REVIEW.md` do
-    not. It runs parallel agents and verifies each candidate against the code before reporting it.
-    Fix the genuine findings and re-run the verification set above, so the sub-agent in step 5 does
-    not spend its pass on bugs a built-in review would have found.
+    For a medium or complex issue, also run `/code-review medium` in the session. The local
+    `/code-review` command works on a personal Max plan. The managed GitHub Code Review service
+    needs a Team or Enterprise plan, and the local command does not read `REVIEW.md`. The local
+    review runs as a background sub-agent and reports correctness bugs. Triage its findings, fix
+    the genuine ones, and re-run the commands above, so the sub-agent in step 5 does not spend its
+    pass on bugs the built-in review would have found. This pass is not one of the two reviews, so
+    it does not count towards the sizing. Say in the PR body whether it ran.
 
 4. **Commit, push, and mark the PR ready for review.** With a plan, `plan-issue` already opened the
    draft PR: commit, push, and run `gh pr ready <PR-number>`. Rewrite the body for the code that now
@@ -108,7 +110,7 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
 6. **Triage, commit and push** — verify each finding against the code rather than accepting it, fix
    the genuine ones, re-run the step-3 verification set, commit and push. Put a one-line tally in
    the PR body for each review (findings raised, accepted, rejected) and record each rejected
-   finding with its one-line reason; the tallies show over time which reviews earn their cost. Every
+   finding with its one-line reason; the tallies show over time which reviews find genuine defects. Every
    review step ends with the branch pushed, so GitHub always shows the state the last review left.
 
 7. **Second adversarial review: mutation testing.** Run this if the sizing called for it. Spawn

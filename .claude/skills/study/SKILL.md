@@ -625,9 +625,9 @@ covers fetch, build, fit, and chart scripts alike. The review of a script's code
 first run, and is separate from the review of the design and the first results in step 4 of "The
 order of work". A fit or a download run before its review cannot be un-run: it spends compute or
 quota and can leave output that later readers trust. Run nothing until the review is triaged, and
-say in the PR body which review each script had. A local `/code-review` run is a cheap first pass
-before that review and does not replace it: it checks correctness, not whether the design is
-scientifically valid.
+say in the PR body which review each script had. A local `/code-review` run can precede the fresh
+script review, but does not replace it, because `/code-review` checks correctness and not whether
+the design is scientifically valid.
 
 **Each reviewer is fresh, and is told:**
 
