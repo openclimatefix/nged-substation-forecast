@@ -63,7 +63,7 @@ one, the mistake is already written.
 | `plan-wave` | choosing the next batch of issues under an epic to run in parallel (`/plan-wave <EPIC>`) |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — sizes the issue, then writes a reviewed plan unless it is trivial, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
-| `implement-issue` | writing code for an approved plan: implement in the draft PR `plan-issue` opened, verify set, mark it ready, up to two adversarial reviews, stop |
+| `implement-issue` | writing code for an approved plan: implement in the draft PR `plan-issue` opened, verify set, mark it ready, up to three adversarial reviews, stop |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh issue/pr comment`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
@@ -461,11 +461,11 @@ any code moves:
    checking correctness and testability — and stops for human review. It writes no code.
 3. **`implement-issue`** picks up an approved plan in the worktree and draft PR `plan-issue` already
    created: implement, the green-before-push verification set, push and mark the PR ready for
-   review, then up to two *further independent* adversarial reviews of the diff — the first for
-   correctness and for cutting the code, tests and prose down to what the change needs, the second
-   mutation-testing the change — committing, triaging and pushing after each, stop for human review.
-   **Never merge.** A simple issue arrives here with no plan and no draft PR, so `implement-issue`
-   makes the worktree and opens the PR itself.
+   review, then up to three *further independent* adversarial reviews of the diff — the first
+   cutting the code, tests and prose down to what the change needs (Sonnet), the second for
+   correctness (Opus), the third mutation-testing the change (Sonnet) — committing, triaging and
+   pushing after each, stop for human review. **Never merge.** A simple issue arrives here with no
+   plan and no draft PR, so `implement-issue` makes the worktree and opens the PR itself.
 
 **How much process an issue gets is sized to the issue**, in step 3 of `plan-issue`:
 
@@ -475,9 +475,9 @@ any code moves:
   that no sub-agent reviewed it, and stop for human review.
 - **Complex** — anything that changes what gets stored, touches the production serving path, touches
   a degradation rule, admits more than one defensible design, or spans code whose callers you could
-  not name without searching. It gets the plan and **all four** reviews.
+  not name without searching. It gets the plan and **all five** reviews.
 - **Medium** — everything else. It gets a plan, and Claude chooses between zero and two of the plan
-  reviews and between zero and two of the diff reviews, running the earlier of each pair first and
+  reviews and between zero and three of the diff reviews, running the earlier of each pair first and
   erring towards running one more when the call is close.
 
 **State a size as an answer to each of the five triggers in the Complex bullet above, never as the

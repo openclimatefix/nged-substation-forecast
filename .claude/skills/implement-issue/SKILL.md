@@ -4,9 +4,9 @@ description: >-
   The routine for implementing an approved plan for a GitHub issue in
   openclimatefix/nged-substation-forecast, in the worktree and draft PR `plan-issue` already
   opened: implement, the green-before-push verification set, mark the PR ready for review, then up
-  to two fresh sub-agents adversarially review the diff in turn — one for correctness and for
-  keeping the code, tests and prose as short as they can be, then one that mutation-tests the
-  change — triaging and pushing after each, stop for human review, never merge. How many of those
+  to three fresh sub-agents adversarially review the diff in turn — one that cuts the code, tests
+  and prose down (Sonnet), one for correctness (Opus), then one that mutation-tests the change
+  (Sonnet) — triaging and pushing after each, stop for human review, never merge. How many of those
   reviews run is set by the issue size: a simple issue arrives here with no plan and no draft PR,
   so it opens its own PR and gets no review at all. Load before writing any code for an issue, and
   when dispatching a sub-agent or a fresh session to solve one. To decide *what* to build, use
@@ -26,9 +26,10 @@ carries new prose, then stops at step 9 with no adversarial pass. If you reach t
 `plan-issue` — a direct instruction to fix something, say — size the issue first, using
 `plan-issue` step 3, and say which size you picked before you start.
 
-**How many of the two reviews below to run** comes from that sizing: both for a complex issue, none
-for a simple one, and between zero and two for a medium one — your choice, under the rules in
-`plan-issue` step 3. Running only one means running step 5, not step 7.
+**How many of the three reviews below to run** comes from that sizing: all three for a complex issue,
+none for a simple one, and between zero and three for a medium one — your choice, under the rules
+in `plan-issue` step 3. Step 5 runs first; what the diff touches decides whether steps 6 and 7
+follow.
 
 When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it these steps up front
 — a report back after step 1 is not finished work.
@@ -82,14 +83,13 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
     pushed before any review runs, and each review's fixes follow as a separate commit whose message
     names the review. The git log then shows what each review changed.
 
-5. **First adversarial review: correctness, and cutting the change down.** Run this if the sizing
-   called for it. Spawn a *new*, independent sub-agent and give it only the PR number, not the
+5. **First adversarial review: cutting the change down.** Run this if the sizing called for it.
+   Spawn a *new*, independent Sonnet sub-agent and give it only the PR number, not the
    implementer's reasoning, so it isn't anchored by it. Tell it to try to refute the PR's claims
    rather than confirm them, because reviewers left to agree tend to agree without evidence, and
-   not to report anything `ruff`, `ty`, `pydoclint` or `pymarkdown` already enforce. It makes four
-   passes in the order below and lists each pass's findings before starting the next, because a
-   combined sweep reports the loudest fault and misses the quieter ones. Correctness comes last so
-   that it covers the replacements the earlier passes propose:
+   not to report anything `ruff`, `ty`, `pydoclint` or `pymarkdown` already enforce. It makes three
+   passes and lists each pass's findings before starting the next, because a combined sweep
+   reports the loudest fault and misses the quieter ones:
 
     - **Simplicity of the code.** Which added lines could go without a user of the system telling
       the difference? Does an existing function, package or Patito model already do what a new one
@@ -106,26 +106,24 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
       Which whole sentences carry no information: restating the heading, summarising what the
       reader has just read, hedging, or narrating what the change replaced? Cut whole sentences, not
       words (CLAUDE.md, "Prose style").
-    - **Correctness**, of the diff as written and of every replacement the earlier passes proposed,
-      because the implementer may reject a simplification. Tailor this pass to the issue: name the
-      failure modes most worth attacking — the risky claim, a behaviour change hiding inside a
-      refactor, whether each new test would actually have failed on `main`.
 
     Ask for each finding as a concrete deletion or replacement. The standard is that the PR adds no
     more lines of code, tests or prose than the change absolutely needs.
 
-6. **Triage, commit and push** — verify each finding against the code rather than accepting it, fix
-   the genuine ones, re-run the step-3 verification set, commit and push. Put a one-line tally in
-   the PR body for each review (findings raised, accepted, rejected) and record each rejected
-   finding with its one-line reason; the tallies show over time which reviews find genuine defects.
-   Every review step ends with the branch pushed, so GitHub always shows the state the last review
-   left.
+6. **Second adversarial review: correctness.** Run this if the sizing called for it, after step 5
+   has been triaged and pushed, so the reviewer reads the diff that is left. Spawn *another* new
+   sub-agent, this time Opus, because a missed bug costs more than the extra tokens. Give it the PR
+   number and the record of which step-5 simplifications were accepted and which rejected, and no
+   account of your reasoning. It tries to refute the PR's claims, as in step 5. Tailor the brief to
+   the issue: name the failure modes most worth attacking — the risky claim, a behaviour change
+   hiding inside a refactor, whether each new test would actually have failed on `main`.
 
-7. **Second adversarial review: mutation testing.** Run this if the sizing called for it. Spawn
-   *another* new sub-agent — not the one from step 5, and again with no account of your reasoning.
-   Its job is to break the production code the PR touches and find out whether the tests notice.
-   There is no mutation-testing tool in this repo, so it works by hand in its own detached worktree,
-   which keeps a mutation off the branch:
+7. **Third adversarial review: mutation testing.** Run this if the sizing called for it, and only
+   where the diff changes production logic that the tests cover. A change to docs, skills, config
+   or a chart script has no behaviour to break. Spawn *another* new Sonnet sub-agent, again with no
+   account of your reasoning. Its job is to break the production code the PR touches and find out
+   whether the tests notice. There is no mutation-testing tool in this repo, so it works by hand in
+   its own detached worktree, which keeps a mutation off the branch:
 
     ```bash
     git worktree add --detach .claude/worktrees/mutate-<branch-name> <branch-name>
@@ -143,28 +141,34 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
     remove`). It never commits or pushes. The table under "NWP grid → H3 orientation coverage" in
     `docs/architecture/testing.md` is what a finished pass looks like.
 
-8. **Triage, commit and push** — on the same terms as step 6. A surviving mutation is a gap only
-   where the behaviour it breaks is behaviour we rely on; where it is, tighten or add a test and
-   confirm that test goes red against the mutation and green without it. Re-run the step-3
-   verification set, commit and push.
+8. **Triage, commit and push after each of steps 5, 6 and 7**, as a separate commit each time.
+   Verify each finding against the code rather than accepting it, fix the genuine ones, re-run the
+   step-3 verification set, commit and push. A surviving mutation is a gap only where the behaviour
+   it breaks is behaviour we rely on; where it is, tighten or add a test and confirm that test goes
+   red against the mutation and green without it. Put a one-line tally in the PR body for each
+   review (findings raised, accepted, rejected) and record each rejected finding with its one-line
+   reason; the tallies show over time which reviews find genuine defects. Every review ends with
+   the branch pushed, so GitHub always shows the state the last review left.
 
 9. **Stop for human review. Never merge.** Report the size the issue was given, which reviews ran,
    what each changed, and what each found that you rejected.
 
 **Run a prose-review pass whenever the diff carries more than a few lines of new prose** — a
-docstring, a README section, a skill update, a PR body, in a Python or markdown file. Steps 5 and 7
-check only concision, not the sentence-level rule sweep the `prose-review` skill runs, so a diff
-heavy in new prose can pass both with pronoun, superlative and umbrella-noun violations still in it.
-Size the pass using `prose-review`'s own table, fix what it finds, and push again before stopping.
+docstring, a README section, a skill update, a PR body, in a Python or markdown file. Step 5 checks
+only concision, not the sentence-level rule sweep the `prose-review` skill runs, so a diff heavy in
+new prose can pass it with pronoun, superlative and umbrella-noun violations still in it. Size the
+pass using `prose-review`'s own table, fix what it finds, and push again before stopping.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
 pass when a human is asked to review it, so that review is the last line of defence rather than the
-first. The reviewer is fresh so the implementer's rationale cannot anchor it. Triage exists because
-reviewer findings are often wrong. Mutation testing goes second so it targets the tests that
-survive the first round, and it gets its own reviewer because a green suite proves nothing on its
-own: only writing the bug and watching shows whether a test would catch it.
+first. Each reviewer is fresh so the implementer's rationale cannot anchor it. Triage exists because
+reviewer findings are often wrong. Correctness comes after the cut so the reviewer reads only the
+code that is left, and mutation testing comes last so it targets the tests that survive. Mutation
+testing has its own reviewer because a green suite proves nothing on its own: only writing the bug
+and watching shows whether a test would catch it. Sonnet does the cutting and the mutating, which
+are mechanical; Opus does the correctness review, where a missed bug does the most damage.
 
 **Why the reviews are sized rather than always run:** an adversarial pass costs wall-clock time and
 a round of triage, and on a change whose correctness is visible in the diff it finds nothing the
