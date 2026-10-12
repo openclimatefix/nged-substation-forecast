@@ -475,7 +475,8 @@ any code moves:
   that no sub-agent reviewed it, and stop for human review.
 - **Complex** — anything that changes what gets stored, touches the production serving path, touches
   a degradation rule, admits more than one defensible design, or spans code whose callers you could
-  not name without searching. It gets the plan and **all five** reviews.
+  not name without searching. It gets the plan and **all five** reviews (the mutation pass only
+  where the diff changes production logic).
 - **Medium** — everything else. It gets a plan, and Claude chooses between zero and two of the plan
   reviews and between zero and three of the diff reviews, running the earlier of each pair first and
   erring towards running one more when the call is close.

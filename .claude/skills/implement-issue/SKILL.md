@@ -21,8 +21,8 @@ reads the issue, decides whether it is worth implementing, sizes the process it 
 review. It also does step 1 below and opens the PR as a draft, so implementation resumes at step 2.
 
 The one issue that arrives **without** a plan is one `plan-issue` sized as simple: a mechanical
-change with no design to approve. It runs steps 1 to 4, then step 9 if the diff carries new
-prose, then stops at step 10 with no adversarial pass. If you reach this skill without
+change with no design to approve. It runs steps 1 to 4, then step 9 if the diff carries more than
+a few lines of new prose, then stops at step 10 with no adversarial pass. If you reach this skill without
 `plan-issue` — a direct instruction to fix something, say — size the issue first, using
 `plan-issue` step 3, and say which size you picked before you start.
 
@@ -72,9 +72,9 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
     defence, and the reviewer must know that before reading the diff.
 
     For a medium or complex issue, then run `/code-review medium` in the session. The local
-    `/code-review` command works on a personal Max plan. The managed GitHub Code Review service
-    needs a Team or Enterprise plan, and the local command does not read `REVIEW.md`. The local
-    review runs as a background sub-agent and reports correctness bugs. Triage its findings, fix
+    `/code-review` command is used because the managed GitHub Code Review service needs a Team or
+    Enterprise plan. The local review runs as a background sub-agent, reports correctness bugs, and
+    does not read `REVIEW.md`. Triage its findings, fix
     the genuine ones, re-run the step-3 commands, then commit and push the fixes as a separate
     commit. This pass is not one of the three reviews, so it does not count towards the sizing. Say
     in the PR body whether it ran.
@@ -86,8 +86,8 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
 5. **First adversarial review: cutting the change down.** Run this if the sizing called for it.
    Spawn a *new*, independent Sonnet sub-agent and give it only the PR number, not the
    implementer's reasoning, so it isn't anchored by it. Tell it to try to refute the PR's claims
-   rather than confirm them, because reviewers left to agree tend to agree without evidence, and
-   not to report anything `ruff`, `ty`, `pydoclint` or `pymarkdown` already enforce. It makes three
+   rather than confirm them, because a brief that asks for confirmation gets confirmation, and not
+   to report anything `ruff`, `ty`, `pydoclint` or `pymarkdown` already enforce. It makes three
    passes and lists each pass's findings before starting the next, because a combined sweep
    reports the loudest fault and misses the quieter ones:
 
@@ -154,8 +154,9 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
    section, a skill update, a PR body, in a Python or markdown file. Step 5 checks only concision,
    not the sentence-level rule sweep the `prose-review` skill runs, so a diff heavy in new prose
    can pass it with pronoun, superlative and umbrella-noun violations still in it. Run this after
-   step 8, so no later fix brings back prose the sweep has checked. Size the pass using
-   `prose-review`'s own table, fix what it finds, and commit and push as a separate commit.
+   step 8, or straight after step 4 on the simple path, so no later fix brings back prose the
+   sweep has checked. Size the pass using `prose-review`'s own table, fix what it finds, and commit
+   and push as a separate commit.
 
 10. **Stop for human review. Never merge.** Report the size the issue was given, which reviews ran,
     what each changed, and what each found that you rejected.

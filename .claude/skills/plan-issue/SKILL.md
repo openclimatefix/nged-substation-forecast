@@ -104,8 +104,9 @@ Not every issue needs a plan, and not every plan needs two reviews. Pick one of 
 it in your reply with a one-line reason before doing anything else**, and let the human override it.
 
 **Simple — no plan, and no agentic review at all.** Skip the rest of this skill and go straight to
-`implement-issue` at its step 1: worktree, implement, the verification set, PR, stop for human
-review. An issue is simple when all of these hold:
+`implement-issue` at its step 1: worktree, implement, the verification set, PR, a prose review if
+the diff carries more than a few lines of new prose, stop for human review. An issue is simple
+when all of these hold:
 
 - The change is mechanical, and reading the diff is enough to see whether it is right — a rename or
   a find-and-replace across files, a prose or docs edit, deleting dead code, a dependency bump, a

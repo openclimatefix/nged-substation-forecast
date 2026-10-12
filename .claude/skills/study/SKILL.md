@@ -121,7 +121,9 @@ review goes on the page only after a committed script prints it into the report.
    publication. Triage, fix, and re-run. Keep reviewing until a reviewer finds nothing that must be
    fixed.
 6. **Finish the charts and the page** (sections below).
-7. **Diff review**, with the `implement-issue` skill.
+7. **Diff review**, with steps 5 to 8 of the `implement-issue` skill, using that skill's models:
+   Sonnet for the cut-down review, Opus for the correctness review. Step 8 below replaces that
+   skill's prose-review step.
 8. **End with a first-stumble review and then a `prose-review` of the page, one rule per pass,
    alongside persona and evidence reviews** (see "Reviews"). The text inside the figures gets the
    same two reviews before the figures are first rendered (see "Review the text of every figure").
@@ -617,8 +619,9 @@ unresolved" is a finding.
 
 **Write each reviewer's brief to a file** under `.claude/worktrees/`, and give the Agent tool a
 three-line prompt pointing at it. A long inline prompt can trip an API safeguard. Use Opus for every
-review and every judgement, and Sonnet for mechanical work such as fetching documentation, checking
-where a dataset is served, or mining transcripts.
+review and every judgement, except the diff reviews in step 7 of "The order of work", and Sonnet
+for mechanical work such as fetching documentation, checking where a dataset is served, or mining
+transcripts.
 
 **Every script, and every change to a script, gets at least one fresh review before it runs.** This
 covers fetch, build, fit, and chart scripts alike. The review of a script's code comes before its
@@ -636,8 +639,8 @@ the design is scientifically valid.
   `.claude/worktrees/`, never `/tmp`;
 - never to write a generator's identifier, name, or coordinates;
 - what earlier reviews already settled, so the reviewer spends its effort elsewhere;
-- to try to refute the script's or the page's claims rather than confirm them, because reviewers
-  left to agree tend to agree without evidence;
+- to try to refute the script's or the page's claims rather than confirm them, because a brief
+  that asks for confirmation gets confirmation;
 - to rank findings, give a verdict on each (must fix, should fix, fine) with the exact replacement
   or re-run, and end with an overall verdict.
 
