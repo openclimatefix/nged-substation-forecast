@@ -24,8 +24,9 @@ DAYLIGHT_FLOOR_W_M2: Final[float] = 1.0
 def _half_hour_clear_sky(*, targets: pl.LazyFrame, coordinates: pl.LazyFrame) -> pl.LazyFrame:
     """Evaluate Haurwitz means using two 15-minute midpoint samples per target.
 
-    NOAA fractional-year solar geometry includes longitude and equation of time. Geometry is
-    independent of run/member, so compute it once per series and target timestamp.
+    US National Oceanic and Atmospheric Administration (NOAA) fractional-year solar geometry
+    includes longitude and equation of time. Geometry is independent of run/member, so compute it
+    once per series and target timestamp.
     """
     samples = (
         targets.select("time_series_id", "valid_time")

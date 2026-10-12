@@ -82,8 +82,9 @@ def test_solar_geometry_against_independent_reference(
     actual = _half_hour_clear_sky(targets=targets.lazy(), coordinates=coordinates).collect()
     actual = actual.sort("valid_time")["_clear_sky"].to_numpy()
     expected = _reference_sky(times=times, latitude=latitude, longitude=longitude)
-    # NOAA fractional-year geometry is approximate; this absolute bound includes its sunrise
-    # error without accepting the multi-hour error from treating native means as snapshots.
+    # US National Oceanic and Atmospheric Administration (NOAA) fractional-year geometry is
+    # approximate; this absolute bound includes its sunrise error without accepting the multi-hour
+    # error from treating native means as snapshots.
     np.testing.assert_allclose(actual, expected, atol=12, rtol=0)
 
 

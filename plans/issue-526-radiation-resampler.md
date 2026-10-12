@@ -6,8 +6,10 @@ support. The study demonstrates the short-wave timing defect independently of fo
 
 Replace point interpolation for the two radiation fields with interval-aware reconstruction.
 Short-wave follows a clear-sky shape with interpolated midpoint indices, then conserves each native
-window's energy. Long-wave fits PCHIP through native-window midpoint means. Keep raw NWP storage intact,
-use the same lazy feature path in training and inference, and defer precipitation, wind and TCC.
+window's energy. Long-wave fits a piecewise cubic Hermite interpolating polynomial (PCHIP) through
+native-window midpoint means. Keep raw numerical weather prediction (NWP) storage intact, use the
+same lazy feature path in training and inference, and defer precipitation, wind, and total cloud
+cover (TCC).
 
 ## Verdict, scope and process
 
@@ -21,7 +23,7 @@ by three independent implementation reviews (simplicity, correctness, mutation t
 Codex reviewers substitute for unavailable Claude models; disclose that substitution. The local
 implementation review requested by implement-issue is additional if available.
 
-- Contracts and storage: no Patito field, raw Delta schema, rounding or asset change. Regenerated
+- Contracts and storage: no Patito field, raw Delta schema, rounding, or asset change. Regenerated
   feature caches will differ. Do not narrow `Nwp.continuous_var_names()` in this PR.
 - Production serving: yes, `_engineer_features` uses the shared resampler during inference.
 - Degradation: yes, missing radiation windows and unusable solar denominators require a policy.
@@ -50,7 +52,7 @@ separately because the resampler currently treats every non-weather input column
 Use site coordinates consistently with the study; the raw source remains the containing H3 cell.
 
 In `_upsample_nwp_to_half_hourly`, separate the two radiation columns from the existing point
-interpolation list locally. Keep its group keys, categorical handling and non-radiation behavior.
+interpolation list locally. Keep its group keys, categorical handling, and non-radiation behavior.
 Create a native-window relation before grid expansion: every radiation mean at `T` belongs to
 `(T - width, T]`, with width 3 hours through lead 144 and 6 hours after that for the supported ECMWF
 model. Lead zero has no interval. Derive width from the model's native schedule, never from the
@@ -59,8 +61,9 @@ window as a wider accumulation. Reuse the native timestamp and group keys as win
 derive missingness from native radiation rather than adding a redundant mask column. Reuse
 `ECMWF_ENS_LEAD_TIME_HOURS` from contracts for the schedule instead of duplicating its constants.
 
-The new production `_radiation.py` helpers construct all 6/12 targets inside each supplied window
-at half-hour ends, before joining the existing output grid. A private expression in that module
+The new production `_radiation.py` helpers construct six target half-hours for each supplied 3-hour
+window and 12 target half-hours for each supplied 6-hour window, before joining the existing output
+grid. Target timestamps mark the ends of those half-hours. A private expression in that module
 evaluates a vectorised, dependency-free solar-position approximation in Polars, including
 longitude and equation of time, and Haurwitz irradiance. Use 15-minute midpoint quadrature: evaluate
 at `T - 22.5 min` and `T - 7.5 min` for a target half-hour. Average those half-hour means over each
@@ -71,9 +74,9 @@ Use the study's Haurwitz coefficient 0.059; its expression is the implementation
 than the roadmap's illustrative 0.057. Reference independent geometry in tests before choosing a
 documented accuracy tolerance near sunrise/sunset.
 
-For finite short-wave windows whose clear-sky mean reaches the documented daylight floor, form the
-native mean / native clear-sky mean and anchor it at the native window midpoint. Interpolate ratios
-in actual elapsed time at target midpoints inside contiguous supported daylight blocks. Detect
+For finite short-wave windows with a clear-sky mean of at least 1 W/m², divide the native radiation
+mean by the clear-sky mean and anchor the resulting index at the native window midpoint. Interpolate
+ratios in actual elapsed time at target midpoints inside contiguous supported daylight blocks. Detect
 support gaps from scheduled-window adjacency, not just adjacency among surviving daylight anchors.
 Define daylight blocks from night gaps in the generated half-hour clear-sky support, not from
 entirely dark native windows: northern UK summer nights can be shorter than a 6-hour window. Make
@@ -83,7 +86,9 @@ overlapping two daylight blocks contributes its same index to both; conservation
 once across that native window's complete target set. Do not interpolate a cloud-index trend
 from one day's sunset into the next day's sunrise. At sunrise/sunset
 hold the closest usable daylight ratio; never interpolate toward an artificial zero night ratio.
-Multiply by target half-hour clear-sky means, then rescale the targets within each complete native
+
+**Each complete short-wave window must conserve its supplied energy.** Multiply by target
+half-hour clear-sky means, then rescale the targets within each complete native
 window so `sum(target_mean * 1800 s) == native_mean * width_seconds` within Float32 tolerance.
 There is no clipping at clear-sky index 1: enhancement and quadrature error must not destroy energy.
 The value at a native timestamp becomes that final half-hour's mean, not the original 3/6-hour mean.
@@ -91,10 +96,11 @@ The value at a native timestamp becomes that final half-hour's mean, not the ori
 For long-wave, fit shape-preserving PCHIP through native-window midpoint means and evaluate at
 half-hour midpoints. Hold the nearest value outside the anchors within each contiguous source
 sequence; never bridge null or absent windows. One anchor gives a constant and two give a line.
-Prioritise smooth ML features over exact interval conservation, as requested in human review.
+Prioritise smooth machine learning (ML) features over exact interval conservation, as requested in
+human review.
 Join radiation targets onto the same output grid and remove all internal helper columns.
 Bulk and single-run feature paths then consume the identical corrected NWP relation before their
-existing joins, lags and rolling features. The output remains lazy and retains existing dtypes.
+existing joins, lags, and rolling features. The output remains lazy and retains existing dtypes.
 
 #### Main branches
 
@@ -176,7 +182,7 @@ Regression assertions that fail on current main for deliberately varying native 
    A constant-index clear day alone cannot test anchoring.
 3. Each finite complete short-wave window conserves `mean * duration`, including lead 144 to 150
    and the final lead-360 window. Long-wave matches an independent SciPy PCHIP reference through
-   interval midpoints, including the 3/6-hour transition, extrema and one/two-anchor sequences.
+   interval midpoints, including the 3/6-hour transition, extrema, and one/two-anchor sequences.
 4. The first finite interval supplies its early half-hours, lead zero remains null, and a missing
    middle source window remains null across its whole support. Current linear interpolation loses
    the first window and fills interior source nulls. Include an actually absent native row, not
@@ -213,14 +219,14 @@ Principles 3 (one execution path), 9 (provenance), and 11 (lazy computation) are
 is untouched, original null support survives, and both modes call the same lazy resampler. H1's
 absence-tolerant service is respected by null/fallback behavior; the plan adds no asset check or
 new failure-producing warning path. Malformed input and internal duplicate joins remain bugs.
-No new model feature, model-selection branch, asset or raw table is introduced. Conservation is a
+No new model feature, model-selection branch, asset, or raw table is introduced. Conservation is a
 constraint on reconstruction, not a claim to recover unknown within-window weather or improve
 forecast scores. Long-wave is absent from the current 24-feature model recipe.
 
 ## Documentation and rollout
 
 - `docs/architecture/nwp-variable-conventions.md`: describe actual backward half-hour output,
-  changed native-timestamp values, conservation, fallback and source-null behavior. Keep the old
+  changed native-timestamp values, conservation, fallback, and source-null behavior. Keep the old
   radiation section anchor if needed by existing inbound links, but rewrite its text in present
   tense. Preserve unresolved wind and temperature limitations.
 - `docs/roadmap/xgboost-improvements.md`: remove the completed radiation implementation recipe and

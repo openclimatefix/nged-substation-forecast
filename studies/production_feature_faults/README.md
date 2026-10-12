@@ -3,7 +3,13 @@
 This study investigates Part 1 of issue 1156 through aggregate feature diagnostics and GPU
 forecast experiments. The report is
 [Production feature faults](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/production-feature-faults/).
-All corrections are study-only; production files are unchanged.
+The corrections evaluated in this study were study-only.
+
+**Saved radiation probe results describe production before interval-aware resampling.** The audit
+calls the installed production implementation, so rerunning its source probes now measures the
+updated resampler. Keep new outputs separate from the historical results. The current policy and
+comparison are in the [radiation resampling
+explanation](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling).
 
 ## Inputs and scope
 

@@ -170,9 +170,10 @@ rescaled so their mean equals the native mean; equivalently, the half-hour energ
 mean × native duration. This constraint can introduce boundary steps and does not recover unknown
 sub-window cloud changes. The index is not clipped at 1.
 
-**Fallbacks preserve energy when solar shaping is unusable.** If no usable index exists, use local
-solar weights; if all solar weights are zero, retain the source mean as a constant. A positive mean
-at a dark endpoint can label preceding daylight. A positive fully-dark source window instead takes
+**Fallbacks preserve energy when solar shaping is unusable.** If no usable index exists, distribute
+the native energy in proportion to the half-hour clear-sky means within that window. If all those
+means are zero, retain the source mean as a constant. A positive native mean whose timestamp falls
+after sunset can still describe a window containing daylight. A positive fully-dark source window takes
 the constant fallback, preserving energy rather than claiming both exact nighttime zero and
 conservation. Zero-energy windows output zero.
 

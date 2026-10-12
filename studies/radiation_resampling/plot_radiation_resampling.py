@@ -235,11 +235,27 @@ def main() -> None:
             width=CONTENT_WIDTH_PX - 65,
             height=150,
             title=alt.TitleParams(
-                text=f"{label}: {width}-hour native means",
-                subtitle=(
-                    f"Maximum interval-mean deviation: before {errors[0]:.2f}, "
-                    f"after {errors[1]:.5f} W/m²"
+                text=(
+                    "Short-wave: sunny morning / dull afternoon"
+                    if cloudy
+                    else f"{label}: {width}-hour native means"
                 ),
+                subtitle=[
+                    *(
+                        [
+                            (
+                                f"{width}-hour native means; "
+                                "85% of clear sky before noon, 20% afterwards."
+                            )
+                        ]
+                        if cloudy
+                        else []
+                    ),
+                    (
+                        f"Maximum interval-mean deviation: before {errors[0]:.2f}, "
+                        f"after {errors[1]:.5f} W/m²"
+                    ),
+                ],
                 anchor="start",
             ),
         )
