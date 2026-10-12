@@ -18,7 +18,8 @@ import vl_convert as vlc
 from studies import charts
 
 INTERVAL_TEXT = (
-    "Dot: paired estimate. Line: 95% interval from whole months and paired fitting seeds."
+    "Dot: mean loss difference on matched forecasts. Line: 95% interval from repeated draws "
+    "of whole months and one matched training seed."
 )
 
 

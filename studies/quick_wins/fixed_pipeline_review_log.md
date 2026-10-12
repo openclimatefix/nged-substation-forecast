@@ -130,3 +130,10 @@ files matched the source-hash inventory and actual study runtimes. No target sou
 Accepted command hardening checks the repository root and required patch, stops on errors and
 rejects an existing reconstruction directory. The reviewer cleared that addition. Source matches
 remain distinct from data, dependency, hardware and numerical-output provenance.
+
+The radiation figure's first-reader review could not follow refitting, forecast leads, predicted
+distributions and the term paired estimate. Revised subtitles explain those concepts before use.
+A small chart-label change describes the dot as a mean difference on matched forecasts and the
+interval as repeated draws of whole months and one matched training seed. A fresh static review
+confirmed that both text export and rendering use the changed constant and that it matches the
+reporter's sampling method. No scores changed; figure prose review remains pending.
