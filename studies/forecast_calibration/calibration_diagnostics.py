@@ -485,10 +485,12 @@ def _equal_series(*, totals: np.ndarray, counts: np.ndarray) -> np.ndarray:
 def _interval(*, totals: np.ndarray, counts: np.ndarray) -> dict[str, float | int | bool]:
     generator = np.random.default_rng(BOOTSTRAP_SEED)
     draws = np.empty(RESAMPLES)
+    dropped_series = np.empty(RESAMPLES, dtype=int)
     for index in range(RESAMPLES):
         seed = int(generator.integers(totals.shape[0]))
         months = generator.integers(totals.shape[2], size=totals.shape[2])
         draws[index] = _equal_series(totals=totals[seed][:, months], counts=counts[seed][:, months])
+        dropped_series[index] = (counts[seed][:, months].sum(axis=-1) == 0).sum()
     seed_means = _equal_series(totals=totals, counts=counts)
     monthly = np.array(
         [
@@ -502,6 +504,7 @@ def _interval(*, totals: np.ndarray, counts: np.ndarray) -> dict[str, float | in
     half_width = (
         stats.t.ppf(0.975, df=len(monthly) - 1) * stats.sem(monthly) if len(monthly) > 1 else np.nan
     )
+    supported_months = (counts > 0).sum(axis=2)
     return {
         "difference_points": 100 * seed_means.mean(),
         "lower95_points": 100 * np.percentile(draws, 2.5),
@@ -516,6 +519,11 @@ def _interval(*, totals: np.ndarray, counts: np.ndarray) -> dict[str, float | in
         "series": totals.shape[1],
         "rows_per_seed": int(counts.sum() / counts.shape[0]),
         "provisional": totals.shape[0] < 3 or totals.shape[2] < 6,
+        "min_supported_months": int(supported_months.min()),
+        "max_supported_months": int(supported_months.max()),
+        "series_with_missing_months": int((supported_months < totals.shape[2]).sum(axis=1).max()),
+        "bootstrap_draws_dropping_series": int((dropped_series > 0).sum()),
+        "max_dropped_series_per_draw": int(dropped_series.max()),
     }
 
 
@@ -741,6 +749,10 @@ Paired differences are treatment minus reference. Intervals resample whole valid
 and one paired fitting seed 2,000 times. Equal-month t-intervals target a separate estimand.
 Provisional means fewer than three seeds or six months. Fold B and sensitivity confirmation
 remain required before any recommendation.
+A draw omits a series when none of its supported months were drawn; remaining series retain
+equal weight. Contrast support columns report month coverage, draws omitting any series,
+and the largest number omitted in a draw. series_with_missing_months is the largest such
+count across fitting seeds. These diagnostics use the same existing bootstrap draws.
 
 The delivered empirical distribution uses inverse-CDF rank ceil(n*q)-1. The primary score is
 twice mean pinball at 19 midpoint levels. Native control knots use nominal .1 through .9 in the

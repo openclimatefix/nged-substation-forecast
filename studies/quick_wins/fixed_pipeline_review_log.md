@@ -69,3 +69,15 @@ It selects and formats existing aggregate reports without recalculating statisti
 filters and finite values, rejects known private/row-level fields, and records immutable output
 provenance. Its basename allowlist is not proof that arbitrary files are public; publication
 specifications must point only to the reviewed aggregate report outputs.
+
+A fresh review cleared the optional four-treatment interaction, computed as combined minus
+radiation minus wind plus old with the original case counts and shared month/seed draws.
+An accepted blocker now checks each treatment role against its frame manifest. Synthetic
+probes recovered zero for additive effects and the injected nonzero interaction. Both reporters
+also disclose sparse month support and draws omitting unsupported series; these diagnostics use
+the existing draws and leave the estimators and random-number calls unchanged.
+
+The required studies suite passed with 3,338 tests and five skips in 238.06 seconds. An earlier
+sandbox run stalled in Zarr because local socket sends were blocked; an isolated reproduction
+confirmed the restriction. The affected 71 tests passed in 2.54 seconds with that restriction
+lifted, followed by the full passing suite. No tests were changed or excluded to obtain the pass.

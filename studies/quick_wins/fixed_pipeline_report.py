@@ -190,6 +190,23 @@ def _resampled(*, monthly: MonthlyLosses, seeds: np.ndarray, weights: np.ndarray
     return _means(totals=totals, counts=counts, axis=1)
 
 
+def _support_diagnostics(
+    *, monthly: MonthlyLosses, seeds: np.ndarray, weights: np.ndarray
+) -> dict[str, int]:
+    supported_months = (monthly.counts > 0).sum(axis=2)
+    resampled_counts = np.einsum("rsm,rm->rs", monthly.counts[seeds], weights)
+    dropped = (resampled_counts == 0).sum(axis=1)
+    return {
+        "min_supported_months": int(supported_months.min()),
+        "max_supported_months": int(supported_months.max()),
+        "series_with_missing_months": int(
+            (supported_months < len(monthly.months)).sum(axis=1).max()
+        ),
+        "bootstrap_draws_dropping_series": int((dropped > 0).sum()),
+        "max_dropped_series_per_draw": int(dropped.max()),
+    }
+
+
 def _contrast(*, left: MonthlyLosses, right: MonthlyLosses) -> dict[str, Any]:
     if (
         left.months != right.months
@@ -224,6 +241,7 @@ def _contrast(*, left: MonthlyLosses, right: MonthlyLosses) -> dict[str, Any]:
         "months_better": int((monthly_difference < 0).sum()),
         "months": n_months,
         "seeds": len(left.seeds),
+        **_support_diagnostics(monthly=left, seeds=seeds, weights=weights),
     }
 
 
@@ -273,6 +291,7 @@ def _absolute_scores(*, runs: dict[str, dict[int, pl.DataFrame]]) -> list[dict[s
                                 if metric.startswith("pinball_")
                                 else None
                             ),
+                            **_support_diagnostics(monthly=monthly, seeds=seeds, weights=weights),
                         }
                     )
     return levels
@@ -297,6 +316,121 @@ def _check_training_pair(*, a_root: Path, b_root: Path, match_counts: bool) -> N
         b_counts = pl.read_parquet(b_root / "training_counts.parquet").sort("time_series_id")
         if not a_counts.equals(b_counts):
             raise ValueError("contrast requires matching cleaned training counts")
+
+
+def _interaction_inputs(
+    *,
+    specification: dict[str, Any],
+    runs: dict[str, dict[int, pl.DataFrame]],
+    fit_roots: dict[tuple[str, int], Path],
+) -> dict[str, dict[int, pl.DataFrame]]:
+    roles = ("combined", "radiation", "wind", "old")
+    if len({specification[role] for role in roles}) != 4:
+        raise ValueError("an interaction requires four distinct treatment labels")
+    arms = {role: runs[specification[role]] for role in roles}
+    identities = set()
+    for role, frames in arms.items():
+        _paired(left=arms["combined"], right=frames)
+        for seed in frames:
+            root = fit_roots[(specification[role], seed)]
+            manifest = json.loads((root / "manifest.json").read_text())
+            if manifest["input_manifest"]["context"]["pipeline_tag"] != role:
+                raise ValueError("interaction role differs from the input pipeline treatment")
+            identities.add(
+                tuple(manifest[name] for name in ("recipe", "setting", "device", "padding"))
+            )
+            _check_training_pair(
+                a_root=fit_roots[(specification["combined"], seed)],
+                b_root=root,
+                match_counts=True,
+            )
+    if len(identities) != 1:
+        raise ValueError("interaction requires the same recipe, setting, device and padding")
+    return arms
+
+
+def _interaction_monthly(*, arms: dict[str, MonthlyLosses]) -> MonthlyLosses:
+    reference = arms["combined"]
+    if any(
+        arm.months != reference.months
+        or arm.seeds != reference.seeds
+        or not np.array_equal(arm.counts, reference.counts)
+        for arm in arms.values()
+    ):
+        raise ValueError("four-treatment monthly pairing mismatch")
+    return MonthlyLosses(
+        totals=reference.totals
+        - arms["radiation"].totals
+        - arms["wind"].totals
+        + arms["old"].totals,
+        counts=reference.counts,
+        months=reference.months,
+        seeds=reference.seeds,
+    )
+
+
+def _interaction_rows(
+    *,
+    specification: dict[str, Any],
+    runs: dict[str, dict[int, pl.DataFrame]],
+    fit_roots: dict[tuple[str, int], Path],
+) -> list[dict[str, Any]]:
+    arms = _interaction_inputs(specification=specification, runs=runs, fit_roots=fit_roots)
+    output = []
+    for group in specification.get("groups", GROUPS):
+        for band in specification.get("bands", BANDS):
+            selected = {
+                role: {
+                    seed: _filter(frame=frame, group=group, band=band)
+                    for seed, frame in frames.items()
+                }
+                for role, frames in arms.items()
+            }
+            if any(frame.is_empty() for frames in selected.values() for frame in frames.values()):
+                continue
+            for metric in specification.get("metrics", METRICS):
+                effect = _interaction_monthly(
+                    arms={
+                        role: _monthly(frames=frames, metric=metric)
+                        for role, frames in selected.items()
+                    }
+                )
+                zero = MonthlyLosses(
+                    totals=np.zeros_like(effect.totals),
+                    counts=effect.counts,
+                    months=effect.months,
+                    seeds=effect.seeds,
+                )
+                output.append(
+                    {
+                        "contrast": specification["label"],
+                        "kind": specification["kind"],
+                        "left": f"{specification['combined']} + {specification['old']}",
+                        "right": f"{specification['radiation']} + {specification['wind']}",
+                        "group": group,
+                        "lead_band": band,
+                        "metric": metric,
+                        "provisional": len(effect.seeds) != 3,
+                        **_contrast(left=effect, right=zero),
+                    }
+                )
+    return output
+
+
+def _support_note(*, interactions: bool) -> str:
+    text = (
+        "A bootstrap draw omits a series when none of its supported months were drawn; "
+        "remaining series retain equal weight. Support columns report month coverage, "
+        "draws omitting any series and the largest number omitted in a draw. "
+        "series_with_missing_months is the largest such count across fitting seeds.\n"
+    )
+    if interactions:
+        text += (
+            "Four-treatment interactions are combined - radiation - wind + old. "
+            "Their intervals use that paired monthly loss combination against zero, "
+            "with original case counts and shared month/seed draws.\n"
+        )
+    return text
 
 
 def main() -> None:
@@ -376,6 +510,10 @@ def main() -> None:
                     }
                     for metric in comparison.get("metrics", METRICS)
                 )
+    for interaction in spec.get("interactions", []):
+        contrasts.extend(
+            _interaction_rows(specification=interaction, runs=runs, fit_roots=fit_roots)
+        )
     args.output.mkdir(parents=True, exist_ok=False)
     provenance = {
         "specification": spec,
@@ -407,6 +545,7 @@ def main() -> None:
         "Negative loss differences favour the first recipe. Coverage differences are descriptive.\n"
     )
     text += "Intervals resample whole calendar months and one paired fitting seed, 2,000 times.\n"
+    text += _support_note(interactions=bool(spec.get("interactions")))
     text += (
         "The t-interval uses equal-month means, a different estimand "
         "from the equal-series score.\n\n"
