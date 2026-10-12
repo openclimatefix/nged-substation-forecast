@@ -62,6 +62,56 @@ def _filter(*, frame: pl.DataFrame, group: str, band: str) -> pl.DataFrame:
     return frame.filter(limits[band])
 
 
+def _source_run_times(
+    *, root: Path, manifest: dict[str, Any], completion: dict[str, Any]
+) -> pl.DataFrame:
+    expected = {name for name in completion["files"] if name.startswith("forecasts/")}
+    actual = {
+        str(path.relative_to(root)) for path in (root / "forecasts").rglob("*") if path.is_file()
+    }
+    frozen = {
+        "forecasts/" + name.removeprefix("val/")
+        for name in manifest["input_manifest"]["files"]
+        if name.startswith("val/")
+    }
+    if not expected or actual != expected or expected != frozen:
+        raise ValueError("source-era forecast inventory differs from the completed frozen fold")
+    pieces = []
+    for name in sorted(expected):
+        if _sha256(path=root / name) != completion["files"][name]:
+            raise ValueError("source-era forecast hash differs from completion")
+        pieces.append(pl.read_parquet(root / name, columns=[*KEYS, "nwp_init_time"]).unique())
+    mapping = pl.concat(pieces).sort(*KEYS)
+    if mapping.null_count().sum_horizontal().item() or mapping.select(*KEYS).is_duplicated().any():
+        raise ValueError("forecast score keys must have exactly one non-null source run")
+    return mapping
+
+
+def _source_era(
+    *,
+    frame: pl.DataFrame,
+    era: str,
+    root: Path,
+    manifest: dict[str, Any],
+    completion: dict[str, Any],
+) -> pl.DataFrame:
+    if era not in {"before_precip", "after_precip"}:
+        raise ValueError("unknown source era; expected before_precip or after_precip")
+    mapping = _source_run_times(root=root, manifest=manifest, completion=completion)
+    attached = frame.join(mapping, on=list(KEYS), how="left", validate="1:1", maintain_order="left")
+    if attached.height != frame.height or attached["nwp_init_time"].null_count():
+        raise ValueError("source-run mapping does not cover every score key exactly once")
+    boundary = pl.datetime(2024, 11, 13, time_zone="UTC")
+    selected = attached.filter(
+        pl.col("nwp_init_time") < boundary
+        if era == "before_precip"
+        else pl.col("nwp_init_time") >= boundary
+    )
+    if selected.is_empty():
+        raise ValueError("requested source-era score selection is empty")
+    return selected
+
+
 def _read_runs(*, runs: list[dict[str, Any]]) -> dict[str, dict[int, pl.DataFrame]]:
     found: dict[str, dict[int, pl.DataFrame]] = {}
     for run in runs:
@@ -96,6 +146,14 @@ def _read_runs(*, runs: list[dict[str, Any]]) -> dict[str, dict[int, pl.DataFram
             raise ValueError("scores exceed the study window")
         if seed in found.setdefault(run["label"], {}):
             raise ValueError("duplicate fitting seed for a label")
+        if "source_era" in run:
+            frame = _source_era(
+                frame=frame,
+                era=run["source_era"],
+                root=root,
+                manifest=manifest,
+                completion=completion,
+            )
         found[run["label"]][seed] = frame
     return found
 
@@ -106,6 +164,11 @@ def _paired(*, left: dict[int, pl.DataFrame], right: dict[int, pl.DataFrame]) ->
     reference = right[min(right)]
     checked = [*left.values(), *right.values()]
     columns = [*KEYS, "effective_capacity_mw", "actual", "time_series_type", "lead_hours"]
+    source_metadata = {"nwp_init_time" in frame.columns for frame in checked}
+    if len(source_metadata) != 1:
+        raise ValueError("paired source-run metadata is attached on only one side or seed")
+    if True in source_metadata:
+        columns.append("nwp_init_time")
     for frame in checked:
         if not frame.select(columns).equals(reference.select(columns)):
             raise ValueError("paired contrast has different rows, targets, types, or capacities")
@@ -417,7 +480,7 @@ def _interaction_rows(
     return output
 
 
-def _support_note(*, interactions: bool) -> str:
+def _support_note(*, interactions: bool, source_eras: bool) -> str:
     text = (
         "A bootstrap draw omits a series when none of its supported months were drawn; "
         "remaining series retain equal weight. Support columns report month coverage, "
@@ -430,7 +493,30 @@ def _support_note(*, interactions: bool) -> str:
             "Their intervals use that paired monthly loss combination against zero, "
             "with original case counts and shared month/seed draws.\n"
         )
+    if source_eras:
+        text += (
+            "Source-era selections use recorded nwp_init_time before/from 13 November 2024 00Z. "
+            "These descriptive availability-era comparisons have different seasons and "
+            "training exposure; they do not identify a causal upgrade effect.\n"
+        )
     return text
+
+
+def _forecast_provenance(*, runs: list[dict[str, Any]]) -> dict[str, str]:
+    sources = {}
+    for run in runs:
+        if "source_era" not in run:
+            continue
+        root = Path(run["path"])
+        completion = json.loads((root / "complete.json").read_text())
+        sources.update(
+            {
+                str(root / name): digest
+                for name, digest in completion["files"].items()
+                if name.startswith("forecasts/")
+            }
+        )
+    return sources
 
 
 def main() -> None:
@@ -526,6 +612,7 @@ def main() -> None:
         },
         "bootstrap_seed": BOOTSTRAP_SEED,
         "resamples": RESAMPLES,
+        "verified_forecast_sources": _forecast_provenance(runs=spec["runs"]),
     }
     (args.output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     level_frame, contrast_frame = pl.DataFrame(levels), pl.DataFrame(contrasts)
@@ -545,7 +632,10 @@ def main() -> None:
         "Negative loss differences favour the first recipe. Coverage differences are descriptive.\n"
     )
     text += "Intervals resample whole calendar months and one paired fitting seed, 2,000 times.\n"
-    text += _support_note(interactions=bool(spec.get("interactions")))
+    text += _support_note(
+        interactions=bool(spec.get("interactions")),
+        source_eras=any("source_era" in run for run in spec["runs"]),
+    )
     text += (
         "The t-interval uses equal-month means, a different estimand "
         "from the equal-series score.\n\n"

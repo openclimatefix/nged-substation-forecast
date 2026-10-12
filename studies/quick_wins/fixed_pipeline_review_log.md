@@ -81,3 +81,9 @@ The required studies suite passed with 3,338 tests and five skips in 238.06 seco
 sandbox run stalled in Zarr because local socket sends were blocked; an isolated reproduction
 confirmed the restriction. The affected 71 tests passed in 2.54 seconds with that restriction
 lifted, followed by the full passing suite. No tests were changed or excluded to obtain the pass.
+
+The planned precipitation-era diagnostic received a fresh reporter review before execution.
+Optional era selections recover exact NWP initialisation times from the hash-verified, complete
+saved forecast inventory, cover every scored key, and preserve source-time pairing. They use
+the recorded 13 November 2024 availability boundary and remain descriptive because season and
+training exposure differ. Reports without an era selection retain their existing calculations.
