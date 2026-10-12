@@ -76,7 +76,9 @@ For solar, the result differs from the lag-features study's day-ahead result (se
   too narrow.** Quantile training takes about 8 times longer. Against spread rescaling on the same
   45 later runs, the quantile gain is smaller: 0.4 points for the plain arm and about 1.0 for the
   best arm. The 459-value distribution is still too narrow (57% coverage of a nominal 80% band), and
-  the control member's 9 quantiles alone score 0.33 points better than the crossed sample.
+  the control member's 9 quantiles alone score 0.33 points better than the crossed sample. The fair
+  CRPS may account for part of that gap, because it gives a set of 9 values a larger spread term
+  than a set of 459.
 - **The point forecast is good at short leads and loses its edge from day 3.** At days 0 to 2 the
   best point-forecast arm's MAE is 9.5% against the heuristic's 11.3%, and for wind farms 10.0%
   against 19.2%. The 9.5% and 10.0% figures are point estimates, and the study computed no paired
@@ -386,10 +388,19 @@ these gains are conservative.
 The 459-value sample holds the outcome in 57% of half-hours for a 10% to 90% band (nominal 80%): 80%
 for solar farms, 59% for wind farms, 50% for demand substations, and 39% for the biofuel generator.
 The 9 quantiles of the control member alone score a CRPS 0.33 points lower [−0.35, −0.30] than the
-459-value sample (12 of 12 months), on every series type. The quantile model learns the weather
-forecast's error, so crossing the quantile model's output with the members may count the weather
-uncertainty twice. Before quantile training is re-implemented in production, test issuing the
-control member's quantiles, with or without the members' spread.
+459-value sample (12 of 12 months), on every series type. The fair CRPS may account for part of that
+gap. It divides its spread term by m(m − 1), where m is the number of values, instead of by m². That
+multiplies the spread term by m/(m − 1), which is 9/8 for 9 values and 459/458 for 459, and a larger
+spread term lowers the score, so the smaller set gains an advantage. The 9 levels (0.1 to 0.9) are
+also not the midpoints of 9 equal-probability bins, which would run from 0.056 to 0.944. Score both
+sets with the same CRPS estimator before reading the gap as a real difference.
+
+**The study did not test why the crossed sample is too narrow.** One candidate cause, that crossing
+the quantiles with the members counts the weather uncertainty twice, would make the sample too wide,
+not too narrow. A likelier cause is in-sample fitting: the XGBoost quantile models learn smaller
+residuals on the rows they were fitted on than they produce on later runs. After the like-for-like
+re-score, and before quantile training is re-implemented in production, test issuing the control
+member's quantiles, with or without the members' spread.
 
 ### Calibration: the ensemble spread is far too narrow
 
@@ -579,11 +590,10 @@ CRPS differences against production with cleaning.
 
 ## Ideas left for future research
 
-[Issue
-#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
-plans experiments on several of the ideas below: the two-stage forecaster, the climatology
-column, the feature faults, the transfer ratio and daily shape, issuing the control member's
-quantiles directly, training on CRPS, and features from the ensemble itself.
+[Issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) plans
+experiments on several of the ideas below: the two-stage forecaster, the climatology column, the
+feature faults, the transfer ratio and daily shape, issuing the control member's quantiles directly,
+training on CRPS, and features from the ensemble itself.
 
 - **A two-stage forecaster:** train a first stage on ERA5 for many years, then a second stage on the
   ECMWF forecasts' errors, as described on [the switching-events roadmap
@@ -629,7 +639,10 @@ quantiles directly, training on CRPS, and features from the ensemble itself.
   sample is a subset of the leaderboard's runs.
 - **Nothing was fitted at `colsample_bytree` 0.8 except the production arm.**
 - **The quantile arms use 9 untuned levels and weight every member and level equally,** and the
-  resulting 459-value distribution is too narrow (57% coverage of a nominal 80% band).
+  resulting 459-value distribution is too narrow (57% coverage of a nominal 80% band). The control
+  member's 9 quantiles and the 459-value crossed sample were scored with the same fair CRPS, which
+  gives the smaller set a larger spread term, so the comparison of those two sets may not be like
+  for like.
 - **Calibration by rescaling is evaluated for CRPS only,** on the later 45 of 53 runs, and rescaling
   the weather ensemble's spread does not make the forecast a proper predictive distribution.
 - **One demand series reads negative throughout and has a large error,** so the mean over series is
