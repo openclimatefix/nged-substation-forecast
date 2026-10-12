@@ -652,7 +652,7 @@ def combine_setting_verdicts(
     return primary if primary == sensitivity else unresolved
 
 
-def _calendar_month_sums(
+def calendar_month_sums(
     *, differences: np.ndarray, months: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Sum each month's differences, per seed, and count each month's rows.
@@ -677,7 +677,7 @@ def _calendar_month_sums(
     return sums, counts, calendar
 
 
-def _calendar_weights(*, counts: np.ndarray, calendar: np.ndarray) -> np.ndarray:
+def calendar_weights(*, counts: np.ndarray, calendar: np.ndarray) -> np.ndarray:
     """Weight each `YYYY-MM` month by 1 over the rows of its calendar month in the whole window.
 
     Args:
@@ -693,7 +693,7 @@ def _calendar_weights(*, counts: np.ndarray, calendar: np.ndarray) -> np.ndarray
     return 1.0 / rows_per_calendar_month[calendar]
 
 
-def _weighted_mean(
+def weighted_mean(
     *, sums: np.ndarray, counts: np.ndarray, weights: np.ndarray, drawn: np.ndarray
 ) -> float:
     """Return the weighted mean difference over the rows of the drawn months.
@@ -701,7 +701,7 @@ def _weighted_mean(
     Args:
         sums: One seed's per-month difference sums.
         counts: Each month's row count.
-        weights: `_calendar_weights`'s result.
+        weights: `calendar_weights`'s result.
         drawn: The indices of the months drawn, repeats allowed.
 
     Returns:
@@ -731,9 +731,9 @@ def calendar_balanced_difference(
     Returns:
         The estimate, the lower and upper bounds, and the number of calendar months averaged.
     """
-    sums, counts, calendar = _calendar_month_sums(differences=differences, months=months)
-    weights = _calendar_weights(counts=counts, calendar=calendar)
-    estimate = _weighted_mean(
+    sums, counts, calendar = calendar_month_sums(differences=differences, months=months)
+    weights = calendar_weights(counts=counts, calendar=calendar)
+    estimate = weighted_mean(
         sums=sums.mean(axis=0), counts=counts, weights=weights, drawn=np.arange(len(counts))
     )
     generator = np.random.default_rng(BOOTSTRAP_SEED)
@@ -741,7 +741,7 @@ def calendar_balanced_difference(
     for resample in range(N_BOOTSTRAP_RESAMPLES):
         seed_index = generator.integers(0, differences.shape[0])
         drawn = generator.integers(0, len(counts), size=len(counts))
-        resampled[resample] = _weighted_mean(
+        resampled[resample] = weighted_mean(
             sums=sums[seed_index], counts=counts, weights=weights, drawn=drawn
         )
     low, high = np.percentile(resampled, q=(2.5, 97.5))

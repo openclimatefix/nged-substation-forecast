@@ -91,16 +91,16 @@ from studies.arm_runner import Job, add_time_features, run_all
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
-    _calendar_month_sums,
-    _calendar_weights,
-    _weighted_mean,
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_at_level,
     calendar_balanced_difference,
+    calendar_month_sums,
+    calendar_weights,
     fold_t_interval,
     paired_differences,
     per_fold_differences,
+    weighted_mean,
 )
 from studies.cross_validation import (
     N_FOLDS,
@@ -1587,9 +1587,9 @@ def _check_calendar_balanced_difference() -> None:
     estimate, low, high, n_calendar = calendar_balanced_difference(
         differences=differences, months=months
     )
-    sums, counts, calendar = _calendar_month_sums(differences=differences, months=months)
-    weights = _calendar_weights(counts=counts, calendar=calendar)
-    draw = _weighted_mean(sums=sums[0], counts=counts, weights=weights, drawn=np.array([0, 1]))
+    sums, counts, calendar = calendar_month_sums(differences=differences, months=months)
+    weights = calendar_weights(counts=counts, calendar=calendar)
+    draw = weighted_mean(sums=sums[0], counts=counts, weights=weights, drawn=np.array([0, 1]))
     if not (
         math.isclose(estimate, 7.0)
         and math.isclose(draw, 8.0)
@@ -1708,7 +1708,7 @@ def _month_group_sums(
         The per-seed sums, shape (n_seeds, n_months), and each month's row count. Months are in
         sorted order.
     """
-    sums, counts, _ = _calendar_month_sums(differences=differences, months=months)
+    sums, counts, _ = calendar_month_sums(differences=differences, months=months)
     return sums, counts
 
 
@@ -1941,7 +1941,7 @@ def _month_means(*, differences: np.ndarray, months: np.ndarray) -> list[float]:
     Returns:
         One mean per month, in sorted month order.
     """
-    sums, counts, _ = _calendar_month_sums(
+    sums, counts, _ = calendar_month_sums(
         differences=differences.mean(axis=0, keepdims=True), months=months
     )
     return (sums[0] / counts).tolist()

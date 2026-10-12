@@ -7,9 +7,6 @@ from studies.bootstrap import (
     BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
     BootstrapInterval,
-    _calendar_month_sums,
-    _calendar_weights,
-    _weighted_mean,
     blend_verdict,
     bootstrap_absolute,
     bootstrap_difference,
@@ -19,9 +16,12 @@ from studies.bootstrap import (
     bootstrap_year_change,
     bracket_verdict,
     calendar_balanced_difference,
+    calendar_month_sums,
+    calendar_weights,
     combine_setting_verdicts,
     fold_t_interval,
     per_fold_differences,
+    weighted_mean,
 )
 
 # Months hold unequal numbers of rows, so a resample that lost the pairing on `seed`, or drew rows
@@ -749,7 +749,7 @@ def test_calendar_month_sums_sorts_months_and_reads_the_calendar_month_from_the_
     differences = np.array([[1.0, 2.0, 4.0, 8.0], [10.0, 20.0, 40.0, 80.0]])
     months = np.array(["2025-02", "2024-12", "2025-02", "2024-12"])
 
-    sums, counts, calendar = _calendar_month_sums(differences=differences, months=months)
+    sums, counts, calendar = calendar_month_sums(differences=differences, months=months)
 
     np.testing.assert_array_equal(sums, [[10.0, 5.0], [100.0, 50.0]])
     np.testing.assert_array_equal(counts, [2.0, 2.0])
@@ -760,7 +760,7 @@ def test_calendar_weights_sum_to_one_per_calendar_month_across_years():
     counts = np.array([2.0, 4.0, 1.0])
     calendar = np.array([1, 1, 2])
 
-    weights = _calendar_weights(counts=counts, calendar=calendar)
+    weights = calendar_weights(counts=counts, calendar=calendar)
 
     np.testing.assert_allclose(weights, [1 / 6, 1 / 6, 1.0])
 
@@ -784,13 +784,13 @@ def test_calendar_balanced_estimate_averages_the_seeds():
 
 
 def test_a_draw_keeps_the_weights_of_the_whole_window_when_months_repeat_or_are_missing():
-    sums, counts, calendar = _calendar_month_sums(
+    sums, counts, calendar = calendar_month_sums(
         differences=UNEQUAL_DIFFERENCES, months=UNEQUAL_MONTHS
     )
-    weights = _calendar_weights(counts=counts, calendar=calendar)
+    weights = calendar_weights(counts=counts, calendar=calendar)
 
     def draw(*drawn: int) -> float:
-        return _weighted_mean(sums=sums[0], counts=counts, weights=weights, drawn=np.array(drawn))
+        return weighted_mean(sums=sums[0], counts=counts, weights=weights, drawn=np.array(drawn))
 
     # Months sort as `2024-01`, `2024-02`, `2025-01`. Drawing the first two, January's 2 rows weigh
     # 1/6 each, so (4/6 + 10) / (2/6 + 1) = 8. Weights rebuilt from the draw alone would give
