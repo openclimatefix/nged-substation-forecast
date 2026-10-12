@@ -343,3 +343,59 @@ Legend entries:
 
 Other text:
 - Models were trained on one random seed (seed 0).
+
+## Figure 13
+
+Title: Figure 13: XGBoost beats the manual heuristic at days 0 to 2 for PV, wind, and Raw Flow, and is usually behind it from day 3
+
+Subtitle:
+- Each dot is the mean over the series of a type of each series' mean score, as a percentage of the series' own effective capacity; zero is a perfect forecast. The last column averages all 31 series. The scores come from 53 weekly ECMWF ensemble forecast runs, July 2025 to June 2026 (fold A), on the rows that all five models scored. XGBoost models were trained with one random seed (seed 0). No intervals are shown.
+- Lead is the time from a run's initialisation to the valid time: days 0 to 2 is under 72 hours, days 3 to 10 is 72 to 263 hours, and 11+ is 264 hours and more. 
+- The best arms were chosen after seeing earlier results (post hoc). The quantile arm trains on 9 quantile levels and is scored on its 51 members at each of 9 levels (459 values).
+
+Panel titles:
+- Mean absolute error of the ensemble mean, MAE (% of capacity; smaller is better)
+- Continuous ranked probability score, CRPS, of the whole ensemble (% of capacity; smaller is better)
+- Column: PV farms (6 series)
+- Column: Wind farms (3 series)
+- Column: Demand series (16 series)
+- Column: Raw Flow series (4 series)
+- Column: All types (31 series)
+
+X axis title: Lead (days)
+Y axis title: (none: the panel title carries the metric, unit and direction)
+
+Legend entries:
+- Manual heuristic
+- Climatology
+- XGBoost, production with cleaning
+- XGBoost, best point-forecast arm (post hoc)
+- XGBoost, best quantile-trained arm (post hoc)
+
+Other text:
+- In 78% of the 40 comparisons of an XGBoost arm with the heuristic at days 3 to 10 and 11+ (both arms, both metrics, five columns), the heuristic's error is lower.
+
+## Figure 14
+
+Title: Figure 14: Over all series types, more months of training data lower the CRPS, and the last 3 months add the least
+
+Subtitle:
+- Each dot is the continuous ranked probability score (CRPS) of a model trained on only the last 6, 9, or 12 months of the 15-month training window, minus the CRPS of the production arm with cleaning, which uses all 15 months. Zero (dashed line, and the 15-month dot by definition) is no change; above zero is a worse forecast.
+- Each vertical line is a 95% interval from resampling whole months of the validation year, July 2025 to June 2026 (53 weekly forecast runs, fold A), with the same months drawn for both arms. Models were trained with one random seed (seed 0). A shorter window drops whole seasons from the training data. The first column also includes the one battery and the one biofuel series.
+
+Panel titles:
+- CRPS of a model trained on only the last N months, minus the CRPS of the 15-month production arm with cleaning (points of capacity; smaller is better)
+- Column: All types
+- Column: PV farms
+- Column: Wind farms
+- Column: Demand series
+- Column: Raw Flow series
+
+X axis title: Months of training data
+Y axis title: (none: the panel title carries the unit and direction)
+
+Legend entries:
+- (none: one colour)
+
+Other text:
+- All-types differences from the 15-month arm, in points of capacity: 6 months +0.48, 9 months +0.31, 12 months +0.08, 15 months +0.00.

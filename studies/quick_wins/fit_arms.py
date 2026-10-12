@@ -112,6 +112,11 @@ def _training_rows(
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Read the cached training frame and drop rows the arm's cleaning rules name.
 
+    Args:
+        arm: The arm, whose cleaning rules and training window decide which rows are kept.
+        window: The fold's dates.
+        types: Columns `time_series_id` and `time_series_type`.
+
     Returns:
         The training rows with a `series_type` column, and a per-series table of how many rows
         the arm kept and dropped.
@@ -231,6 +236,13 @@ def _fit_boosters(
     seed: int,
 ) -> dict[int, tuple[xgb.Booster, list[str], float]]:
     """Fit one booster per series, or one per series type when the arm pools.
+
+    Args:
+        training: The kept training rows with `time_series_type`.
+        arm: The arm being fitted.
+        window: The fold's dates.
+        device: XGBoost's device, `cpu` or `cuda`.
+        seed: The XGBoost seed.
 
     Returns:
         For each series, its booster, its feature columns, and the factor that converts the

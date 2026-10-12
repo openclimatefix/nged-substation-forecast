@@ -70,6 +70,9 @@ def calibrate_arm(
         forecast_dir_files: The run files of one arm, in initialisation order.
         actuals: Observed power.
         capacity: Effective capacity per series.
+
+    Returns:
+        The raw scores, the calibrated scores, and each run's chosen factor per series.
     """
     per_factor: list[dict[float, pl.DataFrame]] = []
     init_times: list[datetime] = []
