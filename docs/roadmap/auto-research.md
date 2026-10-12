@@ -1,40 +1,41 @@
-# Experiments run by an LLM agent ("auto-research")
+# Experiments run by an LLM agent (agentic ML research)
 
-> **Status: 🚧 Planned.** The infrastructure is planned for the v0.3 milestone and tracked in
-> [issue #1031 (Tracking: infrastructure for safe experiments run by an LLM agent
-> (auto-research))](https://github.com/openclimatefix/nged-substation-forecast/issues/1031): a
-> separate Unix account for the agent, one shared command that scores every idea, a written record
-> of every idea tried, and the instructions the agent follows. The first research sessions are
-> tracked in [issue #1131 (Start running the AI researcher on the XGBoost forecasting
-> model)](https://github.com/openclimatefix/nged-substation-forecast/issues/1131), and can start
-> before the training-history extension in [issue #959 (Extend ECMWF ENS training
-> history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959) lands. Neither
-> the infrastructure nor the search is built yet.
+> **Status: 🚧 Phase 1 under way; phase 2 planned.** Phase 1, in which Claude runs studies overnight
+> and posts their scores to the leaderboard, is tracked in [issue #1031 (Tracking: phase 1 of
+> agentic ML research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1031) in
+> the v0.3 milestone. Phase 2, the careful search this page's design describes, is tracked in
+> [issue #1169 (Tracking: phase 2 of agentic ML
+> research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1169) in the v0.5
+> milestone. Phase 2 starts once an XGBoost model beats `manual_heuristic` on the continuous ranked
+> probability score (CRPS), and none of its infrastructure is built yet.
 
-**We plan to have a large language model (LLM) agent screen the [XGBoost
-improvements](xgboost-improvements.md) backlog, the list of ideas for improving this project's
-XGBoost forecasting model, so that people implement properly only the promising ideas.**
-Flexpectation is the forecasting system this project builds for National Grid Electricity
-Distribution (NGED). Flexpectation's current forecaster is an XGBoost model, and XGBoost is a
-standard machine-learning method. The agent implements each idea, scores each implementation, and
-combines the ideas that help. The agent does not write production code. The agent works in the style
-of [Karpathy's autoresearch](https://github.com/karpathy/autoresearch), running experiments and
-reading its own results with no human in the loop.
+**We plan to have a large language model (LLM) agent search for improvements to this project's
+XGBoost forecasting model, in two phases.** Flexpectation is the forecasting system this project
+builds for National Grid Electricity Distribution (NGED). Flexpectation's current forecaster is an
+XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, which is under way,
+Claude runs studies overnight from a plan that the maintainer and Claude agreed the previous day. In
+phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the list of
+ideas for improving the XGBoost forecasting model, so that people implement properly only the
+promising ideas. In phase 2, the agent implements each idea, scores each implementation, and
+combines the ideas that help, in the style of [Karpathy's
+autoresearch](https://github.com/karpathy/autoresearch), with no human in the loop. In neither phase
+does the agent write production code.
 
 **Every forecasting experiment here is trained on one stretch of past data and scored on a later
 stretch, the validation window, that the training never saw.** A training stretch paired with its
 validation window is called a fold. The leaderboard, the table that ranks every experiment, scores
-every experiment on the same fold. The agent never sees the leaderboard fold's validation window.
-The agent scores ideas on earlier folds. The maintainer then scores the best implementation of each
-of the most promising ideas on the leaderboard fold, and re-implements the ideas that survive.
+every experiment on the same fold. In phase 2, the agent never sees the leaderboard fold's
+validation window, and scores ideas on earlier folds. The maintainer then scores the best
+implementation of each of the most promising ideas on the leaderboard fold, and re-implements the
+ideas that survive.
 
 **Each attempt at an idea is kept as a git branch, a separate copy of the code where a change can be
 tried without touching the reviewed code on `main`.** A change reaches `main` only through a pull
 request, which a person reviews before merging.
 
-**Every idea on the XGBoost improvements page is a candidate, and the maintainer leans towards
-screening every idea.** Larger ideas from other roadmap pages, such as a new estimator of generator
-capacity, may also go to the agent.
+**Every idea on the XGBoost improvements page is a candidate for phase 2, and the maintainer leans
+towards screening every idea.** Larger ideas from other roadmap pages, such as a new estimator of
+generator capacity, may also go to the agent.
 
 ## Why energy forecasting suits automated research
 
@@ -49,8 +50,8 @@ monitoring](live-service.md#production-monitoring).
 **Live monitoring is a check no forecast can game, because the power each forecast is scored against
 has not been measured when the forecast is made.** The historical validation window is a weaker
 check, because a person or an agent who has seen that window can steer towards ideas that suit that
-window. The [proposed design](#proposed-design) keeps the agent away from the validation window for
-that reason.
+window. The [phase 2 design](#phase-2-a-careful-search-with-the-validation-data-hidden) keeps the
+agent away from the validation window for that reason.
 
 **Data is comparatively plentiful and each experiment is cheap.** Once the training-history
 extension for the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble (ENS)
@@ -195,7 +196,41 @@ section](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test
 leaderboard design names the risk of scoring hundreds of experiments on one fold. He et al.'s
 separation addresses that risk.
 
-## Proposed design
+## Phase 1: studies run overnight
+
+**Phase 1 lasts until an XGBoost model beats `manual_heuristic` on CRPS on the leaderboard fold.**
+Until then, most gains come from fixing bugs and conceptual faults in the data pipeline and in the
+XGBoost model, and those gains are large next to noise and selection bias. In the [Quick
+wins](../studies/forecasts/quick-wins.md) study, quantile training alone lowered CRPS by 2.4
+percentage points of capacity.
+
+**Phase 1 assumes the agent is honest.** The scorer keeps the checks that catch honest mistakes,
+such as a study that scores fewer rows than the reference experiment, and drops the checks that
+exist only to stop deliberate cheating ([issue #1129 (Remove the scorer checks that only stop
+deliberate cheating)](https://github.com/openclimatefix/nged-substation-forecast/issues/1129)). Each
+study's adversarial reviews look for broken and leaky implementations, as the `study` skill already
+requires.
+
+**Phase 1 runs on a daily rhythm.** During the day, the maintainer and Claude read the latest
+results and agree the next study plan. Overnight, a Claude session runs the plan with the `study`
+skill, on the current data, as the maintainer's own Unix user. Within a budget the plan sets, the
+agent may add arms that combine the night's winners, and each arm the plan did not name is labelled
+post hoc. The next day's discussion decides which ideas to keep. The ideas worth keeping are
+re-implemented in production in reviewed pull requests.
+
+**Each study posts its scores to the leaderboard as a `study/` experiment** ([issue #1168 (Make the
+study skill post scores to the leaderboard and run studies
+overnight)](https://github.com/openclimatefix/nged-substation-forecast/issues/1168)). The `study/`
+prefix labels the rows, and promotion to production never picks a `study/` run.
+
+**A `study/` score on the leaderboard fold is biased low, because the study chose its arms on that
+fold.** The bias is small next to phase 1's gains. Once the gains shrink to tenths of a point, the
+bias could pass for a gain, and phase 2 therefore moves the search off the leaderboard fold.
+
+## Phase 2: a careful search with the validation data hidden
+
+**Phase 2 searches for gains small enough that noise and selection bias on the leaderboard fold
+could pass for them.** The rest of this page describes the phase 2 design.
 
 ### Six roles and objects
 
@@ -349,9 +384,9 @@ December 2024. The second fold trains on April to December 2024 and validates on
 not stand out from noise. Once issue #959 adds about 3 more years of ENS history, screening folds
 can cover every season.
 
-**The first sessions can still run before issue #959 lands, because a large effect should stand out
-even on the short folds.** The Tier 1 ideas are quick to try, because each Tier 1 idea is a
-configuration change that takes hours.
+**Phase 2 searches for small effects, so the short folds limit phase 2 more than phase 1.** A large
+effect stands out even on the short folds, but finding large effects is phase 1's job, on the
+current data.
 
 ### Reviewing an implementation before it is scored
 

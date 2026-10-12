@@ -125,9 +125,7 @@ directory, and production code is carefully reviewed.
 **An idea moves from an autonomous sweep to a reviewed production port in three steps.** A broad
 autonomous sweep narrows the search space; supervised narrow sweeps follow if the results look
 promising; and the study code is ported to production, through review, if the results still look
-promising. The broad autonomous sweep waits on
-[#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958), which protects the
-leaderboard scorer from edits by autonomous research.
+promising.
 
 **The objective is to use as many weather forecasts as possible, on the belief that more forecasts
 make better wind and solar power forecasts.** Three criteria score a design against that objective:
