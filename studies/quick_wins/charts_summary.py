@@ -62,6 +62,7 @@ FAMILY_ORDER: Final[tuple[str, ...]] = (
     "cleaning",
     "features",
     "training",
+    "quantile",
     "combination",
 )
 FAMILY_LABELS: Final[dict[str, str]] = {
@@ -69,6 +70,7 @@ FAMILY_LABELS: Final[dict[str, str]] = {
     "cleaning": "Round 0: cleaning",
     "features": "Round 1: columns shown",
     "training": "Round 1: training",
+    "quantile": "Quantile training (post hoc)",
     "combination": "Round 2: combinations",
 }
 FAMILY_COLOURS: Final[dict[str, str]] = {
@@ -76,6 +78,7 @@ FAMILY_COLOURS: Final[dict[str, str]] = {
     "cleaning": ocf.DATA_SKY,
     "features": ocf.DATA_BLUE,
     "training": ocf.DATA_PURPLE,
+    "quantile": ocf.DATA_DEEP_TEAL,
     "combination": ocf.BRAND_ORANGE,
 }
 """The colour of each kind of arm; the colour carries the kind and the row label names the arm."""
@@ -106,6 +109,9 @@ ARM_LABELS: Final[dict[str, str]] = {
     "d1_min_child_weight_20": "Minimum child weight 20",
     "d2_pooled_by_type": "One model per series type",
     "d3_pooled_with_site_id": "Per type, with site identifier",
+    "g1_heuristic_inputs": "Manual heuristic's inputs as columns",
+    "e1_quantile": "Quantile training, 9 levels",
+    "r2_e1_c1_a3w_d3": "Quantile, lead, wind, pooled",
     "r2_c4_c2": "Abs. loss, stop",
     "r2_c4_c1": "Abs. loss, lead time",
     "r2_c4_c2_c1": "Abs. loss, stop, lead time",
@@ -116,14 +122,28 @@ ARM_LABELS: Final[dict[str, str]] = {
 """A short label for every arm, at most 40 characters so a row label stays on one line."""
 
 ARM_FAMILIES: Final[dict[str, str]] = {
-    name: arm.family for name, arm in arm_definitions.ALL_ARMS.items()
+    name: "quantile" if arm.quantile_levels else arm.family
+    for name, arm in arm_definitions.ALL_ARMS.items()
 }
-"""The kind of each arm: reference, cleaning, features, training, or combination."""
+"""The kind of each arm: reference, cleaning, features, training, quantile, or combination.
+
+Every arm trained on quantiles is in the `quantile` family, whether it is a round 1 idea or a
+round 2 combination, because its CRPS is scored on a different footing (see `ROUND2_LEGEND`).
+"""
+
+LEADERBOARD_EXCLUDED: Final[frozenset[str]] = frozenset(
+    {"clean_new_meter_settling"}
+    | {name for name in arm_definitions.ALL_ARMS if name.startswith("f1_")}
+)
+"""Arms left off Figures 1 to 4: the chosen cleaning rule is the control, and the learning-curve arms
+have their own figure (Figure 14)."""
 
 ROUND2_LEGEND: Final[str] = (
     "Round 2 labels list the ideas combined: abs. loss is the absolute-error loss, stop is "
     "early stopping, lead is the forecast lead-time column, wind is the lean wind-farm columns, "
-    "and pooled is one model per series type with a site identifier."
+    "pooled is one model per series type with a site identifier, and quantile is training on nine "
+    "quantile levels with the pinball loss (the quantile arms' CRPS is scored on 51 members x 9 "
+    "levels samples)."
 )
 
 PLANNED_ARMS: Final[frozenset[str]] = frozenset(
@@ -158,6 +178,8 @@ ROUND1_ARMS: Final[tuple[str, ...]] = (
     "d1_min_child_weight_20",
     "d2_pooled_by_type",
     "d3_pooled_with_site_id",
+    "g1_heuristic_inputs",
+    "e1_quantile",
 )
 ROUND2_LADDER: Final[tuple[str, ...]] = (
     "c4_absolute_error",
@@ -167,6 +189,7 @@ ROUND2_LADDER: Final[tuple[str, ...]] = (
     "r2_c4_c2_c1_a3w",
     "r2_c4_c2_c1_a3w_d3",
     "r2_c4_c1_a3w_d3",
+    "r2_e1_c1_a3w_d3",
 )
 """The round 1 winner, then the round 2 arms, in the order the ladder adds ideas."""
 
@@ -191,6 +214,8 @@ BY_TYPE_ARMS: Final[tuple[str, ...]] = (
     "a3w_lean_wind_only",
     "d2_pooled_by_type",
     "d3_pooled_with_site_id",
+    "g1_heuristic_inputs",
+    "e1_quantile",
 )
 """The ideas Figure 3 breaks down by series type, before the best round 2 arm is appended."""
 
@@ -411,7 +436,12 @@ def build_context(*, fold: str, seeds: list[int]) -> Context:
     if not round2.is_empty():
         best_round2 = round2["arm"][0]
     if calibration is not None:
-        calibration = calibration.filter(pl.col("arm").is_in(["production_cleaned", best_round2]))
+        calibrated_round2 = round2.filter(
+            pl.col("arm").is_in(calibration["arm"].unique().to_list())
+        )
+        calibration = calibration.filter(
+            pl.col("arm").is_in(["production_cleaned", *calibrated_round2["arm"][:1].to_list()])
+        )
     if calibration is not None and calibration_seed is not None:
         first = calibration["arm"][0]
         raw = pl.read_parquet(
@@ -457,7 +487,7 @@ def _level_rows(*, context: Context, metric: str) -> pl.DataFrame:
     rows = context.levels.filter(
         pl.col("group") == "all types", pl.col("lead_band") == BAND_ALL, pl.col("metric") == metric
     ).with_columns(pl.col("value", "lower_95", "upper_95") * PERCENT)
-    return rows.filter(pl.col("arm") != CHOSEN_RULE_ARM)
+    return rows.filter(~pl.col("arm").is_in(LEADERBOARD_EXCLUDED))
 
 
 def _arm_label(*, arm: str, post_hoc: bool = False) -> str:
@@ -540,16 +570,26 @@ def _order_by(*, rows: pl.DataFrame, order: Sequence[str]) -> pl.DataFrame:
 def _kind_of(arm: str) -> str:
     """Return the colour group of an arm in a contrast figure."""
     family = arm_definitions.ALL_ARMS[arm].family
-    return {"features": "Columns shown", "training": "Training", "combination": "Combination"}.get(
-        family, "Cleaning"
-    )
+    return {
+        "features": "Columns shown",
+        "training": "Training",
+        "quantile": "Quantile training",
+        "combination": "Combination",
+    }.get(family, "Cleaning")
 
 
-KIND_ORDER: Final[tuple[str, ...]] = ("Cleaning", "Columns shown", "Training", "Combination")
+KIND_ORDER: Final[tuple[str, ...]] = (
+    "Cleaning",
+    "Columns shown",
+    "Training",
+    "Quantile training",
+    "Combination",
+)
 KIND_COLOURS: Final[tuple[str, ...]] = (
     ocf.DATA_SKY,
     ocf.DATA_BLUE,
     ocf.DATA_PURPLE,
+    ocf.DATA_DEEP_TEAL,
     ocf.BRAND_ORANGE,
 )
 
@@ -776,16 +816,21 @@ def figure_1(*, context: Context) -> Figure:
     rule_text_crps = [
         f"Dashed line, {text}: {value:.1f}%" for value, text, _ in rules("crps", stored["value"])
     ]
-    title_numbers = f"{best['value']:.1f}% of capacity, against {control['value']:.1f}% for production with cleaning"
+    assert best["value"] < control["value"]
+    assert best["arm"] not in ("production", "production_cleaned", "production_colsample0.8")
+    best_name = ARM_LABELS[best["arm"]].lower()
+    title_numbers = (
+        f'{best["value"]:.1f}% of capacity ("{best_name}"), against '
+        f"{control['value']:.1f}% for production with cleaning"
+    )
     if "manual_heuristic" in baselines:
-        beats = best["value"] < baselines["manual_heuristic"]["crps"]
-        tail = "and below" if beats else "but still above"
+        heuristic = baselines["manual_heuristic"]["crps"]
+        tail = "and below" if best["value"] < heuristic else "but still above"
         title = (
-            f"The best arm's CRPS is {title_numbers}, {tail} the manual heuristic's "
-            f"{baselines['manual_heuristic']['crps']:.1f}%"
+            f"The lowest CRPS is {title_numbers}, {tail} the manual heuristic's {heuristic:.1f}%"
         )
     else:
-        title = f"The best arm's CRPS is {title_numbers}"
+        title = f"The lowest CRPS is {title_numbers}"
     x_crps = "Continuous ranked probability score, CRPS (% of capacity; smaller is better)"
     x_mae = "Mean absolute error of the ensemble mean, MAE (% of capacity; smaller is better)"
     panel_crps = "CRPS of each arm, best first (scores the whole ensemble)"
@@ -1182,8 +1227,8 @@ def figure_3(*, context: Context) -> Figure:
             "and biofuel (1 series) are in the all-series figures but not drawn here."
         ),
         (
-            "The best round 2 arm combines absolute-error loss, early stopping, the lead-time "
-            "column, lean wind columns, and one model per series type with a site identifier."
+            f'The best round 2 arm, "{ARM_LABELS[context.best_round2]}", is '
+            f"{arm_definitions.ALL_ARMS[context.best_round2].description[:-1].lower()}."
         ),
         "(post hoc) marks an arm chosen after seeing earlier results; unmarked arms were planned.",
     ]
@@ -1637,11 +1682,15 @@ def write_text(*, figures: dict[int, Figure]) -> None:
     TEXT_FILE.write_text(header.rstrip() + "\n\n" + body)
 
 
-def render(*, figures: dict[int, Figure]) -> None:
+def render(*, figures: dict[int, Figure], png_dir: Path | None = None) -> None:
     """Draw each figure to SVG and shrink it with svgo."""
     for number, figure in figures.items():
         path = ASSET_DIR / f"quick_wins_figure_{number}.svg"
-        figure.draw().save(str(path))
+        chart = figure.draw()
+        chart.save(str(path))
+        if png_dir is not None:
+            png_dir.mkdir(parents=True, exist_ok=True)
+            chart.save(png_dir / f"quick_wins_figure_{number}.png", scale_factor=2)
         subprocess.run([*SVGO_COMMAND, str(path)], check=True, capture_output=True)
         print(f"wrote {path}")
 
@@ -1651,6 +1700,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fold", default=inputs.FOLD_A)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])
+    parser.add_argument("--png-dir", type=Path, default=None, help="also write PNG renders here")
     parser.add_argument("--text-only", action="store_true", help="write the text file, no charts")
     args = parser.parse_args()
 
@@ -1667,7 +1717,7 @@ def main() -> None:
     write_text(figures=figures)
     print(f"wrote {TEXT_FILE}")
     if not args.text_only:
-        render(figures=figures)
+        render(figures=figures, png_dir=args.png_dir)
 
 
 if __name__ == "__main__":
