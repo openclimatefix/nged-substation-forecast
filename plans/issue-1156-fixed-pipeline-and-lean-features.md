@@ -277,3 +277,16 @@ Altair shorthand matcher defect before rendering; the exact fix was accepted and
 The earlier double rounding of shared chart labels changed displayed interval endpoints by a
 hundredth of a point. The correction changes label text only, preserving estimates, statistics,
 mark positions and style. Figure text was re-exported for reader/prose rechecks before rendering.
+
+**The full wind archive gate passed independently before corrected frame construction.** The
+producer manifest and pinned Delta inventories agree for source 1830 and destination 924, with
+all partitions, source-file lists and row counts matched. Each producer completion entry follows
+schema validation, exact equality of sorted keys and non-wind fields, and wind round-trip checks
+within storage precision. The external chat's readiness wrapper remained stale after its
+background rewrite finished; the study recorded its own validation, without changing producer
+files or claiming a producer notification. This preserves the full gate, rather than accepting
+partial data. The wind contrast includes migration quantisation as well as interpolation.
+
+**The final code checks passed after the numeric-label correction.** Ruff and ty pass for all
+11 study scripts; the boundary suite has 14 passes, and the full study suite has 3,338 passes and
+five skips (232.49 seconds). No shared study package changed, so no mutation pass is required.

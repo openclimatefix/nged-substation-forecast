@@ -33,7 +33,9 @@ and scores matched forecasts against the same observed power and frozen capaciti
 
 The wind archive was reconstructed from rounded archived speed and bearing. Its validation checks
 that reconstruction against the archived values; it does not establish lossless recovery of
-upstream components. These two PRs address wind and radiation processing. They do not resolve every
+upstream components. The wind comparison includes the component migration and its storage
+quantisation as well as component interpolation; native wind values can differ slightly too.
+These two PRs address wind and radiation processing. They do not resolve every
 fault listed in issue 1156. Guarding the windchill formula's temperature and speed domain is a
 separate study-only comparison.
 
