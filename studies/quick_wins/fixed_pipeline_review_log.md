@@ -136,4 +136,24 @@ distributions and the term paired estimate. Revised subtitles explain those conc
 A small chart-label change describes the dot as a mean difference on matched forecasts and the
 interval as repeated draws of whole months and one matched training seed. A fresh static review
 confirmed that both text export and rendering use the changed constant and that it matches the
-reporter's sampling method. No scores changed; figure prose review remains pending.
+reporter's sampling method. No scores changed. Subsequent first-reader and rule-by-rule prose
+reviews cleared the final radiation figure text before rendering; its optimised SVG and PNG
+were inspected. A fresh code review also cleared direct two-decimal numeric labels, avoiding
+double rounding through the shared utility's three-decimal intermediate values.
+
+All four wind/combined frame builds passed their boundary checks and pinned destination 924,
+power 70 and capacity 1 before the reviewed corrected-fit queue began. The producer's wrapper
+remained stale, so readiness was established from the complete independent migration gate as
+recorded in the plan. No producer files were changed.
+
+The root freshly reviewed all four Part 2 execution configurations: combined-pipeline production
+and exact quick-wins quantile winner, three seeds, both folds and both hyperparameter settings.
+Each configuration requires six completed fits before the reviewed scorer can run. The point
+reference remains conditional on the actual G3 result.
+
+A separate agent prepared the conditional twelve-fit best-point queue, and the root reviewed
+every line before execution. The queue checks both completed combined frame contexts and every
+absent destination before launching any fit, preserves the public recipe and environment, and
+requires an explicit root G3 result checkpoint. A free GPU slot and an exited preceding queue
+remain execution prerequisites. This preparation is not evidence that G3 passed or that a point
+fit ran.

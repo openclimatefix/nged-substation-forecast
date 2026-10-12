@@ -101,8 +101,9 @@ frozen effective capacity before aggregation. This scale is the 99th percentile 
 over the available history, shared by all recipes. It is a measured historical scale rather than a
 connection rating. The frozen snapshot includes readings after the scored periods, so normalised
 aggregate results are retrospective and conditional on that common scale. The scale enters
-scoring only; pooled fitting uses a separately calculated training-only scale. Lower is better; a difference of one point means
-one percentage point of capacity. This finite-grid score is a study diagnostic, rather than the
+scoring only; pooled fitting uses a separately calculated training-only scale. Lower is better;
+a difference of one point means one percentage point of capacity. This finite-grid score is a
+study diagnostic, rather than the
 official leaderboard score or an exact integral of continuous ranked probability score (CRPS).
 
 The original study's fair CRPS is retained for reproduction and comparisons within the same
@@ -126,8 +127,9 @@ Fold A trains from April 2024 through June 2025 and validates from July 2025 thr
 Fold B reverses these periods and is retrospective evidence. The original quick-wins selection
 already used Fold A, so refitting its winner on that year is reproduction, rather than a new
 independent confirmation. Validation uses weekly weather initialisations and all 51 members;
-these scores must not be presented as official leaderboard results. All fitting targets, power-lag observations and scored outcomes precede 1 July 2026. Score
-normalisation uses a separately frozen effective-capacity table: each series' full-history
+these scores must not be presented as official leaderboard results. All fitting targets, power-lag
+observations and scored outcomes precede 1 July 2026. Score normalisation uses a separately frozen
+effective-capacity table: each series' full-history
 99th percentile of absolute observed power. That table can include observations after the study
 cutoff. It is shared across treatments and does not enter fitting or prediction. Lags are checked
 to precede forecast issuance.
@@ -159,8 +161,6 @@ is added separately. Removing the weekday ordinal and local UTC offset provides 
 The windchill domain guard is tested separately on the full and lean inputs. Total cloud cover
 waits for the full post-introduction year required by the issue; this study does not evaluate it.
 
-
-
 ### Input audit
 
 The input audit compares engineered columns on matched rows, counts changed values and missingness,
@@ -168,8 +168,6 @@ and checks domain and timing diagnostics. A deliberately delayed radiation input
 correlation diagnostic moves by an hour. That synthetic recovery does not establish power to
 detect a forecast-loss improvement. Precipitation availability eras have different seasons and
 training exposure, so their comparison is descriptive rather than a causal upgrade effect.
-
-
 
 ## Results
 
@@ -199,7 +197,6 @@ subsampling 0.8 and the public production fitting path. Their difference is not 
 | old_quick_wins | 71.27 | 70.17 | 72.40 | 3 | 12 |
 | old_cleaned | 10.48 | 9.93 | 11.07 | 3 | 12 |
 
-
 The earlier study's quoted 57% coverage came from its standalone `e1_quantile` model on seed 0.
 The headline winner also pooled series, added lead and used lean wind inputs. Its coverage is
 measured separately here. A difference from the old quoted coverage cannot be credited to the
@@ -208,7 +205,7 @@ The historical interval convention also differed from the empirical inverse-CDF 
 
 ### Radiation correction improves the solar score in both folds (provisional)
 
-![Radiation-only changes in forecast loss on Fold A, with matched forecasts and month-resampled intervals. Negative differences favour corrected radiation.](../assets/fixed-pipeline-lean-features/radiation-fold-a.svg)
+![Radiation correction on Fold A.](../assets/fixed-pipeline-lean-features/radiation-fold-a.svg)
 
 With the production configuration refitted, the radiation-only correction lowers solar's common
 pinball score in both folds and both hyperparameter settings. The paired month-and-seed intervals
@@ -258,7 +255,6 @@ in the aggregate reports; these tables show the common score used for the recipe
 
 <!-- PIPELINE_RESULTS -->
 
-
 <!-- FEATURE_RESULTS -->
 
 <!-- AUDIT_RESULTS -->
@@ -268,7 +264,6 @@ saved corrected-pipeline predictions. It does not fit a calibrator or establish 
 coherence. This study changes no production code or forecast contract.
 
 <!-- PROVENANCE_AND_DECISIONS -->
-
 
 ## Discussion: what to use
 

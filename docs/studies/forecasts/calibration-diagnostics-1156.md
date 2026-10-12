@@ -63,8 +63,8 @@ zero-based rank `ceil(n * q) - 1`. Each row's loss is divided by its frozen capa
 receive equal weight. Frozen effective capacity is the full-history 99th percentile of absolute
 observed power; it can use readings after the study cutoff. It enters scoring only, and makes
 normalised loss and width retrospective and conditional on that common snapshot. Losses and
-widths are percentages of frozen effective capacity; coverage is a percentage of cases. Negative bias means underprediction. These are study diagnostics, not official leaderboard
-scores.
+widths are percentages of frozen effective capacity; coverage is a percentage of cases. Negative
+bias means underprediction. These are study diagnostics, not official leaderboard scores.
 
 The control comparison uses a separate nine-level pinball score at its supported nominal levels.
 Native 80% coverage uses the 0.1 and 0.9 knots: both endpoint inequalities must hold, so inverted
