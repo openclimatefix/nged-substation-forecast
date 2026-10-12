@@ -91,40 +91,23 @@ of that grows with every experiment added, and it is currently zero.
 
 ### Fix the NWP resample to honour the variable conventions
 
-`_upsample_nwp_to_half_hourly` linearly interpolates every column in `Nwp.continuous_var_names()`,
-which silently classifies a period-ending rate and a wrapped angle as safe to interpolate — the root
-cause of all three defects below ([NWP variable
-conventions](../architecture/nwp-variable-conventions.md#what-the-half-hourly-resample-does-today)).
-Adding a `circular_var_names` ClassVar to `Nwp` — alongside the existing `categorical_var_names` and
-`deaccumulated_var_names` — and removing those columns from `continuous_var_names()` is what stops
-the same mistake recurring, because the generic paths then cannot silently swallow a variable class
-they do not handle.
+**The remaining resample work concerns period-ending rates and diurnal amplitude.**
+`_upsample_nwp_to_half_hourly` linearly interpolates every raw continuous weather column. Wind
+components are linear, but radiation and precipitation represent preceding intervals. Their
+reconstruction must honour the [variable conventions](../architecture/nwp-variable-conventions.md#what-the-half-hourly-resample-does-today).
 
-This stricter typing matters beyond this item, because three later items on this page iterate over
-variable classes in exactly the same way. Each is wrong for a circular variable: [neighbouring-cell
-mean and gradient](#neighbouring-h3-cell-weather-context), [per-variable ensemble
-quantiles](#ensemble-statistics-as-features-instead-of-member-by-member-rows), and [climatology
-z-scores](#weather-abnormality-climatology-z-score-features). A gradient or a standardised anomaly
-of a wrapped angle is meaningless, and a p90 of a wrapped angle has no correct definition at all.
+**Derived wind bearings still require circular handling in later features.**
+[Neighbouring-cell means and gradients](#neighbouring-h3-cell-weather-context),
+[ensemble quantiles](#ensemble-statistics-as-features-instead-of-member-by-member-rows), and
+[climatology z-scores](#weather-abnormality-climatology-z-score-features) can operate on stored
+components, then derive polar quantities where appropriate. Arithmetic gradients, quantiles and
+standardised anomalies of wrapped bearings remain invalid. Raw component classification also
+keeps writer rounding and dashboard variable coverage aligned with the archive schema.
 
-**`continuous_var_names()` has three dependents beyond the resample, and narrowing it changes all
-three.** `delta_store.nwp.write_nwp` uses it to choose which columns get rounded to 13 significand
-bits, so dropping the directions from it silently stops rounding them on every future ingest — a
-storage change landing inside the very item that argues from a storage measurement.
-`packages/dashboard/tests/test_forecast_chart.py` asserts that the set equals the dashboard's
-`NWP_PLOT_VARIABLES`, so the change either fails that test or quietly drops wind direction from the
-dashboard's NWP panel. And `packages/contracts/tests/test_weather_schemas.py` asserts that
-continuous and categorical *partition* the weather variables, which a third class abolishes; that
-test has to become a three-way partition assertion. Decide the first deliberately: the likely answer
-is a separate "round these on write" set, since rounding a direction is correct even though
-interpolating a direction is not.
-
-**(a) Wind direction is interpolated across the 0°/360° wrap**
-([measured](../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap)).
-Both direction columns are in `conf/model/xgboost.yaml`'s `selected_features` today. The fix is to
-interpolate the wind *vector* rather than the polar pair, which the [u/v storage
-change](#store-wind-as-uv-components-rather-than-speed-and-direction) below delivers as a side
-effect.
+**(a) Wind is interpolated as components before deriving bearings.**
+The [u/v storage change](#store-wind-as-uv-components-rather-than-speed-and-direction) implements
+the ordering that avoids the [historical wrap defect](../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap).
+Existing speed/bearing feature names remain in `conf/model/xgboost.yaml`.
 
 **(b) Radiation and precipitation are interpolated as though they were instantaneous.** They are
 period-ending means over the preceding step, so interpolating between `valid_time` stamps treats a

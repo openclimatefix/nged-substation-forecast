@@ -81,7 +81,6 @@ All four columns use metres per second and area-weighted H3 spatial means.
 | `wind_u_100m` | East | instantaneous |
 | `wind_v_100m` | North | instantaneous |
 
-
 **The following table is a historical diagnostic of the polar archive**, measured before component
 storage. The wind rows describe derived quantities rather than the current raw column set.
 The final column measures **what the 3 h → 6 h step change costs**: the error, at the held-out
@@ -209,9 +208,7 @@ already at the Nyquist limit for the second, so some amplitude is genuinely unre
 how much has not been measured. The compression feeds the effective-temperature, degree-day and
 `windchill` features.
 
-<a id="wind-is-stored-as-speed-and-direction-and-why"></a>
-
-## Wind is stored as components
+## Wind is stored as components {#wind-is-stored-as-speed-and-direction-and-why}
 
 **The archive keeps u/v alone, accepting an 8.90 % increase in sampled Parquet bytes.**
 A paired measurement of 24 full 00Z forecasts across 2025 used identical raw inputs, H3 weights,
