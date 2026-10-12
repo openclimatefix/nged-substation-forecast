@@ -8,7 +8,8 @@ compares storage and spatial cancellation; no forecasting model was trained or s
 The sample contains the 15th and last day of every month in 2025, all at 00Z, with no unavailable
 dates or substitutions. Each forecast contains 85 native steps, 51 members and 1,671 H3 cells:
 7,243,785 rows per forecast and 173,850,840 rows per representation. Seasons group forecasts by
-initialization month. The comparison uses the same downloaded bytes and H3 weights for all
+initialization month; forecasts may cross season boundaries. The comparison uses the same
+downloaded bytes and H3 weights for all
 representations and the actual production `write_nwp`, including 13-bit significand rounding,
 sort order and writer properties. Non-wind compressed-column bytes match exactly in every pair.
 
@@ -55,9 +56,6 @@ Parquet totals include file metadata; Delta-log bytes are separate. MB means 10â
 | JJA | +9.53% | +18.03% |
 | SON | +9.12% | +17.90% |
 
-Scalar minus vector speed measures spatial cancellation, not turbine-power loss.
-Native forecast rows have equal weight, including both 3-hour and 6-hour steps.
-Seasons group runs by initialization month; forecasts may cross season boundaries.
 Relative gaps divide by vector speed and can grow very large near calm.
 Float32 reduction can give negative gaps of a few millionths of a metre per second.
 
