@@ -625,7 +625,9 @@ covers fetch, build, fit, and chart scripts alike. The review of a script's code
 first run, and is separate from the review of the design and the first results in step 4 of "The
 order of work". A fit or a download run before its review cannot be un-run: it spends compute or
 quota and can leave output that later readers trust. Run nothing until the review is triaged, and
-say in the PR body which review each script had.
+say in the PR body which review each script had. A local `/code-review` run is a cheap first pass
+before that review and does not replace it: it checks correctness, not whether the design is
+scientifically valid.
 
 **Each reviewer is fresh, and is told:**
 
@@ -634,6 +636,8 @@ say in the PR body which review each script had.
   `.claude/worktrees/`, never `/tmp`;
 - never to write a generator's identifier, name, or coordinates;
 - what earlier reviews already settled, so the reviewer spends its effort elsewhere;
+- to try to refute the script's or the page's claims rather than confirm them, because reviewers
+  left to agree tend to agree without evidence;
 - to rank findings, give a verdict on each (must fix, should fix, fine) with the exact replacement
   or re-run, and end with an overall verdict.
 
