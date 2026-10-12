@@ -1,0 +1,247 @@
+# Interval-aware short-wave and long-wave radiation (#526)
+
+The production half-hourly resampler treats backward-looking radiation means as instantaneous
+samples. This displaces short-wave daylight energy and gives both radiation fields the wrong time
+support. The study demonstrates the short-wave timing defect independently of forecast scores.
+
+Replace point interpolation for the two radiation fields with interval-aware reconstruction.
+Short-wave follows a clear-sky shape with interpolated midpoint indices, then conserves each native
+window's energy. Long-wave stays constant within each native window. Keep raw NWP storage intact,
+use the same lazy feature path in training and inference, and defer precipitation, wind and TCC.
+
+## Verdict, scope and process
+
+Worth implementing. Issue #526 is broader than this approved scope; narrow it to radiation and
+transfer its remaining precipitation/temperature work to issue #1165, with wind tracked by
+issue #525. The draft PR will carry `Closes #526` once that scope transfer is recorded. TCC interpolation
+belongs in a note on #1157, not in this implementation. Do not alter model feature selections.
+
+Complex: two sequential independent plan reviews (simplicity, correctness), followed after approval
+by three independent implementation reviews (simplicity, correctness, mutation testing). Available
+Codex reviewers substitute for unavailable Claude models; disclose that substitution. The local
+implementation review requested by implement-issue is additional if available.
+
+- Contracts and storage: no Patito field, raw Delta schema, rounding or asset change. Regenerated
+  feature caches will differ. Do not narrow `Nwp.continuous_var_names()` in this PR.
+- Production serving: yes, `_engineer_features` uses the shared resampler during inference.
+- Degradation: yes, missing radiation windows and unusable solar denominators require a policy.
+- Design alternatives: yes, solar shaping, conservation and missingness admit different choices.
+- Callers: yes, direct resampler tests, feature engineering, storage and dashboard classification
+  dependents needed searching to identify.
+
+Departures from the older issue/roadmap: solar shaping applies only to short-wave; long-wave needs
+no solar geometry. Temperature interpolation cannot recover absent extrema. No circular-class or
+wind-storage change is required to deliver this radiation-only fix. The study candidate is a design
+reference, not the production implementation: it does not guarantee native-window conservation and
+uses pvlib through `studies.solar`, which production must not import.
+
+## Solution
+
+### Walk through
+
+#### Happy path
+
+`TabularFeatureEngineer.engineer` maps H3 weather cells to `time_series_id` through
+`_attach_containing_nwp_cell`, then calls `_engineer_features`. Before upsampling,
+`_engineer_features` passes `metadata_lf.select("time_series_id", "latitude", "longitude")` as
+the new keyword-only `solar_coordinates` argument to `_upsample_nwp_to_half_hourly`. Pass metadata
+separately because the resampler currently treats every non-weather input column as a group key.
+Use site coordinates consistently with the study; the raw source remains the containing H3 cell.
+
+In `_upsample_nwp_to_half_hourly`, separate the two radiation columns from the existing point
+interpolation list locally. Keep its group keys, categorical handling and non-radiation behavior.
+Create a native-window relation before grid expansion: every radiation mean at `T` belongs to
+`(T - width, T]`, with width 3 hours through lead 144 and 6 hours after that for the supported ECMWF
+model. Lead zero has no interval. Derive width from the model's native schedule, never from the
+previous non-null value or a sparse observed-row difference, which would reinterpret a missing
+window as a wider accumulation. Retain a native-row/window identity and source-null mask.
+
+The new production `_radiation.py` helpers construct targets inside each window at half-hour ends.
+`_solar.py` evaluates a vectorised, dependency-free solar-position approximation in Polars, including
+longitude and equation of time, and Haurwitz irradiance. Use 15-minute midpoint quadrature: evaluate
+at `T - 22.5 min` and `T - 7.5 min` for a target half-hour. Average those half-hour means over each
+native window to get the matching denominator; this makes both integrations internally consistent.
+Use the study's Haurwitz coefficient 0.059; its expression is the implementation reference rather
+than the roadmap's illustrative 0.057. Reference independent geometry in tests before choosing a
+documented accuracy tolerance near sunrise/sunset.
+
+For finite short-wave windows whose clear-sky mean reaches the documented daylight floor, form the
+native mean / native clear-sky mean and anchor it at the native window midpoint. Interpolate ratios
+in actual elapsed time at target midpoints inside contiguous supported segments. At sunrise/sunset
+hold the closest usable daylight ratio; never interpolate toward an artificial zero night ratio.
+Multiply by target half-hour clear-sky means, then rescale the targets within each complete native
+window so `sum(target_mean * 1800 s) == native_mean * width_seconds` within Float32 tolerance.
+There is no clipping at clear-sky index 1: enhancement and quadrature error must not destroy energy.
+The value at a native timestamp becomes that final half-hour's mean, not the original 3/6-hour mean.
+
+For long-wave, broadcast each finite native mean to every half-hour in its backward window, including
+the half-hour ending at the native timestamp. This conserves energy without an unsupported thermal
+shape. Join radiation targets onto the same output grid and remove all internal helper columns.
+Bulk and single-run feature paths then consume the identical corrected NWP relation before their
+existing joins, lags and rolling features. The output remains lazy and retains existing dtypes.
+
+#### Main branches
+
+- No radiation columns: retain today's path and do not compute solar geometry. Long-wave alone
+  needs no coordinates. `solar_coordinates` defaults to None for existing non-short-wave callers;
+  production always supplies it. Direct short-wave callers must supply coordinates explicitly.
+- Lead zero: retain its null radiation. A finite lead-3 mean supports targets from lead 0.5 through
+  3, even though lead zero is null. Reconstruct this first window rather than copying the study's
+  cache-boundary fallback, because original native input gives its support.
+- Missing native row or null native radiation: leave that native window's targets null and split
+  ratio interpolation there; never bridge a missing window or borrow another run/member's values.
+  A finite later mean supports its own scheduled window. A sliced input supports its first supplied
+  finite window only where its start can be established from the native schedule, not guessed from
+  the next sample. Keep the existing output-grid extent unless extending it is explicitly approved.
+- All-zero dark window: output zero, without requiring a daylight index. Dark endpoint with daylight
+  earlier in the window: use the integrated solar shape normally.
+- Small solar denominator or no usable daylight ratio in a supported segment: normalise the local
+  positive clear-sky weights directly to the native total when possible. If weights sum to zero,
+  retain the native mean as a constant over the window. This preserves source energy, including
+  small positive fully-dark source values; do not invent daylight or silently discard them. Exact
+  nighttime zero is guaranteed for zero-energy dark windows and for dark target half-hours in a
+  successfully solar-shaped window, not for that explicitly documented fallback.
+- Zero native mean: output zero regardless of neighboring ratios. Do not divide by a zero
+  reconstructed sum. Incomplete output windows are not renormalised as though their visible
+  half-hours covered the full native interval; test their visible values against an unsliced run.
+
+#### Error handling
+
+Absent radiation stays null and reaches the existing model missing-input path; never raise because
+a weather window is absent. Coordinate joins must be unique by time series; validated production
+metadata provides finite coordinates. A missing coordinate in a supported short-wave helper call
+uses the constant-per-window fallback, without dividing by invalid geometry. Reject duplicate keys,
+malformed timestamps or unsupported model conventions at the existing contract/programmer-error
+boundaries rather than quietly choosing a different window. Do not introduce an eager collect to
+emit per-row warnings. Document the fallback and expose counts in the regression/diagnostic report;
+new operational degradation columns and general imputation monitoring are separate work.
+
+## Changes by file
+
+- `packages/ml_core/src/ml_core/features/_solar.py` (new): pure Polars expressions for solar
+  geometry and Haurwitz target means. No pandas, pvlib, study imports, config object or new package.
+- `packages/ml_core/src/ml_core/features/_radiation.py` (new): native interval support, short-wave
+  midpoint-index interpolation/conservation, long-wave broadcast and masks. Plain lazy functions,
+  group keys supplied by `_nwp.py`; use joins/window expressions rather than Python group loops.
+- `packages/ml_core/src/ml_core/features/_nwp.py`: local radiation dispatch; preserve all other
+  interpolation behavior and output keys. Document the new interval and null semantics.
+- `packages/ml_core/src/ml_core/features/tabular_feature_engineer.py`: pass the coordinate relation
+  before upsampling; avoid introducing coordinate columns into the generic group-key calculation.
+- `packages/ml_core/tests/test_radiation.py` (new): synthetic known-answer interval tests and solar
+  reference checks. `test_features.py`: adapt radiation-specific expectations and cover dispatch.
+- `packages/ml_core/tests/test_cross_mode_equivalence.py`: add radiation to meaningful cross-mode
+  assertions on shared forecast targets, including hindcast rows used by rolling/lag features.
+- Check, without changing numeric membership, `packages/delta_store/src/delta_store/nwp.py`,
+  `packages/contracts/tests/test_weather_schemas.py` and
+  `packages/dashboard/tests/test_forecast_chart.py`. Their rounding/partition/plotting behavior
+  must survive local dispatch unchanged.
+
+The existing `plans/` directory contains inherited study plans. Leave those unrelated tracked files
+alone; this task adds only this one implementation plan in its existing isolated desktop worktree.
+
+## Tests and acceptance
+
+Regression assertions that fail on current main:
+
+1. Independent half-hour backward clear-sky reference, aggregated to 3- and 6-hour native windows:
+   corrected daylight centroid and nighttime output match the reference within a justified geometry
+   tolerance; current point interpolation is delayed. Include winter and summer UK cases.
+2. Changing-cloud known-answer inputs distinguish midpoint-anchored ratios from endpoint anchoring.
+   Check the pre-conservation shape at an interior target, then check the final reconstructed shape
+   and native totals separately. A constant-index clear day alone cannot test anchoring.
+3. For both fields, each finite complete native window conserves `mean * duration`, including
+   lead 144 to 150 and the final lead-360 window. Long-wave half-hours equal their own window's mean
+   on both sides of a native boundary; current interpolation violates those assertions.
+4. The first finite interval supplies its early half-hours, lead zero remains null, and a missing
+   middle source window remains null across its whole support. Current linear interpolation loses
+   the first window and fills interior source nulls. Include an actually absent native row, not
+   only a row with a null value, to detect incorrect width inference.
+5. Finite short-wave mean at a dark endpoint reconstructs its preceding daylight; target nighttime
+   zero is checked separately from per-window conservation. Exercise tiny-denominator, all-dark
+   positive, all-dark zero and isolated finite-window fallbacks without NaN/inf or energy loss.
+6. Cropped target/output extent does not concentrate a full window's energy into visible rows.
+   Compare with an unsliced reconstruction with identical native support.
+
+Additional preservation checks, explicitly not claimed to fail on main: shuffled rows; independent
+series/runs/members, including all 51 ensemble member labels; categorical and non-radiation columns;
+stable schema and lazy execution across collection engines; solar/no-solar dispatch; and cross-mode
+agreement. Existing tests may already cover some of these: extend rather than duplicate them.
+
+Add a reproducible real-native-data check for a short-lead case, the 144-hour transition, and a run
+with missing radiation. Compare bulk versus selected single-run engineered values on identical
+forecast targets; aggregate target means back to source windows before target-time filtering.
+Report timing/energy/fallback counts and representative anonymised profiles. Never use engineered
+caches to infer original missingness. If data is unavailable, record that validation as pending
+and do not describe synthetic parity as real-data parity or deploy before it is checked.
+
+## Design-philosophy check
+
+Principles 3 (one execution path), 9 (provenance), and 11 (lazy computation) are preserved: raw NWP
+is untouched, original null support survives, and both modes call the same lazy resampler. H1's
+absence-tolerant service is respected by null/fallback behavior; the plan adds no asset check or
+new failure-producing warning path. Malformed input and internal duplicate joins remain bugs.
+No new model feature, model-selection branch, asset or raw table is introduced. Conservation is a
+constraint on reconstruction, not a claim to recover unknown within-window weather or improve
+forecast scores. Long-wave is absent from the current 24-feature model recipe.
+
+## Documentation and rollout
+
+- `docs/architecture/nwp-variable-conventions.md`: describe actual backward half-hour output,
+  changed native-timestamp values, conservation, fallback and source-null behavior. Keep the old
+  radiation section anchor if needed by existing inbound links, but rewrite its text in present
+  tense. Preserve unresolved wind and temperature limitations.
+- `docs/roadmap/xgboost-improvements.md`: remove the completed radiation implementation recipe and
+  link to permanent architecture decisions; correct the two-radiation clear-sky claim. Keep other
+  resampling work and the shared-helper/physics-feature dependency accurate.
+- `docs/roadmap/index.md` and `docs/roadmap/forecast-building-blocks.md`: update only relevant
+  completion/dependency statements; the broader milestone is not complete.
+- `docs/studies/forecasts/production-feature-faults.md`: leave recorded historical results intact;
+  update the production handoff with the implementation link and conservation-policy departure.
+  Coordinate with PR #1164's small nighttime-threshold wording edit.
+- Issue #1157: record instantaneous TCC point-interpolation recommendation, source-metadata verification,
+  percent units, preserved native values/bounds/nulls, and explicit exclusion from this PR.
+- Before deployment, regenerate affected engineered caches and retrain under the new semantics.
+  Never serve an existing model with new features and call that a controlled comparison. Repeat
+  radiation-only contrasts on actual production outputs; forecast gains are measured separately,
+  not a correctness acceptance criterion. Retain a baseline implementation commit and cache IDs.
+- At merge, archive this plan's substance in the PR and remove this task's plan file. The closing
+  link is for #526 after its residual scope is transferred; study and TCC issues remain separate.
+
+## Verification commands
+
+For implementation, load `code-style` first. Run the implement-issue green-before-push checks:
+
+```bash
+uv run ruff check .
+uv run ruff format .
+uv run --all-packages ty check
+uv run pytest
+uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
+uv run mkdocs build --strict
+```
+
+Run targeted radiation/cross-mode tests first, inspect the rendered convention/roadmap pages, then
+the full suite. Add `--run-studies` if production-boundary checks or study files change. Run the
+real-native-data check and record its exact inputs, source revision and result. During planning,
+validate Markdown, diff whitespace and the plan/PR scope; no production tests are implied to have run.
+
+## Risks and reviewer decisions
+
+- Per-window rescaling may add discontinuities at native boundaries. Recommendation: preserve
+  source energy explicitly now, measure profiles; defer a smoother conservative reconstruction.
+- Constant long-wave has native-window steps. Recommendation: keep the smallest defensible policy
+  until measured evidence justifies reconstructing thermal sub-window shape.
+- Preserve positive all-dark source means or discard them? Recommendation: preserve energy with
+  constant fallback, report the anomaly, and never pretend exact zero-night and strict conservation
+  can both hold for contradictory source data.
+- Solar approximation accuracy and daylight floor: recommend 1 W/m² for usable native denominators,
+  15-minute midpoint integration and independent pvlib reference checks in tests only. Establish
+  explicit geometry/timing tolerances before implementation; do not copy the study's pandas path.
+- Missing-window behavior differs from current accidental filling. Recommendation: intentionally
+  preserve radiation null windows; broader bounded filling and imputation flags remain separate.
+- Caches/models: regeneration and retraining are mandatory before deployment, with radiation-only
+  comparisons retaining unchanged forecast cases and evaluation configuration.
+
+## Review record
+
+Plan and GitHub text reviews are pending. No implementation code has been written.
