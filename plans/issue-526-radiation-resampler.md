@@ -6,7 +6,7 @@ support. The study demonstrates the short-wave timing defect independently of fo
 
 Replace point interpolation for the two radiation fields with interval-aware reconstruction.
 Short-wave follows a clear-sky shape with interpolated midpoint indices, then conserves each native
-window's energy. Long-wave stays constant within each native window. Keep raw NWP storage intact,
+window's energy. Long-wave fits PCHIP through native-window midpoint means. Keep raw NWP storage intact,
 use the same lazy feature path in training and inference, and defer precipitation, wind and TCC.
 
 ## Verdict, scope and process
@@ -88,9 +88,11 @@ window so `sum(target_mean * 1800 s) == native_mean * width_seconds` within Floa
 There is no clipping at clear-sky index 1: enhancement and quadrature error must not destroy energy.
 The value at a native timestamp becomes that final half-hour's mean, not the original 3/6-hour mean.
 
-For long-wave, broadcast each finite native mean to every half-hour in its backward window, including
-the half-hour ending at the native timestamp. This conserves energy without an unsupported thermal
-shape. Join radiation targets onto the same output grid and remove all internal helper columns.
+For long-wave, fit shape-preserving PCHIP through native-window midpoint means and evaluate at
+half-hour midpoints. Hold the nearest value outside the anchors within each contiguous source
+sequence; never bridge null or absent windows. One anchor gives a constant and two give a line.
+Prioritise smooth ML features over exact interval conservation, as requested in human review.
+Join radiation targets onto the same output grid and remove all internal helper columns.
 Bulk and single-run feature paths then consume the identical corrected NWP relation before their
 existing joins, lags and rolling features. The output remains lazy and retains existing dtypes.
 
@@ -138,7 +140,7 @@ new operational degradation columns and general imputation monitoring are separa
 
 - `packages/ml_core/src/ml_core/features/_radiation.py` (new): private pure Polars solar-position
   and Haurwitz expressions, native interval support, short-wave midpoint-index interpolation and
-  conservation, long-wave broadcast and null handling. Plain lazy functions, group keys supplied
+  short-wave conservation, long-wave PCHIP and null handling. Plain lazy functions, group keys supplied
   by `_nwp.py`; use joins/window expressions rather than Python group loops. No pandas, pvlib,
   study imports, config object or new package. Extract solar helpers only when actual reuse needs it.
 - `packages/ml_core/src/ml_core/features/_nwp.py`: local radiation dispatch; preserve all other
@@ -172,9 +174,9 @@ Regression assertions that fail on current main for deliberately varying native 
    separately. Use at least three nonconstant daylight indices and independently calculated
    normalised target shares; explicitly show that endpoint anchoring gives different final output.
    A constant-index clear day alone cannot test anchoring.
-3. For both fields, each finite complete native window conserves `mean * duration`, including
-   lead 144 to 150 and the final lead-360 window. Long-wave half-hours equal their own window's mean
-   on both sides of a native boundary; current interpolation violates those assertions.
+3. Each finite complete short-wave window conserves `mean * duration`, including lead 144 to 150
+   and the final lead-360 window. Long-wave matches an independent SciPy PCHIP reference through
+   interval midpoints, including the 3/6-hour transition, extrema and one/two-anchor sequences.
 4. The first finite interval supplies its early half-hours, lead zero remains null, and a missing
    middle source window remains null across its whole support. Current linear interpolation loses
    the first window and fills interior source nulls. Include an actually absent native row, not
@@ -264,8 +266,8 @@ validate Markdown, diff whitespace and the plan/PR scope; no production tests ar
 
 - Per-window rescaling may add discontinuities at native boundaries. Recommendation: preserve
   source energy explicitly now, measure profiles; defer a smoother conservative reconstruction.
-- Constant long-wave has native-window steps. Recommendation: keep the smallest defensible policy
-  until measured evidence justifies reconstructing thermal sub-window shape.
+- Long-wave PCHIP treats native means as midpoint estimates and changes interval energy. Human
+  review prioritises smooth electricity forecasting features; forecast-score comparison remains.
 - Preserve positive all-dark source means or discard them? Recommendation: preserve energy with
   constant fallback, report the anomaly, and never pretend exact zero-night and strict conservation
   can both hold for contradictory source data.

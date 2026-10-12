@@ -1,8 +1,8 @@
-"""Conservative backward-window radiation reconstruction on the half-hour grid.
+"""Interval-aware radiation reconstruction on the half-hour grid.
 
 Short-wave uses daylight midpoint indices to shape each native window before conserving its
-energy. Long-wave retains the native mean throughout its window because solar geometry gives no
-thermal shape. Missing native windows stay missing. Policies and worked plots:
+energy. Long-wave fits PCHIP through native-window midpoints. Missing native windows stay missing.
+Policies and worked plots:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling>.
 """
 
@@ -214,10 +214,107 @@ def _shape_short_wave(
     )
 
 
+def _pchip_edge_slope(
+    *, width: pl.Expr, next_width: pl.Expr, slope: pl.Expr, next_slope: pl.Expr
+) -> pl.Expr:
+    """Limit the one-sided endpoint derivative used by PCHIP."""
+    estimate = ((2 * width + next_width) * slope - width * next_slope) / (width + next_width)
+    return (
+        pl.when(next_width.is_null())
+        .then(slope)
+        .when(estimate * slope <= 0)
+        .then(0.0)
+        .when((slope * next_slope <= 0) & (estimate.abs() > 3 * slope.abs()))
+        .then(3 * slope)
+        .otherwise(estimate)
+    )
+
+
+def _shape_long_wave(*, targets: pl.LazyFrame, group_cols: list[str]) -> pl.LazyFrame:
+    """Evaluate midpoint PCHIP lazily, with constant edges and no interpolation across gaps.
+
+    Native interval means act as midpoint estimates, without enforcing interval energy. PCHIP's
+    harmonic interior slopes and limited endpoint slopes preserve the shape of the supplied means.
+    """
+    window_keys = [*group_cols, "_window_end"]
+    windows = targets.select(*window_keys, "_window_start", "_anchor_second", LONG_WAVE).unique()
+    for shift, label in ((1, "earlier"), (-1, "later")):
+        neighbour = pl.col(LONG_WAVE).shift(shift).over(group_cols, order_by="_window_end")
+        anchor = pl.col("_anchor_second").shift(shift).over(group_cols, order_by="_window_end")
+        contiguous = (
+            pl.col("_window_start")
+            == pl.col("_window_end").shift(1).over(group_cols, order_by="_window_end")
+            if shift == 1
+            else pl.col("_window_end")
+            == pl.col("_window_start").shift(-1).over(group_cols, order_by="_window_end")
+        )
+        windows = windows.with_columns(
+            **{
+                f"_{label}_value": neighbour.cast(pl.Float64),
+                f"_{label}_width": pl.when(contiguous & neighbour.is_not_null()).then(
+                    (anchor - pl.col("_anchor_second")).abs()
+                ),
+                f"_{label}_secant": (neighbour.cast(pl.Float64) - pl.col(LONG_WAVE))
+                / (anchor - pl.col("_anchor_second")),
+            }
+        )
+    left_h, right_h = pl.col("_earlier_width"), pl.col("_later_width")
+    left_d, right_d = pl.col("_earlier_secant"), pl.col("_later_secant")
+    left_weight, right_weight = 2 * right_h + left_h, right_h + 2 * left_h
+    derivative = (
+        pl.when(left_h.is_not_null() & right_h.is_not_null())
+        .then(
+            pl.when(left_d * right_d > 0)
+            .then((left_weight + right_weight) / (left_weight / left_d + right_weight / right_d))
+            .otherwise(0.0)
+        )
+        .when(left_h.is_null())
+        .then(
+            _pchip_edge_slope(
+                width=right_h,
+                next_width=right_h.shift(-1).over(group_cols, order_by="_window_end"),
+                slope=right_d,
+                next_slope=right_d.shift(-1).over(group_cols, order_by="_window_end"),
+            )
+        )
+        .otherwise(
+            _pchip_edge_slope(
+                width=left_h,
+                next_width=left_h.shift(1).over(group_cols, order_by="_window_end"),
+                slope=left_d,
+                next_slope=left_d.shift(1).over(group_cols, order_by="_window_end"),
+            )
+        )
+        .fill_null(0.0)
+    )
+    windows = windows.with_columns(_derivative=derivative).with_columns(
+        _earlier_derivative=pl.col("_derivative").shift(1).over(group_cols, order_by="_window_end"),
+        _later_derivative=pl.col("_derivative").shift(-1).over(group_cols, order_by="_window_end"),
+    )
+    shaped = targets.join(
+        windows.drop("_window_start", "_anchor_second", LONG_WAVE), on=window_keys, how="left"
+    )
+    offset = pl.col("valid_time").dt.epoch("s") - 900 - pl.col("_anchor_second")
+    expressions = []
+    for direction, label in ((-1, "earlier"), (1, "later")):
+        width = pl.col(f"_{label}_width")
+        fraction = offset.abs() / width
+        curve = (
+            (2 * fraction**3 - 3 * fraction**2 + 1) * pl.col(LONG_WAVE)
+            + (fraction**3 - 2 * fraction**2 + fraction) * direction * width * pl.col("_derivative")
+            + (-2 * fraction**3 + 3 * fraction**2) * pl.col(f"_{label}_value")
+            + (fraction**3 - fraction**2) * direction * width * pl.col(f"_{label}_derivative")
+        )
+        expressions.append(pl.when(width.is_not_null()).then(curve).otherwise(pl.col(LONG_WAVE)))
+    return shaped.with_columns(
+        **{LONG_WAVE: pl.when(offset < 0).then(expressions[0]).otherwise(expressions[1])}
+    )
+
+
 def _resample_radiation(
     *, native: pl.LazyFrame, group_cols: list[str], solar_coordinates: pl.LazyFrame | None
 ) -> pl.LazyFrame:
-    """Return half-hour radiation means over supported backward native windows.
+    """Return half-hour radiation features over supported backward native windows.
 
     Args:
         native: Original native samples, with `nwp_init_time` and weather columns.
@@ -232,6 +329,8 @@ def _resample_radiation(
     targets = _native_targets(
         native=native.select(*group_cols, "valid_time", *radiation), group_cols=group_cols
     )
+    if LONG_WAVE in radiation:
+        targets = _shape_long_wave(targets=targets, group_cols=group_cols)
     if SHORT_WAVE in radiation:
         if solar_coordinates is None:
             raise ValueError("Short-wave reconstruction requires solar_coordinates.")

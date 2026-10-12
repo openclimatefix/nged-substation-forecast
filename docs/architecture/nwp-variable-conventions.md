@@ -105,7 +105,7 @@ meaningful; their error is the mean circular distance instead.
 ## What the half-hourly resample does today
 
 `_upsample_nwp_to_half_hourly` builds a 30-minute grid per `(nwp_init_time, ensemble_member,
-time_series_id)` group. **Radiation follows a dedicated conservative interval path.** Other numeric
+time_series_id)` group. **Radiation follows a dedicated interval-aware path.** Other numeric
 fields use point interpolation and the categorical field uses forward fill. Those generic paths
 can fill interior source nulls; radiation preserves its source-missing windows.
 
@@ -144,9 +144,10 @@ Both columns are in `conf/model/xgboost.yaml`'s `selected_features`, so this rea
 
 **Both radiation fields describe the interval before their timestamp.** The production helper in
 `ml_core.features._radiation` expands each native mean into half-hours inside that backward window.
-The helper obtains widths from the ECMWF lead schedule: 3 hours through lead 144, then 6 hours, including
-`(144, 150]`. Width never comes from the previous available value, which could span missing windows.
-The half-hour ending at a native timestamp is a reconstructed half-hour mean, not the original
+The helper obtains widths from the ECMWF lead schedule: 3 hours through lead 144, then 6 hours,
+including `(144, 150]`. Width never comes from the previous available value, which could span
+missing windows.
+The half-hour ending at a native timestamp has a reconstructed feature value, not the original
 3/6-hour mean.
 
 **Short-wave uses the sun's daily shape and interpolates cloud attenuation.** The helper evaluates
@@ -164,7 +165,7 @@ fits between two native windows that both contain daylight. Missing native windo
 support independently. Each window's index is available to every daylight block that window
 contains, and target means multiply the interpolated index by the half-hour clear-sky mean.
 
-**Every complete native window conserves its supplied energy.** Short-wave target means are
+**Every complete short-wave window conserves its supplied energy.** Short-wave target means are
 rescaled so their mean equals the native mean; equivalently, the half-hour energy sum equals native
 mean × native duration. This constraint can introduce boundary steps and does not recover unknown
 sub-window cloud changes. The index is not clipped at 1.
@@ -175,11 +176,20 @@ at a dark endpoint can label preceding daylight. A positive fully-dark source wi
 the constant fallback, preserving energy rather than claiming both exact nighttime zero and
 conservation. Zero-energy windows output zero.
 
-**Long-wave retains a constant mean inside each native window.** Thermal radiation is present at
-night and depends on atmospheric temperature, humidity, and clouds; the solar daily shape provides
-no suitable reconstruction. Constant backward-window means preserve native energy without inventing
-sub-window structure. The constant means can have steps at native boundaries. A smoother thermal reconstruction
-would need separate evidence.
+**Long-wave uses a smooth spline through native-window midpoint means.** Piecewise Cubic Hermite
+Interpolating Polynomial (PCHIP) interpolation preserves local trends without overshooting the
+neighbouring means. The helper evaluates the spline at each half-hour midpoint, holding the nearest
+mean before the first anchor and after the last. Two anchors give linear interpolation; a single
+anchor gives a constant. Thermal radiation depends on atmospheric temperature, humidity, and
+clouds, so long-wave uses no solar shaping.
+
+**Long-wave prioritises smooth features over exact interval energy.** Native interval means act as
+midpoint estimates; the spline's half-hours need not average back to each original mean. The
+half-hour features feed an electricity forecasting model, and the smoother profile avoids imposing
+steps at every native boundary. Smoothness does not establish a forecast-score gain or recover the
+unknown thermal variation within an interval. See the [PCHIP
+algorithm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.PchipInterpolator.html)
+for the shape-preserving derivative rules.
 
 **Missing source windows stay null in both fields.** Lead zero has no preceding window; a finite
 lead-3 mean supports lead 0.5 through 3. Source nulls and absent native rows leave their own windows
@@ -193,26 +203,35 @@ short-wave, and geometry is reused across runs and members at matching site/time
 Long-wave needs no coordinates. Raw NWP storage and rounding remain unchanged.
 
 **Regenerate engineered caches and retrain before deploying power-forecast models against these
-feature semantics.** Physical correctness does not establish a forecast-score gain.
+feature semantics.** Corrected timing and smoother profiles do not establish a forecast-score gain.
 
-**A synthetic example separates timing from conservation.** The figure uses an invented coordinate
-at 52°N, 0°E on 21 March 2026. Short-wave reference means use independent pvlib solar geometry and
-70% of Haurwitz clear sky; long-wave reference means follow a prescribed smooth daily curve.
+**Synthetic examples show interval timing and changing cloud attenuation.** The figure uses an
+invented coordinate at 52°N, 0°E on 21 March 2026. Short-wave reference means use independent pvlib
+solar geometry and
+70% of Haurwitz clear sky in the constant-attenuation examples. A further 3-hour example uses
+85% before noon and 20% afterwards, representing a sunny morning and dull afternoon.
+Long-wave reference means follow a prescribed smooth daily curve.
 Aggregating the reference half-hours supplies identical native inputs to point interpolation and
 the production feature pipeline. The plotted middle day has complete 3-hour or 6-hour windows;
 nighttime values remain visible so displaced short-wave energy cannot disappear from the comparison.
 
 ![Short-wave and long-wave before and after resampling.](assets/radiation-resampling.svg)
 
-**The new path conserves the inputs without the synthetic short-wave delay.** The energy centroid is
+**The constant-attenuation examples show the short-wave timing correction.** The energy centroid is
 the average half-hour midpoint weighted by that half-hour's radiation energy. Point interpolation
 delays the whole-day short-wave energy centroid by 1.25 hours with 3-hour inputs and 2.73 hours with
 6-hour inputs. The new delays are under 12 seconds, with native-window mean errors below 0.000003
-W/m²; long-wave means are retained exactly. The reported delays and mean errors are deterministic
-checks of this synthetic example, not forecast scores. The smooth long-wave reference is one
-possible underlying curve: its native means do not identify the sub-window shape, and the constant
-reconstruction does not recover it. The script prints every plotted error and centroid shift in [its
-generated
+W/m². The reported delays and mean errors describe these synthetic examples, not forecast scores.
+
+**The sunny-morning example retains each interval's forecast energy.** The reconstructed profile
+retains the stronger morning and weaker afternoon. Interpolation and rescaling can smooth the noon
+change or introduce boundary jumps; the native means cannot identify the true cloud-transition time.
+
+**Long-wave PCHIP trades exact interval energy for a smooth profile.** Interval-mean deviations are
+below 0.98 W/m² for 3-hour inputs and 3.64 W/m² for 6-hour inputs in the prescribed daily curve.
+The smooth long-wave reference is one possible underlying curve; the native means cannot identify
+the true thermal variation. The script prints every plotted deviation and centroid shift in
+[its generated
 report](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/report.md).
 
 Reproduce the figure and report from the repository root:

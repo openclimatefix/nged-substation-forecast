@@ -278,7 +278,8 @@ available.
 ### 1. Give radiation an interval-aware resampler
 
 **Production implementation:** the [radiation resampling policy](../../architecture/nwp-variable-conventions.md#radiation-resampling)
-uses midpoint clear-sky indices for short-wave and constant native-window means for long-wave.
+uses midpoint clear-sky indices for short-wave and PCHIP through native-window midpoint means
+for long-wave.
 Unlike this study candidate, the production helper conserves each native window's energy and
 preserves source-missing windows. Historical study results below remain measurements of the study's
 candidate, not of that production helper.

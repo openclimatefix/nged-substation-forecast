@@ -30,12 +30,12 @@ FIELDS: Final[tuple[str, str]] = (SHORT_WAVE, LONG_WAVE)
 CURVES: Final[list[str]] = [
     "Synthetic reference",
     "Before: point interpolation",
-    "After: conservative reconstruction",
+    "After: interval-aware reconstruction",
 ]
 PLOT_DAY: Final[datetime] = datetime(2026, 3, 21, tzinfo=UTC)
 
 
-def reference_means(*, stamps: pl.Series) -> pl.DataFrame:
+def reference_means(*, stamps: pl.Series, cloudy_afternoon: bool = False) -> pl.DataFrame:
     """Prescribe half-hour means at an invented coordinate, using two midpoint samples."""
     short_wave, long_wave = [], []
     for offset in (450, 1350):
@@ -44,12 +44,13 @@ def reference_means(*, stamps: pl.Series) -> pl.DataFrame:
             time=samples.to_numpy(), latitude=52.0, longitude=0.0
         )
         cosine = np.maximum(np.cos(np.deg2rad(position["zenith"].to_numpy())), 0)
-        short_wave.append(0.7 * 1098 * cosine * np.exp(-0.059 / np.maximum(cosine, 1e-12)))
         hour = (
             samples.dt.hour().to_numpy()
             + samples.dt.minute().to_numpy() / 60
             + samples.dt.second().to_numpy() / 3600
         )
+        attenuation = np.where(hour < 12, 0.85, 0.2) if cloudy_afternoon else 0.7
+        short_wave.append(attenuation * 1098 * cosine * np.exp(-0.059 / np.maximum(cosine, 1e-12)))
         long_wave.append(310 + 30 * np.cos(2 * np.pi * (hour - 15) / 24))
     return pl.DataFrame(
         {
@@ -130,117 +131,130 @@ def main() -> None:
         interval="30m",
         eager=True,
     )
-    truth = reference_means(stamps=stamps)
     panels = []
     report = [
         "# Synthetic radiation resampling check",
         "",
         "Invented coordinate: 52°N, 0°E. Reference day: 21 March 2026 (UTC).",
-        "Before uses point interpolation; after uses production conservative reconstruction.",
+        "Before uses point interpolation; after uses production interval-aware reconstruction.",
         "Errors compare the average of reconstructed half-hours within each complete native window",
         "with that window's supplied Float32 mean.",
         "The energy centroid is the average half-hour midpoint weighted by radiation energy.",
         "Centroid shifts include all 48 half-hours and are relative to the synthetic reference.",
         "Positive shifts mean later. These checks do not measure forecast skill.",
+        "The cloud-transition reference uses 85% of clear sky before noon and 20% afterwards.",
+        "Short-wave conserves each native mean; long-wave PCHIP prioritises smooth midpoint timing",
+        "without enforcing interval energy, evaluating PCHIP at half-hour midpoints.",
+        "Neither method recovers unknown sub-window changes.",
         "",
         (
-            "| Field | Native step (h) | Maximum mean error before (W/m²) | After (W/m²) | "
+            "| Field / scenario | Native step (h) | Maximum mean error before (W/m²) | "
+            "After (W/m²) | "
             "Centroid shift before (h) | After (h) |"
         ),
         "|---|---|---|---|---|---|",
     ]
-    for field, label in ((SHORT_WAVE, "Short-wave"), (LONG_WAVE, "Long-wave")):
-        for width in (3, 6):
-            comparison, native = reconstruct(truth=truth, width=width)
-            assert comparison.height == 48
-            expected = comparison[field].to_numpy()
-            before, after = (
-                comparison[f"{field}_{name}"].to_numpy().astype(np.float64)
-                for name in ("before", "after")
-            )
-            assert np.isfinite(before).all()
-            assert np.isfinite(after).all()
-            source = native[field].to_numpy().astype(np.float64)
-            errors = [
-                float(np.max(np.abs(values.reshape(-1, width * 2).mean(axis=1) - source)))
-                for values in (before, after)
-            ]
+    for field, label, width, cloudy in (
+        (SHORT_WAVE, "Short-wave, constant attenuation", 3, False),
+        (SHORT_WAVE, "Short-wave, constant attenuation", 6, False),
+        (SHORT_WAVE, "Short-wave, sunny morning (85%) / dull afternoon (20%)", 3, True),
+        (LONG_WAVE, "Long-wave", 3, False),
+        (LONG_WAVE, "Long-wave", 6, False),
+    ):
+        truth = reference_means(stamps=stamps, cloudy_afternoon=cloudy)
+        comparison, native = reconstruct(truth=truth, width=width)
+        assert comparison.height == 48
+        expected = comparison[field].to_numpy()
+        before, after = (
+            comparison[f"{field}_{name}"].to_numpy().astype(np.float64)
+            for name in ("before", "after")
+        )
+        assert np.isfinite(before).all()
+        assert np.isfinite(after).all()
+        source = native[field].to_numpy().astype(np.float64)
+        assert len(source) == 24 // width
+        errors = [
+            float(np.max(np.abs(values.reshape(-1, width * 2).mean(axis=1) - source)))
+            for values in (before, after)
+        ]
+        if field == SHORT_WAVE:
             assert errors[1] < 0.001, (field, width, errors)
-            hours = np.arange(0.25, 24, 0.5)
-            shifts = [
-                float(
-                    np.sum(hours * values) / values.sum()
-                    - np.sum(hours * expected) / expected.sum()
-                )
-                for values in (before, after)
-            ]
-            if field == SHORT_WAVE:
-                assert abs(shifts[1]) < 0.15
-                assert shifts[0] > 1
-            report.append(
-                f"| {label} | {width} | {errors[0]:.6f} | {errors[1]:.6f} | "
-                f"{shifts[0]:.6f} | {shifts[1]:.6f} |"
+        hours = np.arange(0.25, 24, 0.5)
+        shifts = [
+            float(np.sum(hours * values) / values.sum() - np.sum(hours * expected) / expected.sum())
+            for values in (before, after)
+        ]
+        if field == SHORT_WAVE and not cloudy:
+            assert abs(shifts[1]) < 0.15
+            assert shifts[0] > 1
+        report.append(
+            f"| {label} | {width} | {errors[0]:.6f} | {errors[1]:.6f} | "
+            f"{shifts[0]:.6f} | {shifts[1]:.6f} |"
+        )
+        data = pl.DataFrame(
+            {"hour": hours, CURVES[0]: expected, CURVES[1]: before, CURVES[2]: after}
+        ).unpivot(index="hour", variable_name="curve", value_name="flux")
+        lines = [
+            alt.Chart(data.filter(pl.col("curve") == curve))
+            .mark_line(
+                interpolate="linear",
+                strokeWidth=2.5,
             )
-            data = pl.DataFrame(
-                {"hour": hours, CURVES[0]: expected, CURVES[1]: before, CURVES[2]: after}
-            ).unpivot(index="hour", variable_name="curve", value_name="flux")
-            lines = [
-                alt.Chart(data.filter(pl.col("curve") == curve))
-                .mark_line(
-                    interpolate="step" if field == LONG_WAVE and curve == CURVES[2] else "linear",
-                    strokeWidth=2.5,
-                )
-                .encode(  # ty: ignore[unresolved-attribute]
-                    x=alt.X(
-                        "hour:Q",
-                        title="Half-hour midpoint (UTC hour)",
-                        scale=alt.Scale(domain=[0, 24]),
-                        axis=alt.Axis(values=[0, 6, 12, 18, 24]),
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X(
+                    "hour:Q",
+                    title="Half-hour midpoint (UTC hour)",
+                    scale=alt.Scale(domain=[0, 24]),
+                    axis=alt.Axis(values=[0, 6, 12, 18, 24]),
+                ),
+                y=alt.Y(
+                    "flux:Q",
+                    title="Radiation (W/m²)",
+                    scale=alt.Scale(zero=field == SHORT_WAVE),
+                ),
+                color=alt.Color(
+                    "curve:N",
+                    title=None,
+                    scale=alt.Scale(
+                        domain=CURVES, range=[ocf.DATA_SKY, ocf.DATA_BLUE, ocf.BRAND_ORANGE]
                     ),
-                    y=alt.Y(
-                        "flux:Q",
-                        title="Radiation (W/m²)",
-                        scale=alt.Scale(zero=field == SHORT_WAVE),
-                    ),
-                    color=alt.Color(
-                        "curve:N",
-                        title=None,
-                        scale=alt.Scale(
-                            domain=CURVES, range=[ocf.DATA_SKY, ocf.DATA_BLUE, ocf.BRAND_ORANGE]
-                        ),
-                        legend=alt.Legend(orient="top", columns=1, labelLimit=500),
-                    ),
-                    strokeDash=alt.StrokeDash(
-                        "curve:N",
-                        scale=alt.Scale(domain=CURVES, range=[[6, 3], [2, 2], [1, 0]]),
-                        legend=None,
-                    ),
-                )
-                for curve in CURVES
-            ]
-            panel = alt.layer(*lines).properties(
-                width=CONTENT_WIDTH_PX - 65,
-                height=150,
-                title=alt.TitleParams(
-                    text=f"{label}: {width}-hour native means",
-                    subtitle=(
-                        f"Maximum native-window mean error: before {errors[0]:.2f}, "
-                        f"after {errors[1]:.5f} W/m² (smaller is better)"
-                    ),
-                    anchor="start",
+                    legend=alt.Legend(orient="top", columns=1, labelLimit=500),
+                ),
+                strokeDash=alt.StrokeDash(
+                    "curve:N",
+                    scale=alt.Scale(domain=CURVES, range=[[6, 3], [2, 2], [1, 0]]),
+                    legend=None,
                 ),
             )
-            panels.append(panel)
+            for curve in CURVES
+        ]
+        panel = alt.layer(*lines).properties(
+            width=CONTENT_WIDTH_PX - 65,
+            height=150,
+            title=alt.TitleParams(
+                text=f"{label}: {width}-hour native means",
+                subtitle=(
+                    f"Maximum interval-mean deviation: before {errors[0]:.2f}, "
+                    f"after {errors[1]:.5f} W/m²"
+                ),
+                anchor="start",
+            ),
+        )
+        panels.append(panel)
     chart = (
         alt.vconcat(*panels, spacing=25)
         .resolve_scale(y="independent")
         .properties(
             title=alt.TitleParams(
-                text="Radiation resampling preserves the supplied interval means",
+                text="Radiation resampling uses interval timing and changing cloud attenuation",
                 subtitle=[
-                    "Synthetic example: 52°N, 0°E; 21 March 2026. All curves are half-hour means.",
-                    "Long-wave's reference is one possible curve; sub-window shape is unknown.",
-                    "This checks timing and conservation, not forecast skill.",
+                    "Synthetic examples: 52°N, 0°E; 21 March 2026. Reference: half-hour means.",
+                    "Reconstructed values are shown at half-hour midpoints.",
+                    (
+                        "Unknown cloud and thermal changes are not recovered; "
+                        "forecast skill is not measured."
+                    ),
+                    "Short-wave retains interval means; long-wave uses midpoint PCHIP.",
                 ],
                 anchor="start",
             )
@@ -248,7 +262,7 @@ def main() -> None:
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(vlc.vegalite_to_svg(chart.to_dict()))
-    args.output.with_suffix(".png").write_bytes(vlc.vegalite_to_png(chart.to_dict(), scale=1.5))
+    args.output.with_suffix(".png").write_bytes(vlc.vegalite_to_png(chart.to_dict(), scale=1.25))
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text("\n".join(report) + "\n")
     print("\n".join(report))

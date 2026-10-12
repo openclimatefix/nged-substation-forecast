@@ -29,7 +29,7 @@ beyond 144 h, so interpolation quality matters most exactly where users look; an
 control member is an increasingly unrepresentative sample of the ensemble.
 
 The interval convention matters as much as resolution. Radiation now uses
-[conservative backward-window resampling](../architecture/nwp-variable-conventions.md#radiation-resampling).
+[interval-aware radiation resampling](../architecture/nwp-variable-conventions.md#radiation-resampling).
 Precipitation still needs interval-aware handling, and wind still needs circular/vector
 interpolation. Those remaining changes are [part of the data-handling work below](#fix-the-nwp-resample-to-honour-the-variable-conventions).
 
@@ -125,8 +125,8 @@ effect.
 
 **(b) Radiation resampling is implemented; precipitation remains.** Short-wave interpolates
 midpoint clear-sky indices within daylight blocks and conserves each native window's energy.
-Long-wave retains constant backward-window means. The implementation and boundary/null policies live
-in [NWP variable conventions](../architecture/nwp-variable-conventions.md#radiation-resampling),
+Long-wave uses PCHIP through native-window midpoint means. The implementation and boundary/null
+policies live in [NWP variable conventions](../architecture/nwp-variable-conventions.md#radiation-resampling),
 including the solar helper needed by the [physics features](#linearised-physics-features-for-solar-and-wind).
 Precipitation's conservative interval policy is tracked with instantaneous-field reconstruction in
 [issue #1165](https://github.com/openclimatefix/nged-substation-forecast/issues/1165).
@@ -219,8 +219,8 @@ Then each fix lands as its own leaderboard experiment, in this order, each score
 before it — so the work ends with an attribution per change rather than one number for a bundle:
 
 1. **u/v storage**, with the resample interpolating components. Subsumes defect (a).
-2. **Radiation resample**: conservative clear-sky shaping for short-wave and constant native-window
-   means for long-wave. Implemented; forecast-score comparison remains.
+2. **Radiation resample**: conservative clear-sky shaping for short-wave and PCHIP through native-window
+   midpoint means for long-wave. Implemented; forecast-score comparison remains.
 3. **Shape-preserving interpolation** of the instantaneous variables. Defect (c).
 4. **Raw `u`/`v` as model features**, replacing `wind_direction_*` in `selected_features` — see [the
    feature-representation

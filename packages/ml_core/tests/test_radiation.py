@@ -8,6 +8,7 @@ import pytest
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._radiation import LONG_WAVE, SHORT_WAVE, _half_hour_clear_sky
 from polars.testing import assert_frame_equal
+from scipy.interpolate import PchipInterpolator
 
 COORDINATES: Final[pl.LazyFrame] = pl.DataFrame(
     {"time_series_id": [1], "latitude": [52.0], "longitude": [0.0]}
@@ -133,10 +134,103 @@ def test_energy_transition_first_and_final_windows(engine: Literal["auto", "stre
             & (pl.col("valid_time") <= row["valid_time"])
         )
         assert window.height == width * 2
-        for column in (SHORT_WAVE, LONG_WAVE):
-            assert window[column].mean() == pytest.approx(row[column], rel=2e-7, abs=1e-5)
-        assert window[LONG_WAVE].unique().to_list() == [row[LONG_WAVE]]
+        assert window[SHORT_WAVE].mean() == pytest.approx(row[SHORT_WAVE], rel=2e-7, abs=1e-5)
     assert result.schema[SHORT_WAVE] == pl.Float32
+
+
+@pytest.mark.parametrize("engine", ["auto", "streaming"])
+def test_long_wave_midpoint_interpolation_across_schedule_transition(
+    engine: Literal["auto", "streaming"],
+) -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start,
+        leads=[138, 141, 144, 150, 156],
+        short_wave=[None, 0.0, 0.0, 0.0, 0.0],
+        long_wave=[None, 300.0, 330.0, 390.0, 360.0],
+    ).drop(SHORT_WAVE)
+    other = native.with_columns(
+        ensemble_member=pl.lit(50, dtype=pl.Int64), **{LONG_WAVE: pl.col(LONG_WAVE) + 100}
+    )
+    mixed = pl.concat([native, other]).sample(fraction=1, shuffle=True, seed=5)
+    result = _resample(mixed, engine=engine)
+    supported = result.filter(
+        (pl.col("ensemble_member") == 0) & (pl.col("valid_time") > start + timedelta(hours=138))
+    )
+    target_hours = (supported["valid_time"] - start).dt.total_seconds().to_numpy() / 3600 - 0.25
+    anchors = np.array([139.5, 142.5, 147, 153])
+    expected = PchipInterpolator(x=anchors, y=[300, 330, 390, 360])(
+        np.clip(target_hours, anchors[0], anchors[-1])
+    )
+    np.testing.assert_allclose(supported[LONG_WAVE], expected, atol=2e-5, rtol=0)
+    np.testing.assert_allclose(
+        result.filter(pl.col("ensemble_member") == 50)[LONG_WAVE],
+        result.filter(pl.col("ensemble_member") == 0)[LONG_WAVE] + 100,
+        equal_nan=True,
+    )
+    assert supported.schema[LONG_WAVE] == pl.Float32
+
+
+@pytest.mark.parametrize("absent_row", [False, True])
+def test_long_wave_missing_window_separates_midpoint_interpolation(absent_row: bool) -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start,
+        leads=[0, 3, 6, 9, 12, 15],
+        short_wave=[None, 0.0, 0.0, None, 0.0, 0.0],
+        long_wave=[None, 200.0, 260.0, None, 350.0, 320.0],
+    ).drop(SHORT_WAVE)
+    if absent_row:
+        native = native.filter(pl.col("valid_time") != start + timedelta(hours=9))
+    result = _resample(native)
+    gap = (pl.col("valid_time") > start + timedelta(hours=6)) & (
+        pl.col("valid_time") <= start + timedelta(hours=9)
+    )
+    assert result.filter(gap)[LONG_WAVE].null_count() == 6
+    for hour, expected in [(6, 260), (9.5, 350), (15, 320)]:
+        assert (
+            result.filter(pl.col("valid_time") == start + timedelta(hours=hour))[LONG_WAVE][0]
+            == expected
+        )
+    changed = native.with_columns(
+        pl.when(pl.col("valid_time") <= start + timedelta(hours=6))
+        .then(pl.col(LONG_WAVE) + 100)
+        .otherwise(pl.col(LONG_WAVE))
+        .alias(LONG_WAVE)
+    )
+    after_gap = pl.col("valid_time") > start + timedelta(hours=9)
+    assert_frame_equal(result.filter(after_gap), _resample(changed).filter(after_gap))
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        [300.0],
+        [300.0, 360.0],
+        [300.0, 300.0, 360.0, 360.0],
+        [300.0, 330.0, 390.0, 420.0],
+        [300.0, 301.0, 390.0, 300.0],
+    ],
+)
+def test_long_wave_pchip_matches_scipy_without_overshoot(values: list[float]) -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start,
+        leads=list(range(0, 3 * len(values) + 1, 3)),
+        short_wave=[None, *([0.0] * len(values))],
+        long_wave=[None, *values],
+    ).drop(SHORT_WAVE)
+    result = _resample(native).filter(pl.col("valid_time") > start)
+    targets = np.arange(0.25, 3 * len(values), 0.5)
+    anchors = np.arange(1.5, 3 * len(values), 3)
+    expected = (
+        PchipInterpolator(x=anchors, y=values)(np.clip(targets, anchors[0], anchors[-1]))
+        if len(values) > 1
+        else np.full_like(targets, values[0])
+    )
+    np.testing.assert_allclose(result[LONG_WAVE], expected, atol=2e-5, rtol=0)
+    assert result[LONG_WAVE].to_numpy().min() >= min(values)
+    assert result[LONG_WAVE].to_numpy().max() <= max(values)
 
 
 @pytest.mark.parametrize("absent_row", [False, True])
