@@ -238,6 +238,80 @@ def _cleaning(*, lines: list[str]) -> None:
         ]
 
 
+def _lead_band_baselines(*, lines: list[str]) -> None:
+    """Print each model's normalised MAE and CRPS by series type and lead band (seed 0, fold A)."""
+    settings = Settings()
+    capacity = pl.DataFrame(inputs.effective_capacity(settings=settings))
+    series_ids = inputs.eligible_series_ids(settings=settings, fold_id=inputs.FOLD_A)
+    types = pl.DataFrame(
+        inputs.series_metadata(settings=settings, time_series_ids=series_ids)
+    ).select("time_series_id", pl.col("time_series_type").cast(pl.String))
+    sources = {
+        "manual_heuristic": BASELINE_DIR / BASELINES["manual_heuristic"],
+        "climatology": BASELINE_DIR / BASELINES["climatology"],
+    }
+    models: dict[str, pl.DataFrame] = {
+        name: normalised_by_capacity(scores=pl.read_parquet(path), capacity=capacity)
+        for name, path in sources.items()
+    }
+    for arm in ("production_cleaned", "r2_c4_c2_c1_a3w_d3", "r2_e1_c1_a3w_d3"):
+        path = inputs.OUTPUT_ROOT / "arms" / inputs.FOLD_A / f"{arm}_seed0" / "scores.parquet"
+        if path.exists():
+            models[arm] = pl.read_parquet(path)
+    bands = {
+        "days 0 to 2": pl.col("lead_hours") < 72,
+        "days 3 to 10": (pl.col("lead_hours") >= 72) & (pl.col("lead_hours") < 264),
+        "days 11 and later": pl.col("lead_hours") >= 264,
+    }
+    rows = []
+    for model, scores in models.items():
+        typed = scores.join(types, on="time_series_id")
+        for band, condition in bands.items():
+            in_band = typed.filter(condition)
+            for group in ("all types", "PV", "Wind", "Disaggregated Demand", "Raw Flow"):
+                part = (
+                    in_band
+                    if group == "all types"
+                    else in_band.filter(pl.col("time_series_type") == group)
+                )
+                per_series = part.group_by("time_series_id").agg(
+                    mae=pl.col("abs_error_norm").mean(), crps=pl.col("crps_norm").mean()
+                )
+                rows.append(
+                    per_series.select(
+                        pl.lit(group).alias("group"),
+                        pl.lit(band).alias("lead_band"),
+                        pl.lit(model).alias("model"),
+                        (pl.col("mae").mean() * 100).alias("mae_percent"),
+                        (pl.col("crps").mean() * 100).alias("crps_percent"),
+                    )
+                )
+    table = pl.concat(rows).with_columns(pl.col("mae_percent", "crps_percent").round(2))
+    lines += [
+        "## Normalised MAE and CRPS by lead band: where XGBoost beats the heuristic (fold A, seed 0)",
+        "",
+        "Percent of capacity, mean over series; baselines are single fits on the same runs.",
+        "",
+        markdown_table(frame=table.sort("group", "lead_band", "model")),
+        "",
+    ]
+
+
+def _blend(*, lines: list[str]) -> None:
+    for path in sorted((inputs.OUTPUT_ROOT / "blend" / inputs.FOLD_A).glob("blend_*.parquet")):
+        frame = pl.read_parquet(path)
+        lines += [
+            f"## Blend of XGBoost members with the heuristic's members (post hoc): {path.stem}",
+            "",
+            markdown_table(
+                frame=frame.with_columns(
+                    pl.col(c).round(4) for c in frame.columns if frame[c].dtype == pl.Float64
+                )
+            ),
+            "",
+        ]
+
+
 def _columns(*, lines: list[str]) -> None:
     lines += ["## Feature columns of every arm", ""]
     for name, arm in arm_definitions.ALL_ARMS.items():
@@ -283,6 +357,8 @@ def main() -> None:
     for tag in ("seeds01", "seeds0"):
         _contrast_tables(lines=lines, fold=inputs.FOLD_B, tag=tag, reference="production_cleaned")
     _calibration(lines=lines)
+    _lead_band_baselines(lines=lines)
+    _blend(lines=lines)
     _cleaning(lines=lines)
     _columns(lines=lines)
     path = REPORT_DIR / "summary.md"
