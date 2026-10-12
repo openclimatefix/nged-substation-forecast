@@ -579,6 +579,9 @@ CRPS differences against production with cleaning.
 
 ## Ideas left for future research
 
+[Issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) plans the first experiments on calibration, the feature faults, and the lean
+column sets listed here.
+
 - **A two-stage forecaster:** train a first stage on ERA5 for many years, then a second stage on the
   ECMWF forecasts' errors, as described on [the switching-events roadmap
   page](../../roadmap/switching-events.md#approach-1-the-two-stage-forecaster). The study's learning

@@ -1143,7 +1143,8 @@ either way.
 ### Pre-train on estimates of past weather
 
 Issues: [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (ingest),
-[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments)
+[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments),
+[#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) (plans a two-stage test: a first stage trained on ERA5 and a second stage trained on ENS forecast errors)
 
 Our power data reaches back to late 2019 but our ECMWF ENS archive starts 2024-04-01, so today's
 fold trains on 15 months and one winter. Ingesting estimates of past weather and pre-training on
@@ -1215,7 +1216,7 @@ lead-time feature, before or with the quantile model family.
 
 ### Ensemble *statistics* as features, instead of member-by-member rows
 
-The fork in the road that the item above assumes away. Today every ensemble member is its own row:
+The fork in the road that the item above assumes away. [Issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) plans the first test of it. Today every ensemble member is its own row:
 `AllFeatures`' primary key is `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)`,
 and a member is pushed through the model one at a time. The alternative is to collapse the member
 axis at feature-build time, so each `(time_series_id, valid_time)` gets **one** row whose weather
