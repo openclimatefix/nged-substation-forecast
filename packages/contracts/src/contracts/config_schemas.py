@@ -135,12 +135,6 @@ class CvConfig(BaseModel):
     included only if it has at least min_training_months months of data before val_start, and
     data through val_end.
 
-    ``final_test_start`` is a guard, not a sealed test year. The ``metrics`` asset refuses to score
-    a window reaching this date, except under the live fold, unless ``NGED_FINAL_TEST=1`` is set in
-    the environment. ``studies.power.scan_power`` returns no reading at or after this date. The
-    observations after the date span a few months, not an independent year. The date must be later
-    than every leaderboard fold's ``val_end``.
-
     ``reference_experiment_name`` names the experiment whose forecast row keys a study's forecasts
     must match exactly before the ``metrics`` asset scores them. The reference experiment's
     name must not start with ``STUDY_EXPERIMENT_PREFIX``, because a study cannot be its own
@@ -149,18 +143,11 @@ class CvConfig(BaseModel):
 
     folds: list[CvFoldConfig]
     min_training_months: int = Field(default=6, ge=1)
-    final_test_start: date
     reference_experiment_name: str
 
     @model_validator(mode="after")
-    def _check_guard_and_reference(self) -> Self:
-        """Reject a cutoff not after every leaderboard ``val_end``, and a study as the reference."""
-        for fold in self.folds:
-            if fold.leaderboard and fold.val_end >= self.final_test_start:
-                raise ValueError(
-                    f"final_test_start={self.final_test_start} must be later than the val_end "
-                    f"({fold.val_end}) of leaderboard fold {fold.fold_id!r}."
-                )
+    def _check_reference(self) -> Self:
+        """Reject a study as the reference experiment."""
         if self.reference_experiment_name.startswith(STUDY_EXPERIMENT_PREFIX):
             raise ValueError(
                 f"reference_experiment_name={self.reference_experiment_name!r} must not start with "

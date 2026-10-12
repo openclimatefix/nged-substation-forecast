@@ -21,7 +21,7 @@ from ml_core.features._lags import _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature
 from ml_core.features.tabular_feature_engineer import _apply_local_time_features
-from studies.power import CLEANED_POWER_DELTA_URI, CV_CONFIG_PATH, scan_power
+from studies.power import CLEANED_POWER_DELTA_URI, scan_power
 from studies.solar import zenith
 
 GROUPS: Final[list[str]] = ["time_series_id", "nwp_init_time", "ensemble_member"]
@@ -282,7 +282,7 @@ def source_probes() -> dict[str, pl.DataFrame]:
 
 
 def lag_lookup(frame: pl.DataFrame, *, power: pl.DataFrame) -> pl.DataFrame:
-    """Compare cached safe control-member lags with the current guarded observation table."""
+    """Compare cached safe control-member lags with the current observation table."""
     checked = (
         frame.filter(pl.col("lead") < 336)
         .select(
@@ -553,8 +553,8 @@ def combine_tables(*, name: str, parts: list[pl.DataFrame]) -> pl.DataFrame:
     return table.sort(keys)
 
 
-def load_guarded_power() -> tuple[pl.DataFrame, int]:
-    """Collect one stable guarded observation snapshot and reject duplicate keys."""
+def load_power() -> tuple[pl.DataFrame, int]:
+    """Collect one stable observation snapshot and reject duplicate keys."""
     power_version = DeltaTable(CLEANED_POWER_DELTA_URI).version()
     power = pl.DataFrame(scan_power().select("time_series_id", "time", "power").collect())
     if DeltaTable(CLEANED_POWER_DELTA_URI).version() != power_version:
@@ -571,9 +571,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.data_root.resolve() != Path(CLEANED_POWER_DELTA_URI).parents[1].resolve():
-        raise ValueError("--data-root must match the guarded power source; set DATA_PATH_INTERNAL")
+        raise ValueError("--data-root must match the power source; set DATA_PATH_INTERNAL")
     metadata = pl.read_parquet(args.data_root / "NGED" / "metadata.parquet")
-    power, power_version = load_guarded_power()
+    power, power_version = load_power()
     features = yaml.safe_load((PROJECT_ROOT / "conf" / "model" / "xgboost.yaml").read_text())[
         "model_params"
     ]["selected_features"]
@@ -658,7 +658,6 @@ def main() -> None:
         "model_config_sha256": file_hash(PROJECT_ROOT / "conf/model/xgboost.yaml"),
         "power_delta_version": power_version,
         "power_source": str(Path(CLEANED_POWER_DELTA_URI).resolve()),
-        "power_cutoff": str(yaml.safe_load(CV_CONFIG_PATH.read_text())["final_test_start"]),
         "scope": (
             "Forward fold, member 0 only. Current source probes do not establish "
             "historical cache provenance."

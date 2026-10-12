@@ -19,8 +19,7 @@ study-only corrected-feature experiments. No production code was changed.
 The diagnostic audit covers **9,762,768 training control-member rows** from April 2024 through
 June 2025 and weekly validation weather runs from July 2025 through June 2026, across 31 series.
 Its prevalence statements apply to the unperturbed ensemble member 0. Forecast experiments train
-on that member and predict all 51 members of the same weekly runs. They use guarded observed power
-and stop before the final-test boundary of 1 July 2026.
+on that member and predict all 51 members of the same weekly runs. They use observed power.
 
 A series is one power time series being forecast. Forecast lead is the time from issuance to the
 forecasted time. The control member is the unperturbed member of the weather ensemble. Training

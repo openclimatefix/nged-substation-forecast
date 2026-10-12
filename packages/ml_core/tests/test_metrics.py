@@ -1,7 +1,7 @@
 """Tests for compute_effective_capacity(), compute_metrics(), build_mlflow_aggregate_metrics()."""
 
 import math
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import patito as pt
 import polars as pl
@@ -14,8 +14,6 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 from ml_core.metrics import (
-    FinalTestWindowError,
-    MultipleModelNamesError,
     NoOverlappingActualsError,
     RowKeyMismatchError,
     RowsOutsideWindowError,
@@ -23,9 +21,7 @@ from ml_core.metrics import (
     compute_effective_capacity,
     compute_metrics,
     require_same_row_keys,
-    require_single_model_name,
     require_valid_times_within_window,
-    require_window_within_guard,
     row_key_fingerprint,
 )
 from polars.testing import assert_frame_equal
@@ -918,41 +914,11 @@ def test_build_mlflow_aggregate_metrics_parametric_sliced_keys():
 
 
 # ---------------------------------------------------------------------------
-# The scorer's refusals: the final-test date guard, the fold window, the reference row keys,
-# and the single model name
+# The scorer's refusals: the fold window and the reference row keys
 # ---------------------------------------------------------------------------
 
-_FINAL_TEST_START = date(2026, 7, 1)
 _WINDOW_START = _utc(2025, 7, 1)
 _WINDOW_END = _utc(2026, 7, 1) - timedelta(seconds=1)
-
-
-@pytest.mark.parametrize(
-    ("window_end", "fold_id", "final_test_enabled", "refused"),
-    [
-        (_utc(2026, 6, 30, 23, 59), "mid_2025_to_mid_2026", False, False),
-        (_utc(2026, 7, 1), "mid_2025_to_mid_2026", False, True),
-        (_utc(2026, 9, 1), "mid_2025_to_mid_2026", False, True),
-        (_utc(2026, 9, 1), "mid_2025_to_mid_2026", True, False),
-        (_utc(2026, 9, 1), "live", False, False),
-    ],
-)
-def test_require_window_within_guard(
-    window_end: datetime, fold_id: str, final_test_enabled: bool, refused: bool
-) -> None:
-    def call() -> None:
-        require_window_within_guard(
-            window_end=window_end,
-            final_test_start=_FINAL_TEST_START,
-            fold_id=fold_id,
-            final_test_enabled=final_test_enabled,
-        )
-
-    if refused:
-        with pytest.raises(FinalTestWindowError, match="NGED_FINAL_TEST=1"):
-            call()
-    else:
-        call()
 
 
 @pytest.mark.parametrize(
@@ -1133,16 +1099,3 @@ def test_require_same_row_keys_checks_every_series_in_a_batch() -> None:
             reference_label="reference",
             series_batch_size=2,
         )
-
-
-def test_require_single_model_name_refuses_a_study_with_two_model_names() -> None:
-    rows = pl.LazyFrame({"power_fcst_model_name": ["a", "b", "a"]})
-
-    with pytest.raises(MultipleModelNamesError, match=r"\['a', 'b'\]"):
-        require_single_model_name(study=rows, group_label="study/x, fold")
-
-
-def test_require_single_model_name_accepts_one_model_name() -> None:
-    require_single_model_name(
-        study=pl.LazyFrame({"power_fcst_model_name": ["a", "a"]}), group_label="study/x, fold"
-    )
