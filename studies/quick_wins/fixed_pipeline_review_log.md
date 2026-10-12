@@ -103,3 +103,10 @@ hash, and compares canonically rechunked five-column training keys. It still rej
 duplicate, reordered or genuinely different keys and differing cleaned-training counts.
 A fresh review by `reference_results_science_review` found no blockers before execution
 (commit `4f1def67`). The fallback serialized-key guard remains strict when frame paths are absent.
+
+A separate fresh reviewer cleared the point-control total-gain reporter before execution.
+Synthetic probes checked gain mapping, zero fill, normalization and invalid-input refusals.
+The accepted provenance improvement records the fitted script and dependency hashes directly;
+the reviewer checked those fields against the fitter manifest and cleared the addition.
+Shares are normalized per booster, then averaged equally across series and six fold/seed refits.
+The reported range is refit variability, not an interval or evidence that a feature helps.
