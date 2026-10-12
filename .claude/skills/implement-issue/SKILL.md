@@ -21,8 +21,8 @@ reads the issue, decides whether it is worth implementing, sizes the process it 
 review. It also does step 1 below and opens the PR as a draft, so implementation resumes at step 2.
 
 The one issue that arrives **without** a plan is one `plan-issue` sized as simple: a mechanical
-change with no design to approve. It runs steps 1 to 4, then the prose-review pass below if the diff
-carries new prose, then stops at step 9 with no adversarial pass. If you reach this skill without
+change with no design to approve. It runs steps 1 to 4, then step 9 if the diff carries new
+prose, then stops at step 10 with no adversarial pass. If you reach this skill without
 `plan-issue` — a direct instruction to fix something, say — size the issue first, using
 `plan-issue` step 3, and say which size you picked before you start.
 
@@ -150,14 +150,15 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
    reason; the tallies show over time which reviews find genuine defects. Every review ends with
    the branch pushed, so GitHub always shows the state the last review left.
 
-9. **Stop for human review. Never merge.** Report the size the issue was given, which reviews ran,
-   what each changed, and what each found that you rejected.
+9. **Prose review, if the diff carries more than a few lines of new prose** — a docstring, a README
+   section, a skill update, a PR body, in a Python or markdown file. Step 5 checks only concision,
+   not the sentence-level rule sweep the `prose-review` skill runs, so a diff heavy in new prose
+   can pass it with pronoun, superlative and umbrella-noun violations still in it. Run this after
+   step 8, so no later fix brings back prose the sweep has checked. Size the pass using
+   `prose-review`'s own table, fix what it finds, and commit and push as a separate commit.
 
-**Run a prose-review pass whenever the diff carries more than a few lines of new prose** — a
-docstring, a README section, a skill update, a PR body, in a Python or markdown file. Step 5 checks
-only concision, not the sentence-level rule sweep the `prose-review` skill runs, so a diff heavy in
-new prose can pass it with pronoun, superlative and umbrella-noun violations still in it. Size the
-pass using `prose-review`'s own table, fix what it finds, and push again before stopping.
+10. **Stop for human review. Never merge.** Report the size the issue was given, which reviews ran,
+    what each changed, and what each found that you rejected.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
