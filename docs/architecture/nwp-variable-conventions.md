@@ -103,6 +103,10 @@ meaningful; their error is the mean circular distance instead.
 
 ## What the half-hourly resample does today
 
+[Issue
+#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
+plans an audit that measures how much each defect below changes the forecast score.
+
 `_upsample_nwp_to_half_hourly` builds a 30-minute grid per `(nwp_init_time, ensemble_member,
 time_series_id)` group, left-joins the native steps onto it, then **linearly interpolates every
 column in `Nwp.continuous_var_names()`** and forward-fills the categorical one.
