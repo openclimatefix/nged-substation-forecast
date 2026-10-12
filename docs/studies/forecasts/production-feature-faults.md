@@ -81,8 +81,8 @@ the resampler’s causal effect.
 ![Pooled engineered short-wave profiles at short and long forecast leads.](../assets/production_feature_faults_radiation_profile.svg)
 
 A positive native mean at a dark endpoint can be legitimate: the preceding interval may contain
-daylight. The audit separately checks fully dark native intervals, and finds no positive native
-radiation in those checked intervals. Do not repair native means by setting every dark endpoint to
+daylight. The audit separately checks fully dark native intervals, and finds no native radiation
+above 1 W/m² in those checked intervals. Do not repair native means by setting every dark endpoint to
 zero.
 
 **Recommended production change:** give interval-mean fields a dedicated resampling path in
