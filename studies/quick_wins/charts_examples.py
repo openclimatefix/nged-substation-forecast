@@ -9,7 +9,7 @@ chosen by a rule too: the lower-middle series of its type when the type's series
 members before and after the post hoc B1 spread calibration. Figure 12 draws the ensemble mean's
 absolute error by lead day for every run.
 
-Every figure's text is written to `docs/studies/assets/quick_wins_figure_text.md` (replacing only
+Every figure's text is written to `studies/quick_wins/figure_text.md` (replacing only
 sections 7 to 12) before any figure is rendered. An NGED generator's power is normalised by its
 effective capacity, labelled with `studies.anonymise`, and plotted against days since the run began,
 never against a calendar date.
@@ -41,7 +41,7 @@ from studies.charts import CONTENT_WIDTH_PX, wrapped
 ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"
 """Where the figures and the figure text file are written."""
 
-TEXT_FILE: Final[Path] = ASSETS_DIR / "quick_wins_figure_text.md"
+TEXT_FILE: Final[Path] = Path(__file__).parent / "figure_text.md"
 """The file holding every quick-wins figure's text, one `## Figure N` section per figure."""
 
 SHOWN_DAYS: Final[int] = 7

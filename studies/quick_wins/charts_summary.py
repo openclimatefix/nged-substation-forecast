@@ -7,7 +7,7 @@ baselines' levels (manual heuristic and climatology) on the rows they share with
 per-series change of the chosen cleaning rule in Figure 5.
 
 The text of every figure (title, subtitle, panel titles, axis titles, legend entries, annotations)
-is written to `docs/studies/assets/quick_wins_figure_text.md` before any chart is rendered, so a
+is written to `studies/quick_wins/figure_text.md` before any chart is rendered, so a
 reviewer can read it first. Another script writes Figures 7 onward into the same file, so this
 script replaces only its own `## Figure N` sections.
 
@@ -36,7 +36,7 @@ from studies import charts
 ASSET_DIR: Final[Path] = PROJECT_ROOT / "docs" / "studies" / "assets"
 """Where the SVG files and the figure-text file are written."""
 
-TEXT_FILE: Final[Path] = ASSET_DIR / "quick_wins_figure_text.md"
+TEXT_FILE: Final[Path] = Path(__file__).parent / "figure_text.md"
 """The text of every figure, one `## Figure N` section each, for review before rendering."""
 
 SVGO_COMMAND: Final[tuple[str, ...]] = (
