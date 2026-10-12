@@ -91,7 +91,8 @@ reads them as an ensemble.
 Two of its properties set our floor. It **consumes no numerical weather prediction (NWP) data**, so
 an NWP outage does not degrade it at all — which makes an NWP outage the hard test for us. (In
 cross-validation, the manual heuristic's rows still come from the NWP runs in the archive, so an
-NWP run missing from the archive removes that run's rows.) And the manual heuristic **survives a power-data
+NWP run missing from the archive removes that run's rows.) And the manual heuristic **survives a
+power-data
 outage**, because the 49–55-week-old analogues are indifferent to recent
 staleness. The manual heuristic already embodies this philosophy, which is why it is the right
 baseline to measure ourselves against, and it gives a far better failure criterion than any
@@ -153,7 +154,8 @@ rather than the event level, because that is what decides whether anybody is tol
 | **nobody is told 🚧** | No Sentry event is sent. Each cell says where the fault does show up instead — usually Dagster's Checks view, which only helps somebody who already went to look — and what the silence costs |
 | **n/a** | Not a production path |
 
-**run failed** and **digest** are mostly `error`-level events (the `report_asset_retry` warning is the
+**run failed** and **digest** are mostly `error`-level events (the `report_asset_retry` warning is
+the
 exception), which is exactly why the level cannot be the discriminator — see [Send telemetry to
 Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
 **No production row should read "nobody is told"** — that is [rule 4](#the-rules), and the rows that
@@ -322,8 +324,9 @@ become a weather-blind model — it falls back on arbitrary default directions, 
 has to be earned by training for the outage, not assumed. Second, the case where the guarantee
 genuinely holds is narrower than it first looks: routing is only one of three mechanisms that meet a
 null here, and the other two act before the model sees anything. Where it does hold is chiefly the
-lead-0 window, whose nulls are in every training run and do reach the model as nulls. A blocky null
-in the interior of the horizon is bridged into a value before routing ever sees it — see
+lead-0 window, whose nulls are in every training run and do reach the model as nulls. An interior
+radiation gap remains null, whereas precipitation
+is bridged into a value before routing sees it — see
 [Missingness in learned models](#missingness-in-learned-models).
 
 ### Widening bands: the in-band signal
@@ -413,18 +416,15 @@ source accumulation: scattered per-pixel in the ordinary case, occasionally a wh
 Issues](../architecture/ecmwf-ens-known-issues.md) for the full account. It is present in every run
 we ingest, so it is in-distribution and needs no scenario.
 
-Be precise about what "handled" means here, because *three* different mechanisms are at work and
-only one of them is XGBoost's. **Spatial renormalisation** absorbs most scattered corruption at
-ingest, before it becomes a null at all. **Temporal interpolation** bridges the blocky nulls in the
-interior of the horizon, because `_upsample_nwp_to_half_hourly` fills interior nulls while
-resampling to the half-hourly grid. **Default-direction routing** takes what is left — the lead-0
-nulls, and a wholly-null slice at the very end of the horizon, since `interpolate()` leaves trailing
-nulls alone just as it leaves leading nulls. Those two are where "XGBoost handles the missingness it
-saw during training" genuinely holds. Which null meets which mechanism is worked through in [Known
-ECMWF ENS Data-Quality
-Issues](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated).
+Be precise about what "handled" means here. **Spatial renormalisation** absorbs most scattered
+corruption at ingest. **Radiation reconstruction preserves missing native windows**, so the model
+sees their nulls. **Temporal point interpolation** still bridges interior precipitation nulls,
+while leaving leading/trailing nulls. **Default-direction routing** handles the nulls reaching the
+model, with its guarantee limited to patterns represented in training. The distinction is worked
+through in [Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated).
 
-**Temporal interpolation is the design point**, because it is imputation, already happening, chosen
+**Temporal interpolation of precipitation is the remaining design point**, because it is
+imputation, already happening, chosen
 by nobody — which inverts the obvious worry: the risk is not that someone might later "fix" this by
 imputing, it is that the fill already exists and is unbounded, unflagged, and unmeasured. Making it
 deliberate is [a planned

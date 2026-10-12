@@ -107,6 +107,8 @@ def _write_metadata(path: Path) -> None:
             "time_series_id": pl.Series([1, 2], dtype=pl.Int32),
             "h3_res_5": pl.Series([_TS1_CELL, _TS2_CELL], dtype=pl.UInt64),
             "time_series_type": ["Primary", "Primary"],
+            "latitude": [53.0] * 2,
+            "longitude": [-0.5] * 2,
         }
     ).write_parquet(path)
 

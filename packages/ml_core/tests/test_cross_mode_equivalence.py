@@ -211,3 +211,65 @@ def test_bulk_and_single_run_features_are_identical() -> None:
         single_run.select(_COMPARE_COLS).sort(_SORT_COLS),
         check_dtypes=False,
     )
+
+
+def test_native_radiation_bulk_and_single_run_are_identical() -> None:
+    """Backward-window radiation and its rolling features share the same predecessor rows."""
+    power, metadata, nwp = _build_fixtures()
+    metadata = pt.DataFrame(
+        pl.DataFrame._from_pydf(metadata._df).with_columns(
+            latitude=pl.lit(52.0), longitude=pl.lit(0.0)
+        )
+    ).set_model(TimeSeriesMetadata)
+    short_wave = "downward_short_wave_radiation_flux_surface"
+    long_wave = "downward_long_wave_radiation_flux_surface"
+    # Keep power half-hourly, but radiation input must describe disjoint native 3-hour windows.
+    nwp = nwp.filter(
+        (pl.col("valid_time").dt.minute() == 0) & (pl.col("valid_time").dt.hour() % 3 == 0)
+    ).with_columns(
+        **{
+            short_wave: pl.when(pl.col("valid_time") == pl.col("init_time"))
+            .then(None)
+            .otherwise(20.0 + pl.col("valid_time").dt.hour() * 10),
+            long_wave: pl.when(pl.col("valid_time") == pl.col("init_time"))
+            .then(None)
+            .otherwise(200.0 + pl.col("valid_time").dt.hour() * 5),
+        }
+    )
+    features = {short_wave, long_wave, f"{short_wave}_rolling_mean_3h", f"{long_wave}_lag_7h"}
+    bulk = _engineer_features(
+        selected_features=features,
+        power_time_series=power,
+        time_series_metadata=metadata,
+        nwp=nwp,
+        nwp_publication_delay_hours=_DELAY_HOURS,
+    ).collect()
+    columns = [
+        "time_series_id",
+        "nwp_init_time",
+        "power_fcst_init_time",
+        "valid_time",
+        "ensemble_member",
+        *sorted(features),
+    ]
+    for run in _NWP_RUNS:
+        issued = run + timedelta(hours=_DELAY_HOURS)
+        single = (
+            _engineer_features(
+                selected_features=features,
+                power_time_series=power,
+                time_series_metadata=metadata,
+                nwp=nwp,
+                power_fcst_init_time=issued,
+                nwp_init_time=run,
+                nwp_publication_delay_hours=_DELAY_HOURS,
+            )
+            .collect()
+            .filter(pl.col("valid_time") > issued)
+        )
+        expected = bulk.filter(pl.col("nwp_init_time") == run)
+        # The single-run output extends over the power timeline beyond this weather horizon.
+        single = single.filter(pl.col("valid_time") <= run + timedelta(hours=_WINDOW_HOURS))
+        assert_frame_equal(
+            expected.select(columns).sort(_SORT_COLS), single.select(columns).sort(_SORT_COLS)
+        )

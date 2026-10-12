@@ -95,7 +95,7 @@ def _write_power(path: str) -> None:
 def _metadata_for(
     time_series_ids: tuple[int, ...], cells: tuple[int, ...]
 ) -> pt.DataFrame[TimeSeriesMetadata]:
-    """A metadata table holding the two columns the feature pipeline reads.
+    """Metadata with cell identity and solar coordinates for the feature pipeline.
 
     ``set_model`` rather than ``validate``, as the assets' own readers do, so a partial frame is
     enough.
@@ -105,6 +105,8 @@ def _metadata_for(
             {
                 "time_series_id": pl.Series(time_series_ids, dtype=pl.Int32),
                 "h3_res_5": pl.Series(cells, dtype=pl.UInt64),
+                "latitude": [53.0] * len(cells),
+                "longitude": [-0.5] * len(cells),
             }
         )
     ).set_model(TimeSeriesMetadata)

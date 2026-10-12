@@ -1,0 +1,280 @@
+from datetime import UTC, datetime, timedelta
+from typing import Final, Literal
+
+import numpy as np
+import polars as pl
+import pvlib
+import pytest
+from ml_core.features._nwp import _upsample_nwp_to_half_hourly
+from ml_core.features._radiation import LONG_WAVE, SHORT_WAVE, _half_hour_clear_sky
+from polars.testing import assert_frame_equal
+
+COORDINATES: Final[pl.LazyFrame] = pl.DataFrame(
+    {"time_series_id": [1], "latitude": [52.0], "longitude": [0.0]}
+).lazy()
+
+
+def _native(
+    *,
+    start: datetime,
+    leads: list[int],
+    short_wave: list[float | None],
+    long_wave: list[float | None] | None = None,
+) -> pl.DataFrame:
+    frame = pl.DataFrame(
+        {
+            "time_series_id": [1] * len(leads),
+            "nwp_init_time": [start] * len(leads),
+            "ensemble_member": [0] * len(leads),
+            "valid_time": [start + timedelta(hours=lead) for lead in leads],
+            SHORT_WAVE: short_wave,
+        }
+    )
+    if long_wave is not None:
+        frame = frame.with_columns(pl.Series(name=LONG_WAVE, values=long_wave))
+    return frame.cast({name: pl.Float32 for name in (SHORT_WAVE, LONG_WAVE) if name in frame})
+
+
+def _resample(
+    frame: pl.DataFrame,
+    *,
+    coordinates: pl.LazyFrame = COORDINATES,
+    engine: Literal["auto", "streaming"] = "auto",
+) -> pl.DataFrame:
+    return (
+        _upsample_nwp_to_half_hourly(frame.lazy(), solar_coordinates=coordinates)
+        .collect(engine=engine)
+        .sort("valid_time")
+    )
+
+
+def _reference_sky(*, times: pl.Series, latitude: float, longitude: float) -> np.ndarray:
+    samples = []
+    for offset in (450, 1350):
+        stamps = times - timedelta(seconds=offset)
+        position = pvlib.solarposition.get_solarposition(
+            time=stamps.to_numpy(), latitude=latitude, longitude=longitude
+        )
+        cosine = np.maximum(np.cos(np.deg2rad(position["zenith"].to_numpy())), 0)
+        samples.append(
+            np.where(cosine > 0, 1098 * cosine * np.exp(-0.059 / np.maximum(cosine, 1e-12)), 0)
+        )
+    return np.mean(samples, axis=0)
+
+
+@pytest.mark.parametrize(
+    ("date", "latitude", "longitude"),
+    [
+        (datetime(2024, 2, 29, tzinfo=UTC), 49.0, -9.0),
+        (datetime(2026, 6, 21, tzinfo=UTC), 61.0, 2.0),
+        (datetime(2026, 12, 21, tzinfo=UTC), 52.0, 0.0),
+    ],
+)
+def test_solar_geometry_against_independent_reference(
+    date: datetime, latitude: float, longitude: float
+) -> None:
+    times = pl.datetime_range(date, date + timedelta(days=1), interval="30m", eager=True)
+    targets = pl.DataFrame({"time_series_id": [1] * len(times), "valid_time": times})
+    coordinates = pl.DataFrame(
+        {"time_series_id": [1], "latitude": [latitude], "longitude": [longitude]}
+    ).lazy()
+    actual = _half_hour_clear_sky(targets=targets.lazy(), coordinates=coordinates).collect()
+    actual = actual.sort("valid_time")["_clear_sky"].to_numpy()
+    expected = _reference_sky(times=times, latitude=latitude, longitude=longitude)
+    # NOAA fractional-year geometry is approximate; this absolute bound includes its sunrise
+    # error without accepting the multi-hour error from treating native means as snapshots.
+    np.testing.assert_allclose(actual, expected, atol=12, rtol=0)
+
+
+@pytest.mark.parametrize("width", [3, 6])
+def test_clear_day_timing_and_dark_targets(width: int) -> None:
+    start = datetime(2026, 3, 21, tzinfo=UTC)
+    times = pl.datetime_range(
+        start + timedelta(minutes=30), start + timedelta(days=3), interval="30m", eager=True
+    )
+    truth = _reference_sky(times=times, latitude=52, longitude=0) * 0.7
+    means = truth.reshape(-1, width * 2).mean(axis=1)
+    # Six-hour windows are native after day six; move init backward for that case.
+    init = start - timedelta(days=6) if width == 6 else start
+    leads = [int((start - init).total_seconds() / 3600) + i * width for i in range(len(means) + 1)]
+    native = _native(start=init, leads=leads, short_wave=[None, *means.tolist()])
+    result = _resample(native)
+    interior = result.filter(
+        (pl.col("valid_time") > start + timedelta(days=1))
+        & (pl.col("valid_time") <= start + timedelta(days=2))
+    )
+    expected = truth[48:96]
+    actual = interior[SHORT_WAVE].to_numpy()
+    hours = np.arange(1, 49) / 2
+    assert abs(np.average(hours, weights=actual) - np.average(hours, weights=expected)) < 0.06
+    np.testing.assert_allclose(actual, expected, atol=12, rtol=0)
+    assert actual[hours >= 20].max() == 0
+
+
+@pytest.mark.parametrize("engine", ["auto", "streaming"])
+def test_energy_transition_first_and_final_windows(engine: Literal["auto", "streaming"]) -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    leads = [0, 3, 6, 141, 144, 150, 156, 354, 360]
+    native = _native(
+        start=start,
+        leads=leads,
+        short_wave=[None, 5.0, 20.0, 200.0, 10.0, 90.0, 300.0, 30.0, 100.0],
+        long_wave=[None, 210.0, 220.0, 240.0, 250.0, 260.0, 270.0, 280.0, 290.0],
+    )
+    result = _resample(native, engine=engine)
+    assert result.filter(pl.col("valid_time") == start)[SHORT_WAVE][0] is None
+    for row in native.iter_rows(named=True):
+        lead = int((row["valid_time"] - start).total_seconds() / 3600)
+        if lead == 0:
+            continue
+        width = 3 if lead <= 144 else 6
+        window = result.filter(
+            (pl.col("valid_time") > row["valid_time"] - timedelta(hours=width))
+            & (pl.col("valid_time") <= row["valid_time"])
+        )
+        assert window.height == width * 2
+        for column in (SHORT_WAVE, LONG_WAVE):
+            assert window[column].mean() == pytest.approx(row[column], rel=2e-7, abs=1e-5)
+        assert window[LONG_WAVE].unique().to_list() == [row[LONG_WAVE]]
+    assert result.schema[SHORT_WAVE] == pl.Float32
+
+
+@pytest.mark.parametrize("absent_row", [False, True])
+def test_source_missing_window_is_not_filled(absent_row: bool) -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start,
+        leads=[0, 3, 6, 9, 12],
+        short_wave=[None, 10.0, None, 200.0, 300.0],
+        long_wave=[None, 250.0, None, 300.0, 350.0],
+    )
+    if absent_row:
+        native = native.filter(pl.col("valid_time") != start + timedelta(hours=6))
+    result = _resample(native)
+    missing = result.filter(
+        (pl.col("valid_time") > start + timedelta(hours=3))
+        & (pl.col("valid_time") <= start + timedelta(hours=6))
+    )
+    for column in (SHORT_WAVE, LONG_WAVE):
+        assert missing[column].null_count() == 6
+    assert result.filter(pl.col("valid_time") == start + timedelta(minutes=30))[SHORT_WAVE][0] == 10
+
+
+def test_midpoint_index_final_shape_and_missing_gap_isolation() -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    times = pl.datetime_range(
+        start + timedelta(minutes=30), start + timedelta(hours=24), interval="30m", eager=True
+    )
+    sky = (
+        _half_hour_clear_sky(
+            targets=pl.DataFrame({"time_series_id": [1] * len(times), "valid_time": times}).lazy(),
+            coordinates=COORDINATES,
+        )
+        .collect()
+        .sort("valid_time")["_clear_sky"]
+        .to_numpy()
+    )
+    indices = np.array([0.0, 0.3, 0.4, 0.9, 0.5, 0.2, 0.7, 0.0])
+    means = sky.reshape(8, 6).mean(axis=1) * indices
+    native = _native(start=start, leads=list(range(0, 25, 3)), short_wave=[None, *means.tolist()])
+    result = _resample(native)[SHORT_WAVE].to_numpy()[1:]
+    # Independently construct the daylight interpolation and normalise each six-target window.
+    daylight = sky.reshape(8, 6).mean(axis=1) >= 1
+    midpoints = np.arange(1.5, 24, 3)[daylight]
+    ratios = (
+        np.array(native[SHORT_WAVE].to_list()[1:])[daylight]
+        / sky.reshape(8, 6).mean(axis=1)[daylight]
+    )
+    target_midpoints = np.arange(0.25, 24, 0.5)
+    expected = sky * np.interp(target_midpoints, midpoints, ratios)
+    wrong = sky * np.interp(target_midpoints, midpoints + 1.5, ratios)
+    for i, mean in enumerate(means):
+        block = slice(i * 6, (i + 1) * 6)
+        for values in (expected, wrong):
+            values[block] *= mean / values[block].mean() if values[block].mean() > 0 else 0
+    np.testing.assert_allclose(result, expected, atol=3e-5, rtol=3e-7)
+    assert np.max(np.abs(result - wrong)) > 20
+    missing = native.with_columns(
+        pl.when(pl.col("valid_time") == start + timedelta(hours=12))
+        .then(None)
+        .otherwise(pl.col(SHORT_WAVE))
+        .alias(SHORT_WAVE)
+    )
+    changed = missing.with_columns(
+        pl.when(pl.col("valid_time") == start + timedelta(hours=9))
+        .then(800.0)
+        .otherwise(pl.col(SHORT_WAVE))
+        .alias(SHORT_WAVE)
+    )
+    after_gap = pl.col("valid_time") > start + timedelta(hours=12)
+    assert_frame_equal(_resample(missing).filter(after_gap), _resample(changed).filter(after_gap))
+
+
+def test_dark_tiny_denominator_and_cropped_first_window() -> None:
+    start = datetime(2026, 12, 21, tzinfo=UTC)
+    native = _native(start=start, leads=[0, 3, 6, 9, 12], short_wave=[None, 0.0, 0.4, 10.0, 50.0])
+    result = _resample(native)
+    assert (
+        result.filter(
+            (pl.col("valid_time") > start) & (pl.col("valid_time") <= start + timedelta(hours=3))
+        )[SHORT_WAVE].max()
+        == 0
+    )
+    assert result.filter(
+        (pl.col("valid_time") > start + timedelta(hours=3))
+        & (pl.col("valid_time") <= start + timedelta(hours=6))
+    )[SHORT_WAVE].unique().to_list() == pytest.approx([0.4])
+    assert result[SHORT_WAVE].drop_nulls().is_finite().all()
+    cropped = native.filter(pl.col("valid_time") >= start + timedelta(hours=9))
+    assert_frame_equal(
+        _resample(cropped), result.filter(pl.col("valid_time") >= start + timedelta(hours=9))
+    )
+
+
+def test_northern_summer_daylight_blocks_and_group_isolation() -> None:
+    start = datetime(2026, 6, 21, tzinfo=UTC)
+    init = start - timedelta(days=6)
+    coordinates = pl.DataFrame(
+        {"time_series_id": [1], "latitude": [61.0], "longitude": [2.0]}
+    ).lazy()
+    native = _native(
+        start=init,
+        leads=list(range(144, 193, 6)),
+        short_wave=[None, 80.0, 400.0, 500.0, 100.0, 50.0, 200.0, 250.0, 60.0],
+    )
+    result = _resample(native, coordinates=coordinates)
+    changed = native.with_columns(
+        pl.when(pl.col("valid_time") <= start + timedelta(days=1))
+        .then(pl.col(SHORT_WAVE) * 2)
+        .otherwise(pl.col(SHORT_WAVE))
+        .alias(SHORT_WAVE)
+    )
+    second_day = pl.col("valid_time") > start + timedelta(days=1)
+    assert_frame_equal(
+        result.filter(second_day), _resample(changed, coordinates=coordinates).filter(second_day)
+    )
+    other = native.with_columns(
+        ensemble_member=pl.lit(50, dtype=pl.Int64), **{SHORT_WAVE: pl.col(SHORT_WAVE) * 2}
+    )
+    mixed = _resample(
+        pl.concat([native, other]).sample(fraction=1, shuffle=True, seed=5), coordinates=coordinates
+    )
+    assert_frame_equal(result, mixed.filter(pl.col("ensemble_member") == 0))
+    np.testing.assert_allclose(
+        mixed.filter(pl.col("ensemble_member") == 50)[SHORT_WAVE],
+        result[SHORT_WAVE] * 2,
+        equal_nan=True,
+    )
+
+
+def test_unsupported_lead_and_long_wave_without_coordinates() -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(start=start, leads=[0, 4], short_wave=[None, 100.0])
+    assert _resample(native)[SHORT_WAVE].null_count() == 9
+    native = _native(
+        start=start, leads=[0, 3, 6], short_wave=[None, 0.0, 0.0], long_wave=[None, 200.0, 300.0]
+    ).drop(SHORT_WAVE)
+    result = _upsample_nwp_to_half_hourly(native.lazy()).collect()
+    assert result.filter(pl.col("valid_time") == start + timedelta(minutes=30))[LONG_WAVE][0] == 200
+    with pytest.raises(ValueError, match="solar_coordinates"):
+        _upsample_nwp_to_half_hourly(native.with_columns(pl.lit(0.0).alias(SHORT_WAVE)).lazy())

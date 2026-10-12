@@ -49,6 +49,8 @@ def _metadata(cells: dict[int, int]) -> pt.DataFrame[TimeSeriesMetadata]:
         {
             "time_series_id": pl.Series(list(cells), dtype=pl.Int32),
             "h3_res_5": pl.Series(list(cells.values()), dtype=pl.UInt64),
+            "latitude": [53.0] * len(cells),
+            "longitude": [-0.5] * len(cells),
         }
     )
     return pt.DataFrame(frame).set_model(TimeSeriesMetadata)

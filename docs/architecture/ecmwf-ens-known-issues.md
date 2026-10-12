@@ -134,7 +134,7 @@ an all-null group to `0.0`, which for weather is a physically plausible, in-boun
 The three de-accumulated variables — `precipitation_surface`,
 `downward_short_wave_radiation_flux_surface`, and `downward_long_wave_radiation_flux_surface` —
 carry nulls beyond the first forecast step. Dynamical de-accumulates these from ECMWF's cumulative
-source fields to instantaneous rates, and the root cause is corrupt source accumulation: some
+source fields to backward-window mean rates, and the root cause is corrupt source accumulation: some
 `(ensemble_member, forecast_step)` fields report physically-impossible *negative* accumulation,
 which the de-accumulation step correctly leaves as null rather than silently clamping corrupt data
 to zero. This is documented and WONTFIX upstream in
@@ -148,29 +148,24 @@ Occasionally a whole `(ensemble_member, valid_time)` slice arrives null across t
 member 34 at the 354-hour and 360-hour steps — 2 of that variable's 4284 `(member, step)` slices (51
 ensemble members × the 84 steps beyond lead-0).
 
-Both patterns are tolerated at ingest, for two reasons. First, a tolerated gap is a small, isolated
-part of one member's trajectory, and it is absorbed the same way the scattered corruption already
-is. Be careful with the tempting shorter version of that argument — "these variables are null at
-lead-0 anyway, so models handle their nulls" — because it does not quite transfer. Lead-0 nulls
-reach the model *as nulls* only because they are *leading*, and `_upsample_nwp_to_half_hourly`
-interpolates only *interior* nulls; an interior wholly-null slice is bridged from its neighbouring
-steps, so the model sees a fabricated value instead. Note the span that bridges: losing one native
-step means interpolating between the steps *either side* of it, so 6 hours in the 3-hourly part of
-the horizon and 12 in the 6-hourly part. That is acceptable, but it is a different claim from "the
-model sees a null and copes" — and it is the reason a *spatial* average over the same step's
-neighbouring grid points, which is what the aggregation above does to the scattered nulls, is the
-better of the two.
+**Both patterns are tolerated at ingest because most of each run is still useful.** Spatial
+renormalisation absorbs scattered missing grid points where other contributions exist in the same
+cell and step. A wholly missing radiation window stays null through the
+[conservative resampler](nwp-variable-conventions.md#radiation-resampling), including interior and
+trailing windows. The model therefore needs training examples with these source-missing windows;
+lead-zero missingness alone does not establish that every gap pattern is learned.
 
-Which of those two a slice gets depends on where it sits in the horizon, and the dswrf example above
-is the awkward case: 360 h is the *last* of the 85 steps, and `interpolate()` leaves trailing nulls
-alone exactly as it leaves leading nulls. So that slice is neither absorbed nor bridged — it reaches
-the model as a null, which is benign for a variable that is already null at lead-0 in every run, but
-it is not the "absorbed" case. Second, the run that failing would discard is overwhelmingly good.
-Take that 2026-08-09 run as the worked example: 0.05% of one already-nullable variable is not worth
-the other 4282 slices of that same variable, nor the 12 other variables that arrived complete.
-Rejecting it leaves the live forecast on a run 24 hours older. That is exactly the trade [principle
-7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary) warns against, in
-its own words: throwing away an otherwise-good NWP run converts a tolerable problem into an outage.
+**Precipitation still takes a different path.** Its generic point interpolation bridges interior
+nulls but leaves leading/trailing nulls. A single missing native step produces a 6-hour bridge on
+the 3-hour grid or a 12-hour bridge on the 6-hour grid. The planned
+[bounded-filling experiment](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)
+will make that choice deliberate and measurable.
+
+In the 2026-08-09 example, 0.05% of one already-nullable variable is not worth discarding the other
+4282 slices of that variable or the 12 other variables that arrived complete. Rejecting the run
+leaves the live forecast on weather 24 hours older. That is the trade
+[principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary) warns
+against: throwing away an otherwise-good run converts a tolerable problem into an outage.
 
 `Nwp.validate` therefore permits both patterns, and the `nwp_has_no_unexpected_nulls` asset check
 reports them (WARN, non-blocking), naming the affected `(variable, ensemble_member, valid_time)`

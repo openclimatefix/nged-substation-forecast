@@ -261,7 +261,12 @@ def _engineer_features(
 
     if nwp_lf is not None:
         _renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
-        _upsampled = _upsample_nwp_to_half_hourly(_renamed)
+        solar_coordinates = (
+            metadata_lf.select("time_series_id", "latitude", "longitude")
+            if "downward_short_wave_radiation_flux_surface" in _renamed.collect_schema()
+            else None
+        )
+        _upsampled = _upsample_nwp_to_half_hourly(_renamed, solar_coordinates=solar_coordinates)
         processed_nwp: pl.LazyFrame | None = _upsampled.with_columns(
             nwp_lead_time_hours=(
                 (pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_seconds() / 3600
