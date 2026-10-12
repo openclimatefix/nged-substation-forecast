@@ -323,5 +323,10 @@ tests or data rebuild are needed before reviewing the design.
 Simplicity review accepted: preserve the existing `WeatherFeature` model vocabulary instead of
 introducing derived static categories; prefer a compute-only fresh-table rewrite for u/v alone;
 preserve the existing calm-direction formula; limit the structural wrap-safety claim to stored
-components. Scalar storage remains conditional on the requested measurement. No findings rejected.
+components. Scalar storage remains conditional on the requested measurement.
+
+Rejected: extract a private configurable writer and call it from the study. Study imports must
+use public package APIs, and the issue explicitly asks for `write_nwp` itself. The three small
+experimental variants keep the production write path literal without widening its public API.
+Revisit this cost only if the benchmark implementation shows the variants are harder to maintain.
 The correctness/testability review is pending.
