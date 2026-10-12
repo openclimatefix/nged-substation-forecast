@@ -69,7 +69,10 @@ wind farms, which the plan asked about, made both worse.
   the arms fitted with three seeds, and 0.6 points above the heuristic's. One arm fitted with one
   seed, which adds the heuristic's weekly inputs, scores 7.63%. Of the 3.5 points, about 1.3 come
   from a better point forecast (the MAE falls by 1.35) and about 2.2 from the spread. Quantile
-  training takes about 8 times longer.
+  training takes about 8 times longer. Against spread rescaling on the same 45 later runs, the
+  quantile gain is smaller: 0.4 points for the plain arm and about 1.0 for the best arm. The
+  459-value distribution is still too narrow (57% coverage of a nominal 80% band), and the control
+  member's 9 quantiles alone score 0.33 points better than the crossed sample.
 - **The point forecast is good at short leads and loses its edge from day 3.** At days 0 to 2 the
   best point-forecast arm's MAE is 9.5% against the heuristic's 11.3%, and for wind farms 10.0%
   against 19.2%. These are point estimates, and the study computed no paired interval against the
@@ -88,9 +91,9 @@ wind farms, which the plan asked about, made both worse.
   substations a little.** Cutting the training window from 15 to 12 months raises CRPS by 0.07
   points [−0.01, 0.14], and to 6 months by 0.48. Showing the model the 6 weekly analogue
   observations the heuristic uses lowers CRPS by 0.24 points [−0.39, −0.07].
-- **Cleaning the training data matters for 2 of 31 series.** Dropping the 6 weeks after a new meter
-  first reads live lowers CRPS by 0.31 points. Rules for zeros, spikes, dropouts, switching days,
-  and commissioning ramps changed it by 0.07 points or less.
+- **Cleaning the training data matters for 2 of 31 series.** Dropping every half-hour up to 6 weeks
+  after a new meter first reads live lowers CRPS by 0.31 points. Rules for zeros, spikes, dropouts,
+  switching days, and commissioning ramps changed it by 0.07 points or less.
 
 ## Why the XGBoost forecast scores worse than the heuristic
 
@@ -106,10 +109,10 @@ wind farms, which the plan asked about, made both worse.
   itself, which needs a custom objective or a neural network, and it did not measure whether the 9
   quantile levels are the right number.
 - **Is the feature pipeline broken?** The study found no sign of it, and did not audit it. The point
-  forecast beats the heuristic by 1.8 points of MAE at days 0 to 2, which a pipeline that mis-joined
-  the weather would not do. Some columns still mislead the model: removing 8 columns that wind farms
-  cannot use lowered wind CRPS by 3.3 points, although the matching 11-column cut for solar farms
-  raised solar CRPS by 0.26 points.
+  forecast beats the heuristic by 1.8 points of MAE at days 0 to 2, which argues against a gross
+  mis-join, but a lead-dependent or one-hour offset would not be excluded. Some columns still
+  mislead the model: removing 8 columns judged irrelevant to wind farms lowered wind CRPS by 3.3
+  points, although the matching 11-column cut for solar farms raised solar CRPS by 0.26 points.
 - **Do we need more years, or an ERA5 first stage?** The study cannot say. Over the 15 months
   available, a longer window helps with diminishing returns: removing the oldest 3 months raises
   CRPS by 0.07 points on fold A. The 15 months hold one winter, so the gain from a second winter, or
@@ -131,13 +134,13 @@ months, one seed) beside it. Each effect is in points of capacity.
 | Order | Change | Planned? | Effect on fold A | Effect on fold B | Effort |
 |---|---|---|---|---|---|
 | 1 | Train with `reg:absoluteerror` | planned | −0.42 [−0.48, −0.37], 12 of 12 months | −0.37 [−0.46, −0.28], 15 of 15 | One config line |
-| 2 | Choose the tree count by early stopping on the last 6 training weeks, then refit | planned | −0.38 [−0.52, −0.24], 11 of 12 | −0.77 [−0.98, −0.55], 15 of 15 | Small change in the training loop |
-| 3 | Train with quantile loss at 9 levels instead of squared error, and score every member times every level | post hoc | −2.39 [−2.52, −2.27], 12 of 12 | −2.60 [−2.74, −2.46], 15 of 15 | Training takes about 8 times longer; the forecast becomes 51 × 9 values |
+| 2 | Choose the tree count by early stopping on the last 6 training weeks, then refit (it roughly doubles the CRPS of the single biofuel generator, +1.16 [0.80, 1.54], so exclude that series or check it) | planned | −0.38 [−0.52, −0.24], 11 of 12 | −0.77 [−0.98, −0.55], 15 of 15 | Small change in the training loop |
+| 3 | Train with quantile loss at 9 levels instead of squared error, and score every member times every level | post hoc | −2.39 [−2.52, −2.27], 12 of 12 | −2.60 [−2.74, −2.46], 15 of 15 | Training takes about 8 times longer; the forecast becomes 51 × 9 values. Against spread rescaling on the same 45 later runs the gain is 0.4 points for the plain arm and 0.8 to 1.0 for the best arm (see the quantile section) |
 | 4 | Show wind farms fewer columns (drop weekday, radiation, dew point, precipitation type, time of year) | post hoc | −0.32 [−0.38, −0.26], 12 of 12 (wind alone −3.3) | −0.35 [−0.45, −0.25], 15 of 15 | One column list |
-| 5 | Add the forecast lead time in hours as a column | planned | −0.05 [−0.08, −0.03], 10 of 12 | −0.08 [−0.11, −0.05], 15 of 15 | Small, and a small effect |
+| 5 | Add the forecast lead time in hours as a column | planned | −0.05 [−0.08, −0.03], 10 of 12 | −0.08 [−0.11, −0.05], 15 of 15 | Small. The arm beats a control padded with one shuffled column by 0.05 points [0.02, 0.07], so the gain is not an artefact of column count; it sits at 48 to 72 hours and in wind farms |
 | 6 | Rescale each series' ensemble spread by a factor fitted on past outcomes, for the point-forecast arms | planned idea, post hoc form | −1.9 for production with cleaning, −1.3 to −1.4 for the best point arm (CRPS only) | −1.95 and −1.3 (seed 0) | A post-processing step and a state file |
-| 7 | One XGBoost model per series type, with a site identifier | post hoc | −0.82 [−0.96, −0.69], 12 of 12 | −0.51 [−0.81, −0.28], 15 of 15; adds nothing to the best point arm | A new training layout |
-| 8 | Drop the 6 weeks after a meter first reads live from training | post hoc | −0.31 [−0.62, −0.06], 9 of 12 (2 series) | No effect by construction | A rule in the cleaning step |
+| 7 | One XGBoost model per series type, with a site identifier | post hoc | −0.82 [−0.96, −0.69], 12 of 12 | −0.51 [−0.81, −0.28], 15 of 15; adds nothing to the best point arm | A new training layout; the site identifier is the raw series number used as an ordered value, which is untested at 2,500 series, so use a categorical identifier or per-site target encoding; on fold B pooling cut the demand gain from −0.65 to −0.35 (t-interval [−0.87, +0.13]) |
+| 8 | Drop from training every half-hour before a meter has been live for 6 weeks | post hoc | −0.31 [−0.62, −0.06] (t-interval [−0.61, +0.02], which includes zero), 9 of 12 (2 series) | No effect by construction | A rule in the cleaning step |
 
 **The four changes together score a CRPS of 7.85% on fold A, 3.50 points [−3.71, −3.28] below
 production with cleaning and 3.7 points below the study's refit of the stored production
@@ -198,10 +201,10 @@ squared error, on the control member's rows. The report prints every arm's colum
 cleaning rule. The CRPS of a quantile arm scores the sample made of every member crossed with every
 quantile level, 459 values per half-hour.
 
-**Round 0 chose one cleaning rule, and every later arm applies it.** The rule drops the 6 weeks
-after a meter first reads live from the training rows. "Production with cleaning" is production plus
-this rule, and it is the control for every later contrast. The round 0 section below gives the
-evidence.
+**Round 0 chose one cleaning rule, and every later arm applies it.** The rule drops from the
+training rows every half-hour before a meter has been live for 6 weeks. "Production with cleaning"
+is production plus this rule, and it is the control for every later contrast. The round 0 section
+below gives the evidence.
 
 **Intervals resample whole validation months, with the same draw for every arm.** The 31 series
 share their weather, so months are the independent units. The page quotes the 95% interval from
@@ -254,13 +257,23 @@ model with a site identifier lowers demand error most (−1.18 points) and does 
 wind. The absolute-error objective also lowers demand error, by 0.15 points. Three wind farms and
 four raw-flow series carry many of the gains, so a wind result rests on three farms.
 
-**Removing the power lags made solar and wind worse, and this does not conflict with the
-same-hour-lag study.** [That study](lag-features.md) found a same-hour lag did not change day-ahead
-MAE at 6 solar plants. This study removed four lags (24, 48, 168, and 336 hours) and the weekday
-columns from solar and wind farms at all leads, scored CRPS, and found solar CRPS 0.27 points worse
-[0.03, 0.51] and wind CRPS 1.38 points worse [0.88, 1.92]. The solar loss is concentrated in the
-first 3 days (+0.68 points). Production's 24-hour lag is blanked at leads of 24 hours or more, so
-the loss at days 0 to 2 comes mostly from shorter leads, which that study did not cover.
+**Removing the four power lags made solar, wind, and demand worse, including at day-ahead, which
+differs from the same-hour-lag study.** A post hoc arm removed only the four lag columns (24, 48,
+168, and 336 hours) and kept every other column, on all series types (fold A, three seeds). CRPS
+rose by 0.19 points [0.08, 0.31] for solar farms, 1.33 points [0.95, 1.74] for wind farms, and 0.27
+points [0.19, 0.34] for demand. For solar farms the rise is +0.55 points below 24 hours, +0.68 at 24
+to 48 hours, +0.09 at 48 to 72 hours, and +0.12 beyond. [The lag-features study](lag-features.md)
+found that a same-hour lag did not change day-ahead MAE at 6 solar plants. The two studies differ in
+these ways:
+
+- **Lags:** four lags here, one there.
+- **Forecast:** 51 members and CRPS here, the ensemble mean and MAE there.
+- **Rows:** half-hourly rows including night here, hourly daylight rows there.
+- **Model:** one XGBoost model per series with 24 columns here.
+
+This study cannot say which difference explains the gap. The earlier arm that also removed the
+weekday columns gave almost the same losses (solar +0.27, wind +1.38), so the weekday columns are
+not the cause. Do not remove the lags in production on the strength of the lag study.
 
 ### Round 2: combining the winners
 
@@ -315,9 +328,26 @@ single gain.** To score it, every ensemble member is crossed with every level, s
 raw flow. Adding the lead-time column, the wind-farm columns, and pooling with a site identifier
 gives the best arm, a CRPS of 7.85% and an MAE of 10.74%, and −3.44 points [−3.98, −3.00] on fold B.
 Adding the heuristic's weekly inputs to that arm lowered CRPS by a further 0.2 points on seed 0
-(7.63%) and on fold B. The study computed no paired interval between the two arms, so that gain is
-untested. The costs are that training takes about 8 times longer (see the compute section), and that
-the 9 levels and the equal weighting of the 459 values are untuned.
+(7.63%) and on fold B. On seed 0 the paired contrast between the two arms is −0.22 points [−0.38,
+−0.06] on fold A (8 of 12 months better) and −0.22 [−0.61, +0.54] on fold B (11 of 15), with solar
+and wind farms worse and demand better, and it is post hoc. The costs are that training takes about
+8 times longer (see the compute section), and that the 9 levels and the equal weighting of the 459
+values are untuned.
+
+**The gain over spread rescaling is smaller than the gain over raw production.** On the 45 later
+runs that the rescaling can be scored on (seed 0, fold A), the quantile arm scores a CRPS 0.44
+points lower [−0.53, −0.37] than rescaled production with cleaning (11 of 11 months). The best
+quantile arm scores 7.81% against 8.89% for the best rescaled point-forecast arm, which is 1.05
+points lower [−1.27, −0.84] (11 of 11 months). The quantile arms were not rescaled, so these are
+conservative.
+
+**Crossing the quantiles with the 51 members is not clearly the right way to issue the forecast.**
+The 459-value sample holds the outcome in 57% of half-hours for a 10% to 90% band (nominal 80%): 80%
+for solar farms, 59% for wind farms, 50% for demand substations, and 39% for the biofuel generator.
+The 9 quantiles of the control member alone score a CRPS 0.33 points lower [−0.35, −0.30] than the
+459-value sample (12 of 12 months), on every series type. The quantile model learns the weather
+forecast's error, so crossing it with the members may count the weather uncertainty twice. Before
+re-implementing, test issuing the control member's quantiles, with or without the members' spread.
 
 ### Calibration: the ensemble spread is far too narrow
 

@@ -84,3 +84,36 @@ def test_an_enum_column_is_coded_by_its_position_and_nulls_stay_null():
     assert matrix["local_day_of_week"].to_list() == [6.0, 0.0]
     assert matrix["x"].to_list() == [1.0, None]
     assert matrix.dtypes == [pl.Float32, pl.Float32]
+
+
+def test_lags_removed_only_drops_the_four_lags_and_keeps_the_weekday_columns():
+    """A1b differs from production in exactly the four power-lag columns, for every series type."""
+    arm = arms.ALL_ARMS["a1b_lags_removed_only"]
+    for series_type in ("PV", "Wind", "Disaggregated Demand"):
+        columns = set(arm.columns(series_type))
+        assert set(arms.PRODUCTION_COLUMNS) - columns == arms.LAG_COLUMNS
+        assert columns >= arms.WEEKDAY_COLUMNS
+        assert len(columns) == len(arms.PRODUCTION_COLUMNS) - 4
+
+
+def test_the_padding_control_has_the_lead_time_arms_column_count():
+    """The control adds one column, as C1 does, and the new column is the shuffled copy."""
+    control = arms.ALL_ARMS["c1p_shuffled_copy_control"]
+    lead = arms.ALL_ARMS["c1_lead_time"]
+    for series_type in ("PV", "Wind", "Disaggregated Demand"):
+        assert len(control.columns(series_type)) == len(lead.columns(series_type))
+        assert control.columns(series_type)[-1] == arms.SHUFFLED_COPY_COLUMN
+    assert arms.needs_shuffled_copy(control)
+    assert not arms.needs_shuffled_copy(lead)
+
+
+def test_the_shuffled_copy_is_a_fixed_permutation_of_the_source_column():
+    """The copy holds the same values in a different order, the same order on every call."""
+    from fit_arms import add_shuffled_copy
+
+    frame = pl.DataFrame({arms.SHUFFLED_COPY_SOURCE: [float(i) for i in range(50)]})
+    first = add_shuffled_copy(frame=frame)[arms.SHUFFLED_COPY_COLUMN]
+    second = add_shuffled_copy(frame=frame)[arms.SHUFFLED_COPY_COLUMN]
+    assert first.to_list() == second.to_list()
+    assert sorted(first.to_list()) == frame[arms.SHUFFLED_COPY_SOURCE].to_list()
+    assert first.to_list() != frame[arms.SHUFFLED_COPY_SOURCE].to_list()

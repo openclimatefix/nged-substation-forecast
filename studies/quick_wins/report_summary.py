@@ -195,6 +195,184 @@ def _calibration(*, lines: list[str]) -> None:
             ]
 
 
+def _arm_scores_with_types(*, fold: str, arm: str, seed: int, types: pl.DataFrame) -> pl.DataFrame:
+    """Read one arm's per-row scores with each series' type."""
+    path = inputs.OUTPUT_ROOT / "arms" / fold / f"{arm}_seed{seed}" / "scores.parquet"
+    return pl.read_parquet(path).join(types, on="time_series_id")
+
+
+def _paired_rows(
+    *, arm: pl.DataFrame, reference: pl.DataFrame, label: str
+) -> list[dict[str, object]]:
+    """Month-resampled difference `arm - reference` by series type, for CRPS and MAE."""
+    rows: list[dict[str, object]] = []
+    groups: list[str | None] = [None, *sorted(arm["time_series_type"].unique().to_list())]
+    for series_type in groups:
+        for metric, column in (("crps", "crps_norm"), ("mae", "abs_error_norm")):
+            tables = []
+            for frame in (arm, reference):
+                part = (
+                    frame
+                    if series_type is None
+                    else frame.filter(pl.col("time_series_type") == series_type)
+                )
+                tables.append(month_bootstrap.monthly_table(scores=part, metric=column))
+            diff = month_bootstrap.difference_interval(arm=tables[0], reference=tables[1])
+            rows.append(
+                {
+                    "comparison": label,
+                    "group": series_type or "all types",
+                    "metric": metric,
+                    "reference_value": month_bootstrap.level_interval(table=tables[1]).estimate,
+                    "difference": diff.estimate,
+                    "interval_95": f"[{diff.lower_95:.4f}, {diff.upper_95:.4f}]",
+                    "t_interval_95": f"[{diff.t_lower_95:.4f}, {diff.t_upper_95:.4f}]",
+                    "months_better": f"{diff.months_better} of {diff.n_months}",
+                }
+            )
+    return rows
+
+
+def _types() -> pl.DataFrame:
+    settings = Settings()
+    series_ids = inputs.eligible_series_ids(settings=settings, fold_id=inputs.FOLD_A)
+    return pl.DataFrame(
+        inputs.series_metadata(settings=settings, time_series_ids=series_ids)
+    ).select("time_series_id", pl.col("time_series_type").cast(pl.String))
+
+
+def _g1_against_quantile(*, lines: list[str]) -> None:
+    """Contrast the quantile combination with the heuristic's inputs against the same without."""
+    types = _types()
+    rows: list[dict[str, object]] = []
+    for fold in (inputs.FOLD_A, inputs.FOLD_B):
+        paths = [
+            inputs.OUTPUT_ROOT / "arms" / fold / f"{name}_seed0" / "scores.parquet"
+            for name in ("r2_e1_c1_a3w_d3_g1", "r2_e1_c1_a3w_d3")
+        ]
+        if not all(path.exists() for path in paths):
+            continue
+        rows += _paired_rows(
+            arm=_arm_scores_with_types(fold=fold, arm="r2_e1_c1_a3w_d3_g1", seed=0, types=types),
+            reference=_arm_scores_with_types(fold=fold, arm="r2_e1_c1_a3w_d3", seed=0, types=types),
+            label=fold,
+        )
+    if not rows:
+        return
+    lines += [
+        "## The heuristic's inputs added to the quantile combination (seed 0)",
+        "",
+        (
+            "Difference is `r2_e1_c1_a3w_d3_g1` minus `r2_e1_c1_a3w_d3` in normalised CRPS "
+            "and MAE; "
+            "negative favours the arm with the heuristic's inputs. Interval: 95% "
+            "month-resampled; t-interval over the monthly differences; months in which "
+            "the arm with the heuristic's inputs was better."
+        ),
+        "",
+        markdown_table(frame=pl.DataFrame(rows)),
+        "",
+    ]
+
+
+CALIBRATED_ARMS: Final[tuple[str, ...]] = (
+    "production_cleaned",
+    "r2_c4_c2_c1_a3w_d3",
+    "r2_c4_c1_a3w_d3",
+)
+"""Arms with a calibration run on fold A seed 0, from which the best point arm is chosen."""
+
+QUANTILE_ARMS: Final[tuple[str, ...]] = (
+    "e1_quantile",
+    "r2_e1_c1_a3w_d3",
+    "r2_e1_c1_a3w_d3_g1",
+)
+"""The quantile arms fitted on fold A seed 0."""
+
+
+def _calibrated_against_quantile(*, lines: list[str]) -> None:
+    """Compare calibrated point arms with the quantile arms on the runs after the warm-up."""
+    types = _types()
+    base = CALIBRATION_DIR / inputs.FOLD_A
+    calibrated: dict[str, pl.DataFrame] = {}
+    for name in CALIBRATED_ARMS:
+        path = base / f"{name}_seed0" / "calibrated.parquet"
+        if path.exists():
+            calibrated[name] = pl.read_parquet(path)
+    if "production_cleaned" not in calibrated:
+        return
+    keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
+    scored_rows = calibrated["production_cleaned"].select(keys)
+    n_runs = scored_rows["power_fcst_init_time"].n_unique()
+
+    def on_those_rows(frame: pl.DataFrame) -> pl.DataFrame:
+        return frame.join(scored_rows, on=keys, how="semi").join(types, on="time_series_id")
+
+    models = {f"{name} (calibrated)": on_those_rows(frame) for name, frame in calibrated.items()}
+    for name in QUANTILE_ARMS:
+        path = inputs.OUTPUT_ROOT / "arms" / inputs.FOLD_A / f"{name}_seed0" / "scores.parquet"
+        if path.exists():
+            models[name] = on_those_rows(pl.read_parquet(path))
+    best_point = min(
+        (name for name in calibrated if name != "production_cleaned"),
+        key=lambda name: float(models[f"{name} (calibrated)"]["crps_norm"].to_numpy().mean()),
+        default=None,
+    )
+    best_quantile = min(
+        (name for name in QUANTILE_ARMS if name in models),
+        key=lambda name: float(models[name]["crps_norm"].to_numpy().mean()),
+        default=None,
+    )
+    rows: list[dict[str, object]] = []
+    for label, frame in models.items():
+        per_series = frame.group_by("time_series_id").agg(
+            pl.col("crps_norm").mean(), pl.col("abs_error_norm").mean()
+        )
+        rows.append(
+            {
+                "model": label,
+                "rows": frame.height,
+                "crps": float(per_series["crps_norm"].to_numpy().mean()),
+                "mae": float(per_series["abs_error_norm"].to_numpy().mean()),
+            }
+        )
+    contrasts: list[dict[str, object]] = []
+    comparisons = [
+        (f"{best_point} (calibrated)", "production_cleaned (calibrated)"),
+        (best_quantile, "production_cleaned (calibrated)"),
+        (best_quantile, f"{best_point} (calibrated)"),
+        ("e1_quantile", "production_cleaned (calibrated)"),
+    ]
+    for arm_label, reference_label in comparisons:
+        if arm_label not in models or reference_label not in models:
+            continue
+        contrasts += _paired_rows(
+            arm=models[arm_label],
+            reference=models[reference_label],
+            label=f"{arm_label} minus {reference_label}",
+        )
+    lines += [
+        "## Calibrated point arms against quantile arms, same runs (fold A, seed 0)",
+        "",
+        (
+            f"All rows are the {n_runs} runs after the calibration warm-up, on the same series "
+            "and valid times. Calibrated arms use only outcomes known at each run's "
+            "initialisation time. Calibration leaves the MAE unchanged. Best calibrated point "
+            f"arm: `{best_point}`. Best quantile arm: `{best_quantile}`."
+        ),
+        "",
+        markdown_table(frame=pl.DataFrame(rows)),
+        "",
+        (
+            "Paired differences (first minus second; negative favours the first). Interval: 95% "
+            "month-resampled."
+        ),
+        "",
+        markdown_table(frame=pl.DataFrame(contrasts)),
+        "",
+    ]
+
+
 def _cleaning(*, lines: list[str]) -> None:
     contrasts = _read(fold=inputs.FOLD_A, kind="contrasts", tag="seeds0")
     if contrasts is None:
@@ -357,6 +535,8 @@ def main() -> None:
     for tag in ("seeds01", "seeds0"):
         _contrast_tables(lines=lines, fold=inputs.FOLD_B, tag=tag, reference="production_cleaned")
     _calibration(lines=lines)
+    _calibrated_against_quantile(lines=lines)
+    _g1_against_quantile(lines=lines)
     _lead_band_baselines(lines=lines)
     _blend(lines=lines)
     _cleaning(lines=lines)

@@ -38,6 +38,9 @@ EARLY_STOPPING_ROUNDS: Final[int] = 50
 EARLY_STOPPING_HOLDOUT: Final[timedelta] = timedelta(weeks=6)
 """Early stopping watches the last six weeks of the training window."""
 
+SHUFFLE_SEED: Final[int] = 20261012
+"""Seeds the row permutation of the shuffled-copy padding column, for training and validation."""
+
 MIN_TREES: Final[int] = 10
 """Fewest trees an early-stopped series is refitted with."""
 
@@ -56,6 +59,17 @@ def feature_matrix(*, frame: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
             else pl.col(c).cast(pl.Float32)
             for c in columns
         ]
+    )
+
+
+def add_shuffled_copy(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add `SHUFFLED_COPY_COLUMN`: the source column with its rows permuted by a fixed seed."""
+    permutation = np.random.default_rng(SHUFFLE_SEED).permutation(frame.height)
+    return frame.with_columns(
+        pl.Series(
+            arm_definitions.SHUFFLED_COPY_COLUMN,
+            frame[arm_definitions.SHUFFLED_COPY_SOURCE].to_numpy()[permutation],
+        )
     )
 
 
@@ -307,14 +321,21 @@ def _predict_and_score(
     capacity: pl.DataFrame,
     arm: arm_definitions.Arm,
     analogue_power: pl.DataFrame | None,
+    save_samples: bool,
 ) -> pl.DataFrame:
-    """Predict every ensemble member of each cached run, write the forecasts, and score them."""
+    """Predict every ensemble member of each cached run, write the forecasts, and score them.
+
+    A quantile arm's forecasts are 9 times as many rows as the members, so they are written only
+    when `save_samples` is set.
+    """
     (out_dir / "forecasts").mkdir(parents=True, exist_ok=True)
     parts = []
     for path in sorted((build_frames.frames_dir(fold_id=fold_id) / "val").glob("init=*.parquet")):
         frame = pl.read_parquet(path).join(types, on="time_series_id")
         if analogue_power is not None:
             frame = extra_features.add_weekly_analogue_features(frame=frame, power=analogue_power)
+        if arm_definitions.needs_shuffled_copy(arm):
+            frame = add_shuffled_copy(frame=frame)
         pieces = []
         for (series_id,), series_rows in frame.group_by("time_series_id"):
             booster, columns, scale = boosters[int(series_id)]
@@ -342,16 +363,31 @@ def _predict_and_score(
         if forecasts.height != frame.height * width:
             msg = f"{path.name}: predicted {forecasts.height:,} rows for {frame.height:,}"
             raise ValueError(msg)
-        if not arm.quantile_levels:
+        if save_samples or not arm.quantile_levels:
             forecasts.write_parquet(out_dir / "forecasts" / path.name)
         parts.append(per_run_scores(forecasts=forecasts, actuals=actuals))
     return normalised_by_capacity(scores=pl.concat(parts), capacity=capacity)
 
 
-def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -> None:
-    """Fit, predict, and score one arm, writing its forecasts, scores, and training-row counts."""
+def fit_arm(
+    *, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int, save_samples: bool = False
+) -> None:
+    """Fit, predict, and score one arm, writing its forecasts, scores, and training-row counts.
+
+    Args:
+        arm: The arm to fit.
+        fold_id: The fold.
+        device: XGBoost's device, `cpu` or `cuda`.
+        seed: The XGBoost seed.
+        save_samples: Also write a quantile arm's full sample of every member crossed with every
+            level. The scores are unchanged. An arm whose scores exist but whose samples do not is
+            refitted, and its previous scores are kept as `scores_before_samples.parquet`.
+    """
     out_dir = arm_dir(fold_id=fold_id, arm=arm, seed=seed)
     scores_path = out_dir / "scores.parquet"
+    has_samples = any((out_dir / "forecasts").glob("init=*.parquet"))
+    if scores_path.exists() and save_samples and not has_samples:
+        scores_path.rename(out_dir / "scores_before_samples.parquet")
     if scores_path.exists():
         print(f"{arm.name}: scores exist, skipping")
         return
@@ -381,6 +417,8 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
             .collect()
         )
         training = extra_features.add_weekly_analogue_features(frame=training, power=analogue_power)
+    if arm_definitions.needs_shuffled_copy(arm):
+        training = add_shuffled_copy(frame=training)
     boosters = _fit_boosters(training=training, arm=arm, window=window, device=device, seed=seed)
     if set(boosters) != set(series_ids):
         msg = f"{arm.name}: trained {len(boosters)} of {len(series_ids)} series"
@@ -396,6 +434,7 @@ def fit_arm(*, arm: arm_definitions.Arm, fold_id: str, device: str, seed: int) -
         capacity=capacity,
         arm=arm,
         analogue_power=analogue_power,
+        save_samples=save_samples,
     )
     counts.write_parquet(out_dir / "train_rows.parquet")
     scores.write_parquet(scores_path.with_suffix(".tmp"))
@@ -413,6 +452,11 @@ def main() -> None:
     parser.add_argument("--fold", default=inputs.FOLD_A)
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cuda")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--save-quantile-samples",
+        action="store_true",
+        help="Write a quantile arm's full member-by-level sample, refitting it if need be.",
+    )
     args = parser.parse_args()
     unknown = [name for name in args.arms if name not in arm_definitions.ALL_ARMS]
     if unknown:
@@ -424,6 +468,7 @@ def main() -> None:
             fold_id=args.fold,
             device=args.device,
             seed=args.seed,
+            save_samples=args.save_quantile_samples,
         )
 
 

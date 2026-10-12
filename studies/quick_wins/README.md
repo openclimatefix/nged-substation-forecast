@@ -48,3 +48,13 @@ leaderboard numbers: the study did not submit to `score_study.py`.
 
 Generators are never named: the scripts print series by type, and charts normalise power by
 capacity.
+
+## Re-runs after the science review
+
+- `lead_band_contrasts.py` splits any arm's contrast against production by lead band.
+- `quantile_check.py` writes `report/quantile_check.md`: coverage of the 459-value sample and the
+  CRPS of the control member's 9 quantiles alone. It needs `fit_arms.py --save-quantile-samples`
+  (about 2 GB).
+- Arms `a1b_lags_removed_only` (only the four power lags removed) and `c1p_shuffled_copy_control`
+  (production plus a shuffled copy of `temperature_2m`) are the lag-only ablation and the padded
+  control for the lead-time column.

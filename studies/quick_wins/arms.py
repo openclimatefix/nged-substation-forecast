@@ -132,6 +132,27 @@ def with_lead_time(series_type: str) -> tuple[str, ...]:
     return (*PRODUCTION_COLUMNS, "nwp_lead_time_hours")
 
 
+def without_lags_only(series_type: str) -> tuple[str, ...]:
+    """Drop only the four power lags, from every series type; the weekday columns stay."""
+    return tuple(c for c in PRODUCTION_COLUMNS if c not in LAG_COLUMNS)
+
+
+SHUFFLED_COPY_SOURCE: Final[str] = "temperature_2m"
+"""The production column whose values are shuffled across rows to make the padding column."""
+
+SHUFFLED_COPY_COLUMN: Final[str] = "shuffled_temperature_2m"
+"""Name of the padding column: `SHUFFLED_COPY_SOURCE` with its rows permuted at random."""
+
+
+def with_shuffled_copy(series_type: str) -> tuple[str, ...]:
+    """Show every series the production columns and one shuffled copy of a weather column.
+
+    The extra column has the same count as `with_lead_time`'s but carries no information, so it
+    measures what adding a 25th column does by itself.
+    """
+    return (*PRODUCTION_COLUMNS, SHUFFLED_COPY_COLUMN)
+
+
 def with_calendar(series_type: str) -> tuple[str, ...]:
     """Add holiday and raw ordinal time columns for the demand-like series."""
     if series_type in GENERATOR_TYPES:
@@ -189,6 +210,14 @@ def needs_weekly_analogues(arm: Arm) -> bool:
         column in WEEKLY_ANALOGUE_COLUMNS
         for series_type in ("PV", "Wind", "Disaggregated Demand", "Raw Flow", "BESS", "Biofuel")
         for column in arm.columns(series_type)
+    )
+
+
+def needs_shuffled_copy(arm: Arm) -> bool:
+    """Whether any series type's columns include the shuffled-copy padding column."""
+    return any(
+        SHUFFLED_COPY_COLUMN in arm.columns(series_type)
+        for series_type in ("PV", "Wind", "Disaggregated Demand", "Raw Flow", "BESS", "Biofuel")
     )
 
 
@@ -314,6 +343,21 @@ FEATURE_ARMS: Final[tuple[Arm, ...]] = (
         family="features",
         description="Production columns plus the forecast lead time.",
         columns=with_lead_time,
+    ),
+    Arm(
+        name="a1b_lags_removed_only",
+        cleaning=CHOSEN_CLEANING,
+        family="features",
+        description="Every series loses only the four power lags (20 columns); weekdays stay.",
+        columns=without_lags_only,
+    ),
+    Arm(
+        name="c1p_shuffled_copy_control",
+        cleaning=CHOSEN_CLEANING,
+        family="features",
+        description="Production columns plus a shuffled copy of the 2 m temperature: C1's padding "
+        "control, with the same column count and no information.",
+        columns=with_shuffled_copy,
     ),
     Arm(
         name="c7_calendar",
