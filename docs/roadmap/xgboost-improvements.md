@@ -721,18 +721,19 @@ model](#global-model-per-time_series_type)'s capacity-factor normalisation does.
 ### Predict PV as a fraction of clear-sky PV
 
 **A PV model could predict the ratio of observed power to clear-sky PV power, and multiply the
-clear-sky curve back in afterwards.** The booster currently predicts raw megawatts. It has to learn
-the product "capacity × clear-sky shape × cloud attenuation" from tree splits on hour, day of year,
-and irradiance. Trees approximate a smooth curve with piecewise-constant steps, and they do this
-poorly for season and time-of-day combinations that the training years cover thinly.
+clear-sky curve back in afterwards.** The booster currently predicts raw megawatts. The booster has
+to learn the product "capacity × clear-sky shape × cloud attenuation" from tree splits on hour, day
+of year, and irradiance. Trees approximate a smooth curve with piecewise-constant steps, which can
+fit poorly in season and time-of-day combinations that the training years cover thinly.
 
-**The ratio target removes the daily and seasonal shape from what the booster has to learn.** For
-one PV site, the ratio of power to clear-sky power varies with cloud, shading, and soiling, but not
-with the sun's position. The multiplication afterwards uses the half-hourly clear-sky curve from the
+**The ratio target removes most of the daily and seasonal shape from what the booster has to
+learn.** For one PV site, the ratio of power to clear-sky power varies mainly with cloud, and less
+with the sun's position than raw power does. Shading and panel orientation still leave some daily
+and seasonal shape. The multiplication afterwards uses the half-hourly clear-sky curve from the
 [solar-position helper](#linearised-physics-features-for-solar-and-wind), so the sunrise and sunset
 ramps stay sharp at half-hourly resolution however coarse the NWP is. The clear-sky index feature
-divides by the same curve, so the features and the target share one definition of "fraction of clear
-sky".
+divides by the clear-sky irradiance from the same helper, so the features and the target share one
+clear-sky model.
 
 **Half-hourly targets are not noise to the booster, so averaging them to 3 or 6 hours is the wrong
 fix.** Most of the half-hourly variation in PV power is the sun's geometry, which is known exactly
@@ -741,11 +742,12 @@ within the step. A booster trained on squared error predicts the conditional mea
 raises the loss floor and does not bias the forecast. Averaging the target would discard the sunrise
 and sunset ramps, and the service still has to publish half-hourly values.
 
-**This is the multiplicative counterpart of the `base_margin` idea in the [global
+**A ratio target is the multiplicative counterpart of the `base_margin` idea in the [global
 model](#global-model-per-time_series_type).** A `base_margin` on a capacity-factor scale gives the
 booster an additive correction to the physics proxy. A ratio target gives it a multiplicative
 correction, which suits cloud attenuation better and resembles a log-link `base_margin` once the
-night-time zeros are handled. The two are alternatives, so an experiment should pick one.
+night-time zeros are handled. A ratio target and a `base_margin` on a capacity-factor scale are
+alternatives, so an experiment should use only one of them.
 
 **Open points for whoever runs the experiment:**
 
@@ -753,12 +755,13 @@ night-time zeros are handled. The two are alternatives, so an experiment should 
   and has no tilt or azimuth, because embedded PV behind a substation is an unknown mix of
   orientations. A ratio target needs a per-site scale. The
   [capacity-estimation](capacity-estimation.md#cheap-baselines-to-beat) page plans a rolling
-  quantile of clear-sky-normalised output, which is one way to get it.
+  quantile of clear-sky-normalised output, which is one way to get the per-site scale.
 - **The ratio is undefined near zero clear-sky power.** Rows below a solar elevation of roughly 5 to
-  10° would be left out of training, and the forecast would be zero there, as for the clear-sky
-  index feature.
-- **It applies only to solar-dominated series.** A substation whose net demand includes load behind
-  the same meter does not have a ratio bounded between 0 and about 1.5.
+  10° would be left out of training, and the forecast would be zero there. The clear-sky index
+  feature is set to null in the same rows.
+- **A ratio target applies only to solar-dominated series.** A substation whose net demand includes
+  load behind the same meter does not have a ratio bounded between 0 and about 1.2, the clip stated
+  for the clear-sky index.
 - **The comparison is the target, nothing else.** Score a raw-megawatt arm and a ratio arm on the
   same rows, features, and folds, with the 3 to 10 day slice and the PV `time_series_type` slice as
   the headline.
