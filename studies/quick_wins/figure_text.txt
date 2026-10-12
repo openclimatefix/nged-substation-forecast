@@ -353,7 +353,7 @@ Title: Figure 13: XGBoost beats the manual heuristic at days 0 to 2 for PV, wind
 
 Subtitle:
 - Each dot is the mean over the series of a type of each series' mean score, as a percentage of the series' own effective capacity; zero is a perfect forecast. The last column averages all 31 series. The scores come from 53 weekly ECMWF ensemble forecast runs, July 2025 to June 2026 (fold A), on the rows that all five models scored. XGBoost scores are the average over random seeds 0, 1, 2. No intervals are shown.
-- Lead is the time from a run's initialisation to the valid time: days 0 to 2 is under 72 hours, days 3 to 10 is 72 to 263 hours, and 11+ is 264 hours and more. 
+- Lead is the time from a run's initialisation to the valid time: days 0 to 2 is under 72 hours, days 3 to 10 is 72 to 263 hours, and 11+ is 264 hours and more.
 - The best arms were chosen after seeing earlier results (post hoc). The quantile arm trains on 9 quantile levels and is scored on its 51 members at each of 9 levels (459 values).
 
 Panel titles:

@@ -4,7 +4,7 @@ Figure 13 compares the XGBoost arms with the manual heuristic and climatology by
 series type. Figure 14 is a learning curve: the CRPS of models trained on only the last 6, 9, or 12
 months of the 15-month training window, against the 15-month production arm with cleaning.
 
-The text of each figure is written to `studies/quick_wins/figure_text.md` before any
+The text of each figure is written to `studies/quick_wins/figure_text.txt` before any
 chart is rendered, replacing only these two figures' sections. Figure 13 is computed here from the
 per-row scores (the mean over rows per series, then over the series of a type, as the leaderboard
 does); Figure 14 reads the contrasts the report script wrote.
