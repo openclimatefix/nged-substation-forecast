@@ -234,11 +234,9 @@ is scored, so a refusal leaves no rows or MLflow runs behind.
 **The refusals check which rows a forecast covers, not how the forecast was made.** The `metrics`
 asset cannot tell a forecast trained on the validation year, or built from power observed after its
 initialisation time, from an honest forecast. A study can build either forecast, because
-`studies.power.scan_power` serves the whole validation year. Until the planned [submit
-command](../roadmap/auto-research.md#the-research-lead-the-submit-command-and-the-review) truncates
-training data at `train_end` and runs a leakage test, a study's leaderboard number is out-of-sample
-only if a reviewer has confirmed that the study used no observation after the fold's `train_end`,
-except as a lag earlier than each forecast's initialisation time.
+`studies.power.scan_power` serves the whole validation year. A study's leaderboard number is
+therefore out-of-sample only if a reviewer has confirmed that the study used no observation after
+the fold's `train_end`, except as a lag earlier than each forecast's initialisation time.
 
 **An unfiltered run of the `metrics` asset skips study experiments rather than refusing them.**
 Re-materialising the reference experiment can change its row keys, so a study scored earlier stops
