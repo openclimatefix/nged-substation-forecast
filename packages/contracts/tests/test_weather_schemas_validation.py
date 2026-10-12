@@ -251,8 +251,12 @@ def test_lead0_deaccumulated_nulls_are_allowed() -> None:
     [
         ("temperature_2m", 150.0),  # exceeds le=100
         ("temperature_2m", -150.0),  # exceeds ge=-100
-        ("wind_u_10m", 201.0),  # exceeds le=200
-        ("wind_u_10m", -201.0),  # exceeds ge=-200
+        *[
+            (f"wind_{axis}_{height}", value)
+            for height in ("10m", "100m")
+            for axis in ("u", "v")
+            for value in (-201.0, 201.0)
+        ],
     ],
 )
 def test_out_of_range_continuous_weather_var_is_fatal(column: str, bad_value: float) -> None:

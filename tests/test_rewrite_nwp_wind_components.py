@@ -88,6 +88,23 @@ def test_rewrite_pins_snapshot_resumes_and_catches_up(tmp_path: Path) -> None:
     assert pl.read_delta(str(destination)).sort("init_time")["wind_v_10m"].to_list() == [9, 5, 7]
 
 
+def test_rewrite_reads_old_values_after_source_partition_replacement(tmp_path: Path) -> None:
+    source, destination = tmp_path / "polar", tmp_path / "components"
+    init_time = datetime(2025, 1, 15, tzinfo=UTC)
+    _old_partition(init_time=init_time, speed=5.0).write_delta(
+        str(source), delta_write_options={"partition_by": ["nwp_model_id", "init_time"]}
+    )
+    _old_partition(init_time=init_time, speed=9.0).write_delta(
+        str(source),
+        mode="overwrite",
+        delta_write_options={"predicate": f"init_time = '{init_time.isoformat()}'"},
+    )
+    migration.rewrite(source=source, destination=destination, source_version=0, limit=None)
+    assert pl.read_delta(str(destination))["wind_v_10m"].to_list() == [5.0]
+    migration.rewrite(source=source, destination=destination, source_version=1, limit=None)
+    assert pl.read_delta(str(destination))["wind_v_10m"].to_list() == [9.0]
+
+
 def test_rewrite_rejects_source_overlap_and_existing_destination(tmp_path: Path) -> None:
     source = tmp_path / "polar"
     _old_partition(init_time=datetime(2025, 1, 15, tzinfo=UTC)).write_delta(str(source))
