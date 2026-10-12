@@ -229,3 +229,10 @@ and user/statistician perspectives. Anonymise private generators before writing 
 Publish a study-only reviewed PR and a concise report of what ran, what moved, the stopping
 decisions, limitations, and one proposed follow-up with rough cost. Never claim human review
 before it happens.
+
+**The radiation figure's subtraction labels were clarified before rendering.** A fresh code
+review cleared the optional direction sentence shared by text export and rendering. A separate
+first-reader review and a rule-by-rule prose review required explicit loss subtraction,
+training runs, forecasting-model wording and the named preferred input treatment; all were
+accepted. No statistical calculation changed. The full study suite passed again with 3,338
+passed and five skipped (233.77 seconds).

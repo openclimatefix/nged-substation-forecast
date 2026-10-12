@@ -22,6 +22,8 @@ INTERVAL_TEXT = (
     "of whole months and one matched training seed."
 )
 
+DIRECTION_TEXT = "Negative differences favour the forecast named before minus in each comparison."
+
 
 def _sha256(*, path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -36,7 +38,7 @@ def _text(*, spec: dict[str, Any]) -> str:
         lines.extend(
             [
                 INTERVAL_TEXT,
-                "More negative loss differences favour the first model.",
+                spec.get("direction_text", DIRECTION_TEXT),
                 charts.PLANNING_NOTES["planned"],
                 "",
             ]
@@ -162,7 +164,7 @@ def main() -> None:
                 subtitle=[
                     *figure["subtitle"],
                     INTERVAL_TEXT,
-                    "More negative loss differences favour the first model.",
+                    spec.get("direction_text", DIRECTION_TEXT),
                 ],
                 figure_planning="planned",
             )
