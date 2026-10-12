@@ -39,8 +39,11 @@ MAY_BOUNDARY: Final[datetime] = datetime(2026, 5, 12, tzinfo=UTC)
 BOOTSTRAP_SEED: Final[int] = 20261012
 RESAMPLES: Final[int] = 2000
 QUANTILE_RECIPE: Final[str] = "r2_e1_c1_a3w_d3"
-REVIEWED_FITTER_SHA256: Final[str] = (
-    "6494889ab56a674b50d86553ab35ebaa04b37ab0d3943889c34f39f69fc20701"
+REVIEWED_FITTER_SHA256: Final[frozenset[str]] = frozenset(
+    {
+        "6494889ab56a674b50d86553ab35ebaa04b37ab0d3943889c34f39f69fc20701",
+        "b073be43f8809290746d952bf1acf988ea1f01cf61a7e2ed11e6f51f2de57ca3",
+    }
 )
 POINT_RECIPE: Final[str] = "r2_c4_c2_c1_a3w_d3"
 RECIPES: Final[frozenset[str]] = frozenset({"production", POINT_RECIPE, QUANTILE_RECIPE})
@@ -180,7 +183,7 @@ def _read_fit(*, root: Path, frames: dict[str, Any], frame_root: Path) -> FitInp
     }
     verified = (
         quantile
-        and manifest["script_sha256"] == REVIEWED_FITTER_SHA256
+        and manifest["script_sha256"] in REVIEWED_FITTER_SHA256
         and all(
             dependencies.get(name) == digest for name, digest in REVIEWED_ENCODER_HASHES.items()
         )
@@ -797,7 +800,7 @@ def main() -> None:
         "sample_counts": {fit.recipe: fit.completion["sample_count"] for fit in fits},
         "source_member_count": 51,
         "reviewed_control_encoder_hashes": REVIEWED_ENCODER_HASHES,
-        "reviewed_fitter_sha256": REVIEWED_FITTER_SHA256,
+        "reviewed_fitter_sha256": sorted(REVIEWED_FITTER_SHA256),
         "dependencies": {name: version(name) for name in ("numpy", "polars", "scipy")},
         "resamples": RESAMPLES,
         "setting": fits[0].manifest["setting"],

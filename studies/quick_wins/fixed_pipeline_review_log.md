@@ -44,3 +44,14 @@ and chart text export were cleared; concrete figure text still requires review b
 Scientific-validity reviews of results, chart/prose/persona reviews and final evidence checks
 remain pending until completed results and a draft page exist. This record makes no publication
 recommendation while those checks remain pending.
+
+A preliminary scientific review independently reproduced the old-pipeline score aggregates,
+checked sampled loss calculations and lag cutoffs, and found a metadata issue: a reloaded
+production booster reports runtime defaults for some training parameters. Predictions were
+unaffected. Future fits label that configuration as runtime metadata and separately save the
+production training parameters. The reporter now reads the hash-verified production metadata,
+prints historical quantile levels, and verifies matching raw training keys and, where required,
+cleaned training counts. These changes received a fresh review before execution; completed
+forecasts remain immutable. The Part 2 source-code allowlist includes the reviewed metadata-only
+fitter revision. Old-reference contrasts are reproduction diagnostics rather than preregistered
+deciding contrasts. This preliminary review does not replace either final scientific review.

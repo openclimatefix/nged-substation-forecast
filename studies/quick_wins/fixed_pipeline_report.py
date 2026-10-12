@@ -111,6 +111,38 @@ def _paired(*, left: dict[int, pl.DataFrame], right: dict[int, pl.DataFrame]) ->
             raise ValueError("paired contrast has different rows, targets, types, or capacities")
 
 
+def _training_parameters(*, root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    completion = json.loads((root / "complete.json").read_text())
+    relative = "models/meta.json" if manifest["recipe"] == "production" else "models.json"
+    if _sha256(path=root / relative) != completion["files"][relative]:
+        raise ValueError("training-parameter source fingerprint mismatch")
+    stored = json.loads((root / relative).read_text())
+    if manifest["recipe"] == "production":
+        return stored["model_params"]
+    model_config = stored[0].get("booster_runtime_config") or stored[0]["effective_xgboost_config"]
+    learner = model_config["learner"]
+    safe_names = (
+        "eta",
+        "learning_rate",
+        "max_depth",
+        "min_child_weight",
+        "subsample",
+        "colsample_bytree",
+        "lambda",
+        "alpha",
+    )
+    tree = learner["gradient_booster"]["tree_train_param"]
+    return {
+        **{name: tree[name] for name in safe_names if name in tree},
+        "objective": learner["learner_train_param"]["objective"],
+        **learner["objective"].get("quantile_loss_param", {}),
+        "seed": manifest["seed"],
+        "device": manifest["device"],
+        "rounds_min": min(model["rounds"] for model in stored),
+        "rounds_max": max(model["rounds"] for model in stored),
+    }
+
+
 def _monthly(*, frames: dict[int, pl.DataFrame], metric: str) -> MonthlyLosses:
     seeds = tuple(sorted(frames))
     first = frames[seeds[0]]
@@ -204,34 +236,8 @@ def _table(*, frame: pl.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def main() -> None:
-    """Write every absolute score and prespecified paired contrast into a reproducible report."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--spec", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
-    if args.output.exists():
-        raise ValueError("report output already exists; use a new immutable directory")
-    spec = json.loads(args.spec.read_text())
-    runs = _read_runs(runs=spec["runs"])
+def _absolute_scores(*, runs: dict[str, dict[int, pl.DataFrame]]) -> list[dict[str, Any]]:
     levels = []
-    contrasts = []
-    features = []
-    public_features = []
-    for run in spec["runs"]:
-        manifest = json.loads((Path(run["path"]) / "manifest.json").read_text())
-        features.append({"label": run["label"], "seed": run["seed"], "manifest": manifest})
-        columns = json.loads((Path(run["path"]) / "features.json").read_text())
-        public_features.extend(
-            {
-                "label": run["label"],
-                "seed": run["seed"],
-                "series_type": kind,
-                "count": len(names),
-                "features": ", ".join(names),
-            }
-            for kind, names in columns.items()
-        )
     for label, frames in runs.items():
         _paired(left=frames, right=frames)
         for group in GROUPS:
@@ -269,9 +275,78 @@ def main() -> None:
                             ),
                         }
                     )
+    return levels
+
+
+def _check_training_pair(*, a_root: Path, b_root: Path, match_counts: bool) -> None:
+    a_manifest = json.loads((a_root / "manifest.json").read_text())
+    b_manifest = json.loads((b_root / "manifest.json").read_text())
+    a_training = a_manifest["input_manifest"]["frames"]["train.parquet"]
+    b_training = b_manifest["input_manifest"]["frames"]["train.parquet"]
+    if a_training["key_sha256"] != b_training["key_sha256"]:
+        raise ValueError("contrast has different raw training forecast keys")
+    if a_manifest["recipe"] == b_manifest["recipe"] or match_counts:
+        for root in (a_root, b_root):
+            completion = json.loads((root / "complete.json").read_text())
+            if (
+                _sha256(path=root / "training_counts.parquet")
+                != completion["files"]["training_counts.parquet"]
+            ):
+                raise ValueError("cleaned training counts fingerprint mismatch")
+        a_counts = pl.read_parquet(a_root / "training_counts.parquet").sort("time_series_id")
+        b_counts = pl.read_parquet(b_root / "training_counts.parquet").sort("time_series_id")
+        if not a_counts.equals(b_counts):
+            raise ValueError("contrast requires matching cleaned training counts")
+
+
+def main() -> None:
+    """Write every absolute score and prespecified paired contrast into a reproducible report."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--spec", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if args.output.exists():
+        raise ValueError("report output already exists; use a new immutable directory")
+    spec = json.loads(args.spec.read_text())
+    runs = _read_runs(runs=spec["runs"])
+    contrasts = []
+    features = []
+    public_features = []
+    parameters = []
+    fit_roots = {(run["label"], int(run["seed"])): Path(run["path"]) for run in spec["runs"]}
+    for run in spec["runs"]:
+        manifest = json.loads((Path(run["path"]) / "manifest.json").read_text())
+        features.append({"label": run["label"], "seed": run["seed"], "manifest": manifest})
+        parameters.append(
+            {
+                "label": run["label"],
+                "seed": run["seed"],
+                "training_parameters": json.dumps(
+                    _training_parameters(root=Path(run["path"]), manifest=manifest), sort_keys=True
+                ),
+            }
+        )
+        columns = json.loads((Path(run["path"]) / "features.json").read_text())
+        public_features.extend(
+            {
+                "label": run["label"],
+                "seed": run["seed"],
+                "series_type": kind,
+                "count": len(names),
+                "features": ", ".join(names),
+            }
+            for kind, names in columns.items()
+        )
+    levels = _absolute_scores(runs=runs)
     for comparison in spec["contrasts"]:
         left, right = runs[comparison["left"]], runs[comparison["right"]]
         _paired(left=left, right=right)
+        for seed in left:
+            _check_training_pair(
+                a_root=fit_roots[(comparison["left"], seed)],
+                b_root=fit_roots[(comparison["right"], seed)],
+                match_counts=bool(comparison.get("match_training_counts", False)),
+            )
         for group in comparison.get("groups", GROUPS):
             for band in comparison.get("bands", BANDS):
                 a = {
@@ -293,6 +368,7 @@ def main() -> None:
                         "group": group,
                         "lead_band": band,
                         "metric": metric,
+                        "provisional": len(left) != 3,
                         **_contrast(
                             left=_monthly(frames=a, metric=metric),
                             right=_monthly(frames=b, metric=metric),
@@ -338,6 +414,12 @@ def main() -> None:
     text += "## Absolute scores\n\n" + _table(frame=level_frame) + "\n\n"
     text += "## Paired contrasts\n\n" + _table(frame=contrast_frame) + "\n"
     text += "\n## Features\n\n" + _table(frame=pl.DataFrame(public_features)) + "\n"
+    text += "\n## Training parameters\n\n" + _table(frame=pl.DataFrame(parameters)) + "\n"
+    text += (
+        "\nProduction training parameters come from its verified models/meta.json. "
+        "The earlier models.json effective_xgboost_config records defaults after Booster reload, "
+        "not production training settings; it does not invalidate the fitted predictions.\n"
+    )
     (args.output / "report.md").write_text(text)
     print(f"Wrote {len(levels)} aggregate scores and {len(contrasts)} paired contrasts")
 

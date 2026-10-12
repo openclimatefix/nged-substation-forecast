@@ -450,7 +450,7 @@ def _save_models(*, models: BoosterMap, output: Path) -> None:
                 "scale": scale,
                 "total_gain": gains,
                 "rounds": booster.num_boosted_rounds(),
-                "effective_xgboost_config": json.loads(booster.save_config()),
+                "booster_runtime_config": json.loads(booster.save_config()),
             }
         )
     (output / "models.json").write_text(json.dumps(rows, indent=2))
@@ -703,6 +703,9 @@ def main() -> None:
         "predict_score_seconds": time.monotonic() - fitted,
         "source_member_count": 51,
         "sample_count": 51 * len(recipe.arm.quantile_levels or (1,)),
+        "production_training_parameters": (
+            production.model_params.to_xgb_params() if production is not None else None
+        ),
     }
     final_manifest, _ = _load_context(root=args.frames)
     if final_manifest != manifest:
