@@ -281,9 +281,9 @@ separate worktrees because both mutate code to prove findings, and one reverting
 mutation manufactures fabricated results. Then one sub-agent implements the triaged fixes in a
 single follow-up PR, reviewed like any other before it merges.
 
-This is the opposite of `implement-issue`'s two reviews, which are deliberately **sequential**
-because a triage-and-push step sits between them: its second reviewer must read the fixed tree, or
-the fixes ship unread by anyone.
+This is the opposite of `implement-issue`'s three reviews, which are deliberately **sequential**
+because a triage-and-push step sits between each pair: each later reviewer must read the fixed
+tree, or the fixes ship unread by anyone.
 
 **The closing-link guard, before every merge.** GitHub registers a closing link whether the keyword
 falls before or after the reference, ignores negations, and the link is sticky once registered —

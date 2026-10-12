@@ -34,7 +34,7 @@ HYSTERESIS_PERSIST_DAYS: Final[int] = 7
 """How many consecutive days a drop, or a recovery, must last before the state changes."""
 
 
-def _day_of_year(*, dates: np.ndarray) -> np.ndarray:
+def day_of_year(*, dates: np.ndarray) -> np.ndarray:
     """Return each date's zero-based day of the year, capped at 364."""
     years = dates.astype("datetime64[Y]")
     return np.minimum(
@@ -42,7 +42,7 @@ def _day_of_year(*, dates: np.ndarray) -> np.ndarray:
     )
 
 
-def _profile_before(*, log_level: np.ndarray, doy: np.ndarray, prior: np.ndarray) -> np.ndarray:
+def profile_before(*, log_level: np.ndarray, doy: np.ndarray, prior: np.ndarray) -> np.ndarray:
     """Return the cross-plant logarithmic day-of-year profile of the days flagged `prior`.
 
     Args:
@@ -84,7 +84,7 @@ def deseasonalise_causally(*, raw: RawEstimate, dates: np.ndarray) -> RawEstimat
     """
     with np.errstate(all="ignore"):
         log_level = np.where(raw.level > 0, np.log(np.where(raw.level > 0, raw.level, 1.0)), np.nan)
-    doy = _day_of_year(dates=dates)
+    doy = day_of_year(dates=dates)
     years = dates.astype("datetime64[Y]").astype(int) + 1970
     level = np.full(raw.level.shape, np.nan)
     sd = None if raw.sd is None else np.full(raw.level.shape, np.nan)
@@ -92,7 +92,7 @@ def deseasonalise_causally(*, raw: RawEstimate, dates: np.ndarray) -> RawEstimat
         prior = years < year
         if not prior.any():
             continue
-        profile = _profile_before(log_level=log_level, doy=doy, prior=prior)
+        profile = profile_before(log_level=log_level, doy=doy, prior=prior)
         today = years == year
         factor = np.exp(profile[doy[today]])
         level[:, today] = raw.level[:, today] / factor

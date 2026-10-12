@@ -104,8 +104,9 @@ Not every issue needs a plan, and not every plan needs two reviews. Pick one of 
 it in your reply with a one-line reason before doing anything else**, and let the human override it.
 
 **Simple — no plan, and no agentic review at all.** Skip the rest of this skill and go straight to
-`implement-issue` at its step 1: worktree, implement, the verification set, PR, stop for human
-review. An issue is simple when all of these hold:
+`implement-issue` at its step 1: worktree, implement, the verification set, PR, a prose review if
+the diff carries more than a few lines of new prose, stop for human review. An issue is simple
+when all of these hold:
 
 - The change is mechanical, and reading the diff is enough to see whether it is right — a rename or
   a find-and-replace across files, a prose or docs edit, deleting dead code, a dependency bump, a
@@ -120,8 +121,9 @@ Issue #583 — replace one word across seven skill and docs files — is the sha
 the same reply that you are taking this path, and open it with `Implementing:` rather than the
 `Planning:` prefix from step 1a.
 
-**Complex — the full routine**: a plan, both plan reviews below, and both diff reviews in
-`implement-issue`. An issue is complex when any of these hold:
+**Complex — the full routine**: a plan, both plan reviews below, and all three diff reviews in
+`implement-issue` (the mutation pass only where the diff changes production logic). An issue is
+complex when any of these hold:
 
 - It adds or changes a Patito model, a Delta table, an asset, or anything else about what gets
   stored.
@@ -142,18 +144,21 @@ where none fires is simple or medium, on the conditions above.
 
 **Medium — everything else.** Write the plan, then choose how much review to spend on it: between
 zero and two of the plan reviews below (steps 5 and 7, each with its triage step), and between zero
-and two of the diff reviews in `implement-issue`. The choice is yours, under four rules:
+and three of the diff reviews in `implement-issue`. The choice is yours, under four rules:
 
 - **Run the earlier of a pair first.** One plan review means the simplicity review, not the
   correctness one, because a plan bigger than its issue survives a correctness review intact. One
-  diff review means the correctness-and-cut-it-down review, not the mutation pass.
+  diff review means the cut-it-down review (Sonnet). A second or third is the correctness review
+  (Opus) or the mutation pass (Sonnet), chosen by the next rule.
 - **Spend a plan review** on a plan that adds an abstraction, a config field, a column or a new file
   (the simplicity review), or on a plan whose account of current behaviour was hard to pin down or
   whose tests are the risky part (the correctness review).
 - **Spend a diff review** on a diff that came out larger than the plan implied or grew a lot of
-  prose (the first review), or on a change whose whole value is a behaviour the tests are meant to
-  pin down — a boundary, an ordering, a join key, a warning path that must not raise (the mutation
-  pass).
+  prose (the cut-it-down review), on a diff whose logic is hard to check by reading it (the
+  correctness review), or on a change whose whole value is a behaviour the tests are meant to pin
+  down — a boundary, an ordering, a join key, a warning path that must not raise (the mutation
+  pass). Skip the mutation pass where the diff changes no production logic that tests cover, such
+  as docs, skills, config or chart scripts.
 - **When you cannot decide, run it.** A review costs one sub-agent; the other error puts a design
   nobody attacked into `main`.
 
