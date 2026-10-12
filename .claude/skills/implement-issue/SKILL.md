@@ -86,12 +86,11 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
    called for it. Spawn a *new*, independent sub-agent and give it only the PR number, not the
    implementer's reasoning, so it isn't anchored by it. Tell it to try to refute the PR's claims
    rather than confirm them, because reviewers left to agree tend to agree without evidence, and
-   not to report anything `ruff`, `ty`, `pydoclint` or `pymarkdown` already enforce. It attacks four
-   things:
+   not to report anything `ruff`, `ty`, `pydoclint` or `pymarkdown` already enforce. It makes four
+   passes in the order below and lists each pass's findings before starting the next, because a
+   combined sweep reports the loudest fault and misses the quieter ones. Correctness comes last so
+   that it covers the replacements the earlier passes propose:
 
-    - **Correctness.** Tailor this part to the issue: name the failure modes most worth attacking —
-      the risky claim, a behaviour change hiding inside a refactor, whether each new test would
-      actually have failed on `main`.
     - **Simplicity of the code.** Which added lines could go without a user of the system telling
       the difference? Does an existing function, package or Patito model already do what a new one
       does? Would a plain function do what a new class, config object or strategy object was added
@@ -107,6 +106,10 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
       Which whole sentences carry no information: restating the heading, summarising what the
       reader has just read, hedging, or narrating what the change replaced? Cut whole sentences, not
       words (CLAUDE.md, "Prose style").
+    - **Correctness**, of the diff as written and of every replacement the earlier passes proposed,
+      because the implementer may reject a simplification. Tailor this pass to the issue: name the
+      failure modes most worth attacking — the risky claim, a behaviour change hiding inside a
+      refactor, whether each new test would actually have failed on `main`.
 
     Ask for each finding as a concrete deletion or replacement. The standard is that the PR adds no
     more lines of code, tests or prose than the change absolutely needs.
@@ -114,8 +117,9 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
 6. **Triage, commit and push** — verify each finding against the code rather than accepting it, fix
    the genuine ones, re-run the step-3 verification set, commit and push. Put a one-line tally in
    the PR body for each review (findings raised, accepted, rejected) and record each rejected
-   finding with its one-line reason; the tallies show over time which reviews find genuine defects. Every
-   review step ends with the branch pushed, so GitHub always shows the state the last review left.
+   finding with its one-line reason; the tallies show over time which reviews find genuine defects.
+   Every review step ends with the branch pushed, so GitHub always shows the state the last review
+   left.
 
 7. **Second adversarial review: mutation testing.** Run this if the sizing called for it. Spawn
    *another* new sub-agent — not the one from step 5, and again with no account of your reasoning.
