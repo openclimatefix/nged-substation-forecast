@@ -58,6 +58,9 @@ jobs serially. Use a new output namespace, separate from the original `quick_win
 5. Give `fixed_pipeline_charts.py` an explicit report-backed figure specification. Export text
    first with `--text-only`; review that text before rendering with `--reviewed-text`. Inspect the
    PNG rendered from each optimised SVG before copying publication assets into the docs.
+6. Use `fixed_pipeline_tables.py` to select and format public aggregate report rows for the page.
+   Its JSON specification names exact sources, filters and columns. It performs no estimation,
+   refuses existing output directories and records source, specification, script and output hashes.
 
 Raw frame exports, models, row-level scores and manifests containing private identifiers stay
 under the private study data directory. Public reports contain type aggregates and feature names.

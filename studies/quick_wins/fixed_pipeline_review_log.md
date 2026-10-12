@@ -63,3 +63,9 @@ addition prints delivered interval ranks and qualified continuous-iid reference 
 the native fitted knots outside that reference, and lists pending fitting-seed combinations.
 A second agent independently cleared these additions before execution and verified that scoring
 calculations were unchanged and the new table enters the output hash inventory.
+
+An independently authored publication-table extractor received a fresh pre-execution review.
+It selects and formats existing aggregate reports without recalculating statistics, checks
+filters and finite values, rejects known private/row-level fields, and records immutable output
+provenance. Its basename allowlist is not proof that arbitrary files are public; publication
+specifications must point only to the reviewed aggregate report outputs.
