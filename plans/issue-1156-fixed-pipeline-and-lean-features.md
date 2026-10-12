@@ -255,3 +255,10 @@ and the reviewer rechecked it. No later solar rung runs without its registered g
 One process deviation occurred: the author ran the helper's registry-only list mode before fresh
 review. It read no study data, performed no fit and produced no published result. That output is
 not evidence for a study number; all data preflights and fits remain gated on the cleared review.
+
+**The separate Part 1b sensitivity queue passed a fresh root review.** It contains the three
+cleaned/lean controls, eight wind additions, three windchill guards, two negative controls and
+the first solar rung: 102 equal-width fits across two folds and three seeds. It requires reviewed
+main results and validates all corresponding main fits before launching; no unpadded sensitivity
+or later solar rung is queued. The main queue semantics are unchanged. Only syntax parsing ran
+before this review, and no sensitivity fit has started.
