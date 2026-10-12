@@ -49,10 +49,10 @@ def _nwp_slice(
         "categorical_precipitation_type_surface": [1] * n,
         "temperature_2m": [10.0] * n,
         "dew_point_temperature_2m": [5.0] * n,
-        "wind_speed_10m": [5.0] * n,
-        "wind_direction_10m": [180.0] * n,
-        "wind_speed_100m": [5.0] * n,
-        "wind_direction_100m": [180.0] * n,
+        "wind_v_10m": [5.0] * n,
+        "wind_u_10m": [0.0] * n,
+        "wind_v_100m": [5.0] * n,
+        "wind_u_100m": [0.0] * n,
         "pressure_surface": [1000.0] * n,
         "pressure_reduced_to_mean_sea_level": [1000.0] * n,
         "geopotential_height_500hpa": [5000.0] * n,
@@ -92,7 +92,7 @@ def test_valid_slice_passes_and_is_healthy() -> None:
     [
         "temperature_2m",
         "pressure_surface",
-        "wind_speed_10m",
+        "wind_v_10m",
         "geopotential_height_500hpa",
     ],
 )
@@ -251,16 +251,16 @@ def test_lead0_deaccumulated_nulls_are_allowed() -> None:
     [
         ("temperature_2m", 150.0),  # exceeds le=100
         ("temperature_2m", -150.0),  # exceeds ge=-100
-        ("wind_direction_10m", 400.0),  # exceeds le=360
-        ("wind_direction_10m", -10.0),  # exceeds ge=0
+        ("wind_u_10m", 201.0),  # exceeds le=200
+        ("wind_u_10m", -201.0),  # exceeds ge=-200
     ],
 )
 def test_out_of_range_continuous_weather_var_is_fatal(column: str, bad_value: float) -> None:
     """A continuous variable outside its physical range must fail ingest.
 
     Guards `Nwp`'s declared `ge`/`le` bounds from inside the package that owns them: a widened
-    range (e.g. `temperature_2m`'s `le=100` relaxed to `le=10000`, or `wind_direction_10m`'s
-    `le=360` relaxed to `le=3600`) would otherwise pass every test in this file undetected.
+    range (e.g. `temperature_2m`'s `le=100` relaxed to `le=10000`, or `wind_u_10m`'s
+    `le=200` relaxed to `le=3600`) would otherwise pass every test in this file undetected.
     """
     df = _nwp_slice(overrides={column: [bad_value, bad_value, bad_value]})
     with pytest.raises(pt.exceptions.DataFrameValidationError):
@@ -337,10 +337,10 @@ def test_categorical_precipitation_type_surface_validation() -> None:
             "categorical_precipitation_type_surface": [None, 1],
             "temperature_2m": [10.0, 10.0],
             "dew_point_temperature_2m": [5.0, 5.0],
-            "wind_speed_10m": [5.0, 5.0],
-            "wind_direction_10m": [180.0, 180.0],
-            "wind_speed_100m": [5.0, 5.0],
-            "wind_direction_100m": [180.0, 180.0],
+            "wind_v_10m": [5.0, 5.0],
+            "wind_u_10m": [0.0, 0.0],
+            "wind_v_100m": [5.0, 5.0],
+            "wind_u_100m": [0.0, 0.0],
             "pressure_surface": [1000.0, 1000.0],
             "pressure_reduced_to_mean_sea_level": [1000.0, 1000.0],
             "geopotential_height_500hpa": [5000.0, 5000.0],

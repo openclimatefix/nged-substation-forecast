@@ -14,14 +14,16 @@ Public interface:
 - ``FeatureEngineer`` — abstract base; implement to swap the full feature pipeline.
 - ``TabularFeatureEngineer`` — default implementation: containing-cell NWP spatial join followed
   by the declarative tabular pipeline.
+- ``wind_feature_expressions`` — vector speed and meteorological bearing for a component pair,
+  also used by study extractors at native forecast steps.
 - ``NWP_PUBLICATION_DELAY_HOURS`` — hours after an NWP run's ``init_time`` before we treat that
   run as usable. Public because the constant is the default of three public signatures:
   ``FeatureEngineer.engineer``, ``TabularFeatureEngineer.engineer``, and
   ``ml_core.production_helpers.select_nwp_init_time``. A caller reasoning about any of those
   three signatures needs a name to reach the constant by.
 
-That public interface lives in the two public sub-modules below, plus the private ``_nwp``. This
-package re-exports ``NWP_PUBLICATION_DELAY_HOURS`` from ``_nwp``. The two public sub-modules are:
+The package re-exports ``NWP_PUBLICATION_DELAY_HOURS`` from ``_nwp`` and
+``wind_feature_expressions`` from ``_parsed_features``. The two public sub-modules are:
 
 - ``feature_engineer`` — the ``FeatureEngineer`` abstract base, plus ``DEFAULT_LOCAL_TIMEZONE``,
   the IANA zone the local-time features are computed in. The zone lives on the interface rather
@@ -40,7 +42,13 @@ Private sub-modules (importable by tests, not part of the public API):
 """
 
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
+from ml_core.features._parsed_features import wind_feature_expressions
 from ml_core.features.feature_engineer import FeatureEngineer
 from ml_core.features.tabular_feature_engineer import TabularFeatureEngineer
 
-__all__ = ["NWP_PUBLICATION_DELAY_HOURS", "FeatureEngineer", "TabularFeatureEngineer"]
+__all__ = [
+    "NWP_PUBLICATION_DELAY_HOURS",
+    "FeatureEngineer",
+    "TabularFeatureEngineer",
+    "wind_feature_expressions",
+]

@@ -160,18 +160,12 @@ def write_nwp(
     percent-encoded Hive directory name. Two materialisations of the *same* partition at once
     contend and the loser raises ``CommitFailedError``; disjoint partitions do not.
 
-    ``schema_mode="overwrite"`` is passed on every write, not just to migrate an old table.
-    Passing it on every write is safe. That safety claim holds only for a **widening** contract
-    change, and a widening change is the only kind this function has been used for so far. Confirmed
-    empirically against ``deltalake`` 1.6.3: widening updates only the table's *logical* schema —
-    the ``_delta_log`` metadata — to match the incoming frame's dtypes. Widening leaves every other
-    partition's physical Parquet bytes untouched. A later read at the new logical dtype is therefore
-    correct and lossless, even for a partition still physically stored at an older, narrower dtype.
-
-    **A validated ``pt.DataFrame[Nwp]`` input is what makes ``schema_mode="overwrite"`` safe to
-    leave on.** The ``nwp`` argument carries the full column set at the *current* contract's dtypes.
-    The write can only ever change the table's schema through a deliberate widening of an ``Nwp``
-    dtype, and the write cannot silently drop a column.
+    ``schema_mode="overwrite"`` is passed on every write. A dtype widening changes the logical
+    Delta schema while leaving other partitions' physical bytes readable at the widened dtype.
+    A full validated input supplies the current column set, but cannot make a breaking change
+    compatible with previously written partitions. Replacing polar wind columns with components
+    requires a separate rebuilt table, never a rolling partition overwrite of the old archive.
+    See <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#migrate-into-a-separate-archive-before-switching-readers>.
 
     A **narrowing** contract change is a different, worse failure mode, also confirmed
     empirically: the write that narrows a column succeeds silently, because

@@ -7,6 +7,7 @@ predict. That column may not be requested as a feature. Nor may an identifying c
 labels a row, such as ``time_series_id`` or ``valid_time``.
 """
 
+import math
 import re
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -28,6 +29,23 @@ STATIC_FEATURE_REGISTRY: Final[dict[StaticFeature, pl.Expr]] = {
         + 0.3965 * pl.col("temperature_2m") * ((pl.col("wind_speed_10m") * 3.6) ** 0.16)
     ).alias("windchill"),
 }
+
+
+def wind_feature_expressions(height: Literal["10m", "100m"]) -> tuple[pl.Expr, pl.Expr]:
+    """Derive vector speed and meteorological bearing from interpolated components.
+
+    Bearing is the direction the wind comes from: north is 0°, east is 90°. At exact calm,
+    the atan2 convention yields 180°; the bearing has no physical meaning there. Null components
+    propagate to null features.
+    """
+    u, v = pl.col(f"wind_u_{height}"), pl.col(f"wind_v_{height}")
+    return (
+        (u**2 + v**2).sqrt().cast(pl.Float32).alias(f"wind_speed_{height}"),
+        ((pl.arctan2(u, v) * (180 / math.pi) + 180) % 360)
+        .cast(pl.Float32)
+        .alias(f"wind_direction_{height}"),
+    )
+
 
 # Prevents physically impossible time shifts and lookahead bias by enforcing strict bounds on lag
 # hours and rolling window hours.

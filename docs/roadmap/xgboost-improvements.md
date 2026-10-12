@@ -185,46 +185,26 @@ The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mea
 
 ### Store wind as u/v components rather than speed and direction
 
-The ingest computes speed and direction from ECMWF's native `u`/`v` components and discards the
-components. That conversion loses no information — the round trip [introduces at most 6.8 × 10⁻³ °
-of error in
-direction](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why)
-once the components are rounded the way the table rounds everything else — but it hands every
-downstream stage a wrapped angle, which is the root of defect (a) above and of the three later items
-named at the top of this section. Storing the components instead makes the whole class of defect
-structurally impossible rather than individually patched, which is what [principle
-15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)
-argues for.
+**Component storage and interpolation ordering are implemented; matched forecasting scores remain
+pending.** The ingest retains area-weighted u/v at 10 m and 100 m, and feature engineering derives
+the existing speed/bearing features after half-hourly component interpolation. Weather lags,
+rolling features and wind chill consume the derived values. The power-curve proxy must likewise
+follow vector interpolation and speed derivation.
 
-Measured through the production write path, storing components instead of the polar pair costs
-storage rather than saves it
-([measured](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why)).
+**The maintainer chose u/v alone after the seasonal storage measurement.** Across 24 full 2025
+forecasts, u/v cost 8.90 % more Parquet bytes than polar storage; scalar-mean speeds added another
+17.90 %. Typical spatial scalar-minus-vector gaps were small, but rare cancellation was large.
+The [measurement](../studies/forecasts/wind-storage.md) does not establish whether scalar speed
+improves generation forecasts. A separate scalar-feature experiment remains possible.
 
-Two consequences to plan for. Wind speed becomes a **derived feature** — `sqrt(u² + v²)` computed at
-half-hourly resolution from the interpolated components, in the same `_parsed_features.py` slot as
-`windchill` — which is what the [wind power-curve
-proxy](#linearised-physics-features-for-solar-and-wind) consumes. The rule the roadmap already
-states for the power curve is unchanged, only refined: interpolate the vector, derive the speed,
-then apply the non-linear curve. And the derived speed will differ slightly from today's stored
-speed, because interpolating the components and taking the magnitude is not the same as
-interpolating the magnitude. So this is a behaviour change to a live feature, and it needs a
-leaderboard arm rather than a silent swap.
-
-**The open question this item must answer: does a scalar-mean speed column earn its storage?** The
-stored speed is a vector mean, and the scalar mean a turbine power curve wants is [a different
-spatial
-reduction](../architecture/nwp-variable-conventions.md#wind-is-stored-as-speed-and-direction-and-why),
-so it cannot be recovered from the archive: obtaining it means re-ingesting, and it needs a third
-wind column per height. The preference is to store `u` and `v` only and derive speed on the fly, so
-this needs the gap measured before it is accepted or rejected rather than assumed small.
-
-**If this item is rejected, the resample item grows back its wind arm.** The sequencing below
-assumes the components land, which removes the wrapped angle from the table entirely. Should the
-storage experiment come out against them, the resample has to convert to components and back
-internally instead, and defect (a) returns to
-[#526](https://github.com/openclimatefix/nged-substation-forecast/issues/526)'s scope. The
-[feature-representation experiment](#raw-uv-components-as-features-instead-of-speed-and-direction)
-also keeps arms that need a direction column, which after this change is derived rather than stored.
+**Cutover requires a rebuilt archive and retrained forecasting models.** The
+[migration procedure](../architecture/nwp-variable-conventions.md#migrate-into-a-separate-archive-before-switching-readers)
+keeps the old table serving until the new table has been validated and caught up. The
+interpolation-ordering experiment retains the existing feature names and training recipe;
+[raw u/v model features](#raw-uv-components-as-features-instead-of-speed-and-direction) remain
+a separate experiment. Wind wrap handling no longer belongs to
+[issue #526](https://github.com/openclimatefix/nged-substation-forecast/issues/526); period-ending
+radiation remains independent.
 
 ### How each fix is measured
 

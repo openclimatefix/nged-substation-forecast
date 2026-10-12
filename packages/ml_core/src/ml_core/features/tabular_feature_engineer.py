@@ -48,10 +48,30 @@ from ml_core.features._nwp import (
     _resolve_nwp_init_time,
     _upsample_nwp_to_half_hourly,
 )
-from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature, ParsedFeatures
+from ml_core.features._parsed_features import (
+    STATIC_FEATURE_REGISTRY,
+    LagFeature,
+    ParsedFeatures,
+    wind_feature_expressions,
+)
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
 
 logger = logging.getLogger(__name__)
+
+
+def _derive_wind_features(nwp: pl.LazyFrame) -> pl.LazyFrame:
+    """Derive polar wind after interpolation, before weather selection and lookbacks.
+
+    Partial NWP projections can omit a height; the full ingest contract supplies both heights.
+    """
+    columns = nwp.collect_schema().names()
+    expressions = [
+        expression
+        for height in ("10m", "100m")
+        if {f"wind_u_{height}", f"wind_v_{height}"} <= set(columns)
+        for expression in wind_feature_expressions(height=height)
+    ]
+    return nwp.with_columns(expressions)
 
 
 def _attach_containing_nwp_cell(
@@ -261,7 +281,7 @@ def _engineer_features(
 
     if nwp_lf is not None:
         _renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
-        _upsampled = _upsample_nwp_to_half_hourly(_renamed)
+        _upsampled = _derive_wind_features(_upsample_nwp_to_half_hourly(_renamed))
         processed_nwp: pl.LazyFrame | None = _upsampled.with_columns(
             nwp_lead_time_hours=(
                 (pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_seconds() / 3600

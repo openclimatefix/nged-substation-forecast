@@ -580,24 +580,17 @@ form on demand, differently for each experiment. Converting wind's `u` and `v` c
 and direction is the second kind: it destroys nothing, and it hands every later stage an angle that
 wraps at 360°, which ordinary interpolation, averaging, quantiles, and z-scores all get wrong.
 
-The saving has to be large, not merely positive. Converting wind to speed and direction does save
-storage — about 6% of the `nwp` table, measured, or roughly 2.4 GB of the ~39 GB a year of ECMWF ENS
-takes — and that is not enough to justify freezing a wrapped angle into the archive. Compare the H3
-aggregation, which is what makes a year of 51-member weather fit on a laptop at all. That contrast
-is the principle: it is the *size* of the saving that decides, and the only way to know the size is
-to measure it.
+The saving has to be large, not merely positive. A paired sample of 24 full 2025 forecasts found
+that component storage costs 8.90% more than polar storage. The maintainer accepted the increase
+to keep signed wind components through interpolation. The [measurement](../studies/forecasts/wind-storage.md)
+describes the sample and its limits.
 
-*Without it:* a transform nobody remembers choosing becomes impossible to revisit. Wind arrives as
-`u` and `v`, the ingest converts it to speed and direction and drops the components, and every later
-stage that interpolates, takes an ensemble quantile of, or standardises a direction is quietly wrong
-— with the fix costing an overnight re-download rather than a config change.
+*Without it:* a stored transform becomes an assumption every later experiment inherits. Arithmetic
+on a direction that wraps at 360° can silently produce invalid bearings.
 
-*Decided:* the `nwp` table's H3 spatial aggregation and 13-bit significand rounding both stay in the
-ingest, because each was measured and each buys a large saving. This principle is also what puts
-wind's polar conversion up for review in v0.5
-([#525](https://github.com/openclimatefix/nged-substation-forecast/issues/525)): the conversion
-saves ~6%, which the principle says is too little to freeze a wrapped angle into the archive for,
-and the storage experiment there is sized to confirm the number before the change is made.
+*Decided:* H3 spatial aggregation and 13-bit significand rounding stay in ingest because each buys
+a substantial measured saving. Wind stays as u/v through storage and interpolation; feature
+engineering derives speed and bearing. Derived bearings still require circular handling.
 
 *Serves:* [Hypothesis 2: a hundred experiments per person in a peak
 month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month) — a transform

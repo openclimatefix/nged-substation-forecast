@@ -19,3 +19,38 @@ records the requested and actual dates. Raw datasets, measured tables, and scala
 carry content digests. Records also identify the imported schema, converter, writer, precision
 code, lockfile, and driver. Reporting checks those identities against the requested manifest and
 grid. A failed write is retried in a fresh study-owned table, keeping log overhead comparable.
+
+## Frozen measurement schemas
+
+Create three worktrees from commit `e3bcb44c`, then cherry-pick `1bef88b2` and `ad2ea712`
+into each. Leave the polar schema unchanged; apply `variants/components.patch` and
+`variants/scalar.patch` to their corresponding worktrees and commit the changes. Do not apply
+these patches to the current component schema. Use the root environment's Python with each
+worktree's `packages/contracts/src`, `packages/dynamical_data/src`, and
+`packages/delta_store/src` on `PYTHONPATH`.
+
+```bash
+python studies/wind_storage/measure_wind_storage.py fetch --grid GRID --output OUTPUT
+python studies/wind_storage/measure_wind_storage.py write --grid GRID --output OUTPUT \
+  --representation polar
+python studies/wind_storage/measure_wind_storage.py report --grid GRID --output OUTPUT
+python studies/wind_storage/summarize_wind_storage.py --grid GRID --output OUTPUT
+```
+
+Run `write` separately in all three matching schema worktrees, selecting the corresponding
+representation each time, before running `report` in the frozen polar worktree. The summary
+script runs from the current checkout and checks the completed measurement records against
+`measurements.json`. Its `summary-provenance.json` hashes the records and generated summary.
+Published tables are copied from `summary.md`; scalar-gap tables precede writer rounding.
+Two independent scientific reviews checked the paired sample and raw reductions.
+
+## Pending forecasting comparison
+
+`leaderboard-reference.json` pins the polar code/table reference and recipe/CV hashes.
+`register-interpolation-arm.yaml` uses the existing `register_experiment_job` in `register_only`
+mode, with no model overrides. Registration was exercised in isolated local MLflow/Dagster
+stores under `data/studies/wind_storage/experiments/`; no fit, score or serving cutover ran.
+Re-register in the evaluation instance only with the matching component archive and pinned
+recipe/CV files. Compare unchanged feature names on identical folds, seeds, scenarios and
+evaluation keys, including 3–10 day horizon/type slices. Scoring remains pending the complete
+component archive and matched polar baseline predictions.
