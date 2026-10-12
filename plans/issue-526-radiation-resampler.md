@@ -65,13 +65,23 @@ evaluates a vectorised, dependency-free solar-position approximation in Polars, 
 longitude and equation of time, and Haurwitz irradiance. Use 15-minute midpoint quadrature: evaluate
 at `T - 22.5 min` and `T - 7.5 min` for a target half-hour. Average those half-hour means over each
 native window to get the matching denominator; this makes both integrations internally consistent.
+Evaluate geometry on unique `(time_series_id, target_time)` rows and join the resulting means back
+to member/run windows, so shared coordinates and timestamps do not repeat trigonometry 51 times.
 Use the study's Haurwitz coefficient 0.059; its expression is the implementation reference rather
 than the roadmap's illustrative 0.057. Reference independent geometry in tests before choosing a
 documented accuracy tolerance near sunrise/sunset.
 
 For finite short-wave windows whose clear-sky mean reaches the documented daylight floor, form the
 native mean / native clear-sky mean and anchor it at the native window midpoint. Interpolate ratios
-in actual elapsed time at target midpoints inside contiguous supported segments. At sunrise/sunset
+in actual elapsed time at target midpoints inside contiguous supported daylight blocks. Detect
+support gaps from scheduled-window adjacency, not just adjacency among surviving daylight anchors.
+Define daylight blocks from night gaps in the generated half-hour clear-sky support, not from
+entirely dark native windows: northern UK summer nights can be shorter than a 6-hour window. Make
+a native index available to each daylight block its window overlaps, retaining its native midpoint
+anchor, and interpolate only among indices for that block and supported source segment. A window
+overlapping two daylight blocks contributes its same index to both; conservation still applies
+once across that native window's complete target set. Do not interpolate a cloud-index trend
+from one day's sunset into the next day's sunrise. At sunrise/sunset
 hold the closest usable daylight ratio; never interpolate toward an artificial zero night ratio.
 Multiply by target half-hour clear-sky means, then rescale the targets within each complete native
 window so `sum(target_mean * 1800 s) == native_mean * width_seconds` within Float32 tolerance.
@@ -116,9 +126,11 @@ Absent radiation stays null and reaches the existing model missing-input path; n
 a weather window is absent. Coordinate joins must be unique by time series; validated production
 metadata provides finite coordinates. A missing coordinate in a short-wave helper call is invalid
 programmer input, not a weather-absence degradation; do not silently change its reconstruction.
-Reject duplicate keys,
-malformed timestamps or unsupported model conventions at the existing contract/programmer-error
-boundaries rather than quietly choosing a different window. Do not introduce an eager collect to
+Reject duplicate keys and malformed programmer input at the existing boundaries. Do not claim
+that `Nwp.validate` already rejects off-schedule leads: the completeness report tolerates them.
+Join to supported scheduled widths and leave unsupported radiation windows null, retaining the
+existing grid and non-radiation path. Introduce neither a new serving exception for off-schedule
+weather nor an eager full-NWP validation pass. Do not introduce an eager collect to
 emit per-row warnings. Document the fallback and expose counts in the regression/diagnostic report;
 new operational degradation columns and general imputation monitoring are separate work.
 
@@ -137,6 +149,9 @@ new operational degradation columns and general imputation monitoring are separa
   reference checks. `test_features.py`: adapt radiation-specific expectations and cover dispatch.
 - `packages/ml_core/tests/test_cross_mode_equivalence.py`: add radiation to meaningful cross-mode
   assertions on shared forecast targets, including hindcast rows used by rolling/lag features.
+  Its existing fixture supplies half-hourly NWP; create a separate native 3-hour radiation fixture
+  with site coordinates and half-hourly power timestamps. Retain existing known-answer fixtures
+  rather than inserting overlapping 3-hour radiation windows at every half-hour.
 - Check, without changing numeric membership, `packages/delta_store/src/delta_store/nwp.py`,
   `packages/contracts/tests/test_weather_schemas.py` and
   `packages/dashboard/tests/test_forecast_chart.py`. Their rounding/partition/plotting behavior
@@ -147,14 +162,16 @@ alone; this task adds only this one implementation plan in its existing isolated
 
 ## Tests and acceptance
 
-Regression assertions that fail on current main:
+Regression assertions that fail on current main for deliberately varying native values:
 
 1. Independent half-hour backward clear-sky reference, aggregated to 3- and 6-hour native windows:
    corrected daylight centroid and nighttime output match the reference within a justified geometry
    tolerance; current point interpolation is delayed. Include winter and summer UK cases.
 2. Changing-cloud known-answer inputs distinguish midpoint-anchored ratios from endpoint anchoring
    through final half-hour outputs, even after conservation. Check shape and native totals
-   separately. A constant-index clear day alone cannot test anchoring.
+   separately. Use at least three nonconstant daylight indices and independently calculated
+   normalised target shares; explicitly show that endpoint anchoring gives different final output.
+   A constant-index clear day alone cannot test anchoring.
 3. For both fields, each finite complete native window conserves `mean * duration`, including
    lead 144 to 150 and the final lead-360 window. Long-wave half-hours equal their own window's mean
    on both sides of a native boundary; current interpolation violates those assertions.
@@ -163,22 +180,27 @@ Regression assertions that fail on current main:
    the first window and fills interior source nulls. Include an actually absent native row, not
    only a row with a null value, to detect incorrect width inference.
 5. Finite short-wave mean at a dark endpoint reconstructs its preceding daylight; target nighttime
-   zero is checked separately from per-window conservation. Exercise tiny-denominator, all-dark
-   positive, all-dark zero and isolated finite-window fallbacks without NaN/inf or energy loss.
-6. Cropped target/output extent does not concentrate a full window's energy into visible rows.
-   Compare with an unsliced reconstruction with identical native support.
+   zero is checked separately from per-window conservation, using a daylight/dark transition
+   where point interpolation leaks energy into night.
 
 Additional preservation checks, explicitly not claimed to fail on main: shuffled rows; independent
 series/runs/members, using contrasting member labels including 0 and 50; categorical and
-non-radiation columns;
-stable schema and lazy execution across collection engines; solar/no-solar dispatch; and cross-mode
-agreement. Existing tests may already cover some of these: extend rather than duplicate them.
+non-radiation columns; stable schema and lazy execution across collection engines; solar/no-solar
+dispatch; and cross-mode agreement. Exercise tiny-denominator, all-dark positive, all-dark zero and
+isolated finite-window fallbacks without NaN/inf or energy loss. Check that cropping does not
+concentrate a full window's energy into visible rows by comparing with an unsliced reconstruction
+with identical native support. Include off-schedule radiation input that stays null without a
+serving exception, and two daylight days with different indices to detect interpolation across a
+night gap, including a northern-UK summer 6-hour case with no entirely dark native window.
+Reference-check solar geometry at leap-year dates and western/eastern UK coordinates.
+Existing tests may already cover some checks: extend rather than duplicate them. Constant-input
+and generic finiteness/cropping assertions alone do not demonstrate that main's resampler is wrong.
 
 Attempt a small reproducible real-native-data check for a short-lead case, the 144-hour transition,
 and a run with missing radiation, including all 51 members when supplied. Compare bulk versus
 selected single-run engineered values on identical
 forecast targets; aggregate target means back to source windows before target-time filtering.
-Record the command, timing/energy/fallback counts and results in the PR; no new permanent diagnostic
+Record the command, runtime, timing/energy/fallback counts and results in the PR; no new permanent diagnostic
 framework or profile publication is required. Never use engineered
 caches to infer original missingness. If data is unavailable, record that validation as pending
 and do not describe synthetic parity as real-data parity or deploy before it is checked.
@@ -207,6 +229,7 @@ forecast scores. Long-wave is absent from the current 24-feature model recipe.
 - `docs/design-philosophy/inherent-stability.md` (missingness in learned models) and
   `docs/architecture/ecmwf-ens-known-issues.md`: distinguish preserved radiation-null windows from
   precipitation's existing interior interpolation; their current descriptions bundle all three.
+  Update both learned-missingness explanations, including the earlier passage around line 325.
 - `docs/studies/forecasts/production-feature-faults.md`: leave recorded historical results intact;
   update the production handoff with the implementation link and conservation-policy departure.
   Coordinate with PR #1164's small nighttime-threshold wording edit.
@@ -270,5 +293,22 @@ callers in `test_features.py` and `test_cross_mode_equivalence.py`, mandatory co
 Alternative deferred: independent constant cloud attenuation per native window would remove
 midpoint-index interpolation and its segment logic, but drops an explicit agreed requirement.
 Retain interpolated indices; reconsider the simpler option only with the maintainer's approval.
-No broader rearchitecture was proposed. Correctness review is pending. No implementation code has
-been written.
+No broader rearchitecture was proposed.
+
+Correctness review accepted: add a native-grid radiation fixture rather than reusing half-hourly
+NWP; separate true regressions from preservation/edge-policy assertions; use supported-width joins
+and null radiation for off-schedule weather because the existing contract does not reject it; test
+final shares with three varying daylight indices; verify source-window adjacency; test solar
+geometry over leap years and UK longitude extremes; record runtime; and update both learned-
+missingness documentation passages. Geometry is evaluated on unique series/time rows, and daylight
+blocks explicitly prevent cross-night cloud-index interpolation. A follow-up check caught that
+entirely dark native windows cannot identify all UK summer nights; use half-hour solar support
+instead, and test a 6-hour northern-UK summer case without a wholly dark native window. Benchmark
+the distinct/join cost of geometry reuse rather than assuming laziness alone makes it fast.
+Verified the test timestamp builder,
+`Nwp.validate` and `assess_nwp_run_completeness` before revising the plan.
+
+No correctness findings were rejected. The native radiation upper bound was checked: engineered
+`AllFeatures` imposes no matching bound, so solar-shaped half-hours above the native mean are not a
+contract defect and must not be clipped merely to satisfy the native schema. No implementation code
+has been written.
