@@ -32,7 +32,13 @@ STATIC_FEATURE_REGISTRY: Final[dict[StaticFeature, pl.Expr]] = {
 
 
 def wind_feature_expressions(height: Literal["10m", "100m"]) -> tuple[pl.Expr, pl.Expr]:
-    """Derive vector speed and meteorological bearing from interpolated components.
+    """Derive vector speed and meteorological bearing from signed component columns.
+
+    u is eastward velocity and v is northward velocity. Polars uses atan2(y, x); passing u first
+    and v second measures the angle from the northward axis. The components describe travel
+    towards a direction, so adding 180° gives the bearing the wind comes from, and modulo 360
+    keeps the result in [0°, 360°). Feature engineering calls this after component interpolation;
+    native-step study extracts use the same expressions without temporal resampling.
 
     Bearing is the direction the wind comes from: north is 0°, east is 90°. At exact calm,
     the atan2 convention yields 180°; the bearing has no physical meaning there. Null components

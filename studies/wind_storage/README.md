@@ -9,7 +9,8 @@ Run `write --representation polar`, `components`, and `scalar` in the correspond
 schema worktrees against the same raw cache. Each variant calls the actual `write_nwp`. Run
 `report` only after all arms finish; a pilot report must carry the same `--limit`.
 
-The scalar arm adds grid-point magnitudes before H3 aggregation. The driver rejects different u/v
+The scalar arm computes speed at each grid point, then takes the area-weighted H3 mean of those
+speeds. The driver rejects different u/v
 null footprints because those would require a separate reduction over paired valid points. It
 reports compression on the sample, not archive-wide compression, and spatial speed gaps rather
 than turbine power. No action writes to the serving archive.
@@ -22,9 +23,11 @@ grid. A failed write is retried in a fresh study-owned table, keeping log overhe
 
 ## Frozen measurement schemas
 
-Create three worktrees from commit `e3bcb44c`, then cherry-pick `1bef88b2` and `ad2ea712`
-into each. Leave the polar schema unchanged; apply `variants/components.patch` and
-`variants/scalar.patch` to their corresponding worktrees and commit the changes. Do not apply
+Before creating the frozen worktrees, save `components.patch` and `scalar.patch` from the current
+checkout's `studies/wind_storage/variants/` directory outside those worktrees. Create three
+worktrees from commit `e3bcb44c`, then cherry-pick `1bef88b2` and `ad2ea712` into each. Leave the
+polar schema unchanged; apply the saved patches to their corresponding worktrees and commit the
+changes. Do not apply
 these patches to the current component schema. Use the root environment's Python with each
 worktree's `packages/contracts/src`, `packages/dynamical_data/src`, and
 `packages/delta_store/src` on `PYTHONPATH`.
@@ -46,11 +49,12 @@ Two independent scientific reviews checked the paired sample and raw reductions.
 
 ## Pending forecasting comparison
 
-`leaderboard-reference.json` pins the polar code/table reference and recipe/CV hashes.
+`leaderboard-reference.json` pins the polar code/table reference and hashes of the training recipe
+and cross-validation (CV) configuration.
 `register-interpolation-arm.yaml` uses the existing `register_experiment_job` in `register_only`
 mode, with no model overrides. Registration was exercised in isolated local MLflow/Dagster
-stores under `data/studies/wind_storage/experiments/`; no fit, score or serving cutover ran.
+stores under `data/studies/wind_storage/experiments/`; no fit, score, or serving cutover ran.
 Re-register in the evaluation instance only with the matching component archive and pinned
-recipe/CV files. Compare unchanged feature names on identical folds, seeds, scenarios and
-evaluation keys, including 3–10 day horizon/type slices. Scoring remains pending the complete
+recipe and CV configuration files. Compare unchanged feature names on identical folds, seeds,
+scenarios, and evaluation keys, including 3–10 day horizon/type slices. Scoring remains pending the complete
 component archive and matched polar baseline predictions.

@@ -2,7 +2,10 @@
 
 The source remains read-only. A sibling manifest pins the source snapshot and records completed
 partitions; rerunning replaces any interrupted partition through the production writer. Keep the
-source and its matching code for rollback. Cutover and catch-up are described at
+source and its matching code for rollback. Archived speeds and bearings have already been rounded;
+reconstruction cannot recover the original native components exactly. Writing applies component
+rounding too. Wind round-trip checks compare against archived polar values; exact equality applies
+to row keys and non-wind columns. Cutover and catch-up are described at
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>.
 """
 

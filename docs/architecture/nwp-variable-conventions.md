@@ -53,7 +53,7 @@ period-ending NWP should stay period-ending to match.
 `wind_direction_10m` and `wind_direction_100m` are **circular**: 359° and 1° are two degrees apart
 in reality, and 358 degrees apart arithmetically. No arithmetic that assumes a number line —
 interpolation, mean, gradient, quantile, standardised anomaly — is valid on them without special
-handling. The archive stores `wind_u_10m`, `wind_v_10m`, `wind_u_100m` and `wind_v_100m`,
+handling. The archive stores `wind_u_10m`, `wind_v_10m`, `wind_u_100m`, and `wind_v_100m`,
 which are linear. Speed and bearing are derived features, not stored weather columns.
 
 ### Numeric versus categorical
@@ -127,7 +127,7 @@ column in `Nwp.continuous_var_names()`** and forward-fills the categorical one.
 **Wind components are interpolated before speed and bearing are derived.** The feature pipeline
 computes `sqrt(u² + v²)` and `(atan2(u, v) × 180/π + 180) mod 360` at half-hourly resolution.
 The bearing describes where the wind comes from: North is 0°, East is 90°. Derivation happens
-before forecast joins, analysis-proxy selection, weather lags and rolling features. Wind chill
+before forecast joins, analysis-proxy selection, weather lags, and rolling features. Wind chill
 uses the derived 10 m speed even when speed is not explicitly requested.
 
 **Exact calm keeps the formula's 180° result, although calm has no physical direction.** Null
@@ -139,7 +139,7 @@ footprints for u and v would imply different contributing sub-areas.
 Period-ending radiation and precipitation still receive ordinary linear interpolation. Their timing
 is a separate repair tracked by [issue #526](https://github.com/openclimatefix/nged-substation-forecast/issues/526).
 
-### Wind direction is interpolated across the 0°/360° wrap
+### Historical bearing interpolation crossed the 0°/360° wrap {#wind-direction-is-interpolated-across-the-0360-wrap}
 
 **A historical audit found that ordinary bearing interpolation can reverse northerly wind.**
 Interpolating 350° → 10° arithmetically yields 180°, whereas the midpoint of equal-speed
@@ -212,7 +212,7 @@ how much has not been measured. The compression feeds the effective-temperature,
 
 **The archive keeps u/v alone, accepting an 8.90 % increase in sampled Parquet bytes.**
 A paired measurement of 24 full 00Z forecasts across 2025 used identical raw inputs, H3 weights,
-rounding, sorting and the production writer. Polar storage used 3.802 GB; u/v used 4.140 GB.
+rounding, sorting, and the production writer. Polar storage used 3.802 GB; u/v used 4.140 GB.
 Adding scalar-mean speed at both heights raised the total to 4.881 GB, another 17.90 % over u/v.
 The [seasonal storage measurement](../studies/forecasts/wind-storage.md) gives the generated
 per-run tables and reproduction procedure. The percentages describe the sample, not an
@@ -237,6 +237,11 @@ not a quantity established as irrelevant by the storage measurement.
 **A component schema requires a fresh destination; partition overwrite cannot migrate the archive.**
 `scripts/maintenance/rewrite_nwp_wind_components.py` reads an explicitly pinned local Delta
 snapshot and reconstructs `u = -speed × sin(bearing)` and `v = -speed × cos(bearing)`.
+Archived speeds and bearings have already been rounded, so reconstruction cannot recover the
+original native components exactly. Writing the reconstructed components applies 13-bit
+significand rounding as well. Wind validation bounds the round-trip error relative to the
+archived polar values, not the original downloaded u/v. Exact equality applies to row keys and
+non-wind columns.
 The script writes through `write_nwp`, verifies exact non-wind columns and row keys, and records
 quantization-aware speed and circular-bearing errors after readback. A sibling manifest records
 completed partitions and source files. Reruns skip verified partitions; a newer pinned snapshot
@@ -251,14 +256,14 @@ uv run python scripts/maintenance/rewrite_nwp_wind_components.py \
 
 **Validate a seasonal pilot, then finish and catch up before cutover.** Remove `--limit` for the
 complete build. Compare source and destination partition inventories, keys, member/lead/cell
-coverage and non-wind values. Pin a newer source version to catch up while the old archive keeps
+coverage, and non-wind values. Pin a newer source version to catch up while the old archive keeps
 serving, and confirm the live selected run exists in the destination. Switch the archive setting
 and matching code together, retrain affected forecasting models and rebuild derived feature caches.
-Keep the old archive, compatible code and model artifacts for rollback. Never mix old and new
+Keep the old archive, compatible code, and model artifacts for rollback. Never mix old and new
 schemas in a single table.
 
 **Study extracts must be rebuilt as matching versioned datasets.** The horizon extract and day-4
-supplement require explicit source, Delta version and new output directory. Both derive polar
+supplement require explicit source, Delta version, and new output directory. Both derive polar
 values at native steps and record the same source identity; the supplement retains exact equality
 checks on shared rows. Frozen historical polar extracts require the historical checkout and
 source archive. A matched forecasting comparison of interpolation ordering remains pending;

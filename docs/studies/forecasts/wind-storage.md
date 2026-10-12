@@ -1,17 +1,20 @@
 # Wind component storage measurement
 
-**Storing u/v costs 8.90 % more Parquet bytes than speed/bearing in this 24-run sample.**
-Adding scalar-mean speeds costs another 17.90 %. The maintainer chose u/v alone. The measurement
+**Storing u/v uses 8.90 % more Parquet bytes than speed/bearing in this 24-run sample.**
+Here, u is eastward velocity and v is northward velocity; polar storage holds speed and
+meteorological bearing. Adding scalar-mean speeds increases the u/v total by another 17.90 %.
+The maintainer chose u/v alone. The measurement
 compares storage and spatial cancellation; no forecasting model was trained or scored.
 
 **The contrasts (planned) compare u/v against polar storage, then scalar means against u/v.**
+Planned means specified before measurement, rather than proposed future work.
 The sample contains the 15th and last day of every month in 2025, all at 00Z, with no unavailable
-dates or substitutions. Each forecast contains 85 native steps, 51 members and 1,671 H3 cells:
+dates or substitutions. Each forecast contains 85 native steps, 51 members, and 1,671 H3 cells:
 7,243,785 rows per forecast and 173,850,840 rows per representation. Seasons group forecasts by
 initialization month; forecasts may cross season boundaries. The comparison uses the same
 downloaded bytes and H3 weights for all
 representations and the actual production `write_nwp`, including 13-bit significand rounding,
-sort order and writer properties. Non-wind compressed-column bytes match exactly in every pair.
+sort order, and writer properties. Non-wind compressed-column bytes match exactly in every pair.
 
 **Scalar-gap statistics precede writer rounding and measure spatial cancellation.**
 Native rows receive equal weight, rather than weighting 6-hour intervals twice as much as
@@ -49,6 +52,9 @@ Parquet totals include file metadata; Delta-log bytes are separate. MB means 10�
 | 2025-12-31 | 165.823 | 180.188 | 211.009 | +8.66% | +17.10% |
 | Pooled | 3801.839 | 4140.126 | 4881.112 | +8.90% | +17.90% |
 
+Season labels use initialization month: DJF is December–February, MAM is March–May,
+JJA is June–August, and SON is September–November.
+
 | Initialization season | Components vs polar | Scalar vs components |
 |---|---:|---:|
 | DJF | +9.00% | +17.86% |
@@ -58,6 +64,7 @@ Parquet totals include file metadata; Delta-log bytes are separate. MB means 10�
 
 Relative gaps divide by vector speed and can grow very large near calm.
 Float32 reduction can give negative gaps of a few millionths of a metre per second.
+The p90 and p99 columns give the 90th and 99th percentiles, respectively.
 
 | Initialization season | Height | Median gap m/s | Mean gap m/s | p90 gap m/s | p99 gap m/s | Max gap m/s | Median relative gap | p99 relative gap |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
@@ -81,18 +88,20 @@ Float32 reduction can give negative gaps of a few millionths of a metre per seco
 ## Reproduce the comparison
 
 **The measurement uses frozen experimental schemas, not the current production schema.**
-Check out commit `e3bcb44c`, then apply commits `1bef88b2` and `ad2ea712` in three isolated
-worktrees. Keep the polar worktree unchanged; apply `studies/wind_storage/variants/components.patch`
-and `scalar.patch` to the respective other worktrees and commit each variant. Use the same
-`uv.lock`, H3 weights and raw cache for all three. The scripts and detailed instructions are in
+Before creating the frozen worktrees, save `components.patch` and `scalar.patch` from the current
+checkout's `studies/wind_storage/variants/` directory outside those worktrees. Create three isolated
+worktrees at commit `e3bcb44c`, then cherry-pick `1bef88b2` and `ad2ea712` into each. Keep the polar
+worktree unchanged; apply the saved component and scalar patches to their respective worktrees
+and commit each variant. Use the same
+`uv.lock`, H3 weights, and raw cache for all three. The scripts and detailed instructions are in
 `studies/wind_storage/README.md`. Generated reports and full records live under
 `data/studies/wind_storage/`; the [summary provenance](../assets/wind-storage-provenance.json)
-records hashes of the input manifest, H3 weights, measurement records, reporting script and
+records hashes of the input manifest, H3 weights, measurement records, reporting script, and
 unmodified generated summary. The published tables copy the generated summary.
 
 **Two independent scientific reviews found no material blockers.** The reviews checked paired
-row inventories, non-wind byte equality, report provenance and independent raw-grid reductions,
+row inventories, non-wind byte equality, report provenance, and independent raw-grid reductions,
 including an extreme cancellation row. OpenAI Codex performed the reviews; human review is
 pending. The measurement does not establish that scalar speed is unhelpful at wind-generation
-sites. A matched model comparison is a separate experiment after archive migration and baseline
+sites. A matched power-forecast comparison is a separate experiment after archive migration and baseline
 preparation.

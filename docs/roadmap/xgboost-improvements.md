@@ -100,7 +100,7 @@ reconstruction must honour the [variable conventions](../architecture/nwp-variab
 [Neighbouring-cell means and gradients](#neighbouring-h3-cell-weather-context),
 [ensemble quantiles](#ensemble-statistics-as-features-instead-of-member-by-member-rows), and
 [climatology z-scores](#weather-abnormality-climatology-z-score-features) can operate on stored
-components, then derive polar quantities where appropriate. Arithmetic gradients, quantiles and
+components, then derive polar quantities where appropriate. Arithmetic gradients, quantiles, and
 standardised anomalies of wrapped bearings remain invalid. Raw component classification also
 keeps writer rounding and dashboard variable coverage aligned with the archive schema.
 
@@ -171,11 +171,11 @@ The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mea
 **Component storage and interpolation ordering are implemented; matched forecasting scores remain
 pending.** The ingest retains area-weighted u/v at 10 m and 100 m, and feature engineering derives
 the existing speed/bearing features after half-hourly component interpolation. Weather lags,
-rolling features and wind chill consume the derived values. The power-curve proxy must likewise
+rolling features, and wind chill consume the derived values. The power-curve proxy must likewise
 follow vector interpolation and speed derivation.
 
 **The maintainer chose u/v alone after the seasonal storage measurement.** Across 24 full 2025
-forecasts, u/v cost 8.90 % more Parquet bytes than polar storage; scalar-mean speeds added another
+forecasts, u/v used 8.90 % more Parquet bytes than polar storage; scalar-mean speeds added another
 17.90 %. Typical spatial scalar-minus-vector gaps were small, but rare cancellation was large.
 The [measurement](../studies/forecasts/wind-storage.md) does not establish whether scalar speed
 improves generation forecasts. A separate scalar-feature experiment remains possible.

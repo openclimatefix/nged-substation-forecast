@@ -218,6 +218,9 @@ class Nwp(pt.Model):
         le=100,
     )
 
+    # The ±200 m/s component bounds are corrupt-feed guards, not meteorological limits.
+    # Independent bounds permit a vector magnitude above 200 m/s; there is no magnitude constraint.
+    # u is eastward and v is northward, and their signs must survive storage and interpolation.
     wind_u_10m: float = pt.Field(
         dtype=pl.Float32,
         description=(
