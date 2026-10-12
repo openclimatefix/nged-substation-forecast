@@ -65,17 +65,7 @@ def _digest(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _resolved_dates(output: Path, requested: list[str], identity: dict[str, str]) -> list[str]:
-    path = output / "resolved-manifest.json"
-    if path.exists():
-        saved = json.loads(path.read_text())
-        if saved["identity"] != identity or saved["requested"] != requested:
-            raise ValueError("Resolved sample belongs to different requested inputs")
-        return saved["dates"]
-    catalog = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
-    available = {
-        str(value)[:10] for value in catalog.init_time.values if str(value)[11:19] == "00:00:00"
-    }
+def _select_dates(requested: list[str], available: set[str]) -> list[str]:
     resolved = []
     for date in requested:
         candidates = sorted(day for day in available if day[:7] == date[:7])
@@ -86,7 +76,33 @@ def _resolved_dates(output: Path, requested: list[str], identity: dict[str, str]
         resolved.append((earlier + later)[0])
     if len(set(resolved)) != len(resolved):
         raise ValueError("Availability substitution produced duplicate runs")
-    _save_json(path, {"identity": identity, "requested": requested, "dates": resolved})
+    return resolved
+
+
+def _resolved_dates(output: Path, requested: list[str], identity: dict[str, str]) -> list[str]:
+    path = output / "resolved-manifest.json"
+    if path.exists():
+        saved = json.loads(path.read_text())
+        if saved["identity"] != identity or saved["requested"] != requested:
+            raise ValueError("Resolved sample belongs to different requested inputs")
+        if saved["dates"] != _select_dates(requested=requested, available=set(saved["available"])):
+            raise ValueError("Cached availability mapping is invalid")
+        return saved["dates"]
+    catalog = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
+    available = {
+        str(value)[:10] for value in catalog.init_time.values if str(value)[11:19] == "00:00:00"
+    }
+    resolved = _select_dates(requested=requested, available=available)
+    _save_json(
+        path,
+        {
+            "identity": identity,
+            "requested": requested,
+            "dates": resolved,
+            "available": sorted(available),
+            "resolved_at": datetime.now(tz=UTC).isoformat(),
+        },
+    )
     return resolved
 
 
@@ -149,6 +165,30 @@ def _validate_run(frame: pl.DataFrame, h3_grid: pl.DataFrame, date: str) -> None
         raise ValueError(f"{date}: incomplete, misidentified, or duplicated run")
 
 
+def _own_output(output: Path, identity: dict[str, str]) -> None:
+    marker = output / "wind-storage-owner.json"
+    expected = {"study": "issue-525-wind-storage", **identity}
+    if marker.exists():
+        if json.loads(marker.read_text()) != expected:
+            raise ValueError("Output directory belongs to different study inputs")
+    else:
+        if any(output.iterdir()):
+            raise ValueError("Refusing to adopt a nonempty unmarked output directory")
+        _save_json(marker, expected)
+
+
+def _prepare_table(destination: Path, identity: dict[str, str]) -> None:
+    if destination.is_symlink() or destination.parent.is_symlink():
+        raise ValueError("Study table and arm directories must not be symlinks")
+    marker = destination.with_suffix(".started.json")
+    expected = {"destination": str(destination.resolve()), **identity}
+    if destination.exists():
+        if not marker.exists() or json.loads(marker.read_text()) != expected:
+            raise ValueError("Refusing to remove an unmarked or differently owned table")
+        shutil.rmtree(destination)
+    _save_json(marker, expected)
+
+
 def _fetch(output: Path, grid: Path, dates: list[str], identity: dict[str, str]) -> None:
     h3_grid = H3GridWeights.validate(pl.read_parquet(grid))
     raw = output / "raw"
@@ -171,17 +211,17 @@ def _fetch(output: Path, grid: Path, dates: list[str], identity: dict[str, str])
         downloaded = download_ecmwf_ens_data(ds_sliced=dataset)
         temporary = raw / f"{date}.zarr.partial"
         downloaded.to_zarr(temporary, mode="w", zarr_format=2)
-        temporary.rename(path)
         _save_json(
             raw / f"{date}.json",
             {
-                "digest": _digest(path),
+                "digest": _digest(temporary),
                 "fetched_at": datetime.now(tz=UTC).isoformat(),
                 "source": "Dynamical ECMWF IFS ENS 15-day 0.25-degree",
                 "resolved_date": date,
                 "attributes": downloaded.attrs,
             },
         )
+        temporary.rename(path)
         print(f"{date}: cached", flush=True)
 
 
@@ -230,6 +270,8 @@ def _write(
         * len(ECMWF_ENS_LEAD_TIME_HOURS)
     )
     arm = output / representation
+    if arm.is_symlink():
+        raise ValueError("Study arm directory must not be a symlink")
     arm.mkdir(parents=True, exist_ok=True)
     metadata = {
         **identity,
@@ -272,9 +314,7 @@ def _write(
             frame = convert_nwp_xarray_dataset_to_polars_dataframe(ds=dataset, h3_grid=h3_grid)
         _validate_arm(frame=frame, representation=representation)
         _validate_run(frame=frame, h3_grid=h3_grid, date=date)
-        if destination.exists():
-            # Only a study-owned unfinished table is removed. Serving paths are never inputs.
-            shutil.rmtree(destination)
+        _prepare_table(destination=destination, identity=identity)
         if representation == "scalar":
             gaps = frame.select(
                 "h3_index",
@@ -381,11 +421,20 @@ def _paired_records(
                 raise ValueError(f"{date}: differing production storage source")
         for arm, item in zip(REPRESENTATIONS, paired, strict=True):
             records.append({"date": date, "arm": arm, **item})
+    for arm in REPRESENTATIONS:
+        metadata = [item["metadata"] for item in records if item["arm"] == arm]
+        signatures = [
+            {key: value for key, value in item.items() if key != "raw"} for item in metadata
+        ]
+        if len({json.dumps(item, sort_keys=True) for item in signatures}) != 1:
+            raise ValueError(f"{arm}: provenance changes across selected runs")
     return records
 
 
 def _report(output: Path, dates: list[str], identity: dict[str, str], pilot: bool) -> None:
     records = _paired_records(output=output, dates=dates, identity=identity)
+    if any(item["metadata"]["driver_hash"] != _digest(Path(__file__)) for item in records):
+        raise ValueError("Reporting driver differs from measurement driver")
     lines = [
         "# Wind storage measurement",
         "",
@@ -393,6 +442,7 @@ def _report(output: Path, dates: list[str], identity: dict[str, str], pilot: boo
         if pilot
         else "Full-run seasonal sample; not an archive census.",
         "Selected runs: " + ", ".join(dates),
+        "Availability resolution: " + (output / "resolved-manifest.json").read_text(),
         "",
     ]
     lines.extend(["| Run | Polar bytes | u/v bytes | u/v + scalar bytes |", "|---|---:|---:|---:|"])
@@ -487,8 +537,10 @@ def main() -> None:
     if args.limit is not None and args.limit <= 0:
         parser.error("--limit must be positive")
     requested = json.loads(args.manifest.read_text())["dates"]
+    args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
     identity = _identity(manifest=args.manifest, grid=args.grid)
+    _own_output(output=args.output, identity=identity)
     dates = _resolved_dates(output=args.output, requested=requested, identity=identity)
     if args.limit is not None:
         dates = dates[: args.limit]

@@ -62,3 +62,39 @@ def test_content_digest_detects_same_length_raw_change(tmp_path: Path):
     original = _digest(tmp_path)
     (tmp_path / "values").write_bytes(b"124")
     assert _digest(tmp_path) != original
+
+
+def test_unavailable_dates_use_earlier_before_later_and_reject_duplicates():
+    from measure_wind_storage import _select_dates
+
+    assert _select_dates(requested=["2025-01-15"], available={"2025-01-14", "2025-01-16"}) == [
+        "2025-01-14"
+    ]
+    with pytest.raises(ValueError, match="duplicate"):
+        _select_dates(requested=["2025-01-15", "2025-01-31"], available={"2025-01-14"})
+
+
+def test_retry_refuses_unowned_table_and_recovers_owned_table(tmp_path: Path):
+    from measure_wind_storage import _prepare_table
+
+    destination = tmp_path / "2025-01-15"
+    destination.mkdir()
+    (destination / "important").write_text("preserve me")
+    with pytest.raises(ValueError, match="unmarked"):
+        _prepare_table(destination=destination, identity={"sample": "first"})
+    assert (destination / "important").read_text() == "preserve me"
+    (destination / "important").unlink()
+    destination.rmdir()
+    _prepare_table(destination=destination, identity={"sample": "first"})
+    destination.mkdir()
+    (destination / "unfinished").touch()
+    _prepare_table(destination=destination, identity={"sample": "first"})
+    assert not destination.exists()
+
+
+def test_output_owner_rejects_existing_data(tmp_path: Path):
+    from measure_wind_storage import _own_output
+
+    (tmp_path / "existing").touch()
+    with pytest.raises(ValueError, match="nonempty"):
+        _own_output(output=tmp_path, identity={"sample": "first"})
