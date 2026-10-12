@@ -236,3 +236,12 @@ first-reader review and a rule-by-rule prose review required explicit loss subtr
 training runs, forecasting-model wording and the named preferred input treatment; all were
 accepted. No statistical calculation changed. The full study suite passed again with 3,338
 passed and five skipped (233.77 seconds).
+
+**The first fresh scientific-validity review cleared the completed reference and radiation
+results without a required rerun.** It independently checked the nine-hour issuance offset,
+lag masking, radiation half-hour conventions, archive/target/capacity lineage, canonical training
+keys, all displayed reference estimates and all 18 radiation table rows. Both should-fix findings
+were accepted: the bootstrap interval represents months and an individual fitted seed around a
+three-seed central estimate, while the equal-month t-interval conditions on each month's seed
+average. Fold B wind point estimates agree; the interval conclusions differ. The draft now states
+these distinctions. Pending combined, wind and feature results still need the second fresh review.
