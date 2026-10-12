@@ -1144,7 +1144,9 @@ either way.
 
 Issues: [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (ingest),
 [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments),
-[#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) (plans a two-stage test: a first stage trained on ERA5 and a second stage trained on ENS forecast errors)
+[#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
+(plans a two-stage test: a first stage trained on ERA5 and a second stage trained on ENS forecast
+errors)
 
 Our power data reaches back to late 2019 but our ECMWF ENS archive starts 2024-04-01, so today's
 fold trains on 15 months and one winter. Ingesting estimates of past weather and pre-training on
