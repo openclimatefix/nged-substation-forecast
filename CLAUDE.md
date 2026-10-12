@@ -439,6 +439,10 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
   what keeps it to one file, so parallel sessions never collide. Usually empty on `main`, and empty
   on a branch whose issue was simple enough to need no plan.
 
+**Never change an issue or PR assigned to someone other than `JackKelly` without asking.** That
+covers its Status, labels, body, and state. Its assignee's work may not be visible on GitHub yet; see
+the `github-issue-pr-workflow` skill.
+
 **Creating an issue or a PR has a checklist** — labels, org issue Type, OCF project membership and
 its fields, sub-issue ordering, the `JackKelly` assignee — and none of it can be set by `gh issue
 create` / `gh pr create`. It lives in the `github-issue-pr-workflow` skill, along with the
