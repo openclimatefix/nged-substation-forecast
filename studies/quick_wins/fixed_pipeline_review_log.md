@@ -55,3 +55,11 @@ cleaned training counts. These changes received a fresh review before execution;
 forecasts remain immutable. The Part 2 source-code allowlist includes the reviewed metadata-only
 fitter revision. Old-reference contrasts are reproduction diagnostics rather than preregistered
 deciding contrasts. This preliminary review does not replace either final scientific review.
+
+The Part 2 reviewer subsequently ran a separate missing-target synthetic probe: one unsupported
+target was excluded and the supported target retained all 51 samples. A publication evidence
+audit corrected the pending May cycle inventory boundary to 12 May 2026 at 06Z. A report-only
+addition prints delivered interval ranks and qualified continuous-iid reference coverage, leaves
+the native fitted knots outside that reference, and lists pending fitting-seed combinations.
+A second agent independently cleared these additions before execution and verified that scoring
+calculations were unchanged and the new table enters the output hash inventory.

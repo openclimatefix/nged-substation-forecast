@@ -35,7 +35,7 @@ LEVELS19: Final[np.ndarray] = (np.arange(19) + 0.5) / 19
 LEVELS9: Final[np.ndarray] = np.arange(1, 10) / 10
 STUDY_END: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
 NOVEMBER_BOUNDARY: Final[datetime] = datetime(2024, 11, 13, tzinfo=UTC)
-MAY_BOUNDARY: Final[datetime] = datetime(2026, 5, 12, tzinfo=UTC)
+MAY_BOUNDARY: Final[datetime] = datetime(2026, 5, 12, 6, tzinfo=UTC)
 BOOTSTRAP_SEED: Final[int] = 20261012
 RESAMPLES: Final[int] = 2000
 QUANTILE_RECIPE: Final[str] = "r2_e1_c1_a3w_d3"
@@ -666,6 +666,28 @@ def _table(*, frame: pl.DataFrame) -> str:
     )
 
 
+def _sample_semantics(*, fits: list[FitInput]) -> pl.DataFrame:
+    """Describe delivered interval ranks and their qualified continuous-iid reference."""
+    rows = []
+    for sample_count in sorted({int(fit.completion["sample_count"]) for fit in fits}):
+        for mass in (0.8, 0.9):
+            lower, upper = np.ceil(
+                sample_count * np.array([(1 - mass) / 2, (1 + mass) / 2])
+            ).astype(int)
+            rows.append(
+                {
+                    "sample_count": sample_count,
+                    "nominal_coverage_percent": 100 * mass,
+                    "lower_rank_one_based": int(lower),
+                    "upper_rank_one_based": int(upper),
+                    "continuous_iid_reference_coverage_percent": 100
+                    * (int(upper) - int(lower))
+                    / (sample_count + 1),
+                }
+            )
+    return pl.DataFrame(rows)
+
+
 def _write_report(
     *,
     output: Path,
@@ -679,6 +701,8 @@ def _write_report(
     contrasts.write_parquet(output / "contrasts.parquet")
     synthetic = _synthetic()
     synthetic.write_parquet(output / "synthetic.parquet")
+    sample_semantics = _sample_semantics(fits=fits)
+    sample_semantics.write_parquet(output / "sample_semantics.parquet")
     summaries = absolute.filter(
         (pl.col("type") == "all")
         & (pl.col("lead_band") == "all")
@@ -696,6 +720,10 @@ def _write_report(
     missing = sorted(RECIPES - {fit.recipe for fit in fits})
     available = "; ".join(
         f"{recipe}: seeds {sorted(fit.seed for fit in fits if fit.recipe == recipe)}"
+        for recipe in sorted(RECIPES)
+    )
+    pending_seeds = "; ".join(
+        f"{recipe}: seeds {sorted({0, 1, 2} - {fit.seed for fit in fits if fit.recipe == recipe})}"
         for recipe in sorted(RECIPES)
     )
     verified_controls = sorted(fit.seed for fit in fits if fit.control_encoding_verified)
@@ -719,6 +747,17 @@ twice mean pinball at 19 midpoint levels. Native control knots use nominal .1 th
 separate nine-level diagnostic. Native crossed endpoints fail coverage; their width is signed.
 The rearranged control variant is exploratory. Control 90% coverage and CDF are pending.
 
+Delivered-sample interval semantics (endpoint ranks are one-based):
+
+{_table(frame=sample_semantics)}
+
+The reference coverage is (upper rank - lower rank)/(n + 1), valid only for continuous
+independent identically distributed samples and an independent outcome from that distribution.
+It is an analytic reference, not a measured forecast result. Fixed quantile pools are structured;
+this reference gives no calibration guarantee for them. No delivered recipe is asserted to be iid.
+Native and rearranged control knots support nominal 80% coverage; their 90% coverage remains
+pending. They are fitted knots, so no iid nine-sample reference is applied to them.
+
 Delivered-sample CDF diagnostic: (#values<actual + .5*#values==actual)/n, no randomisation.
 Bins include their lower endpoint; the last includes one. Finite continuous iid draws have
 equal reference mass at k/n, k=0,...,n, not continuous uniform density. This reference does not
@@ -737,6 +776,8 @@ joint coherence, G5 and G9 are outside this report.
 
 Pending recipes: {", ".join(missing) if missing else "none"}.
 Available fits: {available}.
+Pending fitting seed combinations: {pending_seeds}. Empty seed lists mean complete for this fold
+and setting only. Planned contrasts require the same available seeds on both sides.
 Positively verified control-member extraction seeds: {verified_controls}.
 Unverified control encoding remains pending. Missing seeds, folds and settings remain pending.
 Target-unsupported forecast keys excluded per fit: {sum(exclusions.values())}.

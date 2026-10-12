@@ -111,7 +111,7 @@ parent study's second hyperparameter setting; otherwise label it unresolved or p
 absolute error, coverage and missingness before and after 12 November 2024, assigned by
 `nwp_init_time` rather than valid time, where the saved fold supports them. Verify this archive
 boundary against ingestion provenance. This question is restricted to the November boundary;
-inventory the 12 May 2026 cycle boundary but leave its separate comparison pending. These era summaries
+inventory the 12 May 2026 06Z cycle boundary but leave its separate comparison pending. These era summaries
 have different seasons and training exposure, so they do not identify a causal upgrade effect.
 Do not fit a calibrator across the boundary in this study.
 
