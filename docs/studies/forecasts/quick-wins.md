@@ -441,6 +441,47 @@ CRPS by 0.40 and 0.68. Wind and raw-flow series are noisier than the all-types c
 windows drop whole seasons, so the curve mixes the effect of fewer months with the effect of fewer
 seasons.
 
+## Input features: a visual check of the feature engineering
+
+**The plots below show every input column of the production XGBoost model for one forecast run of
+four example series, and a table of null shares and ranges for all 31 series.** The lag alignment is
+correct: for the demand series in the drawn run, each lag column equals the cleaned power at the
+valid time minus the lag, with a maximum difference of 0. The checks found four faults worth fixing
+in production, none of which the study tested, and no column is constant apart from the UTC offset.
+
+![Figure 15: A power-lag column is the actual power shifted by its lag, and is null once the lag is
+no longer than the lead.](../assets/quick_wins_figure_15.svg)
+
+![Figure 16: Calendar and slowly changing weather columns; the 51 members agree for about the first
+3 days and then spread out.](../assets/quick_wins_figure_16.svg)
+
+![Figure 17: Wind, radiation, and precipitation-type columns for the same
+run.](../assets/quick_wins_figure_17.svg)
+
+![Figure 18: Half of the training rows lack precipitation type, the power lags are null beyond their
+lag, and every other column is complete.](../assets/quick_wins_figure_18.svg)
+
+**Precipitation type is missing from 50% of the training rows and from none of the scored rows.**
+The column is null for every ECMWF run initialised before 13 November 2024, which is 7 of the 15
+training months. The model therefore trains with half the column missing and is scored with none
+missing. The study did not investigate why the stored runs lack the column, or whether dropping the
+column or the early months changes the score.
+
+**Windchill is computed outside the range where its formula is valid.** The formula applies at 10 °C
+or below with wind of at least 4.8 km/h, and production applies it everywhere. It exceeds the air
+temperature in 18% of the rows at 10 °C or above.
+
+**Short-wave radiation is positive after sunset.** In December training rows its median is 14.2 W/m²
+at 20:00 UTC and 2.6 W/m² at 23:00 UTC, and 82% of all training rows exceed 1 W/m². The likely cause
+is interpolation of the 3-hourly and 6-hourly accumulated fields, which the study did not verify.
+
+**Wind direction is fed as raw degrees,** so the control member jumps between 0 and 360. The sine
+and cosine of the direction are the usual replacement. The weekday column is an ordinal from 0 to 6,
+which wraps from Sunday to Monday.
+
+**The 336-hour power lag is null for about 6% of the rows at days 0 to 2 because of gaps in the
+power history.** Those nulls are gaps in the power record, not join failures.
+
 ## Training time at 2,500 series
 
 **One XGBoost model per series scales linearly with the number of series, and one model per series
@@ -494,6 +535,9 @@ CRPS differences against production with cleaning.
   years help.
 - **A climatology column,** built so that a training row's own value never enters its own
   climatological mean.
+- **Fix and test the feature faults** listed under "Input features": precipitation type missing for
+  half the training rows, windchill outside its valid range, wind direction as raw degrees, and
+  radiation positive at night.
 - **Plant information for pooled models:** the transfer ratio (power over forecast irradiance) and
   daily shape from [the lag-features study](lag-features.md) in place of a raw site number. That
   study found the clipping ceiling raised the error for plants left out of training.
