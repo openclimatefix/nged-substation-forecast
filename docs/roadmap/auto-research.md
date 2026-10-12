@@ -204,10 +204,8 @@ XGBoost model, and those gains are large next to noise and selection bias. In th
 wins](../studies/forecasts/quick-wins.md) study, quantile training alone lowered CRPS by 2.4
 percentage points of capacity.
 
-**Phase 1 assumes Claude is honest.** The leaderboard scorer will keep the checks that catch honest
-mistakes, such as a study that scores fewer rows than the reference experiment, and will drop the
-checks that exist only to stop deliberate cheating ([issue #1129 (Remove the scorer checks that only
-stop deliberate cheating)](https://github.com/openclimatefix/nged-substation-forecast/issues/1129)).
+**Phase 1 assumes Claude is honest.** The leaderboard scorer keeps only the checks that catch honest
+mistakes, such as a study that scores fewer rows than the reference experiment.
 Each study's adversarial reviews look for broken and leaky implementations, as the `study` skill
 already requires.
 

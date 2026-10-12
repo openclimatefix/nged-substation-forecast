@@ -440,7 +440,8 @@ def raw_hourly_power() -> pl.DataFrame:
     Returns:
         One row per `(site, time)` with `power_mw`.
     """
-    return solar_hourly_power(sites=pv_sites()).select("site", "time", "power_mw")
+    hourly = solar_hourly_power(sites=pv_sites())
+    return hourly.filter(pl.col("time") < FINAL_TEST_CUTOFF).select("site", "time", "power_mw")
 
 
 def final_test_cutoff() -> datetime:
@@ -540,7 +541,7 @@ def lag_source_hourly(*, shift: float = 0.0) -> pl.DataFrame:
         One row per `(site, time)` with `power_mw`.
     """
     sites = pv_sites()
-    hourly = solar_hourly_power(sites=sites)
+    hourly = solar_hourly_power(sites=sites).filter(pl.col("time") < FINAL_TEST_CUTOFF)
     cleaned = drop_outages_and_spikes(power=hourly, sites=sites).select("site", "time", "power_mw")
     ramped = drop_commissioning_ramp(dataset=cleaned)
     capped = with_export_cap(dataset=ramped).filter(~pl.col("constrained"))

@@ -266,7 +266,7 @@ def _score_study(*, predictions: Path, study_name: str, fold_id: str, replace: b
 
     Raises:
         ValueError: If the study name or the fold is not allowed, the file lacks a row-key column or
-            holds one with the wrong dtype, the file's `fold_id` disagrees, the partition already
+            holds one with the wrong dtype, the file's `fold_id` disagrees, or the partition already
             exists and `replace` is False.
         RowKeyMismatchError: If the row keys differ from the reference experiment's.
     """
