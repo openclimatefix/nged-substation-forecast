@@ -262,3 +262,18 @@ the first solar rung: 102 equal-width fits across two folds and three seeds. It 
 main results and validates all corresponding main fits before launching; no unpadded sensitivity
 or later solar rung is queued. The main queue semantics are unchanged. Only syntax parsing ran
 before this review, and no sensitivity fit has started.
+
+**A first-science follow-up verified the frozen score denominator's scope.** The capacity table
+is the full-history 99th percentile of absolute power and can include observations after the
+study cutoff. The reviewer independently verified that this table enters only scoring, while
+fitting, cleaning, lags and pooled scaling use bounded observations and training-only scales.
+No refit or rescoring is required for the registered comparison conditional on that common
+snapshot. Both pages now disclose the retrospective denominator; they make no fully prospective
+normalised-performance claim. A prospective-denominator sensitivity would require rescoring
+saved forecasts, rather than refitting. No newly inspected timestamp is published.
+
+**Numeric figure labels now round original reported values directly.** Fresh review caught an
+Altair shorthand matcher defect before rendering; the exact fix was accepted and rechecked.
+The earlier double rounding of shared chart labels changed displayed interval endpoints by a
+hundredth of a point. The correction changes label text only, preserving estimates, statistics,
+mark positions and style. Figure text was re-exported for reader/prose rechecks before rendering.

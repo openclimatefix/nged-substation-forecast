@@ -44,9 +44,7 @@ def _text(*, spec: dict[str, Any]) -> str:
             ]
         )
         for panel in figure["panels"]:
-            values = _rows(table=table, panel=panel).with_columns(
-                pl.col("difference", "lower_95", "upper_95").round(3)
-            )
+            values = _rows(table=table, panel=panel)
             lines.extend(
                 [
                     panel["title"],
@@ -104,6 +102,30 @@ def _rows(*, table: pl.DataFrame, panel: dict[str, Any]) -> pl.DataFrame:
     return frame
 
 
+def _precise_labels(*, panel_chart: Any, rows: pl.DataFrame) -> Any:
+    """Format displayed bounds directly from reported values, avoiding double rounding."""
+    labels = {
+        row["label"]: (f"{row['difference']:+.2f} [{row['lower_95']:+.2f}, {row['upper_95']:+.2f}]")
+        for row in rows.iter_rows(named=True)
+    }
+    updated = 0
+    for layer in panel_chart.layer:
+        text_encoding = getattr(layer.encoding, "text", None)
+        if (
+            getattr(text_encoding, "field", None) == "text"
+            or getattr(text_encoding, "shorthand", None) == "text:N"
+        ):
+            if not isinstance(layer.data, pl.DataFrame):
+                raise TypeError("numeric label layer must retain its source frame")
+            layer.data = layer.data.with_columns(
+                pl.col("label").replace_strict(labels).alias("text")
+            )
+            updated += layer.data.height
+    if updated != rows.height:
+        raise ValueError("every reported contrast must have exactly one numeric label")
+    return panel_chart
+
+
 def main() -> None:
     """Export figure text or render report-backed SVG and PNG into a new directory."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -143,20 +165,19 @@ def main() -> None:
                 low = min(0.0, cast(float, rows["lower_95"].min()))
                 high = max(0.0, cast(float, rows["upper_95"].max()))
                 margin = max((high - low) * 0.2, 0.02)
-                panels.append(
-                    charts.interval_panel(
-                        rows=rows,
-                        x_domain=(low - margin, high + margin),
-                        x_title=panel["axis_title"],
-                        zero_label=panel["zero_label"],
-                        better_label="Lower loss",
-                        panel_title=panel["title"],
-                        figure_planning="planned",
-                        family_key=False,
-                        value_labels=True,
-                        colour_by_family=True,
-                    )
+                panel_chart = charts.interval_panel(
+                    rows=rows,
+                    x_domain=(low - margin, high + margin),
+                    x_title=panel["axis_title"],
+                    zero_label=panel["zero_label"],
+                    better_label="Lower loss",
+                    panel_title=panel["title"],
+                    figure_planning="planned",
+                    family_key=False,
+                    value_labels=True,
+                    colour_by_family=True,
                 )
+                panels.append(_precise_labels(panel_chart=panel_chart, rows=rows))
             chart = charts.figure(
                 panels=panels,
                 number=figure["number"],
