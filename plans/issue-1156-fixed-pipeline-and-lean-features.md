@@ -51,11 +51,9 @@ device through immutable manifests. A mismatching cache raises. For `scan_power`
 source Delta version before and after materialisation, then freeze the bounded frame as parquet.
 Other Delta scans pass explicit snapshot versions. Keep all published quick-wins files read only.
 
-**Pin the production recipe and training cutoff before scoring its comparison.** The locally
-promoted model is recorded in `production_model/promotion.json` and `meta.json`; verify its
-provenance against MLflow and, where possible, the actual serving deployment. Call a matched
-historical refit a refit. Do not evaluate a deployed model on rows that precede its training
-cutoff, or present the local promoted artifact as verified live deployment without evidence.
+**The user clarified that production means a refit of production's configuration.** As in the
+quick-wins study, train the production recipe on the same historical fold as the candidates.
+No live deployment or promoted artifact comparison is required. Record the training cutoff.
 Record the source code, configuration, dependencies, feature order, row order, cleaned-power
 version, capacity version, eligible population, forecast archive versions, and frame hashes.
 
@@ -104,8 +102,8 @@ type. Append duplicates by cycling through the lexicographically sorted real fea
 use unique padding names, and never borrow an omitted feature.
 Production reproduction calls the public `XGBoostForecaster.train` and `predict`, preserving
 `QuantileDMatrix` construction and public feature preparation. Quick-wins recipe refits preserve
-their historical `DMatrix` fitting path. Unrecoverable dirty-source production provenance is
-reported explicitly rather than treated as an exact reproduction.
+their historical `DMatrix` fitting path. Production here means a matched refit of the production
+configuration, as in quick-wins; it does not mean the deployed model artifact.
 
 **Leaderboard scores come only from `scripts/forecasting/score_study.py`.** Sampled-run diagnostic
 scores are labelled study scores. Before official submission, predict exactly the reference
@@ -159,7 +157,10 @@ subsampling 1, per-series fits, and `new_meter_settling` cleaning. Preserve sort
 order and equal-width padding. Re-evaluate full versus lean solar and full versus lean wind as
 planned contrasts before add-backs. All these use the combined PR feature pipeline;
 the quick-wins winner remains a benchmark. Do not switch to the one-row ensemble-statistic
-screening model because gate G9 has not been established. Do not add Part 2 calibration work.
+screening model because gate G9 has not been established. Keep Part 2 calibration work in a
+separate study. The maintainer subsequently authorised starting that study if time remains:
+begin with saved-prediction coverage and ensemble diagnostics, then the preregistered
+leave-one-month-out calibration screen. Do not bypass its gates or change output contracts.
 Resolve the issue's "11" and "8" removed-column counts against the actual committed lists and
 print all differences before running; descriptive prose is not a feature specification.
 
