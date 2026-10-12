@@ -125,8 +125,8 @@ effect.
 
 **(b) Radiation resampling is implemented; precipitation remains.** Short-wave interpolates
 midpoint clear-sky indices within daylight blocks and conserves each native window's energy.
-Long-wave uses PCHIP through native-window midpoint means. The implementation and boundary/null
-policies live in [NWP variable conventions](../architecture/nwp-variable-conventions.md#radiation-resampling),
+Long-wave uses piecewise cubic Hermite interpolating polynomial (PCHIP) interpolation through
+native-window midpoint means. The implementation and boundary/null policies live in [NWP variable conventions](../architecture/nwp-variable-conventions.md#radiation-resampling),
 including the solar helper needed by the [physics features](#linearised-physics-features-for-solar-and-wind).
 Precipitation's conservative interval policy is tracked with instantaneous-field reconstruction in
 [issue #1165](https://github.com/openclimatefix/nged-substation-forecast/issues/1165).

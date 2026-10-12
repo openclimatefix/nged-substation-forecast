@@ -1,8 +1,9 @@
 """Interval-aware radiation reconstruction on the half-hour grid.
 
 Short-wave uses daylight midpoint indices to shape each native window before conserving its
-energy. Long-wave fits PCHIP through native-window midpoints. Missing native windows stay missing.
-Policies and worked plots:
+energy. Long-wave fits a piecewise cubic Hermite interpolating polynomial (PCHIP) through native
+means placed at their window midpoints, then evaluates the spline at half-hour midpoints. Missing
+native windows stay missing. Policies and worked plots:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling>.
 """
 

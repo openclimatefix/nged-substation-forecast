@@ -143,8 +143,11 @@ def main() -> None:
         "Centroid shifts include all 48 half-hours and are relative to the synthetic reference.",
         "Positive shifts mean later. These checks do not measure forecast skill.",
         "The cloud-transition reference uses 85% of clear sky before noon and 20% afterwards.",
-        "Short-wave conserves each native mean; long-wave evaluates PCHIP at half-hour midpoints",
-        "without enforcing interval energy.",
+        "Short-wave conserves each native mean. Long-wave evaluates a piecewise cubic Hermite",
+        (
+            "interpolating polynomial (PCHIP) at half-hour midpoints "
+            "without enforcing interval energy."
+        ),
         "Neither method recovers unknown sub-window changes.",
         "",
         (
@@ -254,7 +257,8 @@ def main() -> None:
                         "Unknown cloud and thermal changes are not recovered; "
                         "forecast skill is not measured."
                     ),
-                    "Short-wave retains interval means; long-wave uses midpoint PCHIP.",
+                    "Short-wave retains each interval's energy.",
+                    "Long-wave samples a shape-preserving cubic spline at half-hour midpoints.",
                 ],
                 anchor="start",
             )
@@ -262,7 +266,7 @@ def main() -> None:
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(vlc.vegalite_to_svg(chart.to_dict()))
-    args.output.with_suffix(".png").write_bytes(vlc.vegalite_to_png(chart.to_dict(), scale=1.25))
+    args.output.with_suffix(".png").write_bytes(vlc.vegalite_to_png(chart.to_dict(), scale=1.2))
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text("\n".join(report) + "\n")
     print("\n".join(report))

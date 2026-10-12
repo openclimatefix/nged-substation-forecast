@@ -184,9 +184,10 @@ anchor gives a constant. Thermal radiation depends on atmospheric temperature, h
 clouds, so long-wave uses no solar shaping.
 
 **Long-wave prioritises smooth features over exact interval energy.** Native interval means act as
-midpoint estimates; the spline's half-hours need not average back to each original mean. The
-half-hour features feed an electricity forecasting model, and the smoother profile avoids imposing
-steps at every native boundary. Smoothness does not establish a forecast-score gain or recover the
+midpoint estimates; spline values evaluated at half-hour midpoints need not average back to each
+original mean. The half-hour features feed an electricity forecasting model. The smoother long-wave
+profile avoids imposing steps at every native boundary. Smoothness does not establish a
+forecast-score gain or recover the
 unknown thermal variation within an interval. See the [PCHIP
 algorithm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.PchipInterpolator.html)
 for the shape-preserving derivative rules.
