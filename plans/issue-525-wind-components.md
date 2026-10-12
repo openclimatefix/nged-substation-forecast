@@ -3,7 +3,9 @@
 The ECMWF ingest averages native wind components onto H3 cells, converts them to speed and
 direction, then discards the components. The feature pipeline interpolates those bearings as
 ordinary numbers: wind crossing North can become southerly wind. Storing vectors also prevents
-future spatial and ensemble arithmetic from inheriting the wrapped-angle problem.
+future spatial and ensemble arithmetic on the stored columns from inheriting that problem.
+Derived bearings remain circular; their model encoding and any circular lookback redesign are
+separate work.
 
 Measure the storage cost of three representations and the scalar-versus-vector speed gap first.
 Subject to that evidence, store eastward `u` and northward `v`, interpolate them, and derive the
@@ -95,8 +97,9 @@ Missing joined weather propagates to null polar features, including direction. E
 missing control member in single-run mode retain existing behavior; bulk weather-lag training
 still rejects a missing control member. No new warning or fallback mechanism is introduced.
 
-At exactly zero vector magnitude, return direction 0 degrees as a deterministic convention and
-document that it carries no physical bearing. Test opposing vectors with exact Cartesian inputs;
+At exactly zero vector magnitude, preserve the existing formula
+(`atan2(0, 0) + 180`, normally 180 degrees) and document that it carries no physical bearing.
+Test opposing vectors with exact Cartesian inputs;
 near-zero vectors use their computed bearing without an arbitrary calm threshold.
 
 A failed archive partition leaves the old archive serving. Record rebuild failures and retry
@@ -147,9 +150,11 @@ If the storage cost is rejected, retain polar storage and re-scope 526's wind wo
   signed Float32 `wind_u_10m`, `wind_v_10m`, `wind_u_100m`, `wind_v_100m`, in metres per second,
   with bounds -200 to 200 and current non-nullability. Preserve the old magnitude corrupt-feed
   ceiling by validating `u² + v² <= 200²` at each height. Describe eastward/northward signs.
-- Keep `WeatherFeature` equal to stored weather variables. Extend the lookback base-column type
-  in `_parsed_features.py` to include derived speed/direction as well as `WeatherFeature`.
-  `AllFeatures` already declares polar fields; no raw-component feature experiment is added.
+- Keep `WeatherFeature` as the existing model-weather vocabulary, including derived polar names;
+  document that it describes model inputs rather than stored columns. `AllFeatures` already
+  declares those fields. Replace the literal-equals-Nwp test with an explicit mapping invariant:
+  substitute the four component fields for the four polar feature names. No second feature
+  vocabulary or raw-component model experiment is needed.
 - `packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py`: retain components;
   remove ingest-only polar helpers after moving their expressions into feature engineering.
   If scalar columns are accepted, derive point magnitudes after NaN normalization but before
@@ -162,15 +167,13 @@ If the storage cost is rejected, retain polar storage and re-scope 526's wind wo
 
 ### 3. Feature engineering and consumers
 
-- `_parsed_features.py`: own a small fixed wind-expression registry separate from the windchill
-  registry. Add derived polar names to `StaticFeature`; parse direct polar requests and allow
-  their lags/rolling means. Make `requires_weather_data` true for any of these requests.
-  Do not build a general dependency resolver for this fixed set of four columns.
+- `_parsed_features.py`: own the four fixed wind expressions next to windchill. Keep the existing
+  polar names in `WeatherFeature`, so parsing, weather detection, lag/rolling types, and
+  `requires_weather_data` keep working unchanged. `StaticFeature` stays windchill alone.
+  Do not add a second registry or a general dependency resolver.
 - `tabular_feature_engineer.py`: derive all four polar columns once on `processed_nwp`, immediately
   after interpolation. Keep those expressions out of `_apply_post_join_features`' single
   windchill `with_columns` call; siblings cannot depend on aliases made in that same call.
-  `_apply_post_join_features` applies only the windchill registry entries: derived polar
-  static requests have already been fulfilled and must not be looked up in that registry.
   Remove raw components from the final selected frame unless a future feature explicitly asks
   for them. Preserve direct, lag-only, rolling-only, windchill-only, and power-only requests.
 - `_nwp.py`: existing generic interpolation should work once the stored fields are Cartesian.
@@ -190,10 +193,16 @@ If the storage cost is rejected, retain polar storage and re-scope 526's wind wo
 
 ### 4. Archive cutover and measurement of forecasts
 
-Use the existing `ecmwf_ens` backfill path against a new configured table location. Re-download
-native inputs for scalar means; recommend re-download for u/v alone too, to preserve native
-components without an archive reconstruction path. Estimate elapsed time and download volume
-from the benchmark before scheduling it; do not promise an overnight finish.
+For u/v alone, add `scripts/maintenance/rewrite_nwp_wind_components.py`: read the old Delta archive
+partition by partition through a plain Polars scan pinned to a source version, reconstruct
+`u = -speed * sin(direction)` and `v = -speed * cos(direction)`, remove polar fields, validate
+against the new `Nwp`, and write through `write_nwp` to a new configured destination. Reject
+identical source/destination paths. Record a source-version and completed-partition manifest;
+restart by safely rewriting partitions. The measured reconstruction error is below stored
+precision, so this avoids a full download and upstream revisions. Validate it on the seasonal
+raw-input sample before choosing it. If scalar means are accepted, use the existing `ecmwf_ens`
+backfill path to re-download native inputs into the fresh destination instead. Estimate elapsed
+time and volume before scheduling either path; do not promise an overnight finish.
 
 Inventory required partitions first. Validate new key coverage, dtypes, members, steps, H3 cells,
 null patterns, and magnitude ranges per partition. Compare unchanged weather fields within the
@@ -215,7 +224,8 @@ Each new regression below must fail on current main; existing fixture migrations
 
 - `packages/contracts/tests/test_weather_schemas.py`: a complete signed-component frame validates
   without stored polar fields; legacy-only input is rejected; a component beyond bounds and a
-  pair whose magnitude exceeds 200 are rejected. Keep literal/model and variable-partition tests.
+  pair whose magnitude exceeds 200 are rejected. Update the feature/storage mapping test and
+  keep the continuous/categorical variable-partition test.
 - `packages/dynamical_data/tests/test_convert_to_polars.py`: asymmetric weighted raw vectors
   emerge as their component means and no polar fields. In the conditional scalar variant, two
   opposing vectors have zero vector speed and nonzero scalar mean; missing-pair normalization
@@ -237,6 +247,10 @@ Each new regression below must fail on current main; existing fixture migrations
 - `packages/dashboard/tests/test_forecast_chart.py`: plot registry equals the new continuous
   stored variables; negative components plot with signed units. Test the archive-reader study's
   native polar projection on synthetic cardinal vectors if extracting that projection is needed.
+- Archive-rewrite tests under `tests/`: old polar cardinal vectors become correctly signed
+  components in a different destination; all non-wind columns and row keys survive; a rerun
+  has no duplicates; source data stays untouched; a two-partition result reads under the new
+  contract. These test the new migration tool, whose absence is the failure on current main.
 - Benchmark checks use tiny synthetic frames to verify equal key coverage, column-chunk byte
   accounting, and the distinction between scalar and vector means. They are method checks for
   new measurement code, not regressions claimed to fail before that code exists. Confirm real
@@ -306,5 +320,8 @@ tests or data rebuild are needed before reviewing the design.
 
 ## Review record
 
-The simplicity and correctness reviews are pending. Record accepted changes and each rejected
-finding here after verifying it against the repository.
+Simplicity review accepted: preserve the existing `WeatherFeature` model vocabulary instead of
+introducing derived static categories; prefer a compute-only fresh-table rewrite for u/v alone;
+preserve the existing calm-direction formula; limit the structural wrap-safety claim to stored
+components. Scalar storage remains conditional on the requested measurement. No findings rejected.
+The correctness/testability review is pending.
