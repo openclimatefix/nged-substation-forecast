@@ -210,7 +210,8 @@ def _fetch(output: Path, grid: Path, dates: list[str], identity: dict[str, str])
         print(f"{date}: downloading complete run {dict(dataset.sizes)}", flush=True)
         downloaded = download_ecmwf_ens_data(ds_sliced=dataset)
         temporary = raw / f"{date}.zarr.partial"
-        downloaded.to_zarr(temporary, mode="w", zarr_format=2)
+        # Source chunk encodings still include the squeezed init-time dimension.
+        downloaded.drop_encoding().to_zarr(temporary, mode="w", zarr_format=2)
         _save_json(
             raw / f"{date}.json",
             {
