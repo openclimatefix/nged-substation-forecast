@@ -733,7 +733,7 @@ where no neighbour is available. At roughly 2,500 series neither is free.
 **Two studies on the six metered solar plants in the trial area tested capacity estimators, and
 neither showed that a dynamic estimator is worth building yet.** Both are throw-away experiments on
 one small area. Neither settles which of the candidates above to build, and both leave the choice of
-what to build with this page.
+what to build with this roadmap page.
 
 **In the first study, no capacity estimate lowered the day-ahead forecast error detectably, and the
 Kalman filter that the study's rule selected raised it.** The write-up is [No estimate of a solar
@@ -745,15 +745,16 @@ and that suggestion came from the results, not from the plan.
 
 **In the second study, Claude Sonnet 5.5 given deterministic evidence tools found 14% of planted
 one-month losses, close to the 10% of a fixed rule on the same tools.** The write-up is [Claude
-Sonnet 5.5 found about 1 in 7 planted one-month solar
-losses](../studies/forecasts/llm-capacity-labeller.md). The model found all 12 planted losses of 60%
-lasting 90 days and 5 of 12 losses of 30% lasting 90 days. Its planned comparisons are untested,
-because no estimator passed the positive control. The page ends with a proposed follow-up study, and
-a discussion of other places a language model could serve in the NGED data pipeline.
+Sonnet 5.5 found about 1 in 7 planted one-month solar losses and all 12 of a 60% loss lasting 90
+days; the planned contrasts are untested](../studies/forecasts/llm-capacity-labeller.md). The model
+found all 12 planted losses of 60% lasting 90 days and 5 of 12 losses of 30% lasting 90 days. Its
+planned comparisons are untested, because no estimator passed the positive control. The page ends
+with a proposed follow-up study, and a discussion of other places a language model could serve in
+the NGED data pipeline.
 
-**Ranking estimators at 6 plants is limited by how few real losses the record holds.** Detecting a
-1-point gain in capacity error needs about 90 to 100 planted events, so the trial area is too small
-to rank estimators without planting losses. Planted losses are a stand-in for real ones, and the
+**Powering the second study's planned comparisons would have taken about three times as many planted
+losses as it had.** The study's two comparisons of detection and capacity error (C1 and C2) need
+about 90 to 100 planted events, and it had 32. Planted losses are a stand-in for real ones, and the
 second study's prompt was written for the planted design (one-month losses aligned to calendar
 months).
 
