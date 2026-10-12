@@ -443,8 +443,7 @@ alternatives we considered.
 ### Fold hygiene: selection bias and a final-test window 🚧
 
 Design and interim selection-bias guards:
-[#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960). Scorer and conditional
-final-test enforcement: [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958).
+[#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960).
 The original issue and its design-update comment are retained in
 [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226), closed as consolidated.
 
@@ -472,7 +471,7 @@ own Zarr backfill was estimated at ~November 2027 as of 2026-05, after v1.0, but
 may deliver about
 three of the missing years sooner — see [a staged-GRIB route fills three of the missing
 years](training-history.md#a-staged-grib-route-fills-three-of-the-missing-years-without-waiting-for-the-zarr-backfill).
-The interim guards below are planned work in #960; scorer enforcement is tracked in #958.
+The interim guards below are planned work in #960.
 
 **The planned Ladder guard publishes a new best only when it beats the standing best by more than
 a margin. The published score is then reported rounded to that margin.** [Blum and Hardt
@@ -513,17 +512,6 @@ single answer. TS-Arena avoids reusing any fixed evaluation window at all ([Meye
 (2026)](https://arxiv.org/abs/2512.20761)); Flexpectation's promotion decision cannot work that way,
 for the reason just given, and it is the live-monitoring check where our practice matches the
 TS-Arena pattern instead.
-
-**A narrow scoring guard works whether or not a final-test year is ever reserved.**
-`final_test_start` in `conf/cv/default.yaml` is a date later than every leaderboard fold's
-`val_end`. The `metrics` asset refuses to score a window reaching that date unless the maintainer's
-shell sets `NGED_FINAL_TEST=1`. `studies.power.scan_power` stops at the same date. The date alone
-does not reserve an independent final-test year or show that its observations were never used for
-training. Ahead of Dynamical.org's backfill, the date protects against an experiment, especially an
-unsupervised autonomous research session, scoring on later data without the maintainer's say-so. The
-other refusals of the `metrics` asset, and the `study/` experiment prefix, are described in [What
-the `metrics` asset refuses to
-score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score).
 
 #### Implementation details — final-test window (deleted when it ships)
 

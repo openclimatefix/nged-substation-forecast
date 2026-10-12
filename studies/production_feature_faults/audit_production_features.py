@@ -21,7 +21,7 @@ from ml_core.features._lags import _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature
 from ml_core.features.tabular_feature_engineer import _apply_local_time_features
-from studies.power import CLEANED_POWER_DELTA_URI, CV_CONFIG_PATH, scan_power
+from studies.power import CLEANED_POWER_DELTA_URI, scan_power
 from studies.solar import zenith
 
 GROUPS: Final[list[str]] = ["time_series_id", "nwp_init_time", "ensemble_member"]
@@ -658,7 +658,6 @@ def main() -> None:
         "model_config_sha256": file_hash(PROJECT_ROOT / "conf/model/xgboost.yaml"),
         "power_delta_version": power_version,
         "power_source": str(Path(CLEANED_POWER_DELTA_URI).resolve()),
-        "power_cutoff": str(yaml.safe_load(CV_CONFIG_PATH.read_text())["final_test_start"]),
         "scope": (
             "Forward fold, member 0 only. Current source probes do not establish "
             "historical cache provenance."

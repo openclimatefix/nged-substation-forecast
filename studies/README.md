@@ -68,9 +68,8 @@ number on a study page must trace to a `forecast_metrics` row. The `study/` pref
 forecasts out of the promotion candidates, and lets a reader filter the study experiments out of the
 leaderboard.
 
-**A study reads observed power through `studies.power.scan_power`.** The function returns cleaned
-power, including the whole validation year, before `final_test_start` in `conf/cv/default.yaml`, the
-date from which the `metrics` asset refuses to score unless the maintainer sets `NGED_FINAL_TEST=1`.
+**A study reads observed power through `studies.power.scan_power`.** The function returns every
+cleaned reading, including the whole validation year.
 
 ## What to expect when reading one
 

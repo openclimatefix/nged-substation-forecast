@@ -41,13 +41,12 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal
 
 import numpy as np
 import polars as pl
-from contracts.config_schemas import load_cv_config
 from lag_arm_columns import (
     CAMS_AVAILABLE_THROUGH_DAYS_BEFORE_ISSUE,
     DAILY_FEATURE_COLUMNS,
@@ -69,7 +68,6 @@ from studies.commissioning import drop_commissioning_ramp
 from studies.cross_validation import cut_eras
 from studies.export_cap import with_export_cap
 from studies.guards import check_no_missing, refuse_to_overwrite
-from studies.power import CV_CONFIG_PATH
 from studies.pv_dataset import drop_outages_and_spikes, pv_sites, solar_hourly_power
 from studies.sources import (
     NFC_DIR,
@@ -80,6 +78,9 @@ from studies.sources import (
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+FINAL_TEST_CUTOFF: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
+"""The study reads no power at or after this instant, except in the reproduction check."""
+
 _LOG: Final[logging.Logger] = logging.getLogger("build_lag_frame")
 
 WeatherProduct = Literal["ens_mean", "ifs_single"]
@@ -443,12 +444,12 @@ def raw_hourly_power() -> pl.DataFrame:
 
 
 def final_test_cutoff() -> datetime:
-    """Return midnight UTC at the start of `final_test_start`, which no study may train on or read.
+    """Return midnight UTC on 2026-07-01, which no fit in this study may train on or read.
 
     Returns:
-        The cut-off `studies.power.scan_power` applies.
+        The cut-off.
     """
-    return datetime.combine(load_cv_config(CV_CONFIG_PATH).final_test_start, time.min, tzinfo=UTC)
+    return FINAL_TEST_CUTOFF
 
 
 def month_labels(*, first: str, last: str) -> list[str]:
@@ -979,8 +980,8 @@ def build_frame(
     lines = [
         f"- shared rows: {built.height + after_cutoff}",
         (
-            f"- rows at or after `final_test_start` ({cutoff:%Y-%m-%d}), dropped because "
-            f"`studies.power.scan_power` cannot read their lags: {after_cutoff}"
+            f"- rows at or after {cutoff:%Y-%m-%d}, dropped because the study reads no power "
+            f"from that date, so their lags are missing: {after_cutoff}"
         ),
     ]
     needed = {c for arm in arms for c in extra_columns_of(arm=arm)}
@@ -1216,7 +1217,7 @@ def assert_before_cutoff(*, frame: pl.DataFrame, name: str) -> None:
     """
     late = frame.filter(pl.col("time") >= final_test_cutoff()).height
     if late:
-        msg = f"{late} of {name} are at or after final_test_start, which no fit may read"
+        msg = f"{late} of {name} are at or after the 2026-07-01 cut-off, which no fit may read"
         raise ValueError(msg)
 
 

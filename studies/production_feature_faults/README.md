@@ -14,7 +14,7 @@ The backwards stress test trains on July 2025–June 2026 and evaluates 66 weekl
 2024–June 2025. That chronology is deliberately reversed and is not prospective validation.
 
 Set `DATA_PATH_INTERNAL` to the local data root. The audit and forecasts use
-`studies.power.scan_power`, which stops before the final-test boundary. Metadata supplies solar
+`studies.power.scan_power`. Metadata supplies solar
 geometry; the delivery capacity table supplies each series’ error denominator. No downloads,
 licences, external service writes, or production changes are required.
 

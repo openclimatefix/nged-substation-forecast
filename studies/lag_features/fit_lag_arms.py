@@ -1331,9 +1331,9 @@ def combine(*, results: list[pl.DataFrame]) -> pl.DataFrame:
 def reproduction_check(*, root: Path, device: DeviceType, max_workers: int) -> int:
     """Refit the ENS-mean B0 at lead-day 1 on the shared rows and compare it with the published run.
 
-    The refit uses all 35,263 shared rows, including the 5,144 from `final_test_start` on, because
+    The refit uses all 35,263 shared rows, including the 5,144 from 2026-07-01 on, because
     the published number includes them; B0 reads no power, and nothing else at or after
-    `final_test_start` reaches a fit.
+    the 2026-07-01 cut-off reaches a fit.
 
     Args:
         root: The output root, where `reproduction_check.md` is written.

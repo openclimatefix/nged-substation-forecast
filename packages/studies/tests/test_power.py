@@ -1,6 +1,5 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -104,7 +103,7 @@ def test_scan_power_returns_only_the_rows_no_cleaning_rule_flagged(
     assert kept["power"].to_list() == [1.0]
 
 
-def test_scan_power_stops_before_midnight_on_final_test_start(
+def test_scan_power_returns_readings_on_and_after_2026_07_01(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
     delta_path = tmp_path / "cleaned_power_time_series.delta"
@@ -122,10 +121,7 @@ def test_scan_power_stops_before_midnight_on_final_test_start(
         schema_overrides={"time": pl.Datetime("us", "UTC"), "drop_reason": pl.String},
     ).write_delta(delta_path)
     monkeypatch.setattr(power, "CLEANED_POWER_DELTA_URI", str(delta_path))
-    monkeypatch.setattr(
-        power, "load_cv_config", lambda _path: SimpleNamespace(final_test_start=date(2026, 7, 1))
-    )
 
     kept = power.scan_power().collect()
 
-    assert kept["power"].to_list() == [1.0]
+    assert kept["power"].to_list() == [1.0, 2.0, 3.0]

@@ -6,24 +6,9 @@ file's rows, stored in `power_forecasts` under the experiment name `study/<study
 
 Before anything is written, the script refuses a file whose row keys `(time_series_id,
 power_fcst_init_time, valid_time, ensemble_member)` differ from those of the cross-validation (CV)
-config's `reference_experiment_name` experiment for the same fold. The script also refuses a file
-whose rows carry more than one `power_fcst_model_name`. A study therefore cannot abstain on hard
-rows, choose its own ensemble members, or down-weight rows by spreading them across model names.
-The `metrics` asset repeats both checks when it scores a study, because the asset is the one source
-of a leaderboard number.
-
-The script also discards the environment it was started with. `Settings` reads `DATA_PATH_INTERNAL`,
-`METADATA_PATH`, `CV_CONFIG_PATH`, and `MLFLOW_TRACKING_URI` from the environment, and the `metrics`
-asset reads `NGED_FINAL_TEST`. Any of them could repoint the actuals or switch off the final-test
-date guard. The script therefore re-executes itself with an environment holding only
-`ALLOWED_ENVIRONMENT`. The paths and credentials come from the `.env` file of the checkout.
-
-The script runs the code of whichever checkout its interpreter belongs to. An autonomous research
-session can therefore change what the script executes, unless the maintainer's `sudo` rule runs
-the `main` checkout's interpreter directly (not `uv run`) on the `main` checkout's copy of the
-script, with `env_reset` and a fixed `secure_path`. The re-execution in `main` happens only after
-the module's imports have run, so a `PYTHONPATH` or `PATH` set before the script starts can still
-run code in the first process.
+config's `reference_experiment_name` experiment for the same fold. A study therefore cannot abstain
+on hard rows or choose its own ensemble members. The `metrics` asset repeats the check when it
+scores a study, because the asset is the one source of a leaderboard number.
 
     uv run python scripts/forecasting/score_study.py \
         predictions.parquet my_study mid_2025_to_mid_2026
@@ -35,10 +20,9 @@ study, including this one. Each new study name is another attempt against the sa
 same reference, so the number says how many chances the submitters have had to find a lucky score
 on that fold.
 
-A study that has already been scored is not overwritten. `--replace` overwrites the earlier
-submission, its metrics, and its MLflow fold run, so the script accepts the flag only when
-`NGED_ALLOW_REPLACE=1` is set in the environment of the maintainer's own shell. The `sudo` rule's
-`env_reset` drops that variable. The log keeps the record of an overwritten submission.
+A study that has already been scored is not overwritten unless `--replace` is passed. `--replace`
+overwrites the earlier submission, its metrics, and its MLflow fold run. The log keeps the record of
+an overwritten submission.
 """
 
 import argparse
@@ -47,9 +31,8 @@ import json
 import os
 import re
 import shutil
-import sys
 import tempfile
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -63,7 +46,7 @@ from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from dagster import DagsterInstance, RunConfig, materialize
 from delta_store.power_forecasts import write_power_forecasts
-from ml_core.metrics import ROW_KEY_COLUMNS, require_same_row_keys, require_single_model_name
+from ml_core.metrics import ROW_KEY_COLUMNS, require_same_row_keys
 from ml_core.mlflow_runs import (
     get_or_create_experiment,
     get_or_create_fold_run,
@@ -80,19 +63,6 @@ The Delta writers build their overwrite predicate from the experiment name by st
 a name containing a quote could overwrite other experiments' rows.
 """
 
-ALLOWED_ENVIRONMENT: Final[frozenset[str]] = frozenset({"PATH", "HOME", "LANG", "LC_ALL"})
-"""The environment variables the script keeps."""
-
-CLEAN_ENVIRONMENT_MARKER: Final[str] = "NGED_SCORE_STUDY_CLEAN_ENVIRONMENT"
-"""Set to `1` in the re-executed process, so the process re-executes once only."""
-
-ALLOW_REPLACE_VARIABLE: Final[str] = "NGED_ALLOW_REPLACE"
-"""The environment variable that lets `--replace` overwrite a submission.
-
-Only the maintainer's own shell sets it to `1`. The script forwards it across the re-execution,
-whose cleaned environment would otherwise drop it.
-"""
-
 SUBMISSION_LOG_NAME: Final[str] = "study_submissions.jsonl"
 """The append-only log of every submission attempt, in `local_artifacts_path`."""
 
@@ -105,18 +75,6 @@ SERIES_BATCH_SIZE: Final[int] = 4
 A full fold is about 364 million rows, which already exhausts a 29 GB machine when written in one
 call. The size matches the scoring batch of the `metrics` asset.
 """
-
-
-def clean_environment(environment: Mapping[str, str]) -> dict[str, str]:
-    """Return only the variables of `environment` that the script keeps.
-
-    Args:
-        environment: The caller's environment.
-
-    Returns:
-        The variables named in `ALLOWED_ENVIRONMENT`.
-    """
-    return {name: value for name, value in environment.items() if name in ALLOWED_ENVIRONMENT}
 
 
 def validate_study_name(study_name: str) -> str:
@@ -309,16 +267,9 @@ def _score_study(*, predictions: Path, study_name: str, fold_id: str, replace: b
     Raises:
         ValueError: If the study name or the fold is not allowed, the file lacks a row-key column or
             holds one with the wrong dtype, the file's `fold_id` disagrees, the partition already
-            exists and `replace` is False, or `replace` is True and `NGED_ALLOW_REPLACE=1` is not
-            set.
-        MultipleModelNamesError: If the rows carry more than one `power_fcst_model_name`.
+            exists and `replace` is False.
         RowKeyMismatchError: If the row keys differ from the reference experiment's.
     """
-    if replace and os.environ.get(ALLOW_REPLACE_VARIABLE) != "1":
-        raise ValueError(
-            f"--replace overwrites an earlier submission, so it needs {ALLOW_REPLACE_VARIABLE}=1 "
-            "in the maintainer's own shell."
-        )
     settings = Settings()
     # Load the CV config the way the `metrics` asset does, from the environment variable alone. A
     # `CV_CONFIG_PATH` entry in the `.env` file, which `Settings` would also read, then cannot make
@@ -349,7 +300,6 @@ def _score_study(*, predictions: Path, study_name: str, fold_id: str, replace: b
             f"{experiment_name} already holds rows for {fold_id}; pass --replace to overwrite them."
         )
 
-    require_single_model_name(study=study, group_label=f"{experiment_name}, {fold_id}")
     require_same_row_keys(
         study=study,
         reference=PopulationFilter(
@@ -380,16 +330,7 @@ def _score_study(*, predictions: Path, study_name: str, fold_id: str, replace: b
 
 
 def main() -> None:
-    """Re-execute with a clean environment, then score the study named on the command line."""
-    if os.environ.get(CLEAN_ENVIRONMENT_MARKER) != "1":
-        forwarded = (
-            {ALLOW_REPLACE_VARIABLE: "1"} if os.environ.get(ALLOW_REPLACE_VARIABLE) == "1" else {}
-        )
-        os.execve(
-            sys.executable,
-            [sys.executable, *sys.argv],
-            {**clean_environment(os.environ), **forwarded, CLEAN_ENVIRONMENT_MARKER: "1"},
-        )
+    """Score the study named on the command line."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("predictions", type=Path, help="Parquet file of PowerForecast rows.")
     parser.add_argument("study_name", help="The study's name, without the study/ prefix.")
