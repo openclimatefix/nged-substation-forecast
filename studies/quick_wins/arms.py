@@ -461,7 +461,7 @@ def combine(*, name: str, parts: tuple[Arm, ...], description: str) -> Arm:
 _A3W = next(a for a in FEATURE_ARMS if a.name == "a3w_lean_wind_only")
 _D3 = next(a for a in TRAINING_ARMS if a.name == "d3_pooled_with_site_id")
 _E1 = next(a for a in TRAINING_ARMS if a.name == "e1_quantile")
-_G1 = next(a for a in FEATURE_ARMS if a.name == "g1_heuristic_inputs")
+_G1 = next(a for a in TRAINING_ARMS if a.name == "g1_heuristic_inputs")
 _C1 = next(a for a in FEATURE_ARMS if a.name == "c1_lead_time")
 _C2 = next(a for a in TRAINING_ARMS if a.name == "c2_early_stopping")
 _C4 = next(a for a in TRAINING_ARMS if a.name == "c4_absolute_error")
