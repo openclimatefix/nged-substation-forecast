@@ -8,8 +8,8 @@ The energy centroid is the average half-hour midpoint weighted by radiation ener
 Centroid shifts include all 48 half-hours and are relative to the synthetic reference.
 Positive shifts mean later. These checks do not measure forecast skill.
 The cloud-transition reference uses 85% of clear sky before noon and 20% afterwards.
-Short-wave conserves each native mean; long-wave PCHIP prioritises smooth midpoint timing
-without enforcing interval energy, evaluating PCHIP at half-hour midpoints.
+Short-wave conserves each native mean; long-wave evaluates PCHIP at half-hour midpoints
+without enforcing interval energy.
 Neither method recovers unknown sub-window changes.
 
 | Field / scenario | Native step (h) | Maximum mean error before (W/m²) | After (W/m²) | Centroid shift before (h) | After (h) |

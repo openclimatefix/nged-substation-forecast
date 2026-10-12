@@ -143,8 +143,8 @@ def main() -> None:
         "Centroid shifts include all 48 half-hours and are relative to the synthetic reference.",
         "Positive shifts mean later. These checks do not measure forecast skill.",
         "The cloud-transition reference uses 85% of clear sky before noon and 20% afterwards.",
-        "Short-wave conserves each native mean; long-wave PCHIP prioritises smooth midpoint timing",
-        "without enforcing interval energy, evaluating PCHIP at half-hour midpoints.",
+        "Short-wave conserves each native mean; long-wave evaluates PCHIP at half-hour midpoints",
+        "without enforcing interval energy.",
         "Neither method recovers unknown sub-window changes.",
         "",
         (
