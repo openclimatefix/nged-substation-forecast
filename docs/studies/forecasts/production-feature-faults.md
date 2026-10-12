@@ -1,7 +1,7 @@
 # Production feature faults: diagnosis and forecast effects
 
 > **Draft study.** The diagnostic audit is complete. Forecast experiments and the final scientific
-> and prose reviews are still in progress; forecast-effect conclusions will follow.
+> and prose reviews are still in progress. Forecast-effect conclusions will follow.
 
 Two reproducible calculation problems affect the conversion of weather inputs to the half-hourly
 timestamps used by the power forecast. Radiation values are averages over the interval ending at
