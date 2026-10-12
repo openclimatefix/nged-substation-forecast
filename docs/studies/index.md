@@ -187,3 +187,11 @@ a
   Single's radiation and temperature lowers the error by about 1 point. The ensemble mean the
   production service reads gives about the same gain, and AIFS Single adds about 0.13 points to
   that mean, which the study cannot resolve.
+- [Which cheap changes lower the production XGBoost forecast's error?](forecasts/quick-wins.md) — at
+  31 NGED series over one validation year, four changes to the production training recipe (quantile
+  training, a lead-time column, leaner wind-farm columns, and one XGBoost model per series type)
+  lower the continuous ranked probability score (CRPS) from 11.3% to 7.9% of capacity, against 7.2%
+  for the manual heuristic. The production ensemble's 10% to 90% band holds the outcome in only 10%
+  of half-hours, and rescaling its spread lowers the CRPS by 1.3 to 1.9 points. The absolute-error
+  objective and early stopping each lower the CRPS by about 0.4 points. Removing power lags from
+  solar and wind farms raised their error.
