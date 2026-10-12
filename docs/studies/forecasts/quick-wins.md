@@ -182,7 +182,8 @@ later diagnostic round added quantile training, a learning curve, the heuristic'
 blend with the heuristic's members. The plan named four planned contrasts: the chosen cleaning
 against no cleaning (P0), the round 2 combination against production on fold B (P1), per-type
 physics columns for solar farms only (P2), and spread calibration against the same forecast
-unrescaled (P3). Their results are in the results below. Every other number is exploratory.
+unrescaled (P3). Their results are in Round 0 (P0), Round 1 (P2), Round 2 (P1), and Calibration
+(P3). Every other number is exploratory.
 
 ## Data and methods
 
