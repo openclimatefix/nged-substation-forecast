@@ -569,7 +569,7 @@ def _order_by(*, rows: pl.DataFrame, order: Sequence[str]) -> pl.DataFrame:
 
 def _kind_of(arm: str) -> str:
     """Return the colour group of an arm in a contrast figure."""
-    family = arm_definitions.ALL_ARMS[arm].family
+    family = ARM_FAMILIES[arm]
     return {
         "features": "Columns shown",
         "training": "Training",

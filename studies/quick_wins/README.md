@@ -20,8 +20,10 @@ skips any arm whose scores already exist.
 | `cleaning_rules.py`, `extra_features.py`, `arms.py` | Round 0 cleaning rules, the extra feature columns, and the definition of every arm. |
 | `fit_arms.py` | Fits named arms on a fold and seed, predicts every member of the sampled runs, and writes per-row scores. |
 | `calibrate.py` | The post hoc spread rescaling (B1), using only outcomes known at each run's initialisation time. |
+| `blend_heuristic.py` | A post hoc diagnostic: scores the XGBoost members mixed with the stored `manual_heuristic` members. |
 | `report_quick_wins.py` | Month-resampled intervals and paired contrasts for every arm, printed into `report_*.md` and saved as parquet files. |
-| `charts_summary.py`, `charts_examples.py` | The page's figures. |
+| `report_summary.py`, `report_compute.py` | Print every table the page quotes into `summary.md`, and the training-time table into `compute.md`. |
+| `charts_summary.py`, `charts_examples.py`, `charts_diagnostics.py` | The page's figures 1 to 14. |
 
 ## Commands
 

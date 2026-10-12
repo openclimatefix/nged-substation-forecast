@@ -60,6 +60,7 @@ Axis titles:
 Legend entries:
 - Kind of change: Columns shown
 - Kind of change: Training
+- Kind of change: Quantile training
 
 Annotations:
 - same as production with cleaning
