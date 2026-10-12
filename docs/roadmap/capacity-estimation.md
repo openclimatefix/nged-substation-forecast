@@ -728,6 +728,35 @@ cloud, so nothing in a single series separates them. Dividing by the median outp
 sites cancels cloud, season and time of day; a clear-sky irradiance model would do the same job
 where no neighbour is available. At roughly 2,500 series neither is free.
 
+## What two capacity-estimator studies found at six solar plants
+
+**Two studies on the six metered solar plants in the trial area tested capacity estimators, and
+neither showed that a dynamic estimator is worth building yet.** Both studies are throw-away
+experiments on one small area. Neither study settles which of the candidates above to build.
+
+**In the first study, no capacity estimate lowered the day-ahead forecast error detectably, and the
+Kalman filter that the study's rule selected raised it.** The write-up is [No estimate of a solar
+plant's capacity lowered day-ahead forecast error detectably at 6 plants, and a daily Kalman filter
+raised it](../studies/forecasts/effective-capacity.md). Only 3 of 106 plant-months were the
+low-output kind of loss that an estimator exists to repair, so the record cannot say whether a
+better estimator would help. The study suggests testing a hold-at-static detector on more plants,
+and that suggestion came from the results, not from the plan.
+
+**In the second study, Claude Sonnet 5.5 given deterministic evidence tools found 14% of planted
+one-month losses, close to the 10% of a fixed rule on the same tools.** The write-up is [Claude
+Sonnet 5.5 found about 1 in 7 planted one-month solar losses and all 12 of a 60% loss lasting 90
+days; the planned contrasts are untested](../studies/forecasts/llm-capacity-labeller.md). Claude
+Sonnet 5.5 found all 12 planted losses of 60% lasting 90 days and 5 of 12 losses of 30% lasting 90
+days. The study's planned comparisons are untested, because no estimator passed the positive
+control. The write-up ends with a proposed follow-up study, and a discussion of other places a
+language model could serve in the NGED data pipeline.
+
+**Powering the second study's planned comparisons would have taken about three times as many planted
+losses as the study had.** The study's two comparisons of detection and capacity error (C1 and C2)
+need about 90 to 100 planted events, and the study had 32. Planted losses are a stand-in for real
+losses. The second study's prompt was written for the planted design (one-month losses aligned to
+calendar months).
+
 ## What comes after v0.7
 
 Once the metered assets are accurately tracked, the harder v2 goal — disaggregating the *unmetered*
