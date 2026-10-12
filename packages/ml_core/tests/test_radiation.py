@@ -233,6 +233,29 @@ def test_long_wave_pchip_matches_scipy_without_overshoot(values: list[float]) ->
     assert result[LONG_WAVE].to_numpy().max() <= max(values)
 
 
+def test_long_wave_mixed_series_match_independent_resampling() -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start,
+        leads=[0, 3, 6, 9],
+        short_wave=[None, 0.0, 0.0, 0.0],
+        long_wave=[None, 200.0, 260.0, 210.0],
+    ).drop(SHORT_WAVE)
+    other = _native(
+        start=start,
+        leads=[0, 3, 6, 9],
+        short_wave=[None, 0.0, 0.0, 0.0],
+        long_wave=[None, 400.0, 310.0, 380.0],
+    ).drop(SHORT_WAVE)
+    other = other.with_columns(time_series_id=pl.lit(2, dtype=pl.Int64))
+    mixed = _resample(pl.concat([native, other]).sample(fraction=1, shuffle=True, seed=5))
+    for trajectory in (native, other):
+        assert_frame_equal(
+            _resample(trajectory),
+            mixed.filter(pl.col("time_series_id") == trajectory["time_series_id"][0]),
+        )
+
+
 @pytest.mark.parametrize("absent_row", [False, True])
 def test_source_missing_window_is_not_filled(absent_row: bool) -> None:
     start = datetime(2026, 6, 1, tzinfo=UTC)
