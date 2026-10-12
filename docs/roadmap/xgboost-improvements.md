@@ -595,11 +595,13 @@ off one shared solar-position/clear-sky helper, so this lands as a three-stage s
 matters: build the clear-sky machinery and fix the upsample **first**, then derive features from the
 already-upsampled columns.
 
-**(a) Reuse the production solar geometry.** Radiation resampling supplies dependency-free
-NOAA geometry and Haurwitz interval means in `ml_core.features._radiation`. Extract a shared helper
-when these derived features become a second caller, retaining matching backward-window denominators.
+**(a) Reuse the production solar geometry.** Radiation resampling supplies dependency-free solar
+geometry and Haurwitz interval means in `ml_core.features._radiation`. Extract a shared helper when
+these derived features become a second caller, retaining matching backward-window denominators.
 
-**(b) Derive physics features from the [half-hourly radiation outputs](../architecture/nwp-variable-conventions.md#radiation-resampling).**
+**(b) Radiation resampling is implemented.** The
+[half-hourly radiation outputs](../architecture/nwp-variable-conventions.md#radiation-resampling)
+supply period-ending means for the derived features in stage (c).
 
 **(c) Derived features, computed from the upsampled columns:**
 

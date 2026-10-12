@@ -144,14 +144,15 @@ Both columns are in `conf/model/xgboost.yaml`'s `selected_features`, so this rea
 
 **Both radiation fields describe the interval before their timestamp.** The production helper in
 `ml_core.features._radiation` expands each native mean into half-hours inside that backward window.
-It obtains widths from the ECMWF lead schedule: 3 hours through lead 144, then 6 hours, including
+The helper obtains widths from the ECMWF lead schedule: 3 hours through lead 144, then 6 hours, including
 `(144, 150]`. Width never comes from the previous available value, which could span missing windows.
 The half-hour ending at a native timestamp is a reconstructed half-hour mean, not the original
 3/6-hour mean.
 
 **Short-wave uses the sun's daily shape and interpolates cloud attenuation.** The helper evaluates
-[NOAA fractional-year solar geometry](https://gml.noaa.gov/grad/solcalc/solareqns.PDF), including
-longitude and equation of time, then Haurwitz clear-sky irradiance. Two 15-minute midpoint samples
+[fractional-year solar geometry](https://gml.noaa.gov/grad/solcalc/solareqns.PDF) from the US National
+Oceanic and Atmospheric Administration (NOAA), including longitude and equation of time, then
+Haurwitz clear-sky irradiance. Two 15-minute midpoint samples
 supply each backward half-hour mean. Averaging these half-hours supplies the matching native-window
 clear-sky mean. The native radiation divided by that mean is the clear-sky index, anchored at the
 native window midpoint. Windows with a clear-sky mean of at least 1 W/m² supply indices.
@@ -166,30 +167,60 @@ contains, and target means multiply the interpolated index by the half-hour clea
 **Every complete native window conserves its supplied energy.** Short-wave target means are
 rescaled so their mean equals the native mean; equivalently, the half-hour energy sum equals native
 mean × native duration. This constraint can introduce boundary steps and does not recover unknown
-sub-window cloud changes. The index is not clipped at 1. If no usable index exists, use local solar
-weights; if all solar weights are zero, retain the source mean as a constant. A positive mean at a
-dark endpoint can label preceding daylight. A positive fully-dark source window instead takes the
-constant fallback, preserving energy rather than claiming both exact nighttime zero and
+sub-window cloud changes. The index is not clipped at 1.
+
+**Fallbacks preserve energy when solar shaping is unusable.** If no usable index exists, use local
+solar weights; if all solar weights are zero, retain the source mean as a constant. A positive mean
+at a dark endpoint can label preceding daylight. A positive fully-dark source window instead takes
+the constant fallback, preserving energy rather than claiming both exact nighttime zero and
 conservation. Zero-energy windows output zero.
 
 **Long-wave retains a constant mean inside each native window.** Thermal radiation is present at
-night and depends on atmospheric temperature, humidity and clouds; the solar daily shape provides
+night and depends on atmospheric temperature, humidity, and clouds; the solar daily shape provides
 no suitable reconstruction. Constant backward-window means preserve native energy without inventing
-sub-window structure. They can have steps at native boundaries. A smoother thermal reconstruction
+sub-window structure. The constant means can have steps at native boundaries. A smoother thermal reconstruction
 would need separate evidence.
 
 **Missing source windows stay null in both fields.** Lead zero has no preceding window; a finite
 lead-3 mean supports lead 0.5 through 3. Source nulls and absent native rows leave their own windows
 null, including the final window. Unsupported off-schedule source timestamps supply no radiation
 window, while other weather columns retain their existing path. No window borrows values from
-another series, run or ensemble member. Complete windows are reconstructed before cropping to the
+another series, run, or ensemble member. Complete windows are reconstructed before cropping to the
 existing output grid, so a visible tail never receives the whole window's energy.
 
 **Training and inference use the same lazy helper.** Site metadata supplies coordinates for
 short-wave, and geometry is reused across runs and members at matching site/time coordinates.
-Long-wave needs no coordinates. Raw NWP storage and rounding remain unchanged. Regenerate engineered
-caches and retrain before deploying models against these feature semantics; physical correctness
-does not establish a forecast-score gain.
+Long-wave needs no coordinates. Raw NWP storage and rounding remain unchanged.
+
+**Regenerate engineered caches and retrain before deploying power-forecast models against these
+feature semantics.** Physical correctness does not establish a forecast-score gain.
+
+**A synthetic example separates timing from conservation.** The figure uses an invented coordinate
+at 52°N, 0°E on 21 March 2026. Short-wave reference means use independent pvlib solar geometry and
+70% of Haurwitz clear sky; long-wave reference means follow a prescribed smooth daily curve.
+Aggregating the reference half-hours supplies identical native inputs to point interpolation and
+the production feature pipeline. The plotted middle day has complete 3-hour or 6-hour windows;
+nighttime values remain visible so displaced short-wave energy cannot disappear from the comparison.
+
+![Short-wave and long-wave before and after resampling.](assets/radiation-resampling.svg)
+
+**The new path conserves the inputs without the synthetic short-wave delay.** The energy centroid is
+the average half-hour midpoint weighted by that half-hour's radiation energy. Point interpolation
+delays the whole-day short-wave energy centroid by 1.25 hours with 3-hour inputs and 2.73 hours with
+6-hour inputs. The new delays are under 12 seconds, with native-window mean errors below 0.000003
+W/m²; long-wave means are retained exactly. The reported delays and mean errors are deterministic
+checks of this synthetic example, not forecast scores. The smooth long-wave reference is one
+possible underlying curve: its native means do not identify the sub-window shape, and the constant
+reconstruction does not recover it. The script prints every plotted error and centroid shift in [its
+generated
+report](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/report.md).
+
+Reproduce the figure and report from the repository root:
+
+```bash
+uv run python studies/radiation_resampling/plot_radiation_resampling.py
+npx svgo@4 --multipass --precision=1 --final-newline docs/architecture/assets/radiation-resampling.svg
+```
 
 The archive confirms the period-ending reading. Forming the clear-sky index two ways over the
 2026-08-10 00Z run (1671 cells × 51 members, ~2.8 M rows after restricting to those where clear-sky
