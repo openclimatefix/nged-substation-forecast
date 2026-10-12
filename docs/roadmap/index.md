@@ -548,7 +548,7 @@ differentiable-physics modules, so the encoder comes after the physics and disag
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for
   sharper probabilistic forecasts ([issue
   #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
-  plans an early test, behind cheaper calibration steps)
+  plans a test, run only if cheaper calibration steps leave the forecast poorly calibrated)
 - **Modelling DER response to market signals** (stretch goal, only if time remains well after v2):
   extend the [differentiable-physics](../techniques/differentiable-physics.md) DER modules to react
   to a price signal directly — battery charge/discharge and other price-sensitive dispatch as a

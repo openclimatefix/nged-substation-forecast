@@ -1220,7 +1220,7 @@ lead-time feature, before or with the quantile model family.
 
 The fork in the road that the item above assumes away. [Issue
 #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
-plans the first test of it. Today every ensemble member is its own row:
+plans the first test of ensemble statistics as features. Today every ensemble member is its own row:
 `AllFeatures`' primary key is `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)`,
 and a member is pushed through the model one at a time. The alternative is to collapse the member
 axis at feature-build time, so each `(time_series_id, valid_time)` gets **one** row whose weather

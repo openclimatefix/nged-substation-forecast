@@ -1091,7 +1091,7 @@ Spread inflation widens the fan but cannot reshape it (the inflated ensemble is 
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of
 building it. [Issue
 #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
-plans the EMOS and conformal variants of this calibration, scored
+plans EMOS and conformal variants of spread calibration, scored
 on the same rows as the quick-wins study.
 
 ### Phase D — ensemble of quantile forecasts (Representation 3 → pooled Representation 2)
@@ -1121,8 +1121,9 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
    explainer), with a per-horizon affine recalibration hook (fit on train) applied only if the
    pooled spread-skill/PICP numbers demand it. Scored with pinball/PICP/CRPS head-to-head against
    the Phase-C inflated deterministic champion. The quick-wins study found that crossing the quantile
-   model's output with the 51 members left the band too narrow, and [issue
-   #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
+   model's output with the 51 members left the 10% to 90% band covering 57% of outcomes,
+   against a nominal 80%, and [issue
+   #1156]({U})
    plans the
    follow-up checks on how to score and recombine the quantiles.
 

@@ -581,8 +581,9 @@ CRPS differences against production with cleaning.
 
 [Issue
 #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
-plans the first experiments on calibration, the feature faults, and the lean column sets listed
-here.
+plans experiments on several of the ideas below: the two-stage forecaster, the climatology
+column, the feature faults, the transfer ratio and daily shape, issuing the control member's
+quantiles directly, training on CRPS, and features from the ensemble itself.
 
 - **A two-stage forecaster:** train a first stage on ERA5 for many years, then a second stage on the
   ECMWF forecasts' errors, as described on [the switching-events roadmap
