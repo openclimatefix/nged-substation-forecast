@@ -32,7 +32,19 @@ The report explains the cached-native-value and boundary limitations.
 
 ## Reproduce
 
-From the repository root, with the workspace dependencies installed:
+**Run this historical audit from the pinned polar checkout.** Use an isolated worktree at commit
+`5ac2e16a7088d13f2f7103f0385a58f54388bfba`, its dependencies, and the matching polar archive and
+engineered caches. The raw speed/bearing probes exercise that historical contract and resampler;
+they do not exercise the component pipeline. From the current repository root:
+
+```bash
+git worktree add --detach .claude/worktrees/historical-feature-faults \
+  5ac2e16a7088d13f2f7103f0385a58f54388bfba
+cd .claude/worktrees/historical-feature-faults
+uv sync
+```
+
+Run all commands below from the root of that isolated checkout:
 
 ```bash
 export DATA_PATH_INTERNAL=/path/to/local/data

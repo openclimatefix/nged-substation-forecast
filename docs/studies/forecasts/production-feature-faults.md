@@ -3,9 +3,15 @@
 > **Draft study.** The diagnostic audit is complete. Forecast experiments and the final scientific
 > and prose reviews are still in progress. Forecast-effect conclusions will follow.
 
-Two reproducible calculation problems affect the conversion of weather inputs to the half-hourly
-timestamps used by the power forecast. Radiation values are averages over the interval ending at
-their timestamp, but the current conversion treats them as measurements at that instant. Wind
+**This audit describes the polar pipeline at commit
+`5ac2e16a7088d13f2f7103f0385a58f54388bfba`.** Reproduction uses the matching polar archive and
+engineered caches. References to the current calculations below mean that audited implementation.
+The [component pipeline interpolates u/v before deriving speed and bearing](../../architecture/nwp-variable-conventions.md#what-the-half-hourly-resample-does-today);
+the historical wrap results below do not describe its behaviour.
+
+Two reproducible calculation problems affected conversion to the half-hourly timestamps used by
+that power forecast. Radiation values are averages over the interval ending at their timestamp,
+but the audited conversion treats them as measurements at that instant. Wind
 directions near north can be interpolated through south. Windchill is also evaluated outside the
 formula’s stated domain. Temperature loses some extrema on the coarser weather grid; precipitation
 has a historical availability boundary; and the checked two-week lag gaps correspond to absent
@@ -118,11 +124,10 @@ sides. Original sample times and ambiguous pairs separated by 180° are excluded
 discrepancies are measured against shortest-arc reconstruction, not observed wind. Every lead band
 has affected series.
 
-**Recommended production change:** retain and interpolate native wind components, then derive
-speed and bearing. If only speed and direction are stored, convert them internally before
-interpolation. The score experiment isolates the wrap problem by changing direction through
+**Current implementation:** the component pipeline retains and interpolates u/v, then derives
+speed and bearing. The score experiment isolates the wrap problem by changing direction through
 shortest-arc interpolation at both heights while leaving speeds unchanged. Its result therefore
-does not measure every effect of a future vector interpolation implementation.
+does not measure every effect of the component interpolation pipeline.
 
 See [the documented wind
 convention](../../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap).
@@ -262,9 +267,10 @@ source, and configuration hashes bind the outputs to their runs. Reviews use fre
 reviewers in place of the study skill’s unavailable Claude models; the PR records the review
 findings and triage.
 
-The proposed follow-up is a production PR for interval-aware radiation resampling and circular
-wind interpolation, with feature-path equivalence and energy controls; allow roughly two to three
-engineering days, then repeat the same forecast contrasts on its actual engineered outputs.
+The proposed follow-up is a production PR for interval-aware radiation resampling, with
+feature-path equivalence and energy controls; allow roughly two to three engineering days, then
+repeat the same forecast contrasts on its actual engineered outputs. Component interpolation
+ordering is implemented; matched power-forecast evaluation remains pending.
 
 ## Production implementation handoff
 
@@ -308,11 +314,11 @@ rounding, and dashboard callers before changing shared behaviour.
 350° and 10° passes through south; the shortest path crosses north. Around 3–7% of eligible inserted
 bearings differ from shortest-arc reconstruction by more than 1° in this audit.
 
-Prefer interpolating wind components and deriving speed and bearing afterwards. Components are
-currently converted to speed and direction in
-`packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py`; decide whether to
-retain components or reconstruct them internally from the stored speed and direction. Preserve the
-meteorological “from” convention and units at both heights.
+The current converter retains signed u/v components. Feature engineering interpolates those
+components before deriving speed and meteorological bearing at both heights. Component
+interpolation resolves the historical arithmetic wrap fault; the study's shortest-arc scores do
+not evaluate every effect of component interpolation. The separate archive migration reconstructs
+historical components from archived speed and bearing.
 
 **Gotchas:** vector interpolation changes speed as well as direction. The study’s shortest-arc
 experiment holds speed fixed, so its score difference does not estimate the complete vector change.
