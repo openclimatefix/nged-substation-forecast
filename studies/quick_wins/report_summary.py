@@ -288,7 +288,7 @@ def _lead_band_baselines(*, lines: list[str]) -> None:
                 )
     table = pl.concat(rows).with_columns(pl.col("mae_percent", "crps_percent").round(2))
     lines += [
-        "## Normalised MAE and CRPS by lead band: where XGBoost beats the heuristic (fold A, seed 0)",
+        "## Normalised MAE and CRPS by lead band: where XGBoost beats the heuristic (fold A)",
         "",
         "Percent of capacity, mean over series; baselines are single fits on the same runs.",
         "",
