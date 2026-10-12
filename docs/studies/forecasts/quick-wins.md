@@ -603,7 +603,8 @@ training on CRPS, and features from the ensemble itself.
   climatological mean.
 - **Fix and test the feature faults** listed under "Input features": precipitation type missing for
   half the training rows, windchill outside its valid range, wind direction as raw degrees, and
-  radiation positive at night.
+  radiation positive at night. See the [follow-up feature audit](production-feature-faults.md)
+  for diagnosis and forecast effects.
 - **The transfer ratio and daily shape of each plant, for pooled models:** the transfer ratio (power
   over forecast irradiance) and daily shape from [the lag-features study](lag-features.md), in place
   of a raw site number. In that study, the clipping ceiling (the plant's running 99.5th percentile
