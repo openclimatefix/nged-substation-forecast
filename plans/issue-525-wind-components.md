@@ -44,6 +44,10 @@ Departures and boundaries:
 - Use a new archive location. `write_nwp` uses partition overwrite with schema overwrite; replacing
   columns in an existing table does not convert its other partitions. An in-place rolling rebuild
   would expose mixed physical schemas to readers.
+- Use per-component bounds rather than adding a radial magnitude validator. Independent
+  component rounding preserves representable bounds of -200 to 200, but cannot preserve a
+  strict 200 m/s vector-norm boundary. The resulting allowed norm is at most about 283 m/s;
+  this loosens the existing corrupt-feed guard and needs explicit acceptance with the plan.
 - Do not claim experiments still cost zero: the production-feature study now exists. Preserve its
   input snapshots and treat its published numbers as historical evidence.
 - Coordinate with 526 before implementation. Its planning worktree exists locally, although no
@@ -148,12 +152,14 @@ If the storage cost is rejected, retain polar storage and re-scope 526's wind wo
 
 - `packages/contracts/src/contracts/weather_schemas.py`: replace stored speed/direction with
   signed Float32 `wind_u_10m`, `wind_v_10m`, `wind_u_100m`, `wind_v_100m`, in metres per second,
-  with bounds -200 to 200 and current non-nullability. Preserve the old magnitude corrupt-feed
-  ceiling by validating `u² + v² <= 200²` at each height. Describe eastward/northward signs.
+  with bounds -200 to 200 and current non-nullability. Use those per-field bounds as the
+  corrupt-feed policy; do not add a radial check that can invalidate a valid vector after
+  independent significand rounding. Describe the loosened magnitude ceiling and signs.
 - Keep `WeatherFeature` as the existing model-weather vocabulary, including derived polar names;
   document that it describes model inputs rather than stored columns. `AllFeatures` already
   declares those fields. Replace the literal-equals-Nwp test with an explicit mapping invariant:
-  substitute the four component fields for the four polar feature names. No second feature
+  substitute the four component fields for the four polar feature names, excluding any accepted
+  scalar diagnostic columns from model inputs. No second feature
   vocabulary or raw-component model experiment is needed.
 - `packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py`: retain components;
   remove ingest-only polar helpers after moving their expressions into feature engineering.
@@ -188,8 +194,14 @@ If the storage cost is rejected, retain polar storage and re-scope 526's wind wo
 - `studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py`: derive polar values at native
   steps before its existing output projection; it directly scans the production archive.
   Search for other readers by archive path and `Nwp.scan_delta`, not wind names alone. Update
-  actual production-table readers only; Open-Meteo/reanalysis frames and frozen study caches
+  actual production-table readers only, including
+  `studies/beam_diffuse_split/fetch_ens_point_wind.py`; Open-Meteo/reanalysis frames and caches
   use independent schemas and should retain their names and provenance.
+- `studies/nwp_forecast_comparison/fetch_ens_day4_supplement.py`: preserve its exact equality
+  check against the main extract. Make source archive and output dataset locations explicit
+  options on both extract scripts. A new component archive must produce a new, matching
+  extract-and-supplement dataset with source version/schema metadata; never append it to the
+  old frozen extract. Historical reproduction uses the old checkout and pinned old archive.
 
 ### 4. Archive cutover and measurement of forecasts
 
@@ -198,9 +210,11 @@ partition by partition through a plain Polars scan pinned to a source version, r
 `u = -speed * sin(direction)` and `v = -speed * cos(direction)`, remove polar fields, validate
 against the new `Nwp`, and write through `write_nwp` to a new configured destination. Reject
 identical source/destination paths. Record a source-version and completed-partition manifest;
-restart by safely rewriting partitions. The measured reconstruction error is below stored
-precision, so this avoids a full download and upstream revisions. Validate it on the seasonal
-raw-input sample before choosing it. If scalar means are accepted, use the existing `ecmwf_ens`
+restart by safely rewriting partitions. The measured reconstruction error is of the same order
+as stored
+rounding on the documented full run, so this avoids a full download and upstream revisions.
+Validate it on the seasonal raw-input sample before choosing it. If scalar means are accepted, use
+the existing `ecmwf_ens`
 backfill path to re-download native inputs into the fresh destination instead. Estimate elapsed
 time and volume before scheduling either path; do not promise an overnight finish.
 
@@ -208,7 +222,10 @@ Inventory required partitions first. Validate new key coverage, dtypes, members,
 null patterns, and magnitude ranges per partition. Compare unchanged weather fields within the
 writer's precision. Record source revisions and exceptions: re-downloading revised upstream
 data need not reproduce the original archive bit for bit. Switch settings only with the matching
-feature code and compatible trained model; keep old artifacts for rollback and rebuild derived
+feature code and compatible trained model; catch up partitions ingested after the pinned rebuild
+snapshot
+using a separately recorded source version before switching. Check that the live selected run
+is present. Keep old artifacts for rollback and rebuild derived
 feature caches. Readers must never scan old and new schemas as one table.
 
 Preserve the pre-change commit and old table version/path as the reference. Register the u/v arm
@@ -223,8 +240,9 @@ baselines/metrics are unavailable; record the pending arm and immutable referenc
 Each new regression below must fail on current main; existing fixture migrations are maintenance.
 
 - `packages/contracts/tests/test_weather_schemas.py`: a complete signed-component frame validates
-  without stored polar fields; legacy-only input is rejected; a component beyond bounds and a
-  pair whose magnitude exceeds 200 are rejected. Update the feature/storage mapping test and
+  without stored polar fields; legacy-only input and a component beyond bounds are rejected.
+  Explicitly accept in-bounds diagonal vectors under
+  the new per-component policy. Update the feature/storage mapping test and
   keep the continuous/categorical variable-partition test.
 - `packages/dynamical_data/tests/test_convert_to_polars.py`: asymmetric weighted raw vectors
   emerge as their component means and no polar fields. In the conditional scalar variant, two
@@ -233,6 +251,8 @@ Each new regression below must fail on current main; existing fixture migrations
 - `packages/delta_store/tests/test_nwp.py`: write/read negative and zero components through
   `write_nwp`, asserting contract fields, significand rounding, and two-partition readability.
   Rematerializing one partition must retain the other and introduce no duplicate keys.
+  Include legacy speed 200 with non-cardinal bearings such as 0.125 and 0.0625 degrees: after
+  reconstruction and the real writer rounding, the read-back frame still validates.
 - `packages/ml_core/tests/test_features.py`: equal-speed bearings 350 and 10 degrees yield a
   midpoint at North and reduced vector magnitude, not 180 degrees and unchanged speed. At both
   heights verify cardinal signs, native endpoints, exact calm/opposing vectors, and nulls.
@@ -246,7 +266,10 @@ Each new regression below must fail on current main; existing fixture migrations
   and power-only tests; add a component-schema case that current main cannot process.
 - `packages/dashboard/tests/test_forecast_chart.py`: plot registry equals the new continuous
   stored variables; negative components plot with signed units. Test the archive-reader study's
-  native polar projection on synthetic cardinal vectors if extracting that projection is needed.
+  native polar projection on synthetic cardinal and non-cardinal vectors. For the day-4
+  supplement, an old polar extract paired with a rewritten archive must be rejected, while
+  a newly versioned extract and supplement from that archive pass the unchanged exact check.
+  New source-manifest compatibility checks must fail when those manifests disagree.
 - Archive-rewrite tests under `tests/`: old polar cardinal vectors become correctly signed
   components in a different destination; all non-wind columns and row keys survive; a rerun
   has no duplicates; source data stays untouched; a two-partition result reads under the new
@@ -261,7 +284,8 @@ Each new regression below must fail on current main; existing fixture migrations
 Principles 12 and 15 require measuring the storage trade and moving reversible transformations
 to feature engineering. Principle 8 requires an attributable comparison; principle 10 rules out
 an archive left half converted. No permanent writer abstraction or model-selection experiment
-is needed. The signed-component magnitude check preserves the existing malformed-input rule.
+is needed. Signed-component bounds remain strict for malformed inputs; their disclosed
+vector-norm ceiling differs from the old scalar-speed guard.
 
 This path serves production: preserve missing-weather nulls and existing degradation reporting,
 without adding a new exception or inventing a new degradation reason. R&D measurements fail fast
@@ -311,6 +335,9 @@ tests or data rebuild are needed before reviewing the design.
   the maintainer decide before schema retention or re-ingest; it is not mean turbine power.
 - Are 24 runs sufficient to establish seasonal compression cost? Recommend the fixed sample
   above, expanding by a date-only rule if between-season spread makes the decision ambiguous.
+- Is loosening the vector-norm ceiling acceptable? Recommend the rounding-stable -200 to 200
+  component bounds; they allow diagonal magnitudes up to about 283 m/s. A stricter radial policy
+  would need coordinated ingest, write-rounding, and read validation, and is not recommended.
 - When should the archive/code switch happen, and which model must be retrained? Recommend
   staged rebuild and a coordinated switch after inventory validation, with old artifacts retained.
 - Does 526 land first? Recommend agreeing its scope before either implementation; components
@@ -329,4 +356,12 @@ Rejected: extract a private configurable writer and call it from the study. Stud
 use public package APIs, and the issue explicitly asks for `write_nwp` itself. The three small
 experimental variants keep the production write path literal without widening its public API.
 Revisit this cost only if the benchmark implementation shows the variants are harder to maintain.
-The correctness/testability review is pending.
+Correctness review accepted: specify rounding-stable per-component bounds instead of a strict
+radial limit; add non-cardinal boundary round-trip tests; version matching extract/supplement
+datasets instead of weakening exact equality; name the beam/diffuse archive reader; exclude
+conditional scalar diagnostics from the feature/storage mapping; qualify the one-run precision
+evidence. No correctness findings rejected. The reviewer inspected repository code but could not
+fetch GitHub independently; the parent fetched the issue and its empty comments successfully.
+
+A first-time reader review also prompted an explanation of the audit's shortest-arc diagnostic.
+Both adversarial plan reviews are complete; no implementation has begun.
