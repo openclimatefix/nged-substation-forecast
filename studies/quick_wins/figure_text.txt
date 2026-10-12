@@ -405,11 +405,11 @@ Other text:
 
 ## Figure 15
 
-Title: Figure 15: A power-lag column is the actual power shifted by its lag, and is null beyond its lag
+Title: Figure 15: A power-lag column is the actual power shifted by its lag, and is null once the lead reaches the lag
 
 Subtitle:
-- One ECMWF ensemble run from the validation year, the median run by the PV farm's mean actual power over its first 10 days. Top row: the actual power. Rows below: the four power-lag columns the production XGBoost model is given, each the actual power from 24, 48, 168, or 336 hours before the valid time.
-- Power is a percentage of each series' effective capacity. A grey band marks the hours when the column is null, because the lag is no longer than the lead from the forecast's initialisation time (9 hours after the ECMWF run's).
+- One ECMWF ensemble run from the validation year: the run whose PV farm mean actual power over its first 10 days is the median of the 53 runs. Top row: the actual power. Rows below: the four power-lag columns the production XGBoost model is given, each the actual power from 24, 48, 168, or 336 hours before the valid time.
+- Power is a percentage of each series' effective capacity. A grey band marks the hours when the column is null, because the lag is no longer than the lead from the forecast's initialisation time, which is 9 hours after the ECMWF run's own initialisation time.
 
 Panel titles:
 - Column: PV farm A
@@ -422,17 +422,17 @@ Y axis title: (none: the row label names the column)
 
 Legend entries:
 - Actual power, and power lagged by the column's own lag
-- Hours when the lag column is null (withheld)
+- Hours when the lag column is null
 
 Other text:
 - Row labels: power (actual), power_lag_24h, power_lag_48h, power_lag_168h, power_lag_336h.
 
 ## Figure 16
 
-Title: Figure 16: Calendar columns follow local time; temperature and pressure columns vary by member
+Title: Figure 16: Calendar and slowly changing weather columns; the 51 members agree for about the first 3 days and then spread out
 
 Subtitle:
-- One ECMWF ensemble run from the validation year, the median run by the PV farm's mean actual power over its first 10 days.
+- One ECMWF ensemble run from the validation year: the run whose PV farm mean actual power over its first 10 days is the median of the 53 runs.
 - Rows, top to bottom: the eight calendar columns, then six weather columns, as the production XGBoost model is given them. Units: degrees Celsius, pascals, and metres (geopotential height). Each panel has its own y axis.
 - The solar and wind generators share a weather grid cell, so one column serves both. The two time-of-year rows show the change from the first hour, because their values would date the run.
 
@@ -454,11 +454,11 @@ Other text:
 
 ## Figure 17
 
-Title: Figure 17: Wind, radiation, and precipitation-type columns, for all 51 ensemble members
+Title: Figure 17: Wind, radiation, and precipitation-type columns, for the 51 ensemble members (precipitation type: control member only)
 
 Subtitle:
-- One ECMWF ensemble run from the validation year, the median run by the PV farm's mean actual power over its first 10 days.
-- The six remaining weather columns: wind speed in metres per second, wind direction in degrees, downward short-wave radiation in watts per square metre, and precipitation type (a category code). Each panel has its own y axis.
+- One ECMWF ensemble run from the validation year: the run whose PV farm mean actual power over its first 10 days is the median of the 53 runs.
+- The six remaining weather columns: wind speed at 10 m and 100 m in metres per second, wind direction at 10 m and 100 m in degrees, downward short-wave radiation in watts per square metre, and precipitation type (a category code). Each panel has its own y axis.
 - The solar and wind generators share a weather grid cell, so one column serves both. Precipitation type draws the control member only.
 
 Panel titles:
@@ -479,15 +479,15 @@ Other text:
 
 ## Figure 18
 
-Title: Figure 18: Half the training rows lack the precipitation type; the power lags are null past their lag
+Title: Figure 18: Half the training rows lack precipitation type; the power lags are null once the lead reaches the lag
 
 Subtitle:
 - All 31 series. Training: the control member of the 15-month training window. Validation: all 51 ensemble members of the 53 weekly runs, July 2025 to June 2026 (fold A). The upper panel shades each cell by its share of null or NaN values: white is none and orange is all.
-- The precipitation type is null in the first 7 months of the training window, because the stored ECMWF runs of those months carry none. A power lag is null once its lag is no longer than the lead, and also wherever the power history has a gap (6% at 336 hours, days 0-2).
+- Precipitation type is null in the first 7 months of the training window, because the stored ECMWF runs of those months carry none. A power lag is null once its lag is no longer than the lead, and also wherever the power history has a gap (6% at 336 hours, days 0 to 2).
 - The lower panel gives each column's minimum, median, and maximum. The power lags are not shown, because their range in megawatts would reveal single generators' sizes.
 
 Panel titles:
-- Share of values that are null or NaN, by lead band (days 0-2: under 72 hours; days 3-10: 72 to 263 hours; days 11+: 264 hours and more)
+- Share of values that are null or NaN, by lead band (days 0 to 2: under 72 hours; days 3 to 10: 72 to 263 hours; days 11 and later: 264 hours and more)
 - Smallest, median, and largest value, in the column's own unit
 
 X axis title: (none: the column headings name the dataset and lead band or statistic)

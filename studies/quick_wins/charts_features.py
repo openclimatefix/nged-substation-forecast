@@ -93,12 +93,12 @@ DAY_NAMES: Final[tuple[str, ...]] = (
 )
 
 BAND_EDGES_HOURS: Final[tuple[int, int]] = (72, 264)
-BAND_LABELS: Final[tuple[str, ...]] = ("days 0-2", "days 3-10", "days 11+")
+BAND_LABELS: Final[tuple[str, ...]] = ("days 0 to 2", "days 3 to 10", "days 11 and later")
 
 CONTROL: Final[str] = "Control member (member 0)"
 OTHER: Final[str] = "The other 50 members"
 POWER: Final[str] = "Actual power, and power lagged by the column's own lag"
-WITHHELD: Final[str] = "Hours when the lag column is null (withheld)"
+WITHHELD: Final[str] = "Hours when the lag column is null"
 ROLE_COLOURS: Final[dict[str, str]] = {
     POWER: ocf.BLACK_1,
     CONTROL: ocf.DATA_BLUE,
@@ -416,15 +416,18 @@ def _stack(*, chart: charts.Panel, text: examples.FigureText) -> alt.TopLevelMix
 
 def _run_text(*, init_time: datetime) -> str:
     return (
-        "One ECMWF ensemble run from the validation year, the median run by the PV farm's mean "
-        "actual power over its first 10 days."
+        "One ECMWF ensemble run from the validation year: the run whose PV farm mean actual "
+        "power over its first 10 days is the median of the 53 runs."
     )
 
 
 def figure_15(*, labels: dict[int, str], rows: pl.DataFrame, init_time: datetime) -> Figure:
     """Build Figure 15: the actual power and the four power-lag columns."""
     data = long_form(rows=rows, labels=labels, features=POWER_ROWS, with_members=False)
-    title = "A power-lag column is the actual power shifted by its lag, and is null beyond its lag"
+    title = (
+        "A power-lag column is the actual power shifted by its lag, and is null once the lead "
+        "reaches the lag"
+    )
     subtitle = [
         (
             f"{_run_text(init_time=init_time)} Top row: the actual power. Rows below: the four "
@@ -434,7 +437,8 @@ def figure_15(*, labels: dict[int, str], rows: pl.DataFrame, init_time: datetime
         (
             "Power is a percentage of each series' effective capacity. A grey band marks the "
             "hours when the column is null, because the lag is no longer than the lead from the "
-            "forecast's initialisation time (9 hours after the ECMWF run's)."
+            "forecast's initialisation time, which is 9 hours after the ECMWF run's own "
+            "initialisation time."
         ),
     ]
     text = examples.FigureText(
@@ -526,7 +530,10 @@ def figure_16(*, labels: dict[int, str], rows: pl.DataFrame, init_time: datetime
     """Build Figure 16: the calendar columns, then temperature, pressure, and height."""
     return _weather_figure(
         number=16,
-        title="Calendar columns follow local time; temperature and pressure columns vary by member",
+        title=(
+            "Calendar and slowly changing weather columns; the 51 members agree for about the "
+            "first 3 days and then spread out"
+        ),
         subtitle=[
             (
                 "Rows, top to bottom: the eight calendar columns, then six weather columns, as "
@@ -549,12 +556,16 @@ def figure_17(*, labels: dict[int, str], rows: pl.DataFrame, init_time: datetime
     """Build Figure 17: wind, radiation, and precipitation type."""
     return _weather_figure(
         number=17,
-        title="Wind, radiation, and precipitation-type columns, for all 51 ensemble members",
+        title=(
+            "Wind, radiation, and precipitation-type columns, for the 51 ensemble members "
+            "(precipitation type: control member only)"
+        ),
         subtitle=[
             (
-                "The six remaining weather columns: wind speed in metres per second, wind "
-                "direction in degrees, downward short-wave radiation in watts per square metre, "
-                "and precipitation type (a category code). Each panel has its own y axis."
+                "The six remaining weather columns: wind speed at 10 m and 100 m in metres per "
+                "second, wind direction at 10 m and 100 m in degrees, downward short-wave "
+                "radiation in watts per square metre, and precipitation type (a category code). "
+                "Each panel has its own y axis."
             ),
             f"{SHARED_CELL_NOTE} Precipitation type draws the control member only.",
         ],
@@ -720,12 +731,13 @@ def figure_18(*, summary: pl.DataFrame) -> Figure:
         .properties(width=6 * 56, height=len(FEATURES) * 16)
     )
     heat_title = (
-        "Share of values that are null or NaN, by lead band (days 0-2: under 72 hours; days 3-10: "
-        "72 to 263 hours; days 11+: 264 hours and more)"
+        "Share of values that are null or NaN, by lead band (days 0 to 2: under 72 hours; "
+        "days 3 to 10: 72 to 263 hours; days 11 and later: 264 hours and more)"
     )
     range_title = "Smallest, median, and largest value, in the column's own unit"
     title = (
-        "Half the training rows lack the precipitation type; the power lags are null past their lag"
+        "Half the training rows lack precipitation type; the power lags are null once the lead "
+        "reaches the lag"
     )
     subtitle = [
         (
@@ -735,10 +747,10 @@ def figure_18(*, summary: pl.DataFrame) -> Figure:
             "white is none and orange is all."
         ),
         (
-            "The precipitation type is null in the first 7 months of the training window, because "
+            "Precipitation type is null in the first 7 months of the training window, because "
             "the stored ECMWF runs of those months carry none. A power lag is null once its lag "
             "is no longer than the lead, and also wherever the power history has a gap (6% at "
-            "336 hours, days 0-2)."
+            "336 hours, days 0 to 2)."
         ),
         (
             "The lower panel gives each column's minimum, median, and maximum. The power lags "
