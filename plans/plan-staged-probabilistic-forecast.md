@@ -241,8 +241,9 @@ whose errors exceed ERA5's.
 late 2019 to 2026, which includes the COVID lockdowns (about 2020-03 to 2021-07, roughly 1.3 of the
 5.5 winters). The lockdowns distort the occupancy and calendar response of demand far more than the
 weather-to-power response of wind and solar farms, so the question applies to demand series and
-net-load substations, not to generation. **The docs hold only ideas here, no decision and no
-dataset.** The [era covariates section of the training-history
+net-load substations, not to generation. **The docs already contain ideas for how to represent
+the lockdowns and for which datasets to ingest, but nothing is decided and nothing is
+ingested.** The [era covariates section of the training-history
 roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/training-history/#era-covariates)
 lists the candidate ways to represent the lockdown: a scalar in [0, 1] sourced from the Oxford
 COVID-19 Government Response Tracker (a daily UK stringency index) or from Google's COVID-19
