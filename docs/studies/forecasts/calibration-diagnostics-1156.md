@@ -625,7 +625,8 @@ vl-convert-python 1.9.0.post1. Diagnostics use bootstrap seed 20261012 and 2,000
 | Fitter for the saved corrected-pipeline forecasts | `b073be43f8809290746d952bf1acf988ea1f01cf61a7e2ed11e6f51f2de57ca3` |
 | Publication-table selector, Fold A main extract | `6c2bc6a59eb9ad5b8e8f4326c7c1fa850a2b90e11423c2c4e8da36d68d691362` |
 | Coverage chart script, Fold A main render | `21cc9fde248b27b45790374dc154e9bc94e955d4f62bf6a343e603882d61dbda` |
-| Combined integration patch | `23f4f76a30687b1c741b897273aba67fb5319dc43b6e51fdf062dc5083cf47a9` |
+| Executed combined integration patch | `23f4f76a30687b1c741b897273aba67fb5319dc43b6e51fdf062dc5083cf47a9` |
+| Published equivalent integration patch | `fca0456fde5f6009290908c3c9b895bba285b4af7cdfa98972745a0adcc116b3` |
 
 **The final public reproduction inventory is still being prepared.** Completed artifacts retain
 original run configurations, input and output hashes, dependency versions and completion records.

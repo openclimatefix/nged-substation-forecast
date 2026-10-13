@@ -2,7 +2,8 @@
 
 The study uses isolated package sources at the base commit and the two pinned PR heads below.
 The commands reconstruct wind, radiation and combined treatments without modifying the study
-checkout's production packages. Run them from the repository root of a clone containing all three commit objects.
+checkout's production packages. Run them from the repository root of a clone containing all
+three commit objects.
 `git cat-file` checks their availability; fetching a newer PR head does not establish a match.
 
 ```bash
@@ -36,8 +37,11 @@ wind speed/bearing after resampling components. Tests are outside these source-o
 
 `all-source-hashes.json` records every Python source file under the selected contracts and
 ml_core package roots for each treatment, including unchanged files. Compare reconstructed files
-against the corresponding treatment mapping before fitting. The integration patch's SHA-256 is
+against the corresponding treatment mapping before fitting. The published integration patch's
+SHA-256 is `fca0456fde5f6009290908c3c9b895bba285b4af7cdfa98972745a0adcc116b3`.
+It omits one blank context line from the executed patch, whose SHA-256 was
 `23f4f76a30687b1c741b897273aba67fb5319dc43b6e51fdf062dc5083cf47a9`.
+The removed context line changes no source code; reconstructed source hashes must still match.
 
 Select the treatment before Python starts, for example:
 

@@ -410,3 +410,10 @@ exact unaffected-type proofs and all eight Fold A additions. It found no require
 or rerun. The guarded result retains the lean-wind advantage, while the negative controls do
 not establish negligible effects or a pipeline-noise ceiling. Final adoption still depends
 on the remaining registered checks and the separate fresh second scientific review.
+
+The first draft-PR CI run passed the study tests. Its pre-commit step found an overlong runtime
+README line and a blank patch-context line that the whitespace hook would alter. The root
+wrapped the prose and removed only that initial context line, adjusting the hunk range. A fresh
+reviewer inspected the change before reconstructing two new combined runtimes with the executed
+and published patch variants. Both matched all 24 pinned source hashes exactly. The executed
+patch hash remains recorded separately; no fitted artifact, runtime source or result changed.

@@ -1,7 +1,6 @@
 --- a/packages/ml_core/src/ml_core/features/tabular_feature_engineer.py
 +++ b/packages/ml_core/src/ml_core/features/tabular_feature_engineer.py
-@@ -281,7 +281,14 @@
- 
+@@ -282,6 +282,13 @@
      if nwp_lf is not None:
          _renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
 -        _upsampled = _derive_wind_features(_upsample_nwp_to_half_hourly(_renamed))
