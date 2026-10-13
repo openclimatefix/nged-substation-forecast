@@ -139,6 +139,36 @@ footprints for u and v would imply different contributing sub-areas.
 Period-ending radiation and precipitation still receive ordinary linear interpolation. Their timing
 is a separate repair tracked by [issue #526](https://github.com/openclimatefix/nged-substation-forecast/issues/526).
 
+### Interpolate components before deriving speed and bearing
+
+**These known-answer examples check linear vector interpolation, not observed weather accuracy.**
+Two synthetic 3-hour intervals assume that eastward u and northward v change linearly between
+native forecast steps. Before interpolates endpoint speeds and bearings arithmetically. After
+uses the production half-hourly feature pipeline; expected values come from independent analytic
+trajectories. The same linear component rule applies to 6-hour native intervals.
+
+![Before and after wind interpolation compared with independent analytic values.](../studies/assets/wind-interpolation.svg)
+
+**Interpolating the vector preserves the North crossing and allows opposing winds to cancel.**
+The North-crossing midpoint is northerly, whereas the old arithmetic bearing is 180° (South).
+Bearings in the figure are unwrapped through 360°; 370° means 10°. Speed at that midpoint is
+9.848078 m/s, below the 10 m/s endpoints. Opposing 10 m/s vectors reach calm at the midpoint;
+interpolated scalar speeds remain 10 m/s. Calm has no physical bearing, so the opposing-wind panel
+plots speed only. These deterministic examples need no uncertainty interval and establish no
+forecast-skill improvement.
+
+Reproduce the figure and its checked CSV/report from the repository root:
+
+```bash
+uv run python scripts/diagnostics/plot_wind_interpolation.py
+npx svgo@4 --multipass --precision=1 --final-newline \
+  docs/studies/assets/wind-interpolation.svg
+```
+
+The numerical report and CSV are written under
+`data/studies/wind_storage/interpolation-proof/`. The figure uses 10 m components; the production
+expressions and regression tests cover both stored heights.
+
 ### Historical bearing interpolation crossed the 0°/360° wrap {#wind-direction-is-interpolated-across-the-0360-wrap}
 
 **A historical audit found that ordinary bearing interpolation can reverse northerly wind.**

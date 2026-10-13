@@ -19,7 +19,7 @@ def wind_feature_expressions(height: Literal["10m", "100m"]) -> tuple[pl.Expr, p
     the atan2 convention yields 180°; the bearing has no physical meaning there. Null components
     propagate to null features.
 
-    See <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#what-the-half-hourly-resample-does-today>.
+    See <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#interpolate-components-before-deriving-speed-and-bearing>.
     """
     u, v = pl.col(f"wind_u_{height}"), pl.col(f"wind_v_{height}")
     return (
