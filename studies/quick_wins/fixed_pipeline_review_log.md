@@ -417,3 +417,30 @@ wrapped the prose and removed only that initial context line, adjusting the hunk
 reviewer inspected the change before reconstructing two new combined runtimes with the executed
 and published patch variants. Both matched all 24 pinned source hashes exactly. The executed
 patch hash remains recorded separately; no fitted artifact, runtime source or result changed.
+
+The completed Fold B main wind additions received a directly rounded 32-table export, using
+an interim selector freshly checked against the final registered table objects before execution.
+The root checked every exported table, accepted a bounded prose proposal and copied the generated
+bodies byte for byte into the appendix. All tested calendar additions worsen wind loss in both
+main folds; precipitation, dewpoint and short-wave radiation remain unresolved in Fold B. These
+main-setting findings do not bypass the pending alternate-setting and required-control checks.
+The interim selector will be superseded by the final full-family publication inventory.
+
+The unpadded Fold A unaffected-type verifier passed six exact comparisons, covering all 53
+forecast files per comparison. The page and script README now give commands for the full
+registered verifier matrix. These proofs compare unaffected types within each padding policy;
+they do not establish cross-padding equality of the affected forecasts.
+
+An additional fresh local code review inspected all thirteen changed study Python/integration
+files. It reproduced all 71 runtime hashes and synthetic bootstrap, tie and crossing checks,
+and found no actionable issue or requested rerun. Final publication inventories and prose were
+explicitly outside that pass and still require the final diff reviews. The `/code-review` command
+was unavailable in this environment; an independent Codex agent supplied this additional pass,
+without a claim of Claude or human review.
+
+The final precipitation-era selector exported four directly rounded tables from the completed
+Fold B reports. The root checked the manifest, all four tables and their byte-exact appendix
+copy. Both era loss contrasts remain unresolved under both interval methods. The page distinguishes
+weather-initialisation archive availability from the operational upgrade and notes shared partial
+November support, seasonal differences and training exposure; it makes no causal precipitation
+or upgrade claim. This is the first completed final Part 1b publication family.

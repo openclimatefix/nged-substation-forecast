@@ -75,6 +75,12 @@ jobs serially. Use a new output namespace, separate from the original `quick_win
    describe per-booster normalized training gain. Use `fixed_pipeline_importance_charts.py` with
    the same text-review gate for its figure. Its ranges describe refit variability, not uncertainty
    about a feature's benefit.
+9. Run `fixed_pipeline_unaffected.py` after the corresponding combined-pipeline fits complete.
+   Use both folds, main and sensitivity settings with equal padding, and the main setting with
+   no padding. It verifies exact sample keys and forecast values for unaffected types, checks
+   complete file inventories and hashes before and after comparison, and writes an aggregate
+   proof to a new private file. This does not compare affected-type predictions across padding
+   policies. The page gives the full commands.
 
 Raw frame exports, models, row-level scores and manifests containing private identifiers stay
 under the private study data directory. Public reports contain type aggregates and feature names.

@@ -5,15 +5,15 @@
 **The quantile recipe has lower delivered-sample loss in both folds and both training settings.**
 The marginal diagnostics leave calibration questions open: coverage changes accompany substantial
 width changes, and pooling's small nine-level loss effect differs between folds. This separate
-Part 2 draft of issue 1156 supports no calibration or production recommendation. Final scientific,
-first-reader and prose reviews remain pending.
+Part 2 draft of issue 1156 supports no calibration or production recommendation. Scientific
+reviews are complete; first-reader, prose and publication-inventory checks remain pending.
 
 ![Coverage on Fold A, primary training settings.](../assets/calibration-diagnostics-1156/coverage-fold-a.svg)
 
 > **How this page was made.** The research question came from a human. OpenAI Codex wrote the new
 > study code, analysis and text, reusing recipes and fitting helpers from the Claude-authored
-> [quick-wins study](quick-wins.md). An independent AI review checked the first results; final
-> scientific and prose reviews remain pending. Human review of the page is pending.
+> [quick-wins study](quick-wins.md). Two independent AI scientific reviews checked the results
+> and draft page; final prose and publication checks remain pending. Human review is pending.
 
 ## Key findings
 
@@ -552,8 +552,8 @@ establishing that pooling improves calibration.
 **The completed diagnostics justify neither a calibrator choice nor a coherence claim.** No
 calibrator was fitted, the conditional best-point refit was not triggered, and marginal scores
 cannot establish joint scenarios across sites or forecast times. The supplementary CDF, lead
-and era tables are descriptive. Final scientific, first-reader and prose reviews and the public
-reproduction inventory remain pending; no calibration or production recommendation follows.
+and era tables are descriptive. First-reader and prose reviews and the public reproduction
+inventory remain pending; no calibration or production recommendation follows.
 
 ## Proposed follow-up study
 
@@ -694,6 +694,6 @@ After the exported `figure-text.md` has passed the required text reviews:
   --reviewed-text "$STUDY_REPRO_ROOT/coverage-fold-a-text/figure-text.md"
 ```
 
-**Final scientific, first-reader and prose review of the completed page remain pending.** The
-scorer's immutable report, aggregate tables and manifest preserve the evidence for those reviews;
-the reproduction commands do not replace them.
+**Scientific reviews are complete; final reading and publication checks remain pending.** The
+scorer's immutable report, aggregate tables and manifest preserve their evidence; the reproduction
+commands do not replace those checks.

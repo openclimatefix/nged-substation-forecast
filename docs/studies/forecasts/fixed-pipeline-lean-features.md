@@ -536,8 +536,8 @@ is 0.204 (0.070 to 0.337); the equal-month increase is 0.200 (0.044 to 0.355), a
 statistically significant at the 5% level. Lean solar has lower loss in only four of 12 Fold A
 months and four of 15 Fold B months.
 
-The [feature-results appendix](fixed-pipeline-feature-results-tables.md) retains the eight
-unaltered publication tables for these lean and solar comparisons.
+The [feature-results appendix](fixed-pipeline-feature-results-tables.md) retains the unaltered
+publication tables for the feature comparisons.
 
 ### The first solar addition stops the registered ladder
 
@@ -582,8 +582,55 @@ cannot identify its information content from a wholly missing input. Its second-
 comparisons require their own interpretation. The dewpoint and short-wave intervals do not
 establish zero effects.
 
-<!-- PART1B_SECOND_FOLD_ADDBACKS_SLOT: add the reviewed Fold B single-feature results and
-precipitation-era interpretation when their immutable reports are complete. -->
+### Calendar additions also worsen wind loss in retrospective Fold B's main setting
+
+**Each tested calendar addition raises wind loss in retrospective Fold B's main setting,
+statistically significant at the unadjusted 5% level under both interval methods.** These are
+separate additions to lean wind, using the historical cleaned point-model recipe, equal-width
+padding to 24 trained columns and the combined wind/radiation-corrected pipeline. They cover
+three wind series, three fitting seeds and 15 validation months. Lean wind's absolute fair CRPS
+is 12.876 percent of frozen effective capacity (95% month-and-seed bootstrap interval 11.768
+to 13.944). The differences below subtract that lean baseline and are capacity percentage points;
+positive differences mean higher loss.
+
+The annual-cycle sine increases fair CRPS by 2.741 points (95% paired bootstrap interval 1.960
+to 3.491), and the cosine by 2.377 (1.566 to 3.211). Each addition has lower loss in only one
+of 15 months. The weekday ordinal increases loss by 0.288 points (0.164 to 0.393), weekday
+sine by 0.251 (0.160 to 0.331), and weekday cosine by 0.242 (0.131 to 0.347). Their separate
+equal-month t-intervals also support higher loss. This agreement concerns these individual
+main-setting refits; it does not establish additive effects or identify why a feature harms
+this recipe.
+
+**Precipitation type, dewpoint and short-wave radiation remain unresolved in this fold and
+setting.** The precipitation-type difference is 0.225 capacity points (95% paired bootstrap
+interval -0.072 to 0.572), dewpoint's is 0.007 (-0.067 to 0.086), and downward short-wave
+radiation's is 0.055 (-0.013 to 0.127). Each equal-month t-interval also allows improvement
+and deterioration. None of these intervals establishes a zero effect. The precipitation result
+does not identify its information content: the archive's earlier wholly missing era and later
+availability require separate descriptive comparisons, which cannot establish an era-balanced
+causal benefit from this aggregate contrast.
+
+**These main-setting add-backs do not yet decide a final input recommendation.** The alternate
+training setting and guarded-windchill, negative-control and unpadded checks remain pending.
+Their results must be reviewed before concluding which lean inputs to retain. The tests concern
+this historical point-model recipe, rather than the public production configuration or the
+pooled quantile winner.
+
+**Splitting Fold B by precipitation availability does not resolve either era's loss effect.**
+After the archive boundary, adding precipitation type changes wind fair CRPS by 0.032 capacity
+points (95% paired bootstrap interval -0.008 to 0.085). Before it, the difference is 0.409
+(-0.161 to 0.953). Both separate equal-month t-intervals also include zero. Each era has eight
+supported valid-time months, sharing part of November rather than forming independent samples
+of eight whole months. The [absolute and paired era tables](fixed-pipeline-feature-results-tables.md)
+retain both arms' scores and support counts.
+
+The split uses weather initialisation before or from 13 November 2024 at 00:00 UTC, the
+[documented archive-availability boundary](../../architecture/ecmwf-ens-known-issues.md).
+It differs from the [operational weather-model upgrade](../../roadmap/data-sources.md)
+at 12 November 2024 at 06:00 UTC. An absent precipitation column in the earlier era cannot
+identify that input's information content. Different seasons and training exposure also prevent
+these summaries from identifying a causal upgrade effect. Fold A's scoring window is wholly
+after the archive boundary.
 
 <!-- PART1B_ALTERNATE_SETTINGS_SLOT: add the reviewed second-setting lean, first-solar-rung
 and wind-addition findings, including disagreements with these main-setting results. -->
@@ -912,6 +959,32 @@ with `STUDY_FOLD` set to `fold_a` or `fold_b`:
   --combined "$STUDY_REPRO_ROOT/frames/combined/$STUDY_FOLD" \
   --output "$STUDY_REPRO_ROOT/input_audit/$STUDY_FOLD"
 ```
+
+**Verify that each feature experiment preserves forecasts for unaffected series types.** After
+the required combined-pipeline fits complete, the verifier compares every saved sample key and
+forecast value exactly for those types. It checks the two lean arms against their full-input
+control, and the first solar addition against lean solar. The unpadded check covers only the
+two registered lean comparisons. It checks input inventories and hashes before and after the
+comparison and writes an aggregate proof without private row keys or predictions. Use new
+proof filenames:
+
+```bash
+for STUDY_FOLD in fold_a fold_b; do
+  for STUDY_SETTING in main sensitivity; do
+    .venv/bin/python studies/quick_wins/fixed_pipeline_unaffected.py \
+      --data-root "$STUDY_REPRO_ROOT" --fold "$STUDY_FOLD" \
+      --setting "$STUDY_SETTING" --padding equal \
+      --output "$STUDY_REPRO_ROOT/unaffected-$STUDY_FOLD-$STUDY_SETTING-equal.json"
+  done
+  .venv/bin/python studies/quick_wins/fixed_pipeline_unaffected.py \
+    --data-root "$STUDY_REPRO_ROOT" --fold "$STUDY_FOLD" \
+    --setting main --padding none \
+    --output "$STUDY_REPRO_ROOT/unaffected-$STUDY_FOLD-main-none.json"
+done
+```
+
+This proof concerns unaffected types within each padding policy. It does not test equality
+between the padded and unpadded forecasts for the affected type.
 
 The importance figure uses its own completed specification and report. After selecting and
 rebinding `STUDY_IMPORTANCE_SPEC` from the public index, regenerate its aggregate report and text:
