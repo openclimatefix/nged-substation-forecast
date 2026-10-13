@@ -52,6 +52,13 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
    link, run `uv run mkdocs build --strict` and read the rendered HTML under `site/`, not just the
    linter — see the `mkdocs-authoring` skill.
 
+    **Recommend a quick before-and-after plot for any PR that changes data processing.** Write a
+    short script comparing the old and new processing on the same inputs, with expected behaviour
+    or an independent reference where available. The script and plot can be throw-away: include
+    the plot in the PR without merging either file. If the explanation has lasting value, merge
+    the script and also add the plot to the relevant docs. This is a recommendation, not a merge
+    requirement.
+
 3. **Verify, all green before pushing**: `uv run ruff check .`, `uv run ruff format .`, `uv run
    --all-packages ty check`, `uv run pytest` (add `--run-studies` if the diff touches
    `packages/studies/` or `studies/`), plus (if docs were touched) `uv run pymarkdown scan -r docs
