@@ -61,9 +61,28 @@ SUBTITLE: Final[tuple[str, ...]] = (
     "Each model's feature gains are scaled to sum to one; unused columns receive zero.",
     "Meters of one type have equal weight within each refit; the six refits have equal weight.",
     "Ranges describe variability across refits, not confidence intervals.",
+    "Horizontal axes are logarithmic, with a display floor of 0.01% of training gain.",
+    "Means and range endpoints below the floor, including zero, are displayed at the floor.",
+    "A mark at the floor does not establish positive gain; reported shares remain unchanged.",
     "Gain divides credit between correlated features and does not establish benefit.",
 )
-AXIS_TITLE: Final[str] = "Share of training gain (%; larger is more gain, not more benefit)"
+AXIS_TITLE: Final[str] = "Training gain share (%; log scale; larger is more gain, not more benefit)"
+DISPLAY_FLOOR_PERCENT: Final[float] = 0.01
+LOG_TICKS_PERCENT: Final[tuple[float, ...]] = (
+    0.01,
+    0.02,
+    0.05,
+    0.1,
+    0.2,
+    0.5,
+    1,
+    2,
+    5,
+    10,
+    20,
+    50,
+    100,
+)
 REPORT_COLUMNS: Final[frozenset[str]] = frozenset(
     {
         "series_type",
@@ -140,13 +159,21 @@ def _text(*, table: pl.DataFrame, number: str) -> str:
     for kind, title in PANELS.items():
         rows = table.filter(pl.col("series_type") == kind)
         lines.extend([title, AXIS_TITLE, *rows["label"].to_list(), ""])
-    lines.append("Horizontal axes are linear and start at zero; zero shares remain at zero.")
     return "\n".join(lines) + "\n"
 
 
 def _panel(*, rows: pl.DataFrame, title: str) -> charts.Panel:
     labels = rows["label"].to_list()
-    base = alt.Chart(rows).encode(
+    displayed = rows.with_columns(
+        display_mean_percent=pl.col("mean_percent").clip(lower_bound=DISPLAY_FLOOR_PERCENT),
+        display_min_percent=pl.col("min_percent").clip(lower_bound=DISPLAY_FLOOR_PERCENT),
+        display_max_percent=pl.col("max_percent").clip(lower_bound=DISPLAY_FLOOR_PERCENT),
+    )
+    scale = alt.Scale(type="log", domain=[DISPLAY_FLOOR_PERCENT, 100], nice=False, zero=False)
+    axis = alt.Axis(
+        values=list(LOG_TICKS_PERCENT), format=".2~f", labelOverlap=False, labelFlush=False
+    )
+    base = alt.Chart(displayed).encode(
         y=alt.Y(
             "label:N",
             sort=labels,
@@ -162,11 +189,11 @@ def _panel(*, rows: pl.DataFrame, title: str) -> charts.Panel:
         ),
     )
     interval = cast(alt.Chart, base.mark_rule(color=ocf.DATA_BLUE, strokeWidth=2)).encode(
-        x=alt.X("min_percent:Q", title=AXIS_TITLE, scale=alt.Scale(zero=True)),
-        x2=alt.X2("max_percent:Q"),
+        x=alt.X("display_min_percent:Q", title=AXIS_TITLE, scale=scale, axis=axis),
+        x2=alt.X2("display_max_percent:Q"),
     )
     point = cast(alt.Chart, base.mark_point(color=ocf.DATA_BLUE, filled=True, size=55)).encode(
-        x=alt.X("mean_percent:Q", title=AXIS_TITLE, scale=alt.Scale(zero=True)),
+        x=alt.X("display_mean_percent:Q", title=AXIS_TITLE, scale=scale, axis=axis),
     )
     return alt.layer(interval, point).properties(
         width=charts.PLOT_WIDTH_PX,
@@ -206,10 +233,7 @@ def main() -> None:
             panels=panels,
             number=args.number,
             title=TITLE,
-            subtitle=[
-                *SUBTITLE,
-                "Horizontal axes are linear and start at zero; zero shares remain at zero.",
-            ],
+            subtitle=list(SUBTITLE),
             figure_planning=None,
         )
         svg = args.output / "fixed_pipeline_importance.svg"

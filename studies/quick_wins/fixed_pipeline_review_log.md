@@ -206,3 +206,50 @@ matched report became available. Both main-fold G3 rows fall below the preregist
 absolute fair-CRPS threshold, despite their negative equal-month t intervals. The conditional
 best-point refit was therefore not triggered; its prepared queue is not an executed study input.
 Part 2's corresponding contrast remains unrun for this explicit gate decision.
+
+The root reviewed all seven prepared Part 1b supplementary selector configurations before any
+execution, including their source paths, exact planned labels, type/lead/metric filters, displayed
+columns and distinct bootstrap/equal-month summaries. Only completed, actually used sources may
+be exported. The long extracts belong in supplementary files; they do not silently combine
+folds or settings or turn precipitation availability eras into causal comparisons.
+
+The root also reviewed all 24 sensitivity report specifications against their main counterparts.
+Static reversal checks confirmed that only each fitting path's setting segment and the top-level
+setting changed; frames, seeds, labels, pairs, type restrictions and training-match checks remain
+identical. Inherited preparation and main-stage gate notes are historical, non-operational
+metadata. Actual sensitivity execution requires its corresponding completed sensitivity fits
+and the recorded root main-results checkpoint; none of these prepared reports has yet run.
+
+The final headline and radiation captions were shortened because the earlier explanatory text
+hid their plots below the initial screen. Unused weather-member, quantile and CDF discussion was
+removed together with the terms it explained. Exact scoring, periods, within-row weighting,
+random-seed meaning and full-history capacity scope remain explicit. Fresh first-reader and
+rule-by-rule prose checks required a plain explanation of pinball loss and an unambiguous
+separation of matched forecasts from equal meter/refit weights; both were accepted. The root
+reviewed every specification change before exporting text and inspected the final rendered PNGs.
+The publication assets now use headline text/render v10 and radiation text/render v17.
+
+The root reviewed the private two-worker report orchestration and every entry of its 52-report
+inventory before launch. Two accepted corrections use the verified virtualenv interpreter
+without dependency resolution and preserve errors in exclusive private logs rather than discard
+them. Each worker waits for completed frames and fits, runs reports serially with eight threads,
+and refuses existing outputs or automatic retries. The workers are running and waiting for
+Part 1b fits; their launch does not authorise a sensitivity fit before its main-results gate.
+
+The Part 2 supplementary selectors also passed fresh root review before execution: delivered
+CDF-bin shares, lead diagnostics and descriptive November availability-era summaries retain
+both recipes, exact scope labels and support counts. Their sensitivity sources are still pending.
+
+The importance figure now follows the study skill's logarithmic-axis rule for shares spanning
+orders of magnitude. The root freshly reviewed the display-only clamp, fixed 1–2–5 ticks and
+caption changes before execution. Means and range endpoints below 0.01%, including zero, appear
+at that floor; raw report shares and ranges remain unchanged. Isolated first-reader and
+rule-by-rule prose reviews cleared the exact floor explanation. Rendered inspection caught
+suppressed and then overlapping tick labels; freshly reviewed axis-label settings corrected
+both without changing text or data. Final text v4/render v6 shows all tick labels and all 24
+features clearly. The public assets supersede the earlier linear figure.
+
+The complete study suite passed with 3,338 tests passed and five skipped in 210.55 seconds.
+Subsequent code edits affect only axis-label visibility and alignment, verified by rendering.
+Repository-wide Ruff checks and formatting checks passed for all 942 Python files, and the
+repository-wide type check passed.

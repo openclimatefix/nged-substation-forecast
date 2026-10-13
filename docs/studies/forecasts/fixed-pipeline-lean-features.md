@@ -500,6 +500,9 @@ weight in the final mean. The blue dots show mean gain shares; the blue lines sh
 and maximum across refits. These training summaries remain descriptive alongside the separate
 held-out loss comparisons.
 
+The logarithmic axes show small shares alongside large ones. Means and range endpoints below
+0.01%, including zero, appear at that display floor; a floor mark does not establish positive gain.
+
 **The input audit confirms changed radiation and wind-derived features in both folds; forecast
 benefit requires the matched loss comparisons above.** Each treatment exposes the same 32
 engineered fields on matched rows. That audit inventory includes fields available for feature
