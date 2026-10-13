@@ -90,7 +90,10 @@ cannot take a second weather model is the wrong design. The aims, in priority or
    null that XGBoost routes, never a raised exception.
 7. **Research first.** Studies test every idea before production code changes.
 
-Aims 2 and 3 are the reason for a staged design.
+Aim 2 is the reason the forecast chain has more than one learned stage. Aim 3 needs stage 1 only as
+an offline artifact that runs on analysis weather, so it does not by itself justify serving four
+chained artifacts. Stage 1 still runs at serving time to compute the lag anomalies, but on analysis
+weather and not on forecast members.
 
 **Design principles traded away.** The staged design departs from three of the [design
 principles](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/).
@@ -98,22 +101,29 @@ Principle 2 (complexity belongs offline, not in the serving path) is met for tra
 serving, where the adapter, stage 1, stage 2, and coupling all run on every forecast. Principle 3
 (one execution path from research to production) is strained because stage 1 has no lead time and so
 does not fit the `BaseForecaster` interface. Principle 6 (the whole system runs on one laptop)
-requires four chained trained artifacts to run on one machine. In return the design buys aims 2 and
-3. The studies keep the stage count to what they prove: a stage that does not earn its place is
+requires four chained trained artifacts to run on one machine. In return the design buys aim 2.
+The studies keep the stage count to what they prove: a stage that does not earn its place is
 removed.
 
 ## 4. The candidate design
 
-**The ultimate aim is a chain of stages that each do one job and always run.** The first version
-omits stage 0, and a learned stage 0 is built only if the second-NWP study shows the chain failing.
+**The lead candidate is an ENS champion model with a small correction per additional product.** The
+champion is a single-stage quantile XGBoost model on ENS statistics and lags, which takes stage 1's
+output as an input so that the long ERA5 and CAMS history reaches the forecast. A new product adds
+only a correction with a handful of numbers. The fuller chain below, with a separate stage 2 and a
+blend, is the challenger, built only if the champion fails the studies. A learned weather-correction
+stage ("stage 0") is not in the first design; see the alternatives.
 
 ```text
-NWP n, member m ─▶ adapter ─▶ [stage 0] ─▶ canonical weather ─▶ Stage 1 ─▶ power(n,m,s,t)
-                                                                           │
-   per-NWP statistics across members, lead, lags, lag anomalies ◀──────────┘
-                              │
-                              ▼
-                           Stage 2 ─▶ calibrated quantiles(s,t) ─▶ ECC ─▶ 51 coherent members
+NWP n, member m ─▶ adapter ─▶ canonical weather ─▶ Stage 1 (1a, 1b) ─▶ power(n,m,s,t)
+                                                                         │
+ per-NWP statistics across members, lead, lags, lag anomalies ◀──────────┘
+                            │
+                            ▼
+              ENS champion (+ per-product correction) ─▶ calibrated quantiles(s,t)
+                            │
+                            ▼
+                           ECC ─▶ 51 coherent members
 ```
 
 Notation: n is the NWP product, m the ensemble member, s the series, t the valid time.
@@ -121,10 +131,11 @@ Notation: n is the NWP product, m the ensemble member, s the series, t the valid
 | Stage | Input | Output | Per NWP | Per member | Lead input |
 |---|---|---|---|---|---|
 | Adapter (code, not learned) | One member's raw fields; a per-NWP, per-variable, per-date convention table | Fields on the common half-hourly grid in the canonical convention | Yes | Yes | No |
-| Stage 0 (learned, conditional) | Adapter output; source step width; lead; init hour | Corrected canonical weather for that member, variance-preserving, no distribution | Yes | Yes | Yes |
-| Stage 1 (learned) | Canonical weather, calendar, site static fields | Conditional quantiles of power for one series (9 levels), with the median used as the member's point value | No | Yes | No |
-| Stage 2 (learned) | Per-NWP statistics of stage 1 power across members (mean, spread, percentiles), lead, NWP-only variables, lagged power, lag anomalies | Calibrated marginal quantiles of power per series and valid time | No (all NWPs in one model) | No | Yes |
-| ECC (code) | Stage 2 quantiles, stage 1 member medians | 51 coherent members (the ENS member count) | No | Output | No |
+| Stage 1a (learned) | Canonical weather, calendar, site static fields | Conditional quantiles of power for one series (9 levels), with the median used as the member's point value | No | Yes | No |
+| Stage 1b (learned) | Residual of power against stage 1a at the forecast origin and earlier, lead | Predicted residual at the target time, fading to zero at long lead | No | Yes | Yes |
+| ENS champion (learned) | ENS statistics of stage 1 power (mean, spread, percentiles), lead, lagged power, lag anomalies | Calibrated marginal quantiles of power per series and valid time | n/a (ENS only) | No | Yes |
+| Per-product correction (few numbers per product) | The product's stage 1 median minus the ENS stage 1 median, the product's spread, lead | Shift in the champion's location and log-scale | Yes | No | Yes |
+| ECC (code) | Calibrated quantiles, stage 1 member medians | 51 coherent members (the ENS member count) | No | Output | No |
 
 **The adapter handles known facts as code.** Each NWP has a table of step width, accumulation or
 instantaneous convention, and the date each convention applies from. The adapter resamples every NWP
@@ -166,35 +177,75 @@ perfect prognosis on mean squared error. The merged study therefore includes a s
 ENS early leads, and the deciding contrast is the full chain against a single-stage model trained
 directly on ENS, by lead band.
 
-**Stage 2 is one model with several inputs, on purpose.** Lagged power and lag anomalies, cross-NWP
-agreement, and ensemble spread all bear on how wide the interval is and where it sits, and a tree
-model finds those interactions without being told. An XGBoost model given an NWP identifier splits
-on it freely, so the identifier cannot act as a scale adjustment only. Separate feature columns per
-product also do not transfer what the model learned: splits learned on the ENS spread column do not
-apply to a UKV spread column, so refitting for a new product learns its relationships from the short
-overlap alone. Two designs make the transfer explicit, and the studies compare them. **Design 1**
-is one XGBoost model with per-product columns, which a new product retrains in full. **Design 2**
-is a shared per-product calibrator followed by a small blend: one function with identical feature
-names for every product (that product's mean, spread, and percentiles of stage 1 power, plus the
-lead) is fitted on the pooled rows of all products, with a per-product multiplicative spread
-factor; a second small step, the blend, combines the per-product calibrated distributions and
-adds the lag inputs. A new product then adds one spread factor and one set of blend weights, which
-is what the short-history claim needs. **The blend is learned, with few parameters, because a fixed
-blend is not calibrated by construction.** An equal-weight mixture of individually calibrated
-distributions is generally over-dispersed, and averaging quantiles re-creates under-dispersion
-(see the [explainer](https://openclimatefix.github.io/nged-substation-forecast/techniques/probabilistic-forecasting/#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)).
-The blend has three learned parts, all fitted on held-out months: one weight per product per lead
-band, shrunk towards equal weights when the overlap is short; a monotone width correction on the
-mixture, as a function of lead (one candidate is the beta-transformed linear pool of Gneiting and
-Ranjan, which the plan has not yet checked in the literature); and the spread of the per-product
-medians as an input, so that disagreement between products widens the interval. The control arm is
-a fixed equal-weight mixture. The studies score both with the PIT histogram and coverage by lead
-band. Other safeguards: a fixed template of
-statistics per product. A wider ensemble spread must not narrow the interval, and XGBoost monotone
-constraints do not guarantee that, because they constrain a prediction against a feature and not
-the difference between two quantiles (both bounds can rise while the gap shrinks). The studies
-therefore parameterise stage 2 as a location plus a positive scale times a fixed quantile shape,
-with the scale monotone in spread, and test the width property directly on held-out data.
+**Stage 1b learns persistence from ERA5 and CAMS.** Stage 1a is the weather-to-power function with no
+lags and no lead. Stage 1b predicts the residual `r(t) = power − stage 1a` at target time `t` from
+the residuals at the forecast origin `T0 = t − L` and earlier, plus the lead `L`. Training simulates
+many origins and leads per target time on the full ERA5 and CAMS history, so the persistence
+structure of demand, which depends weakly on weather and strongly on recent history, is learned from
+seven years and not two. The forecast is stage 1a plus stage 1b. The roadmap already has a related
+idea ([weather-delta compensation for power
+lags](https://openclimatefix.github.io/nged-substation-forecast/roadmap/xgboost-improvements/#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation)).
+Four risks apply. The model learns to trust near-perfect weather and so under-weights the lags
+compared with real forecasts, which means the ERA5-trained lag weights are a prior and the champion
+re-learns the mixing on the ENS era. Flagged or stuck-meter lags enter as nulls. Overlapping
+origin-and-target pairs need subsampled leads and time-blocked folds. The lockdown residuals carry a
+regime change, so the COVID arms apply. Stage 1a alone stays lead-free and reusable for aim 3; the
+lead belongs to stage 1b.
+
+**The champion and the per-product correction.** The champion is trained on ENS only and takes
+stage 1 statistics (from 1a, and 1a plus 1b) as inputs. Stage 1's values on the ENS-era training
+months must be forward-chained out-of-fold, or the champion would see stage 1 predictions that are
+too good.
+Each additional product adds a correction, and the champion is never retrained. The correction shifts
+the champion's location by `a × Δ` and its log-scale by `b × |Δ| + c × (the product's spread)`, where
+`Δ` is the product's stage 1 median minus the ENS stage 1 median, and `a`, `b`, and `c` vary smoothly
+with lead, are pooled per technology, and shrink towards zero. A missing product gives zero
+correction, so a product enters safely by construction. A deterministic product has zero spread, so
+the scale term needs a lead-dependent intercept. A product with a short horizon fades its correction
+to zero towards its last lead. The correction cannot learn interactions between a product and the
+lags, which is probably a small loss (the lead column gained only 0.05 points in quick-wins) but is
+unmeasured. The long ENS record supports this: in the study of [Lang et al.
+(2020)](https://doi.org/10.5194/npg-27-23-2020), on 2 m temperature at central-European stations,
+training on several years beat a sliding window of recent days, including across an ECMWF model
+change.
+
+**Challenger: a separate stage 2, in two designs.** A separate stage 2 is built only if the champion
+fails the studies. Lagged power, lag anomalies, cross-NWP agreement, and ensemble spread all bear on
+how wide the interval is and where it sits. An XGBoost model given an NWP identifier splits on it
+freely, so the identifier cannot act as a scale adjustment only. Separate feature columns per product
+also do not transfer what the model learned: splits learned on the ENS spread column do not apply to
+a UKV spread column. Null versus non-null also acts as a date flag, because the new product's columns
+are non-null only in the most recent months, so the trees can split on "recent month" and absorb any
+drift in that period. A 3-month overlap is millions of rows but only about 30 to 45 independent
+weather episodes (the estimate in the training-history roadmap). **Design 1** is one XGBoost model with
+per-product columns, which a new product retrains in full; it is a control only. **Design 2** keeps
+the lags away from the product combination. A shared per-product calibrator is one function with
+identical feature names for every product (that product's mean, spread, and percentiles of stage 1
+power, plus the lead), fitted on the pooled rows of all products with a per-product multiplicative
+spread factor. A small blend then combines the per-product calibrated distributions, and the lag
+inputs stay in the champion and do not enter the blend.
+
+**The blend is learned, with few parameters, because a fixed blend is not calibrated by
+construction.** An equal-weight mixture of individually calibrated distributions is generally
+over-dispersed ([Ranjan and Gneiting (2010)](https://doi.org/10.1111/j.1467-9868.2009.00726.x) show
+that a weighted average of distinct calibrated forecasts is uncalibrated, in a case study of binary
+probability-of-precipitation forecasts), and averaging quantiles re-creates under-dispersion (see the
+[explainer](https://openclimatefix.github.io/nged-substation-forecast/techniques/probabilistic-forecasting/#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)).
+The beta-transformed linear pool fixes this with two shape parameters and nests the plain linear pool
+(when both equal 1); [Gneiting and Ranjan (2013)](https://doi.org/10.1214/13-EJS823) extend it to full
+predictive distributions. We have read abstracts and secondary summaries of both papers, not the full
+texts. The blend has two learned parts, fitted on held-out months: one weight per product, smooth in
+lead and shrunk towards equal weights when the overlap is short, and the two shape parameters, smooth
+in lead. A mixture already widens when the product medians disagree, so a separate disagreement input
+is added only if a study shows the beta-transformed pool is still under-dispersed when products
+disagree. The control arm is a fixed equal-weight mixture. The studies score both with the PIT
+histogram and coverage by lead band.
+
+**Width must be monotone in spread, and XGBoost does not guarantee it.** XGBoost monotone constraints
+bound a prediction against a feature, not the difference between two quantiles (both bounds can rise
+while the gap shrinks). The studies therefore parameterise the calibrated distribution as a location
+plus a positive scale times a fixed quantile shape, with the scale monotone in spread, and test the
+width property directly on held-out data.
 
 **Pooling stage 1 quantiles over members is a valid baseline, not double counting.** If stage 1
 estimates the distribution of power given the weather and the members are draws of the weather, the
@@ -243,22 +294,22 @@ clear a low bar. The risks are thin data per bucket and quantile jumps at bucket
 
 **Training scenarios and cadence.**
 
-- **From scratch:** take the cleaned power history from `clean_nged_power_data`; fit stage 1 on ERA5
-  and CAMS with forward-chained out-of-fold predictions (each block predicted by a model trained only
-  on earlier blocks, with a purge gap of at least one week); run the adapter then stage 1 per member
-  over the NWP era; fit stage 2 on the per-member statistics; score end-to-end CRPS on held-out
-  months.
+- **From scratch:** take the cleaned power history from `clean_nged_power_data`. Fit stage 1a and
+  stage 1b on ERA5 and CAMS (stage 1b with simulated origins and leads) with forward-chained
+  out-of-fold predictions: each block is predicted by a model trained only on earlier blocks, with a
+  purge gap of at least one week. Run the adapter then stage 1 per ENS member over the NWP era, using
+  the out-of-fold stage 1. Fit the champion on the per-member statistics. Score end-to-end CRPS on
+  held-out months.
 - **Monthly retrain:** keep stage 1 frozen, because its predictions for the new month are out of
-  sample. Choose between the candidate and the incumbent stage 2 by rolling-origin evaluation: fit
+  sample. Choose between the candidate and the incumbent champion by rolling-origin evaluation: fit
   each on months up to a cut-off and score both on the following months, which neither saw. Only
   after the promotion decision, refit the winner on all months. Scoring the newest month after
   fitting on it would favour the candidate. Stage 1 retrains yearly, or when cleaning rules change
   or sites are added.
-- **A new NWP with short history:** add an adapter table; leave stage 1 untouched. Under Design 2,
-  add one per-product spread factor and one set of blend weights to stage 2. Under Design 1,
-  retrain stage 2 in full with the new product's columns. Study 3 tests which of the two holds up
-  on a few months of history. Add a learned stage 0 for the NWP
-  only if the studies show it is needed.
+- **A new NWP with short history:** add an adapter table and the product's correction (a few
+  numbers per technology). Leave stage 1 and the champion untouched. Study 4 measures how few months
+  of history the correction needs. Under the challenger designs, Design 2 adds one spread factor and
+  the blend parameters, and Design 1 retrains the model in full.
 
 **Leakage rules.** Stage 1 must not train on months that stage 2 or the end-to-end score uses for
 validation, and ERA5 overlaps the ENS era. Forward-chained out-of-fold predictions replace a
@@ -300,15 +351,29 @@ covariate exists. The design consequences are:
 
 **Alternatives considered.**
 
+- **A learned weather-correction stage ("stage 0")** that maps each NWP towards ERA5 and CAMS, member
+  by member, before stage 1. It is a further learned artifact, a variance-preserving correction
+  cannot close the perfect-prognosis gap, and a climatological quantile map has known defects (it
+  does not fade with skill, it injects incoherent variance from coarse steps, and it breaks
+  consistency between variables). Built only if the second-NWP study shows the champion plus
+  correction failing. If built: fit at the NWP's own step width, correct wind speed and clear-sky
+  index and not their components, smooth over lead, exclude the validation months, and include an
+  identity arm.
 - **Merge stages 0 and 1** (pretrain on ERA5 and CAMS, fine-tune per NWP with power): needs power
-  data per NWP, which is the short-history problem, and suits a neural network better than XGBoost.
-  Studied only if the chain fails on a second NWP.
+  data per NWP, which is the short-history problem, and suits a neural network better than XGBoost
+  (an XGBoost warm start can only add trees). Studied only if the champion fails on a second NWP.
+- **Pool the products as exchangeable members of one ensemble:** a deterministic UKV would get a
+  weight of 1/52. [Hagedorn et al. (2012)](https://www.ecmwf.int/en/elibrary/74701-comparing-tigge-multimodel-forecasts-reforecast-calibrated-ecmwf-ensemble-forecasts)
+  found that a nine-system multi-model ensemble did not beat the ECMWF ensemble alone on
+  extratropical temperature, and that calibrated ECMWF often matched the multi-model ensemble. The
+  gain from blending products may therefore be smaller than hoped for solar, while the project's
+  matched-lead study found a wind gain of 0.184 points of capacity.
 - **Weather-space correction fitted on power error** through the frozen stage 1, as the
   [training-history
   roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/training-history/#the-calibrator-can-act-on-power-or-on-weather)
   proposes, instead of towards ERA5 and CAMS. It keeps each member's rank. It is an arm if stage 0
   is built.
-- **Drop stage 2:** possible only if the mixture baseline matches it.
+- **A separate stage 2 or a blend:** the challenger above, built only if the champion fails.
 - **A physics stage 1** (differentiable physics, version 2): drops into the same slot with the same
   interface and has few parameters, so it suits new sites. Not studied now.
 - **An NWP better than ERA5** (UKV at short leads, for local wind and cloud): the canonical
@@ -342,9 +407,9 @@ versioned stage 1 artifact, and a rule-based detector first.
 
 ## 5. The studies
 
-**The studies run in this order, and the critical path is studies 0 to 3.** Each study pre-registers
-a few planned contrasts. Every other comparison is exploratory and is reported as such. Studies write
-code under `studies/` only.
+**The studies run in this order, and the critical path is studies 0 to 3, with 2a first.** Each
+study pre-registers a few planned contrasts. Every other comparison is exploratory and is reported
+as such. Studies write code under `studies/` only.
 
 0. **Complete the conventions adapter.** The radiation and wind rules have shipped. Remaining: step
    widths for hourly-stepped NWPs, the same adapter for ERA5 and CAMS, the per-NWP convention table,
@@ -356,45 +421,58 @@ code under `studies/` only.
    out-of-sample coverage test on the saved `e1_quantile` samples; one coherence score (CRPS of
    summed solar farms in a weather cell), with the energy and variogram scores added once coupled
    members exist.
-2. **Single-stage model against the chain, on ENS.**
-    - **A, the single-stage control:** an XGBoost model on ensemble statistics (arms: control member,
-      ensemble mean, mean plus spread and percentiles), quantile loss at 19 levels, with spread
-      rescaling and EMOS as calibration baselines.
+2. **The ENS champion with stage 1 inputs, against the alternatives.** The champion must beat
+   `manual_heuristic` (7.2% CRPS) before any multi-product machinery is built.
+    - **2a, the stage 1 pilot (run first).** On the nine generator series (6 solar farms and 3 wind
+      farms), where ERA5 and CAMS are already on disk, train stage 1a on ERA5 and CAMS from 2019-09
+      to before the ENS-era validation months, and apply it to ENS control-member and ensemble-mean
+      weather. Score point error (MAE) by lead band against the ENS-trained XGBoost model of the
+      quick-wins study. This measures the payoff of perfect prognosis and the hedging risk, before
+      any chain exists. Demand series wait for ERA5 temperature at their locations.
+    - **A, the champion:** an XGBoost model on ensemble statistics (arms: control member, ensemble
+      mean, mean plus spread and percentiles), quantile loss at 19 levels, with spread rescaling and
+      EMOS as calibration baselines.
+    - **A plus 1a, A plus 1a and 1b:** the champion with stage 1a statistics as inputs, then with
+      stage 1b's lag-aware prediction added. Stage 1b is compared with no lags, and the lag weight
+      it learns on ERA5 is compared at each lead with the weight an ENS-trained model learns, which
+      measures the perfect-prognosis gap for lags. Lag-anomaly features are built from
+      serving-latency sources.
     - **B, the mixture baseline:** forward-chained out-of-fold stage 1 quantiles mixed over members,
       with and without a spread rescaling. Stage 1 arms: raw megawatts, the PV ratio target, and the
       wind `base_margin`.
-    - **C, the chain:** stage 1 median statistics into stage 2 (Design 1 against Design 2 from
-      section 4, with the learned blend against a fixed equal-weight mixture, and a location-and-scale
-      parameterisation against a free quantile model), with
-      lag-anomaly features built from serving-latency sources, stage 1 power as a feature in A,
-      and one lead-bucket arm.
+    - **C, the challenger:** stage 1 median statistics into a separate stage 2 (Design 2 with the
+      learned blend against a fixed equal-weight mixture, a location-and-scale parameterisation
+      against a free quantile model, and Design 1 as a control), and one lead-bucket arm.
     - **D, perfect-prognosis check:** a stage 1 trained on ENS early leads instead of the analysis.
     - **Ceiling:** stage 1 fed with ERA5, CAMS, ERA5 plus CAMS, and each NWP's short-lead fields.
     - **Regime arms (exploratory, demand series only):** stage 1 with recency weights, with the
       lockdown period excluded, and, only if either helps, with a lockdown scalar.
     - **Coupling:** ECC-Q (with the interpolation, tail, and tie rules above) against the Schaake
       shuffle at short leads, scored by lead band.
-    - **Deciding contrast:** the chain against A, by lead band. Stage 0 is the identity throughout.
-3. **How short can a new NWP's history be?** Test on products that are genuinely different from the
-   one the shared relationship was learned on: ENS before and after the 12 November 2024 upgrade
-   treated as two products, the ENS control member as a deterministic product, and a truncated
-   long-history ensemble such as GEFS. The first two test adaptation inside one model family. They
-   do not test transfer to a different family such as UKV or MOGREPS-UK, so the short-history claim
-   is accepted only after a different family passes (GEFS here, or the second NWP in study 4).
-   Until then the claim stays unresolved. Rotate the truncation window across at least
-   two starting seasons, score by season, and report in-season and out-of-season gaps separately.
-   Compare a shared spread-skill relationship with a per-NWP fit, and include an hourly-step
-   transfer test. The `tcc` (total cloud cover) natural experiment (served from 21 November 2025;
+    - **Deciding contrasts:** A plus 1a against A, and A plus 1a and 1b against A plus 1a, by lead
+      band; the challenger against the champion only if the champion fails. If stage 1 adds nothing
+      on the ENS era, stage 1 leaves the forecast chain and remains an offline artifact for aim 3.
+3. **How few months of history does a new product's correction need?** Fit the per-product
+   correction on products genuinely different from ENS: ENS before and after the 12 November 2024
+   upgrade treated as two products, the ENS control member as a deterministic product, and a
+   truncated long-history ensemble such as GEFS. The first two test adaptation inside one model
+   family. They do not test transfer to a different family such as UKV or MOGREPS-UK, so the
+   short-history claim is accepted only after a different family passes (GEFS here, or the second NWP
+   in study 4). Until then the claim stays unresolved. Score a learning curve at 1, 2, 3, 6, and 12
+   months of history, rotating the truncation window across at least two starting seasons, scoring
+   by season, and reporting in-season and out-of-season gaps separately. **Safe entry:** at 1 and 2
+   months, the forecast with the new product must be equivalent to ENS alone (the t-interval inside
+   ±0.15 points). Include an hourly-step transfer test, and the correction against the challenger
+   designs. The `tcc` (total cloud cover) natural experiment (served from 21 November 2025;
    [issue #1157 (Ingest total cloud cover (tcc) from Dynamical.org's ECMWF IFS
    ensemble)](https://github.com/openclimatefix/nged-substation-forecast/issues/1157))
    needs its own split, for example training November 2025 to March 2026 and scoring later, or it
    is dropped.
 4. **A real second NWP** (UKV or MOGREPS-UK; needs an ingest issue first). Includes column dropout
-   in stage 1 and withheld variables for the missing-variable path. A learned stage 0 (a
-   variance-preserving per-member correction, smooth in lead, correcting wind speed and clear-sky
-   index, fitted at the NWP's own step width, with an identity arm and validation months excluded)
-   is built only if this study shows the chain failing.
-5. **Longer ENS history for stage 2** (optional, parallel). Uses the ENS backfill from Source
+   in stage 1 and withheld variables for the missing-variable path, and the fade-to-zero rule near a
+   short-horizon product's last lead. A learned weather-correction stage is built only if this study
+   shows the champion plus correction failing.
+5. **Longer ENS history for the champion** (optional, parallel). Uses the ENS backfill from Source
    Cooperative; needs approval against the £30 egress cap.
 
 **Decision rule.** A planned contrast passes when the mean paired difference is at most −0.15 CRPS
@@ -462,12 +540,13 @@ body may be a link to the rendered roadmap section when the docs already hold th
 2. **Six child issues,** in this order, with these blocking links:
     - Study 0: "Study: complete the NWP conventions adapter and per-NWP convention table."
     - Study 1: "Study: scoring harness and coverage test for probabilistic power forecasts."
-    - Study 2: "Study: single-stage model against the staged chain, on ECMWF ENS" (blocked by studies
-      0 and 1).
-    - Study 3: "Study: how short can a new NWP's history be?" (blocked by study 2).
-    - Study 4: "Study: a second NWP in the staged chain" (blocked by study 3 and by an ingest issue
-      for the chosen NWP that does not yet exist).
-    - Study 5: "Study: longer ECMWF ENS history for the calibration stage" (optional, blocked by
+    - Study 2: "Study: the ENS champion with stage 1 inputs, against the alternatives" (the pilot
+      step 2a can start at once; the remaining arms are blocked by studies 0 and 1).
+    - Study 3: "Study: how few months of history does a new product's correction need?" (blocked by
+      study 2).
+    - Study 4: "Study: a second NWP with the ENS champion and a per-product correction" (blocked by
+      study 3 and by an ingest issue for the chosen NWP that does not yet exist).
+    - Study 5: "Study: longer ECMWF ENS history for the champion" (optional, blocked by
       study 2; check whether [issue #959 (Extend ECMWF ENS training
       history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959)
       already covers it, in which case link it instead of creating a duplicate).
@@ -506,6 +585,12 @@ This section is a record of what changed; it is not part of the design.
   unresolved until a different model family passes; the monthly promotion uses rolling-origin
   evaluation; the tie rule uses a dependence template; width monotonicity is tested directly and
   the scale is parameterised; the architecture page waits for a shipped production implementation.
+- **Accepted from a later Opus review of how the plan adds short-history products:** the ENS champion
+  plus a per-product correction is the lead design and the separate stage 2 is the challenger;
+  stage 0 moves to the alternatives; aim 3 no longer justifies the serving structure; the disagreement
+  input and the lag inputs leave the blend; study 3 gains the safe-entry test and a learning curve;
+  the champion must beat `manual_heuristic` before multi-product machinery is built. The reviewer
+  read abstracts and summaries, not full texts, of the cited papers.
 - **Not yet reviewed:** this version of the plan, and the documentation and issue plan in sections 6
   and 7.
 
@@ -539,9 +624,11 @@ and input/output still probably dominate wall-clock time and need chunking by se
   parametric and non-parametric calibration.
 - Does a fixed 51-member output change the `PowerForecast` contract (`ensemble_member` would hold
   ECC-reordered samples)? The contract is not changed without asking.
-- CAMS is on disk only at the six solar farms. Does stage 1 for the other series use ERA5 alone, or
-  is CAMS fetched at every series' location? Study 2 starts on the 31-series row set, so this blocks
-  only the later scale-up.
+- CAMS is on disk only at the six solar farms, and ERA5 on disk covers irradiance and temperature
+  at 20 grid cells and wind at the 3 wind farms. The demand series have no ERA5 temperature at
+  their locations on disk. Does stage 1 for the other series use ERA5 alone, or is CAMS fetched at
+  every series' location, and is ERA5 fetched for the demand series' cells? Study 2a runs on the 9
+  generator series, so this blocks only the demand series and the later scale-up.
 - Are the Oxford stringency index and Google mobility series still downloadable, and does the
   maintainer want a scalar sourced from either, given that the docs record only ideas?
 - Which second NWP first, UKV or MOGREPS-UK, and which UKV product has usable history? (The CEDA
