@@ -633,6 +633,18 @@ identify that input's information content. Different seasons and training exposu
 these summaries from identifying a causal upgrade effect. Fold A's scoring window is wholly
 after the archive boundary.
 
+**The post hoc second-setting era checks remain unresolved.** They were added after the main
+era reports because the later-era main interval met the study skill's near-line rule; both
+eras were retained. In sensitivity, the later-era precipitation-type difference is 0.012
+capacity points (95% paired bootstrap interval -0.017 to 0.043), with an equal-month difference
+of 0.013 (t-interval -0.007 to 0.033). The earlier-era difference is -0.177 (-0.593 to 0.216),
+with an equal-month difference of -0.210 (-0.677 to 0.257). Both methods allow improvement and
+deterioration in each era. The earlier-era point estimate changes sign from the main setting,
+but neither setting establishes a benefit there. These are descriptive availability-era checks,
+not evidence for precipitation information in a wholly missing input or a causal upgrade effect.
+The inherited report metadata calls the contrast `planned`; this added sensitivity analysis
+is post hoc. The appendix preserves both settings' absolute scores and support counts.
+
 ### Fold A sensitivity retains lean wind's benefit, while lean solar remains unresolved
 
 **Lean wind retains lower loss under the second training setting, while lean solar's higher
@@ -741,8 +753,54 @@ significant at the unadjusted 5% level; only four of 15 months have lower loss. 
 cover six solar series and three seeds. They retain the main-setting directions in this
 retrospective fold, while Fold A's sensitivity lean-solar comparison remains unresolved.
 
-<!-- PART1B_FOLD_B_SENSITIVITY_REMAINING_SLOT: add the reviewed first-solar, wind-addition,
-guarded and negative-control sensitivity findings, plus both post hoc availability-era checks. -->
+### Calendar additions retain higher wind loss in retrospective Fold B sensitivity
+
+**All five calendar additions worsen wind loss in both Fold B settings.** In sensitivity,
+annual-cycle sine increases fair CRPS by 2.379 capacity points (95% paired month-and-seed
+bootstrap interval 1.673 to 3.055), and cosine by 2.043 (1.282 to 2.793). Weekday ordinal,
+cosine and sine increase loss by 0.205 (0.125 to 0.286), 0.189 (0.108 to 0.268) and
+0.161 (0.088 to 0.231), respectively. Both the bootstrap and separate equal-month
+t-intervals support higher loss, statistically significant at the unadjusted 5% level.
+These comparisons cover three wind series, three fitting seeds and 15 validation months;
+each addition lowers loss in only one or two months. Separate refits cannot decompose the
+full-input model's loss or establish a causal feature effect.
+
+Precipitation type remains unresolved in Fold B sensitivity: its paired difference is
+-0.085 points (-0.321 to 0.120), with an equal-month difference of -0.081
+(t-interval -0.268 to 0.105). Its point estimate changes sign from main's 0.225-point
+increase, but both settings leave its direction unresolved. Fold A's supported
+precipitation-type deterioration therefore does not generalise across both folds.
+Dewpoint is also unresolved at -0.018 (-0.056 to 0.019), as is downward short-wave
+radiation at 0.017 (-0.022 to 0.065); both equal-month t-intervals allow both signs.
+Dewpoint's small point-estimate sign change from main does not establish a reversal.
+The [supporting tables](fixed-pipeline-feature-results-tables.md) retain absolute scores
+and both interval methods for every addition.
+
+### Retrospective Fold B retains the guarded lean-wind benefit
+
+**Guarded lean wind also beats guarded full inputs in Fold B sensitivity.** Their absolute
+fair-CRPS scores are 13.028 (95% month-and-seed bootstrap interval 11.905 to 14.092) and
+16.594 (14.900 to 18.304), respectively. The paired difference is -3.566 capacity points
+(-4.626 to -2.561), with an equal-month difference of -3.541 (t-interval -4.705 to
+-2.377). Both methods support lower loss, statistically significant at the unadjusted
+5% level, with improvement in all 15 months across three wind series and three seeds.
+The guarded lean/full solar difference remains a supported deterioration under both methods:
+0.138 (0.025 to 0.241), with an equal-month difference of 0.133 (0.011 to 0.255).
+
+**The guard's own wind effects remain sensitive to the interval method and training setting.**
+Within full inputs, the sensitivity guard difference is -0.083 (-0.227 to 0.062), unresolved
+under the bootstrap, whereas the equal-month difference is -0.082 (-0.143 to -0.021),
+statistically significant improvement at the unadjusted 5% level. Main's corresponding
+equal-month interval supports deterioration. Within lean wind, the sensitivity guard
+difference is -0.0172 (-0.0426 to 0.0002), unresolved under the bootstrap, while the
+equal-month difference is -0.0172 (-0.0308 to -0.0035) supports improvement. Four decimal
+places retain the bootstrap's small positive upper bound. Its main-setting comparison is
+unresolved under both methods. Full-input solar's guard effect is unresolved in both
+settings. Lean solar's zero guard contrast is structural because that recipe omits windchill.
+These direct contrasts establish no causal explanation for the lean/full difference.
+
+<!-- PART1B_FOLD_B_SENSITIVITY_REMAINING_SLOT: add the reviewed first-solar
+and negative-control sensitivity findings. -->
 
 ### Main-setting controls retain the lean-wind result, with unresolved small contrasts
 

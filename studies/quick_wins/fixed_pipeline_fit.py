@@ -130,6 +130,77 @@ def recipe_registry() -> dict[str, Recipe]:
     for source in ("production_cleaned", "lean_pv", "lean_wind"):
         name = f"{source}_guarded_windchill"
         registry[name] = Recipe(replace(registry[source].arm, name=name), guarded_windchill=True)
+    for kind, name, columns in (
+        (
+            "PV",
+            "solar_minimal_requested",
+            ("temperature_2m", "downward_short_wave_radiation_flux_surface"),
+        ),
+        (
+            "PV",
+            "solar_expanded_requested",
+            (
+                "temperature_2m",
+                "dew_point_temperature_2m",
+                "wind_speed_10m",
+                "downward_long_wave_radiation_flux_surface",
+                "downward_short_wave_radiation_flux_surface",
+                "precipitation_surface",
+                "categorical_precipitation_type_surface",
+                "sun_east",
+                "sun_north",
+                "sun_up",
+                "clear_sky_irradiance",
+            ),
+        ),
+        (
+            "Wind",
+            "wind_minimal_requested",
+            (
+                "temperature_2m",
+                "wind_direction_100m",
+                "wind_direction_10m",
+                "wind_speed_100m",
+                "wind_speed_10m",
+            ),
+        ),
+        (
+            "Wind",
+            "wind_minimal_uv_requested",
+            (
+                "temperature_2m",
+                "wind_direction_100m",
+                "wind_direction_10m",
+                "wind_speed_100m",
+                "wind_speed_10m",
+                "wind_u_10m",
+                "wind_v_10m",
+                "wind_u_100m",
+                "wind_v_100m",
+            ),
+        ),
+        (
+            "Wind",
+            "wind_minimal_circular_requested",
+            (
+                "temperature_2m",
+                "wind_speed_10m",
+                "wind_speed_100m",
+                "wind_direction_10m_sin",
+                "wind_direction_10m_cos",
+                "wind_direction_100m_sin",
+                "wind_direction_100m_cos",
+            ),
+        ),
+    ):
+        registry[name] = Recipe(
+            replace(
+                base,
+                name=name,
+                description=f"Post hoc requested {name} inputs; other series keep full inputs.",
+                columns=_changed_columns(series_type=kind, columns=tuple(sorted(columns))),
+            )
+        )
     return registry
 
 

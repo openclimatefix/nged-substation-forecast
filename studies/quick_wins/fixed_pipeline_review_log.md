@@ -470,3 +470,61 @@ bodies byte for byte. The exact unaffected-type verifier also passed all nine co
 covering all 53 forecast files per comparison. Fold B sensitivity is still running. These
 interim selectors will be superseded by the final publication families and are excluded from
 the public configuration inventory.
+
+Both added precipitation-era sensitivity reports exited successfully. The root verified their
+exact five-file output sets, embedded specifications and specification/reporter hashes before
+executing the freshly reviewed four-table selector. All four generated tables and the complete
+manifest were read, and the table bodies were copied byte for byte. Both eras remain unresolved
+under both interval methods; the earlier-era point estimate changes sign across settings.
+The manuscript identifies this robustness addition as post hoc despite inherited contrast-kind
+metadata, and preserves the archive-availability and causal limitations.
+
+## Requested five-set extension: accepted plan and preparation reviews
+
+The user requested two fixed solar input sets, three wind representations and feature-importance
+plots for all five. The separate post hoc extension plan registers 90 CUDA jobs and one CPU
+diagnostic. Both independent available Codex plan reviewers accepted the amended design after
+adding all five main-setting unpadded checks and mandatory targeted guarded-reference contrasts.
+The original G4 ladder remains stopped. No extension execution or control reuse is claimed.
+
+The first fresh implementation review accepted the registry-only addition statically and found
+builder source-contract, parent-lineage and runtime-binding gaps. Root accepted those findings,
+plus independent bearing-range and style corrections; a revised builder is being prepared.
+The fresh reuse-audit review found builder-interface and original-column-order gaps, also
+accepted for correction. Revised scripts and actual execution specifications require renewed
+review before execution. Historical original source hashes and artifacts remain immutable.
+
+The final wind-addition exporter now supplies all 64 tables across both folds and settings.
+Root checked all 16 new retrospective-fold sensitivity tables against their source export and
+verified the previous 48 table bodies unchanged. The appendix now contains 102 aggregate tables;
+original first-solar, guarded and negative-control sensitivity completion is still pending.
+
+## Part 2 scope frozen to completed diagnostics
+
+The maintainer asked for the existing Part 2 findings to be written up and explicitly prohibited
+any further Part 2 code while revising its plan. No calibration correction or temporal/spatial
+coherence implementation has been written. Remaining Part 2 work is prose review and publication
+of the completed saved-prediction diagnostics and existing figure/tables. New feature experiments
+and importance scripts belong only to Part 1b.
+
+## Original runs complete; new Part 1b implementation cleared
+
+The original 102-job sensitivity queue exited successfully. Its reviewed shell implementation
+has no completion footer; root checked all 102 registered completion manifests and exact file
+inventories instead. Both original report workers exited successfully with their queue-complete
+footers. Fold B's final unaffected-type audit passed all nine comparisons across 66 forecast
+files each. Historical fits retain fitter source `b073be43` and their original frame manifests.
+
+The renewed fresh builder-v4 review found no must-fix issue after all five original findings
+were addressed. Root read its complete source and accepted the result. The stricter metadata,
+capacity and bounded-power schemas were checked against both pinned original folds and match.
+The optional scheduled-initialisation synthetic-case isolation is deferred: the actual condition
+is present, and rejection checks will not be described as mutation coverage. The renewed
+formatting-only registry review was clean. Root then applied only the five fixed additions;
+new fitter source is `96249cf9`, with historical source bytes preserved separately.
+
+The new Part 1b builder preserves the full historical parent manifest, binds approved runtime
+sources/versions/defaults, validates frozen support and source/readback semantics, and writes its
+external proof only after completion. Static clearance establishes no passing build or reuse
+proof. The audit-v2 consumer also received a clean renewed fresh review; its actual execution
+specifications and proofs remain pending. No Part 2 code was changed or added.
