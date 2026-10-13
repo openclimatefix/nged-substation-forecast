@@ -269,8 +269,14 @@ def summarize(*, directory: Path, report: Path) -> None:
             "**The variants compare different processing policies on the same native means.**",
             "`point` uses main at `ce7285e4`; `before` uses the radiation PR at `99a40cf5` with",
             "full-target sorts and as-of joins. `after` uses native-window neighbour fills, the",
-            "20 W/m² conditioning floor, and lazy schedule/coordinate validation. All helper hashes",
-            "and individual measurements are retained in the accompanying JSON. The comparison does",
+            (
+                "20 W/m² conditioning floor, and lazy schedule/coordinate validation. "
+                "All helper hashes"
+            ),
+            (
+                "and individual measurements are retained in the accompanying JSON. "
+                "The comparison does"
+            ),
             "not isolate the lookup change from the other review fixes. Results at larger scales",
             "must be measured; these two workloads do not establish linear scaling or a",
             "memory cap.",
