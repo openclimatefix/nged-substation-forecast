@@ -595,6 +595,13 @@ contract change, production code change or evaluation of observed power from Jul
 
 ## Data and code availability
 
+**OpenAI Codex wrote the new study work; the reused code has historical Claude credits.**
+Following the imported study helpers and chart theme through their commit histories finds
+Claude Fable 5, Opus 5 and 5.5 (including 1M-context credits), and Sonnet 4.6, 5 and 5.5;
+some commits credit Claude without a model name. These are authorship records for reused code,
+not the identities of this study's reviewers. Available Codex agents performed the independent
+reviews in place of the study skill's unavailable named models.
+
 **The public evidence consists of aggregate tables and figures; reproducing the scores requires
 the private frozen inputs.** The scorer is `studies/forecast_calibration/calibration_diagnostics.py`;
 `studies/quick_wins/fixed_pipeline_tables.py` selects the displayed tables without recalculating

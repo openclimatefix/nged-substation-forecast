@@ -339,3 +339,45 @@ description and rebound the exact bytes and schemas; no numerical result changed
 reviewed the correction and source-specific numeric collisions, then reran redacted preflight.
 Every reported occurrence was approved for its exact source hash. Neither helper has copied
 public configurations or private manifests.
+
+The main lean comparisons completed in both folds. Before interpreting the Fold A type cuts,
+the independently reviewed unaffected-type verifier checked all forecast files, exact keys and
+predictions for three seeds, including the first solar addition. All nine comparisons matched
+exactly; complete frame and fitted-artifact inventories were hash-verified before and after.
+The first solar addition reduced Fold A fair CRPS by 0.0246 capacity points, below G4's registered
+0.15-point continuation threshold. The primary bootstrap remains unresolved while the equal-month
+t-interval favours lower loss. The root approved the registered stopping decision: no later
+solar rungs and no adoption of lean solar. The required second-fold and alternate-setting
+checks remain in the execution queues.
+
+The lean-feature figure received an isolated first-reader review followed by a one-rule-per-pass
+prose sweep. The root checked every accepted wording change before text export and rendering
+with the exact-text guard. The optimised SVG and rendered PNG were inspected; the separate panel
+scales, uncertainty distinctions and full-history scoring denominator remain explicit.
+
+The Fold B unaffected-type verifier also passed all nine exact comparisons. The solar stopping
+figure then received its own isolated first-reader review and one-rule-per-pass prose sweep.
+The root accepted scope, heading and sentence clarifications. Suggested Markdown bolding and
+paragraph breaks were rejected because the figure uses separately wrapped plain-text caption
+lines; Markdown markers would appear literally in the image. The root reviewed the exact changes,
+rendered with the approved-text guard, and inspected the optimised SVG's PNG. The same scope
+clarification was applied to the lean figure and received a renewed full prose sweep before
+rerendering. Both prerequisite PR heads remain at their pinned revisions.
+
+The remaining repository suite passed 1,196 tests before an executable-path setup failure in
+the real MLflow-server test. Its unclosed log then caused a warning error in a later fixture.
+Both affected integration tests passed after adding the existing virtualenv executables to
+PATH (two passed in 11.08 seconds); no test or application code changed. The separately required
+study suite remains at 3,338 passed and five skipped. Full-tree Ruff, formatting and type checks
+also pass, covering 947 formatted files.
+
+The solar stopping figure's final caption rounds estimates and interval endpoints to three
+decimals, matching the publication tables. The full-precision report and gate decision remain
+unchanged. A renewed twenty-pass prose review found no new issue; the root retained the earlier
+plain-text caption-formatting decision, rendered with the exact reviewed-text guard, and inspected
+the updated PNG. Exact figure specifications will bind this final version in the public inventory.
+
+The public assets retain the optimised SVG figures used by the pages. Duplicate PNG assets were
+removed from the proposed diff; the inspected PNGs remain in the immutable private rendering
+directories with their recorded hashes. This avoids shipping redundant raster files, several
+of which exceed the repository's added-file size limit, without altering the published figures.

@@ -212,6 +212,15 @@ before execution.
 
 ## Overnight execution and reporting
 
+**The solar ladder stopped at its first addition under G4.** Adding 10 m wind speed to the
+lean solar inputs reduced Fold A main fair CRPS by 0.0246 capacity points, below the registered
+0.15-point continuation threshold. The primary month-and-seed interval for the difference is
+-0.0626 to 0.0223; the equal-month t-interval is -0.0371 to -0.0047, with lower loss in nine of
+12 months. These methods treat month weights and fitting seeds differently. The stopping
+decision follows the registered mean-gain rule despite the differing interval conclusions.
+Later solar rungs are not run, and the plan does not adopt lean solar. The first rung still
+receives the registered second-fold and alternate-setting checks.
+
 **The conditional best-point refit was not triggered by G3.** The execution checkpoint recorded
 the gate before corrected-pipeline results: combined minus old public-production fair CRPS,
 all series, an absolute three-seed mean change of at least 0.15 capacity points, and a nonzero

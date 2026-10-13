@@ -1,7 +1,7 @@
 # Do wind and radiation fixes improve XGBoost forecasts, and which lean inputs help?
 
-> **Draft study.** Matched refits are running. Corrected-pipeline results and final scientific
-> reviews are pending; no forecast-effect recommendation is made yet.
+> **Draft study.** Pipeline comparisons are complete. Lean-feature robustness checks and final
+> scientific reviews are pending; final input recommendations remain open.
 
 This study compares two changes to the weather-feature pipeline and revisits the lean solar and
 wind inputs in Part 1b of [issue 1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156).
@@ -10,7 +10,18 @@ It follows the [feature-fault diagnostic audit](production-feature-faults.md) an
 refit of the production XGBoost configuration. Production here means the training recipe fitted
 on the study's historical data, rather than a deployed model artifact.
 
-<!-- HEADLINE_RESULTS -->
+**Correcting radiation processing consistently improves solar forecasts; correcting wind
+processing does not establish a general forecast improvement.** Across both historical folds
+and both training settings, radiation-only processing lowers solar loss, and the combined
+corrections lower overall and solar loss within each reference recipe. Wind-only processing
+worsens wind-farm loss in retrospective Fold B. Its Fold A effects remain unresolved.
+
+The quick-wins winner retains a substantially lower common pinball score than the refitted
+production configuration on the corrected inputs. This compares whole training recipes and
+cannot be credited to the processing fixes. Lower loss also does not establish adequate interval
+coverage; the separate [Part 2 study](calibration-diagnostics-1156.md) examines that question.
+These are weekly-initialisation diagnostics for a fixed population, with a retrospective capacity
+denominator. Final lean-wind recommendations await the remaining Part 1b settings and controls.
 
 ![Input fixes and recipe comparison.](../assets/fixed-pipeline-lean-features/headline-fold-a.svg)
 
@@ -19,7 +30,29 @@ on the study's historical data, rather than a deployed model artifact.
 > AI scientific, evidence and prose reviews are required before publication. Human review of this
 > page is pending.
 
-<!-- KEY_FINDINGS -->
+## Key findings
+
+- **Radiation correction consistently helps solar.** With the production configuration, its
+  main-setting common pinball difference is -0.337 capacity points in Fold A (95% paired
+  month-and-seed interval -0.473 to -0.236) and -0.346 in retrospective Fold B (-0.498 to -0.237).
+  Both sensitivity settings also support lower solar loss. These comparisons cover six solar
+  series and three fitting seeds, over 12 validation months in Fold A and 15 in Fold B.
+- **Wind processing has no established general loss benefit.** Wind-only effects remain
+  unresolved under the primary bootstrap in Fold A. For the three wind series in retrospective
+  Fold B, wind-only processing increases common pinball loss by 0.194 capacity points in the
+  main setting (0.002 to 0.470) and 0.121 in sensitivity (0.048 to 0.204). The combined corrections
+  also worsen wind loss in Fold B sensitivity; their wind effects remain unresolved in the
+  other fold/settings.
+- **The winner's advantage is a recipe difference.** On corrected inputs, its all-series common
+  pinball difference from refitted production is -3.723 capacity points in Fold A's main setting
+  (-4.059 to -3.392) and -3.435 in Fold B's main setting (-3.936 to -2.982). Both sensitivity
+  settings retain the advantage. The exact winner uses nine quantiles, pooling, forecast lead,
+  lean wind inputs and training-only scaling, without early stopping. These contrasts do not
+  isolate any one ingredient or establish adequate coverage.
+- **The conditional best-point refit was not run.** Neither fold passes G3's preregistered
+  0.15-capacity-point magnitude gate on main-setting production fair CRPS. Statistical
+  significance alone does not pass that gate. Final lean-feature findings remain pending the
+  Part 1b alternate settings and controls.
 
 ## Introduction
 
@@ -525,6 +558,36 @@ coherence. This study changes no production code or forecast contract.
 
 <!-- DISCUSSION_RESULTS -->
 
+**The strongest processing result is the solar benefit from correcting radiation intervals.**
+Its direction is supported in both folds and both training settings. The combined corrections
+also lower overall and solar common pinball loss within both production and the quick-wins
+winner. The wind evidence needs a narrower interpretation: wind-only processing has unresolved
+Fold A effects and worsens wind-farm loss in retrospective Fold B. Adding the wind correction
+after radiation remains unresolved under the primary bootstrap, so these results do not establish
+a general wind forecast benefit. The combined-correction wind deterioration in Fold B sensitivity
+also prevents an unqualified claim that both fixes improve every series type. Processing
+correctness and measured forecast benefit are separate questions; these historical loss tests
+address the latter within the pinned archives and recipes.
+
+**The corrected winner remains a stronger distributional-loss benchmark than refitted
+production, while its coverage requires separate assessment.** The deciding score evaluates
+both delivered distributions at the same 19 midpoint probabilities. It supports the winner in
+both folds and both settings, but the comparison changes objective, pooling, inputs and
+preprocessing together. Its advantage cannot be attributed to the PR fixes, quantile training
+alone or early stopping, which the exact winner does not use. The original quick-wins selection
+used Fold A, and Fold B is retrospective; neither comparison establishes future deployment
+performance. Part 2 reports interval coverage alongside widths and assesses undercoverage
+separately by interval and series type. A lower common loss does not establish adequate coverage
+or coherent joint scenarios.
+
+**The preregistered gate rules out the conditional best-point experiment in this study.** G3
+uses the main-setting production fair-CRPS contrast between matched 51-member ensembles. Its
+three-seed differences are -0.1176 capacity points in Fold A and -0.0572 in Fold B, each below
+the required absolute change of 0.15. The separate equal-month t-intervals favour improvement,
+but do not satisfy the magnitude requirement. The conditional best-point refit was therefore
+not run. Fair CRPS remains a diagnostic for matched sample constructions; it does not decide
+the point-versus-quantile recipe comparison.
+
 ## Proposed follow-up study
 
 <!-- FOLLOWUP_RESULTS -->
@@ -553,6 +616,13 @@ examines marginal distributions and does not establish coherent joint scenarios.
 
 ## Data and code availability
 
+**OpenAI Codex wrote the new study work; the reused code has historical Claude credits.**
+Following the imported study helpers and chart theme through their commit histories finds
+Claude Fable 5, Opus 5 and 5.5 (including 1M-context credits), and Sonnet 4.6, 5 and 5.5;
+some commits credit Claude without a model name. These are authorship records for reused code,
+not the identities of this study's reviewers. Available Codex agents performed the independent
+reviews in place of the study skill's unavailable named models.
+
 ECMWF ensemble weather and NGED observed power are the production-system inputs. The weather
 component migration reconstructs archived speed and direction; it does not download new native
 components. The NGED observations, generator metadata, fitted boosters and row-level forecasts
@@ -569,8 +639,180 @@ The runs use XGBoost 3.4.1 and Polars 2.0.0. Fit manifests record source and dep
 parameters, data snapshots, seeds and hardware selection; report provenance verifies saved fit
 artifacts before aggregation.
 
-<!-- AVAILABILITY_RESULTS -->
+**Reproduction requires the registered private snapshots.** Old and radiation-only frames use
+polar archive version 1830; wind-only and combined frames use component archive version 924.
+All four treatments use observed-power version 70, capacity version 1 and eligibility snapshot 1.
+Observed power is bounded before 1 July 2026, with each fold's additional training and scoring
+bounds recorded separately. The frozen effective-capacity denominator is a full-history 99th
+percentile and can include readings after that cutoff. It enters scoring only; normalised scores
+therefore remain retrospective and conditional on this common snapshot.
+
+**The public configuration inventory is not yet final.** The intended indexes are
+`studies/quick_wins/fixed_pipeline_specs/index.json` and
+`studies/quick_wins/fixed_pipeline_runtime_records/index.json`.
+TODO: reconcile completed artifacts, publish the reviewed entries and hashes, and verify these
+destinations before treating them as available downloads. Exact executed JSON specifications
+must be distinguished from records reconstructed from completed provenance: a derived CLI record
+is neither an original executed JSON specification nor a transcript of historical shell arguments.
+Dependency snapshots document the recorded environment; they do not constitute a complete
+environment lock or guarantee numerical equality on different hardware. Prepared queues and the
+full recipe registry are not evidence that every listed job completed. Private manifests and
+generator mappings are excluded from the public inventory.
 
 ## Reproducing the figures
 
-<!-- REPRODUCING_RESULTS -->
+**Reconstruct the four feature treatments before rebuilding frames.** Run from a repository
+clone containing the three pinned commits, using the recorded dependencies and authorised access
+to the frozen inputs. Follow the commands in
+`studies/quick_wins/fixed_pipeline_runtime/README.md`
+to create the wind, radiation and combined source trees and compare their source hashes with
+`all-source-hashes.json`. In the same shell, add the unchanged treatment:
+
+```bash
+git worktree add --detach "$STUDY_RUNTIME_ROOT/old" \
+  4e820d24c0129c8c95c567ff7355abff8d416144
+```
+
+The component migration must have passed its full readiness checks before either component
+treatment is built. Source reconstruction supplies no weather or power data. Use new output
+directories throughout; these commands describe reproduction and have not themselves been run
+as a new experiment. Set the following paths to your authorised input copies and an absent
+output root. The data roots must expose the registered power, capacity and eligibility snapshots;
+the frame builder checks power version 70 and records the eligibility snapshot it reads, which
+must match snapshot 1. It has no eligibility-version command-line override.
+
+```bash
+set -euo pipefail
+STUDY_REPRO_ROOT="/path/to/new/fixed-pipeline-reproduction"
+STUDY_POLAR_ARCHIVE="/path/to/frozen/polar-archive"
+STUDY_COMPONENT_ARCHIVE="/path/to/frozen/component-archive"
+export DATA_PATH_INTERNAL="/path/to/authorised/internal-data"
+export DATA_PATH_DELIVERY="/path/to/authorised/delivery-data"
+export REPO_DATA_DIR="$DATA_PATH_INTERNAL"
+export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+export MLFLOW_DISABLE_AGENT_HINT=1
+
+for STUDY_PIPELINE in old radiation wind combined; do
+  export PYTHONPATH="$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/contracts/src:$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/ml_core/src"
+  case "$STUDY_PIPELINE" in
+    old)
+      STUDY_ARCHIVE="$STUDY_POLAR_ARCHIVE"; STUDY_ARCHIVE_VERSION=1830
+      STUDY_REVISION="4e820d24c0129c8c95c567ff7355abff8d416144" ;;
+    radiation)
+      STUDY_ARCHIVE="$STUDY_POLAR_ARCHIVE"; STUDY_ARCHIVE_VERSION=1830
+      STUDY_REVISION="0f094c35" ;;
+    wind)
+      STUDY_ARCHIVE="$STUDY_COMPONENT_ARCHIVE"; STUDY_ARCHIVE_VERSION=924
+      STUDY_REVISION="PR1167:38025f4eab457b9605b8c124006609869dbfca0d+base:4e820d24+source1830+destination924" ;;
+    combined)
+      STUDY_ARCHIVE="$STUDY_COMPONENT_ARCHIVE"; STUDY_ARCHIVE_VERSION=924
+      STUDY_REVISION="PR1167:38025f4eab457b9605b8c124006609869dbfca0d+PR1166:0f094c356da82e75c4014664ad7fb33fe1df8b7f+base:4e820d24+source1830+destination924" ;;
+  esac
+  for STUDY_FOLD in fold_a fold_b; do
+    case "$STUDY_FOLD" in
+      fold_a) STUDY_WINDOW=mid_2025_to_mid_2026 ;;
+      fold_b) STUDY_WINDOW=backwards_2025_07_to_2026_06 ;;
+    esac
+    .venv/bin/python studies/quick_wins/fixed_pipeline_frames.py \
+      --output "$STUDY_REPRO_ROOT/frames/$STUDY_PIPELINE/$STUDY_FOLD" \
+      --fold "$STUDY_WINDOW" --pipeline-tag "$STUDY_PIPELINE" \
+      --pipeline-revision "$STUDY_REVISION" --archive "$STUDY_ARCHIVE" \
+      --archive-version "$STUDY_ARCHIVE_VERSION" --power-version 70 --capacity-version 1
+  done
+done
+```
+
+**Refit the report-listed recipes on their matching frames.** The `production` recipe calls the public
+production training and prediction path; `r2_e1_c1_a3w_d3` preserves the exact quick-wins winner's
+historical fitting path. Both use no padding. The Part 1b `production_cleaned`, `lean_pv` and
+`lean_wind` controls, the registered wind add-backs, guarded-windchill arms, negative controls and
+first solar rung use their separately recorded padding and setting. The unpadded controls are
+distinct main-setting checks. Select the completed fits from the exact executed report
+specifications in the forthcoming public spec index. Each report lists its runs, including fit
+path, frames, label and seed, together with fold, setting and padding. The canonical fit path
+`fits/<treatment>/<fold>/<recipe>/<setting>/<device>_seed<seed>_<padding>` identifies the treatment,
+recipe and device; check these against the fit manifest. The derived runtime index does not
+contain per-fit records. Do not infer a Cartesian product from the recipe registry. For each
+selected run, set these variables from its report specification and checked fit path, then run
+the following command, one CUDA fit at a time:
+
+```bash
+: "${STUDY_PIPELINE:?Select the treatment from the checked fit path}"
+: "${STUDY_FOLD:?Select the report fold}"
+: "${STUDY_RECIPE:?Select the recipe from the checked fit path}"
+: "${STUDY_SETTING:?Select the report setting}"
+: "${STUDY_SEED:?Select the report run seed}"
+: "${STUDY_DEVICE:?Select the device from the checked fit path}"
+: "${STUDY_PADDING:?Select the report padding}"
+export PYTHONPATH="$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/contracts/src:$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/ml_core/src"
+.venv/bin/python studies/quick_wins/fixed_pipeline_fit.py \
+  --frames "$STUDY_REPRO_ROOT/frames/$STUDY_PIPELINE/$STUDY_FOLD" \
+  --output "$STUDY_REPRO_ROOT/fits/$STUDY_PIPELINE/$STUDY_FOLD" \
+  --recipe "$STUDY_RECIPE" --seed "$STUDY_SEED" --device "$STUDY_DEVICE" \
+  --setting "$STUDY_SETTING" --padding "$STUDY_PADDING"
+```
+
+The combined production and exact-winner refits use seeds 0, 1 and 2 at both main and sensitivity
+settings in both folds. Do not add the conditional G3 best-point refit: its preregistered gate
+failed in both folds, so it was not run. The solar ladder starts with `solar_add_wind10`; report
+that rung and apply the registered stopping rule before considering another. Listing later
+rungs in the registry does not establish their execution or authorise bypassing that rule.
+
+**Regenerate reports and publication artifacts from reviewed specifications.** Select the exact
+completed report, table, chart and importance specifications from the forthcoming public spec
+index. Retain the original executed bytes and their hashes. If input or output paths need to
+change, make a separately labelled reproduction copy bound to the rebuilt artifacts; it is a
+derived configuration, not the original executed specification. TODO: finalise the public
+inventory and its path-rebinding instructions. Until then, the following variables are explicit
+placeholders for selected, reviewed copies, rather than asserted public filenames:
+
+```bash
+: "${STUDY_REPORT_SPEC:?Select and rebind the reviewed report specification}"
+: "${STUDY_TABLE_SPEC:?Select and rebind the reviewed publication-table specification}"
+: "${STUDY_CHART_SPEC:?Select and rebind the reviewed figure specification}"
+: "${STUDY_ARTIFACT:?Choose the indexed artifact name for fresh outputs}"
+.venv/bin/python studies/quick_wins/fixed_pipeline_report.py \
+  --spec "$STUDY_REPORT_SPEC" --output "$STUDY_REPRO_ROOT/reports/$STUDY_ARTIFACT"
+.venv/bin/python studies/quick_wins/fixed_pipeline_tables.py \
+  --spec "$STUDY_TABLE_SPEC" --output "$STUDY_REPRO_ROOT/publication/$STUDY_ARTIFACT"
+.venv/bin/python studies/quick_wins/fixed_pipeline_charts.py \
+  --spec "$STUDY_CHART_SPEC" --output "$STUDY_REPRO_ROOT/figure-text/$STUDY_ARTIFACT" \
+  --text-only
+```
+
+Review the exported figure text before rendering the corresponding chart into another new
+directory:
+
+```bash
+.venv/bin/python studies/quick_wins/fixed_pipeline_charts.py \
+  --spec "$STUDY_CHART_SPEC" --output "$STUDY_REPRO_ROOT/figures/$STUDY_ARTIFACT" \
+  --reviewed-text "$STUDY_REPRO_ROOT/figure-text/$STUDY_ARTIFACT/figure-text.md"
+```
+
+The input-audit report has a direct CLI rather than an executed JSON spec. Repeat for each fold,
+with `STUDY_FOLD` set to `fold_a` or `fold_b`:
+
+```bash
+.venv/bin/python studies/quick_wins/fixed_pipeline_input_audit.py \
+  --old "$STUDY_REPRO_ROOT/frames/old/$STUDY_FOLD" \
+  --radiation "$STUDY_REPRO_ROOT/frames/radiation/$STUDY_FOLD" \
+  --wind "$STUDY_REPRO_ROOT/frames/wind/$STUDY_FOLD" \
+  --combined "$STUDY_REPRO_ROOT/frames/combined/$STUDY_FOLD" \
+  --output "$STUDY_REPRO_ROOT/input_audit/$STUDY_FOLD"
+```
+
+The importance figure uses its own completed specification and report. After selecting and
+rebinding `STUDY_IMPORTANCE_SPEC` from the public index, regenerate its aggregate report and text:
+
+```bash
+: "${STUDY_IMPORTANCE_SPEC:?Select and rebind the reviewed importance specification}"
+.venv/bin/python studies/quick_wins/fixed_pipeline_importance.py \
+  --spec "$STUDY_IMPORTANCE_SPEC" --output "$STUDY_REPRO_ROOT/importance/report"
+.venv/bin/python studies/quick_wins/fixed_pipeline_importance_charts.py \
+  --report "$STUDY_REPRO_ROOT/importance/report" \
+  --output "$STUDY_REPRO_ROOT/importance/text" --number 6 --text-only
+```
+
+After reviewing that text, render with `fixed_pipeline_importance_charts.py` using the same
+`--report` and `--number 6`, a new `--output` directory and
+`--reviewed-text "$STUDY_REPRO_ROOT/importance/text/figure-text.md"`.
