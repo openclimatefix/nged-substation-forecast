@@ -110,6 +110,16 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   rather than through `uv run`, as the maintainer's user. The script's module docstring explains
   why.
 
+## `diagnostics/` — checking and illustrating processing behaviour
+
+These scripts are run by hand to compare processing results with expected behaviour and produce
+explanatory plots.
+
+- `plot_wind_interpolation.py` — compares speed/bearing interpolation with component interpolation
+  through the production feature pipeline and independent synthetic vector calculations. Writes
+  the wind interpolation docs figure and a CSV/report without downloading weather data or training
+  a model.
+
 ## `maintenance/` — looking after the workstation
 
 - `backup_workstation.py` — **run once a day by the systemd user units in `systemd/`.** Copies

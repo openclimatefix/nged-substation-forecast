@@ -220,6 +220,11 @@ class Nwp(pt.Model):
 
     # The ±200 m/s component bounds are corrupt-feed guards, not meteorological limits.
     # Independent bounds permit a vector magnitude above 200 m/s; there is no magnitude constraint.
+    # The highest non-tornadic surface wind gust ever recorded is 113.2 m/s. That gust was
+    # measured on Barrow Island during Tropical Cyclone Olivia on 10 April 1996. The World
+    # Meteorological Organisation (WMO) ratified the record in its World Weather and Climate
+    # Extremes Archive: <https://wmo.int/asu-map?map=Wind_028>. That record is a 3-second gust at a
+    # single anemometer.
     # u is eastward and v is northward, and their signs must survive storage and interpolation.
     wind_u_10m: float = pt.Field(
         dtype=pl.Float32,
