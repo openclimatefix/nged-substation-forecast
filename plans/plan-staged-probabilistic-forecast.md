@@ -169,10 +169,22 @@ directly on ENS, by lead band.
 **Stage 2 is one model with several inputs, on purpose.** Lagged power and lag anomalies, cross-NWP
 agreement, and ensemble spread all bear on how wide the interval is and where it sits, and a tree
 model finds those interactions without being told. An XGBoost model given an NWP identifier splits
-on it freely, so the identifier cannot act as a scale adjustment only. The default for a
-short-history NWP is therefore a shared quantile model plus a per-NWP multiplicative spread factor
-fitted afterwards. The studies compare it with a location-and-scale split. Other safeguards: a fixed
-template of statistics per NWP, and monotone constraints so wider spread never narrows the interval.
+on it freely, so the identifier cannot act as a scale adjustment only. Separate feature columns per
+product also do not transfer what the model learned: splits learned on the ENS spread column do not
+apply to a UKV spread column, so refitting for a new product learns its relationships from the short
+overlap alone. Two designs make the transfer explicit, and the studies compare them. **Design 1**
+is one XGBoost model with per-product columns, which a new product retrains in full. **Design 2**
+is a shared per-product calibrator followed by a small blend: one function with identical feature
+names for every product (that product's mean, spread, and percentiles of stage 1 power, plus the
+lead) is fitted on the pooled rows of all products, with a per-product multiplicative spread
+factor; a second small step blends the per-product calibrated distributions with weights by lead
+band and adds the lag inputs. A new product then adds one spread factor and one set of blend
+weights, which is what the short-history claim needs. Other safeguards: a fixed template of
+statistics per product. A wider ensemble spread must not narrow the interval, and XGBoost monotone
+constraints do not guarantee that, because they constrain a prediction against a feature and not
+the difference between two quantiles (both bounds can rise while the gap shrinks). The studies
+therefore parameterise stage 2 as a location plus a positive scale times a fixed quantile shape,
+with the scale monotone in spread, and test the width property directly on held-out data.
 
 **Pooling stage 1 quantiles over members is a valid baseline, not double counting.** If stage 1
 estimates the distribution of power given the weather and the members are draws of the weather, the
@@ -190,11 +202,15 @@ in that explainer.
 valid time is stage 2's quantiles. ECC-Q needs one quantile per member, so the coupling step
 interpolates the 19 stage 2 quantile levels to the levels i/52 for i = 1 to 51, with a stated tail
 rule beyond the outermost levels, and assigns them to members by the rank of each member's stage 1
-median. Ties (night-time solar, where every member is zero) break by member identifier, consistently
-over time. At short leads members are nearly identical and ranks are mostly noise, so the studies
-score coupling by lead band with the variogram score and include the Schaake shuffle there. The
-output is always the 51 ENS members. Other NWPs enter stage 2 as columns and do not add members,
-which removes the question of how to pool members of different NWPs.
+median. Ties at night-time solar, where every member is zero, need no rule because every assigned
+quantile is also zero. Other ties (for example when weather is missing and the medians coincide)
+would, if broken by member identifier, give perfect rank correlation across the affected series and
+times and distort aggregate uncertainty, so they break by a dependence template instead: the ranks
+of the members' stage 1 medians at neighbouring times, or a template taken from history (the
+Schaake shuffle). The studies test the template with the coherence scores. At short leads members
+are nearly identical and ranks are mostly noise, so the studies score coupling by lead band with
+the variogram score and include the Schaake shuffle there. The output is always the 51 ENS
+members. Other NWPs enter stage 2 as columns and do not add members, which removes the question of how to pool members of different NWPs.
 
 **Targets for solar and wind power.** Stage 1 could predict a ratio for solar: power divided by
 clear-sky PV power, multiplied back by the known half-hourly clear-sky curve, so the output stays in
@@ -222,11 +238,15 @@ clear a low bar. The risks are thin data per bucket and quantile jumps at bucket
   over the NWP era; fit stage 2 on the per-member statistics; score end-to-end CRPS on held-out
   months.
 - **Monthly retrain:** keep stage 1 frozen, because its predictions for the new month are out of
-  sample; refit stage 2 on all months; promote only if it is no worse than the previous stage 2 on
-  the newest month. Stage 1 retrains yearly, or when cleaning rules change or sites are added.
-- **A new NWP with short history:** add an adapter table and a per-NWP spread factor in stage 2;
-  leave stage 1 untouched; refit stage 2 with the new NWP's columns, sharing the spread-skill
-  relationship across NWPs and fitting only the per-NWP factor. Add a learned stage 0 for the NWP
+  sample. Choose between the candidate and the incumbent stage 2 by rolling-origin evaluation: fit
+  each on months up to a cut-off and score both on the following months, which neither saw. Only
+  after the promotion decision, refit the winner on all months. Scoring the newest month after
+  fitting on it would favour the candidate. Stage 1 retrains yearly, or when cleaning rules change
+  or sites are added.
+- **A new NWP with short history:** add an adapter table; leave stage 1 untouched. Under Design 2,
+  add one per-product spread factor and one set of blend weights to stage 2. Under Design 1,
+  retrain stage 2 in full with the new product's columns. Study 3 tests which of the two holds up
+  on a few months of history. Add a learned stage 0 for the NWP
   only if the studies show it is needed.
 
 **Leakage rules.** Stage 1 must not train on months that stage 2 or the end-to-end score uses for
@@ -332,9 +352,10 @@ code under `studies/` only.
     - **B, the mixture baseline:** forward-chained out-of-fold stage 1 quantiles mixed over members,
       with and without a spread rescaling. Stage 1 arms: raw megawatts, the PV ratio target, and the
       wind `base_margin`.
-    - **C, the chain:** stage 1 median statistics into stage 2 (a shared quantile model plus a
-      per-NWP spread factor, against a location-and-scale split), with lag-anomaly features built
-      from serving-latency sources, stage 1 power as a feature in A, and one lead-bucket arm.
+    - **C, the chain:** stage 1 median statistics into stage 2 (Design 1 against Design 2 from
+      section 4, and a location-and-scale parameterisation against a free quantile model), with
+      lag-anomaly features built from serving-latency sources, stage 1 power as a feature in A,
+      and one lead-bucket arm.
     - **D, perfect-prognosis check:** a stage 1 trained on ENS early leads instead of the analysis.
     - **Ceiling:** stage 1 fed with ERA5, CAMS, ERA5 plus CAMS, and each NWP's short-lead fields.
     - **Regime arms (exploratory, demand series only):** stage 1 with recency weights, with the
@@ -345,7 +366,10 @@ code under `studies/` only.
 3. **How short can a new NWP's history be?** Test on products that are genuinely different from the
    one the shared relationship was learned on: ENS before and after the 12 November 2024 upgrade
    treated as two products, the ENS control member as a deterministic product, and a truncated
-   long-history ensemble such as GEFS if obtainable. Rotate the truncation window across at least
+   long-history ensemble such as GEFS. The first two test adaptation inside one model family. They
+   do not test transfer to a different family such as UKV or MOGREPS-UK, so the short-history claim
+   is accepted only after a different family passes (GEFS here, or the second NWP in study 4).
+   Until then the claim stays unresolved. Rotate the truncation window across at least
    two starting seasons, score by season, and report in-season and out-of-season gaps separately.
    Compare a shared spread-skill relationship with a per-NWP fit, and include an hourly-step
    transfer test. The `tcc` (total cloud cover) natural experiment (served from 21 November 2025;
@@ -369,7 +393,7 @@ months, or March to October only, stated in advance, because winter solar differ
 Fold B is weak confirmation because the folds share series and weather regimes, so each finalist is
 also scored once on the untouched holdout from July 2026 onward. **Equivalence** means the t-interval
 lies inside ±0.15 points. **A stage stays** only if it beats the previous design by the rule, or is
-equivalent to it and helps a short-history NWP in study 3.
+equivalent to it and helps a short-history NWP in study 3 or study 4.
 
 **Constraints.** Production-system data plus ERA5, CAMS, and (if approved) the ENS backfill. No
 production code changes. NGED generators are anonymised in every published figure. Validation months
@@ -402,9 +426,10 @@ that follows approval of this plan contains:
    data-cleaning roadmap pages.
 4. **The roadmap index and navigation** list the page, and `docs/documentation-guide.md` gains one row
    for "a design under study" explaining the one-page-per-candidate-design convention.
-5. **When the studies finish,** the surviving design moves to a `docs/architecture/` page describing
-   what is built, and the roadmap page is deleted. A refuted candidate shrinks to a short rejected
-   note linked from the index.
+5. **Lifecycle.** When the studies finish, the roadmap page records the verdicts and the
+   surviving design. When a reviewed production implementation ships, the design moves to a
+   `docs/architecture/` page describing what is built, and the roadmap page is deleted. A refuted
+   candidate shrinks to a short rejected note linked from the index.
 
 **Shared components move out of design pages** so that two candidate designs would not duplicate
 them: the conventions adapter stays on the [NWP variable conventions
@@ -464,6 +489,11 @@ This section is a record of what changed; it is not part of the design.
   products for the short-history test with a rotated truncation window; pre-registered contrasts with
   Holm adjustment and an untouched holdout; daylight-weighted solar months; a separate `tcc` split;
   the ratio-target conditions; a cleaning-recall test before reuse.
+- **Accepted from a later external review (GPT-6 Astra) of the pushed plan:** stage 2 now says how
+  knowledge transfers between products (Designs 1 and 2) and the short-history claim stays
+  unresolved until a different model family passes; the monthly promotion uses rolling-origin
+  evaluation; the tie rule uses a dependence template; width monotonicity is tested directly and
+  the scale is parameterised; the architecture page waits for a shipped production implementation.
 - **Not yet reviewed:** this version of the plan, and the documentation and issue plan in sections 6
   and 7.
 
