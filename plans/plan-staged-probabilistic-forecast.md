@@ -177,9 +177,19 @@ is one XGBoost model with per-product columns, which a new product retrains in f
 is a shared per-product calibrator followed by a small blend: one function with identical feature
 names for every product (that product's mean, spread, and percentiles of stage 1 power, plus the
 lead) is fitted on the pooled rows of all products, with a per-product multiplicative spread
-factor; a second small step blends the per-product calibrated distributions with weights by lead
-band and adds the lag inputs. A new product then adds one spread factor and one set of blend
-weights, which is what the short-history claim needs. Other safeguards: a fixed template of
+factor; a second small step, the blend, combines the per-product calibrated distributions and
+adds the lag inputs. A new product then adds one spread factor and one set of blend weights, which
+is what the short-history claim needs. **The blend is learned, with few parameters, because a fixed
+blend is not calibrated by construction.** An equal-weight mixture of individually calibrated
+distributions is generally over-dispersed, and averaging quantiles re-creates under-dispersion
+(see the [explainer](https://openclimatefix.github.io/nged-substation-forecast/techniques/probabilistic-forecasting/#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)).
+The blend has three learned parts, all fitted on held-out months: one weight per product per lead
+band, shrunk towards equal weights when the overlap is short; a monotone width correction on the
+mixture, as a function of lead (one candidate is the beta-transformed linear pool of Gneiting and
+Ranjan, which the plan has not yet checked in the literature); and the spread of the per-product
+medians as an input, so that disagreement between products widens the interval. The control arm is
+a fixed equal-weight mixture. The studies score both with the PIT histogram and coverage by lead
+band. Other safeguards: a fixed template of
 statistics per product. A wider ensemble spread must not narrow the interval, and XGBoost monotone
 constraints do not guarantee that, because they constrain a prediction against a feature and not
 the difference between two quantiles (both bounds can rise while the gap shrinks). The studies
@@ -354,7 +364,8 @@ code under `studies/` only.
       with and without a spread rescaling. Stage 1 arms: raw megawatts, the PV ratio target, and the
       wind `base_margin`.
     - **C, the chain:** stage 1 median statistics into stage 2 (Design 1 against Design 2 from
-      section 4, and a location-and-scale parameterisation against a free quantile model), with
+      section 4, with the learned blend against a fixed equal-weight mixture, and a location-and-scale
+      parameterisation against a free quantile model), with
       lag-anomaly features built from serving-latency sources, stage 1 power as a feature in A,
       and one lead-bucket arm.
     - **D, perfect-prognosis check:** a stage 1 trained on ENS early leads instead of the analysis.
