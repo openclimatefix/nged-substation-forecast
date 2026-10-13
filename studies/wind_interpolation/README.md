@@ -53,3 +53,27 @@ Production serving and degradation rules are untouched; no shared package logic 
 pass is needed for isolated study scripts. Run study-boundary/tests, lint, typing, Markdown and
 strict docs/link checks before pushing. Review figure text before rendering, inspect PNGs, optimise
 SVGs, and check each published number against the script-generated report.
+
+## Post-hoc direct station check
+
+After the power results, the maintainer suggested the on-disk MIDAS Open nominal 10 m wind speed as
+a direct target. This extension is exploratory. It compares forecast speed directly with
+observations; it does not train extra XGBoost models or use station observations as inputs.
+
+Use every on-disk station with measured SYNOP wind (unit code 1 or 4), valid station coordinates,
+and a complete control-member forecast at its containing H3 cell. Read observations from April 2024
+through December 2025, the available overlap. Compare identical station/forecast/observation keys
+for all three interpolators at day 1 and day 7. Retain calm winds; drop missing, non-finite or
+negative speeds. No station is chosen by error or proximity to a particular wind farm.
+
+SYNOP speed is a 10-minute mean from HH-20 to HH-10. For each hourly observation, average the
+interpolated vector magnitude over that same window using five-point Gauss–Legendre quadrature;
+check ten-point quadrature as a numerical sensitivity. Use observation hours 25–48 and 169–192 after
+each 00:00 run, keeping each averaging window inside its respective lead day. No extrapolation. The
+scalar mean speed is the target, not a gust or a bearing.
+
+Report absolute speed MAE in m/s and smooth-minus-linear differences, with paired whole-month
+bootstrap intervals. There is no fitting-seed variation in this check. Use 95% intervals and 98.75%
+intervals for its four exploratory comparisons, and state that this correction does not remove the
+post-hoc status. Save anonymised station labels and provenance. Surface exposure and cell-to-point
+differences remain; this check cannot establish power-forecast improvement.
