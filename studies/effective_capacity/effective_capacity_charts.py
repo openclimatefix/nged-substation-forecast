@@ -302,7 +302,7 @@ def dot_interval_panel(
     )
     layers: list[alt.Chart] = []
     rules: list[tuple[float, str | None, str, list[int]]] = (
-        ([(0.0, zero_label, ocf.BLACK_1, [])]) if zero_label is not None else []
+        [(0.0, zero_label, ocf.BLACK_1, [])] if zero_label is not None else []
     )
     rules += [(position, label, ocf.BLACK_1, [4, 3]) for position, label in references]
     for position, label, rule_colour, dash in rules:
