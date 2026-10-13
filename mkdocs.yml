@@ -125,8 +125,14 @@ nav:
           - "Is a daily capacity estimate worth building for day-ahead solar forecasts?": studies/forecasts/effective-capacity.md
           - "Which cheap changes lower the production XGBoost forecast's error?": studies/forecasts/quick-wins.md
           - "Production feature faults: diagnosis and forecast effects": studies/forecasts/production-feature-faults.md
-          - "Do wind and radiation fixes improve XGBoost forecasts, and which lean inputs help?": studies/forecasts/fixed-pipeline-lean-features.md
-          - "How well calibrated are the corrected XGBoost forecasts?": studies/forecasts/calibration-diagnostics-1156.md
+          - "Do wind and radiation fixes improve XGBoost forecasts, and which lean inputs help?":
+              - Overview: studies/forecasts/fixed-pipeline-lean-features.md
+              - Pipeline results tables: studies/forecasts/fixed-pipeline-results-tables.md
+              - Input audit tables: studies/forecasts/fixed-pipeline-input-audit-tables.md
+              - Configured feature inventory: studies/forecasts/fixed-pipeline-feature-inventory.md
+          - "How well calibrated are the corrected XGBoost forecasts?":
+              - Overview: studies/forecasts/calibration-diagnostics-1156.md
+              - Supplementary diagnostic tables: studies/forecasts/calibration-diagnostics-1156-tables.md
           - "Can a language model label a solar plant's capacity changes?": studies/forecasts/llm-capacity-labeller.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
