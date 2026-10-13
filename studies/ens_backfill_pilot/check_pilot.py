@@ -321,6 +321,7 @@ def section_physics(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
             f"| {name} | {finite.min():.6g} | {finite.max():.6g} | {means[name]:.6g} | "
             f"{stacked.size - finite.size} |"
         )
+    emit("")
     for name in ("2t", "2d"):
         unit = "KELVIN" if means[name] > 150 else "DEGREES CELSIUS"
         emit(f"{name}: mean {means[name]:.2f} means the values are in {unit}.")

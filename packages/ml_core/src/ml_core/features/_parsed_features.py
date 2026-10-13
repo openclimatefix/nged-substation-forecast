@@ -77,7 +77,8 @@ class LagFeature(BaseLookbackFeature):
     """Represents a parsed lag feature."""
 
     SUFFIX: ClassVar[str] = "lag"
-    base_col: WeatherFeature | Literal["power"]
+    # The model is frozen, so widening the inherited field is safe; ty flags it anyway.
+    base_col: WeatherFeature | Literal["power"]  # ty: ignore[invalid-attribute-override]
 
     def is_leaky(self) -> bool:
         """Power lags are always leaky.

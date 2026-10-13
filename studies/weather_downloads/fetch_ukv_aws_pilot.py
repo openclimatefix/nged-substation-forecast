@@ -47,7 +47,7 @@ import os
 import shutil
 import time
 from collections import defaultdict
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -423,7 +423,7 @@ def _gridded_variable(*, dataset: h5py.File) -> h5py.Dataset:
 
 
 @contextlib.contextmanager
-def _open(*, key: str) -> Iterator[tuple[h5py.File, Any]]:
+def _open(*, key: str) -> Generator[tuple[h5py.File, Any]]:
     """Open one remote file for cached range reads; yield the HDF5 file and the HTTP file."""
     with (
         fsspec.open(
