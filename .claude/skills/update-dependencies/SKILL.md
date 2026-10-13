@@ -103,12 +103,11 @@ maintainer has read the report.
 8. **Write the report, put it in the PR body, tell the maintainer, and wait.**
     - The PR body keeps the package list and gains the report: the fixes made and why, and the
       answer to each question in step 7 for each package that needed one. Say plainly what was not
-      checked.
+      checked. Edit the body from the same scratchpad file with `gh pr edit --body-file`.
     - Add a short list of every behaviour change that affects this repository, good or bad, each
       as one line naming the package and the code it touches, such as "the upgrade of `foo` should
       make our `baz` function roughly twice as fast" or "`foo` now returns rows in a different
-      order, which `baz` relied on". Leave out a change that nothing in the repository
-      uses. Edit the body from the same scratchpad file with `gh pr edit --body-file`.
+      order, which `baz` relied on". Leave out a change that nothing in the repository uses.
     - Mark the PR ready for review only when the maintainer asks.
     - In the chat, give the same report as short bullets, with the PR linked in the form
       `[PR #N (title)](url)`.
