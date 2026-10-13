@@ -143,15 +143,13 @@ def _audit_fit(
     _require(condition=manifest["input_fingerprint"] == frame_manifest["input_fingerprint"])
     _require(condition=completion["source_member_count"] == 51 and completion["sample_count"] == 51)
     files = completion["files"]
-    _require(
-        condition="manifest.json" in files and files["manifest.json"] == pinned["manifest.json"]
-    )
+    _require(condition=not {"manifest.json", "complete.json"}.intersection(files))
     actual = {
         str(path.relative_to(root))
         for path in root.rglob("*")
         if path.is_file() or path.is_symlink()
     }
-    _require(condition=actual == set(files) | {"complete.json"})
+    _require(condition=actual == set(files) | {"manifest.json", "complete.json"})
     forecasts = {name for name in files if name.startswith("forecasts/")}
     _require(condition=forecasts == {"forecasts/" + Path(name).name for name in expected})
     _checked_inventory(root=root, files=files)

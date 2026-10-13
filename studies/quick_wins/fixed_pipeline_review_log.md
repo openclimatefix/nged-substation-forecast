@@ -280,3 +280,31 @@ page preserves the exact selected domain counts, precipitation missingness and t
 including lead/era support. Unsupported paired-finite change shares were omitted rather than
 filled with zero. The introduction distinguishes forecast input rows from distinct observed
 hours and the midnight May grouping marker from the deferred 06:00 operational-cycle comparison.
+
+A further pre-execution cross-check caught a mismatch between the verifier and the fitter's
+completion inventory: the fitter fingerprints `manifest.json` separately and omits it from
+`complete.json`'s artifact list. The root confirmed the producer's code and reviewed the correction
+before any verifier run. Both manifest files are now checked separately and included in the exact
+on-disk inventory. No fitting or scoring result required a rerun.
+
+The supplementary feature registry preserves the inventory script's exact ordered lists and
+counts, with an explicit warning that configured conditional recipes were not necessarily fitted.
+The new study index links describe scope without extending any result claim.
+
+An interim full-text privacy scan found short numeric identifier collisions in ordinary code,
+aggregate counts and SVG geometry. Redacted source-field and line diagnostics distinguished these
+from names, spatial indexes and private free text, for which no matches were found. Three rounded
+polygon-coordinate tokens coincided with the Fold B G3 statistics; the root verified their
+independent origin in the aggregate scoring report. These are context checks, rather than a
+blanket exemption for numeric identifiers. A final scan and manual figure inspection remain due.
+
+After the baseline training queue exited successfully and an independent GPU check found no
+active compute process, the root launched the freshly reviewed 114-fit main feature wrapper.
+Its pinned first-lean, first-solar and independent-addition queues remain separate from the
+conditional later solar rungs and the sensitivity gate. The Part 2 Fold B sensitivity diagnostic
+and both reviewed aggregate publication extracts completed. The parent Fold B sensitivity scorer
+is running. A separate required study-suite run follows the verifier inventory correction.
+
+The private publication-copy helper was reviewed again after adding source-specific, hash-bound
+numeric collision diagnostics and exclusive mode-0600 diagnostic output. The root launched only
+its redacted preflight mode; no public configuration copying or numeric exemption was authorized.
