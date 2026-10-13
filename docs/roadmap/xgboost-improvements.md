@@ -28,7 +28,7 @@ concentrated at day 0–2 (persistence-like anchors); ECMWF ENS steps drop from 
 beyond 144 h, so interpolation quality matters most exactly where users look; and by day 7–10 the
 control member is an increasingly unrepresentative sample of the ensemble.
 
-The interval convention matters as much as resolution. Radiation now uses
+The interval convention matters as much as resolution. Radiation uses
 [interval-aware radiation resampling](../architecture/nwp-variable-conventions.md#radiation-resampling).
 Wind components are interpolated before speed and bearing are derived. Precipitation still needs
 interval-aware handling. The remaining changes are [part of the data-handling work below](#fix-the-nwp-resample-to-honour-the-variable-conventions).
@@ -60,12 +60,12 @@ nulls the de-accumulated ECMWF variables carry are the one case the guarantee ge
 argument: [Inherent Stability → Default directions, and their
 limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
 
-**The null-covered case is narrower than it sounds, because most nulls never reach the model as
-nulls at all.** Only *leading and trailing* nulls reach the model as nulls:
-`_upsample_nwp_to_half_hourly` already interpolates interior ones away (see [the null-filling
-item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)), and the scattered
-per-pixel corruption mostly never becomes a null in the first place, because the ingest renormalises
-each H3 cell over the grid points that arrived.
+**The null patterns reaching the forecasting model depend on the variable.** Radiation preserves
+missing native windows, including interior gaps. Generic numeric interpolation can fill interior
+source nulls, leaving leading and trailing gaps (see [the null-filling
+item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)). Scattered per-pixel
+corruption mostly never becomes a null, because ingest renormalises each H3 cell over the grid
+points that arrived.
 
 ## Before anything else — fix how the NWP variables are interpreted
 

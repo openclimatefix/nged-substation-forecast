@@ -7,18 +7,57 @@ native windows stay missing. Policies and worked plots:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling>.
 """
 
+import logging
 from datetime import timedelta
+from functools import partial
 from itertools import pairwise
 from math import pi
 from typing import Final
 
 import polars as pl
-from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS
+from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, NwpModelId
+
+logger = logging.getLogger(__name__)
 
 SHORT_WAVE: Final[str] = "downward_short_wave_radiation_flux_surface"
 LONG_WAVE: Final[str] = "downward_long_wave_radiation_flux_surface"
 RADIATION_COLUMNS: Final[frozenset[str]] = frozenset({SHORT_WAVE, LONG_WAVE})
-DAYLIGHT_FLOOR_W_M2: Final[float] = 1.0
+DAYLIGHT_FLOOR_W_M2: Final[float] = 20.0
+"""Minimum native clear-sky mean for an index to influence neighbouring windows.
+
+This conditioning threshold excludes weak dawn/dusk denominators. Excluded windows retain their
+own energy; neither radiation values nor usable clear-sky indices are clipped.
+"""
+
+
+def _check_radiation_schedule(frame: pl.DataFrame, *, strict: bool) -> pl.DataFrame:
+    """Reject unsupported native support in research; name the fault and leave nulls in serving.
+
+    Validation runs on native batches during collection, before expansion. Missing scheduled rows
+    are allowed; an off-schedule timestamp or unknown weather source cannot define a window width.
+    """
+    supported = (pl.col("valid_time") - pl.col("nwp_init_time")).is_in(
+        [timedelta(hours=lead) for lead in ECMWF_ENS_LEAD_TIME_HOURS]
+    )
+    if "nwp_model_id" in frame:
+        supported &= pl.col("nwp_model_id") == NwpModelId.ECMWF_ENS_0_25_degree.name
+    invalid = frame.filter(~supported.fill_null(False))
+    if not invalid.is_empty():
+        identity = [
+            name for name in ("nwp_model_id", "nwp_init_time", "valid_time") if name in frame
+        ]
+        examples = invalid.select(identity).unique().head(5).to_dicts()
+        message = (
+            f"unsupported_radiation_schedule: {invalid.height} native rows in this batch have "
+            f"unsupported source/lead times; examples: {examples}. "
+            "Radiation requires ECMWF ENS scheduled native windows."
+        )
+        if strict:
+            raise ValueError(message)
+        logger.warning(message)
+        # Exclude unknown sources as well as off-schedule rows before applying ECMWF widths.
+        frame = frame.filter(supported.fill_null(False))
+    return frame
 
 
 def _half_hour_clear_sky(*, targets: pl.LazyFrame, coordinates: pl.LazyFrame) -> pl.LazyFrame:
@@ -86,14 +125,7 @@ def _half_hour_clear_sky(*, targets: pl.LazyFrame, coordinates: pl.LazyFrame) ->
         sky.with_columns(
             _day_start=(pl.col("_clear_sky") > 0)
             & (
-                (pl.col("_clear_sky").shift().over("time_series_id", order_by="valid_time") <= 0)
-                | (
-                    (
-                        pl.col("valid_time")
-                        - pl.col("valid_time").shift().over("time_series_id", order_by="valid_time")
-                    )
-                    != timedelta(minutes=30)
-                )
+                pl.col("_clear_sky").shift().over("time_series_id", order_by="valid_time") <= 0
             ).fill_null(True)
         )
         .with_columns(
@@ -164,31 +196,53 @@ def _shape_short_wave(
         _target_second=pl.col("valid_time").dt.epoch("s") - 900,
     )
     interpolation_keys = [*group_cols, "_segment", "_daylight_block"]
-    anchors = (
-        targets.filter(
-            (pl.col("_clear_sky") > 0)
-            & pl.col(SHORT_WAVE).is_not_null()
-            & (pl.col("_native_clear_sky") >= DAYLIGHT_FLOOR_W_M2)
-        )
-        .select(
-            *interpolation_keys,
-            "_anchor_second",
-            _ratio=pl.col(SHORT_WAVE) / pl.col("_native_clear_sky"),
-        )
-        .unique()
+    knots = targets.group_by(*interpolation_keys, "_window_end").agg(
+        _anchor_second=pl.col("_anchor_second").first(),
+        _ratio=(
+            pl.when(pl.col("_native_clear_sky") >= DAYLIGHT_FLOOR_W_M2)
+            .then(pl.col(SHORT_WAVE) / pl.col("_native_clear_sky"))
+            .filter(pl.col("_clear_sky") > 0)
+            .first()
+        ),
     )
-    shaped = targets.sort("_target_second")
-    for strategy, label in (("backward", "earlier"), ("forward", "later")):
-        shaped = shaped.join_asof(
-            anchors.rename(
-                {"_anchor_second": f"_{label}_second", "_ratio": f"_{label}_ratio"}
-            ).sort(f"_{label}_second"),
-            left_on="_target_second",
-            right_on=f"_{label}_second",
-            by=interpolation_keys,
-            strategy=strategy,
-            check_sortedness=False,
-        )
+    # Find neighbouring usable indices on the native-window table. A window can contribute to
+    # two daylight blocks; its midpoint remains the anchor in each block. Source segments keep
+    # forward/backward fills from crossing missing windows.
+    for shift, label, fill in ((1, "earlier", "forward"), (-1, "later", "backward")):
+        for column, suffix in (
+            (pl.col("_ratio"), "ratio"),
+            (pl.when(pl.col("_ratio").is_not_null()).then(pl.col("_anchor_second")), "second"),
+        ):
+            shifted = column.shift(shift)
+            neighbour = shifted.forward_fill() if fill == "forward" else shifted.backward_fill()
+            knots = knots.with_columns(
+                **{
+                    f"_{label}_{suffix}": neighbour.over(
+                        interpolation_keys, order_by="_anchor_second"
+                    )
+                }
+            )
+    shaped = targets.join(
+        knots.drop("_anchor_second"),
+        on=[*interpolation_keys, "_window_end"],
+        how="left",
+    )
+    before_anchor = pl.col("_target_second") < pl.col("_anchor_second")
+    own_second = pl.when(pl.col("_ratio").is_not_null()).then(pl.col("_anchor_second"))
+    shaped = shaped.with_columns(
+        _earlier_second=pl.when(before_anchor)
+        .then(pl.col("_earlier_second"))
+        .otherwise(pl.coalesce(own_second, pl.col("_earlier_second"))),
+        _earlier_ratio=pl.when(before_anchor)
+        .then(pl.col("_earlier_ratio"))
+        .otherwise(pl.coalesce("_ratio", "_earlier_ratio")),
+        _later_second=pl.when(before_anchor)
+        .then(pl.coalesce(own_second, pl.col("_later_second")))
+        .otherwise(pl.col("_later_second")),
+        _later_ratio=pl.when(before_anchor)
+        .then(pl.coalesce("_ratio", "_later_ratio"))
+        .otherwise(pl.col("_later_ratio")),
+    )
     span = pl.col("_later_second") - pl.col("_earlier_second")
     ratio = (
         pl.when(span > 0)
@@ -314,7 +368,11 @@ def _shape_long_wave(*, targets: pl.LazyFrame, group_cols: list[str]) -> pl.Lazy
 
 
 def _resample_radiation(
-    *, native: pl.LazyFrame, group_cols: list[str], solar_coordinates: pl.LazyFrame | None
+    *,
+    native: pl.LazyFrame,
+    group_cols: list[str],
+    solar_coordinates: pl.LazyFrame | None,
+    strict_schedule: bool = True,
 ) -> pl.LazyFrame:
     """Return half-hour radiation features over supported backward native windows.
 
@@ -322,15 +380,21 @@ def _resample_radiation(
         native: Original native samples, with `nwp_init_time` and weather columns.
         group_cols: Identity columns separating independent weather trajectories.
         solar_coordinates: Unique latitude/longitude by time_series_id; required for short-wave.
+        strict_schedule: Raise on unsupported source/lead times; otherwise log and leave nulls.
 
     Returns:
         Group keys, target valid_time and reconstructed radiation, in the original numeric dtypes.
     """
     schema = native.collect_schema()
     radiation = sorted(RADIATION_COLUMNS.intersection(schema.names()))
-    targets = _native_targets(
-        native=native.select(*group_cols, "valid_time", *radiation), group_cols=group_cols
+    checked = native.select(*group_cols, "valid_time", *radiation).map_batches(
+        partial(_check_radiation_schedule, strict=strict_schedule),
+        predicate_pushdown=False,
+        projection_pushdown=False,
+        slice_pushdown=False,
+        streamable=True,
     )
+    targets = _native_targets(native=checked, group_cols=group_cols)
     if LONG_WAVE in radiation:
         targets = _shape_long_wave(targets=targets, group_cols=group_cols)
     if SHORT_WAVE in radiation:

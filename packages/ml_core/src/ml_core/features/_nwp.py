@@ -136,7 +136,10 @@ def _join_nwp_single_run(
 
 
 def _upsample_nwp_to_half_hourly(
-    nwp_lf: pl.LazyFrame, *, solar_coordinates: pl.LazyFrame | None = None
+    nwp_lf: pl.LazyFrame,
+    *,
+    solar_coordinates: pl.LazyFrame | None = None,
+    strict_radiation_schedule: bool = True,
 ) -> pl.LazyFrame:
     """Resample weather to half-hours within each independent run/member/series.
 
@@ -145,13 +148,15 @@ def _upsample_nwp_to_half_hourly(
     interpolating polynomial (PCHIP) interpolation through native means placed at interval
     midpoints, evaluated at half-hour midpoints.
     Source-missing radiation windows stay null. Other numeric fields use point interpolation and
-    categories use forward fill; both retain their existing interior-null filling behavior.
+    categories use forward fill; both can fill interior source nulls.
     Radiation policy and explanatory plots:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling>.
 
     Args:
         nwp_lf: Original native NWP with init_time renamed to nwp_init_time.
         solar_coordinates: Site latitude/longitude by time_series_id, required for short-wave.
+        strict_radiation_schedule: Raise on unsupported radiation source/lead times. Serving passes
+            False to log the fault and retain null radiation over unsupported windows.
 
     Returns:
         A lazy half-hourly frame with the original columns and numeric dtypes.
@@ -214,7 +219,10 @@ def _upsample_nwp_to_half_hourly(
     radiation_cols = sorted(RADIATION_COLUMNS.intersection(schema_names))
     if radiation_cols:
         radiation = _resample_radiation(
-            native=nwp_lf, group_cols=group_cols, solar_coordinates=solar_coordinates
+            native=nwp_lf,
+            group_cols=group_cols,
+            solar_coordinates=solar_coordinates,
+            strict_schedule=strict_radiation_schedule,
         )
         upsampled = (
             upsampled.drop(radiation_cols)

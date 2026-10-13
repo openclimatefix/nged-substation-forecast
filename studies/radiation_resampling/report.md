@@ -8,6 +8,8 @@ The energy centroid is the average half-hour midpoint weighted by radiation ener
 Centroid shifts include all 48 half-hours and are relative to the synthetic reference.
 Positive shifts mean later. These checks do not measure forecast skill.
 The cloud-transition reference uses 85% of clear sky before noon and 20% afterwards.
+The different-shape reference uses 70% of Ineichen clear sky at sea level, Linke turbidity 3.
+Production short-wave shaping always uses Haurwitz; the other short-wave references use Haurwitz.
 Short-wave conserves each native mean. Long-wave evaluates a piecewise cubic Hermite
 interpolating polynomial (PCHIP) at half-hour midpoints without enforcing interval energy.
 Neither method recovers unknown sub-window changes.
@@ -17,5 +19,6 @@ Neither method recovers unknown sub-window changes.
 | Short-wave, constant attenuation | 3 | 104.221438 | 0.000002 | 1.245899 | 0.000434 |
 | Short-wave, constant attenuation | 6 | 125.526932 | 0.000002 | 2.726965 | 0.003228 |
 | Short-wave, sunny morning (85%) / dull afternoon (20%) | 3 | 145.972608 | 0.000001 | 1.113304 | -0.100711 |
+| Short-wave, different clear-sky reference | 3 | 106.153048 | 0.000005 | 1.247465 | 0.001462 |
 | Long-wave | 3 | 9.324748 | 0.978648 | 0.045120 | -0.009471 |
 | Long-wave | 6 | 12.381561 | 3.638646 | -0.000000 | -0.035213 |

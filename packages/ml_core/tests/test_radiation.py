@@ -297,7 +297,7 @@ def test_midpoint_index_final_shape_and_missing_gap_isolation() -> None:
     native = _native(start=start, leads=list(range(0, 25, 3)), short_wave=[None, *means.tolist()])
     result = _resample(native)[SHORT_WAVE].to_numpy()[1:]
     # Independently construct the daylight interpolation and normalise each six-target window.
-    daylight = sky.reshape(8, 6).mean(axis=1) >= 1
+    daylight = sky.reshape(8, 6).mean(axis=1) >= 20
     midpoints = np.arange(1.5, 24, 3)[daylight]
     ratios = (
         np.array(native[SHORT_WAVE].to_list()[1:])[daylight]
@@ -409,7 +409,8 @@ def test_northern_summer_daylight_blocks_and_group_isolation() -> None:
 def test_unsupported_lead_and_long_wave_without_coordinates() -> None:
     start = datetime(2026, 6, 1, tzinfo=UTC)
     native = _native(start=start, leads=[0, 4], short_wave=[None, 100.0])
-    assert _resample(native)[SHORT_WAVE].null_count() == 9
+    with pytest.raises(ValueError, match="unsupported_radiation_schedule"):
+        _resample(native)
     native = _native(
         start=start, leads=[0, 3, 6], short_wave=[None, 0.0, 0.0], long_wave=[None, 200.0, 300.0]
     ).drop(SHORT_WAVE)
@@ -417,3 +418,82 @@ def test_unsupported_lead_and_long_wave_without_coordinates() -> None:
     assert result.filter(pl.col("valid_time") == start + timedelta(minutes=30))[LONG_WAVE][0] == 200
     with pytest.raises(ValueError, match="solar_coordinates"):
         _upsample_nwp_to_half_hourly(native.with_columns(pl.lit(0.0).alias(SHORT_WAVE)).lazy())
+
+
+@pytest.mark.parametrize("engine", ["auto", "streaming"])
+def test_weak_dawn_index_cannot_distort_next_window(engine: Literal["auto", "streaming"]) -> None:
+    start = datetime(2026, 4, 5, tzinfo=UTC)
+    times = pl.datetime_range(
+        start + timedelta(minutes=30), start + timedelta(hours=12), interval="30m", eager=True
+    )
+    # Order explicitly: the geometry aggregation need not retain chronological order.
+    sky = (
+        _half_hour_clear_sky(
+            targets=pl.DataFrame({"time_series_id": [1] * len(times), "valid_time": times}).lazy(),
+            coordinates=COORDINATES,
+        )
+        .collect()
+        .sort("valid_time")["_clear_sky"]
+        .to_numpy()
+    )
+    means = sky.reshape(-1, 6).mean(axis=1)
+    assert 1 < means[1] < 2
+    outputs = []
+    for dawn_index in (0.6, 10.0):
+        values = [None, 0.0, means[1] * dawn_index, means[2] * 0.6, means[3] * 0.6]
+        native = _native(start=start, leads=[0, 3, 6, 9, 12], short_wave=values)
+        result = _resample(native, engine=engine)
+        dawn = result.filter(
+            (pl.col("valid_time") > start + timedelta(hours=3))
+            & (pl.col("valid_time") <= start + timedelta(hours=6))
+        )[SHORT_WAVE]
+        assert dawn.mean() == pytest.approx(values[2], abs=2e-6)
+        outputs.append(result.filter(pl.col("valid_time") > start + timedelta(hours=6)))
+    assert_frame_equal(*outputs)
+
+
+@pytest.mark.parametrize("engine", ["auto", "streaming"])
+@pytest.mark.parametrize("unknown_model", [False, True])
+def test_unsupported_schedule_is_reported_and_serving_retains_other_weather(
+    engine: Literal["auto", "streaming"], unknown_model: bool, caplog: pytest.LogCaptureFixture
+) -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start, leads=[0, 3 if unknown_model else 4], short_wave=[None, 100.0]
+    ).with_columns(temperature_2m=pl.Series([10.0, 20.0], dtype=pl.Float32))
+    if unknown_model:
+        native = native.with_columns(nwp_model_id=pl.lit("unsupported_source"))
+    with pytest.raises(ValueError, match="unsupported_radiation_schedule"):
+        _upsample_nwp_to_half_hourly(native.lazy(), solar_coordinates=COORDINATES).collect(
+            engine=engine
+        )
+    result = _upsample_nwp_to_half_hourly(
+        native.lazy(), solar_coordinates=COORDINATES, strict_radiation_schedule=False
+    ).collect(engine=engine)
+    assert "unsupported_radiation_schedule" in caplog.text
+    assert str(start.year) in caplog.text
+    assert result[SHORT_WAVE].null_count() == result.height
+    assert result["temperature_2m"].null_count() == 0
+    assert result["temperature_2m"].min() == 10
+    assert result["temperature_2m"].max() == 20
+
+
+@pytest.mark.parametrize("engine", ["auto", "streaming"])
+def test_shared_absent_window_isolates_short_wave_segments(
+    engine: Literal["auto", "streaming"],
+) -> None:
+    start = datetime(2026, 6, 1, tzinfo=UTC)
+    native = _native(
+        start=start, leads=[0, 3, 6, 12, 15], short_wave=[None, 0.0, 10.0, 100.0, 80.0]
+    )
+    changed = native.with_columns(
+        pl.when(pl.col("valid_time") == start + timedelta(hours=6))
+        .then(1000.0)
+        .otherwise(pl.col(SHORT_WAVE))
+        .alias(SHORT_WAVE)
+    )
+    after_gap = pl.col("valid_time") > start + timedelta(hours=9)
+    assert_frame_equal(
+        _resample(native, engine=engine).filter(after_gap),
+        _resample(changed, engine=engine).filter(after_gap),
+    )

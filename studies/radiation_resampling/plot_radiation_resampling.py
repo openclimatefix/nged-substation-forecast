@@ -35,7 +35,9 @@ CURVES: Final[list[str]] = [
 PLOT_DAY: Final[datetime] = datetime(2026, 3, 21, tzinfo=UTC)
 
 
-def reference_means(*, stamps: pl.Series, cloudy_afternoon: bool = False) -> pl.DataFrame:
+def reference_means(
+    *, stamps: pl.Series, cloudy_afternoon: bool = False, alternate_clear_sky: bool = False
+) -> pl.DataFrame:
     """Prescribe half-hour means at an invented coordinate, using two midpoint samples."""
     short_wave, long_wave = [], []
     for offset in (450, 1350):
@@ -50,7 +52,17 @@ def reference_means(*, stamps: pl.Series, cloudy_afternoon: bool = False) -> pl.
             + samples.dt.second().to_numpy() / 3600
         )
         attenuation = np.where(hour < 12, 0.85, 0.2) if cloudy_afternoon else 0.7
-        short_wave.append(attenuation * 1098 * cosine * np.exp(-0.059 / np.maximum(cosine, 1e-12)))
+        if alternate_clear_sky:
+            zenith = position["apparent_zenith"].to_numpy()
+            clear_sky = pvlib.clearsky.ineichen(
+                apparent_zenith=zenith,
+                airmass_absolute=pvlib.atmosphere.get_relative_airmass(zenith=zenith),
+                linke_turbidity=3.0,
+                altitude=0,
+            )["ghi"]
+        else:
+            clear_sky = 1098 * cosine * np.exp(-0.059 / np.maximum(cosine, 1e-12))
+        short_wave.append(attenuation * clear_sky)
         long_wave.append(310 + 30 * np.cos(2 * np.pi * (hour - 15) / 24))
     return pl.DataFrame(
         {
@@ -143,6 +155,14 @@ def main() -> None:
         "Centroid shifts include all 48 half-hours and are relative to the synthetic reference.",
         "Positive shifts mean later. These checks do not measure forecast skill.",
         "The cloud-transition reference uses 85% of clear sky before noon and 20% afterwards.",
+        (
+            "The different-shape reference uses 70% of Ineichen clear sky at sea level, "
+            "Linke turbidity 3."
+        ),
+        (
+            "Production short-wave shaping always uses Haurwitz; "
+            "the other short-wave references use Haurwitz."
+        ),
         "Short-wave conserves each native mean. Long-wave evaluates a piecewise cubic Hermite",
         (
             "interpolating polynomial (PCHIP) at half-hour midpoints "
@@ -157,14 +177,17 @@ def main() -> None:
         ),
         "|---|---|---|---|---|---|",
     ]
-    for field, label, width, cloudy in (
-        (SHORT_WAVE, "Short-wave, constant attenuation", 3, False),
-        (SHORT_WAVE, "Short-wave, constant attenuation", 6, False),
-        (SHORT_WAVE, "Short-wave, sunny morning (85%) / dull afternoon (20%)", 3, True),
-        (LONG_WAVE, "Long-wave", 3, False),
-        (LONG_WAVE, "Long-wave", 6, False),
+    for field, label, width, cloudy, alternate in (
+        (SHORT_WAVE, "Short-wave, constant attenuation", 3, False, False),
+        (SHORT_WAVE, "Short-wave, constant attenuation", 6, False, False),
+        (SHORT_WAVE, "Short-wave, sunny morning (85%) / dull afternoon (20%)", 3, True, False),
+        (SHORT_WAVE, "Short-wave, different clear-sky reference", 3, False, True),
+        (LONG_WAVE, "Long-wave", 3, False, False),
+        (LONG_WAVE, "Long-wave", 6, False, False),
     ):
-        truth = reference_means(stamps=stamps, cloudy_afternoon=cloudy)
+        truth = reference_means(
+            stamps=stamps, cloudy_afternoon=cloudy, alternate_clear_sky=alternate
+        )
         comparison, native = reconstruct(truth=truth, width=width)
         assert comparison.height == 48
         expected = comparison[field].to_numpy()
@@ -187,7 +210,7 @@ def main() -> None:
             float(np.sum(hours * values) / values.sum() - np.sum(hours * expected) / expected.sum())
             for values in (before, after)
         ]
-        if field == SHORT_WAVE and not cloudy:
+        if field == SHORT_WAVE and not cloudy and not alternate:
             assert abs(shifts[1]) < 0.15
             assert shifts[0] > 1
         report.append(
@@ -238,6 +261,8 @@ def main() -> None:
                 text=(
                     "Short-wave: sunny morning / dull afternoon"
                     if cloudy
+                    else "Short-wave: different clear-sky reference"
+                    if alternate
                     else f"{label}: {width}-hour native means"
                 ),
                 subtitle=[
@@ -249,6 +274,8 @@ def main() -> None:
                             )
                         ]
                         if cloudy
+                        else ["3-hour native means; reference uses 70% of Ineichen clear sky."]
+                        if alternate
                         else []
                     ),
                     (
@@ -282,7 +309,7 @@ def main() -> None:
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(vlc.vegalite_to_svg(chart.to_dict()))
-    args.output.with_suffix(".png").write_bytes(vlc.vegalite_to_png(chart.to_dict(), scale=1.2))
+    args.output.with_suffix(".png").write_bytes(vlc.vegalite_to_png(chart.to_dict(), scale=1.0))
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text("\n".join(report) + "\n")
     print("\n".join(report))

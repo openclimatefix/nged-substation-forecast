@@ -209,7 +209,10 @@ Oceanic and Atmospheric Administration (NOAA), including longitude and equation 
 Haurwitz clear-sky irradiance. Two 15-minute midpoint samples
 supply each backward half-hour mean. Averaging these half-hours supplies the matching native-window
 clear-sky mean. The native radiation divided by that mean is the clear-sky index, anchored at the
-native window midpoint. Windows with a clear-sky mean of at least 1 W/m² supply indices.
+native window midpoint. Windows with a clear-sky mean of at least 20 W/m² supply indices.
+The threshold is a conditioning safeguard, not a measured optimum: a small denominator can turn
+modest diffuse light into an extreme index that distorts the next daylight window. Weaker windows
+retain their supplied energy but do not supply indices to neighbouring windows.
 
 **Interpolation stays within a supported daylight block.** The index varies linearly between
 midpoints; before the first usable index and after the last, it holds the nearest index. Solar
@@ -248,14 +251,24 @@ for the shape-preserving derivative rules.
 
 **Missing source windows stay null in both fields.** Lead zero has no preceding window; a finite
 lead-3 mean supports lead 0.5 through 3. Source nulls and absent native rows leave their own windows
-null, including the final window. Unsupported off-schedule source timestamps supply no radiation
-window, while other weather columns retain their existing path. No window borrows values from
-another series, run, or ensemble member. Complete windows are reconstructed before cropping to the
-existing output grid, so a visible tail never receives the whole window's energy.
+null, including the final window. Unsupported source identifiers or off-schedule timestamps fail
+at collection in bulk research mode. Single-run serving logs `unsupported_radiation_schedule`,
+including example source/run/timestamps, and leaves unsupported radiation null while processing
+other weather columns. Native-batch validation runs lazily before window expansion. No window
+borrows values from another series, run, or ensemble member. Complete windows are reconstructed
+before cropping to the existing output grid, so a visible tail never receives the whole window's
+energy.
 
 **Training and inference use the same lazy helper.** Site metadata supplies coordinates for
 short-wave, and geometry is reused across runs and members at matching site/time coordinates.
 Long-wave needs no coordinates. Raw NWP storage and rounding remain unchanged.
+
+**Short-wave neighbour lookup operates on native windows.** Forward/backward fills find usable
+indices within each source segment and daylight block, then a keyed join supplies neighbouring
+anchors to half-hours. The helper avoids sorting and as-of joining the entire half-hour target
+frame. The [bulk resampler benchmark and reproduction
+commands](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/README.md#bulk-resampler-benchmark)
+report in-memory time and whole-process peak RSS, with the scope and scaling limits stated.
 
 **Regenerate engineered caches and retrain before deploying power-forecast models against these
 feature semantics.** Corrected timing and smoother profiles do not establish a forecast-score gain.
@@ -265,7 +278,9 @@ invented coordinate at 52°N, 0°E on 21 March 2026. Short-wave reference means 
 solar geometry and
 70% of Haurwitz clear sky in the constant-attenuation examples. A further 3-hour example uses
 85% before noon and 20% afterwards, representing a sunny morning and dull afternoon.
-Long-wave reference means follow a prescribed smooth daily curve.
+A separate 3-hour example uses 70% of Ineichen clear sky at sea level with fixed Linke turbidity 3,
+so the reference shape differs from production's Haurwitz shape. Long-wave reference means follow
+a prescribed smooth daily curve.
 Aggregating the reference half-hours supplies identical native inputs to point interpolation and
 the production feature pipeline. The plotted middle day has complete 3-hour or 6-hour windows;
 nighttime values remain visible so displaced short-wave energy cannot disappear from the comparison.
@@ -277,6 +292,11 @@ the average half-hour midpoint weighted by that half-hour's radiation energy. Po
 delays the whole-day short-wave energy centroid by 1.25 hours with 3-hour inputs and 2.73 hours with
 6-hour inputs. The new delays are under 12 seconds, with native-window mean errors below 0.000003
 W/m². The reported delays and mean errors describe these synthetic examples, not forecast scores.
+
+**The different-shape example tests timing beyond the matched clear-sky formula.** Its reference
+uses Ineichen clear sky while reconstruction uses Haurwitz. The centroid delay falls from about
+1.25 hours to about 5.3 seconds in this example. The matched-Haurwitz examples are positive controls;
+none of these synthetic cases establishes a bound for other locations, seasons, or cloud profiles.
 
 **The sunny-morning example retains each interval's forecast energy.** The reconstructed profile
 retains the stronger morning and weaker afternoon. Interpolation and rescaling can smooth the noon

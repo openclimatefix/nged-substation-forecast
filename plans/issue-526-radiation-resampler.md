@@ -74,7 +74,7 @@ Use the study's Haurwitz coefficient 0.059; its expression is the implementation
 than the roadmap's illustrative 0.057. Reference independent geometry in tests before choosing a
 documented accuracy tolerance near sunrise/sunset.
 
-For finite short-wave windows with a clear-sky mean of at least 1 W/m², divide the native radiation
+For finite short-wave windows with a clear-sky mean of at least 20 W/m², divide the native radiation
 mean by the clear-sky mean and anchor the resulting index at the native window midpoint. Interpolate
 ratios in actual elapsed time at target midpoints inside contiguous supported daylight blocks. Detect
 support gaps from scheduled-window adjacency, not just adjacency among surviving daylight anchors.
@@ -136,10 +136,10 @@ metadata provides finite coordinates. A missing coordinate in a short-wave helpe
 programmer input, not a weather-absence degradation; do not silently change its reconstruction.
 Reject duplicate keys and malformed programmer input at the existing boundaries. Do not claim
 that `Nwp.validate` already rejects off-schedule leads: the completeness report tolerates them.
-Join to supported scheduled widths and leave unsupported radiation windows null, retaining the
-existing grid and non-radiation path. Introduce neither a new serving exception for off-schedule
-weather nor an eager full-NWP validation pass. Do not introduce an eager collect to
-emit per-row warnings. Document the fallback and expose counts in the regression/diagnostic report;
+Validate native batches lazily at collection. Bulk research raises on unsupported source/lead
+pairs; single-run serving logs `unsupported_radiation_schedule` and leaves those windows null,
+retaining the existing grid and non-radiation path. Missing scheduled windows are allowed. Introduce
+neither a serving exception for off-schedule weather nor an eager full-NWP validation pass. Document the fallback and expose counts in the regression/diagnostic report;
 new operational degradation columns and general imputation monitoring are separate work.
 
 ## Changes by file
@@ -277,7 +277,7 @@ validate Markdown, diff whitespace and the plan/PR scope; no production tests ar
 - Preserve positive all-dark source means or discard them? Recommendation: preserve energy with
   constant fallback, report the anomaly, and never pretend exact zero-night and strict conservation
   can both hold for contradictory source data.
-- Solar approximation accuracy and daylight floor: recommend 1 W/m² for usable native denominators,
+- Solar approximation accuracy and daylight floor: use 20 W/m² for usable native denominators,
   15-minute midpoint integration and independent pvlib reference checks in tests only. Establish
   explicit geometry/timing tolerances before implementation; do not copy the study's pandas path.
 - Missing-window behavior differs from current accidental filling. Recommendation: intentionally
@@ -320,3 +320,17 @@ No correctness findings were rejected. The native radiation upper bound was chec
 `AllFeatures` imposes no matching bound, so solar-shaped half-hours above the native mean are not a
 contract defect and must not be clipped merely to satisfy the native schema. No implementation code
 has been written.
+
+
+## Approved response to the external review
+
+Use a 20 W/m² conditioning floor for cross-window short-wave anchors; retain each excluded
+window's energy. The floor is a safeguard, not an empirically tuned optimum. Source-segment keys
+own missing-window isolation, so remove the duplicate temporal-gap check from solar daylight
+segmentation. Check unsupported source/schedule pairs lazily, fail in bulk research, and log with
+null radiation in serving. Include the radiation helper in source provenance, reuse `SHORT_WAVE`,
+and keep coordinates optional for non-short-wave callers. Retain historical measurement context.
+Add an Ineichen reference alongside the matched-Haurwitz positive controls. Benchmark the
+in-memory bulk resampler against point interpolation and the pre-review implementation, with
+identical inputs, fixed thread counts, interleaved fresh-process repetitions, elapsed collection
+time, and whole-process peak RSS. Run fresh correctness and detailed prose reviews after fixes.

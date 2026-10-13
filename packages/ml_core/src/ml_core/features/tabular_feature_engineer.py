@@ -53,6 +53,7 @@ from ml_core.features._parsed_features import (
     LagFeature,
     ParsedFeatures,
 )
+from ml_core.features._radiation import SHORT_WAVE
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
 
 logger = logging.getLogger(__name__)
@@ -282,11 +283,15 @@ def _engineer_features(
         _renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
         solar_coordinates = (
             metadata_lf.select("time_series_id", "latitude", "longitude")
-            if "downward_short_wave_radiation_flux_surface" in _renamed.collect_schema()
+            if SHORT_WAVE in _renamed.collect_schema()
             else None
         )
         _upsampled = _derive_wind_features(
-            _upsample_nwp_to_half_hourly(_renamed, solar_coordinates=solar_coordinates)
+            _upsample_nwp_to_half_hourly(
+                _renamed,
+                solar_coordinates=solar_coordinates,
+                strict_radiation_schedule=power_fcst_init_time is None,
+            )
         )
         processed_nwp: pl.LazyFrame | None = _upsampled.with_columns(
             nwp_lead_time_hours=(

@@ -245,7 +245,7 @@ def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
         window_end=train_end,
         init_time_start=_EARLY_INIT_TIME,
     )
-    # _EARLY_INIT_TIME's partition is still in scope, but its valid times (04-01 10:00-12:00) fall
+    # _EARLY_INIT_TIME's partition is still in scope, but its valid times (04-01 06:00-12:00) fall
     # before this window's start, so only the valid_time >= window_start filter can drop them.
     assert _EARLY_INIT_TIME not in nwp_after_early_cluster.collect()["init_time"].unique().to_list()
 
@@ -340,7 +340,9 @@ def test_power_lag_near_window_start_is_non_null_with_lookback(
         )
         .collect()
     )
-    assert features_no_lookback["power_lag_336h"].to_list() == [None]
+    assert features_no_lookback.filter(pl.col("valid_time") == target_valid_time)[
+        "power_lag_336h"
+    ].to_list() == [None]
 
     power_with_lookback, nwp_with_lookback = load_engineering_inputs(
         settings, [1], metadata, window_start, window_end, power_lookback=timedelta(hours=336)
@@ -355,9 +357,15 @@ def test_power_lag_near_window_start_is_non_null_with_lookback(
         )
         .collect()
     )
-    # One row, not two: the widened power scan adds no spine rows, because power is left-joined
-    # onto the NWP-derived spine rather than being the spine.
-    assert features_with_lookback["power_lag_336h"].to_list() == [historical_power]
+    # Widening the power scan adds no spine rows: only the native weather support sets the grid.
+    assert (
+        features_with_lookback["valid_time"]
+        .sort()
+        .equals(features_no_lookback["valid_time"].sort())
+    )
+    assert features_with_lookback.filter(pl.col("valid_time") == target_valid_time)[
+        "power_lag_336h"
+    ].to_list() == [historical_power]
 
 
 def _fold_run(client: MlflowClient) -> Run:

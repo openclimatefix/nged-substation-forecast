@@ -23,6 +23,7 @@ from deltalake import DeltaTable
 from ml_core.features._lags import _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature
+from ml_core.features._radiation import _resample_radiation
 from ml_core.features.tabular_feature_engineer import _apply_local_time_features
 from studies.power import CLEANED_POWER_DELTA_URI, scan_power
 from studies.solar import zenith
@@ -668,6 +669,7 @@ def main() -> None:
         inspect.getfile(f)
         for f in (
             _upsample_nwp_to_half_hourly,
+            _resample_radiation,
             _nullify_leaky_lags,
             _apply_local_time_features,
             zenith,
