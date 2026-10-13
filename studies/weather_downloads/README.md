@@ -72,6 +72,16 @@ way):
   only into `_trial/`. A second request re-fetches 2024-01 for the wind-farm cells so that the
   validator can check bit-equality with `ERA5/wind_native_cds.parquet`. `era5_cells.py` holds the
   tested chunk and cell helpers.
+- `fetch_era5_stage1_box_arco.py` and `validate_era5_stage1_box.py` — hourly ERA5 from 2019-09-01
+  to 2026-07-31 for the staged probabilistic forecast's stage 1: 2 m temperature and dewpoint, 10 m
+  and 100 m wind components, surface and mean-sea-level pressure, total cloud cover, precipitation
+  type, the three accumulated fields `ssrd`, `fdir`, and `strd`, total precipitation, and
+  geopotential at 500 hPa. The cells are the block enclosing the trial-area box, widened by 3 cells
+  in every direction. The values are read from Google's public ARCO-ERA5 zarr store, needs `uv run
+  --with zarr --with gcsfs`, with one parquet file per variable per month under `_month_cache/`.
+  The geopotential array stores all 37 pressure levels in each hourly chunk, so one hour of
+  geopotential reads 80 MB and the variable is fetched with `--variables z` on its own. The
+  validator compares the cells it shares with the held CDS tables.
 - `fetch_midas_open.py` and `validate_midas_open.py` — Met Office MIDAS Open station observations.
 - `fetch_icon_dream.py` — DWD's ICON-DREAM-EU, whole-domain monthly GRIB cropped to the box then
   deleted, needs `uv run --with cfgrib --with eccodes --with requests`.
