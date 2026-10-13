@@ -77,7 +77,8 @@ class LagFeature(BaseLookbackFeature):
     """Represents a parsed lag feature."""
 
     SUFFIX: ClassVar[str] = "lag"
-    # The model is frozen, so widening the inherited field is safe; ty flags it anyway.
+    # The Pydantic model is frozen, so no write can put "power" into a subclass that forbids it.
+    # ty reports `invalid-attribute-override` for any widened attribute, whatever `frozen` says.
     base_col: WeatherFeature | Literal["power"]  # ty: ignore[invalid-attribute-override]
 
     def is_leaky(self) -> bool:
