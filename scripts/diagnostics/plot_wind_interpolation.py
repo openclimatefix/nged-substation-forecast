@@ -228,7 +228,7 @@ def main() -> None:
     )
     FIGURE.parent.mkdir(parents=True, exist_ok=True)
     chart.save(FIGURE.with_suffix(".svg"))
-    chart.save(FIGURE.with_suffix(".png"), scale_factor=2)
+    chart.save(FIGURE.with_suffix(".png"), scale_factor=1.5)
     print((OUTPUT / "report.md").read_text())
 
 
