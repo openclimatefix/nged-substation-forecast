@@ -17,12 +17,12 @@ skill is claimed.
 
 | Sites × runs | Output rows | Variant | Median time (s) | Range (s) | Median peak RSS (MiB) |
 |---|---|---|---|---|---|
-| 10 × 2 | 735,420 | point | 0.061 | 0.059–0.061 | 474.4 |
-| 10 × 2 | 735,420 | before | 0.576 | 0.548–0.584 | 936.1 |
-| 10 × 2 | 735,420 | after | 0.397 | 0.396–0.456 | 687.4 |
-| 50 × 8 | 14,708,400 | point | 1.106 | 1.099–1.138 | 3663.4 |
-| 50 × 8 | 14,708,400 | before | 9.821 | 9.692–10.457 | 6703.4 |
-| 50 × 8 | 14,708,400 | after | 6.657 | 6.613–6.698 | 5240.5 |
+| 10 × 2 | 735,420 | point | 0.058 | 0.052–0.061 | 469.4 |
+| 10 × 2 | 735,420 | before | 0.562 | 0.549–0.581 | 944.2 |
+| 10 × 2 | 735,420 | after | 0.407 | 0.403–0.421 | 693.4 |
+| 50 × 8 | 14,708,400 | point | 1.055 | 1.019–1.070 | 3748.1 |
+| 50 × 8 | 14,708,400 | before | 9.924 | 9.875–10.122 | 6636.1 |
+| 50 × 8 | 14,708,400 | after | 6.706 | 6.652–6.719 | 5289.7 |
 
 **The variants compare different processing policies on the same native means.**
 `point` uses main at `ce7285e4`; `before` uses the radiation PR at `99a40cf5` with

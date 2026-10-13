@@ -60,6 +60,29 @@ def _check_radiation_schedule(frame: pl.DataFrame, *, strict: bool) -> pl.DataFr
     return frame
 
 
+def _check_solar_coordinates(frame: pl.DataFrame) -> pl.DataFrame:
+    """Reject incomplete solar inputs from direct callers before null geometry becomes darkness.
+
+    Reusable-helper validation: production's validated site relation supplies finite coordinates,
+    but direct callers can omit a site or provide null/nonfinite values. Those inputs are programmer
+    errors rather than fully-dark weather windows, so the constant-energy fallback must not apply.
+    """
+    valid = (
+        pl.col("latitude").is_finite()
+        & pl.col("latitude").is_between(-90, 90)
+        & pl.col("longitude").is_finite()
+        & pl.col("longitude").is_between(-180, 180)
+    )
+    invalid = frame.filter(~valid.fill_null(False))
+    if not invalid.is_empty():
+        sites = invalid["time_series_id"].unique().head(5).to_list()
+        raise ValueError(
+            "invalid_solar_coordinates: short-wave requires finite latitude/longitude for "
+            f"every time series; invalid examples: {sites}."
+        )
+    return frame
+
+
 def _half_hour_clear_sky(*, targets: pl.LazyFrame, coordinates: pl.LazyFrame) -> pl.LazyFrame:
     """Evaluate Haurwitz means using two 15-minute midpoint samples per target.
 
@@ -71,6 +94,13 @@ def _half_hour_clear_sky(*, targets: pl.LazyFrame, coordinates: pl.LazyFrame) ->
         targets.select("time_series_id", "valid_time")
         .unique()
         .join(coordinates, on="time_series_id", how="left", validate="m:1")
+        .map_batches(
+            _check_solar_coordinates,
+            predicate_pushdown=False,
+            projection_pushdown=False,
+            slice_pushdown=False,
+            streamable=True,
+        )
         .with_columns(_offset=pl.lit([450, 1350]))
         .explode("_offset")
         .with_columns(_stamp=pl.col("valid_time") - pl.duration(seconds=pl.col("_offset")))

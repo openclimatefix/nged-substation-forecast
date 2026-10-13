@@ -497,3 +497,30 @@ def test_shared_absent_window_isolates_short_wave_segments(
         _resample(native, engine=engine).filter(after_gap),
         _resample(changed, engine=engine).filter(after_gap),
     )
+
+
+@pytest.mark.parametrize("engine", ["auto", "streaming"])
+@pytest.mark.parametrize(
+    "fault", ["missing_site", "null_latitude", "nan_longitude", "infinite_latitude"]
+)
+def test_invalid_solar_coordinates_are_not_treated_as_dark_weather(
+    engine: Literal["auto", "streaming"], fault: str
+) -> None:
+    start = datetime(2026, 3, 21, tzinfo=UTC)
+    native = _native(start=start, leads=[0, 12], short_wave=[None, 400.0])
+    coordinates = pl.DataFrame(
+        {
+            "time_series_id": [2 if fault == "missing_site" else 1],
+            "latitude": [
+                None
+                if fault == "null_latitude"
+                else float("inf")
+                if fault == "infinite_latitude"
+                else 52.0
+            ],
+            "longitude": [float("nan") if fault == "nan_longitude" else 0.0],
+        },
+        schema={"time_series_id": pl.Int64, "latitude": pl.Float64, "longitude": pl.Float64},
+    )
+    with pytest.raises(ValueError, match="invalid_solar_coordinates"):
+        _resample(native, coordinates=coordinates.lazy(), engine=engine)

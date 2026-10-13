@@ -262,6 +262,9 @@ energy.
 **Training and inference use the same lazy helper.** Site metadata supplies coordinates for
 short-wave, and geometry is reused across runs and members at matching site/time coordinates.
 Long-wave needs no coordinates. Raw NWP storage and rounding remain unchanged.
+Direct short-wave callers must supply a complete finite coordinate relation. Missing, null, or
+nonfinite coordinates raise `invalid_solar_coordinates` during collection rather than selecting
+the fully-dark fallback. Production's validated site relation supplies those coordinates.
 
 **Short-wave neighbour lookup operates on native windows.** Forward/backward fills find usable
 indices within each source segment and daylight block, then a keyed join supplies neighbouring
