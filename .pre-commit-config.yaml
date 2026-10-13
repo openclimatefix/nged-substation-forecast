@@ -3,6 +3,8 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        # Unified diffs need the single-space markers on blank context lines.
+        exclude: ^studies/wind_storage/variants/.*\.patch$
       - id: end-of-file-fixer
       - id: check-yaml
       # A Vega/Altair chart exported straight to SVG trips the hook's 500 KB default, because a
