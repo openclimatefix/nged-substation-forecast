@@ -73,6 +73,8 @@ def _write_metadata(path: Path) -> None:
             "time_series_id": pl.Series([1], dtype=pl.Int32),
             "h3_res_5": pl.Series([_TS1_CELL], dtype=pl.UInt64),
             "time_series_type": ["Primary"],
+            "latitude": [53.0] * 1,
+            "longitude": [-0.5] * 1,
         }
     ).write_parquet(path)
 
@@ -285,6 +287,8 @@ def test_cv_power_forecasts_fails_loudly_when_a_trained_series_loses_its_metadat
             "time_series_id": pl.Series([2], dtype=pl.Int32),
             "h3_res_5": pl.Series([_TS1_CELL], dtype=pl.UInt64),
             "time_series_type": ["Primary"],
+            "latitude": [53.0] * 1,
+            "longitude": [-0.5] * 1,
         }
     ).write_parquet(tmp_path / "NGED" / "metadata.parquet")
 

@@ -1,0 +1,323 @@
+{
+  "cpu_model": "AMD EPYC 9124 16-Core Processor",
+  "measurements": [
+    {
+      "label": "after",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.4072636510099983,
+      "peak_rss_mib": 700.83203125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "a51092f843e5ed410ff35ceb3a4317744b1af0f13cf8906a4595f3417883576e",
+        "_radiation.py": "a05e89fb570719f3a85c5d0b9dec0a0f0505935e8c63c87a9f941032d1464359"
+      }
+    },
+    {
+      "label": "after",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.4028165289928438,
+      "peak_rss_mib": 693.390625,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "a51092f843e5ed410ff35ceb3a4317744b1af0f13cf8906a4595f3417883576e",
+        "_radiation.py": "a05e89fb570719f3a85c5d0b9dec0a0f0505935e8c63c87a9f941032d1464359"
+      }
+    },
+    {
+      "label": "after",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.4206225399975665,
+      "peak_rss_mib": 687.69921875,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "a51092f843e5ed410ff35ceb3a4317744b1af0f13cf8906a4595f3417883576e",
+        "_radiation.py": "a05e89fb570719f3a85c5d0b9dec0a0f0505935e8c63c87a9f941032d1464359"
+      }
+    },
+    {
+      "label": "after",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 6.7056989510019775,
+      "peak_rss_mib": 5289.71875,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "a51092f843e5ed410ff35ceb3a4317744b1af0f13cf8906a4595f3417883576e",
+        "_radiation.py": "a05e89fb570719f3a85c5d0b9dec0a0f0505935e8c63c87a9f941032d1464359"
+      }
+    },
+    {
+      "label": "after",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 6.652028739001253,
+      "peak_rss_mib": 5276.05078125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "a51092f843e5ed410ff35ceb3a4317744b1af0f13cf8906a4595f3417883576e",
+        "_radiation.py": "a05e89fb570719f3a85c5d0b9dec0a0f0505935e8c63c87a9f941032d1464359"
+      }
+    },
+    {
+      "label": "after",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 6.718998722004471,
+      "peak_rss_mib": 5422.0703125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "a51092f843e5ed410ff35ceb3a4317744b1af0f13cf8906a4595f3417883576e",
+        "_radiation.py": "a05e89fb570719f3a85c5d0b9dec0a0f0505935e8c63c87a9f941032d1464359"
+      }
+    },
+    {
+      "label": "before",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.5615578120050486,
+      "peak_rss_mib": 944.16796875,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "fdcffd6110ad6fdaff5d1e9e127086b8611dbd73bba9c5ad411cf6dbdfd840ff",
+        "_radiation.py": "8674145d8baa4404171a90e52e544101a2e375e7015da5fac026aaedd29798a4"
+      }
+    },
+    {
+      "label": "before",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.5491306090116268,
+      "peak_rss_mib": 954.91015625,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "fdcffd6110ad6fdaff5d1e9e127086b8611dbd73bba9c5ad411cf6dbdfd840ff",
+        "_radiation.py": "8674145d8baa4404171a90e52e544101a2e375e7015da5fac026aaedd29798a4"
+      }
+    },
+    {
+      "label": "before",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.580693058000179,
+      "peak_rss_mib": 915.65234375,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "fdcffd6110ad6fdaff5d1e9e127086b8611dbd73bba9c5ad411cf6dbdfd840ff",
+        "_radiation.py": "8674145d8baa4404171a90e52e544101a2e375e7015da5fac026aaedd29798a4"
+      }
+    },
+    {
+      "label": "before",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 9.874600379989715,
+      "peak_rss_mib": 6636.0859375,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "fdcffd6110ad6fdaff5d1e9e127086b8611dbd73bba9c5ad411cf6dbdfd840ff",
+        "_radiation.py": "8674145d8baa4404171a90e52e544101a2e375e7015da5fac026aaedd29798a4"
+      }
+    },
+    {
+      "label": "before",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 9.924452994993771,
+      "peak_rss_mib": 6645.45703125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "fdcffd6110ad6fdaff5d1e9e127086b8611dbd73bba9c5ad411cf6dbdfd840ff",
+        "_radiation.py": "8674145d8baa4404171a90e52e544101a2e375e7015da5fac026aaedd29798a4"
+      }
+    },
+    {
+      "label": "before",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 10.122013382992009,
+      "peak_rss_mib": 6567.08203125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "fdcffd6110ad6fdaff5d1e9e127086b8611dbd73bba9c5ad411cf6dbdfd840ff",
+        "_radiation.py": "8674145d8baa4404171a90e52e544101a2e375e7015da5fac026aaedd29798a4"
+      }
+    },
+    {
+      "label": "point",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.05806992299039848,
+      "peak_rss_mib": 475.39453125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "391dd1332cb2621f7c2352fd7ecb6ceb74a11034df35c4c098e88d266ce4df34"
+      }
+    },
+    {
+      "label": "point",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.0607842140016146,
+      "peak_rss_mib": 469.39453125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "391dd1332cb2621f7c2352fd7ecb6ceb74a11034df35c4c098e88d266ce4df34"
+      }
+    },
+    {
+      "label": "point",
+      "sites": 10,
+      "runs": 2,
+      "members": 51,
+      "native_rows": 86700,
+      "output_rows": 735420,
+      "seconds": 0.05198757900507189,
+      "peak_rss_mib": 467.73828125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "391dd1332cb2621f7c2352fd7ecb6ceb74a11034df35c4c098e88d266ce4df34"
+      }
+    },
+    {
+      "label": "point",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 1.0702632289903704,
+      "peak_rss_mib": 3675.0625,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "391dd1332cb2621f7c2352fd7ecb6ceb74a11034df35c4c098e88d266ce4df34"
+      }
+    },
+    {
+      "label": "point",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 1.055272611003602,
+      "peak_rss_mib": 3813.796875,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "391dd1332cb2621f7c2352fd7ecb6ceb74a11034df35c4c098e88d266ce4df34"
+      }
+    },
+    {
+      "label": "point",
+      "sites": 50,
+      "runs": 8,
+      "members": 51,
+      "native_rows": 1734000,
+      "output_rows": 14708400,
+      "seconds": 1.0193901329912478,
+      "peak_rss_mib": 3748.05078125,
+      "polars_version": "2.0.0",
+      "threads": 8,
+      "python": "3.14.7",
+      "cpu": "",
+      "source_hashes": {
+        "_nwp.py": "391dd1332cb2621f7c2352fd7ecb6ceb74a11034df35c4c098e88d266ce4df34"
+      }
+    }
+  ]
+}

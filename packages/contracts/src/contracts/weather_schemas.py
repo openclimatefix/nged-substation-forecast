@@ -348,6 +348,14 @@ class Nwp(pt.Model):
         {"categorical_precipitation_type_surface"}
     )
 
+    radiation_var_names: ClassVar[frozenset[str]] = frozenset(
+        {
+            "downward_short_wave_radiation_flux_surface",
+            "downward_long_wave_radiation_flux_surface",
+        }
+    )
+    """Radiation flux fields, also included in `continuous_var_names` for rounding and plotting."""
+
     deaccumulated_var_names: ClassVar[frozenset[str]] = frozenset(
         {
             "precipitation_surface",
@@ -377,7 +385,7 @@ class Nwp(pt.Model):
 
     @classmethod
     def continuous_var_names(cls) -> frozenset[str]:
-        """Meteorological variable field names suitable for linear interpolation."""
+        """Numeric meteorological field names, including period-ending radiation and rates."""
         return cls.all_weather_var_names() - cls.categorical_var_names
 
     @classmethod

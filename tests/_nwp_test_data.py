@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import polars as pl
-from contracts.weather_schemas import Nwp
+from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, Nwp
 from deltalake import write_deltalake
 from ml_core.features import NWP_PUBLICATION_DELAY_HOURS
 
@@ -69,17 +69,17 @@ def cast_to_nwp_dtypes(frame: pl.DataFrame, *columns: str) -> pl.DataFrame:
 
 
 def half_hours(day: datetime) -> pl.Series:
-    """Half-hourly valid times inside a 00Z run's forecast window, after the publication delay.
+    """Deliverable half-hours through the next native 3-hour boundary of a 00Z run.
 
     The start is derived from ``NWP_PUBLICATION_DELAY_HOURS`` rather than hard-coded: bulk mode
     stamps ``power_fcst_init_time = init_time + NWP_PUBLICATION_DELAY_HOURS`` and drops every
     earlier valid time as a hindcast, so a fixed window silently empties the fixture — and the
     asset then fails with "no usable rows" — if the delay ever grows.
     """
-    first = day.replace(hour=0) + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS + 1)
-    return pl.datetime_range(
-        first, first + timedelta(hours=2), interval="30m", time_zone="UTC", eager=True
-    )
+    init_time = day.replace(hour=0)
+    first = init_time + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS, minutes=30)
+    end = init_time + timedelta(hours=(NWP_PUBLICATION_DELAY_HOURS // 3 + 1) * 3)
+    return pl.datetime_range(first, end, interval="30m", time_zone="UTC", eager=True)
 
 
 def nwp_records(
@@ -91,15 +91,18 @@ def nwp_records(
 ) -> list[dict]:
     """Synthetic, contract-valid ``Nwp`` rows for one (cell, day, members) combination.
 
-    One row per (member, valid_time), all sharing ``init_time``. ``valid_times`` defaults to
-    ``half_hours(day)``; pass it explicitly for a fixture whose valid times need to span multiple
-    days, e.g. to give a forecast a realistic multi-day horizon rather than the couple of hours
-    ``half_hours`` produces. ``init_time`` defaults to ``day`` at 00Z; pass it explicitly for a
-    run that was initialised on an earlier day and forecasts into ``day`` (e.g. to exercise an
-    NWP-lookback window).
+    One row per member and native forecast step, all sharing ``init_time``. The requested target
+    times default to ``half_hours(day)``; native steps bracket that target interval using the
+    ECMWF 3/6-hour schedule. Pass ``valid_times`` for a wider target interval. ``init_time``
+    defaults to ``day`` at 00Z; an earlier initialisation exercises NWP lookback without inventing
+    off-schedule native radiation windows.
     """
     resolved_init_time = init_time if init_time is not None else day.replace(hour=0)
-    resolved_valid_times = valid_times if valid_times is not None else half_hours(day)
+    requested = list(valid_times if valid_times is not None else half_hours(day))
+    schedule = [resolved_init_time + timedelta(hours=lead) for lead in ECMWF_ENS_LEAD_TIME_HOURS]
+    first = max(time for time in schedule if time <= min(requested))
+    last = min(time for time in schedule if time >= max(requested))
+    resolved_valid_times = [time for time in schedule if first <= time <= last]
     ptype = None if resolved_init_time <= _PTYPE_INTRODUCED else 0
     records = []
     for member in members:
@@ -113,6 +116,8 @@ def nwp_records(
                 "categorical_precipitation_type_surface": ptype,
             }
             record.update(NWP_CONTINUOUS_COL_VALUES)
+            if valid_time == resolved_init_time:
+                record.update(dict.fromkeys(Nwp.deaccumulated_var_names))
             records.append(record)
     return records
 

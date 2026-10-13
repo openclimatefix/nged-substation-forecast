@@ -85,7 +85,8 @@ All four columns use metres per second and area-weighted H3 spatial means.
 storage. The wind rows describe derived quantities rather than the current raw column set.
 The final column measures **what the 3 h → 6 h step change costs**: the error, at the held-out
 intermediate steps, from reconstructing the 3-hourly part of the horizon out of a 6-hourly version
-of itself the way the feature pipeline reconstructs half-hourly rows. `MAE/SD` normalises that error
+of itself using point interpolation, as measured before interval-aware radiation resampling.
+`MAE/SD` normalises that error
 by the variable's own spread, so the column is comparable across variables. Measured on the
 2026-08-10 00Z run, scored over the 2,045,304 held-out steps within leads 3–144 h. For the
 period-ending variables the 6-hourly product is *exactly* reproducible by averaging consecutive
@@ -116,13 +117,14 @@ meaningful; their error is the mean circular distance instead.
 
 ## What the half-hourly resample does today
 
-[Issue
-#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
-plans an audit that measures how much each defect below changes the forecast score.
-
 `_upsample_nwp_to_half_hourly` builds a 30-minute grid per `(nwp_init_time, ensemble_member,
-time_series_id)` group, left-joins the native steps onto it, then **linearly interpolates every
-column in `Nwp.continuous_var_names()`** and forward-fills the categorical one.
+time_series_id)` group. **Radiation follows a dedicated interval-aware path.** Other numeric
+fields use point interpolation and the categorical field uses forward fill. Those generic paths
+can fill interior source nulls; radiation preserves its source-missing windows.
+
+`Nwp.continuous_var_names()` remains the numeric-variable set used by storage rounding and dashboard
+plots. Resampling dispatch excludes both radiation columns locally, without changing that shared
+classification.
 
 **Wind components are interpolated before speed and bearing are derived.** The feature pipeline
 computes `sqrt(u² + v²)` and `(atan2(u, v) × 180/π + 180) mod 360` at half-hourly resolution.
@@ -136,8 +138,8 @@ corrupt-feed guard; the contract does not impose a separate 200 m/s bound on vec
 The ingest averages u and v over the contributing grid points of each H3 cell. Different missing
 footprints for u and v would imply different contributing sub-areas.
 
-Period-ending radiation and precipitation still receive ordinary linear interpolation. Their timing
-is a separate repair tracked by [issue #526](https://github.com/openclimatefix/nged-substation-forecast/issues/526).
+Precipitation still receives ordinary linear interpolation. Its interval-aware reconstruction is
+tracked by [issue #1165](https://github.com/openclimatefix/nged-substation-forecast/issues/1165).
 
 ### Interpolate components before deriving speed and bearing
 
@@ -199,24 +201,135 @@ interpolated 10 m bearings and 6.32 % of interpolated 100 m bearings differed ac
 The stored-component pipeline avoids arithmetic interpolation of bearings; downstream calculations
 on derived bearings still require circular handling.
 
-### Period-ending variables are interpolated as though they were instantaneous
+<!-- pyml disable-next-line no-inline-html -->
+<a id="period-ending-variables-are-interpolated-as-though-they-were-instantaneous"></a>
 
-The resample interpolates between `valid_time` stamps, which treats a backward-looking mean as an
-instantaneous reading at the *end* of its window. The reconstructed day is therefore both flattened
-and shifted late — by half the step width, so **3 hours** in the 6-hourly part of the horizon.
-Reconstructing a clear-sky day (Haurwitz clear-sky irradiance at 52.5° N, 1° W, 10 August):
+### Radiation resampling
 
-| step | reconstruction | peak W m⁻² | peak at |
-|---|---|---|---|
-| — | truth (instantaneous) | 816 | 12:00 |
-| 3 h | today's resample | 756 | 15:00 |
-| 6 h | today's resample | 590 | 18:00 |
+**Both radiation fields describe the interval before their timestamp.** The production helper in
+`ml_core.features._radiation` expands each native mean into half-hours inside that backward window.
+The helper obtains widths from the ECMWF lead schedule: 3 hours through lead 144, then 6 hours,
+including `(144, 150]`. Width never comes from the previous available value, which could span
+missing windows.
+The half-hour ending at a native timestamp has a reconstructed feature value, not the original
+3/6-hour mean.
 
-Read the 6-hourly row carefully: the reconstruction is a near-flat plateau from 12:00 to 18:00, and
-the argmax lands at 18:00 only because the two knots differ by about 6%. The honest summary is that
-the modelled solar day is shifted about 3 hours late and its peak cut by a quarter, not that it
-peaks at 18:00. Daily *energy* is preserved (7.18 against 7.20 kWh m⁻²) — it is the shape and the
-timing that are wrong, which is what a PV site responds to.
+**Short-wave uses the sun's daily shape and interpolates cloud attenuation.** The helper evaluates
+[fractional-year solar geometry](https://gml.noaa.gov/grad/solcalc/solareqns.PDF) from the US National
+Oceanic and Atmospheric Administration (NOAA), including longitude and equation of time, then
+Haurwitz clear-sky irradiance. Two 15-minute midpoint samples
+supply each backward half-hour mean. Averaging these half-hours supplies the matching native-window
+clear-sky mean. The native radiation divided by that mean is the clear-sky index, anchored at the
+native window midpoint. Windows with a clear-sky mean of at least 20 W/m² supply indices.
+The threshold is a conditioning safeguard, not a measured optimum: a small denominator can turn
+modest diffuse light into an extreme index that distorts the next daylight window. Weaker windows
+retain their supplied energy but do not supply indices to neighbouring windows.
+
+**Interpolation stays within a supported daylight block.** The index varies linearly between
+midpoints; before the first usable index and after the last, it holds the nearest index. Solar
+night gaps on the half-hour grid separate daylight blocks, even when a short northern summer night
+fits between two native windows that both contain daylight. Missing native windows split the source
+support independently. Each window's index is available to every daylight block that window
+contains, and target means multiply the interpolated index by the half-hour clear-sky mean.
+
+**Every complete short-wave window conserves its supplied energy.** Short-wave target means are
+rescaled so their mean equals the native mean; equivalently, the half-hour energy sum equals native
+mean × native duration. This constraint can introduce boundary steps and does not recover unknown
+sub-window cloud changes. The index is not clipped at 1.
+
+**Fallbacks preserve energy when solar shaping is unusable.** If no usable index exists, distribute
+the native energy in proportion to the half-hour clear-sky means within that window. If all those
+means are zero, retain the source mean as a constant. A positive native mean whose timestamp falls
+after sunset can still describe a window containing daylight. A positive fully-dark source window takes
+the constant fallback, preserving energy rather than claiming both exact nighttime zero and
+conservation. Zero-energy windows output zero.
+
+**Long-wave uses a smooth spline through native-window midpoint means.** Piecewise Cubic Hermite
+Interpolating Polynomial (PCHIP) interpolation preserves local trends without overshooting the
+neighbouring means. The helper evaluates the spline at each half-hour midpoint, holding the nearest
+mean before the first anchor and after the last. Two anchors give linear interpolation; a single
+anchor gives a constant. Thermal radiation depends on atmospheric temperature, humidity, and
+clouds, so long-wave uses no solar shaping.
+
+**Long-wave prioritises smooth features over exact interval energy.** Native interval means act as
+midpoint estimates; spline values evaluated at half-hour midpoints need not average back to each
+original mean. The half-hour features feed an electricity forecasting model. The smoother long-wave
+profile avoids imposing steps at every native boundary. Smoothness does not establish a
+forecast-score gain or recover the
+unknown thermal variation within an interval. See the [PCHIP
+algorithm](https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.PchipInterpolator.html)
+for the shape-preserving derivative rules.
+
+**Missing source windows stay null in both fields.** Lead zero has no preceding window; a finite
+lead-3 mean supports lead 0.5 through 3. Source nulls and absent native rows leave their own windows
+null, including the final window. Unsupported source identifiers or off-schedule timestamps fail
+at collection in bulk research mode. Single-run serving logs `unsupported_radiation_schedule`,
+including example source/run/timestamps, and leaves unsupported radiation null while processing
+other weather columns. Native-batch validation runs lazily before window expansion. No window
+borrows values from another series, run, or ensemble member. Complete windows are reconstructed
+before cropping to the existing output grid, so a visible tail never receives the whole window's
+energy.
+
+**Training and inference use the same lazy helper.** Site metadata supplies coordinates for
+short-wave, and geometry is reused across runs and members at matching site/time coordinates.
+Long-wave needs no coordinates. Raw NWP storage and rounding remain unchanged.
+Direct short-wave callers must supply a complete finite coordinate relation. Missing, null, or
+nonfinite coordinates raise `invalid_solar_coordinates` during collection rather than selecting
+the fully-dark fallback. Production's validated site relation supplies those coordinates.
+
+**Short-wave neighbour lookup operates on native windows.** Forward/backward fills find usable
+indices within each source segment and daylight block, then a keyed join supplies neighbouring
+anchors to half-hours. The helper avoids sorting and as-of joining the entire half-hour target
+frame. The [bulk resampler benchmark and reproduction
+commands](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/README.md#bulk-resampler-benchmark)
+report in-memory time and whole-process peak resident set size (RSS), with the scope and scaling
+limits stated.
+
+**Regenerate engineered caches and retrain before deploying power-forecast models against these
+feature semantics.** Corrected timing and smoother profiles do not establish a forecast-score gain.
+
+**Synthetic examples show interval timing and changing cloud attenuation.** The figure uses an
+invented coordinate at 52°N, 0°E on 21 March 2026. Short-wave reference means use independent pvlib
+solar geometry and
+70% of Haurwitz clear sky in the constant-attenuation examples. A further 3-hour example uses
+85% before noon and 20% afterwards, representing a sunny morning and dull afternoon.
+A separate 3-hour example uses 70% of Ineichen clear sky at sea level with fixed Linke turbidity 3,
+so the reference shape differs from production's Haurwitz shape. Long-wave reference means follow
+a prescribed smooth daily curve.
+Aggregating the reference half-hours supplies identical native inputs to point interpolation and
+the production feature pipeline. The plotted middle day has complete 3-hour or 6-hour windows;
+nighttime values remain visible so displaced short-wave energy cannot disappear from the comparison.
+
+![Short-wave and long-wave before and after resampling.](assets/radiation-resampling.svg)
+
+**The constant-attenuation examples show the short-wave timing correction.** The energy centroid is
+the average half-hour midpoint weighted by that half-hour's radiation energy. Point interpolation
+delays the whole-day short-wave energy centroid by 1.25 hours with 3-hour inputs and 2.73 hours with
+6-hour inputs. The new delays are under 12 seconds, with native-window mean errors below 0.000003
+W/m². The reported delays and mean errors describe these synthetic examples, not forecast scores.
+
+**The different-shape example tests timing beyond the matched clear-sky formula.** Its reference
+uses Ineichen clear sky while reconstruction uses Haurwitz. The centroid delay falls from about
+1.25 hours to about 5.3 seconds in this example. The matched-Haurwitz examples are positive controls;
+none of these synthetic cases establishes a bound for other locations, seasons, or cloud profiles.
+
+**The sunny-morning example retains each interval's forecast energy.** The reconstructed profile
+retains the stronger morning and weaker afternoon. Interpolation and rescaling can smooth the noon
+change or introduce boundary jumps; the native means cannot identify the true cloud-transition time.
+
+**Long-wave PCHIP trades exact interval energy for a smooth profile.** Interval-mean deviations are
+below 0.98 W/m² for 3-hour inputs and 3.64 W/m² for 6-hour inputs in the prescribed daily curve.
+The smooth long-wave reference is one possible underlying curve; the native means cannot identify
+the true thermal variation. The script prints every plotted deviation and centroid shift in
+[its generated
+report](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/report.md).
+
+Reproduce the figure and report from the repository root:
+
+```bash
+uv run python studies/radiation_resampling/plot_radiation_resampling.py
+npx svgo@4 --multipass --precision=1 --final-newline docs/architecture/assets/radiation-resampling.svg
+```
 
 The archive confirms the period-ending reading. Forming the clear-sky index two ways over the
 2026-08-10 00Z run (1671 cells × 51 members, ~2.8 M rows after restricting to those where clear-sky
@@ -242,7 +355,7 @@ for lead time: comparing the native 3-hourly steps of days 1–6 against a 6-hou
 same steps, the mean daily temperature range falls from **6.09 °C to 5.37 °C — an 11.9%
 compression**.
 
-Unlike the other two defects this one has no exact fix. The diurnal cycle is not a pure sinusoid:
+This information loss has no exact interpolation fix. The diurnal cycle is not a pure sinusoid:
 its asymmetric afternoon peak needs the second and third harmonics, and four samples a day is
 already at the Nyquist limit for the second, so some amplitude is genuinely unrecoverable at
 6-hourly spacing. A shape-preserving interpolant would recover more of it than a linear one, though

@@ -18,6 +18,8 @@ import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
 
+from ml_core.features._radiation import _resample_radiation
+
 NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
 """Hours after an NWP run's ``init_time`` before we treat that run as usable.
 
@@ -133,39 +135,42 @@ def _join_nwp_single_run(
     return result
 
 
-def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
-    """Upsample NWP data to 30-minute resolution.
+def _upsample_nwp_to_half_hourly(
+    nwp_lf: pl.LazyFrame,
+    *,
+    solar_coordinates: pl.LazyFrame | None = None,
+    strict_radiation_schedule: bool = True,
+) -> pl.LazyFrame:
+    """Resample weather to half-hours within each independent run/member/series.
 
-    Assumes 'init_time' has already been renamed to 'nwp_init_time'. Continuous weather variables
-    are linearly interpolated within each group; categorical variables are forward-filled within
-    each group. All other columns (e.g. nwp_init_time, ensemble_member) are used as group-by
-    keys.
+    Radiation is a mean over the native interval ending at its timestamp, so its dedicated
+    path conserves each short-wave window's energy. Long-wave uses piecewise cubic Hermite
+    interpolating polynomial (PCHIP) interpolation through native means placed at interval
+    midpoints, evaluated at half-hour midpoints.
+    Source-missing radiation windows stay null. Other numeric fields use point interpolation and
+    categories use forward fill; both can fill interior source nulls.
+    Radiation policy and explanatory plots:
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling>.
 
-    The implementation stays fully lazy. A 30-min time grid is generated per group via
-    datetime_ranges + explode. The original NWP values are then left-joined back in. Finally,
-    interpolate/forward_fill are applied with over() to stay within group boundaries.
+    Args:
+        nwp_lf: Original native NWP with init_time renamed to nwp_init_time.
+        solar_coordinates: Site latitude/longitude by time_series_id, required for short-wave.
+        strict_radiation_schedule: Raise on unsupported radiation source/lead times. Serving passes
+            False to log the fault and retain null radiation over unsupported windows.
 
-    End-null propagation: Polars' interpolate() fills interior nulls. Leading nulls and trailing
-    nulls are both left as null. A leading null sits before the group's first non-null value, and
-    a trailing null sits after the group's last non-null value. The weather model this pipeline
-    consumes is the European Centre for Medium-Range Weather Forecasts ensemble (ECMWF ENS). Some
-    ECMWF ENS variables — precipitation and the radiation fluxes — are period-ending: each value
-    is the average rate over the interval ending at that valid_time. There is no such interval at
-    lead time 0, so they are null there by convention. Before a group's first non-null native
-    step — typically a 3-hour window per NWP run — every interpolated 30-min row therefore
-    remains null. ECMWF ENS runs at a 3-hour native step width out to 144 hours, then coarsens to
-    a 6-hour step width for the rest of its 360-hour horizon. The trailing case is rarer but
-    real: at the last native step of the horizon, a wholly-null slice is not bridged either, so
-    that slice too reaches the caller as null. Callers and downstream models should treat every
-    one of these nulls as a genuinely missing value rather than as a corrupted download to be
-    repaired or imputed.
+    Returns:
+        A lazy half-hourly frame with the original columns and numeric dtypes.
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()
     group_cols = [
         col for col in schema_names if col != "valid_time" and col not in all_weather_vars
     ]
-    continuous_cols = [col for col in schema_names if col in Nwp.continuous_var_names()]
+    continuous_cols_excluding_radiation = [
+        col
+        for col in schema_names
+        if col in Nwp.continuous_var_names() and col not in Nwp.radiation_var_names
+    ]
     categorical_cols = [col for col in schema_names if col in Nwp.categorical_var_names]
 
     # Build 30-min time grid per group: aggregate min/max valid_time per group,
@@ -200,10 +205,10 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
 
     # Fill nulls within each group, never crossing group boundaries.
     # order_by="valid_time" ensures correct temporal ordering within each group window.
-    if continuous_cols:
+    if continuous_cols_excluding_radiation:
         upsampled = upsampled.with_columns(
             pl.col(col).interpolate().over(group_cols, order_by="valid_time")
-            for col in continuous_cols
+            for col in continuous_cols_excluding_radiation
         )
     if categorical_cols:
         upsampled = upsampled.with_columns(
@@ -211,4 +216,17 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
             for col in categorical_cols
         )
 
+    radiation_cols = sorted(Nwp.radiation_var_names.intersection(schema_names))
+    if radiation_cols:
+        radiation = _resample_radiation(
+            native=nwp_lf,
+            group_cols=group_cols,
+            solar_coordinates=solar_coordinates,
+            strict_schedule=strict_radiation_schedule,
+        )
+        upsampled = (
+            upsampled.drop(radiation_cols)
+            .join(radiation, on=[*group_cols, "valid_time"], how="left")
+            .select(schema_names)
+        )
     return upsampled

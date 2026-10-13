@@ -65,12 +65,18 @@ neither receives an invented “corrected” score.
 
 ## Radiation: interval means are displaced and flattened
 
+**The radiation probe below records production behaviour before interval-aware resampling.** The
+saved figure and numbers remain a historical snapshot, reproduced from the pinned checkout above.
+See [radiation resampling](../../architecture/nwp-variable-conventions.md#radiation-resampling)
+for the current policy and before/after comparison.
+
 Each native radiation value is a mean over the **interval before its timestamp**. Here, “native”
-means the weather forecast’s original sampling grid. The current upsampler fills the half-hourly
-grid by drawing straight lines between the timestamped means. This spreads daylight energy later
-and flattens the daily peak. The independent synthetic probe aggregates half-hour backward means
-into three- or six-hour means before calling the current production upsampler. It therefore has a
-known answer, rather than treating a different interpolant as observed truth.
+means the weather forecast’s original sampling grid. The upsampler at the time of this study filled
+the half-hourly grid by drawing straight lines between the timestamped means. The interpolation
+spread daylight energy later and flattened the daily peak. The independent synthetic probe
+aggregated half-hour backward means into three- or six-hour means before calling that production
+upsampler. The probe has a known answer, rather than treating a different interpolant as observed
+truth.
 
 ![Synthetic radiation reconstruction shows delayed and flattened daylight energy.](../assets/production_feature_faults_radiation_probe.svg)
 
@@ -281,6 +287,13 @@ improvements. The next session should read this section alongside the generated 
 available.
 
 ### 1. Give radiation an interval-aware resampler
+
+**Production implementation:** the [radiation resampling policy](../../architecture/nwp-variable-conventions.md#radiation-resampling)
+uses midpoint clear-sky indices for short-wave and piecewise cubic Hermite interpolating polynomial
+(PCHIP) interpolation through native-window midpoint means for long-wave.
+Unlike this study candidate, the production helper conserves each short-wave window's energy and
+preserves source-missing windows. Historical study results below remain measurements of the study's
+candidate, not of that production helper.
 
 **Replace point interpolation of short-wave interval means in
 `packages/ml_core/src/ml_core/features/_nwp.py`.** On the synthetic probe’s complete interior day,

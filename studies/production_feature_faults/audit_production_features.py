@@ -23,6 +23,7 @@ from deltalake import DeltaTable
 from ml_core.features._lags import _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature
+from ml_core.features._radiation import _resample_radiation
 from ml_core.features.tabular_feature_engineer import _apply_local_time_features
 from studies.power import CLEANED_POWER_DELTA_URI, scan_power
 from studies.solar import zenith
@@ -183,6 +184,9 @@ def source_probes() -> dict[str, pl.DataFrame]:
     truth = np.maximum(0, np.sin((half_hour_midpoint - 6) * np.pi / 12)) * 800
     radiation_parts = []
     metrics = []
+    coordinates = pl.DataFrame(
+        {"time_series_id": [0], "latitude": [52.0], "longitude": [0.0]}
+    ).lazy()
     for width in (3, 6):
         indices = np.arange(0, len(stamps), width * 2)
         native_values = [None] + [
@@ -192,12 +196,17 @@ def source_probes() -> dict[str, pl.DataFrame]:
             {
                 "time_series_id": [0] * len(indices),
                 "ensemble_member": [0] * len(indices),
-                "nwp_init_time": [start] * len(indices),
+                # Six-hour windows begin after lead 144 in the ECMWF schedule.
+                "nwp_init_time": [start - timedelta(hours=144 if width == 6 else 0)] * len(indices),
                 "valid_time": stamps.gather(indices),
                 RADIATION: native_values,
             }
         )
-        reconstructed = _upsample_nwp_to_half_hourly(native.lazy()).collect().sort("valid_time")
+        reconstructed = (
+            _upsample_nwp_to_half_hourly(native.lazy(), solar_coordinates=coordinates)
+            .collect()
+            .sort("valid_time")
+        )
         recovered = reconstructed[RADIATION].to_numpy()
         interior = (hours > 24) & (hours <= 48)
         x = hours[interior] - 24
@@ -213,14 +222,22 @@ def source_probes() -> dict[str, pl.DataFrame]:
                 "reconstructed_energy_kwh_m2": float(actual.sum() * 0.5 / 1000),
                 "dark_positive_rows": int(((original == 0) & (actual > 1)).sum()),
                 "eligible_rows": int(interior.sum()),
-                "leading_null_rows": int(np.isnan(recovered[: width * 2]).sum()),
+                "leading_null_rows": int(np.isnan(recovered[:1]).sum()),
             }
         )
         zero = native.with_columns(
             pl.when(pl.col(RADIATION).is_null()).then(None).otherwise(0.0).alias(RADIATION)
         )
-        zero_result = _upsample_nwp_to_half_hourly(zero.lazy()).collect()[RADIATION].drop_nulls()
-        if not (zero_result == 0).all() or not np.isnan(recovered[: width * 2]).all():
+        zero_result = (
+            _upsample_nwp_to_half_hourly(zero.lazy(), solar_coordinates=coordinates)
+            .collect()[RADIATION]
+            .drop_nulls()
+        )
+        if (
+            not (zero_result == 0).all()
+            or not np.isnan(recovered[0])
+            or not np.isfinite(recovered[1:]).all()
+        ):
             raise ValueError("radiation dark/leading-null control failed")
         radiation_parts.append(
             pl.DataFrame(
@@ -652,6 +669,7 @@ def main() -> None:
         inspect.getfile(f)
         for f in (
             _upsample_nwp_to_half_hourly,
+            _resample_radiation,
             _nullify_leaky_lags,
             _apply_local_time_features,
             zenith,
