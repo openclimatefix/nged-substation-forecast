@@ -478,6 +478,89 @@ significance alone does not pass this gate.
 |---|---|---|---|---|---|---|---|
 | Both corrections minus old pipeline | all | -0.057 | -0.053 | -0.083 | -0.024 | 13 | 15 |
 
+### Fold A's sensitivity setting retains overall and solar gains (provisional)
+
+**The second training setting retains the overall and solar improvements within each recipe.**
+For the production configuration, both corrections change the all-series common pinball loss by
+-0.102 capacity points (95% interval -0.174 to -0.004). For the quick-wins winner, the difference
+is -0.134 (-0.174 to -0.099). The overall and solar gains are statistically significant at the 5%
+level, and solar improves in all 12 validation months within both recipes. The corrected winner's
+all-series advantage over corrected production is -3.497 points (-3.827 to -3.165). That larger
+comparison changes the whole training recipe and does not isolate the processing corrections.
+
+#### Absolute common 19-level pinball loss (% capacity): July 2025–June 2026, sensitivity setting
+
+| Forecast recipe and pipeline | Series type | Twice-mean pinball (% capacity) |
+|---|---|---|
+| old_production | all | 11.374 |
+| old_production | PV | 8.215 |
+| old_production | Wind | 16.811 |
+| combined_production | all | 11.271 |
+| combined_production | PV | 7.818 |
+| combined_production | Wind | 16.866 |
+| old_winner | all | 7.909 |
+| old_winner | PV | 5.553 |
+| old_winner | Wind | 11.368 |
+| combined_winner | all | 7.775 |
+| combined_winner | PV | 5.186 |
+| combined_winner | Wind | 11.369 |
+
+
+#### Deciding comparisons on common 19-level pinball loss: July 2025–June 2026, sensitivity setting
+
+| Comparison | Series type | Loss difference (capacity points) | 95% lower | 95% upper | Months with lower loss |
+|---|---|---|---|---|---|
+| Both corrections minus old pipeline | all | -0.102 | -0.174 | -0.004 | 10 |
+| Both corrections minus old pipeline | PV | -0.396 | -0.503 | -0.300 | 12 |
+| Both corrections minus old pipeline | Wind | 0.055 | -0.077 | 0.153 | 3 |
+| Both corrections on quick-wins winner | all | -0.134 | -0.174 | -0.099 | 12 |
+| Both corrections on quick-wins winner | PV | -0.367 | -0.493 | -0.263 | 12 |
+| Both corrections on quick-wins winner | Wind | 0.001 | -0.006 | 0.008 | 6 |
+| Corrected quick-wins winner minus corrected production configuration | all | -3.497 | -3.827 | -3.165 | 12 |
+| Corrected quick-wins winner minus corrected production configuration | PV | -2.633 | -3.340 | -1.971 | 12 |
+| Corrected quick-wins winner minus corrected production configuration | Wind | -5.497 | -6.259 | -4.873 | 12 |
+
+
+**Wind effects remain unresolved under the primary month-and-seed bootstrap in this setting.**
+Both corrections and the wind-only correction have intervals allowing improvement and
+deterioration for wind farms. Adding wind processing after radiation is corrected also remains
+unresolved. For the wind-only correction across all series, the equal-month t-interval favours
+deterioration: the equal-month difference is 0.018 points (0.001 to 0.036), while the primary
+bootstrap difference is 0.013 (-0.032 to 0.075). The two intervals use different weighting and
+treatment of fitting-seed variation, so the all-series wind-only effect remains unresolved across
+those methods. The full sensitivity extract retains the equal-month estimates and support counts.
+
+#### Pipeline-isolation comparisons, common 19-level pinball loss: July 2025–June 2026, sensitivity setting
+
+| Comparison | Series type | Loss difference (capacity points) | 95% lower | 95% upper | Months with lower loss |
+|---|---|---|---|---|---|
+| Radiation correction minus old pipeline | all | -0.112 | -0.189 | -0.002 | 10 |
+| Radiation correction minus old pipeline | PV | -0.397 | -0.511 | -0.292 | 12 |
+| Radiation correction minus old pipeline | Wind | 0.038 | -0.063 | 0.113 | 4 |
+| Wind correction minus old pipeline | all | 0.013 | -0.032 | 0.075 | 4 |
+| Wind correction minus old pipeline | PV | 0.005 | -0.019 | 0.031 | 6 |
+| Wind correction minus old pipeline | Wind | 0.026 | -0.064 | 0.098 | 3 |
+| Wind correction with radiation corrected | all | 0.010 | -0.020 | 0.050 | 4 |
+| Wind correction with radiation corrected | PV | 0.001 | -0.020 | 0.028 | 6 |
+| Wind correction with radiation corrected | Wind | 0.017 | -0.050 | 0.087 | 6 |
+| Radiation correction with wind corrected | all | -0.116 | -0.181 | -0.051 | 9 |
+| Radiation correction with wind corrected | PV | -0.401 | -0.504 | -0.312 | 12 |
+| Radiation correction with wind corrected | Wind | 0.028 | -0.053 | 0.104 | 6 |
+
+
+**The wind–radiation interaction remains unresolved for all series, solar, and wind.**
+The interaction intervals allow both signs, as in Fold A's main setting. These sensitivity checks
+cover Fold A; the final robustness assessment also requires the retrospective Fold B sensitivity
+results. The cleaned control has no sensitivity fit in this pipeline-isolation comparison.
+
+#### Wind–radiation interaction (combined − radiation − wind + old), common 19-level pinball loss: July 2025–June 2026, sensitivity setting
+
+| Comparison | Series type | Interaction (capacity points) | 95% lower | 95% upper | Months with negative interaction |
+|---|---|---|---|---|---|
+| Interaction between wind and radiation corrections | all | -0.003 | -0.080 | 0.075 | 8 |
+| Interaction between wind and radiation corrections | PV | -0.004 | -0.039 | 0.032 | 6 |
+| Interaction between wind and radiation corrections | Wind | -0.010 | -0.087 | 0.075 | 7 |
+
 <!-- FEATURE_RESULTS -->
 
 ### Descriptive feature importance

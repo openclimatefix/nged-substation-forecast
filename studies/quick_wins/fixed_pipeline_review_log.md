@@ -253,3 +253,15 @@ The complete study suite passed with 3,338 tests passed and five skipped in 210.
 Subsequent code edits affect only axis-label visibility and alignment, verified by rendering.
 Repository-wide Ruff checks and formatting checks passed for all 942 Python files, and the
 repository-wide type check passed.
+
+Fold A sensitivity reports are now complete for both studies. The root reviewed the exact
+aggregate publication selectors before execution and checked the Part 2 draft's inserted tables,
+support statements, equal-month intervals and zero-crossing scope against the completed reports.
+The pooled-nine versus native-nine loss effect remains unresolved in both Fold A settings.
+
+The root freshly reviewed optional per-row report sources in the loss-chart script before any
+execution. Exact contrast selection and reviewed-text guards remain in force; provenance now
+hashes every used report before and after export. A compatibility text export was byte-identical
+to the previously reviewed headline text. Ruff and formatting checks passed; the required study
+suite is running again because this change affects chart source selection. The new wind-addback
+specification remains a preparation draft and has not been rendered or interpreted.

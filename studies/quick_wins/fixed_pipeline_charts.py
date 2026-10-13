@@ -2,6 +2,7 @@
 
 Use --text-only first, review the resulting figure-text.md, then render into a different new
 directory. Charts read reported numbers and perform no statistical estimation.
+Each panel row may name its own `report`; otherwise it uses the top-level `report`.
 """
 
 import argparse
@@ -30,9 +31,25 @@ def _sha256(*, path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _text(*, spec: dict[str, Any]) -> str:
+def _source(*, spec: dict[str, Any], row: dict[str, Any]) -> Path:
+    source = row.get("report", spec.get("report"))
+    if not isinstance(source, str) or not source:
+        raise ValueError("each chart row requires a report or a top-level default report")
+    return Path(source).resolve()
+
+
+def _source_hashes(*, sources: set[Path]) -> dict[str, dict[str, str]]:
+    return {
+        str(source): {
+            name: _sha256(path=source / name)
+            for name in ("contrasts.parquet", "report.md", "provenance.json")
+        }
+        for source in sorted(sources)
+    }
+
+
+def _text(*, spec: dict[str, Any], tables: dict[Path, pl.DataFrame]) -> str:
     lines = ["# Fixed-pipeline figure text", ""]
-    table = pl.read_parquet(Path(spec["report"]) / "contrasts.parquet")
     for figure in spec["figures"]:
         lines.extend([f"## Figure {figure['number']}: {figure['title']}", ""])
         lines.extend(figure["subtitle"])
@@ -45,7 +62,7 @@ def _text(*, spec: dict[str, Any]) -> str:
             ]
         )
         for panel in figure["panels"]:
-            values = _rows(table=table, panel=panel)
+            values = _rows(tables=tables, spec=spec, panel=panel)
             lines.extend(
                 [
                     panel["title"],
@@ -67,9 +84,12 @@ def _text(*, spec: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _rows(*, table: pl.DataFrame, panel: dict[str, Any]) -> pl.DataFrame:
+def _rows(
+    *, tables: dict[Path, pl.DataFrame], spec: dict[str, Any], panel: dict[str, Any]
+) -> pl.DataFrame:
     rows = []
     for wanted in panel["rows"]:
+        table = tables[_source(spec=spec, row=wanted)]
         selected = table.filter(
             pl.col("contrast") == wanted["contrast"],
             pl.col("group") == wanted["group"],
@@ -150,7 +170,15 @@ def main() -> None:
     if args.output.exists():
         raise ValueError("chart output exists; use a new immutable directory")
     spec = json.loads(args.spec.read_text())
-    text = _text(spec=spec)
+    sources = {
+        _source(spec=spec, row=row)
+        for figure in spec["figures"]
+        for panel in figure["panels"]
+        for row in panel["rows"]
+    }
+    source_hashes = _source_hashes(sources=sources)
+    tables = {source: pl.read_parquet(source / "contrasts.parquet") for source in sources}
+    text = _text(spec=spec, tables=tables)
     if not args.text_only and (
         args.reviewed_text is None or args.reviewed_text.read_text() != text
     ):
@@ -163,18 +191,19 @@ def main() -> None:
         "script_sha256": _sha256(path=Path(__file__)),
         "text_only": args.text_only,
         "palette": [ocf.DATA_BLUE],
+        "reports_sha256": source_hashes,
     }
     if not args.text_only:
-        source = Path(spec["report"])
-        for name in ("contrasts.parquet", "report.md", "provenance.json"):
-            provenance[f"report_{name}_sha256"] = _sha256(path=source / name)
-        table = pl.read_parquet(source / "contrasts.parquet")
+        # Retain the legacy provenance keys when the top-level report is actually used.
+        if "report" in spec and Path(spec["report"]).resolve() in sources:
+            for name, digest in source_hashes[str(Path(spec["report"]).resolve())].items():
+                provenance[f"report_{name}_sha256"] = digest
         for figure in spec["figures"]:
             panels = []
             for panel in figure["panels"]:
                 if panel["metric"] in {"coverage80", "coverage90"}:
                     raise ValueError("loss-direction charts cannot plot coverage")
-                rows = _rows(table=table, panel=panel)
+                rows = _rows(tables=tables, spec=spec, panel=panel)
                 low = min(0.0, cast(float, rows["lower_95"].min()))
                 high = max(0.0, cast(float, rows["upper_95"].max()))
                 margin = max((high - low) * 0.2, 0.02)
@@ -218,6 +247,8 @@ def main() -> None:
                 capture_output=True,
             )
             (args.output / f"{stem}.png").write_bytes(vlc.svg_to_png(svg.read_text(), scale=2))
+    if _source_hashes(sources=sources) != source_hashes:
+        raise ValueError("source reports changed during chart export")
     provenance["outputs_sha256"] = {
         path.name: _sha256(path=path) for path in sorted(args.output.iterdir()) if path.is_file()
     }

@@ -5,8 +5,9 @@
 **The quantile recipe has lower delivered-sample loss in both folds at the primary training
 settings.** This separate Part 2 study of issue 1156 also compares forecast coverage and width.
 Pooling has an unresolved nine-level loss effect in Fold A and a small supported improvement in
-retrospective Fold B. Alternative training settings and final scientific and prose reviews remain
-pending. These draft results support no calibration or production recommendation.
+retrospective Fold B. Fold A's alternative training settings retain the delivered loss advantage
+and unresolved pooling effect. Fold B's alternative settings and final scientific and prose reviews
+remain pending. These draft results support no calibration or production recommendation.
 
 ![Coverage on Fold A, primary training settings.](../assets/calibration-diagnostics-1156/coverage-fold-a.svg)
 
@@ -107,7 +108,8 @@ omissions; an interval does not remove the limitation of sparse support.
 
 **Both folds are complete for production and the quantile recipe at the primary training
 settings.** Each fold uses fitting seeds 0, 1 and 2 for both corrected-pipeline recipes. Fold B
-provides retrospective robustness evidence. Alternative training settings remain pending. The
+provides retrospective robustness evidence. Fold A's alternative training settings are also complete;
+Fold B's alternative settings remain pending. The
 conditional best point comparison was not run because the preregistered gate was not reached.
 
 **Production delivers 51 weather-member point predictions; the quantile recipe delivers a pool
@@ -136,7 +138,7 @@ the effect of pooling on the separate nine-level score remains unresolved.** Com
 compare `production` with the quantile recipe `r2_e1_c1_a3w_d3`, using fitting seeds 0, 1 and 2.
 Each fit contributes 1,070,930 supported forecast rows across 31 series and 12 scored months.
 Every series has all 12 months, and no uncertainty draw drops a series. The second hyperparameter
-setting remains pending. The conditional comparison with `r2_c4_c2_c1_a3w_d3` was not run because
+setting for Fold A follows below. The conditional comparison with `r2_c4_c2_c1_a3w_d3` was not run because
 the preregistered gate was not reached.
 
 **The quantile recipe's lower delivered-sample loss is supported across all 12 months in this
@@ -230,13 +232,104 @@ effect.** Treatment is `r2_e1_c1_a3w_d3` throughout; differences are treatment m
 so negative values favour treatment. “Capacity points” means percentage points of frozen
 effective capacity. The printed 95% intervals are the month/individual-fit ranges described
 above. The delivered and native-control contrasts are planned; the rearranged-control contrast
-is exploratory. Sensitivity confirmation remains pending; the retrospective Fold B results follow.
+is exploratory. Fold A sensitivity results follow before the retrospective Fold B results.
 
 | Treatment variant | Reference recipe | Reference variant | Pinball metric | Difference (capacity points) | 95% interval lower (capacity points) | 95% interval upper (capacity points) | Months with lower loss |
 |---|---|---|---|---|---|---|---|
 | delivered | production | delivered | pinball19 | -3.723 | -4.059 | -3.382 | 12 |
 | pooled_nine | r2_e1_c1_a3w_d3 | control_native | pinball9 | -0.028 | -0.072 | 0.012 | 6 |
 | pooled_nine | r2_e1_c1_a3w_d3 | control_rearranged | pinball9 | -0.028 | -0.072 | 0.012 | 6 |
+
+### Fold A: sensitivity settings
+
+**The alternative training settings retain Fold A's delivered loss advantage and unresolved
+pooling effect.** Both recipes use fitting seeds 0, 1 and 2, with 1,070,930 supported forecast
+rows per fit across 31 series and 12 months. Every series has all 12 months, and no uncertainty
+draw drops a series. The shared nineteen-level loss difference is -3.497 percentage points of
+frozen capacity, with a central 95% month/individual-fit range of [-3.801, -3.163] and lower loss
+in all 12 months (planned). The separate equal-month t-interval also lies below zero.
+
+| Recipe | Metric | Value (%) |
+|---|---|---|
+| production | pinball19 | 11.271 |
+| production | bias | -1.933 |
+| production | coverage80 | 12.162 |
+| production | coverage90 | 15.835 |
+| production | width80 | 4.448 |
+| production | width90 | 5.797 |
+| r2_e1_c1_a3w_d3 | pinball19 | 7.775 |
+| r2_e1_c1_a3w_d3 | bias | -0.726 |
+| r2_e1_c1_a3w_d3 | coverage80 | 73.400 |
+| r2_e1_c1_a3w_d3 | coverage90 | 77.108 |
+| r2_e1_c1_a3w_d3 | width80 | 28.450 |
+| r2_e1_c1_a3w_d3 | width90 | 31.139 |
+
+**Solar coverage remains above the 80% label and below the 90% label; wind remains below both
+(exploratory).** Quantile-pool solar coverage is 84.950% and 89.361%, with respective widths of
+21.921% and 24.678% of frozen capacity. Wind coverage is 74.117% and 81.946%, with widths of
+42.881% and 50.910%. Coverage is a percentage of cases; widths, bias and losses are percentages
+of frozen effective capacity. The coverage changes must be read alongside width and loss, and
+do not establish better calibration.
+
+| Recipe | Generation type | Metric | Value (%) |
+|---|---|---|---|
+| production | PV | coverage80 | 18.540 |
+| production | PV | coverage90 | 24.269 |
+| production | PV | width80 | 4.692 |
+| production | PV | width90 | 6.066 |
+| production | Wind | coverage80 | 15.724 |
+| production | Wind | coverage90 | 19.971 |
+| production | Wind | width80 | 9.744 |
+| production | Wind | width90 | 12.740 |
+| r2_e1_c1_a3w_d3 | PV | coverage80 | 84.950 |
+| r2_e1_c1_a3w_d3 | PV | coverage90 | 89.361 |
+| r2_e1_c1_a3w_d3 | PV | width80 | 21.921 |
+| r2_e1_c1_a3w_d3 | PV | width90 | 24.678 |
+| r2_e1_c1_a3w_d3 | Wind | coverage80 | 74.117 |
+| r2_e1_c1_a3w_d3 | Wind | coverage90 | 81.946 |
+| r2_e1_c1_a3w_d3 | Wind | width80 | 42.881 |
+| r2_e1_c1_a3w_d3 | Wind | width90 | 50.910 |
+
+**Pooling remains unresolved on the separate nine-level score under Fold A sensitivity
+settings (planned).** Pooled minus native loss is -0.035 percentage points of frozen capacity,
+with a central 95% month/individual-fit range of [-0.079, 0.004] and lower loss in 7 of 12
+months. The separate equal-month t-interval also includes zero. Pooled 80% coverage is lower
+than native coverage (73.400% versus 75.587%), alongside a narrower interval (28.450% versus
+30.019% of frozen capacity). Those descriptive changes do not establish improved calibration.
+
+**The saved control knots also have no crossings or invalid intervals in Fold A sensitivity
+results (exploratory).** Native and rearranged diagnostics therefore agree. Observed zero rates
+now cover Fold A's two settings and Fold B's primary settings; the observation provides no
+guarantee for future forecasts. Fold B sensitivity remains pending, as does control 90% coverage.
+
+| Distribution variant | Metric | Value (%) |
+|---|---|---|
+| control_rearranged | pinball9 | 8.390 |
+| control_rearranged | coverage80 | 75.587 |
+| control_rearranged | width80 | 30.019 |
+| control_rearranged | crossing_rate | 0.000 |
+| control_rearranged | invalid_interval_rate | 0.000 |
+| control_native | pinball9 | 8.390 |
+| control_native | coverage80 | 75.587 |
+| control_native | width80 | 30.019 |
+| control_native | crossing_rate | 0.000 |
+| control_native | invalid_interval_rate | 0.000 |
+| pooled_nine | pinball9 | 8.355 |
+| pooled_nine | coverage80 | 73.400 |
+| pooled_nine | width80 | 28.450 |
+| pooled_nine | crossing_rate | 0.000 |
+| pooled_nine | invalid_interval_rate | 0.000 |
+
+**The sensitivity table preserves the separate nineteen-level and nine-level comparisons.**
+Treatment is `r2_e1_c1_a3w_d3` throughout; negative differences favour treatment. Capacity points
+and the printed 95% intervals retain the definitions above. The delivered and native-control
+contrasts are planned; the rearranged-control contrast is exploratory.
+
+| Treatment variant | Reference recipe | Reference variant | Pinball metric | Difference (capacity points) | 95% interval lower (capacity points) | 95% interval upper (capacity points) | Months with lower loss |
+|---|---|---|---|---|---|---|---|
+| delivered | production | delivered | pinball19 | -3.497 | -3.801 | -3.163 | 12 |
+| pooled_nine | r2_e1_c1_a3w_d3 | control_native | pinball9 | -0.035 | -0.079 | 0.004 | 7 |
+| pooled_nine | r2_e1_c1_a3w_d3 | control_rearranged | pinball9 | -0.035 | -0.079 | 0.004 | 7 |
 
 ### Retrospective Fold B: primary settings
 
@@ -342,8 +435,9 @@ native-control contrasts are planned; the rearranged-control contrast is explora
 **No calibration or production recommendation follows from this draft.** The useful question is
 whether changes in coverage also improve loss without relying on excessive width. Both primary-setting
 folds favour the quantile recipe's delivered loss. Pooling's small nine-level improvement is supported
-in retrospective Fold B and unresolved in Fold A. Alternative training settings and final scientific
-and prose reviews remain pending before any recommendation. Marginal performance cannot establish
+in retrospective Fold B's primary settings and unresolved in both Fold A settings. Fold B's alternative
+training settings and final scientific and prose reviews remain pending before any recommendation.
+Marginal performance cannot establish
 coherent scenarios across sites or forecast times.
 
 ## Proposed follow-up study
