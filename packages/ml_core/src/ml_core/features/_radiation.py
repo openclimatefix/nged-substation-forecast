@@ -15,13 +15,12 @@ from math import pi
 from typing import Final
 
 import polars as pl
-from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, NwpModelId
+from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, Nwp, NwpModelId
 
 logger = logging.getLogger(__name__)
 
 SHORT_WAVE: Final[str] = "downward_short_wave_radiation_flux_surface"
 LONG_WAVE: Final[str] = "downward_long_wave_radiation_flux_surface"
-RADIATION_COLUMNS: Final[frozenset[str]] = frozenset({SHORT_WAVE, LONG_WAVE})
 DAYLIGHT_FLOOR_W_M2: Final[float] = 20.0
 """Minimum native clear-sky mean for an index to influence neighbouring windows.
 
@@ -416,7 +415,7 @@ def _resample_radiation(
         Group keys, target valid_time and reconstructed radiation, in the original numeric dtypes.
     """
     schema = native.collect_schema()
-    radiation = sorted(RADIATION_COLUMNS.intersection(schema.names()))
+    radiation = sorted(Nwp.radiation_var_names.intersection(schema.names()))
     checked = native.select(*group_cols, "valid_time", *radiation).map_batches(
         partial(_check_radiation_schedule, strict=strict_schedule),
         predicate_pushdown=False,

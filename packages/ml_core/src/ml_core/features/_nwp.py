@@ -18,7 +18,7 @@ import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
 
-from ml_core.features._radiation import RADIATION_COLUMNS, _resample_radiation
+from ml_core.features._radiation import _resample_radiation
 
 NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
 """Hours after an NWP run's ``init_time`` before we treat that run as usable.
@@ -166,10 +166,10 @@ def _upsample_nwp_to_half_hourly(
     group_cols = [
         col for col in schema_names if col != "valid_time" and col not in all_weather_vars
     ]
-    continuous_cols = [
+    continuous_cols_excluding_radiation = [
         col
         for col in schema_names
-        if col in Nwp.continuous_var_names() and col not in RADIATION_COLUMNS
+        if col in Nwp.continuous_var_names() and col not in Nwp.radiation_var_names
     ]
     categorical_cols = [col for col in schema_names if col in Nwp.categorical_var_names]
 
@@ -205,10 +205,10 @@ def _upsample_nwp_to_half_hourly(
 
     # Fill nulls within each group, never crossing group boundaries.
     # order_by="valid_time" ensures correct temporal ordering within each group window.
-    if continuous_cols:
+    if continuous_cols_excluding_radiation:
         upsampled = upsampled.with_columns(
             pl.col(col).interpolate().over(group_cols, order_by="valid_time")
-            for col in continuous_cols
+            for col in continuous_cols_excluding_radiation
         )
     if categorical_cols:
         upsampled = upsampled.with_columns(
@@ -216,7 +216,7 @@ def _upsample_nwp_to_half_hourly(
             for col in categorical_cols
         )
 
-    radiation_cols = sorted(RADIATION_COLUMNS.intersection(schema_names))
+    radiation_cols = sorted(Nwp.radiation_var_names.intersection(schema_names))
     if radiation_cols:
         radiation = _resample_radiation(
             native=nwp_lf,
