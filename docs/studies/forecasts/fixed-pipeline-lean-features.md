@@ -253,11 +253,164 @@ in the aggregate reports; these tables show the common score used for the recipe
 | PV | -0.329 | -0.432 | -0.237 | 15 |
 | Wind | 0.039 | -0.060 | 0.172 | 6 |
 
-<!-- PIPELINE_RESULTS -->
+### Both corrections lower overall loss in the first fold (provisional)
+
+**Fold A's main setting shows a modest pipeline improvement alongside a much larger recipe
+difference.** The combined wind and radiation corrections lower the all-series common pinball loss
+by 0.115 capacity points within both the production configuration and the quick-wins winner. The
+corrected winner's 3.723-point advantage over corrected production compares different training
+recipes. That comparison changes the objective, pooling, features, and preprocessing together; it
+cannot isolate the effect of quantile training or be credited to the pipeline corrections. These
+initial combined-pipeline results remain provisional. Fold B and the sensitivity setting for the
+combined and wind comparisons are pending.
+
+**The absolute scores keep the pipeline and recipe comparisons separate.** `old_production` and
+`combined_production` use the production configuration; `old_winner` and `combined_winner` use the
+quick-wins recipe. `combined` means both processing corrections. The tables below reproduce the
+report's printed aggregate selections without recalculation. All loss differences use the same
+19-level score and are in percentage points of frozen capacity. Negative differences favour the
+treatment named first.
+
+#### Absolute common 19-level pinball loss (% capacity): July 2025–June 2026, main setting
+
+| Forecast recipe and pipeline | Series type | Twice-mean pinball (% capacity) |
+|---|---|---|
+| old_production | all | 11.594 |
+| old_production | PV | 8.319 |
+| old_production | Wind | 17.159 |
+| combined_production | all | 11.479 |
+| combined_production | PV | 8.002 |
+| combined_production | Wind | 17.208 |
+| old_winner | all | 7.871 |
+| old_winner | PV | 5.658 |
+| old_winner | Wind | 11.403 |
+| combined_winner | all | 7.756 |
+| combined_winner | PV | 5.371 |
+| combined_winner | Wind | 11.397 |
+
+**Both corrections improve overall and solar loss within each recipe, while the wind effect remains
+unresolved.** For production, the all-series difference is -0.115 points (95% interval -0.159 to
+-0.067), and solar's difference is -0.317 (-0.443 to -0.224). For the winner, the corresponding
+differences are -0.115 (-0.155 to -0.082) and -0.287 (-0.414 to -0.184). These paired improvements
+are statistically significant at the 5% level in this fold and setting. Wind's production difference
+is 0.049 (-0.079 to 0.160), and the winner's is -0.006 (-0.017 to 0.003). Both wind intervals allow
+improvement and deterioration.
+
+#### Deciding comparisons on common 19-level pinball loss: July 2025–June 2026, main setting
+
+| Comparison | Series type | Loss difference (capacity points) | 95% lower | 95% upper | Months with lower loss |
+|---|---|---|---|---|---|
+| Both corrections minus old pipeline | all | -0.115 | -0.159 | -0.067 | 11 |
+| Both corrections minus old pipeline | PV | -0.317 | -0.443 | -0.224 | 12 |
+| Both corrections minus old pipeline | Wind | 0.049 | -0.079 | 0.160 | 2 |
+| Both corrections on quick-wins winner | all | -0.115 | -0.155 | -0.082 | 12 |
+| Both corrections on quick-wins winner | PV | -0.287 | -0.414 | -0.184 | 12 |
+| Both corrections on quick-wins winner | Wind | -0.006 | -0.017 | 0.003 | 8 |
+| Corrected quick-wins winner minus corrected production configuration | all | -3.723 | -4.059 | -3.392 | 12 |
+| Corrected quick-wins winner minus corrected production configuration | PV | -2.631 | -3.356 | -1.940 | 12 |
+| Corrected quick-wins winner minus corrected production configuration | Wind | -5.810 | -6.544 | -5.202 | 12 |
+
+**The wind correction alone has no resolved loss effect in this fold and setting.** With the
+production configuration, the wind-only difference is 0.005 points overall (95% interval -0.033 to
+0.064) and -0.019 for wind farms (-0.117 to 0.080). Adding the wind correction after radiation is
+corrected also leaves overall and wind effects unresolved. The intervals do not establish that the
+wind correction has zero effect.
+
+#### Pipeline-isolation comparisons, common 19-level pinball loss: July 2025–June 2026, main setting
+
+| Comparison | Series type | Loss difference (capacity points) | 95% lower | 95% upper | Months with lower loss |
+|---|---|---|---|---|---|
+| Radiation correction minus old pipeline | all | -0.122 | -0.175 | -0.075 | 11 |
+| Radiation correction minus old pipeline | PV | -0.337 | -0.473 | -0.236 | 12 |
+| Radiation correction minus old pipeline | Wind | 0.043 | -0.048 | 0.122 | 4 |
+| Wind correction minus old pipeline | all | 0.005 | -0.033 | 0.064 | 4 |
+| Wind correction minus old pipeline | PV | 0.002 | -0.035 | 0.031 | 6 |
+| Wind correction minus old pipeline | Wind | -0.019 | -0.117 | 0.080 | 6 |
+| Wind correction with radiation corrected | all | 0.007 | -0.028 | 0.040 | 7 |
+| Wind correction with radiation corrected | PV | 0.020 | -0.018 | 0.057 | 3 |
+| Wind correction with radiation corrected | Wind | 0.006 | -0.140 | 0.108 | 7 |
+| Radiation correction with wind corrected | all | -0.120 | -0.183 | -0.042 | 11 |
+| Radiation correction with wind corrected | PV | -0.319 | -0.428 | -0.227 | 12 |
+| Radiation correction with wind corrected | Wind | 0.068 | -0.057 | 0.178 | 2 |
+
+**The interaction between the processing corrections remains unresolved.** The interaction subtracts
+the radiation-only and wind-only scores from the combined score and adds the old-pipeline score. The
+all-series interaction is 0.002 capacity points (95% interval -0.083 to 0.061). Solar and wind
+interactions also remain unresolved. An interaction measures departure from additive correction
+effects; the count of months with negative interaction is not a count of months with lower forecast
+loss.
+
+#### Wind–radiation interaction (combined − radiation − wind + old), common 19-level pinball loss: July 2025–June 2026, main setting
+
+| Comparison | Series type | Interaction (capacity points) | 95% lower | 95% upper | Months with negative interaction |
+|---|---|---|---|---|---|
+| Interaction between wind and radiation corrections | all | 0.002 | -0.083 | 0.061 | 7 |
+| Interaction between wind and radiation corrections | PV | 0.018 | -0.037 | 0.074 | 5 |
+| Interaction between wind and radiation corrections | Wind | 0.025 | -0.112 | 0.159 | 6 |
+
+**The cleaned feature baseline also gains overall and for solar, with wind unresolved.** Both
+corrections lower its all-series common pinball score by 0.147 points (95% interval -0.201 to
+-0.079) and its solar score by 0.337 points (difference -0.337; -0.447 to -0.251). The wind
+difference is 0.045 (-0.054 to 0.177). The cleaned baseline uses the historical point-model fitting
+path and column subsampling one, so this comparison supports the feature-study control rather than
+replacing the production-configuration comparison.
+
+#### Cleaned-control pipeline comparison, common 19-level pinball loss: July 2025–June 2026, main setting
+
+| Comparison | Series type | Loss difference (capacity points) | 95% lower | 95% upper | Months with lower loss |
+|---|---|---|---|---|---|
+| Both corrections on cleaned feature baseline | all | -0.147 | -0.201 | -0.079 | 11 |
+| Both corrections on cleaned feature baseline | PV | -0.337 | -0.447 | -0.251 | 11 |
+| Both corrections on cleaned feature baseline | Wind | 0.045 | -0.054 | 0.177 | 5 |
+
+**Fold A does not pass the G3 material-fault threshold.** G3 uses the fair-CRPS comparison between
+the matched 51-member production ensembles and requires an absolute change of at least 0.15 capacity
+points. Fold A's three-seed fair-CRPS difference is -0.118 points, below that magnitude. The
+separate equal-month mean is -0.124, with a month t-interval of -0.174 to -0.074: statistically
+significant at the 5% level, but statistical significance does not satisfy the material-size
+requirement. Fold B's G3 result is pending; the material-fault gate has not passed.
+
+#### G3 material-fault gate: fair CRPS, combined production minus old production; July 2025–June 2026, main setting
+
+| Comparison | Series type | Fair CRPS difference (capacity points) | Equal-month mean difference (capacity points) | Month t-interval lower | Month t-interval upper | Months with lower loss | Months scored |
+|---|---|---|---|---|---|---|---|
+| Both corrections minus old pipeline | all | -0.118 | -0.124 | -0.174 | -0.074 | 11 | 12 |
 
 <!-- FEATURE_RESULTS -->
 
-<!-- AUDIT_RESULTS -->
+**The input audit confirms changed radiation and wind-derived features in both folds; forecast
+benefit requires the matched loss comparisons above.** Each treatment exposes the same 32
+engineered fields on matched rows. That audit inventory includes fields available for feature
+experiments and is distinct from the 24 trained columns in the full-input control. Radiation
+changes short-wave and long-wave values and the temperature-adjusted long-wave residual. Wind
+processing changes speed, bearing and derived windchill. Counts cover all weather members;
+bearing differences use shortest angular distances, and other changes compare paired finite
+Float32 values exactly.
+
+**Null counts and domain screens need different interpretations.** Power-lag nulls include the
+expected masking of observations unavailable at forecast issuance; missing lags alone do not
+establish a pipeline error. The audit reports null and nonfinite counts separately and excludes
+both from changed-value shares. Windchill is still evaluated outside its formula's temperature
+and speed domain in the PR-only treatments; a separate domain guard remains to be evaluated.
+Radiation threshold and midpoint-night flags are screens rather than definitive invalid values:
+a half-hour whose midpoint is at night can still be partly sunlit.
+
+**The deliberately delayed radiation passes the timing-detector check in both folds.** The
+solar correlation peak moves from offset zero for the original input to offset one hour for
+the input delayed by one hour; both reports print `Shift detector passed: True`. Offsets compare
+power at time `t` with control-member weather at `t + offset`, after removing each series'
+within-day, within-run mean and giving series equal weight. Recovery supports the detector's
+response to the injected delay. Autocorrelation, curtailment and cloud regimes still confound
+the observed peak, so the check establishes neither causal timing accuracy nor the ability of a
+forecast-loss comparison to detect a timing fault.
+
+**Precipitation availability remains an era limitation rather than evidence of an upgrade
+benefit.** Fold B's earlier era has missing precipitation-type inputs, while the later era has
+available inputs. The audit assigns eras by weather initialisation time, using the November
+archive-availability boundary and a separate May cycle marker. Source-provenance verification
+remains required before interpreting those markers. Different seasons and training exposure
+prevent the era summaries from identifying precipitation's information content or a causal
+upgrade effect.
 
 The separate [calibration diagnostics study](calibration-diagnostics-1156.md) starts Part 2 from
 saved corrected-pipeline predictions. It does not fit a calibrator or establish joint scenario

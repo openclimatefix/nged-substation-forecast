@@ -21,15 +21,21 @@ import vl_convert as vlc
 from studies import charts
 
 RECIPES: Final[dict[str, str]] = {
-    "production": "Production config",
-    "r2_e1_c1_a3w_d3": "Quick-wins quantiles",
+    "production": "Production recipe",
+    "r2_e1_c1_a3w_d3": "Quick-wins quantile recipe",
 }
 GROUPS: Final[dict[str, str]] = {"PV": "Solar farms", "Wind": "Wind farms"}
 FOLDS: Final[dict[str, str]] = {
     "mid_2025_to_mid_2026": "Fold A: July 2025 to June 2026",
     "backwards_2025_07_to_2026_06": "Fold B: April 2024 to June 2025 (retrospective)",
 }
-TITLE: Final[str] = "How often do corrected intervals cover outcomes?"
+SETTINGS: Final[dict[str, str]] = {
+    "main": "Primary training settings (main).",
+    "sensitivity": (
+        "Alternative training settings (sensitivity), used to check dependence on training choices."
+    ),
+}
+TITLE: Final[str] = "Quick-wins intervals cover more outcomes than production's"
 AXIS: Final[str] = "Observed coverage (% of cases)"
 TICKS: Final[tuple[int, ...]] = (0, 20, 40, 60, 80, 100)
 REPORT_FILES: Final[frozenset[str]] = frozenset(
@@ -43,12 +49,25 @@ REPORT_FILES: Final[frozenset[str]] = frozenset(
     }
 )
 NOTES: Final[tuple[str, ...]] = (
-    "Dot: equal-series mean, averaged across three fitting seeds; all leads.",
-    "Absolute coverage intervals are not reported; no uncertainty lines are shown.",
-    "Nominal targets are descriptive for finite, structured forecast outputs.",
-    "Interval endpoints use one-based empirical inverse-CDF ranks ceil(n × q).",
-    "Empirical interval ranks have a finite-iid reference, not a calibration guarantee.",
-    "Coverage alone cannot rank forecasts; read loss and width alongside it.",
+    "Coverage is the fraction of observed power readings inside a forecast interval.",
+    "Both recipes predict power from 51 alternative weather forecasts.",
+    "A quantile is a threshold below which a specified fraction of outcomes should fall.",
+    (
+        "Production uses one power prediction for each; quick-wins pools nine quantiles for each: "
+        "459 values."
+    ),
+    "The 80% band uses the 10th and 90th sample percentiles; the 90% band uses the 5th and 95th.",
+    "Endpoints select the first sorted value whose cumulative fraction reaches the percentile.",
+    "Dots average coverage equally across meters, then across three XGBoost training runs.",
+    "All forecast horizons are included. Different seeds control each run's random choices.",
+    "No uncertainty ranges were estimated for these coverage means.",
+    "Dashed lines mark requested coverage, which finite, structured samples do not guarantee.",
+    (
+        "If the samples and outcome are independent draws from one continuous distribution, "
+        "expected coverage depends on sample size."
+    ),
+    "Neither recipe's predictions are claimed to be independent draws from one distribution.",
+    "Coverage alone cannot rank recipes; compare forecast loss and interval width too.",
 )
 
 
@@ -140,12 +159,12 @@ def _text(*, manifest: dict[str, Any]) -> str:
         "# Delivered coverage figure text",
         "",
         f"Figure 1: {TITLE}",
-        "Corrected wind/radiation pipeline; NGED solar and wind farms.",
+        "Corrected wind and radiation inputs; NGED solar and wind farms.",
         FOLDS[manifest["fold"]],
-        f"Hyperparameter setting: {manifest['setting']}; device: {manifest['device']}.",
+        SETTINGS[manifest["setting"]],
         *NOTES,
         charts.PLANNING_NOTES["exploratory"],
-        "Model",
+        "Forecast recipe",
         *RECIPES.values(),
         *GROUPS.values(),
         AXIS,
@@ -183,12 +202,12 @@ def _panel(*, rows: pl.DataFrame, nominal: int) -> alt.LayerChart:
         yOffset=alt.YOffset("model:N", sort=list(RECIPES.values())),
         color=alt.Color(
             "model:N",
-            title="Model",
+            title="Forecast recipe",
             scale=alt.Scale(domain=list(RECIPES.values()), range=[ocf.DATA_BLUE, ocf.DATA_GREEN]),
         ),
         shape=alt.Shape(
             "model:N",
-            title="Model",
+            title="Forecast recipe",
             scale=alt.Scale(domain=list(RECIPES.values()), range=["circle", "diamond"]),
         ),
     )
@@ -216,9 +235,9 @@ def _render(*, rows: pl.DataFrame, manifest: dict[str, Any], output: Path) -> No
         number=1,
         title=TITLE,
         subtitle=[
-            "Corrected wind/radiation pipeline; NGED solar and wind farms.",
+            "Corrected wind and radiation inputs; NGED solar and wind farms.",
             FOLDS[manifest["fold"]],
-            f"Hyperparameter setting: {manifest['setting']}; device: {manifest['device']}.",
+            SETTINGS[manifest["setting"]],
             *NOTES,
         ],
         figure_planning="exploratory",

@@ -93,7 +93,7 @@ historical feature order, cuts/additions and duplicate padding. Accepted provena
 hash the production feature YAML and pooled encoder source and identify the site identifier as
 Float32 numeric. The inventory reads no study observations and fits no models.
 
-### Canonical training-key guard
+## Canonical training-key guard
 
 The radiation report refused its first pairing because the frame builder's IPC digest includes
 Arrow chunk layout. An independent audit found exact schema, row order and key values in both
@@ -157,3 +157,32 @@ absent destination before launching any fit, preserves the public recipe and env
 requires an explicit root G3 result checkpoint. A free GPU slot and an exited preceding queue
 remain execution prerequisites. This preparation is not evidence that G3 passed or that a point
 fit ran.
+
+The first independent Part 2 scientific review examined the completed Fold A main report and
+independently checked saved-run issuance, lag availability, encoded sample labels, aggregate hashes,
+finite-rank references and synthetic diagnostics. It required no fit, frame or scoring rerun.
+Its wording correction was accepted: the page now distinguishes the three-seed central estimate,
+the bootstrap's individual-refit variation and the t-interval's within-month seed averaging.
+Results must keep the unresolved pooling loss effect separate from its lower observed coverage
+and narrower intervals, and distinguish solar's 80%/90% findings from wind's. The completed
+report does not establish calibration, joint coherence or an isolated effect of the input fixes.
+The fresh final scientific review remains required after other folds/settings and the page finish.
+
+A focused independent science review explained the small difference between the parent and
+Part 2 intervals for the same delivered-recipe contrast. Both correctly resample whole months
+and one shared individual fitting seed, but consume the deterministic random stream in a
+different order. Their central estimates and separate equal-month summaries agree; the finite
+bootstrap percentile endpoints differ through Monte Carlo variation. No rerun was required.
+The pages disclose this difference rather than implying identical resample sequences.
+
+The initial coverage figure's text received fresh static reviews before each revised export.
+An isolated first reader required definitions before the first use of quantiles, an explanation
+of the main setting's role, and plain wording for finite-sample expected coverage. All three
+changes were accepted and the revised text cleared. Rule-by-rule prose review and first rendered
+inspection remain pending; no rendered figure is claimed by these text checks.
+
+The separate rule-by-rule coverage-caption review accepted a final grammatical correction,
+which received fresh static review before export. The reviewer cleared the exact revised text
+before its first render. The root inspected the PNG made from the optimised SVG: all eight
+coverage means, interval labels, nominal lines and explanatory text are visible without overlap
+or clipping. The Fold A main SVG and PNG are included as the initial Part 2 figure.
