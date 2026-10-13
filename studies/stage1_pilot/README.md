@@ -192,17 +192,22 @@ is in points of capacity, fold A, three fitting seeds, 12 validation months.
   versions. Forecast weather costs wind about 7.5 points over all leads and solar 1.7.
 - **Training weather and training length matter more than the recipe.** `s1_recipe_on_ens`
   (stage 1a's columns trained on 15 months of ENS) is worse than `c0` (solar +0.64, wind +1.41),
-  and `s1_memberavg` is 1.48 (solar) and 5.13 (wind) better than it.
+  and `s1_memberavg` is 1.48 (solar) and 5.13 (wind) better than it. The two contrasts
+  change the training weather and the training length together, so this study does not separate
+  them.
 - **Averaging 51 members helps.** `s1_memberavg` is better than `s1_control` by 0.68 (solar) and
   2.17 (wind) over all leads, and by more at long leads.
-- **No sign of over-reaction.** The slope of observed on predicted power for `s1_memberavg` is
-  1.04 to 0.97 for solar and 1.04 to 0.83 for wind from the first to the last lead band, against
-  0.86 to 1.01 (solar) and 0.05 to 1.07 (wind) for `c0`; the ceiling's slope is 0.94 to 1.00.
+- **Slopes.** A slope below 1 means the forecast varies more than the observed power. The slope of
+  observed on predicted power for `s1_memberavg` is 1.04 to 0.97 for solar and 1.04 to 0.83 for
+  wind from the first to the last lead band (0.81 at 7 to 10 days, interval 0.50 to 1.08), against
+  0.86 to 1.01 (solar) and 0.05 to 1.07 (wind) for `c0`; the ceiling's slope is 0.94 to 1.01. Mild
+  over-reaction at long leads cannot be ruled out for wind, and `c0` shows much more.
 - **GPU repeatability.** The same GPU fit repeated gave identical predictions (difference 0.0000).
   `c0_refit` reproduces the stored `c0` exactly.
 
 Caveats: the control `c0` is weak for wind (19 points over all leads), and the P1 gain is the
-gain over that control, not over a best-possible ENS-trained model. ENS wind is 13% to 15% slower
-and ENS shortwave 6% brighter than ERA5 at the same valid time (`inputs/checks.md`), a bias stage
-1a was not trained on. Twenty-four decisions (2 contrasts, 2 technologies, 6 lead bands) are read
-against the materiality rule without correction for multiple comparisons.
+gain over that control, not over a best-possible ENS-trained model. ENS 10 m wind is 13% to 15%
+slower than ERA5, ENS 100 m wind 9% slower, and ENS shortwave 7% brighter, at the same valid time
+(`inputs/checks.md`), a bias stage 1a was not trained on. Twenty-four decisions (2 contrasts, 2
+technologies, 6 lead bands) are read against the materiality rule without correction for multiple
+comparisons.
