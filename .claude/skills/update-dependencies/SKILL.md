@@ -16,11 +16,14 @@ routine ends at step 8 and waits. Never merge, and never mark the PR ready for r
 maintainer has read the report.
 
 1. **Start a new branch from `origin/main`**, named `upgrade-locked-dependencies-<YYYY-MM-DD>`.
-   Run `uv sync` so the environment matches `main`'s lockfile.
+   Run `uv sync --locked --all-packages` so the environment matches `main`'s lockfile and holds
+   every workspace member, as CI's does. Without `--all-packages`, `ty` can pass locally and fail
+   in CI.
 
-2. **Run the full verification set on the untouched lockfile**, then fix nothing. A failure here is
-   already on `main`, and knowing that first stops a pre-existing failure being blamed on the
-   upgrade. The set is the union of `.github/workflows/ci.yml` and
+2. **Run the full verification set on the untouched lockfile**, and do not fix any failure
+   in this PR. A failure here is already on `main`. Record it, so that it is not blamed on the
+   upgrade, and tell the maintainer about it in the report. The hooks in this set rewrite files
+   when they find a problem, so discard those rewrites with `git checkout .`. The set is the union of `.github/workflows/ci.yml` and
    `.github/workflows/studies_tests.yml`, which are authoritative if this list has drifted, plus the
    pre-commit hooks:
 
@@ -36,23 +39,30 @@ maintainer has read the report.
     uv run pre-commit run --all-files --show-diff-on-failure
     ```
 
-    `pytest --run-studies` takes about three minutes, and CI runs the studies tests in a separate
+    `pytest --run-studies` takes about 3 minutes, and CI runs the studies tests in a separate
     job, so run both. Check the CPU load first, because one spinning core slows the XGBoost tests.
 
 3. **Upgrade**, keeping the list of changes for the PR body:
 
     ```bash
     uv lock --upgrade 2>&1 | grep -E "^(Updated|Added|Removed)" > <scratchpad>/changes.txt
-    uv sync
+    uv sync --all-packages
     ```
 
     If nothing changed, stop and tell the maintainer.
 
-4. **Commit `uv.lock` and open a draft PR.** Write the body to a file in the session scratchpad,
+4. **Commit `uv.lock` and open a draft PR.** Load `github-issue-pr-workflow` first, because it
+   owns the PR checklist. Create the PR with `gh pr create --draft`. Write the body to a file in the session scratchpad,
    never in the repo, with the `github-issue-pr-workflow` rules: the attribution line first, one
    line per paragraph, no hard wraps. The body lists every upgraded package, one bullet per package
-   as `` `name` old → new ``, generated from `changes.txt` with `sed` so that no package is
-   missing. Then set the label and the `JackKelly` assignee.
+   as `` `name` old → new ``, generated from `changes.txt` so that no package is missing:
+
+    ```bash
+    sed -E 's/^Updated ([^ ]+) (v[^ ]+) -> (v[^ ]+)/- `\1` \2 → \3/' <scratchpad>/changes.txt
+    ```
+
+    Packages that `uv` added or removed need their own bullets.
+ Then set the label and the `JackKelly` assignee.
 
 5. **Re-run the whole verification set from step 2**, and fix every failure.
     - Fix the code for the new version rather than pinning the old version, unless the new version
@@ -64,9 +74,11 @@ maintainer has read the report.
       as well, or the next run reverts the fix.
     - Commit each fix separately from the lockfile and push.
 
-6. **Research what the upgrades changed**, with one Sonnet sub-agent per group of related packages,
-   and give each the list of packages, their old and new versions, and the questions in step 7. Do
-   not read the changelogs of all packages yourself. Where the changelogs live:
+6. **Research what the upgrades changed**, with one Sonnet sub-agent per group of related packages.
+   Give each sub-agent the packages, their old and new versions, and all of step 7, because the
+   sub-agent reads the changelogs, greps this repository for the changed APIs, and answers the four
+   questions for each package. Do not read the changelogs of all packages yourself. Spot-check
+   one answer that says "no impact" by running its grep. Where the changelogs live:
     - **GitHub releases** are the quickest source: `gh release view <tag> --repo <owner>/<repo>`.
       The tag has a leading `v` for some projects and none for others (`ruff` uses `0.17.0`), so
       run `gh release list --repo <owner>/<repo> --limit 5` first.
@@ -76,8 +88,8 @@ maintainer has read the report.
     - **Packages without a changelog** (some transitive dependencies) get no research, and the
       report says so.
 
-7. **Judge each upgrade against the repository.** Read a changelog entry for the one thing that
-   matters, whether this repository uses the changed behaviour. Grep for the changed API in `src/`,
+7. **Judge each upgrade against the repository.** For each changelog entry, ask whether this
+   repository uses the changed behaviour. Grep for the changed API in `src/`,
    `packages/`, and `studies/` before concluding either way, and answer four questions for every
    package with a breaking change, a deprecation, or a behaviour change:
     - **Does it need a wider code review?** For example, a Polars 2 upgrade changed row order after
@@ -89,7 +101,6 @@ maintainer has read the report.
       those.
     - **Does it change a rule we configure?** `pyproject.toml` writes out the ruff `select` list,
       so ruff's changes to its default rule set do not apply, but a changed formatter does.
-
     - **Does it need a one-off operation before the code runs?** Search every changelog for
       "database upgrade", "schema", "migration", "migrate", and "backup". MLflow 3.17.0 needed
       `mlflow db upgrade <database-url>` with every writer stopped, and nothing failed in the test
@@ -98,7 +109,7 @@ maintainer has read the report.
       run a migration against the maintainer's data without being asked, and back the file up
       first.
 
-   Write down the packages whose notes you read, the packages you did not read, and why.
+    Write down the packages whose notes you read, the packages you did not read, and why.
 
 8. **Write the report, put it in the PR body, tell the maintainer, and wait.**
     - The PR body keeps the package list and gains the report: the fixes made and why, and the
