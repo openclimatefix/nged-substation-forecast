@@ -210,7 +210,8 @@ of the members' stage 1 medians at neighbouring times, or a template taken from 
 Schaake shuffle). The studies test the template with the coherence scores. At short leads members
 are nearly identical and ranks are mostly noise, so the studies score coupling by lead band with
 the variogram score and include the Schaake shuffle there. The output is always the 51 ENS
-members. Other NWPs enter stage 2 as columns and do not add members, which removes the question of how to pool members of different NWPs.
+members. Other NWPs enter stage 2 as columns and do not add members, which removes the question
+of how to pool members of different NWPs.
 
 **Targets for solar and wind power.** Stage 1 could predict a ratio for solar: power divided by
 clear-sky PV power, multiplied back by the known half-hourly clear-sky curve, so the output stays in
