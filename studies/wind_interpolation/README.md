@@ -67,10 +67,12 @@ for all three interpolators at day 1 and day 7. Retain calm winds; drop missing,
 negative speeds. No station is chosen by error or proximity to a particular wind farm.
 
 SYNOP speed is a 10-minute mean from HH-20 to HH-10. For each hourly observation, average the
-interpolated vector magnitude over that same window using five-point Gauss–Legendre quadrature;
-check ten-point quadrature as a numerical sensitivity. Use observation hours 25–48 and 169–192 after
-each 00:00 run, keeping each averaging window inside its respective lead day. No extrapolation. The
-scalar mean speed is the target, not a gust or a bearing.
+interpolated vector magnitude over that same window using Gauss–Legendre quadrature, doubling the
+point count until maximum and mean changes are below 0.0001 and 0.0000001 m/s. The initial
+five-versus-ten-point check failed in near-calm windows; this numerical refinement was added before
+station results existed. Use observation hours 25–48 and 169–192 after each 00:00 run, keeping each
+averaging window inside its respective lead day. No extrapolation. The scalar mean speed is the
+target, not a gust or a bearing.
 
 Report absolute speed MAE in m/s and smooth-minus-linear differences, with paired whole-month
 bootstrap intervals. There is no fitting-seed variation in this check. Use 95% intervals and 98.75%

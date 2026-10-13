@@ -11,7 +11,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, TypedDict
 
 import h3
 import numpy as np
@@ -25,6 +25,14 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 STOP: Final[datetime] = datetime(2026, 1, 1, tzinfo=UTC)
 OBS_HOURS: Final[np.ndarray] = np.concatenate((np.arange(25, 49), np.arange(169, 193)))
 OUTPUT: Final[Path] = study_dir_for(study="wind_interpolation")
+
+
+class QuadratureCheck(TypedDict):
+    """Numerical convergence evidence for one method's ten-minute means."""
+
+    points_per_window: int
+    max_difference_m_s: float
+    mean_difference_m_s: float
 
 
 def mean_speed(*, u: np.ndarray, v: np.ndarray, method: MethodType, points: int) -> np.ndarray:
@@ -117,7 +125,9 @@ def _read(*, output: Path, version: int) -> tuple[pl.DataFrame, pl.DataFrame, di
     return native, observations, provenance
 
 
-def _score(*, output: Path, native: pl.DataFrame, observed: pl.DataFrame) -> dict[str, float]:
+def _score(
+    *, output: Path, native: pl.DataFrame, observed: pl.DataFrame
+) -> dict[str, QuadratureCheck]:
     """Pair every method on identical station/run/observation keys and score speed MAE."""
     run_keys = native.select("site", "init_time").unique(maintain_order=True)
     u = native["wind_u_10m"].to_numpy().reshape(-1, len(LEADS))
@@ -143,10 +153,20 @@ def _score(*, output: Path, native: pl.DataFrame, observed: pl.DataFrame) -> dic
     errors = {}
     parts = []
     for method in METHODS:
-        prediction = mean_speed(u=u, v=v, method=method, points=5)
-        refined = mean_speed(u=u, v=v, method=method, points=10)
-        errors[method] = float(np.max(np.abs(prediction - refined)))
-        assert errors[method] < 1e-3, "Ten-minute quadrature is not accurate enough"
+        for points in (5, 10, 20, 40, 80):
+            coarse = mean_speed(u=u, v=v, method=method, points=points)
+            prediction = mean_speed(u=u, v=v, method=method, points=points * 2)
+            difference = np.abs(prediction - coarse)
+            maximum, mean = float(difference.max()), float(difference.mean())
+            if maximum < 1e-4 and mean < 1e-7:
+                errors[method] = QuadratureCheck(
+                    points_per_window=points * 2,
+                    max_difference_m_s=maximum,
+                    mean_difference_m_s=mean,
+                )
+                break
+        else:
+            raise ValueError("Ten-minute quadrature did not converge")
         frame = (
             base.with_columns(prediction=pl.Series(prediction.flatten()))
             .join(
@@ -212,9 +232,7 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=False)
     version = json.loads((args.output / "provenance.json").read_text())["nwp_version"]
     native, observed, provenance = _read(output=output, version=version)
-    provenance["max_5_vs_10_point_quadrature_error_m_s"] = _score(
-        output=output, native=native, observed=observed
-    )
+    provenance["quadrature_convergence"] = _score(output=output, native=native, observed=observed)
     (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
 
 
