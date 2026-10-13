@@ -169,6 +169,17 @@ The numerical report and CSV are written under
 `data/studies/wind_storage/interpolation-proof/`. The figure uses 10 m components; the production
 expressions and regression tests cover both stored heights.
 
+### Why retain linear component interpolation?
+
+**The focused wind-farm comparison found no consistent power benefit from smoothing u/v.**
+GPU XGBoost models received only the derived 10 m and 100 m speed and bearing. Across the three
+wind farms, both tested lead bands and both fixed settings, the pooled point estimates favoured
+linear interpolation over PCHIP and modified Akima. Most differences were small and uncertain.
+The [experiment and plots](../studies/forecasts/wind-interpolation.md) explain the interpolation
+assumptions and compare them with power observations and a direct station-wind check.
+The focused comparison supports retaining linear interpolation for the current forecasting
+pipeline; the comparison does not establish that linear is universally more accurate.
+
 ### Historical bearing interpolation crossed the 0°/360° wrap {#wind-direction-is-interpolated-across-the-0360-wrap}
 
 **A historical audit found that ordinary bearing interpolation can reverse northerly wind.**
