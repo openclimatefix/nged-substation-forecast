@@ -211,6 +211,59 @@ correlation diagnostic moves by an hour. That synthetic recovery does not establ
 detect a forecast-loss improvement. Precipitation availability eras have different seasons and
 training exposure, so their comparison is descriptive rather than a causal upgrade effect.
 
+### Requested minimal-feature extension
+
+**Five fixed feature sets form a separate post hoc extension.** They were requested after the
+original results and do not continue the stopped solar ladder. They inherit the historical
+cleaned per-series point recipe; untargeted series retain its full inputs. None of the five
+targeted sets includes power lags, calendar fields, a site identifier, or windchill. The
+[generated inventory](fixed-pipeline-feature-inventory.md#requested-post-hoc-feature-sets)
+prints their exact ordered real and trained columns.
+
+| Requested set | Target | Real inputs | Representation |
+|---|---|---|---|
+| Minimal solar | Solar | 2 | Temperature and downward short-wave radiation |
+| Expanded solar | Solar | 11 | Seven weather fields, three sun-position components, and clear-sky irradiance |
+| Minimal wind | Wind | 5 | Temperature, speed and raw bearing at 10 m and 100 m |
+| Minimal wind plus u/v | Wind | 9 | The same five inputs plus four reconstructed components |
+| Circular minimal wind | Wind | 7 | Temperature and both speeds; sine/cosine pairs replace both raw bearings |
+
+Expanded solar's seven weather fields are temperature, dewpoint, 10 m wind speed, downward
+long-wave and short-wave radiation, precipitation rate, and precipitation type. Sun position
+uses the existing apparent zenith and azimuth at the midpoint of the half-hour ending at valid
+time. Three dimensionless components are `east = sin(zenith) * sin(azimuth)`,
+`north = sin(zenith) * cos(azimuth)`, and `up = cos(zenith)`. The vertical component stays
+negative below the horizon. Clear-sky irradiance is Haurwitz global horizontal irradiance
+averaged at thirty one-minute midpoints over that preceding half-hour, in W/m². It is a
+deterministic model estimate, rather than measured irradiance or tilted-panel output.
+Time and the fixed coordinates are known before forecast issuance; observed power is not used.
+
+For each wind height, the component representation uses `u = -speed * sin(bearing)` and
+`v = -speed * cos(bearing)`, after converting the meteorological bearing from degrees to radians.
+The circular representation instead supplies the bearing's sine and cosine without raw
+bearings or u/v. Both derive from the corrected, processed polar values, so they add no weather
+information and do not recover native upstream components. Calculations use Float64 and
+stored additions use Float32; nulls propagate without zero imputation or input-dependent
+row filtering. The augmented frames preserve every original column and copied support artifact.
+
+The extension specifies seven deciding post hoc contrasts: each solar set versus full inputs,
+expanded versus minimal solar, minimal wind versus full and original lean wind, and each
+alternative wind representation versus minimal wind. Seven additional comparisons are
+exploratory. Both folds, both training settings, and three seeds are retained. Equal-width fits
+duplicate each set's own retained columns to 24; main-setting unpadded fits and direct
+padded-minus-unpadded contrasts assess padding dependence. Targeted comparisons against
+guarded full inputs, and against guarded original lean wind for the wind sets, assess dependence
+on those references' windchill handling. The new sets omit windchill; their guard comparisons
+reuse target predictions only after proving prepared-input invariance.
+
+Fair CRPS is the deciding score for these matched 51-value point forecasts. The same paired
+month-and-seed intervals, separate equal-month t-intervals, support counts, and unadjusted
+multiple-comparison limitations apply. These post hoc results are not independent confirmation
+on untouched folds. No new automatic adoption threshold or further feature search is specified.
+Five descriptive gain-importance figures show main and sensitivity settings separately, combining
+duplicate-padding credit with its real source and including zero-gain inputs. Their ranges
+describe variability across refits, rather than confidence intervals or evidence that an input helps.
+
 ## Results
 
 ### Reproducing the old-pipeline references
@@ -897,6 +950,8 @@ main unpadded checks retain the reported scores. Final scientific review and the
 smaller-feature experiments remain pending. These weekly-initialisation scores do not
 establish an official leaderboard result, adequate calibration or joint scenario coherence.
 
+![Original lean-wind loss improvements across training settings, windchill guards and padding checks.](../assets/fixed-pipeline-lean-features/lean-wind-controls.svg)
+
 ### Descriptive feature importance
 
 **Training gain describes how the point-control models divide split credit; held-out feature
@@ -982,6 +1037,15 @@ also prevents an unqualified claim that both fixes improve every series type. Pr
 correctness and measured forecast benefit are separate questions; these historical loss tests
 address the latter within the pinned archives and recipes.
 
+**A plausible wind-loss mechanism remains a hypothesis rather than a demonstrated bug.**
+Interpolating vector components can reduce speed when directions turn, compared with
+interpolating endpoint scalar speeds. The correction also changes bearings and derived
+windchill, which can change tree predictions and forecast spread. Source inspection found no
+demonstrated defect explaining the score deterioration, and these experiments do not isolate
+those mechanisms or compare the interpolated weather with observations. The requested u/v
+and circular tests examine downstream representations of the already processed values;
+they do not isolate the interpolation algorithm or recover native wind information.
+
 **The corrected winner remains a stronger distributional-loss benchmark than refitted
 production, while its coverage requires separate assessment.** The deciding score evaluates
 both delivered distributions at the same 19 midpoint probabilities. It supports the winner in
@@ -1043,7 +1107,7 @@ remain private. Published artifacts contain aggregate scores, feature names, cod
 specifications, without a private generator mapping.
 
 The old implementation is pinned to repository commit
-`4e820d24c0129c8c95c567ff7355abff8d416144`; the wind and radiation PR heads are
+`4e820d24c0129c8c95c567ff7355abff8d416144`; the executed wind and radiation PR revisions are
 `38025f4eab457b9605b8c124006609869dbfca0d` and
 `0f094c356da82e75c4014664ad7fb33fe1df8b7f`. Isolated package source trees preserve those
 implementations while the study code evolves. A committed integration patch combines their
@@ -1051,6 +1115,20 @@ feature-processing order, and the runtime inventory hashes every selected Python
 The runs use XGBoost 3.4.1 and Polars 2.0.0. Fit manifests record source and dependency hashes,
 parameters, data snapshots, seeds and hardware selection; report provenance verifies saved fit
 artifacts before aggregation.
+
+A subsequent check found PR 1167 at `70dd58f9da75c2500bcf7a3f6dc5ad1b663ffb95`.
+It moves the wind-derivation function to `weather_utils` without changing its executable
+syntax tree or its placement after interpolation. The added storage schema guard, dashboard
+support and documentation do not change the frozen study inputs. Historical runs retain their
+actual earlier revision; they are not relabelled as executions of the later commit. PR 1166's
+revision was unchanged at that check.
+
+At the subsequent 13 October check, wind PR 1167 was merged at
+`754954a66fdbfa540ce068e38716f9774a5c5f7e`; its additional changes were comments and documentation.
+Radiation PR 1166 was at `99a40cf586f93524f1034608faf285ae7cb91c2d`, incorporating the wind caller
+ordering already represented by the study's combined runtime. Those updates preserve the
+calculations used for the frozen frames. The requested feature comparisons reuse those frames;
+they do not evaluate subsequent changes to either implementation.
 
 **Reproduction requires the registered private snapshots.** Old and radiation-only frames use
 polar archive version 1830; wind-only and combined frames use component archive version 924.
