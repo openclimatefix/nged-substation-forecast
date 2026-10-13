@@ -444,3 +444,29 @@ copy. Both era loss contrasts remain unresolved under both interval methods. The
 weather-initialisation archive availability from the operational upgrade and notes shared partial
 November support, seasonal differences and training exposure; it makes no causal precipitation
 or upgrade claim. This is the first completed final Part 1b publication family.
+
+The later-era main precipitation interval meets the study skill's near-line rule. A post hoc
+robustness addition will therefore repeat both archive-availability eras with the existing
+sensitivity fits, adding two reports and four tables without adding model fits or changing the
+running queue. A fresh root review read all three new specifications and verified exact parsed
+equality with their main sources after reversing only the setting and report-path substitutions.
+The plan records the addition before execution. Its status remains post hoc and descriptive,
+despite the inherited contrast-kind metadata.
+
+The Fold B unpadded unaffected-type verifier passed all six exact comparisons, covering all
+66 forecast files in each comparison. Together with the Fold A proof, this completes the main
+unpadded verifier checks. Each proof concerns unaffected types within its padding policy.
+
+The main control export supplied sixteen directly rounded tables. The root checked all of
+them and integrated the twelve guarded, negative-control and unpadded tables, retaining the
+already integrated four era tables without duplication. The control prose records every relevant
+bootstrap/t-interval disagreement and limits the exact-equality proofs to unaffected types.
+The final unpadded selector also completed; its four tables agree with the interim export.
+
+Fold A's full sensitivity queue and twelve reports completed successfully. A freshly reviewed
+interim selector exported twenty-four exact table objects from the original final-family
+selectors; the root read all tables and the complete manifest before copying their generated
+bodies byte for byte. The exact unaffected-type verifier also passed all nine comparisons,
+covering all 53 forecast files per comparison. Fold B sensitivity is still running. These
+interim selectors will be superseded by the final publication families and are excluded from
+the public configuration inventory.

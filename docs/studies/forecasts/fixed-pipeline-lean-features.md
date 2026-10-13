@@ -611,8 +611,9 @@ availability require separate descriptive comparisons, which cannot establish an
 causal benefit from this aggregate contrast.
 
 **These main-setting add-backs do not yet decide a final input recommendation.** The alternate
-training setting and guarded-windchill, negative-control and unpadded checks remain pending.
-Their results must be reviewed before concluding which lean inputs to retain. The tests concern
+training setting remains pending. The main guarded-windchill, negative-control and unpadded
+checks are reported below; alternate-setting controls must also be reviewed before concluding
+which lean inputs to retain. The tests concern
 this historical point-model recipe, rather than the public production configuration or the
 pooled quantile winner.
 
@@ -632,16 +633,193 @@ identify that input's information content. Different seasons and training exposu
 these summaries from identifying a causal upgrade effect. Fold A's scoring window is wholly
 after the archive boundary.
 
-<!-- PART1B_ALTERNATE_SETTINGS_SLOT: add the reviewed second-setting lean, first-solar-rung
-and wind-addition findings, including disagreements with these main-setting results. -->
+### Fold A sensitivity retains lean wind's benefit, while lean solar remains unresolved
 
-<!-- PART1B_REQUIRED_CONTROLS_SLOT: add the guarded-windchill, negative-control and unpadded
-comparisons after completion and evidence review. -->
+**Lean wind retains lower loss under the second training setting, while lean solar's higher
+loss is no longer statistically supported in Fold A.** These are combined-pipeline historical
+point-model comparisons, with equal-width padding to 24 trained columns, three fitting seeds,
+12 validation months, six solar series and three wind series. The full-input control remains
+the historical cleaned recipe, distinct from public production and the pooled quantile winner.
+Fair CRPS is expressed as a percentage of frozen effective capacity; paired differences are
+capacity percentage points.
+
+For wind, the control's absolute fair CRPS is 16.843 (95% month-and-seed bootstrap interval
+15.085 to 18.527), versus 13.851 (12.308 to 15.275) for lean wind. The paired difference is
+-2.992 points (-3.724 to -2.362), and the separate equal-month difference is -2.968
+(t-interval -3.756 to -2.179). Both support improvement, statistically significant at the
+unadjusted 5% level, with lower loss in all 12 months. This retains the main-setting direction
+without attributing the benefit to a public-production change or an ingredient of the pooled
+winner.
+
+For solar, the control scores 7.763 (5.772 to 9.924), versus 7.881 (5.854 to 10.119) for
+lean solar. The paired difference is 0.118 (-0.009 to 0.264); the equal-month difference is
+0.097 (t-interval -0.077 to 0.270). Both allow improvement and deterioration. The main setting's
+primary bootstrap supported higher lean-solar loss, while its t-interval remained unresolved;
+the second setting therefore does not retain statistical support for that harm. This does not
+establish equivalence or a zero effect.
+
+### The first solar addition still cannot reopen the stopped ladder
+
+**The first solar addition has a supported bootstrap improvement in this setting, but its
+equal-month t-interval remains unresolved.** Adding 10 m wind speed scores 7.859 (95% bootstrap
+interval 5.841 to 10.091), against lean solar's 7.881 (5.854 to 10.119). Its paired difference
+is -0.022 points (-0.047 to -0.004), statistically significant at the unadjusted 5% level under
+the primary bootstrap. The equal-month difference is -0.016 (t-interval -0.033 to 0.001),
+allowing both signs, with lower loss in nine of 12 months. This reverses the main setting's
+interval disagreement, where the t-interval supported improvement and the bootstrap did not.
+The 0.022-point mean reduction remains below 0.15. More fundamentally, G4's registered
+continuation decision used the main-setting mean and already stopped the ladder. This check
+does not reopen it, imply later rungs were run or establish adoption of lean solar.
+
+### Calendar and precipitation additions retain higher wind loss in Fold A
+
+**The five calendar additions and precipitation type raise wind loss in both Fold A settings.**
+In sensitivity, the annual-cycle sine's paired difference is 2.057 points (95% bootstrap
+interval 1.280 to 2.839), and the cosine's is 1.529 (1.174 to 1.890). Weekday ordinal, sine
+and cosine differences are 0.251 (0.137 to 0.355), 0.211 (0.103 to 0.314) and 0.176
+(0.077 to 0.281), respectively. Precipitation type's difference is 0.331 (0.111 to 0.601).
+For each individual addition, both the bootstrap and equal-month t-interval support higher
+loss, statistically significant at the unadjusted 5% level. These separate refits do not
+decompose the full-input model's loss or identify a causal feature effect.
+
+Dewpoint remains unresolved, with a paired difference of -0.009 points (-0.064 to 0.045),
+as does downward short-wave radiation at -0.001 (-0.046 to 0.041). Their equal-month
+t-intervals also allow both signs. The short-wave point estimate changes sign from main,
+but that small sign change does not establish a reversal. Neither unresolved comparison
+establishes zero effect.
+
+### Guard and negative-control checks retain important interval disagreements
+
+**The guarded lean/full wind comparison retains its improvement, while the guard's own
+lean-wind effect disagrees across methods.** Directly comparing guarded lean wind with guarded
+full inputs gives -2.980 points (95% paired bootstrap interval -3.703 to -2.348), with an
+equal-month difference of -2.956 (t-interval -3.735 to -2.177). Improvement is statistically
+significant at the unadjusted 5% level under both methods, with lower loss in every month.
+The corresponding guarded lean/full solar contrast is unresolved under both methods:
+0.113 (-0.009 to 0.257), with an equal-month difference of 0.079 (-0.092 to 0.250).
+These are direct contrasts; their differences from unguarded contrasts do not estimate a
+guard interaction.
+
+Within lean wind itself, adding the guard gives 0.009 points (-0.006 to 0.020), unresolved
+under the bootstrap, while its equal-month difference is 0.009 (0.002 to 0.016), statistically
+significant deterioration at the unadjusted 5% level under the t-interval. The full-input
+guard effects remain unresolved under both methods for solar and wind. Lean solar omits
+windchill, so its printed zero guard contrast is structural rather than independent evidence
+that the guard is ineffective.
+
+**Wind's weekday-removal negative control also disagrees across methods.** Its paired
+difference is 0.078 points (95% bootstrap interval -0.004 to 0.171), while the equal-month
+difference is 0.077 (t-interval 0.002 to 0.152), statistically significant deterioration at
+the unadjusted 5% level only under the latter method. Its mean exceeds the expected 0.05-point
+small-change scale, which is neither a measured noise ceiling nor an equivalence margin.
+The other sensitivity negative-control contrasts—UTC-offset removal for solar and wind, and
+weekday removal for solar—remain unresolved under both methods. They do not establish
+negligible changes or passed equivalence checks. In particular, the main setting's supported
+equal-month solar UTC-removal improvement is not retained in sensitivity.
+
+The [feature-results appendix](fixed-pipeline-feature-results-tables.md) retains the emitted
+absolute and paired tables. The bootstrap resamples whole months and one shared fitted seed;
+the t-interval gives months equal weight after averaging fitting seeds within month. Their
+estimands and treatment of seed variation differ, and these tests have no multiple-comparison
+adjustment. Fold B sensitivity findings remain pending; the completed Fold A checks do not
+settle the final lean-input recommendation or establish performance beyond this fixed population
+and historical validation window.
+
+### Retrospective Fold B sensitivity retains lean wind's benefit and lean solar's higher loss
+
+**Both lean/full directions persist in retrospective Fold B's second setting.** Wind's full-input
+fair CRPS is 16.677 (95% month-and-seed bootstrap interval 15.030 to 18.373), versus 13.045
+(11.913 to 14.117) for lean wind. The paired difference is -3.632 capacity points (-4.756 to
+-2.606); the separate equal-month difference is -3.606 (t-interval -4.793 to -2.419).
+Both methods support lower loss, statistically significant at the unadjusted 5% level, in all
+15 validation months across the same three wind series and three fitting seeds.
+
+Solar's full-input score is 8.615 (6.985 to 10.146), versus 8.752 (7.082 to 10.307) for lean
+solar. Its paired increase is 0.138 capacity points (0.023 to 0.242), with an equal-month
+increase of 0.133 (t-interval 0.012 to 0.254). Both methods support higher loss, statistically
+significant at the unadjusted 5% level; only four of 15 months have lower loss. These results
+cover six solar series and three seeds. They retain the main-setting directions in this
+retrospective fold, while Fold A's sensitivity lean-solar comparison remains unresolved.
+
+<!-- PART1B_FOLD_B_SENSITIVITY_REMAINING_SLOT: add the reviewed first-solar, wind-addition,
+guarded and negative-control sensitivity findings, plus both post hoc availability-era checks. -->
+
+### Main-setting controls retain the lean-wind result, with unresolved small contrasts
+
+**The guarded-windchill comparisons retain lower lean-wind loss and higher lean-solar loss
+in both main folds.** These tests use the historical cleaned point-model recipe on the combined
+pipeline, three fitting seeds, six solar or three wind series, and 12 validation months in
+Fold A or 15 in retrospective Fold B. Loss differences are fair-CRPS capacity percentage points.
+Against the full-input control with the same guard, lean wind's difference is -3.314 in Fold A
+(95% paired month-and-seed bootstrap interval -3.953 to -2.730) and -3.811 in Fold B
+(-4.896 to -2.766). Both reductions are statistically significant at the unadjusted 5% level
+under the bootstrap and separate equal-month t-intervals, with lower loss in every validation
+month. These are direct guarded lean-minus-guarded-full comparisons, rather than a difference
+inferred between separate contrasts.
+
+Guarded lean solar has higher loss than guarded full inputs: 0.198 points in Fold A
+(0.028 to 0.394) and 0.190 in Fold B (0.046 to 0.325), statistically significant at the
+unadjusted 5% level under the primary bootstrap. Fold A's equal-month difference is 0.099
+(t-interval -0.195 to 0.392), leaving its direction unresolved under that method. Fold B's
+equal-month difference is 0.186 (0.033 to 0.338), supporting higher loss at the unadjusted
+5% level. Lean solar omits windchill, and its guarded-minus-unguarded solar score contrast
+is printed as zero in both folds. The lean-solar arm's deliberately retained wind predictions
+instead use the corresponding full-input control; similarly, the lean-wind arm retains the
+corresponding full-input solar predictions. Those retained types are not tests of the lean
+feature cut.
+
+**The guard's own effect on the full-input control remains unresolved under the primary
+bootstrap.** Fold A's differences are 0.008 for solar (-0.029 to 0.058) and -0.017 for wind
+(-0.106 to 0.066); their equal-month t-intervals also allow both signs. Fold B's solar difference
+is 0.014 (-0.017 to 0.042), also unresolved under both methods. Fold B wind disagrees across
+methods: its primary difference is 0.081 (-0.111 to 0.314), while the equal-month difference
+is 0.082 (0.022 to 0.142), statistically significant deterioration at the unadjusted 5% level
+under the t-interval. The guard's effect within lean wind also remains unresolved under both
+methods in each fold. Neither those unresolved contrasts nor agreement in the lean/full
+direction establishes that the guard has zero effect.
+
+**The negative controls do not establish a small-change ceiling.** Removing UTC offset from
+the full-input control gives a Fold A solar difference of -0.016 points (95% paired bootstrap
+interval -0.043 to 0.008), while its equal-month difference is -0.024 (t-interval -0.047 to
+-0.001): improvement is statistically significant at the unadjusted 5% level only under the
+latter method. Fold A wind's UTC-removal difference remains unresolved under both methods.
+Removing the weekday ordinal also remains unresolved for both types under both methods in
+Fold A; its wind point estimate is 0.067, above the expected 0.05-point small-change scale.
+
+In retrospective Fold B, UTC removal again disagrees across methods for both types. Solar's
+bootstrap difference is 0.012 (-0.079 to 0.094), versus an equal-month difference of 0.011
+(0.001 to 0.022). Wind's bootstrap difference is 0.112 (-0.233 to 0.650), versus an equal-month
+difference of 0.112 (0.047 to 0.177). Both t-intervals support deterioration at the unadjusted
+5% level, while the bootstrap intervals allow both signs. Weekday-ordinal removal remains
+unresolved under both methods: the primary differences are -0.005 for solar (-0.035 to 0.029)
+and 0.121 for wind (-0.017 to 0.262). Both Fold B wind negative-control means exceed the
+expected 0.05-point scale. That expectation is neither a measured noise ceiling nor an
+equivalence margin; the intervals permit meaningful changes, so these controls cannot be
+called negligible or treated as having passed an equivalence test. The injected radiation
+correlation check tests the timing detector, not forecast-loss detectability.
+
+**Removing duplicate padding retains the printed main-setting lean/full results.** The
+unpadded wind differences are -3.330 in Fold A (95% paired bootstrap interval -3.989 to -2.739)
+and -3.744 in Fold B (-4.849 to -2.678); the solar differences are 0.206 (0.044 to 0.393)
+and 0.204 (0.070 to 0.337). The absolute scores, paired estimates and intervals match the
+equal-padding publication tables at their printed precision, including Fold A solar's unresolved
+equal-month t-interval. This supports the main-setting score conclusions without asserting
+identical affected forecasts across padding policies. Separate artifact verification confirmed
+that deliberately retained unaffected types match their corresponding full-input controls within
+the unpadded policy in both folds. That proof concerns retained types within one padding policy,
+rather than equality between padded and unpadded affected forecasts.
+
+The [feature-results appendix](fixed-pipeline-feature-results-tables.md) retains the absolute
+and paired control tables, including both interval methods. Alternate-setting guarded and
+negative-control comparisons remain pending. These main-setting checks do not yet settle
+the final lean-wind recommendation.
 
 **A final lean-wind recommendation remains conditional on the required checks.** The two
 main-fold reductions support lean wind within this padded historical point-model recipe, but
-the alternate settings and guarded, negative and unpadded controls are pending. Their results
-must be reviewed before deciding what to retain. These weekly-initialisation scores do not
+both lean sensitivity comparisons are complete, while Fold B's guarded and negative controls
+remain pending. The main unpadded checks retain the reported scores. Remaining results must be
+reviewed before deciding what to
+retain. These weekly-initialisation scores do not
 establish an official leaderboard result, adequate calibration or joint scenario coherence.
 
 ### Descriptive feature importance
@@ -680,7 +858,8 @@ Float32 values exactly.
 expected masking of observations unavailable at forecast issuance; missing lags alone do not
 establish a pipeline error. The audit reports null and nonfinite counts separately and excludes
 both from changed-value shares. Windchill is still evaluated outside its formula's temperature
-and speed domain in the PR-only treatments; a separate domain guard remains to be evaluated.
+and speed domain in the PR-only treatments; the separate guarded comparisons above test that
+additional change.
 Radiation threshold and midpoint-night flags are screens rather than definitive invalid values:
 a half-hour whose midpoint is at night can still be partly sunlit.
 

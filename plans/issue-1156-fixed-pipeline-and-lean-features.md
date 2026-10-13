@@ -189,6 +189,14 @@ availability boundary. Fold B's earlier, wholly missing era measures availabilit
 precipitation's information content. The preserved folds cannot identify an era-balanced benefit;
 make that limitation explicit instead of asserting causality from an era sign reversal.
 
+**Post hoc robustness addition after the main era reports:** the later-era precipitation
+interval meets the study skill's near-line rule. Repeat both availability-era reports under
+the registered sensitivity setting, using its existing lean-wind and precipitation-addition
+fits. This adds two reports and four publication tables, with no new fits or change to the
+running queue. Retaining both eras avoids selecting only the near-line result. These additional
+reports are post hoc descriptive checks; the inherited `planned` metadata does not change that
+status, and neither era identifies a causal precipitation or operational-upgrade effect.
+
 **The two PRs do not repair every Part 1 diagnostic.** Describe their combined output as the
 wind/radiation-corrected pipeline, never as eliminating all audited faults. Check the windchill
 domain with a separately named study-only guarded version, using temperature at or below 10 C
