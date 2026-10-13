@@ -17,7 +17,15 @@ from typing import Any, Final
 import polars as pl
 
 PUBLIC_BASENAMES: Final[frozenset[str]] = frozenset(
-    {"levels.parquet", "contrasts.parquet", "absolute.parquet", "sample_semantics.parquet"}
+    {
+        "levels.parquet",
+        "contrasts.parquet",
+        "absolute.parquet",
+        "sample_semantics.parquet",
+        "feature_changes.parquet",
+        "domain_flags.parquet",
+        "timing_correlations.parquet",
+    }
 )
 PRIVATE_COLUMNS: Final[frozenset[str]] = frozenset(
     {

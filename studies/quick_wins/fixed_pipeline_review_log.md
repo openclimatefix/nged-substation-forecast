@@ -265,3 +265,18 @@ hashes every used report before and after export. A compatibility text export wa
 to the previously reviewed headline text. Ruff and formatting checks passed; the required study
 suite is running again because this change affects chart source selection. The new wind-addback
 specification remains a preparation draft and has not been rendered or interpreted.
+
+That study suite completed with 3,338 tests passed and five skipped in 212.53 seconds.
+
+The root reviewed the exact unaffected-type prediction verifier, first privately and then as a
+committed study script, before execution. It checks every saved forecast's complete keys and
+exact unaffected values, binds complete frame/fit inventories, and rechecks hashes afterward.
+An explicit privacy exception guard suppresses library errors that could expose private keys.
+Ruff, formatting and type checks passed. Its first execution awaits completed lean and solar fits.
+
+The root reviewed the aggregate input-audit table-source allowlist and all six selectors before
+execution. Existing private-column and selection guards remain unchanged. The supplementary
+page preserves the exact selected domain counts, precipitation missingness and timing rows,
+including lead/era support. Unsupported paired-finite change shares were omitted rather than
+filled with zero. The introduction distinguishes forecast input rows from distinct observed
+hours and the midnight May grouping marker from the deferred 06:00 operational-cycle comparison.

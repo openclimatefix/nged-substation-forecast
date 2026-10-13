@@ -479,29 +479,93 @@ contract change, production code change or evaluation of observed power from Jul
 
 ## Data and code availability
 
-The study-local scorer is `studies/forecast_calibration/calibration_diagnostics.py`. Forecasts,
-power observations, fit manifests and detailed provenance remain private under the study's data
-namespace. Public evidence is restricted to aggregate tables and figures without site identifiers,
-names or coordinates. Exact input/output hashes, code revision, dependency versions, XGBoost
-settings and completed-run inventory must be supplied with the results; none is inferred from
-this draft.
+**The public evidence consists of aggregate tables and figures; reproducing the scores requires
+the private frozen inputs.** The scorer is `studies/forecast_calibration/calibration_diagnostics.py`;
+`studies/quick_wins/fixed_pipeline_tables.py` selects the displayed tables without recalculating
+statistics. Forecasts, observations, fit manifests and detailed input inventories remain private.
+Completed diagnostic manifests cover Fold A main, Fold A sensitivity and Fold B main, using CUDA
+fits without padding and seeds 0, 1 and 2 for production and `r2_e1_c1_a3w_d3`. Fold B sensitivity
+remains pending. The conditional best-point refit was not run because the preregistered gate was
+not reached.
 
-<!-- PROVENANCE -->
+**The feature implementations and diagnostic environment are pinned.** The parent study's
+`studies/quick_wins/fixed_pipeline_runtime/README.md` describes reconstruction from base revision
+`4e820d24c0129c8c95c567ff7355abff8d416144`, wind PR revision
+`38025f4eab457b9605b8c124006609869dbfca0d` and radiation PR revision
+`0f094c356da82e75c4014664ad7fb33fe1df8b7f`, with the recorded combined integration patch.
+Completed fit provenance records XGBoost 3.4.1; diagnostic manifests record NumPy 2.5.3,
+Polars 2.0.0 and SciPy 1.18.1. The Fold A coverage render records Altair 6.3.0 and
+vl-convert-python 1.9.0.post1. Diagnostics use bootstrap seed 20261012 and 2,000 resamples.
+
+| Recorded source | SHA-256 |
+|---|---|
+| Diagnostic scorer, all three completed reports | `adba37654e98da9f49f8be1dfad906e1318a537b25250821f0a36108253dd5c7` |
+| Fitter for the saved corrected-pipeline forecasts | `b073be43f8809290746d952bf1acf988ea1f01cf61a7e2ed11e6f51f2de57ca3` |
+| Publication-table selector, Fold A main extract | `6c2bc6a59eb9ad5b8e8f4326c7c1fa850a2b90e11423c2c4e8da36d68d691362` |
+| Coverage chart script, Fold A main render | `21cc9fde248b27b45790374dc154e9bc94e955d4f62bf6a343e603882d61dbda` |
+| Combined integration patch | `23f4f76a30687b1c741b897273aba67fb5319dc43b6e51fdf062dc5083cf47a9` |
+
+**The final public reproduction inventory is still being prepared.** Completed artifacts retain
+original run configurations, input and output hashes, dependency versions and completion records.
+The private preparation inventory includes unexecuted jobs, so that inventory alone is not a
+completion record. Publication of the sanitised configurations and complete hash inventory remains
+pending final reconciliation. Whole private manifests are not public reproduction artifacts.
 
 ## Reproducing the figures
 
-**The first coverage figure uses the completed Fold A main report.** The following is a scoring
-command template, not the exact completed command. Variables must point to verified, matching completed
-fits for one fold and setting, and a new output directory; omit a missing point fit and report it
-as pending rather than substituting an older pipeline.
+**The commands below rescore the three completed fold/settings from their six saved fits.** Run
+from the repository root with the recorded environment. Set `STUDY_DATA_ROOT` to the private
+`data/studies/per_study` directory and choose a new `STUDY_REPRO_ROOT`; each output directory must
+be absent. The recipe and seed loops name the exact completed fit-directory layout. These are
+portable reproduction commands, not a claim that new runs have been executed. They omit Fold B
+sensitivity and the untriggered best-point refit.
 
 ```bash
-.venv/bin/python studies/forecast_calibration/calibration_diagnostics.py \
-  --frames "$COMBINED_FRAMES" \
-  --fit "$PRODUCTION_FIT" "$QUANTILE_FIT" "$POINT_FIT" \
-  --output "$NEW_DIAGNOSTIC_OUTPUT"
+set -euo pipefail
+STUDY_DATA_ROOT="/path/to/data/studies/per_study"
+STUDY_REPRO_ROOT="/path/to/new/calibration-reproduction"
+STUDY_PARENT_ROOT="$STUDY_DATA_ROOT/quick_wins_fixed_pipeline_1156"
+export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+export MLFLOW_DISABLE_AGENT_HINT=1
+
+for STUDY_RUN in fold_a_main fold_a_sensitivity fold_b_main; do
+  STUDY_FOLD="${STUDY_RUN%_*}"
+  STUDY_SETTING="${STUDY_RUN##*_}"
+  STUDY_FITS=()
+  for STUDY_RECIPE in production r2_e1_c1_a3w_d3; do
+    for STUDY_SEED in 0 1 2; do
+      STUDY_FITS+=("$STUDY_PARENT_ROOT/fits/combined/$STUDY_FOLD/$STUDY_RECIPE/$STUDY_SETTING/cuda_seed${STUDY_SEED}_none")
+    done
+  done
+  .venv/bin/python studies/forecast_calibration/calibration_diagnostics.py \
+    --frames "$STUDY_PARENT_ROOT/frames/combined/$STUDY_FOLD" \
+    --fit "${STUDY_FITS[@]}" \
+    --output "$STUDY_REPRO_ROOT/reports/$STUDY_RUN"
+done
 ```
 
-The scorer writes aggregate diagnostic tables, sample semantics and a manifest. Exact completed
-commands, figure-generation code and rendering instructions remain pending, along with scientific,
-first-reader and prose review of the completed page.
+**Figure text must be reviewed before rendering.** The coverage script verifies a completed
+report's output hashes and exports the text with `--text-only`. The first-reader and prose reviews
+must clear that exact text before a separate render command uses `--reviewed-text`. Use distinct,
+new output directories for text export and rendering, and inspect the rendered labels and layout.
+The following commands reproduce the Fold A main coverage figure from the rescored report above.
+
+```bash
+.venv/bin/python studies/forecast_calibration/calibration_coverage_charts.py \
+  --report "$STUDY_REPRO_ROOT/reports/fold_a_main" \
+  --output "$STUDY_REPRO_ROOT/coverage-fold-a-text" \
+  --text-only
+```
+
+After the exported `figure-text.md` has passed the required text reviews:
+
+```bash
+.venv/bin/python studies/forecast_calibration/calibration_coverage_charts.py \
+  --report "$STUDY_REPRO_ROOT/reports/fold_a_main" \
+  --output "$STUDY_REPRO_ROOT/coverage-fold-a-render" \
+  --reviewed-text "$STUDY_REPRO_ROOT/coverage-fold-a-text/figure-text.md"
+```
+
+**Final scientific, first-reader and prose review of the completed page remain pending.** The
+scorer's immutable report, aggregate tables and manifest preserve the evidence for those reviews;
+the reproduction commands do not replace them.

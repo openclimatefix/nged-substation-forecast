@@ -505,7 +505,6 @@ comparison changes the whole training recipe and does not isolate the processing
 | combined_winner | PV | 5.186 |
 | combined_winner | Wind | 11.369 |
 
-
 #### Deciding comparisons on common 19-level pinball loss: July 2025–June 2026, sensitivity setting
 
 | Comparison | Series type | Loss difference (capacity points) | 95% lower | 95% upper | Months with lower loss |
@@ -519,7 +518,6 @@ comparison changes the whole training recipe and does not isolate the processing
 | Corrected quick-wins winner minus corrected production configuration | all | -3.497 | -3.827 | -3.165 | 12 |
 | Corrected quick-wins winner minus corrected production configuration | PV | -2.633 | -3.340 | -1.971 | 12 |
 | Corrected quick-wins winner minus corrected production configuration | Wind | -5.497 | -6.259 | -4.873 | 12 |
-
 
 **Wind effects remain unresolved under the primary month-and-seed bootstrap in this setting.**
 Both corrections and the wind-only correction have intervals allowing improvement and
@@ -546,7 +544,6 @@ those methods. The full sensitivity extract retains the equal-month estimates an
 | Radiation correction with wind corrected | all | -0.116 | -0.181 | -0.051 | 9 |
 | Radiation correction with wind corrected | PV | -0.401 | -0.504 | -0.312 | 12 |
 | Radiation correction with wind corrected | Wind | 0.028 | -0.053 | 0.104 | 6 |
-
 
 **The wind–radiation interaction remains unresolved for all series, solar, and wind.**
 The interaction intervals allow both signs, as in Fold A's main setting. These sensitivity checks
@@ -619,6 +616,12 @@ archive-availability boundary and a separate May cycle marker. Source-provenance
 remains required before interpreting those markers. Different seasons and training exposure
 prevent the era summaries from identifying precipitation's information content or a causal
 upgrade effect.
+
+The [input-audit tables](fixed-pipeline-input-audit-tables.md) print the solar and wind domain
+counts, precipitation missingness and timing correlations for both folds. Counts include all
+weather members and overlapping forecast windows; they count forecast input rows rather than
+distinct observed hours. The separate guarded-windchill fits test whether the lean-feature
+conclusions depend on inputs outside that formula's domain.
 
 The separate [calibration diagnostics study](calibration-diagnostics-1156.md) starts Part 2 from
 saved corrected-pipeline predictions. It does not fit a calibrator or establish joint scenario
