@@ -128,6 +128,7 @@ nav:
           - "Do wind and radiation fixes improve XGBoost forecasts, and which lean inputs help?":
               - Overview: studies/forecasts/fixed-pipeline-lean-features.md
               - Pipeline results tables: studies/forecasts/fixed-pipeline-results-tables.md
+              - Lean feature results tables: studies/forecasts/fixed-pipeline-feature-results-tables.md
               - Input audit tables: studies/forecasts/fixed-pipeline-input-audit-tables.md
               - Configured feature inventory: studies/forecasts/fixed-pipeline-feature-inventory.md
           - "How well calibrated are the corrected XGBoost forecasts?":

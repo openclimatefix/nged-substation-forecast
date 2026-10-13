@@ -381,3 +381,24 @@ The public assets retain the optimised SVG figures used by the pages. Duplicate 
 removed from the proposed diff; the inspected PNGs remain in the immutable private rendering
 directories with their recorded hashes. This avoids shipping redundant raster files, several
 of which exceed the repository's added-file size limit, without altering the published figures.
+
+A fresh first-results science extension reviewed the completed wind-only and combined baselines
+in both folds and settings. It independently checked score-key/target/capacity matching, served
+leads and lag masks, all 71 runtime-source hashes, eight frame-source manifests and 252 fit
+metadata hashes. It required no rerun and confirmed the baseline conclusions and G3 stop.
+The root accepted its reporting finding after reading the six original contrast rows: the page
+now discloses additional main-setting disagreements between equal-month t intervals and the
+primary month-and-seed bootstrap. The fresh final science review still awaits Part 1b completion.
+
+The wind addback figure received a fresh isolated first-reader review and a twenty-pass prose
+sweep before rendering. The root accepted a definition of the weather ensemble, a date-scoped
+title and two sentence splits. The weather definition was also applied to the lean and solar
+figures; renewed twenty-pass sweeps found no further issue. Two cosmetic suggestions were
+rejected: repeating the already defined XGBoost family in every sentence, and changing a shared
+axis-label capitalisation. The root inspected all three final PNGs and copied only their SVGs.
+
+An initial feature-table draft was rejected because it manually transcribed report values and
+double-rounded several numbers. A freshly reviewed selector instead exported eight exact main
+lean and first-solar tables. Their generated bodies were copied byte for byte to the feature
+appendix; numerical prose was checked against those directly rounded exports. Remaining feature
+tables and the final recommendation await the queued controls and second setting.

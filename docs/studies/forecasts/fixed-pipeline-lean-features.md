@@ -300,6 +300,12 @@ wind correction has zero effect.
 
 [Pipeline-isolation comparisons](fixed-pipeline-results-tables.md#fold-a-main).
 
+In Fold A's main setting, the primary bootstrap remains unresolved for adding wind processing
+after radiation on solar farms and for adding radiation processing after wind on wind farms.
+Their equal-month t-intervals instead favour deterioration: 0.028 points (0.004 to 0.053) and
+0.067 points (0.027 to 0.107), respectively. These intervals weight months and fitted seeds
+differently, so the primary bootstrap conclusions remain unresolved.
+
 **The interaction between the processing corrections remains unresolved.** The interaction subtracts
 the radiation-only and wind-only scores from the combined score and adds the old-pipeline score. The
 all-series interaction is 0.002 capacity points (95% interval -0.083 to 0.061). Solar and wind
@@ -359,12 +365,21 @@ below. These pipeline comparisons support no feature recommendation.
 processing after radiation remains unresolved.** The wind-only wind-farm interval lies above
 zero; the conditional wind-after-radiation interval includes both improvement and deterioration.
 The wind-only finding differs from Fold A's unresolved comparison; Fold B's sensitivity setting
-also supports deterioration, as reported below. The interaction intervals also include zero for
-every reported type. Negative loss
+also supports deterioration, as reported below. The primary bootstrap interaction intervals include
+zero for every reported type. Negative loss
 differences favour the treatment named first; all pinball differences are percentage points of
 frozen capacity.
 
 [Pipeline-isolation comparisons](fixed-pipeline-results-tables.md#fold-b-main-retrospective).
+
+Fold B's main setting also has interval-method disagreements. The equal-month t-intervals
+favour deterioration for wind-only processing across all series, both corrections on wind farms,
+and wind processing after radiation across all series: 0.027 points (0.011 to 0.042),
+0.159 (0.038 to 0.279), and 0.038 (0.015 to 0.060). The wind interaction has a negative equal-month
+estimate of -0.152 (-0.266 to -0.039), while its primary bootstrap interval includes zero.
+This interaction measures departures from additivity of losses; it does not establish a forecast
+improvement from adding wind processing. The primary bootstrap remains unresolved for these
+comparisons.
 
 [Wind–radiation interaction](fixed-pipeline-results-tables.md#fold-b-main-retrospective).
 
@@ -483,7 +498,104 @@ The [fair-CRPS sensitivity table](fixed-pipeline-results-tables.md#fold-b-sensit
 is supplementary and does not replace the main-setting G3 gate. These pipeline comparisons do
 not decide which lean inputs help; the matched feature comparisons remain separate.
 
-<!-- FEATURE_RESULTS -->
+### Lean wind lowers loss, while lean solar raises it in both main folds
+
+![Full and lean point-model inputs in Fold A.](../assets/fixed-pipeline-lean-features/lean-fold-a.svg)
+
+**The lean wind inputs lower fair CRPS in both main folds, while the lean solar inputs raise
+it.** These comparisons use the combined wind/radiation-corrected pipeline and the historical
+cleaned point-model fitting path. All arms have 24 trained columns, using deterministic duplicate
+padding where needed, and column subsampling one. Their full-input control is
+`production_cleaned`, which differs from the public production configuration. Each forecast has
+51 values; fair CRPS compares these matched sample constructions. The results below cover
+three fitting seeds, six solar series or three wind series, with 12 validation months in Fold A
+and 15 in retrospective Fold B. Loss is a percentage of frozen effective capacity; differences
+are capacity percentage points. Lower is better.
+
+**Wind's loss reduction is statistically significant at the 5% level in both folds under both
+interval methods.** In Fold A, full-input fair CRPS is 17.151 (95% month-and-seed bootstrap
+interval 15.507 to 18.710), versus 13.821 (12.261 to 15.203) for lean wind. The paired
+lean-minus-full difference is -3.330 capacity points (-3.989 to -2.739). In retrospective
+Fold B, the corresponding absolute scores are 16.620 (14.859 to 18.291) and 12.876
+(11.768 to 13.944), with a paired difference of -3.744 (-4.849 to -2.678). Every validation
+month has lower loss: 12 of 12 in Fold A and 15 of 15 in Fold B.
+
+The separate equal-month wind differences are -3.309 in Fold A (95% t-interval -4.026 to
+-2.592) and -3.725 in Fold B (-4.923 to -2.527). The primary bootstrap resamples whole months
+and one paired fitting seed; the equal-month t-interval averages the fitted seeds within each
+month and gives months equal weight. Those methods represent different month weights and
+treatment of fitting-seed variation. Their agreement here does not make their estimands identical.
+
+**Solar's higher loss is statistically significant at the 5% level under the primary bootstrap
+in both folds, while Fold A's equal-month t-interval remains unresolved.** In Fold A, full-input
+fair CRPS is 7.889 (95% bootstrap interval 5.802 to 10.144), versus 8.095 (5.953 to 10.420)
+for lean solar. The paired increase is 0.206 capacity points (0.044 to 0.393), while the
+equal-month difference is 0.107 (t-interval -0.170 to 0.384). In retrospective Fold B, the
+absolute scores are 8.612 (6.976 to 10.134) and 8.816 (7.103 to 10.392). Its paired increase
+is 0.204 (0.070 to 0.337); the equal-month increase is 0.200 (0.044 to 0.355), also
+statistically significant at the 5% level. Lean solar has lower loss in only four of 12 Fold A
+months and four of 15 Fold B months.
+
+The [feature-results appendix](fixed-pipeline-feature-results-tables.md) retains the eight
+unaltered publication tables for these lean and solar comparisons.
+
+### The first solar addition stops the registered ladder
+
+![The first solar addition in Fold A.](../assets/fixed-pipeline-lean-features/solar-first-fold-a.svg)
+
+**Adding 10 m wind speed does not reach G4's continuation threshold.** Against lean solar,
+Fold A's three-seed mean fair-CRPS reduction is 0.025 capacity points, below the registered
+0.15-point threshold. Its absolute fair CRPS is 8.070 (95% bootstrap interval 5.940 to 10.402),
+compared with lean solar's 8.095 (5.953 to 10.420). The paired difference is -0.025
+(-0.063 to 0.022), so the primary bootstrap allows improvement and deterioration. The separate
+equal-month difference is -0.021 (t-interval -0.037 to -0.005), statistically significant at the
+5% level, with lower loss in nine of 12 months. The magnitude rule stops the ladder despite
+that disagreement.
+Later solar rungs are not run, and the registered rule does not adopt the lean solar set.
+
+**Retrospective Fold B does not resolve a benefit from the first addition.** Its paired
+difference is 0.005 capacity points (95% bootstrap interval -0.038 to 0.051), with the opposite
+sign from Fold A. Its equal-month difference is 0.006 (t-interval -0.032 to 0.043); both
+methods allow improvement and deterioration. The added-input arm's absolute fair CRPS is
+8.821 (7.120 to 10.385), compared with lean solar's 8.816 (7.103 to 10.392), with lower loss
+in seven of 15 months. The first rung still receives its planned alternate-setting check;
+that check does not bypass the stopped ladder.
+
+### Restoring individual calendar inputs worsens wind loss in Fold A
+
+![Separate wind input additions in Fold A.](../assets/fixed-pipeline-lean-features/wind-addbacks-fold-a.svg)
+
+**Each tested calendar addition raises wind loss against the lean wind baseline in Fold A's
+main setting, statistically significant at the unadjusted 5% level under both interval methods.** The
+annual-cycle sine and cosine and the three weekday columns are separate additions, each with
+the other lean inputs retained. Precipitation type also raises loss in this fold and setting,
+statistically significant at the unadjusted 5% level under both methods.
+Dewpoint and downward short-wave radiation remain unresolved under both interval methods;
+their intervals allow improvement and deterioration. These comparisons cover the same three
+wind series, three seeds and 12 validation months as the lean-wind contrast.
+
+**The isolated additions do not decompose the full-input model's loss.** Each test refits a
+different feature set, and the effects need not add together. They do not identify a causal
+mechanism for an individual feature's harm or show that a feature is useless under another
+recipe. Precipitation also has an archive-availability boundary: the retrospective earlier era
+cannot identify its information content from a wholly missing input. Its second-fold and era
+comparisons require their own interpretation. The dewpoint and short-wave intervals do not
+establish zero effects.
+
+<!-- PART1B_SECOND_FOLD_ADDBACKS_SLOT: add the reviewed Fold B single-feature results and
+precipitation-era interpretation when their immutable reports are complete. -->
+
+<!-- PART1B_ALTERNATE_SETTINGS_SLOT: add the reviewed second-setting lean, first-solar-rung
+and wind-addition findings, including disagreements with these main-setting results. -->
+
+<!-- PART1B_REQUIRED_CONTROLS_SLOT: add the guarded-windchill, negative-control and unpadded
+comparisons after completion and evidence review. -->
+
+**A final lean-wind recommendation remains conditional on the required checks.** The two
+main-fold reductions support lean wind within this padded historical point-model recipe, but
+the alternate settings and guarded, negative and unpadded controls are pending. Their results
+must be reviewed before deciding what to retain. These weekly-initialisation scores do not
+establish an official leaderboard result, adequate calibration or joint scenario coherence.
 
 ### Descriptive feature importance
 
