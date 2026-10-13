@@ -64,6 +64,7 @@ one, the mistake is already written.
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — sizes the issue, then writes a reviewed plan unless it is trivial, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
 | `implement-issue` | writing code for an approved plan: implement in the draft PR `plan-issue` opened, verify set, mark it ready, up to three adversarial reviews, stop |
+| `update-dependencies` | upgrading the locked dependencies (`uv lock --upgrade`) — the baseline-test, upgrade, fix, research-the-API-changes routine that ends in a PR report and waits for approval |
 | `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh issue/pr comment`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
@@ -438,6 +439,10 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
   `plan-issue` skill before any code is touched and deleted on merge. One worktree per branch is
   what keeps it to one file, so parallel sessions never collide. Usually empty on `main`, and empty
   on a branch whose issue was simple enough to need no plan.
+
+**Never change an issue or PR assigned to someone other than `JackKelly` without asking.** That
+covers its Status, labels, body, and state. Its assignee's work may not be visible on GitHub yet; see
+the `github-issue-pr-workflow` skill.
 
 **Creating an issue or a PR has a checklist** — labels, org issue Type, OCF project membership and
 its fields, sub-issue ordering, the `JackKelly` assignee — and none of it can be set by `gh issue

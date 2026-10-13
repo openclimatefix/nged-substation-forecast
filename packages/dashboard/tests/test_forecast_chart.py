@@ -19,7 +19,7 @@ from dashboard.forecast_chart import (
     build_view_forecast_chart,
 )
 from plotting import ocf_theme
-from weather_utils import select_analysis_proxy
+from weather_utils import select_analysis_proxy, wind_feature_expressions
 
 INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
 """During British Summer Time, so wall time is UTC+1 — the axis tests below rely on that."""
@@ -430,10 +430,55 @@ def test_nwp_chart_plots_each_member_with_the_units_on_the_y_axis() -> None:
     assert {row["ensemble_member"] for row in rows} == {0, 1, 2}
 
 
-def test_nwp_plot_variables_cover_exactly_the_continuous_nwp_vars() -> None:
+def test_nwp_plot_variables_cover_raw_continuous_and_derived_wind() -> None:
     # Drift guard: adding a variable to the Nwp contract must be mirrored here (or this set
     # comparison fails), and categorical variables must stay excluded.
-    assert set(NWP_PLOT_VARIABLES) == Nwp.continuous_var_names()
+    assert set(NWP_PLOT_VARIABLES) == Nwp.continuous_var_names() | {
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "wind_speed_100m",
+        "wind_direction_100m",
+    }
+
+
+@pytest.mark.parametrize("height", ["10m", "100m"])
+@pytest.mark.parametrize("quantity", ["speed", "direction"])
+def test_wind_chart_shows_derived_native_values_and_proxy(height: str, quantity: str) -> None:
+    variable = f"wind_{quantity}_{height}"
+    native = pl.LazyFrame(
+        {
+            "valid_time": [INIT_TIME, INIT_TIME + timedelta(hours=3)],
+            "ensemble_member": [0, 0],
+            "wind_u_10m": [3.0, -3.0],
+            "wind_v_10m": [4.0, -4.0],
+            "wind_u_100m": [3.0, -3.0],
+            "wind_v_100m": [4.0, -4.0],
+        }
+    ).with_columns(
+        *wind_feature_expressions(height="10m"), *wind_feature_expressions(height="100m")
+    )
+    analysis = select_analysis_proxy(
+        native.with_columns(init_time=pl.lit(NWP_INIT_TIME), h3_index=pl.lit(100)),
+        group_key="h3_index",
+    )
+    spec = build_nwp_ensemble_chart(
+        native,
+        variable=variable,
+        power_fcst_init_time=INIT_TIME,
+        nwp_init_time=NWP_INIT_TIME,
+        analysis=analysis,
+        shade_weekends=False,
+    ).to_dict()
+    for layer in spec["layer"][:2]:
+        rows = sorted(spec["datasets"][layer["data"]["name"]], key=lambda row: row["valid_time"])
+        values = [row[variable] for row in rows]
+        expected = [5.0, 5.0] if quantity == "speed" else [216.8699, 36.8699]
+        assert values == pytest.approx(expected, abs=1e-4)
+        unit = "m/s" if quantity == "speed" else "°"
+        assert (
+            layer["encoding"]["y"]["title"]
+            == f"{height[:-1]} {height[-1]} wind {quantity} ({unit})"
+        )
 
 
 def test_precipitation_is_displayed_in_mm_per_hour() -> None:

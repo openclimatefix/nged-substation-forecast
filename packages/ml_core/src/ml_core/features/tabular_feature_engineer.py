@@ -38,7 +38,7 @@ import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
-from weather_utils import NWP_ANALYSIS_MEMBER, select_analysis_proxy
+from weather_utils import NWP_ANALYSIS_MEMBER, select_analysis_proxy, wind_feature_expressions
 
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import (
@@ -48,10 +48,29 @@ from ml_core.features._nwp import (
     _resolve_nwp_init_time,
     _upsample_nwp_to_half_hourly,
 )
-from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, LagFeature, ParsedFeatures
+from ml_core.features._parsed_features import (
+    STATIC_FEATURE_REGISTRY,
+    LagFeature,
+    ParsedFeatures,
+)
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
 
 logger = logging.getLogger(__name__)
+
+
+def _derive_wind_features(nwp: pl.LazyFrame) -> pl.LazyFrame:
+    """Derive polar wind after interpolation, before weather selection and lookbacks.
+
+    Partial NWP projections can omit a height; the full ingest contract supplies both heights.
+    """
+    columns = nwp.collect_schema().names()
+    expressions = [
+        expression
+        for height in ("10m", "100m")
+        if {f"wind_u_{height}", f"wind_v_{height}"} <= set(columns)
+        for expression in wind_feature_expressions(height=height)
+    ]
+    return nwp.with_columns(expressions)
 
 
 def _attach_containing_nwp_cell(
@@ -266,7 +285,9 @@ def _engineer_features(
             if "downward_short_wave_radiation_flux_surface" in _renamed.collect_schema()
             else None
         )
-        _upsampled = _upsample_nwp_to_half_hourly(_renamed, solar_coordinates=solar_coordinates)
+        _upsampled = _derive_wind_features(
+            _upsample_nwp_to_half_hourly(_renamed, solar_coordinates=solar_coordinates)
+        )
         processed_nwp: pl.LazyFrame | None = _upsampled.with_columns(
             nwp_lead_time_hours=(
                 (pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_seconds() / 3600

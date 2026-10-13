@@ -62,6 +62,7 @@ Ranges re-fetched: 20; SHA-256 differs from the first fetch: 0
 | strd | 0 | 4.71365e+08 | 1.71468e+08 | 0 |
 | ssrd | 0 | 4.25329e+08 | 8.4181e+07 | 0 |
 | z500 | 47594 | 58463.8 | 54568.8 | 0 |
+
 2t: mean 284.23 means the values are in KELVIN.
 2d: mean 280.93 means the values are in KELVIN.
 z500 mean 54569 m2 s-2 is 5564 m of geopotential height.

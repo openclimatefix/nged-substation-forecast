@@ -5,10 +5,9 @@ forecast experiments. The report is
 [Production feature faults](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/production-feature-faults/).
 The corrections evaluated in this study were study-only.
 
-**Saved radiation probe results describe production before interval-aware resampling.** The audit
-calls the installed production implementation, so rerunning its source probes now measures the
-updated resampler. Keep new outputs separate from the historical results. The current policy and
-comparison are in the [radiation resampling
+**Saved radiation probe results describe production before interval-aware resampling.** Reproduce
+those results from the pinned historical checkout below, with matching inputs and dependencies.
+The current policy and comparison are in the [radiation resampling
 explanation](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling).
 
 ## Inputs and scope
@@ -20,7 +19,7 @@ The backwards stress test trains on July 2025–June 2026 and evaluates 66 weekl
 2024–June 2025. That chronology is deliberately reversed and is not prospective validation.
 
 Set `DATA_PATH_INTERNAL` to the local data root. The audit and forecasts use
-`studies.power.scan_power`, which stops before the final-test boundary. Metadata supplies solar
+`studies.power.scan_power`. Metadata supplies solar
 geometry; the delivery capacity table supplies each series’ error denominator. No downloads,
 licences, external service writes, or production changes are required.
 
@@ -38,7 +37,19 @@ The report explains the cached-native-value and boundary limitations.
 
 ## Reproduce
 
-From the repository root, with the workspace dependencies installed:
+**Run this historical audit from the pinned polar checkout.** Use an isolated worktree at commit
+`5ac2e16a7088d13f2f7103f0385a58f54388bfba`, its dependencies, and the matching polar archive and
+engineered caches. The raw speed/bearing probes exercise that historical contract and resampler;
+they do not exercise the component pipeline. From the current repository root:
+
+```bash
+git worktree add --detach .claude/worktrees/historical-feature-faults \
+  5ac2e16a7088d13f2f7103f0385a58f54388bfba
+cd .claude/worktrees/historical-feature-faults
+uv sync
+```
+
+Run all commands below from the root of that isolated checkout:
 
 ```bash
 export DATA_PATH_INTERNAL=/path/to/local/data

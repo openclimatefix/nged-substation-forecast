@@ -187,7 +187,7 @@ constructed.
 with a `ValidationError` naming the key. This matters more than a typo usually would, because the
 searches planned to drive most registrations will run unattended. The
 [large language model (LLM) agent](../roadmap/auto-research.md) planned for automated
-experimentation will run experiments and read the leaderboard with nobody in the loop. The
+experimentation will train and score screening runs with nobody in the loop. The
 [variant grid](../roadmap/training-history.md) planned for the training-history experiments will
 sweep several dimensions at once. A key that was quietly dropped would give you a grid of
 *identical* runs, each scoring plausibly, each landing on the leaderboard, and nothing to

@@ -190,11 +190,11 @@ uv run python studies/lag_features/lag_features_charts.py --followups
 
 - **The lag source** is NGED's hourly power with the multi-day zero runs, meter spikes, commissioning
   ramp and export-capped hours removed. The target is the shared rows' `power_mw`.
-- **Only the reproduction check reads rows at or after `final_test_start` (2026-07-01).** It refits
+- **Only the reproduction check reads rows at or after 2026-07-01.** It refits
   the ENS-mean B0 at lead-day 1 on the study's device and all 35,263 shared rows, including the
   5,144 from that date, because the published number includes them, and asserts a mean absolute
   error within 0.03 points of the published 8.771%. B0 reads no power. **Nothing else at or after
-  the date reaches a fit.** `studies.power.scan_power` stops there, the builder drops the shared
+  the date reaches a fit.** The builder drops the shared
   rows and the stage-1 hours from that date, and the build and fit scripts assert that no training
   row is at or after it. The study has 18 usable
   months.

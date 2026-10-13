@@ -48,11 +48,9 @@ None of these is ever legitimately null, anywhere in a run. That is why
 from the de-accumulated variables. It is also why the ``ecmwf_ens`` asset gates a check on that
 count being zero.
 
-Derived from the download list rather than from ``Nwp``'s fields, because the two namespaces differ.
-We download ``wind_u_10m``/``wind_v_10m`` (and the 100 m pair), and
-`dynamical_data.ecmwf_ens.convert_to_polars.convert_nwp_xarray_dataset_to_polars_dataframe`
-derives ``wind_speed_*``/``wind_direction_*`` from them. A set taken from the contract would name
-four variables the downloaded dataset does not carry, and indexing it would raise ``KeyError``.
+Derived from the download list so upstream checks describe exactly the requested dataset. Wind
+arrives as ``wind_u_*``/``wind_v_*`` and stays as components through H3 aggregation and storage.
+Feature engineering derives speed and bearing after temporal interpolation.
 """
 
 

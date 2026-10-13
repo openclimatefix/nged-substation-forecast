@@ -7,13 +7,14 @@ from contracts.weather_schemas import (
 
 
 def test_weather_feature_literal_matches_model_fields():
-    """WeatherFeature Literal must contain exactly the variables in Nwp.all_weather_var_names().
-
-    This test catches any divergence between the static type annotation and the runtime
-    model-field derivation — e.g. a new NWP variable added to Nwp but not to WeatherFeature, or
-    vice versa.
-    """
-    assert frozenset(get_args(WeatherFeature)) == Nwp.all_weather_var_names()
+    """Model features use derived polar wind; the archive stores components."""
+    components = {f"wind_{axis}_{height}" for axis in ("u", "v") for height in ("10m", "100m")}
+    polar = {
+        f"wind_{quantity}_{height}"
+        for quantity in ("speed", "direction")
+        for height in ("10m", "100m")
+    }
+    assert frozenset(get_args(WeatherFeature)) == (Nwp.all_weather_var_names() - components) | polar
 
 
 def test_continuous_and_categorical_partition_all_weather_vars():

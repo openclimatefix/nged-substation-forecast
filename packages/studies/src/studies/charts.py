@@ -593,7 +593,7 @@ def _rule_layers(
                 clip=True,
                 aria=False,
                 yOffset=y_offset,
-                **({"strokeDash": list(DASH)} if is_dashed else {}),
+                strokeDash=list(DASH) if is_dashed else alt.Undefined,
             )
             .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(f"{lower}:Q", scale=x_spec.scale, title=x_spec.title, axis=x_spec.axis),

@@ -13,6 +13,24 @@ description: >-
 
 # Creating issues and PRs, and shipping them
 
+## Be very cautious with an issue or PR assigned to someone else
+
+**Before changing an issue or PR in any way, check its assignees, and leave it alone if anyone
+other than `JackKelly` is assigned.** "In any way" covers closing, reopening, retitling, editing the
+body, changing labels, Type, sub-issue position or parent, and every project field, Status
+included. An assignee's work often lives where GitHub cannot see it: a local branch, an unpushed
+commit, a conversation. An issue with no pull request, no branch, and no recent comment can still be
+in progress, and a sweep that moves it to Todo misreports the assignee's work. A sweep did exactly
+this to four In Progress issues, and the assignee's colleague had to ask for the Status to be put
+back.
+
+```bash
+gh issue view <N> --json assignees --jq '[.assignees[].login]'   # same for `gh pr view`
+```
+
+When an issue assigned to someone else looks done or stale, report it to the maintainer and let the
+maintainer or the assignee decide. Do not post a comment on it either, unless asked.
+
 ## Creating GitHub issues
 
 Whenever you create an issue, also set:

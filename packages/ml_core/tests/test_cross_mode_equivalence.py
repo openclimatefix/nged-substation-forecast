@@ -51,6 +51,9 @@ _MEMBERS = [0, 1]
 _FEATURES = {
     "temperature_2m",
     "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_speed_10m_lag_7h",
+    "wind_speed_10m_rolling_mean_3h",
     "windchill",
     "local_time_of_day_sin",
     "local_time_of_day_cos",
@@ -68,6 +71,9 @@ _COMPARE_COLS = [
     "nwp_lead_time_hours",
     "temperature_2m",
     "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_speed_10m_lag_7h",
+    "wind_speed_10m_rolling_mean_3h",
     "windchill",
     "local_time_of_day_sin",
     "local_time_of_day_cos",
@@ -112,7 +118,8 @@ def _build_fixtures() -> tuple[
             "ensemble_member": member,
             "init_time": run,
             "temperature_2m": 10.0 + vt.hour + member * 0.5,
-            "wind_speed_10m": 3.0 + (vt.minute / 30.0) + member,
+            "wind_u_10m": 0.0,
+            "wind_v_10m": 3.0 + (vt.minute / 30.0) + member,
         }
         for run in _NWP_RUNS
         for member in _MEMBERS

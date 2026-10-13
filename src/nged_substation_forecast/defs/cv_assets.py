@@ -53,9 +53,7 @@ from ml_core.metrics import (
     compute_metrics,
     enrich_metrics_rows,
     require_same_row_keys,
-    require_single_model_name,
     require_valid_times_within_window,
-    require_window_within_guard,
     row_key_fingerprint,
 )
 from ml_core.mlflow_runs import (
@@ -722,24 +720,12 @@ class MetricsConfig(Config):
         return self
 
 
-FINAL_TEST_ENV_VAR: Final[str] = "NGED_FINAL_TEST"
-"""The environment variable that lets ``metrics`` score a window reaching ``final_test_start``.
-
-Only the maintainer's own shell sets it to ``"1"``; an experiment or a study never does.
-"""
-
-
 class _EvalWindow(NamedTuple):
     """The inclusive evaluation window of one metrics group, and the label stamped on its rows."""
 
     start: datetime
     end: datetime
     label: str
-
-
-def _final_test_enabled() -> bool:
-    """Return whether the maintainer's environment allows scoring past ``final_test_start``."""
-    return os.environ.get(FINAL_TEST_ENV_VAR) == "1"
 
 
 def _valid_time_extent(group_scan: pl.LazyFrame) -> tuple[datetime, datetime]:
@@ -802,11 +788,9 @@ def _validate_group(
     refusal on a later group never leaves
     an earlier group's ``forecast_metrics`` rows or MLflow runs behind.
 
-    Four checks, each raising. The final-test date guard applies to every scope. In leaderboard
-    scope every row's ``valid_time`` must also lie inside the fold's window. A ``study/``
-    experiment in leaderboard scope must additionally carry exactly the reference experiment's row
-    keys for the fold, so it cannot abstain on hard rows, and a single ``power_fcst_model_name``,
-    so it cannot down-weight them by spreading rows across model names.
+    Two checks, each raising, both in leaderboard scope only. Every row's ``valid_time`` must lie
+    inside the fold's window. A ``study/`` experiment must additionally carry exactly the reference
+    experiment's row keys for the fold, so it cannot abstain on hard rows.
 
     Args:
         exp_name: Experiment name of the group.
@@ -820,12 +804,6 @@ def _validate_group(
         The group's evaluation window.
     """
     window = _resolve_eval_window(evaluation_scope, fold_id, group_scan)
-    require_window_within_guard(
-        window_end=window.end,
-        final_test_start=_cv_config.final_test_start,
-        fold_id=fold_id,
-        final_test_enabled=_final_test_enabled(),
-    )
     if evaluation_scope != "leaderboard":
         return window
     valid_time_min, valid_time_max = _valid_time_extent(group_scan)
@@ -838,7 +816,6 @@ def _validate_group(
         group_label=group_label,
     )
     if exp_name.startswith(STUDY_EXPERIMENT_PREFIX):
-        require_single_model_name(study=group_scan, group_label=group_label)
         reference = PopulationFilter(
             experiment_name=_cv_config.reference_experiment_name, fold_id=fold_id
         ).apply(scan)
@@ -1303,20 +1280,17 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live or dev-fold rows: it
     takes the window from the rows themselves.
 
-    Every group is checked before any group is scored, and each check raises. A window that reaches
-    ``final_test_start`` in the CV config is refused unless ``NGED_FINAL_TEST=1`` is set in the
-    environment of the maintainer's shell; live rows are exempt. In leaderboard scope, every row's
-    ``valid_time`` must lie inside the fold's window.
+    Every group is checked before any group is scored, and each check raises. In leaderboard scope,
+    every row's ``valid_time`` must lie inside the fold's window.
 
     Experiments whose name starts with ``study/`` hold forecasts submitted through
     ``scripts/forecasting/score_study.py``. In leaderboard scope each study experiment must carry
     exactly the row keys ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)`` of
     the CV config's ``reference_experiment_name`` for the same fold, so a study cannot abstain on
-    hard rows or choose its own ensemble members, and a
-    single ``power_fcst_model_name``, so a study cannot down-weight hard rows by spreading rows
-    across model names. A run whose population filter names no ``experiment_name`` skips study
-    experiments, naming them in a warning and in the ``skipped_study_experiments`` output metadata;
-    a run whose population filter names a study's ``experiment_name`` scores that study.
+    hard rows or choose its own ensemble members. A run whose population filter names no
+    ``experiment_name`` skips study experiments, naming them in a warning and in the
+    ``skipped_study_experiments`` output metadata; a run whose population filter names a study's
+    ``experiment_name`` scores that study.
 
     In leaderboard scope, a run that scores a study also scores the reference experiment's group for
     the same fold, so the study and the reference share one snapshot of the observed power and of

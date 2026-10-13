@@ -443,8 +443,7 @@ alternatives we considered.
 ### Fold hygiene: selection bias and a final-test window 🚧
 
 Design and interim selection-bias guards:
-[#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960). Scorer and conditional
-final-test enforcement: [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958).
+[#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960).
 The original issue and its design-update comment are retained in
 [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226), closed as consolidated.
 
@@ -455,11 +454,14 @@ optimistic bias** — see
 for [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of
 which our own fold already meets in length but not in independence. The winner's reported skill will
-grow more optimistically biased over time, because hundreds of experiments are planned, including a
-search run by a large language model (LLM) agent that
-[Experiments run by an LLM agent](auto-research.md) describes. Our own fold is small in effective
-sample size rather than in row count, because consecutive half-hours are strongly correlated. The
-epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
+grow more optimistically biased over time, because hundreds of experiments are planned. Each study
+that posts a score to the leaderboard as a `study/` experiment adds to the bias, because the study
+chose its arms on the leaderboard fold. In phase 2 of the search that [Experiments run by an LLM agent](auto-research.md)
+describes, a large language model (LLM) agent screens ideas on folds that end before the leaderboard
+fold's validation window, but each finalist the maintainer scores on the leaderboard fold still adds
+to the bias. Our own fold is small in effective sample size rather than in row count, because
+consecutive half-hours are strongly correlated. The epoch mechanism handles *data* changes but not
+*adaptive selection* on a fixed fold.
 
 **Whether to reserve a genuinely untouched final-test year remains a design decision in #960.**
 Jack has questioned whether to reserve that year rather than train on more history and report
@@ -469,7 +471,7 @@ own Zarr backfill was estimated at ~November 2027 as of 2026-05, after v1.0, but
 may deliver about
 three of the missing years sooner — see [a staged-GRIB route fills three of the missing
 years](training-history.md#a-staged-grib-route-fills-three-of-the-missing-years-without-waiting-for-the-zarr-backfill).
-The interim guards below are planned work in #960; scorer enforcement is tracked in #958.
+The interim guards below are planned work in #960.
 
 **The planned Ladder guard publishes a new best only when it beats the standing best by more than
 a margin. The published score is then reported rounded to that margin.** [Blum and Hardt
@@ -510,17 +512,6 @@ single answer. TS-Arena avoids reusing any fixed evaluation window at all ([Meye
 (2026)](https://arxiv.org/abs/2512.20761)); Flexpectation's promotion decision cannot work that way,
 for the reason just given, and it is the live-monitoring check where our practice matches the
 TS-Arena pattern instead.
-
-**A narrow scoring guard works whether or not a final-test year is ever reserved.**
-`final_test_start` in `conf/cv/default.yaml` is a date later than every leaderboard fold's
-`val_end`. The `metrics` asset refuses to score a window reaching that date unless the maintainer's
-shell sets `NGED_FINAL_TEST=1`. `studies.power.scan_power` stops at the same date. The date alone
-does not reserve an independent final-test year or show that its observations were never used for
-training. Ahead of Dynamical.org's backfill, the date protects against an experiment, especially an
-unsupervised autonomous research session, scoring on later data without the maintainer's say-so. The
-other refusals of the `metrics` asset, and the `study/` experiment prefix, are described in [What
-the `metrics` asset refuses to
-score](../ml_experimentation/cross-validation-folds.md#what-the-metrics-asset-refuses-to-score).
 
 #### Implementation details — final-test window (deleted when it ships)
 

@@ -45,10 +45,11 @@ best-estimate, not a guarantee.
   pooling variants, how a weather product with a few months of history could enter the forecast,
   the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
   a promotion criterion.
-- [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent running
-  the XGBoost backlog, and larger ideas, as a search led by an LLM research lead: what published
-  research agents found, and a proposed design in which every implementation is reviewed before
-  training and scored from outside the worker's session.
+- [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent
+  searching for improvements to the XGBoost forecasting model in two phases: studies run overnight
+  from a plan agreed the day before, then a careful search in which the agent runs as a separate
+  Unix user that never sees the leaderboard's validation window. The page also summarises what
+  published research agents found. A person re-implements every idea that survives either phase.
 - [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate estimators
   of the time-varying effective capacity of metered generators: a [convex
@@ -150,9 +151,9 @@ AWS.*
       ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
     - Score every leaderboard experiment under each scenario, against `manual_heuristic`
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
-- **Infrastructure for experiments run by a large language model (LLM) agent** — the trusted submit
-  command, the review step, the leakage test, the research repository, the hypothesis store, and the
-  machine-readable leaderboard query, so that v0.5 can run experiments through the agent
+- **Phase 1 of agentic ML research** — Claude runs studies overnight, and each study posts its
+  scores to the leaderboard as a `study/` experiment; the scorer drops the checks that exist only to
+  stop deliberate cheating
   ([#1031](https://github.com/openclimatefix/nged-substation-forecast/issues/1031)); see
   [Experiments run by an LLM agent](auto-research.md)
 - One-command rollback for `promoted_model`
@@ -224,15 +225,14 @@ quantile pipeline:
   ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) — deliberately
   gated on the two items above, since degrading earlier would emit output no scenario has tested
 
-**Automated experimentation ("auto-research")**: an LLM agent runs some or all of the XGBoost
-backlog, and possibly larger ideas from other roadmap pages, as a search on infrastructure built in
-v0.3. Which ideas go to the agent is not yet decided. The work is gated on
-[#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first, because
-an autonomous session is only trustworthy once the session cannot edit or bypass the scorer the
-session is judged against. [Experiments run by an LLM agent](auto-research.md) gives the published
-evidence, and a proposed design in which every implementation is reviewed before training, an idea
-is implemented again whenever the idea's score is close to a competitor's, and every experiment is
-scored from outside the agent's session.
+**Phase 2 of agentic ML research**: once an XGBoost model beats `manual_heuristic` on the continuous
+ranked probability score (CRPS), an LLM agent screens the XGBoost backlog, and possibly larger ideas
+from other roadmap pages, as a separate Unix user that never sees the leaderboard's validation
+window ([#1169](https://github.com/openclimatefix/nged-substation-forecast/issues/1169)). The
+maintainer leans towards screening every idea. [Experiments run by an LLM agent](auto-research.md)
+gives the published evidence, and a design in which the agent screens ideas on data before the
+leaderboard's validation window, an idea is implemented again whenever the idea's score is close to
+a competitor's, and a person re-implements every idea that survives in a reviewed pull request.
 
 ---
 
