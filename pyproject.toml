@@ -397,6 +397,7 @@ extra-paths = [
     "studies/quick_wins",
     "studies/solar_bmu_census",
     "studies/weather_downloads",
+    "studies/wind_storage",
     "packages/studies/tests/past_weather",
 ]
 
@@ -477,6 +478,7 @@ pythonpath = [
     "studies/quick_wins",
     "studies/solar_bmu_census",
     "studies/weather_downloads",
+    "studies/wind_storage",
     "packages/studies/tests/past_weather",
 ]
 # `error` first: any warning not explicitly excepted below fails the test that raised it, so a

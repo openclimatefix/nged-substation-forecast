@@ -29,6 +29,7 @@ STATIC_FEATURE_REGISTRY: Final[dict[StaticFeature, pl.Expr]] = {
     ).alias("windchill"),
 }
 
+
 # Prevents physically impossible time shifts and lookahead bias by enforcing strict bounds on lag
 # hours and rolling window hours.
 Hours = Annotated[int, Field(gt=0, le=365 * 24 * 2)]

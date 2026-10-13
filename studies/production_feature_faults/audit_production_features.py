@@ -1,7 +1,9 @@
-"""Audit cached control-member features and probe production calculations without changing them.
+"""Audit cached control-member features and probe the historical polar-wind calculations.
 
 Only aggregate tables leave memory. Source identifiers and coordinates are never written.
-The private cache and the current production implementation are separate evidence sources.
+The private cache and the implementation pinned for this historical audit are separate evidence
+sources. Reproduction requires checkout 5ac2e16a7088d13f2f7103f0385a58f54388bfba and its
+matching polar archive, engineered caches, and dependencies.
 """
 
 import argparse
@@ -16,6 +18,7 @@ import numpy as np
 import polars as pl
 import yaml
 from contracts.settings import PROJECT_ROOT
+from contracts.weather_schemas import Nwp
 from deltalake import DeltaTable
 from ml_core.features._lags import _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
@@ -160,7 +163,18 @@ def temperature_ranges(frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def source_probes() -> dict[str, pl.DataFrame]:
-    """Run known-answer radiation, direction, weekday and lag-boundary production probes."""
+    """Run known-answer probes of the pinned historical production calculations."""
+    polar_columns = {
+        f"wind_{quantity}_{height}"
+        for height in ("10m", "100m")
+        for quantity in ("speed", "direction")
+    }
+    if not polar_columns <= Nwp.all_weather_var_names():
+        raise ValueError(
+            "Historical polar-wind audit requires checkout "
+            "5ac2e16a7088d13f2f7103f0385a58f54388bfba and matching inputs; "
+            "the component pipeline cannot reproduce these historical probes."
+        )
     start = datetime(2025, 1, 1, tzinfo=UTC)
     stamps = pl.datetime_range(start, start + timedelta(days=3), interval="30m", eager=True)
     hours = np.arange(len(stamps)) / 2
@@ -570,6 +584,7 @@ def main() -> None:
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    tables = source_probes()
     if args.data_root.resolve() != Path(CLEANED_POWER_DELTA_URI).parents[1].resolve():
         raise ValueError("--data-root must match the power source; set DATA_PATH_INTERNAL")
     metadata = pl.read_parquet(args.data_root / "NGED" / "metadata.parquet")
@@ -622,7 +637,6 @@ def main() -> None:
         ).items():
             collected.setdefault(name, []).append(table.with_columns(split=pl.lit(split)))
         print(f"audited {split}: {path.name}, {frame.height:,} control rows", flush=True)
-    tables = source_probes()
     tables.update(
         {name: combine_tables(name=name, parts=parts) for name, parts in collected.items()}
     )

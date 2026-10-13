@@ -19,8 +19,9 @@ needs it.
 
 **Direction is circular**, per the same page: 359 degrees and 1 degree are two degrees apart in
 reality and 358 degrees apart arithmetically, so `wind_direction_10m`/`wind_direction_100m` must
-never be averaged, interpolated, or differenced as plain numbers. They are written through
-unchanged here for a downstream study to turn into sine/cosine features, as
+never be averaged, interpolated, or differenced as plain numbers. The script derives speed and
+bearing from stored u/v at native forecast steps for a downstream study to turn into sine/cosine
+features, as
 `wind_products.py` already does for its other wind sources.
 
 The `ecmwf_ens` Dagster asset must already have populated `data/NWP/`, because this script reads
@@ -45,6 +46,8 @@ from fetch_ens_point import (
     _labelled_by_horizon,
     _wanted_leads,
 )
+from ml_core.features import wind_feature_expressions
+from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import wind_sites
 from studies.sources import ENS_SITE_POINTS_DIR
 
@@ -82,6 +85,10 @@ def _read_meters(*, cells: list[int], leads: list[int]) -> pl.DataFrame:
     return (
         pl.scan_delta(str(NWP_ROOT.parent))
         .filter(pl.col("h3_index").is_in(cells))
+        .with_columns(
+            *wind_feature_expressions(height="10m"),
+            *wind_feature_expressions(height="100m"),
+        )
         .select("h3_index", "init_time", "valid_time", "ensemble_member", *WIND_COLUMNS)
         .with_columns(
             lead_hours=((pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() // 60).cast(
@@ -102,6 +109,7 @@ def main() -> int:
     Raises:
         FileNotFoundError: If the ENS table is not on disk.
     """
+    refuse_to_overwrite(paths=[OUTPUT_PATH])
     if not NWP_ROOT.exists():
         msg = f"{NWP_ROOT} is missing; run the ecmwf_ens asset first"
         raise FileNotFoundError(msg)

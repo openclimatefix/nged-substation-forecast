@@ -4,7 +4,7 @@ The regular lat/lon grid is aggregated onto H3 cells on the way.
 """
 
 from collections.abc import Sequence
-from typing import Final, Literal
+from typing import Final
 
 import numpy as np
 import patito as pt
@@ -36,9 +36,8 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     """Convert one downloaded ECMWF ENS run into the validated `Nwp` frame.
 
     Loops over every `(lead_time, ensemble_member)` pair in `ds`. For each pair, aggregates that
-    chunk's grid points onto `h3_grid`'s H3 cells and derives wind speed and direction from the
-    downloaded u/v components. Returns the concatenated result, validated against the `Nwp`
-    contract.
+    chunk's grid points onto `h3_grid`'s H3 cells, retaining the downloaded u/v components.
+    Returns the concatenated result, validated against the `Nwp` contract.
 
     Guarantees, per cell:
 
@@ -55,9 +54,8 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     Each variable is renormalised over its *own* denominator, which is what keeps one variable's
     corruption from nulling the others. The cost a caller must know about: two variables in one
     cell can then be averaged over different sub-areas of the hexagon. So if `wind_u_*` and
-    `wind_v_*` ever have different null footprints, the wind vector derived by `_calc_wind_speed`
-    and `_calc_wind_direction` mixes two sub-areas. Upstream corruption has always been co-located
-    across variables, so that is theoretical today.
+    `wind_v_*` ever have different null footprints, the stored wind vector mixes two sub-areas.
+    Upstream corruption has always been co-located across variables, so that is theoretical today.
 
     Args:
         ds: One downloaded ECMWF ENS run, as returned by
@@ -70,8 +68,9 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
 
     Returns:
         One row per `(init_time, valid_time, ensemble_member, h3_index)`, validated against `Nwp`.
-        The wind components are dropped in favour of the derived speed and direction. Every other
-        downloaded variable is carried through under its `Nwp` field name.
+        Wind components remain signed area-weighted means, so temporal interpolation can precede
+        speed and bearing derivation. Every downloaded variable keeps its `Nwp` field name.
+        See <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>.
     """
     # Convention-sensitive to real ECMWF ENS data. The dimension and coordinate order feeds the
     # ravel below and the value-join that follows it, and the physical units feed Nwp.validate. The
@@ -106,51 +105,21 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
             )
             dfs.append(df)
 
-    df = (
-        pl.concat(dfs)
-        .with_columns(
-            nwp_model_id=pl.lit(NwpModelId.ECMWF_ENS_0_25_degree.name).cast(pl.String),
-            init_time=pl.lit(ds["init_time"].values).cast(UTC_DATETIME_DTYPE),
-            # h3_grid.h3_index (H3GridWeights, joined in above) is UInt64. That contract is
-            # Parquet-backed, so it never had Delta's no-unsigned-integer constraint. Nwp.h3_index
-            # is Int64, so the cast belongs here rather than at H3GridWeights's boundary. The
-            # narrowing loses nothing at any resolution: H3 reserves bit 63 of every index as zero,
-            # so no H3 value reaches the bit a signed Int64 gives up. See Nwp.h3_index in
-            # contracts.weather_schemas for the full argument.
-            h3_index=pl.col("h3_index").cast(pl.Int64),
-            # Wind speed and direction are computed here, after the H3 aggregation above, and that
-            # order matters. wind_u_*/wind_v_* are aggregated as ordinary numeric variables first.
-            # Speed and direction are then derived from the already-aggregated components. Averaging
-            # *direction* over grid points instead would average bearings numerically, and two
-            # points either side of North would come out as due South. A naive time resample of a
-            # direction column hits that same 0/360 wrap defect. See
-            # <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>.
-            wind_speed_10m=_calc_wind_speed(height="10m"),
-            wind_speed_100m=_calc_wind_speed(height="100m"),
-            wind_direction_10m=_calc_wind_direction(height="10m"),
-            wind_direction_100m=_calc_wind_direction(height="100m"),
-        )
-        .drop(cs.matches("^wind_u_.*") | cs.matches("^wind_v_.*"))
+    df = pl.concat(dfs).with_columns(
+        nwp_model_id=pl.lit(NwpModelId.ECMWF_ENS_0_25_degree.name).cast(pl.String),
+        init_time=pl.lit(ds["init_time"].values).cast(UTC_DATETIME_DTYPE),
+        # h3_grid.h3_index (H3GridWeights, joined in above) is UInt64. That contract is
+        # Parquet-backed, so it never had Delta's no-unsigned-integer constraint. Nwp.h3_index
+        # is Int64, so the cast belongs here rather than at H3GridWeights's boundary. The
+        # narrowing loses nothing at any resolution: H3 reserves bit 63 of every index as zero,
+        # so no H3 value reaches the bit a signed Int64 gives up. See Nwp.h3_index in
+        # contracts.weather_schemas for the full argument.
+        h3_index=pl.col("h3_index").cast(pl.Int64),
     )
 
     # No sort here: physical row order is delta_store.nwp's job (the single source of truth for
     # on-disk layout), and validation is order-independent.
     return Nwp.validate(df)
-
-
-def _calc_wind_speed(height: Literal["10m", "100m"]) -> pl.Expr:
-    return (pl.col(f"wind_u_{height}") ** 2 + pl.col(f"wind_v_{height}") ** 2).sqrt()
-
-
-def _calc_wind_direction(height: Literal["10m", "100m"]) -> pl.Expr:
-    """Compute wind direction (meteorological convention: the angle the wind is coming *from*)."""
-    RAD_TO_DEG = 180 / np.pi
-    # The arctan2 order: standard math usually writes atan2(y, x), and Polars' pl.arctan2("y",
-    # "x") follows that convention. Passing u as y and v as x aligns the 0-degree angle with the
-    # North (v) axis. The +180 offset: u and v describe where the wind is going, so arctan2 gives
-    # the direction of travel. Adding 180 degrees flips the vector to the direction the wind is
-    # coming from, which is the meteorological convention this function's name promises.
-    return (pl.arctan2(f"wind_u_{height}", f"wind_v_{height}") * RAD_TO_DEG + 180) % 360
 
 
 def _process_chunk_for_1_lead_time_and_1_ens_member(

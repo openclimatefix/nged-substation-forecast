@@ -1,0 +1,110 @@
+--- a/packages/contracts/src/contracts/weather_schemas.py
++++ b/packages/contracts/src/contracts/weather_schemas.py
+@@ -218,61 +218,32 @@
+         le=100,
+     )
+ 
+-    wind_speed_10m: float = pt.Field(
+-        dtype=pl.Float32,
+-        description=(
+-            "Wind speed at 10 m. Unit: metres per second. This is the magnitude of the cell's"
+-            " *vector* mean wind, not the mean of its grid points' scalar speeds. See"
+-            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
+-        ),
+-        ge=0,
+-        # The 200 m/s ceiling is a corrupt-feed guard, not a meteorological limit. The highest
+-        # non-tornadic surface wind gust ever recorded is 113.2 m/s. That gust was measured on
+-        # Barrow Island during Tropical Cyclone Olivia on 10 April 1996. The World Meteorological
+-        # Organisation (WMO) ratified the record in its World Weather and Climate Extremes
+-        # Archive: <https://wmo.int/asu-map?map=Wind_028>. That record is a 3-second gust at a
+-        # single anemometer. This column holds an instantaneous wind averaged as a vector over a
+-        # whole H3 cell. A cell-mean vector wind is lower again than a 3-second gust at a point.
+-        # Only a unit error or a corrupt value can reach 200.
++    wind_u_10m: float = pt.Field(
++        dtype=pl.Float32,
++        description="Eastward H3-mean wind at 10m. Unit: metres per second.",
++        ge=-200,
+         le=200,
+     )
+ 
+-    wind_direction_10m: float = pt.Field(
+-        dtype=pl.Float32,
+-        description=(
+-            "Wind direction at 10 m. The angle where the wind is coming from. Degrees."
+-            " 0° is North; 90° is East. This is a *circular* quantity: 359° and 1° are two degrees"
+-            " apart, so interpolating, averaging, differencing or taking a quantile of it as if it"
+-            " were an ordinary number is wrong wherever the values straddle North. Convert to"
+-            " components first. See"
+-            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
+-        ),
+-        ge=0,
+-        le=360,
+-    )
+-
+-    wind_speed_100m: float = pt.Field(
+-        dtype=pl.Float32,
+-        description=(
+-            "Wind speed at 100 m. Unit: metres per second. The stored value is a vector mean,"
+-            " with the same caveat as `wind_speed_10m`: a turbine power curve responds to the"
+-            " scalar speed at each grid point, not to the cell's vector mean. A height of 100 m"
+-            " matters most for wind generation, being near a modern turbine's hub. See"
+-            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
+-        ),
+-        ge=0,
+-        le=200,  # The same corrupt-feed ceiling as `wind_speed_10m`; see the comment there.
+-    )
+-
+-    wind_direction_100m: float = pt.Field(
+-        dtype=pl.Float32,
+-        description=(
+-            "Wind direction at 100 m. The angle where the wind is coming from. Degrees. 0° is "
+-            "North; 90° is East. This is circular, with the same handling requirement as "
+-            "`wind_direction_10m`."
+-        ),
+-        ge=0,
+-        le=360,
++    wind_v_10m: float = pt.Field(
++        dtype=pl.Float32,
++        description="Northward H3-mean wind at 10m. Unit: metres per second.",
++        ge=-200,
++        le=200,
++    )
++
++    wind_u_100m: float = pt.Field(
++        dtype=pl.Float32,
++        description="Eastward H3-mean wind at 100m. Unit: metres per second.",
++        ge=-200,
++        le=200,
++    )
++
++    wind_v_100m: float = pt.Field(
++        dtype=pl.Float32,
++        description="Northward H3-mean wind at 100m. Unit: metres per second.",
++        ge=-200,
++        le=200,
+     )
+ 
+     pressure_surface: float = pt.Field(
+--- a/packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py
++++ b/packages/dynamical_data/src/dynamical_data/ecmwf_ens/convert_to_polars.py
+@@ -118,19 +118,7 @@
+             # so no H3 value reaches the bit a signed Int64 gives up. See Nwp.h3_index in
+             # contracts.weather_schemas for the full argument.
+             h3_index=pl.col("h3_index").cast(pl.Int64),
+-            # Wind speed and direction are computed here, after the H3 aggregation above, and that
+-            # order matters. wind_u_*/wind_v_* are aggregated as ordinary numeric variables first.
+-            # Speed and direction are then derived from the already-aggregated components. Averaging
+-            # *direction* over grid points instead would average bearings numerically, and two
+-            # points either side of North would come out as due South. A naive time resample of a
+-            # direction column hits that same 0/360 wrap defect. See
+-            # <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>.
+-            wind_speed_10m=_calc_wind_speed(height="10m"),
+-            wind_speed_100m=_calc_wind_speed(height="100m"),
+-            wind_direction_10m=_calc_wind_direction(height="10m"),
+-            wind_direction_100m=_calc_wind_direction(height="100m"),
+-        )
+-        .drop(cs.matches("^wind_u_.*") | cs.matches("^wind_v_.*"))
++        )
+     )
+ 
+     # No sort here: physical row order is delta_store.nwp's job (the single source of truth for

@@ -14,6 +14,7 @@ theme:
     - content.code.copy
 
 markdown_extensions:
+  - attr_list
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.highlight
@@ -114,6 +115,7 @@ nav:
           - "Does CEDA's UKV or ERA5 describe past wind and temperature better?": studies/past-weather/ukv-ceda-vs-era5.md
           - "Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?": studies/past-weather/ukv-ceda-vs-openmeteo.md
       - Forecasts:
+          - "Wind component storage measurement": studies/forecasts/wind-storage.md
           - "How accurate is a power forecast driven by ECMWF ENS at each horizon?": studies/forecasts/ens-horizons.md
           - "Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?": studies/forecasts/matched-lead.md
           - "Extra weather products in the day-ahead lead comparison: how they are read, and their results": studies/forecasts/matched-lead-extra-products.md

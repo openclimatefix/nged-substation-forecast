@@ -1,0 +1,12 @@
+ops:
+  register_experiment:
+    config:
+      experiment_name: wind_components_after_interpolation
+      base_model_config: conf/model/xgboost.yaml
+      config_overrides: {}
+      run_mode: register_only
+      description: >-
+        Pending matched interpolation-ordering comparison for issue 525. Unchanged model
+        features and recipe. Polar reference commit 5ac2e16a7088d13f2f7103f0385a58f54388bfba,
+        Delta version 1830. Requires complete component archive and matched baseline rows;
+        no score or serving cutover is claimed.

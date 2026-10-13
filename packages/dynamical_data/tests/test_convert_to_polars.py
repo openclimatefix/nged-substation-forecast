@@ -67,11 +67,11 @@ def test_convert_happy_path_shape_and_schema(
     assert df["nwp_model_id"].unique().to_list() == ["ECMWF_ENS_0_25_degree"]
     # Each member's rows carry its own id (pins the per-member value routing, not just the count).
     assert sorted(df["ensemble_member"].unique().to_list()) == [0, 1]
-    # Wind speed/direction are derived; the raw u/v components are dropped.
+    # The archive retains components; model-facing polar features are derived later.
     for col in ("wind_speed_10m", "wind_direction_10m", "wind_speed_100m", "wind_direction_100m"):
-        assert col in df.columns
-    for col in ("wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"):
         assert col not in df.columns
+    for col in ("wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"):
+        assert col in df.columns
     assert df["init_time"].unique().to_list() == [_INIT_TIME]
     assert set(df["valid_time"].unique().to_list()) == {
         datetime(2025, 1, 1, 0, tzinfo=UTC),
@@ -80,67 +80,34 @@ def test_convert_happy_path_shape_and_schema(
     }
 
 
-def test_convert_derives_wind_speed(
+def test_convert_retains_weighted_wind_components(
     make_ens_dataset: Callable[..., xr.Dataset],
     make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
 ) -> None:
     ds = make_ens_dataset(
         latitudes=(52.0,),
-        longitudes=(-1.0,),
+        longitudes=(-1.0, -0.75),
         lead_time_hours=(0,),
         ensemble_members=(0,),
         var_values={
-            "wind_u_10m": 3.0,
-            "wind_v_10m": 4.0,
-            "wind_u_100m": 6.0,
-            "wind_v_100m": 8.0,
+            "wind_u_10m": np.array([[3.0, -3.0]], dtype=np.float32),
+            "wind_v_10m": np.array([[4.0, -4.0]], dtype=np.float32),
+            "wind_u_100m": np.array([[6.0, -6.0]], dtype=np.float32),
+            "wind_v_100m": np.array([[8.0, -8.0]], dtype=np.float32),
         },
     )
-    df = convert(ds=ds, h3_grid=_single_cell_grid(make_h3_grid))
-
-    assert df.height == 1
-    assert df["wind_speed_10m"].item() == pytest.approx(5.0)  # sqrt(3^2 + 4^2)
-    assert df["wind_speed_100m"].item() == pytest.approx(10.0)  # sqrt(6^2 + 8^2)
-
-
-@pytest.mark.parametrize(
-    ("wind_u", "wind_v", "expected_direction"),
-    # Meteorological "direction from"; formula is (arctan2(u, v) * 180/pi + 180) % 360. All four
-    # quadrants plus a non-axis-aligned bearing; values kept clear of the 0/360 wrap boundary so
-    # float rounding can't flip 359.99 <-> 0.
-    [
-        (0.0, 1.0, 180.0),  # from the south
-        (1.0, 0.0, 270.0),  # from the west
-        (-1.0, 0.0, 90.0),  # from the east
-        (1.0, 1.0, 225.0),  # from the south-west
-        (-1.0, -1.0, 45.0),  # from the north-east
-    ],
-)
-def test_convert_derives_wind_direction(
-    make_ens_dataset: Callable[..., xr.Dataset],
-    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
-    wind_u: float,
-    wind_v: float,
-    expected_direction: float,
-) -> None:
-    # Inject identical components at both heights so the 100 m derivation is checked too, not just
-    # its column presence.
-    ds = make_ens_dataset(
-        latitudes=(52.0,),
-        longitudes=(-1.0,),
-        lead_time_hours=(0,),
-        ensemble_members=(0,),
-        var_values={
-            "wind_u_10m": wind_u,
-            "wind_v_10m": wind_v,
-            "wind_u_100m": wind_u,
-            "wind_v_100m": wind_v,
-        },
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.25, 0.75],
     )
-    df = convert(ds=ds, h3_grid=_single_cell_grid(make_h3_grid))
+    df = convert(ds=ds, h3_grid=h3)
 
-    assert df["wind_direction_10m"].item() == pytest.approx(expected_direction)
-    assert df["wind_direction_100m"].item() == pytest.approx(expected_direction)
+    assert df["wind_u_10m"].item() == pytest.approx(-1.5)
+    assert df["wind_v_10m"].item() == pytest.approx(-2.0)
+    assert df["wind_u_100m"].item() == pytest.approx(-3.0)
+    assert df["wind_v_100m"].item() == pytest.approx(-4.0)
 
 
 def test_convert_proportion_weighted_aggregation(

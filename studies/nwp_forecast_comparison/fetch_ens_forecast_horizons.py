@@ -23,9 +23,14 @@ leads each technology scores.
 The extract is read through the Delta transaction log, never by globbing the parquet files, because
 a partition written twice keeps its superseded files on disk.
 
-Run it with `uv run python studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py`.
+Run with `uv run python studies/nwp_forecast_comparison/fetch_ens_forecast_horizons.py`
+followed by `--source COMPONENT_TABLE --source-version VERSION --output-directory NEW_DIRECTORY`.
+The main extract and supplement must use the same pinned source snapshot and output directory.
+Existing polar caches remain frozen and cannot be paired with newly derived values.
 """
 
+import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -33,23 +38,19 @@ from typing import Final
 
 import h3.api.basic_int as h3
 import polars as pl
+from ml_core.features import wind_feature_expressions
 from studies.ens_members import ENSEMBLE_SIZE
+from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import pv_sites, wind_sites
-from studies.sources import ENS_PRODUCT_DIR, REPO_DATA_DIR
+from studies.sources import ENS_PRODUCT_DIR
+
+OUTPUT_PATH: Final[Path] = ENS_PRODUCT_DIR / "ens_members.parquet"
+"""Frozen extract used by existing analyses; new extractions require an output directory."""
 
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_forecast_horizons")
 
-NWP_TABLE: Final[Path] = REPO_DATA_DIR / "NWP"
-"""The production NWP Delta table, partitioned by model and run."""
-
 NWP_MODEL_ID: Final[str] = "ECMWF_ENS_0_25_degree"
-"""The ENS partition of `NWP_TABLE`."""
-
-OUTPUT_DIR: Final[Path] = ENS_PRODUCT_DIR
-"""Where the extract is written, in the shared ENS extract folder."""
-
-OUTPUT_PATH: Final[Path] = OUTPUT_DIR / "ens_members.parquet"
-"""The extract: one row per generator, run, valid time and member."""
+"""The ENS partition of the source table."""
 
 H3_RESOLUTION: Final[int] = 5
 """The resolution the ENS table's `h3_index` is keyed at."""
@@ -101,10 +102,14 @@ def _cells(*, sites: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _members(*, cells: list[int], leads: list[int] | None = None) -> pl.DataFrame:
+def _members(
+    *, source: Path, source_version: int, cells: list[int], leads: list[int] | None = None
+) -> pl.DataFrame:
     """Read every member of every run at the wanted cells and leads.
 
     Args:
+        source: Component-wind Delta archive.
+        source_version: Pinned Delta snapshot.
         cells: The H3 cells to read.
         leads: The lead hours to read; `_leads()` where `None`.
 
@@ -113,12 +118,16 @@ def _members(*, cells: list[int], leads: list[int] | None = None) -> pl.DataFram
         reads.
     """
     return (
-        pl.scan_delta(str(NWP_TABLE))
+        pl.scan_delta(str(source), version=source_version)
         .filter(pl.col("nwp_model_id") == NWP_MODEL_ID, pl.col("h3_index").is_in(cells))
         .with_columns(
             lead_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_hours().cast(pl.Int32)
         )
         .filter(pl.col("lead_hours").is_in(_leads() if leads is None else leads))
+        .with_columns(
+            *wind_feature_expressions(height="10m"),
+            *wind_feature_expressions(height="100m"),
+        )
         .select(
             "h3_index",
             "init_time",
@@ -136,8 +145,28 @@ def _members(*, cells: list[int], leads: list[int] | None = None) -> pl.DataFram
     )
 
 
-def main() -> int:
+def source_metadata(*, source: Path, source_version: int) -> dict:
+    """Identify the native component snapshot shared by an extract and its supplement."""
+    return {
+        "source": str(source.resolve()),
+        "version": source_version,
+        "schema": {
+            name: str(dtype)
+            for name, dtype in pl.scan_delta(str(source), version=source_version)
+            .collect_schema()
+            .items()
+        },
+        "wind_representation": "components-derived-polar-native-v1",
+    }
+
+
+def main(*, source: Path, source_version: int, output_directory: Path) -> int:
     """Write the per-member extract.
+
+    Args:
+        source: Component-wind Delta archive.
+        source_version: Pinned Delta snapshot.
+        output_directory: New dataset directory, separate from historical polar extracts.
 
     Returns:
         The process exit status.
@@ -147,8 +176,11 @@ def main() -> int:
         ValueError: If a generator's H3 cell has no rows in the table.
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    if not NWP_TABLE.exists():
-        msg = f"{NWP_TABLE} is missing; run the ecmwf_ens asset first"
+    output_path = output_directory / "ens_members.parquet"
+    metadata_path = output_directory / "ens_members.source.json"
+    refuse_to_overwrite(paths=[output_path, metadata_path])
+    if not source.exists():
+        msg = f"{source} is missing; build the component archive first"
         raise FileNotFoundError(msg)
 
     sites = pl.concat(
@@ -158,7 +190,9 @@ def main() -> int:
         ]
     )
     lookup = _cells(sites=sites)
-    members = _members(cells=lookup["h3_index"].unique().to_list())
+    members = _members(
+        source=source, source_version=source_version, cells=lookup["h3_index"].unique().to_list()
+    )
     rows = (
         lookup.join(members, on="h3_index")
         .drop("h3_index")
@@ -168,8 +202,13 @@ def main() -> int:
     if missing:
         msg = f"no ENS rows for generators {sorted(missing)}: their H3 cells are not in the table"
         raise ValueError(msg)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    rows.write_parquet(OUTPUT_PATH)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_suffix(".parquet.partial")
+    rows.write_parquet(temporary)
+    metadata_path.write_text(
+        json.dumps(source_metadata(source=source, source_version=source_version), indent=2) + "\n"
+    )
+    temporary.replace(output_path)
     _LOG.info(
         "wrote %d rows for %d generators, %d runs (%s to %s), %d members, to %s",
         rows.height,
@@ -178,7 +217,7 @@ def main() -> int:
         rows["init_time"].min(),
         rows["init_time"].max(),
         rows["ensemble_member"].n_unique(),
-        OUTPUT_PATH,
+        output_path,
     )
     per_stamp = rows.group_by("site", "init_time", "valid_time").len()
     _LOG.info(
@@ -191,4 +230,15 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--source-version", type=int, required=True)
+    parser.add_argument("--output-directory", type=Path, required=True)
+    args = parser.parse_args()
+    sys.exit(
+        main(
+            source=args.source,
+            source_version=args.source_version,
+            output_directory=args.output_directory,
+        )
+    )
