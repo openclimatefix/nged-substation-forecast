@@ -402,3 +402,11 @@ double-rounded several numbers. A freshly reviewed selector instead exported eig
 lean and first-solar tables. Their generated bodies were copied byte for byte to the feature
 appendix; numerical prose was checked against those directly rounded exports. Remaining feature
 tables and the final recommendation await the queued controls and second setting.
+
+A fresh Part 1b first-results scientific review independently reproduced the six main lean
+and first-solar differences, the solar bootstrap and equal-month interval, actual feature
+widths and parameters, issuance/lag masks and example fair-CRPS calculations. It checked the
+exact unaffected-type proofs and all eight Fold A additions. It found no required correction
+or rerun. The guarded result retains the lean-wind advantage, while the negative controls do
+not establish negligible effects or a pipeline-noise ceiling. Final adoption still depends
+on the remaining registered checks and the separate fresh second scientific review.
