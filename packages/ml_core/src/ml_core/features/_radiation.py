@@ -30,10 +30,23 @@ own energy; neither radiation values nor usable clear-sky indices are clipped.
 
 
 def _check_radiation_schedule(frame: pl.DataFrame, *, strict: bool) -> pl.DataFrame:
-    """Reject unsupported native support in research; name the fault and leave nulls in serving.
+    """Reject unsupported native support in research; filter faulty rows in serving.
 
     Validation runs on native batches during collection, before expansion. Missing scheduled rows
     are allowed; an off-schedule timestamp or unknown weather source cannot define a window width.
+
+    Args:
+        frame: Native rows with UTC datetime columns `nwp_init_time` and `valid_time`. Each row
+            represents a period-ending native radiation mean. Optional `nwp_model_id` identifies
+            the source; when absent, ECMWF ENS is assumed. Other columns are passed through.
+        strict: Raise `ValueError` for unsupported source/lead times when true; otherwise log
+            `unsupported_radiation_schedule` and remove those rows. Scheduled lead zero is allowed
+            here, although it has no backward window and is removed during expansion.
+
+    Returns:
+        The input columns and dtypes, with all rows retained if valid. In non-strict mode only
+        supported ECMWF ENS rows remain. This helper does not insert missing rows or null values;
+        the caller's later join onto the forecast grid leaves excluded timestamps null.
     """
     supported = (pl.col("valid_time") - pl.col("nwp_init_time")).is_in(
         [timedelta(hours=lead) for lead in ECMWF_ENS_LEAD_TIME_HOURS]
@@ -60,11 +73,21 @@ def _check_radiation_schedule(frame: pl.DataFrame, *, strict: bool) -> pl.DataFr
 
 
 def _check_solar_coordinates(frame: pl.DataFrame) -> pl.DataFrame:
-    """Reject incomplete solar inputs from direct callers before null geometry becomes darkness.
+    """Reject incomplete solar inputs before null geometry becomes darkness.
 
     Reusable-helper validation: production's validated site relation supplies finite coordinates,
     but direct callers can omit a site or provide null/nonfinite values. Those inputs are programmer
     errors rather than fully-dark weather windows, so the constant-energy fallback must not apply.
+
+    Args:
+        frame: Joined solar target rows containing `time_series_id`, numeric `latitude` and
+            `longitude` in degrees, and any other columns to pass through. The caller supplies
+            one row per site/target timestamp. Coordinates must be finite, non-null, and within
+            [-90, 90] latitude and [-180, 180] longitude; violations raise `ValueError` with
+            `invalid_solar_coordinates`.
+
+    Returns:
+        The same frame, with every row, column, dtype, and value unchanged when validation passes.
     """
     valid = (
         pl.col("latitude").is_finite()
@@ -88,6 +111,23 @@ def _half_hour_clear_sky(*, targets: pl.LazyFrame, coordinates: pl.LazyFrame) ->
     US National Oceanic and Atmospheric Administration (NOAA) fractional-year solar geometry
     includes longitude and equation of time. Geometry is independent of run/member, so compute it
     once per series and target timestamp.
+
+    Args:
+        targets: Rows containing `time_series_id` and UTC datetime `valid_time`, the ending label
+            of a half-hour interval. Repeated site/time pairs across runs or ensemble members are
+            deduplicated; all other input columns are ignored.
+        coordinates: One row per `time_series_id`, with numeric `latitude` and `longitude` in
+            degrees. Supply exactly these three columns. Every target site must have valid
+            coordinates; duplicate IDs fail the many-to-one join and missing/invalid coordinates
+            fail `_check_solar_coordinates` during collection.
+
+    Returns:
+        One row per distinct target site/time pair, with exactly `time_series_id`, `valid_time`
+        (their input dtypes), `_clear_sky` (Float64, W/m²), and `_daylight_block` (Int64).
+        `_clear_sky` averages samples 7.5 and 22.5 minutes before `valid_time` and is zero in
+        darkness. `_daylight_block` counts transitions from zero to positive clear-sky flux in
+        timestamp order per site, starting at one if the first target is sunlit, otherwise zero.
+        No run/member keys or coordinate columns are returned; output row order is unspecified.
     """
     samples = (
         targets.select("time_series_id", "valid_time")
@@ -168,7 +208,30 @@ def _half_hour_clear_sky(*, targets: pl.LazyFrame, coordinates: pl.LazyFrame) ->
 
 
 def _native_targets(*, native: pl.LazyFrame, group_cols: list[str]) -> pl.LazyFrame:
-    """Expand supported source windows, using scheduled widths even when rows are missing."""
+    """Expand supported source windows, using scheduled widths even when rows are missing.
+
+    Args:
+        native: One row per `group_cols`/`valid_time`, with Datetime[us, UTC] `nwp_init_time` and
+            `valid_time` and the available radiation columns named by `SHORT_WAVE`/`LONG_WAVE`.
+            Radiation values are nullable period-ending means in W/m². Source rows must have
+            passed schedule validation; other columns, if supplied, are also retained.
+        group_cols: Columns identifying independent trajectories, including `nwp_init_time` and
+            normally `time_series_id`, `ensemble_member`, and optional `nwp_model_id`.
+
+    Returns:
+        Six rows per supported three-hour window or twelve per six-hour window. Every input
+        column is retained, except source `valid_time` becomes `_window_end` and a new
+        `valid_time` labels each half-hour ending from `_window_start` + 30 minutes through
+        `_window_end`. Radiation means and other source values repeat across their window;
+        null means remain null. Both window bounds use the input datetime dtype.
+        Added columns are `_lead` (Duration[us], valid time minus initialisation),
+        `_width_minutes` (Int64, scheduled window length), `_window_start`, and `_anchor_second`
+        (Int64, Unix seconds at the native window midpoint). If short-wave is present, `_break`
+        (Boolean) marks the first window, a missing preceding window, or a null current/previous
+        short-wave mean; `_segment` (Int64) cumulatively counts these breaks per trajectory.
+        Lead-zero and unsupported leads produce no rows. Missing source windows are not filled,
+        and complete windows are expanded without cropping to the caller's forecast horizon.
+    """
     leads = ECMWF_ENS_LEAD_TIME_HOURS
     schedule = (
         pl.DataFrame(
@@ -217,7 +280,34 @@ def _native_targets(*, native: pl.LazyFrame, group_cols: list[str]) -> pl.LazyFr
 def _shape_short_wave(
     *, targets: pl.LazyFrame, group_cols: list[str], coordinates: pl.LazyFrame
 ) -> pl.LazyFrame:
-    """Interpolate indices in daylight blocks, then conserve complete native-window energy."""
+    """Interpolate indices in daylight blocks, then conserve complete native-window energy.
+
+    Args:
+        targets: Complete expanded windows from `_native_targets`, including `SHORT_WAVE`,
+            `time_series_id`, `valid_time`, `_window_end`, `_anchor_second`, `_segment`, and
+            every `group_cols` column. Each window's native short-wave mean in W/m² is repeated
+            on its half-hour rows. Additional columns, including long-wave results, pass through.
+        group_cols: The trajectory identity columns used to expand `targets`.
+        coordinates: Exactly `time_series_id`, `latitude`, and `longitude`, with one finite,
+            non-null coordinate pair in degrees per target site, as for `_half_hour_clear_sky`.
+
+    Returns:
+        The same target rows and input columns, with `SHORT_WAVE` replaced by Float64 half-hour
+        means in W/m² whose average within each complete native window equals its source mean.
+        Null source means stay null; missing windows are not inserted or crossed by interpolation.
+        Added Float64 columns are `_clear_sky` and `_native_clear_sky` (half-hour and native-window
+        clear-sky means, W/m²), `_ratio` (usable native mean/clear-sky index), `_earlier_ratio` and
+        `_later_ratio` (indices bracketing the target midpoint within its segment/daylight block),
+        `_shape` and `_shape_mean` (interpolated solar weights and their native-window mean, W/m²).
+        Added Int64 columns are `_daylight_block`, `_target_second` (Unix seconds at the half-hour
+        midpoint), and nullable `_earlier_second`/`_later_second` (the index anchor times).
+        `_ratio` is null when the source mean is null, the native clear-sky mean is below
+        `DAYLIGHT_FLOOR_W_M2`, or its window has no sunlit target in this daylight block. Neighbour
+        indices are null when no usable anchor exists on that side within the segment/block; they
+        can include the window itself according to the target midpoint. Missing neighbours use the
+        available index, then local clear-sky weights if no index is usable. Fully dark windows
+        keep a constant source mean.
+    """
     window_keys = [*group_cols, "_window_end"]
     sky = _half_hour_clear_sky(targets=targets, coordinates=coordinates)
     targets = targets.join(sky, on=["time_series_id", "valid_time"], how="left").with_columns(
@@ -302,7 +392,20 @@ def _shape_short_wave(
 def _pchip_edge_slope(
     *, width: pl.Expr, next_width: pl.Expr, slope: pl.Expr, next_slope: pl.Expr
 ) -> pl.Expr:
-    """Limit the one-sided endpoint derivative used by PCHIP."""
+    """Limit the one-sided endpoint derivative used by PCHIP.
+
+    Args:
+        width: Expression for the positive gap in seconds between the endpoint and next anchor.
+        next_width: Expression for the next positive anchor gap in seconds; null when absent.
+        slope: Expression for the secant over `width`, in W/m² per second.
+        next_slope: Expression for the secant over `next_width`, in W/m² per second.
+
+    Returns:
+        An expression for the endpoint derivative in W/m² per second. With no next gap it uses
+        `slope`; otherwise it limits the one-sided estimate to preserve the local slope's sign
+        and bounds it to three times that slope when the two secants change sign. Null inputs
+        can produce null output; the caller handles isolated anchors.
+    """
     estimate = ((2 * width + next_width) * slope - width * next_slope) / (width + next_width)
     return (
         pl.when(next_width.is_null())
@@ -320,6 +423,26 @@ def _shape_long_wave(*, targets: pl.LazyFrame, group_cols: list[str]) -> pl.Lazy
 
     Native interval means act as midpoint estimates, without enforcing interval energy. PCHIP's
     harmonic interior slopes and limited endpoint slopes preserve the shape of the supplied means.
+
+    Args:
+        targets: Complete expanded windows from `_native_targets`, including `LONG_WAVE`,
+            `valid_time`, `_window_start`, `_window_end`, `_anchor_second`, and every `group_cols`
+            column. Each window's native long-wave mean in W/m² repeats on its half-hour rows.
+            Other input columns, including short-wave means, pass through.
+        group_cols: The trajectory identity columns used to expand `targets`.
+
+    Returns:
+        The same target rows and input columns, with `LONG_WAVE` replaced by Float64 midpoint
+        estimates in W/m² evaluated 15 minutes before each ending `valid_time`. Each contiguous
+        sequence holds its nearest anchor's value outside the anchor range; null source windows
+        stay null and absent source windows produce no rows. Neither kind of gap is interpolated.
+        Added columns are `_earlier_value`/`_later_value` (nullable Float64 neighbouring native
+        means, W/m²), `_earlier_width`/`_later_width` (nullable Int64 anchor gaps in seconds, null
+        for noncontiguous or null neighbours), `_earlier_secant`/`_later_secant` (Float64 neighbour
+        secants, W/m² per second), `_derivative` (Float64 derivative at this anchor), and
+        `_earlier_derivative`/`_later_derivative` (nullable Float64 neighbouring derivatives in
+        the same units). Neighbour values, secants and derivatives can refer across gaps; only
+        non-null widths permit their use in the spline. Singleton anchors use derivative zero.
     """
     window_keys = [*group_cols, "_window_end"]
     windows = targets.select(*window_keys, "_window_start", "_anchor_second", LONG_WAVE).unique()
@@ -406,13 +529,30 @@ def _resample_radiation(
     """Return half-hour radiation features over supported backward native windows.
 
     Args:
-        native: Original native samples, with `nwp_init_time` and weather columns.
-        group_cols: Identity columns separating independent weather trajectories.
-        solar_coordinates: Unique latitude/longitude by time_series_id; required for short-wave.
-        strict_schedule: Raise on unsupported source/lead times; otherwise log and leave nulls.
+        native: One row per trajectory/`valid_time`, with Datetime[us, UTC] `nwp_init_time` and
+            `valid_time`, every `group_cols` column, and the available `Nwp.radiation_var_names`
+            columns as nullable floating-point period-ending means in W/m². Optional `nwp_model_id`
+            identifies the source; its absence assumes ECMWF ENS. Other weather columns are ignored.
+        group_cols: Identity columns separating independent trajectories; must include
+            `nwp_init_time` and, for short-wave, `time_series_id`. Production also supplies
+            `ensemble_member`; include `nwp_model_id` whenever present so it survives selection and
+            source/run/member sequences stay separate.
+        solar_coordinates: Exactly `time_series_id`, numeric `latitude` and `longitude` in degrees,
+            with one finite, non-null coordinate pair per target site. Required for short-wave;
+            may be None for long-wave alone. Duplicates or missing/invalid coordinates fail lazily.
+        strict_schedule: Raise on unsupported source/lead times during collection when true;
+            otherwise log `unsupported_radiation_schedule` and exclude faulty native rows.
 
     Returns:
-        Group keys, target valid_time and reconstructed radiation, in the original numeric dtypes.
+        Exactly `group_cols`, half-hour-ending `valid_time`, and the radiation columns present in
+        `native` (in sorted name order). Identity columns and radiation retain their source dtypes;
+        `valid_time` retains the source datetime dtype. Short-wave values are backward half-hour
+        means conserving each native-window mean; long-wave values are PCHIP estimates at half-hour
+        midpoints, without an energy constraint. Null source windows remain null, absent windows
+        and lead zero produce no rows, and unsupported rows are excluded in non-strict mode.
+        Every retained native window expands fully, including targets outside the caller's desired
+        horizon; the caller crops by joining onto its forecast grid. No helper columns are returned
+        and row order is unspecified.
     """
     schema = native.collect_schema()
     radiation = sorted(Nwp.radiation_var_names.intersection(schema.names()))
