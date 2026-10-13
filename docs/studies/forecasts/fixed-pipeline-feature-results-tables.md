@@ -1,8 +1,8 @@
 # Supporting tables: lean inputs and individual additions
 
 These aggregate tables support the [fixed-pipeline study](fixed-pipeline-lean-features.md).
-The main lean, first-solar and individual wind-addition comparisons are complete; alternate
-settings and control tables are still being added. Negative paired differences favour the recipe
+The original lean, first-solar, individual wind-addition and control comparisons are complete
+for both training settings and folds. Negative paired differences favour the recipe
 named before `minus`. Losses and differences use percentage points of frozen effective capacity.
 
 The full-input control is the historical cleaned point-model recipe, rather than the public
@@ -104,6 +104,19 @@ their public configuration inventory is still being finalised.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | solar_add_wind10 minus lean_pv | PV | -0.025 | -0.063 | 0.022 | -0.021 | -0.037 | -0.005 | 9 | 12 | 3 | False | 12 | 12 | 0 | 0 | 0 |
 
+## solar-01-solar_add_wind10-fold_a; sensitivity; padding equal — absolute fair CRPS (capacity points)
+
+| label | group | Fair CRPS (capacity points) | Bootstrap 95% lower | Bootstrap 95% upper | seeds | months | series | rows_per_seed | provisional |
+|---|---|---|---|---|---|---|---|---|---|
+| lean_pv | PV | 7.881 | 5.854 | 10.119 | 3 | 12 | 6 | 175795 | False |
+| solar_add_wind10 | PV | 7.859 | 5.841 | 10.091 | 3 | 12 | 6 | 175795 | False |
+
+## solar-01-solar_add_wind10-fold_a; sensitivity; padding equal — planned paired fair CRPS (left minus right)
+
+| contrast | group | Equal-series difference (capacity points) | Paired bootstrap 95% lower | Paired bootstrap 95% upper | Equal-month difference (capacity points) | Equal-month t 95% lower | Equal-month t 95% upper | Months with lower loss | months | seeds | provisional | min_supported_months | max_supported_months | series_with_missing_months | bootstrap_draws_dropping_series | max_dropped_series_per_draw |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| solar_add_wind10 minus lean_pv | PV | -0.022 | -0.047 | -0.004 | -0.016 | -0.033 | 0.001 | 9 | 12 | 3 | False | 12 | 12 | 0 | 0 | 0 |
+
 ## solar-01-solar_add_wind10-fold_b; main; padding equal — absolute fair CRPS (capacity points)
 
 | label | group | Fair CRPS (capacity points) | Bootstrap 95% lower | Bootstrap 95% upper | seeds | months | series | rows_per_seed | provisional |
@@ -116,6 +129,19 @@ their public configuration inventory is still being finalised.
 | contrast | group | Equal-series difference (capacity points) | Paired bootstrap 95% lower | Paired bootstrap 95% upper | Equal-month difference (capacity points) | Equal-month t 95% lower | Equal-month t 95% upper | Months with lower loss | months | seeds | provisional | min_supported_months | max_supported_months | series_with_missing_months | bootstrap_draws_dropping_series | max_dropped_series_per_draw |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | solar_add_wind10 minus lean_pv | PV | 0.005 | -0.038 | 0.051 | 0.006 | -0.032 | 0.043 | 7 | 15 | 3 | False | 15 | 15 | 0 | 0 | 0 |
+
+## solar-01-solar_add_wind10-fold_b; sensitivity; padding equal — absolute fair CRPS (capacity points)
+
+| label | group | Fair CRPS (capacity points) | Bootstrap 95% lower | Bootstrap 95% upper | seeds | months | series | rows_per_seed | provisional |
+|---|---|---|---|---|---|---|---|---|---|
+| lean_pv | PV | 8.752 | 7.082 | 10.307 | 3 | 15 | 6 | 253003 | False |
+| solar_add_wind10 | PV | 8.692 | 7.048 | 10.223 | 3 | 15 | 6 | 253003 | False |
+
+## solar-01-solar_add_wind10-fold_b; sensitivity; padding equal — planned paired fair CRPS (left minus right)
+
+| contrast | group | Equal-series difference (capacity points) | Paired bootstrap 95% lower | Paired bootstrap 95% upper | Equal-month difference (capacity points) | Equal-month t 95% lower | Equal-month t 95% upper | Months with lower loss | months | seeds | provisional | min_supported_months | max_supported_months | series_with_missing_months | bootstrap_draws_dropping_series | max_dropped_series_per_draw |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| solar_add_wind10 minus lean_pv | PV | -0.060 | -0.090 | -0.033 | -0.060 | -0.090 | -0.031 | 12 | 15 | 3 | False | 15 | 15 | 0 | 0 | 0 |
 
 ## wind_add_categorical_precipitation_type_surface-fold_a; main; padding equal — absolute fair CRPS (capacity points)
 
@@ -786,19 +812,6 @@ their public configuration inventory is still being finalised.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | lean_pv minus production_cleaned | PV | 0.204 | 0.070 | 0.337 | 0.200 | 0.044 | 0.355 | 4 | 15 | 3 | False | 15 | 15 | 0 | 0 | 0 |
 | lean_wind minus production_cleaned | Wind | -3.744 | -4.849 | -2.678 | -3.725 | -4.923 | -2.527 | 15 | 15 | 3 | False | 15 | 15 | 0 | 0 | 0 |
-
-## solar-01-solar_add_wind10-fold_a; sensitivity; padding equal — absolute fair CRPS (capacity points)
-
-| label | group | Fair CRPS (capacity points) | Bootstrap 95% lower | Bootstrap 95% upper | seeds | months | series | rows_per_seed | provisional |
-|---|---|---|---|---|---|---|---|---|---|
-| lean_pv | PV | 7.881 | 5.854 | 10.119 | 3 | 12 | 6 | 175795 | False |
-| solar_add_wind10 | PV | 7.859 | 5.841 | 10.091 | 3 | 12 | 6 | 175795 | False |
-
-## solar-01-solar_add_wind10-fold_a; sensitivity; padding equal — planned paired fair CRPS (left minus right)
-
-| contrast | group | Equal-series difference (capacity points) | Paired bootstrap 95% lower | Paired bootstrap 95% upper | Equal-month difference (capacity points) | Equal-month t 95% lower | Equal-month t 95% upper | Months with lower loss | months | seeds | provisional | min_supported_months | max_supported_months | series_with_missing_months | bootstrap_draws_dropping_series | max_dropped_series_per_draw |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| solar_add_wind10 minus lean_pv | PV | -0.022 | -0.047 | -0.004 | -0.016 | -0.033 | 0.001 | 9 | 12 | 3 | False | 12 | 12 | 0 | 0 | 0 |
 
 ## precip-era-after_precip-fold_b; sensitivity; padding equal — absolute fair CRPS (capacity points)
 

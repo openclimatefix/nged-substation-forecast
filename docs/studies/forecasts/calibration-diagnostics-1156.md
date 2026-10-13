@@ -2,7 +2,10 @@
 
 ## Summary
 
-**The quantile recipe has lower delivered-sample loss in both folds and both training settings.**
+This study compares a refit of the production configuration with a recipe that predicts power
+at specified probability levels, called quantiles. It evaluates the forecast distributions
+they deliver in two training/test splits and two sets of model hyperparameters.
+**The quantile recipe has lower distribution loss than the production refit in all four comparisons.**
 The marginal diagnostics leave calibration questions open: coverage changes accompany substantial
 width changes, and pooling's small nine-level loss effect differs between folds. This separate
 Part 2 draft of issue 1156 supports no calibration or production recommendation. Scientific
@@ -16,6 +19,11 @@ reviews are complete; first-reader, prose and publication-inventory checks remai
 > and draft page; final prose and publication checks remain pending. Human review is pending.
 
 ## Key findings
+
+The quantile recipe combines nine fitted quantiles from each of 51 weather members into a pool
+of 459 values. We also compare that pool with the nine labelled quantiles from the control
+weather member, using a separate nine-level loss score. Here, control denotes a weather member,
+not the production recipe.
 
 - Pooling's nine-level loss effect is unresolved in both Fold A settings and favours pooling in
   both retrospective Fold B settings. Pooled 80% intervals are narrower and cover fewer cases
@@ -52,9 +60,14 @@ Fold A trains on April 2024–June 2025 and scores July 2025–June 2026. Fold B
 and provides retrospective robustness evidence. The intended fitting seeds are 0, 1 and 2;
 observed power from July 2026 onward is excluded.
 
+Each fold uses two sets of model hyperparameters: the primary settings, labelled main in the
+tables, and alternative settings used for the sensitivity comparison. The parent study records
+the exact parameter values.
+
 A *planned* contrast was specified in the study plan before results existed; other comparisons
 are *exploratory*. The three planned contrasts compare the quantile winner with the production
-configuration, with the best point recipe, and with its own control weather member. The last
+configuration, with the best point recipe, and with the quantiles it fits for the weather
+ensemble's control member. The last
 comparison requires unambiguous recovery of the control member's quantile levels. Subgroup,
 source-era and rearrangement diagnostics are exploratory. Intervals describe individual paired
 contrasts; they do not adjust for multiple comparisons or establish a family-wide significance
@@ -565,8 +578,9 @@ little reproducible improvement or inadequate support would argue against procee
 For planning only, assume about one day of agent work, one hour of maintainer review and up to
 one CPU-day on the existing workstation, with no new downloads or spend. These are rough
 assumptions, not measured costs or an execution commitment. Measured scoring throughput is needed
-before proposing execution. This draft passes neither the issue's G5 calibration gate nor its
-G9 gate for later ensemble-statistic experiments.
+before proposing execution. These completed diagnostics do not establish the requirements for
+proceeding with calibration or later ensemble-statistic experiments under the issue's G5 and
+G9 gates.
 
 ## Limitations
 

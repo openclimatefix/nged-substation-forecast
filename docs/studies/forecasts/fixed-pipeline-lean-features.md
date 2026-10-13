@@ -1,7 +1,7 @@
 # Do wind and radiation fixes improve XGBoost forecasts, and which lean inputs help?
 
-> **Draft study.** Pipeline comparisons are complete. Lean-feature robustness checks and final
-> scientific reviews are pending; final input recommendations remain open.
+> **Draft study.** Original pipeline, lean-feature and robustness comparisons are complete.
+> The requested minimal-feature extension and final scientific reviews remain pending.
 
 This study compares two changes to the weather-feature pipeline and revisits the lean solar and
 wind inputs in Part 1b of [issue 1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156).
@@ -21,7 +21,8 @@ production configuration on the corrected inputs. This compares whole training r
 cannot be credited to the processing fixes. Lower loss also does not establish adequate interval
 coverage; the separate [Part 2 study](calibration-diagnostics-1156.md) examines that question.
 These are weekly-initialisation diagnostics for a fixed population, with a retrospective capacity
-denominator. Final lean-wind recommendations await the remaining Part 1b settings and controls.
+denominator. The original lean-wind improvement persists across the completed settings and
+controls; the requested smaller feature sets and final reviews remain pending.
 
 ![Input fixes and recipe comparison.](../assets/fixed-pipeline-lean-features/headline-fold-a.svg)
 
@@ -51,8 +52,8 @@ denominator. Final lean-wind recommendations await the remaining Part 1b setting
   isolate any one ingredient or establish adequate coverage.
 - **The conditional best-point refit was not run.** Neither fold passes G3's preregistered
   0.15-capacity-point magnitude gate on main-setting production fair CRPS. Statistical
-  significance alone does not pass that gate. Final lean-feature findings remain pending the
-  Part 1b alternate settings and controls.
+  significance alone does not pass that gate. The original lean-feature checks are complete;
+  the requested minimal-feature extension remains pending.
 
 ## Introduction
 
@@ -610,10 +611,8 @@ does not identify its information content: the archive's earlier wholly missing 
 availability require separate descriptive comparisons, which cannot establish an era-balanced
 causal benefit from this aggregate contrast.
 
-**These main-setting add-backs do not yet decide a final input recommendation.** The alternate
-training setting remains pending. The main guarded-windchill, negative-control and unpadded
-checks are reported below; alternate-setting controls must also be reviewed before concluding
-which lean inputs to retain. The tests concern
+**Input recommendations require both settings and the controls reported below.** Their completed
+results follow these main-setting additions. The tests concern
 this historical point-model recipe, rather than the public production configuration or the
 pooled quantile winner.
 
@@ -733,9 +732,8 @@ The [feature-results appendix](fixed-pipeline-feature-results-tables.md) retains
 absolute and paired tables. The bootstrap resamples whole months and one shared fitted seed;
 the t-interval gives months equal weight after averaging fitting seeds within month. Their
 estimands and treatment of seed variation differ, and these tests have no multiple-comparison
-adjustment. Fold B sensitivity findings remain pending; the completed Fold A checks do not
-settle the final lean-input recommendation or establish performance beyond this fixed population
-and historical validation window.
+adjustment. The retrospective Fold B sensitivity findings follow below. These checks do not
+establish performance beyond this fixed population and historical validation window.
 
 ### Retrospective Fold B sensitivity retains lean wind's benefit and lean solar's higher loss
 
@@ -799,8 +797,30 @@ unresolved under both methods. Full-input solar's guard effect is unresolved in 
 settings. Lean solar's zero guard contrast is structural because that recipe omits windchill.
 These direct contrasts establish no causal explanation for the lean/full difference.
 
-<!-- PART1B_FOLD_B_SENSITIVITY_REMAINING_SLOT: add the reviewed first-solar
-and negative-control sensitivity findings. -->
+### Fold B sensitivity supports a small first-solar improvement
+
+**Adding 10 m wind speed to original lean solar lowers loss in Fold B sensitivity, while
+main remains unresolved.** The sensitivity absolute scores are 8.752 for lean solar and
+8.692 for the addition; their 95% month-and-seed bootstrap intervals are 7.082 to 10.307
+and 7.048 to 10.223, respectively. The paired difference is -0.060 capacity points
+(-0.090 to -0.033), with an equal-month difference of -0.060 (t-interval -0.090 to
+-0.031). Both methods support improvement, statistically significant at the unadjusted
+5% level, with lower loss in 12 of 15 months across six solar series and three seeds.
+The corresponding main-setting difference is 0.005 (-0.038 to 0.051), unresolved under
+both methods. Neither setting's mean reaches the 0.15-point continuation threshold;
+G4 remains stopped, and no later ladder rung was fitted.
+
+### Fold B sensitivity negative controls remain unresolved
+
+**Neither removal resolves a solar or wind loss effect under either interval method.**
+Removing UTC offset gives paired differences of -0.003 points for solar (95% bootstrap
+interval -0.023 to 0.026) and -0.010 for wind (-0.148 to 0.108). Removing weekday ordinal
+gives -0.008 for solar (-0.029 to 0.014) and 0.064 for wind (-0.101 to 0.234).
+All separate equal-month t-intervals also allow both signs. Main's supported equal-month
+UTC-removal deterioration therefore does not persist in sensitivity. Wind's weekday-removal
+mean exceeds the expected 0.05-point small-change scale, but that expectation is neither
+a measured noise ceiling nor an equivalence margin. These unresolved results do not
+establish zero or negligible effects.
 
 ### Main-setting controls retain the lean-wind result, with unresolved small contrasts
 
@@ -868,16 +888,13 @@ the unpadded policy in both folds. That proof concerns retained types within one
 rather than equality between padded and unpadded affected forecasts.
 
 The [feature-results appendix](fixed-pipeline-feature-results-tables.md) retains the absolute
-and paired control tables, including both interval methods. Alternate-setting guarded and
-negative-control comparisons remain pending. These main-setting checks do not yet settle
-the final lean-wind recommendation.
+and paired control tables, including both interval methods and the completed alternate-setting
+guarded and negative controls reported above.
 
-**A final lean-wind recommendation remains conditional on the required checks.** The two
-main-fold reductions support lean wind within this padded historical point-model recipe, but
-both lean sensitivity comparisons are complete, while Fold B's guarded and negative controls
-remain pending. The main unpadded checks retain the reported scores. Remaining results must be
-reviewed before deciding what to
-retain. These weekly-initialisation scores do not
+**The original lean-wind benefit survives the completed robustness checks.** Both folds and
+training settings support lower loss, including direct guarded lean/full comparisons. The
+main unpadded checks retain the reported scores. Final scientific review and the requested
+smaller-feature experiments remain pending. These weekly-initialisation scores do not
 establish an official leaderboard result, adequate calibration or joint scenario coherence.
 
 ### Descriptive feature importance

@@ -1,7 +1,8 @@
 # Supplementary calibration diagnostic tables
 
 > **Draft evidence.** These ten tables are copied verbatim from the completed aggregate publication
-> extract. Final scientific and prose reviews remain pending; human review has not been completed.
+> extract. Scientific reviews are complete; final prose and publication checks remain pending.
+> Human review has not been completed.
 
 **The tables extend the [main study](calibration-diagnostics-1156.md) with descriptive empirical-CDF,
 lead-band and November-era diagnostics.** `production` denotes the production-configuration refit;

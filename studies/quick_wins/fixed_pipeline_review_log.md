@@ -528,3 +528,23 @@ sources/versions/defaults, validates frozen support and source/readback semantic
 external proof only after completion. Static clearance establishes no passing build or reuse
 proof. The audit-v2 consumer also received a clean renewed fresh review; its actual execution
 specifications and proofs remain pending. No Part 2 code was changed or added.
+
+## Requested-feature reuse-audit promotion
+
+Root accepted all fresh audit findings. The revised implementation now consumes the actual
+builder-v4 context/proof layout, independently checks original column order, distinguishes
+archived engineering lineage from consumed live fitting dependencies, and enforces seven
+thread caps before imports. Original and augmented `context.json` inventory conventions are
+handled explicitly. A renewed fresh review of audit v2 was clean, followed by a clean review
+of the final formatting and equivalent style fixes in v3. Promoted source is `3134fb35`.
+No reuse or post-fit prediction audit has yet executed; populated per-scope specs and completed
+builder artifacts remain required. This script serves only the requested Part 1b experiments.
+
+## First augmentation and verification
+
+Fold A augmentation exited successfully with all analytic and malformed-input guards, source
+and readback semantic checks, original-column bit equality and support-file byte equality.
+Its external proof binds augmented manifest `b9322547` to original manifest `7cdbcf9f` and
+builder `d371d635`. Fold B uses the same reviewed runtime and builder and is in flight.
+No fitting result follows from these checks. The full studies suite passes: 3338 tests passed,
+5 skipped. All Part 2 changes in this update are prose clarifications only.
