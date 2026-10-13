@@ -1,8 +1,9 @@
 """Compare interpolated nominal 10 m forecast speed directly with MIDAS observations.
 
 This post-hoc check uses measured SYNOP means over HH-20 to HH-10, matching that window with
-numerical quadrature of the interpolated vector magnitude. It fits no models and downloads
-nothing. Run after `wind_interpolation_experiment.py`; outputs go in its `midas/` subdirectory.
+numerical quadrature of the interpolated vector magnitude. The check fits no models and downloads
+nothing. Run after `wind_interpolation_experiment.py`; outputs go in the experiment's `midas/`
+subdirectory.
 """
 
 import argparse

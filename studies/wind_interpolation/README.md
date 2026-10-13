@@ -6,9 +6,10 @@ focused experiment leaves production interpolation unchanged.
 
 ## Planned comparison
 
-- Read a pinned component NWP snapshot, ECMWF ENS control member 0, at the three wind farms'
-  existing H3 cells, retaining only 00:00 UTC runs. Use instantaneous anchors at `valid_time`,
-  without extrapolation.
+- Read a pinned component numerical weather prediction (NWP) snapshot, using control member 0 of the
+  European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble (ENS), at the three wind
+  farms' existing H3 cells, retaining only 00:00 UTC runs. Use instantaneous anchors at
+  `valid_time`, without extrapolation.
 - Use every complete native run for each site. Interpolate the full 85-step forecast, then score
   half-hourly leads 24–47.5 h and 168–191.5 h separately, covering 3-hour and 6-hour spacing.
 - Give each per-farm XGBoost model exactly four columns: `wind_speed_10m`, `wind_direction_10m`,
@@ -22,14 +23,15 @@ focused experiment leaves production interpolation unchanged.
   farm by its maximum cleaned training power before the embargo (a capacity proxy, not a verified
   physical capacity). Record missing targets and complete-run exclusions. Use exactly the same rows
   and row order for all methods.
-- Fit on the RTX A6000 GPU with the shared primary and sensitivity XGBoost settings, all columns
-  available to each tree, and seeds 0, 1, and 2. No tuning or early stopping. Clip negative power
-  predictions to zero, but do not impose an observed validation maximum.
+- Fit on the RTX A6000 graphics processing unit (GPU) with the shared primary and sensitivity
+  XGBoost settings, all columns available to each tree, and seeds 0, 1, and 2. No tuning or early
+  stopping. Clip negative power predictions to zero, but do not impose an observed validation
+  maximum.
 - The four planned contrasts are PCHIP minus linear and Makima minus linear at each lead band.
   Report absolute mean absolute error (MAE) as percentage points of training capacity, plus paired
   differences and 95% intervals resampling whole validation months and one fitting seed (2,000
   resamples). Pool the farms on matched forecast keys within each band; intervals describe these
-  three farms, weather months and fitting noise, not a population of wind farms. The four intervals
+  three farms, weather months, and fitting noise, not a population of wind farms. The four intervals
   are nominal, with additional 98.75% intervals correcting the four contrasts by Bonferroni. Prefer
   linear unless both settings support a consistent reduction; do not infer equivalence from a null
   result. Report each farm separately as descriptive context.
@@ -56,15 +58,17 @@ SVGs, and check each published number against the script-generated report.
 
 ## Post-hoc direct station check
 
-After the power results, the maintainer suggested the on-disk MIDAS Open nominal 10 m wind speed as
-a direct target. This extension is exploratory. It compares forecast speed directly with
-observations; it does not train extra XGBoost models or use station observations as inputs.
+After the power results, the maintainer suggested the on-disk Met Office MIDAS Open archive of
+nominal 10 m wind speed as a direct target. This extension is exploratory. It compares forecast
+speed directly with observations; it does not train extra XGBoost models or use station observations
+as inputs.
 
-Use every on-disk station with measured SYNOP wind (unit code 1 or 4), valid station coordinates,
-and a complete control-member forecast at its containing H3 cell. Read observations from April 2024
-through December 2025, the available overlap. Compare identical station/forecast/observation keys
-for all three interpolators at day 1 and day 7. Retain calm winds; drop missing, non-finite or
-negative speeds. No station is chosen by error or proximity to a particular wind farm.
+Use every on-disk station with measured surface synoptic (SYNOP) wind (unit code 1 or 4), valid
+station coordinates, and a complete control-member forecast at its containing H3 cell. Read
+observations from April 2024 through December 2025, the available overlap. Compare identical
+station/forecast/observation keys for all three interpolators at day 1 and day 7. Retain calm winds;
+drop missing, non-finite, or negative speeds. No station is chosen by error or proximity to a
+particular wind farm.
 
 SYNOP speed is a 10-minute mean from HH-20 to HH-10. For each hourly observation, average the
 interpolated vector magnitude over that same window using Gauss–Legendre quadrature, doubling the
