@@ -52,9 +52,9 @@ maintainer has read the report.
     If nothing changed, stop and tell the maintainer.
 
 4. **Commit `uv.lock` and open a draft PR.** Load `github-issue-pr-workflow` first, because it
-   owns the PR checklist. Create the PR with `gh pr create --draft`. Write the body to a file in the session scratchpad,
-   never in the repo, with the `github-issue-pr-workflow` rules: the attribution line first, one
-   line per paragraph, no hard wraps. The body lists every upgraded package, one bullet per package
+   owns the PR checklist. Create the PR with `gh pr create --draft`. Write the body to a file in the session
+   scratchpad, never in the repo, with the `github-issue-pr-workflow` rules: the attribution line
+   first, one line per paragraph, no hard wraps. The body lists every upgraded package, one bullet per package
    as `` `name` old → new ``, generated from `changes.txt` so that no package is missing:
 
     ```bash
