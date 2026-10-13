@@ -416,12 +416,14 @@ source accumulation: scattered per-pixel in the ordinary case, occasionally a wh
 Issues](../architecture/ecmwf-ens-known-issues.md) for the full account. It is present in every run
 we ingest, so it is in-distribution and needs no scenario.
 
-Be precise about what "handled" means here. **Spatial renormalisation** absorbs most scattered
-corruption at ingest. **Radiation reconstruction preserves missing native windows**, so the model
+**Missing source weather reaches the electricity forecasting model through different paths for
+radiation and precipitation.** Spatial renormalisation absorbs most scattered corruption at ingest.
+**Radiation reconstruction preserves missing native windows**, so the electricity forecasting model
 sees their nulls. **Temporal point interpolation** still bridges interior precipitation nulls,
 while leaving leading/trailing nulls. **Default-direction routing** handles the nulls reaching the
-model, with its guarantee limited to patterns represented in training. The distinction is worked
-through in [Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated).
+electricity forecasting model, with its guarantee limited to patterns represented in training.
+The distinction is worked through in [Known ECMWF ENS Data-Quality
+Issues](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated).
 
 **Temporal interpolation of precipitation is the remaining design point**, because it is
 imputation, already happening, chosen

@@ -96,7 +96,7 @@ def test_clear_day_timing_and_dark_targets(width: int) -> None:
     )
     truth = _reference_sky(times=times, latitude=52, longitude=0) * 0.7
     means = truth.reshape(-1, width * 2).mean(axis=1)
-    # Six-hour windows are native after day six; move init backward for that case.
+    # Native windows use a 6-hour width after day 6; move init backward for that case.
     init = start - timedelta(days=6) if width == 6 else start
     leads = [int((start - init).total_seconds() / 3600) + i * width for i in range(len(means) + 1)]
     native = _native(start=init, leads=leads, short_wave=[None, *means.tolist()])

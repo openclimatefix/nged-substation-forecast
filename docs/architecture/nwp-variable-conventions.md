@@ -271,7 +271,8 @@ indices within each source segment and daylight block, then a keyed join supplie
 anchors to half-hours. The helper avoids sorting and as-of joining the entire half-hour target
 frame. The [bulk resampler benchmark and reproduction
 commands](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/README.md#bulk-resampler-benchmark)
-report in-memory time and whole-process peak RSS, with the scope and scaling limits stated.
+report in-memory time and whole-process peak resident set size (RSS), with the scope and scaling
+limits stated.
 
 **Regenerate engineered caches and retrain before deploying power-forecast models against these
 feature semantics.** Corrected timing and smoother profiles do not establish a forecast-score gain.

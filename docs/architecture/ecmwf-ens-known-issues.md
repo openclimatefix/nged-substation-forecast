@@ -152,7 +152,8 @@ ensemble members × the 84 steps beyond lead-0).
 renormalisation absorbs scattered missing grid points where other contributions exist in the same
 cell and step. A wholly missing radiation window stays null through the
 [conservative resampler](nwp-variable-conventions.md#radiation-resampling), including interior and
-trailing windows. The model therefore needs training examples with these source-missing windows;
+trailing windows. The electricity forecasting model therefore needs training examples with these source-missing
+windows;
 lead-zero missingness alone does not establish that every gap pattern is learned.
 
 **Precipitation still takes a different path.** Its generic point interpolation bridges interior

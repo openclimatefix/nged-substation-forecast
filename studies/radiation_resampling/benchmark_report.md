@@ -1,19 +1,22 @@
 # Radiation resampler benchmark
 
-**Native-window neighbour lookup reduces the cost of interval-aware reconstruction.**
-The comparison uses identical shuffled synthetic ECMWF inputs, all 51 members, and
-the complete 15-day horizon (85 native steps and 721 output timestamps per trajectory).
+**The revised interval-aware resampler uses less time and peak memory than the pre-review
+implementation in these two workloads.**
+The comparison uses identical shuffled synthetic inputs for the European Centre for
+Medium-Range Weather Forecasts ensemble (ECMWF ENS), with all 51 members and the
+complete 15-day horizon (85 native steps and 721 output timestamps per trajectory).
 Each variant has three fresh-process repetitions, with execution order rotated between
 variants. Eight Polars threads are fixed for every worker. No tests ran concurrently.
 
 Host CPU: AMD EPYC 9124 16-Core Processor. Python 3.14.7; Polars 2.0.0.
 
 **Timing includes query construction and collection of every output column.** Input
-construction is excluded. Peak RSS is the whole process, including imports, input/output
-frames, and result assertions; it is not incremental resampler memory. The inputs contain
-short-wave, long-wave, and temperature. Archive I/O, forecast joins, lags, rolling
-features, and forecasting-model fitting are excluded. No full-CV timing or forecast
-skill is claimed.
+construction is excluded. Peak resident set size (RSS) covers the whole process,
+including imports, input/output frames, and result assertions; it is not incremental
+resampler memory. The inputs contain short-wave, long-wave, and temperature.
+Archive I/O, forecast joins, lags, rolling
+features, and forecasting-model fitting are excluded. No end-to-end cross-validation
+timing or forecast skill is claimed.
 
 | Sites × runs | Output rows | Variant | Median time (s) | Range (s) | Median peak RSS (MiB) |
 |---|---|---|---|---|---|
@@ -27,8 +30,8 @@ skill is claimed.
 **The variants compare different processing policies on the same native means.**
 `point` uses main at `ce7285e4`; `before` uses the radiation PR at `99a40cf5` with
 full-target sorts and as-of joins. `after` uses native-window neighbour fills, the
-20 W/m² conditioning floor, and lazy schedule validation. All helper hashes and
-individual measurements are retained in the accompanying JSON. The comparison does
+20 W/m² conditioning floor, and lazy schedule/coordinate validation. All helper hashes
+and individual measurements are retained in the accompanying JSON. The comparison does
 not isolate the lookup change from the other review fixes. Results at larger scales
 must be measured; these two workloads do not establish linear scaling or a
 memory cap.

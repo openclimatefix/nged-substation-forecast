@@ -27,8 +27,8 @@ implementation review requested by implement-issue is additional if available.
   feature caches will differ. Do not narrow `Nwp.continuous_var_names()` in this PR.
 - Production serving: yes, `_engineer_features` uses the shared resampler during inference.
 - Degradation: yes, missing radiation windows and unusable solar denominators require a policy.
-- Design alternatives: yes, solar shaping, conservation and missingness admit different choices.
-- Callers: yes, direct resampler tests, feature engineering, storage and dashboard classification
+- Design alternatives: yes, solar shaping, conservation, and missingness admit different choices.
+- Callers: yes, direct resampler tests, feature engineering, storage, and dashboard classification
   dependents needed searching to identify.
 
 Departures from the older issue/roadmap: solar shaping applies only to short-wave; long-wave needs
@@ -61,7 +61,7 @@ window as a wider accumulation. Reuse the native timestamp and group keys as win
 derive missingness from native radiation rather than adding a redundant mask column. Reuse
 `ECMWF_ENS_LEAD_TIME_HOURS` from contracts for the schedule instead of duplicating its constants.
 
-The new production `_radiation.py` helpers construct six target half-hours for each supplied 3-hour
+The new production `_radiation.py` helpers construct 6 target half-hours for each supplied 3-hour
 window and 12 target half-hours for each supplied 6-hour window, before joining the existing output
 grid. Target timestamps mark the ends of those half-hours. A private expression in that module
 evaluates a vectorised, dependency-free solar-position approximation in Polars, including
@@ -211,7 +211,8 @@ forecast targets; aggregate target means back to source windows before target-ti
 Record the command, runtime, timing/energy/fallback counts and results in the PR; no new permanent diagnostic
 framework or profile publication is required. Never use engineered
 caches to infer original missingness. If data is unavailable, record that validation as pending
-and do not describe synthetic parity as real-data parity or deploy before it is checked.
+and do not describe synthetic parity as real-data parity or deploy before the real-native-data check
+is complete.
 
 ## Design-philosophy check
 
@@ -278,7 +279,7 @@ validate Markdown, diff whitespace and the plan/PR scope; no production tests ar
   constant fallback, report the anomaly, and never pretend exact zero-night and strict conservation
   can both hold for contradictory source data.
 - Solar approximation accuracy and daylight floor: use 20 W/m² for usable native denominators,
-  15-minute midpoint integration and independent pvlib reference checks in tests only. Establish
+  15-minute midpoint integration, and independent pvlib reference checks in tests only. Establish
   explicit geometry/timing tolerances before implementation; do not copy the study's pandas path.
 - Missing-window behavior differs from current accidental filling. Recommendation: intentionally
   preserve radiation null windows; broader bounded filling and imputation flags remain separate.
@@ -312,14 +313,15 @@ missingness documentation passages. Geometry is evaluated on unique series/time 
 blocks explicitly prevent cross-night cloud-index interpolation. A follow-up check caught that
 entirely dark native windows cannot identify all UK summer nights; use half-hour solar support
 instead, and test a 6-hour northern-UK summer case without a wholly dark native window. Benchmark
-the distinct/join cost of geometry reuse rather than assuming laziness alone makes it fast.
+the runtime and peak-memory effects of distinct/join operations for geometry reuse rather than
+assuming laziness alone makes it fast.
 Verified the test timestamp builder,
-`Nwp.validate` and `assess_nwp_run_completeness` before revising the plan.
+`Nwp.validate`, and `assess_nwp_run_completeness` before revising the plan.
 
 No correctness findings were rejected. The native radiation upper bound was checked: engineered
 `AllFeatures` imposes no matching bound, so solar-shaped half-hours above the native mean are not a
-contract defect and must not be clipped merely to satisfy the native schema. No implementation code
-has been written.
+contract defect and must not be clipped merely to satisfy the native schema. At the end of the plan
+reviews, no implementation code had been written.
 
 
 ## Approved response to the external review
@@ -333,4 +335,5 @@ and keep coordinates optional for non-short-wave callers. Retain historical meas
 Add an Ineichen reference alongside the matched-Haurwitz positive controls. Benchmark the
 in-memory bulk resampler against point interpolation and the pre-review implementation, with
 identical inputs, fixed thread counts, interleaved fresh-process repetitions, elapsed collection
-time, and whole-process peak RSS. Run fresh correctness and detailed prose reviews after fixes.
+time, and whole-process peak resident set size (RSS). Run fresh correctness and detailed prose
+reviews after fixes.

@@ -1,9 +1,9 @@
 """Measure half-hour weather resampling on deterministic synthetic bulk inputs.
 
 Run this script under each checkout's ml_core import path. Each repetition uses a fresh process
-and collects all output columns. Input construction is excluded from elapsed time; peak RSS
-includes imports, native input, query execution, and collected output. This is an in-memory
-resampler benchmark, not an end-to-end CV or archive-I/O benchmark.
+and collects all output columns. Input construction is excluded from elapsed time; peak resident
+set size (RSS) includes imports, native input, query execution, and collected output. This is an
+in-memory resampler benchmark, not an end-to-end cross-validation or archive-I/O benchmark.
 """
 
 import argparse
@@ -221,9 +221,11 @@ def summarize(*, directory: Path, report: Path) -> None:
     lines = [
         "# Radiation resampler benchmark",
         "",
-        "**Native-window neighbour lookup reduces the cost of interval-aware reconstruction.**",
-        "The comparison uses identical shuffled synthetic ECMWF inputs, all 51 members, and",
-        "the complete 15-day horizon (85 native steps and 721 output timestamps per trajectory).",
+        "**The revised interval-aware resampler uses less time and peak memory than the pre-review",
+        "implementation in these two workloads.**",
+        "The comparison uses identical shuffled synthetic inputs for the European Centre for",
+        "Medium-Range Weather Forecasts ensemble (ECMWF ENS), with all 51 members and the",
+        "complete 15-day horizon (85 native steps and 721 output timestamps per trajectory).",
         "Each variant has three fresh-process repetitions, with execution order rotated between",
         "variants. Eight Polars threads are fixed for every worker. No tests ran concurrently.",
         "",
@@ -233,11 +235,12 @@ def summarize(*, directory: Path, report: Path) -> None:
         ),
         "",
         "**Timing includes query construction and collection of every output column.** Input",
-        "construction is excluded. Peak RSS is the whole process, including imports, input/output",
-        "frames, and result assertions; it is not incremental resampler memory. The inputs contain",
-        "short-wave, long-wave, and temperature. Archive I/O, forecast joins, lags, rolling",
-        "features, and forecasting-model fitting are excluded. No full-CV timing or forecast",
-        "skill is claimed.",
+        "construction is excluded. Peak resident set size (RSS) covers the whole process,",
+        "including imports, input/output frames, and result assertions; it is not incremental",
+        "resampler memory. The inputs contain short-wave, long-wave, and temperature.",
+        "Archive I/O, forecast joins, lags, rolling",
+        "features, and forecasting-model fitting are excluded. No end-to-end cross-validation",
+        "timing or forecast skill is claimed.",
         "",
         (
             "| Sites × runs | Output rows | Variant | Median time (s) | Range (s) | "
@@ -266,8 +269,8 @@ def summarize(*, directory: Path, report: Path) -> None:
             "**The variants compare different processing policies on the same native means.**",
             "`point` uses main at `ce7285e4`; `before` uses the radiation PR at `99a40cf5` with",
             "full-target sorts and as-of joins. `after` uses native-window neighbour fills, the",
-            "20 W/m² conditioning floor, and lazy schedule validation. All helper hashes and",
-            "individual measurements are retained in the accompanying JSON. The comparison does",
+            "20 W/m² conditioning floor, and lazy schedule/coordinate validation. All helper hashes",
+            "and individual measurements are retained in the accompanying JSON. The comparison does",
             "not isolate the lookup change from the other review fixes. Results at larger scales",
             "must be measured; these two workloads do not establish linear scaling or a",
             "memory cap.",
