@@ -4,6 +4,10 @@
 > extract. Scientific reviews are complete; final prose and publication checks remain pending.
 > Human review has not been completed.
 
+Further Part 2 implementation and experiments are on hold while the maintainer revises the plan.
+The tables document completed diagnostics. No calibration correction or method for temporal or
+spatial coherence was evaluated.
+
 **The tables extend the [main study](calibration-diagnostics-1156.md) with descriptive empirical-CDF,
 lead-band and November-era diagnostics.** `production` denotes the production-configuration refit;
 `r2_e1_c1_a3w_d3` denotes the historical quick-wins quantile recipe. Both use corrected wind and

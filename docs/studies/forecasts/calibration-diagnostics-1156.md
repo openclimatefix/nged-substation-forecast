@@ -9,7 +9,13 @@ they deliver in two training/test splits and two sets of model hyperparameters.
 The marginal diagnostics leave calibration questions open: coverage changes accompany substantial
 width changes, and pooling's small nine-level loss effect differs between folds. This separate
 Part 2 draft of issue 1156 supports no calibration or production recommendation. Scientific
-reviews are complete; first-reader, prose and publication-inventory checks remain pending.
+and first-reader reviews are complete; final prose and publication-inventory checks remain pending.
+
+**Part 2 implementation is on hold while the maintainer revises its plan.** The write-up records
+only the completed diagnostics: two folds, two hyperparameter settings, and three fitting
+seeds, presented in twenty-six diagnostic tables and one coverage figure. No calibration correction
+or temporal or spatial coherence method has been implemented or evaluated. Further Part 2 code and
+experiments are deferred pending the revised plan.
 
 ![Coverage on Fold A, primary training settings.](../assets/calibration-diagnostics-1156/coverage-fold-a.svg)
 
@@ -565,10 +571,13 @@ establishing that pooling improves calibration.
 **The completed diagnostics justify neither a calibrator choice nor a coherence claim.** No
 calibrator was fitted, the conditional best-point refit was not triggered, and marginal scores
 cannot establish joint scenarios across sites or forecast times. The supplementary CDF, lead
-and era tables are descriptive. First-reader and prose reviews and the public reproduction
-inventory remain pending; no calibration or production recommendation follows.
+and era tables are descriptive. Final prose review and the public reproduction inventory remain
+pending. The completed diagnostics support no calibration or production recommendation.
 
 ## Proposed follow-up study
+
+**The earlier calibration study proposal is retained for the plan revision.** The proposal does
+not authorise implementation. Further Part 2 code and experiments are on hold.
 
 A separately planned calibration screen could test whether held-out-month calibration improves
 on the matched `manual_heuristic` baseline. It would fit on eleven scored months and evaluate the
@@ -600,8 +609,9 @@ inventorying that boundary does not verify a cycle effect.
 
 This stage examines saved-prediction marginal distributions. Training-versus-validation coverage,
 cross-fitted training forecasts, spread rescaling, EMOS, residual-quantile and isotonic calibration
-remain pending. Validation forecasts cannot substitute for matching training predictions, and
-coverage alone neither proves nor rules out overfitting.
+were not evaluated and are deferred pending the revised Part 2 plan. Validation forecasts cannot
+substitute for matching training predictions, and coverage alone neither proves nor rules out
+overfitting.
 
 Joint energy and variogram scores, scenario reordering, weather-cell or hierarchy sums and the
 issue's later model experiments remain outside this stage. There is no coherence claim, forecast
