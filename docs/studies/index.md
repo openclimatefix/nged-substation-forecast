@@ -125,7 +125,7 @@ the
 
 ## Forecasts
 
-**Six studies score power forecasts driven by weather forecasts.**
+**These studies score power forecasts driven by weather forecasts.**
 
 - [How accurate is a power forecast driven by ECMWF ENS at each
   horizon?](forecasts/ens-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
@@ -195,3 +195,10 @@ a
   of half-hours, and rescaling its spread lowers the CRPS by 1.3 to 1.9 points. The absolute-error
   objective and early stopping each lower the CRPS by about 0.4 points. Removing power lags from
   solar and wind farms raised their error.
+- [Do wind and radiation fixes improve XGBoost forecasts, and which lean inputs
+  help?](forecasts/fixed-pipeline-lean-features.md) — matched refits compare the production and
+  quick-wins configurations under corrected weather processing, then test lean inputs and
+  individual feature additions.
+- [How well calibrated are the corrected XGBoost
+  forecasts?](forecasts/calibration-diagnostics-1156.md) — saved corrected-pipeline forecasts
+  provide marginal coverage, width and loss diagnostics for the first stage of calibration work.

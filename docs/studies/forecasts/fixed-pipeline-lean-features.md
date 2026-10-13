@@ -152,6 +152,11 @@ with every column available to each tree, this controls random column availabili
 unpadded lean check tests sensitivity to that construction. The exact production and quick-wins
 reference refits remain unpadded.
 
+The [feature inventory](fixed-pipeline-feature-inventory.md) prints every configured recipe's
+ordered inputs and duplicate padding. Solar retains 13 real inputs and removes 11 from the
+production list; wind retains 16 and removes eight. Those removals include three weekday
+columns for each type. The registry also lists conditional recipes that were not necessarily run.
+
 For solar, the starting cut removes weather-regime proxies and weekday columns while retaining
 power lags. The planned cumulative ladder adds 10 m wind speed, pressure, 500 hPa height, longwave
 radiation and its temperature-adjusted residual, then replaces the clock features with sun
