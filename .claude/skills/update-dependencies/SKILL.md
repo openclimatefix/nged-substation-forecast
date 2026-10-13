@@ -78,7 +78,7 @@ maintainer has read the report.
 
 7. **Judge each upgrade against the repository.** Read a changelog entry for the one thing that
    matters, whether this repository uses the changed behaviour. Grep for the changed API in `src/`,
-   `packages/`, and `studies/` before concluding either way, and answer three questions for every
+   `packages/`, and `studies/` before concluding either way, and answer four questions for every
    package with a breaking change, a deprecation, or a behaviour change:
     - **Does it need a wider code review?** For example, a Polars 2 upgrade changed row order after
       a lazy join without raising, and green tests did not prove the code was still right.
@@ -90,12 +90,25 @@ maintainer has read the report.
     - **Does it change a rule we configure?** `pyproject.toml` writes out the ruff `select` list,
       so ruff's changes to its default rule set do not apply, but a changed formatter does.
 
+    - **Does it need a one-off operation before the code runs?** Search every changelog for
+      "database upgrade", "schema", "migration", "migrate", and "backup". MLflow 3.17.0 needed
+      `mlflow db upgrade <database-url>` with every writer stopped, and nothing failed in the test
+      suite, because the tests use a fresh database. Name the command, the files it touches
+      (`mlflow.db` in the main checkout, for MLflow), and whether the maintainer must run it. Never
+      run a migration against the maintainer's data without being asked, and back the file up
+      first.
+
    Write down the packages whose notes you read, the packages you did not read, and why.
 
 8. **Write the report, put it in the PR body, tell the maintainer, and wait.**
     - The PR body keeps the package list and gains the report: the fixes made and why, and the
       answer to each question in step 7 for each package that needed one. Say plainly what was not
-      checked. Edit the body from the same scratchpad file with `gh pr edit --body-file`.
+      checked.
+    - Add a short list of every behaviour change that affects this repository, good or bad, each
+      as one line naming the package and the code it touches, such as "the upgrade of `foo` should
+      make our `baz` function roughly twice as fast" or "`foo` now returns rows in a different
+      order, which `baz` relied on". Leave out a change that nothing in the repository
+      uses. Edit the body from the same scratchpad file with `gh pr edit --body-file`.
     - Mark the PR ready for review only when the maintainer asks.
     - In the chat, give the same report as short bullets, with the PR linked in the form
       `[PR #N (title)](url)`.
