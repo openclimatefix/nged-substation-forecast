@@ -308,3 +308,34 @@ is running. A separate required study-suite run follows the verifier inventory c
 The private publication-copy helper was reviewed again after adding source-specific, hash-bound
 numeric collision diagnostics and exclusive mode-0600 diagnostic output. The root launched only
 its redacted preflight mode; no public configuration copying or numeric exemption was authorized.
+
+That final verifier/table-source study-suite run completed with 3,338 tests passed and five
+skipped in 214.06 seconds. Ruff, formatting and the verifier type check passed. Both PR heads
+were rechecked and remain at the pinned revisions. Redacted publication diagnostics showed only
+short identifier-token coincidences in seed constants, display precision, figure numbering,
+aggregate explanatory counts, dates, timing offsets and lead labels. The root reviewed every
+reported JSON path and all 52 source-specific reasons; the resulting approvals bind only those
+26 exact specification hashes. Public copying remains deferred until final inventory reconciliation.
+
+The completed Part 2 manuscript received its fresh second scientific-validity review from a
+reviewer independent of its first science reviewer and authors. It verified all 30 table bodies,
+all four completed report/extract inventories, subgroup and contrast claims, the rendered coverage
+figure, and a separate Fold B issuance/lead/lag check. It found no scientific blocker or required
+rerun. Diff, manuscript, persona and final publication checks remain outstanding.
+
+The parent Fold B sensitivity report and its freshly reviewed narrow/full selectors completed.
+The draft now distinguishes supported wind-only deterioration in both retrospective Fold B
+settings from unresolved wind-after-radiation comparisons under the primary bootstrap. Combined
+corrections increase wind loss in Fold B sensitivity, while lowering overall and solar loss.
+The draft records the differing equal-month conclusions rather than treating their estimand as
+identical to the primary bootstrap. Pipeline tables were moved to an appendix with their exact
+generated bodies preserved; the main page retains the deciding contrasts.
+
+A companion private helper received fresh root review before diagnostic-only execution. A separate
+independent evidence review checked all nineteen proposed provenance-derived runtime records
+against their pinned original manifests. It found one wording defect: two coverage records called
+an inferred hash-bound report directory directly recorded. The author corrected that provenance
+description and rebound the exact bytes and schemas; no numerical result changed. The root
+reviewed the correction and source-specific numeric collisions, then reran redacted preflight.
+Every reported occurrence was approved for its exact source hash. Neither helper has copied
+public configurations or private manifests.

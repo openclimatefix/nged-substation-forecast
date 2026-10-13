@@ -2,18 +2,28 @@
 
 ## Summary
 
-**The quantile recipe has lower delivered-sample loss in both folds at the primary training
-settings.** This separate Part 2 study of issue 1156 also compares forecast coverage and width.
-Pooling has an unresolved nine-level loss effect in Fold A and a small supported improvement in
-retrospective Fold B. Fold A's alternative training settings retain the delivered loss advantage
-and unresolved pooling effect. Fold B's alternative settings and final scientific and prose reviews
-remain pending. These draft results support no calibration or production recommendation.
+**The quantile recipe has lower delivered-sample loss in both folds and both training settings.**
+The marginal diagnostics leave calibration questions open: coverage changes accompany substantial
+width changes, and pooling's small nine-level loss effect differs between folds. This separate
+Part 2 draft of issue 1156 supports no calibration or production recommendation. Final scientific,
+first-reader and prose reviews remain pending.
 
 ![Coverage on Fold A, primary training settings.](../assets/calibration-diagnostics-1156/coverage-fold-a.svg)
 
 > **How this page was made.** The research question came from a human. OpenAI Codex wrote the new
-> study code, analysis and text. An independent AI review checked the first results; final
+> study code, analysis and text, reusing recipes and fitting helpers from the Claude-authored
+> [quick-wins study](quick-wins.md). An independent AI review checked the first results; final
 > scientific and prose reviews remain pending. Human review of the page is pending.
+
+## Key findings
+
+- Pooling's nine-level loss effect is unresolved in both Fold A settings and favours pooling in
+  both retrospective Fold B settings. Pooled 80% intervals are narrower and cover fewer cases
+  than native control intervals in every completed comparison.
+- Quantile-pool solar coverage exceeds the 80% label but falls below the 90% label in all four
+  fold/settings; wind falls below both labels. Coverage must be read alongside width and loss.
+- [Supplementary tables](calibration-diagnostics-1156-tables.md) expose empirical-CDF bins,
+  lead bands, descriptive November eras and support counts without a causal or coherence claim.
 
 ## Introduction
 
@@ -96,7 +106,11 @@ uncertainty draws resamples whole valid-time calendar months and selects one sha
 for the compared forecasts. Its central 95% range describes month and individual-fit variation;
 it is not a confidence interval for the mean of a three-fit ensemble. The separate equal-month
 t-interval first averages the seeds within each month and then estimates variation between months.
-Reports also show months favouring each loss contrast, seed spread and support counts.
+Within each series, the central loss difference weights supported forecast cases equally;
+months with more cases therefore contribute more. The equal-month t-interval gives calendar
+months equal weight and targets a different mean. Mean coverage is descriptive and has no
+reported confidence interval. Reports also show months favouring each loss contrast, seed spread
+and support counts. Forecast cases from different issuances can share the same valid hour.
 The parent study uses the same bootstrap method with a different deterministic resample sequence;
 small differences between its interval endpoints and these reflect Monte Carlo variation.
 Fewer than three seeds or six months makes a comparison provisional. If a draw contains no
@@ -106,10 +120,9 @@ omissions; an interval does not remove the limitation of sparse support.
 
 ## Results
 
-**Both folds are complete for production and the quantile recipe at the primary training
-settings.** Each fold uses fitting seeds 0, 1 and 2 for both corrected-pipeline recipes. Fold B
-provides retrospective robustness evidence. Fold A's alternative training settings are also complete;
-Fold B's alternative settings remain pending. The
+**Both folds and both training settings are complete for production and the quantile recipe.**
+Each comparison uses fitting seeds 0, 1 and 2 for both corrected-pipeline recipes. Fold B
+provides retrospective robustness evidence. The
 conditional best point comparison was not run because the preregistered gate was not reached.
 
 **Production delivers 51 weather-member point predictions; the quantile recipe delivers a pool
@@ -299,8 +312,8 @@ than native coverage (73.400% versus 75.587%), alongside a narrower interval (28
 
 **The saved control knots also have no crossings or invalid intervals in Fold A sensitivity
 results (exploratory).** Native and rearranged diagnostics therefore agree. Observed zero rates
-now cover Fold A's two settings and Fold B's primary settings; the observation provides no
-guarantee for future forecasts. Fold B sensitivity remains pending, as does control 90% coverage.
+cover both settings in both folds; the observation provides no guarantee for future forecasts.
+Control 90% coverage remains unavailable from the fitted endpoint knots.
 
 | Distribution variant | Metric | Value (%) |
 |---|---|---|
@@ -430,15 +443,117 @@ native-control contrasts are planned; the rearranged-control contrast is explora
 | pooled_nine | r2_e1_c1_a3w_d3 | control_native | pinball9 | -0.047 | -0.083 | -0.016 | 10 |
 | pooled_nine | r2_e1_c1_a3w_d3 | control_rearranged | pinball9 | -0.047 | -0.083 | -0.016 | 10 |
 
+### Retrospective Fold B: sensitivity settings
+
+**Fold B's alternative settings retain the delivered loss advantage (planned).** The nineteen-level
+score is 8.510% of frozen capacity for the quantile recipe and 12.079% for production. The paired
+difference is -3.569 percentage points of frozen capacity, with a central 95% month/individual-fit
+range of [-4.134, -2.974] and lower loss in all 15 months. The separate equal-month t-interval
+also lies below zero. Support matches Fold B main: 1,326,430 forecast cases per seed across 31
+series, with 5 to 15 supported months per series, two series missing months, and two draws each
+omitting one series. Fitting seeds are 0, 1 and 2.
+
+#### Fold B (retrospective), sensitivity: delivered overall diagnostics
+
+| Recipe | Metric | Value (%) |
+|---|---|---|
+| production | pinball19 | 12.079 |
+| production | bias | 2.556 |
+| production | coverage80 | 11.581 |
+| production | coverage90 | 15.032 |
+| production | width80 | 4.290 |
+| production | width90 | 5.646 |
+| r2_e1_c1_a3w_d3 | pinball19 | 8.510 |
+| r2_e1_c1_a3w_d3 | bias | 1.822 |
+| r2_e1_c1_a3w_d3 | coverage80 | 72.917 |
+| r2_e1_c1_a3w_d3 | coverage90 | 76.614 |
+| r2_e1_c1_a3w_d3 | width80 | 28.634 |
+| r2_e1_c1_a3w_d3 | width90 | 31.384 |
+
+**Solar remains above the 80% label and below the 90% label; wind remains below both
+(exploratory).** Quantile-pool solar coverage is 82.781% and 87.652%, with respective widths of
+21.008% and 24.072% of frozen capacity. Wind coverage is 73.039% and 81.103%, with widths of
+43.632% and 52.086%. Coverage is a percentage of cases; widths, bias and losses are percentages
+of frozen effective capacity. No confidence intervals for these mean coverages are reported.
+
+#### Fold B (retrospective), sensitivity: solar and wind interval diagnostics
+
+| Recipe | Generation type | Metric | Value (%) |
+|---|---|---|---|
+| production | PV | coverage80 | 18.098 |
+| production | PV | coverage90 | 23.361 |
+| production | PV | width80 | 4.487 |
+| production | PV | width90 | 5.843 |
+| production | Wind | coverage80 | 13.595 |
+| production | Wind | coverage90 | 17.479 |
+| production | Wind | width80 | 9.032 |
+| production | Wind | width90 | 12.028 |
+| r2_e1_c1_a3w_d3 | PV | coverage80 | 82.781 |
+| r2_e1_c1_a3w_d3 | PV | coverage90 | 87.652 |
+| r2_e1_c1_a3w_d3 | PV | width80 | 21.008 |
+| r2_e1_c1_a3w_d3 | PV | width90 | 24.072 |
+| r2_e1_c1_a3w_d3 | Wind | coverage80 | 73.039 |
+| r2_e1_c1_a3w_d3 | Wind | coverage90 | 81.103 |
+| r2_e1_c1_a3w_d3 | Wind | width80 | 43.632 |
+| r2_e1_c1_a3w_d3 | Wind | width90 | 52.086 |
+
+**Pooling's small nine-level improvement is supported in both Fold B settings (planned).** Under
+sensitivity settings, pooled minus native loss is -0.063 capacity points, with a central 95%
+month/individual-fit range of [-0.099, -0.030] and lower loss in 11 of 15 months. The separate
+equal-month t-interval also lies below zero. Pooled 80% coverage is lower than native coverage
+(72.917% versus 75.067%), alongside a narrower interval (28.634% versus 30.213% of frozen
+capacity). The loss gain and descriptive coverage/width changes do not establish better calibration.
+Native and rearranged control results agree because no saved control knots cross; zero crossing
+and invalid-interval rates are observed in all four completed fold/settings, without a future
+guarantee. Control 90% coverage remains unavailable from the fitted knots.
+
+#### Fold B (retrospective), sensitivity: native, rearranged and pooled nine-level diagnostics
+
+| Distribution variant | Metric | Value (%) |
+|---|---|---|
+| control_native | pinball9 | 9.149 |
+| control_native | coverage80 | 75.067 |
+| control_native | width80 | 30.213 |
+| control_native | crossing_rate | 0.000 |
+| control_native | invalid_interval_rate | 0.000 |
+| control_rearranged | pinball9 | 9.149 |
+| control_rearranged | coverage80 | 75.067 |
+| control_rearranged | width80 | 30.213 |
+| control_rearranged | crossing_rate | 0.000 |
+| control_rearranged | invalid_interval_rate | 0.000 |
+| pooled_nine | pinball9 | 9.085 |
+| pooled_nine | coverage80 | 72.917 |
+| pooled_nine | width80 | 28.634 |
+| pooled_nine | crossing_rate | 0.000 |
+| pooled_nine | invalid_interval_rate | 0.000 |
+
+**The paired sensitivity results retain the separate loss scales and planned contrasts.** Treatment
+is `r2_e1_c1_a3w_d3` throughout. Negative differences favour treatment; capacity points and the
+95% ranges retain the definitions above. The rearranged-control contrast is exploratory.
+
+#### Fold B (retrospective), sensitivity: paired nine- and nineteen-level losses
+
+| Treatment variant | Reference recipe | Reference variant | Pinball metric | Difference (capacity points) | 95% interval lower (capacity points) | 95% interval upper (capacity points) | Months with lower loss |
+|---|---|---|---|---|---|---|---|
+| delivered | production | delivered | pinball19 | -3.569 | -4.134 | -2.974 | 15 |
+| pooled_nine | r2_e1_c1_a3w_d3 | control_native | pinball9 | -0.063 | -0.099 | -0.030 | 11 |
+| pooled_nine | r2_e1_c1_a3w_d3 | control_rearranged | pinball9 | -0.063 | -0.099 | -0.030 | 11 |
+
 ## Discussion
 
-**No calibration or production recommendation follows from this draft.** The useful question is
-whether changes in coverage also improve loss without relying on excessive width. Both primary-setting
-folds favour the quantile recipe's delivered loss. Pooling's small nine-level improvement is supported
-in retrospective Fold B's primary settings and unresolved in both Fold A settings. Fold B's alternative
-training settings and final scientific and prose reviews remain pending before any recommendation.
-Marginal performance cannot establish
-coherent scenarios across sites or forecast times.
+**Lower marginal loss does not settle the calibration or production decision.** The quantile
+recipe's delivered nineteen-level loss advantage persists in both folds and both settings, but
+the recipe contrast changes objective, inputs, pooling and preprocessing together. Pooling's
+small nine-level improvement is supported in both retrospective Fold B settings and unresolved
+in both Fold A settings. Narrower pooled 80% intervals also cover fewer observations than the
+native control intervals. Those findings motivate a separate calibration question without
+establishing that pooling improves calibration.
+
+**The completed diagnostics justify neither a calibrator choice nor a coherence claim.** No
+calibrator was fitted, the conditional best-point refit was not triggered, and marginal scores
+cannot establish joint scenarios across sites or forecast times. The supplementary CDF, lead
+and era tables are descriptive. Final scientific, first-reader and prose reviews and the public
+reproduction inventory remain pending; no calibration or production recommendation follows.
 
 ## Proposed follow-up study
 
@@ -461,8 +576,9 @@ earlier data. Shared weather episodes, frozen capacities, missing targets and sp
 support limit interpretation beyond the observed period and population.
 
 Source-era summaries use recorded weather initialisation times before or from
-13 November 2024 at 00:00 UTC, the archive's precipitation-availability boundary. This is distinct
-from the operational cycle change. Different seasons and training exposure prevent a causal
+13 November 2024 at 00:00 UTC, the verified archive precipitation-availability boundary. This
+grouping differs from the operational upgrade cycle at 12 November 2024 at 06:00 UTC and does
+not evaluate that cycle's effect. Different seasons and training exposure prevent a causal
 upgrade interpretation. The separate comparison around 12 May 2026 at 06:00 UTC remains pending;
 inventorying that boundary does not verify a cycle effect.
 
@@ -483,10 +599,9 @@ contract change, production code change or evaluation of observed power from Jul
 the private frozen inputs.** The scorer is `studies/forecast_calibration/calibration_diagnostics.py`;
 `studies/quick_wins/fixed_pipeline_tables.py` selects the displayed tables without recalculating
 statistics. Forecasts, observations, fit manifests and detailed input inventories remain private.
-Completed diagnostic manifests cover Fold A main, Fold A sensitivity and Fold B main, using CUDA
-fits without padding and seeds 0, 1 and 2 for production and `r2_e1_c1_a3w_d3`. Fold B sensitivity
-remains pending. The conditional best-point refit was not run because the preregistered gate was
-not reached.
+Completed diagnostic manifests cover Fold A and Fold B, each at main and sensitivity settings,
+using CUDA fits without padding and seeds 0, 1 and 2 for production and `r2_e1_c1_a3w_d3`.
+The conditional best-point refit was not run because the preregistered gate was not reached.
 
 **The feature implementations and diagnostic environment are pinned.** The parent study's
 `studies/quick_wins/fixed_pipeline_runtime/README.md` describes reconstruction from base revision
@@ -499,7 +614,7 @@ vl-convert-python 1.9.0.post1. Diagnostics use bootstrap seed 20261012 and 2,000
 
 | Recorded source | SHA-256 |
 |---|---|
-| Diagnostic scorer, all three completed reports | `adba37654e98da9f49f8be1dfad906e1318a537b25250821f0a36108253dd5c7` |
+| Diagnostic scorer, all four completed reports | `adba37654e98da9f49f8be1dfad906e1318a537b25250821f0a36108253dd5c7` |
 | Fitter for the saved corrected-pipeline forecasts | `b073be43f8809290746d952bf1acf988ea1f01cf61a7e2ed11e6f51f2de57ca3` |
 | Publication-table selector, Fold A main extract | `6c2bc6a59eb9ad5b8e8f4326c7c1fa850a2b90e11423c2c4e8da36d68d691362` |
 | Coverage chart script, Fold A main render | `21cc9fde248b27b45790374dc154e9bc94e955d4f62bf6a343e603882d61dbda` |
@@ -509,16 +624,21 @@ vl-convert-python 1.9.0.post1. Diagnostics use bootstrap seed 20261012 and 2,000
 original run configurations, input and output hashes, dependency versions and completion records.
 The private preparation inventory includes unexecuted jobs, so that inventory alone is not a
 completion record. Publication of the sanitised configurations and complete hash inventory remains
-pending final reconciliation. Whole private manifests are not public reproduction artifacts.
+pending final reconciliation. Remaining public files are the four completed scoring configurations,
+the four primary publication-table specifications, the supplementary table specification and their
+sanitised hash inventory. Their public destinations have not been established, so no configuration
+download links are asserted here. Whole private manifests are not public reproduction artifacts.
 
 ## Reproducing the figures
 
-**The commands below rescore the three completed fold/settings from their six saved fits.** Run
+**The commands below rescore all four completed fold/settings from their six saved fits.** Run
 from the repository root with the recorded environment. Set `STUDY_DATA_ROOT` to the private
 `data/studies/per_study` directory and choose a new `STUDY_REPRO_ROOT`; each output directory must
 be absent. The recipe and seed loops name the exact completed fit-directory layout. These are
-portable reproduction commands, not a claim that new runs have been executed. They omit Fold B
-sensitivity and the untriggered best-point refit.
+portable reproduction commands, not a claim that new runs have been executed. They omit the
+untriggered best-point refit. The [supplementary tables](calibration-diagnostics-1156-tables.md)
+copy the completed selector output; reproducing that selection also requires the public
+specification whose publication remains pending.
 
 ```bash
 set -euo pipefail
@@ -528,7 +648,7 @@ STUDY_PARENT_ROOT="$STUDY_DATA_ROOT/quick_wins_fixed_pipeline_1156"
 export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
 export MLFLOW_DISABLE_AGENT_HINT=1
 
-for STUDY_RUN in fold_a_main fold_a_sensitivity fold_b_main; do
+for STUDY_RUN in fold_a_main fold_a_sensitivity fold_b_main fold_b_sensitivity; do
   STUDY_FOLD="${STUDY_RUN%_*}"
   STUDY_SETTING="${STUDY_RUN##*_}"
   STUDY_FITS=()
