@@ -30,7 +30,8 @@ import polars as pl
 from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import ObjectStoreOptions
 from contracts.weather_schemas import Nwp
-from deltalake import WriterProperties, write_deltalake
+from deltalake import DeltaTable, WriterProperties, write_deltalake
+from deltalake.exceptions import TableNotFoundError
 
 from delta_store.precision import round_to_significand_bits
 
@@ -160,8 +161,12 @@ def write_nwp(
     percent-encoded Hive directory name. Two materialisations of the *same* partition at once
     contend and the loser raises ``CommitFailedError``; disjoint partitions do not.
 
-    ``schema_mode="overwrite"`` is passed on every write. A dtype widening changes the logical
-    Delta schema while leaving other partitions' physical bytes readable at the widened dtype.
+    Existing tables must have exactly the incoming column set. A mismatch raises before writing,
+    naming the table and differing columns, so a component-wind run cannot silently change a
+    polar archive's schema. Breaking column changes require a separate rebuilt table.
+    ``schema_mode="overwrite"`` permits dtype widening within that column set. A widening changes
+    the logical Delta schema while leaving other partitions' physical bytes readable at the
+    widened dtype.
     A full validated input supplies the current column set, but cannot make a breaking change
     compatible with previously written partitions. Replacing polar wind columns with components
     requires a separate rebuilt table, never a rolling partition overwrite of the old archive.
@@ -188,6 +193,24 @@ def write_nwp(
         storage_options: delta-rs object-store options (credentials/endpoint) for a remote
             ``table_uri``; ``None``/empty for a local path.
     """
+    options = typeddict_to_dict(storage_options)
+    target: str | Path | DeltaTable = table_uri
+    try:
+        existing = DeltaTable(str(table_uri), storage_options=options)
+    except TableNotFoundError:
+        pass
+    else:
+        stored_columns = {field.name for field in existing.schema().fields}
+        incoming_columns = set(nwp.columns)
+        if stored_columns != incoming_columns:
+            raise ValueError(
+                f"NWP table {table_uri} has an incompatible column set: "
+                f"missing {sorted(incoming_columns - stored_columns)}, "
+                f"unexpected {sorted(stored_columns - incoming_columns)}. "
+                "Build a separate archive before switching readers and writers."
+            )
+        target = existing
+
     continuous_vars = sorted(Nwp.continuous_var_names())
     rounded = nwp.with_columns(
         **{
@@ -205,7 +228,7 @@ def write_nwp(
     prepared = rounded.to_arrow().combine_chunks()
 
     write_deltalake(
-        table_or_uri=table_uri,
+        table_or_uri=target,
         data=prepared,
         mode="overwrite",
         schema_mode="overwrite",
@@ -218,5 +241,5 @@ def write_nwp(
             max_row_group_size=_member_aligned_row_group_size(nwp)
         ),
         target_file_size=NWP_TARGET_FILE_SIZE_BYTES,
-        storage_options=typeddict_to_dict(storage_options),
+        storage_options=options,
     )

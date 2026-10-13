@@ -87,6 +87,10 @@ class NwpPlotVariable:
 NWP_PLOT_VARIABLES: Final[dict[str, NwpPlotVariable]] = {
     "temperature_2m": NwpPlotVariable("2 m temperature", "°C"),
     "dew_point_temperature_2m": NwpPlotVariable("2 m dew-point temperature", "°C"),
+    "wind_speed_10m": NwpPlotVariable("10 m wind speed", "m/s"),
+    "wind_direction_10m": NwpPlotVariable("10 m wind direction", "°"),
+    "wind_speed_100m": NwpPlotVariable("100 m wind speed", "m/s"),
+    "wind_direction_100m": NwpPlotVariable("100 m wind direction", "°"),
     "wind_u_10m": NwpPlotVariable("10 m eastward wind", "m/s"),
     "wind_v_10m": NwpPlotVariable("10 m northward wind", "m/s"),
     "wind_u_100m": NwpPlotVariable("100 m eastward wind", "m/s"),
@@ -104,13 +108,13 @@ NWP_PLOT_VARIABLES: Final[dict[str, NwpPlotVariable]] = {
     # mm/h, the unit forecasters expect.
     "precipitation_surface": NwpPlotVariable("Precipitation rate", "mm/h", scale=3600.0),
 }
-"""The NWP variables the dashboard offers, keyed by ``contracts.weather_schemas.Nwp`` column.
+"""Raw continuous NWP columns and derived wind speed/bearing offered by the dashboard.
 
-The dict holds exactly the *continuous* ``Nwp`` variables. ``Nwp.continuous_var_names()`` is the
-authority, and ``test_nwp_plot_variables_cover_exactly_the_continuous_nwp_vars`` fails if this dict
-drifts from that set. ``categorical_precipitation_type_surface`` is the one ``Nwp`` weather column
-left out. Its values are category codes, and a line chart would render category codes as
-meaningless slopes.
+``Nwp.continuous_var_names()`` defines the stored numeric variables. The dashboard also derives
+speed and meteorological bearing at both heights from each native-step component pair, before
+proxy-analysis selection. The chart connects native values; it does not show the feature
+pipeline's half-hourly vector interpolation. ``categorical_precipitation_type_surface`` is
+excluded because a line chart would render category codes as meaningless slopes.
 """
 
 NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=27)
@@ -509,8 +513,9 @@ def build_nwp_ensemble_chart(
             the selected forecast's ``nwp_init_time``, at the H3 cell containing this time
             series. ``TimeSeriesMetadata.h3_res_5`` equals ``Nwp.h3_index``, and both are
             resolution 5. Every distinct ``ensemble_member`` becomes a thin grey line. Native NWP
-            time steps (3- or 6-hourly) are drawn as-is, not upsampled.
-        variable: The ``Nwp`` column to plot; must be a key of ``NWP_PLOT_VARIABLES``.
+            time steps (3- or 6-hourly) are drawn as-is, not upsampled. For wind speed/bearing,
+            the caller derives the columns from each native component pair before plotting.
+        variable: Raw or derived column to plot; must be a key of ``NWP_PLOT_VARIABLES``.
         power_fcst_init_time: The *power* forecast init time (tz-aware UTC). Sets the plotted
             window and the dashed rule, matching the power chart above exactly.
         nwp_init_time: When the plotted NWP run was initialised (tz-aware UTC); shown in the
@@ -520,9 +525,11 @@ def build_nwp_ensemble_chart(
         analysis: The proxy-analysis line, already reduced to one control-member row per
             ``valid_time`` by ``weather_utils.select_analysis_proxy``. That reduction takes the
             first ``NWP_ANALYSIS_LEAD`` of each run, with the freshest run winning where runs
-            overlap. The frame carries ``valid_time`` alongside the variable columns. Drawn as a
-            single thick blue line: our closest proxy for the true weather, since we hold no
-            weather observations. ``None``, or no rows in the window, omits the line.
+            overlap. The frame carries ``valid_time`` alongside the variable columns.
+            Wind speed/bearing must be derived before this reduction so both components come
+            from the same source run. Drawn as a single thick blue line: our closest proxy for
+            the true weather, since we hold no weather observations. ``None``, or no rows in the
+            window, omits the line.
         shade_weekends: Whether to draw the same faint weekend bands as the power chart.
 
     Returns:

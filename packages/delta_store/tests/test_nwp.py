@@ -24,7 +24,8 @@ from delta_store.nwp import (
     NWP_SORT_COLS,
     write_nwp,
 )
-from deltalake import write_deltalake
+from deltalake import DeltaTable, write_deltalake
+from polars.testing import assert_frame_equal
 
 _T0 = datetime(2025, 6, 1, tzinfo=UTC)
 
@@ -291,6 +292,35 @@ def test_categorical_ptype_missing_sentinel_round_trips(tmp_path: Path) -> None:
 
     collected = Nwp.scan_delta(table).collect()
     assert collected["categorical_precipitation_type_surface"].to_list() == [255] * n
+
+
+@pytest.mark.parametrize("schema_change", ["polar", "missing", "extra"])
+def test_writer_rejects_changed_column_set_without_modifying_table(
+    tmp_path: Path, schema_change: str
+) -> None:
+    table = tmp_path / "existing"
+    old = _make_nwp()
+    if schema_change == "polar":
+        old = old.with_columns(
+            **{
+                f"wind_{quantity}_{height}": pl.lit(value, dtype=pl.Float32)
+                for height in ("10m", "100m")
+                for quantity, value in (("speed", 5.0), ("direction", 180.0))
+            }
+        ).drop([f"wind_{axis}_{height}" for height in ("10m", "100m") for axis in ("u", "v")])
+    elif schema_change == "missing":
+        old = old.drop("wind_v_100m")
+    else:
+        old = old.with_columns(unexpected_column=pl.lit(1))
+    write_deltalake(
+        table_or_uri=table, data=old.to_arrow(), partition_by=["nwp_model_id", "init_time"]
+    )
+    before = pl.read_delta(str(table)).sort("h3_index")
+    with pytest.raises(ValueError, match="incompatible column set") as error:
+        write_nwp(nwp=_make_nwp(init_time=_T0 + timedelta(days=1)), table_uri=table)
+    assert str(table) in str(error.value)
+    assert DeltaTable(str(table)).version() == 0
+    assert_frame_equal(before, pl.read_delta(str(table)).sort("h3_index"), check_exact=True)
 
 
 def test_scan_reads_correctly_across_old_narrow_and_new_wide_physical_partitions(

@@ -23,7 +23,7 @@ Public interface:
   three signatures needs a name to reach the constant by.
 
 The package re-exports ``NWP_PUBLICATION_DELAY_HOURS`` from ``_nwp`` and
-``wind_feature_expressions`` from ``_parsed_features``. The two public sub-modules are:
+``wind_feature_expressions`` from ``weather_utils.wind``. The two public sub-modules are:
 
 - ``feature_engineer`` — the ``FeatureEngineer`` abstract base, plus ``DEFAULT_LOCAL_TIMEZONE``,
   the IANA zone the local-time features are computed in. The zone lives on the interface rather
@@ -41,8 +41,9 @@ Private sub-modules (importable by tests, not part of the public API):
 - ``_lags`` — power lags, weather lags (the dual-strategy join), and leaky-lag nullification.
 """
 
+from weather_utils.wind import wind_feature_expressions
+
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
-from ml_core.features._parsed_features import wind_feature_expressions
 from ml_core.features.feature_engineer import FeatureEngineer
 from ml_core.features.tabular_feature_engineer import TabularFeatureEngineer
 

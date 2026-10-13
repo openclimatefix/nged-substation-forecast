@@ -35,6 +35,7 @@ from contracts.uri import object_exists
 from contracts.weather_schemas import Nwp
 from delta_store.nwp import write_nwp
 from delta_store.power_forecasts import write_power_forecasts
+from deltalake import write_deltalake
 from nged_data.storage import (
     _process_file_listing,
     _ProcessedFileListing,
@@ -42,6 +43,7 @@ from nged_data.storage import (
     upsert_metadata,
     write_downloaded_files,
 )
+from polars.testing import assert_frame_equal
 
 from nged_substation_forecast.defs.cv_assets import PopulationFilter
 
@@ -233,10 +235,30 @@ def test_nwp_round_trip_over_s3(s3_endpoint: str) -> None:
     opts = settings.storage_options
 
     write_nwp(_make_nwp(), uri, opts)
+    write_nwp(_make_nwp(), uri, opts)
 
     back = Nwp.scan_delta(uri, storage_options=opts).collect()
     assert back.height == 6
     assert set(back["ensemble_member"]) == set(range(6))
+
+
+def test_nwp_schema_guard_preserves_incompatible_s3_table(s3_endpoint: str) -> None:
+    settings = _s3_settings(s3_endpoint, "incompatible-nwp")
+    uri = settings.nwp_data_path
+    opts = typeddict_to_dict(settings.storage_options)
+    old = _make_nwp().drop("wind_v_100m")
+    write_deltalake(
+        table_or_uri=uri,
+        data=old.to_arrow(),
+        storage_options=opts,
+        partition_by=["nwp_model_id", "init_time"],
+    )
+    before = pl.read_delta(uri, storage_options=opts).sort("h3_index")
+    with pytest.raises(ValueError, match=r"incompatible column set.*wind_v_100m"):
+        write_nwp(nwp=_make_nwp(), table_uri=uri, storage_options=settings.storage_options)
+    assert_frame_equal(
+        before, pl.read_delta(uri, storage_options=opts).sort("h3_index"), check_exact=True
+    )
 
 
 def test_metadata_parquet_round_trip_over_s3(s3_endpoint: str) -> None:

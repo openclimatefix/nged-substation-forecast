@@ -38,7 +38,7 @@ import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
-from weather_utils import NWP_ANALYSIS_MEMBER, select_analysis_proxy
+from weather_utils import NWP_ANALYSIS_MEMBER, select_analysis_proxy, wind_feature_expressions
 
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import (
@@ -52,7 +52,6 @@ from ml_core.features._parsed_features import (
     STATIC_FEATURE_REGISTRY,
     LagFeature,
     ParsedFeatures,
-    wind_feature_expressions,
 )
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
 

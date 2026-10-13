@@ -7,8 +7,8 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from ml_core.features import wind_feature_expressions
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
-from ml_core.features._parsed_features import wind_feature_expressions
 from ml_core.features.tabular_feature_engineer import _derive_wind_features, _engineer_features
 
 

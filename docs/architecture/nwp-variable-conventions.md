@@ -235,6 +235,8 @@ not a quantity established as irrelevant by the storage measurement.
 ## Migrate into a separate archive before switching readers
 
 **A component schema requires a fresh destination; partition overwrite cannot migrate the archive.**
+`write_nwp` rejects an existing table whose column set differs from the incoming frame, while
+allowing dtype widening within the same column set.
 `scripts/maintenance/rewrite_nwp_wind_components.py` reads an explicitly pinned local Delta
 snapshot and reconstructs `u = -speed × sin(bearing)` and `v = -speed × cos(bearing)`.
 Archived speeds and bearings have already been rounded, so reconstruction cannot recover the
