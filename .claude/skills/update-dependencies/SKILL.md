@@ -23,9 +23,9 @@ maintainer has read the report.
 2. **Run the full verification set on the untouched lockfile**, and do not fix any failure
    in this PR. A failure here is already on `main`. Record it, so that it is not blamed on the
    upgrade, and tell the maintainer about it in the report. The hooks in this set rewrite files
-   when they find a problem, so discard those rewrites with `git checkout .`. The set is the union of `.github/workflows/ci.yml` and
-   `.github/workflows/studies_tests.yml`, which are authoritative if this list has drifted, plus the
-   pre-commit hooks:
+   when they find a problem, so discard those rewrites with `git checkout .`. The set is the union
+   of `.github/workflows/ci.yml` and `.github/workflows/studies_tests.yml`, which are authoritative
+   if this list has drifted, plus the pre-commit hooks:
 
     ```bash
     uv run ruff check .
