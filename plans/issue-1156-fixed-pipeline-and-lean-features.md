@@ -212,6 +212,13 @@ before execution.
 
 ## Overnight execution and reporting
 
+**The conditional best-point refit was not triggered by G3.** The execution checkpoint recorded
+the gate before corrected-pipeline results: combined minus old public-production fair CRPS,
+all series, an absolute three-seed mean change of at least 0.15 capacity points, and a nonzero
+equal-month t-interval in either main fold. Both completed main-fold intervals are below zero,
+but neither magnitude reaches 0.15. The prepared best-point queue is therefore not executed;
+the second hyperparameter setting remains a robustness check rather than a replacement gate.
+
 **Finish the required comparisons before adding exploratory work.** No unplanned model families,
 new archives, paid compute, calibration search, or data licence acceptance. Up to two post hoc
 diagnostic contrasts may clarify an unexpected result, using existing saved predictions where

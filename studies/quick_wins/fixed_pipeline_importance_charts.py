@@ -48,9 +48,18 @@ LABELS: Final[dict[str, str]] = {
 PANELS: Final[dict[str, str]] = {"PV": "Solar farms", "Wind": "Wind farms"}
 TITLE: Final[str] = "Training gain describes splits; feature tests decide usefulness"
 SUBTITLE: Final[tuple[str, ...]] = (
-    "Combined pipeline; full-feature point control; two folds and three seeds.",
-    "Blue dot: mean gain share. Blue line: min/max across six fold/seed refits.",
-    "Equal weight per series within each refit, then per refit; unsplit features have zero.",
+    (
+        "Corrected wind and radiation inputs; squared-error models fitted separately for each "
+        "meter using all 24 production features."
+    ),
+    "Training periods: April 2024 to June 2025 and July 2025 to June 2026.",
+    (
+        "Each meter's model is fitted three times for each training period, using different random "
+        "seeds: six refits per meter."
+    ),
+    "Blue dot: mean gain share. Blue line: minimum to maximum across the six refits.",
+    "Each model's feature gains are scaled to sum to one; unused columns receive zero.",
+    "Meters of one type have equal weight within each refit; the six refits have equal weight.",
     "Ranges describe variability across refits, not confidence intervals.",
     "Gain divides credit between correlated features and does not establish benefit.",
 )
@@ -126,7 +135,7 @@ def _read_table(*, root: Path) -> pl.DataFrame:
 
 
 def _text(*, table: pl.DataFrame, number: str) -> str:
-    lines = ["# Point-control importance figure text", "", f"Figure {number}: {TITLE}"]
+    lines = ["# Feature-importance figure text", "", f"Figure {number}: {TITLE}"]
     lines.extend([*SUBTITLE, ""])
     for kind, title in PANELS.items():
         rows = table.filter(pl.col("series_type") == kind)

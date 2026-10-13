@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, cast
 
+import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 import vl_convert as vlc
@@ -48,7 +49,11 @@ def _text(*, spec: dict[str, Any]) -> str:
             lines.extend(
                 [
                     panel["title"],
-                    panel["axis_title"],
+                    charts.axis_title_with_direction(
+                        x_title=panel["axis_title"],
+                        better_label="Lower loss",
+                        better_direction="negative",
+                    ),
                     panel["zero_label"],
                     "Lower loss",
                     *[row["label"] for row in panel["rows"]],
@@ -103,7 +108,11 @@ def _rows(*, table: pl.DataFrame, panel: dict[str, Any]) -> pl.DataFrame:
 
 
 def _precise_labels(*, panel_chart: Any, rows: pl.DataFrame) -> Any:
-    """Format displayed bounds directly from reported values, avoiding double rounding."""
+    """Place exact reported bounds below row labels in the reserved left column.
+
+    Formatting uses reported values directly to avoid double rounding. Pixel positioning keeps
+    numeric text clear of the intervals and zero rule without changing the panel's data scale.
+    """
     labels = {
         row["label"]: (f"{row['difference']:+.2f} [{row['lower_95']:+.2f}, {row['upper_95']:+.2f}]")
         for row in rows.iter_rows(named=True)
@@ -120,6 +129,10 @@ def _precise_labels(*, panel_chart: Any, rows: pl.DataFrame) -> Any:
             layer.data = layer.data.with_columns(
                 pl.col("label").replace_strict(labels).alias("text")
             )
+            layer.encoding.x = alt.XValue(value=0)
+            layer.mark.align = "right"
+            layer.mark.dx = -7
+            layer.mark.dy = 14
             updated += layer.data.height
     if updated != rows.height:
         raise ValueError("every reported contrast must have exactly one numeric label")

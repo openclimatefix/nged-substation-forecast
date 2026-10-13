@@ -186,3 +186,23 @@ which received fresh static review before export. The reviewer cleared the exact
 before its first render. The root inspected the PNG made from the optimised SVG: all eight
 coverage means, interval labels, nominal lines and explanatory text are visible without overlap
 or clipping. The Fold A main SVG and PNG are included as the initial Part 2 figure.
+
+The corrected-pipeline headline and radiation figures received a fresh static review of their
+numeric-label placement and exported axis text. Labels now sit beneath their row labels, clear
+of the interval marks and zero reference. Isolated first-reader and rule-by-rule prose reviews
+cleared the final population caption and actual axis title before rendering. The root inspected
+both final PNGs: numeric labels, marks, reference lines and axis units are visible without
+clipping or overlap. Their final public assets use headline text/render v8 and radiation
+text/render v14; earlier draft figures are not publication inputs.
+
+The importance report completed on the six corrected cleaned point-control refits. Its final
+caption changes received fresh static review before export, followed by isolated first-reader
+and rule-by-rule prose reviews. The root inspected the final v3 PNG before copying the SVG and
+PNG into the page assets. All 24 columns appear for solar and wind, including zero-gain columns;
+refit ranges remain descriptive variability, not confidence intervals or evidence of benefit.
+
+The root reviewed and executed the B-main aggregate-table specification after its complete
+matched report became available. Both main-fold G3 rows fall below the preregistered 0.15-point
+absolute fair-CRPS threshold, despite their negative equal-month t intervals. The conditional
+best-point refit was therefore not triggered; its prepared queue is not an executed study input.
+Part 2's corresponding contrast remains unrun for this explicit gate decision.
