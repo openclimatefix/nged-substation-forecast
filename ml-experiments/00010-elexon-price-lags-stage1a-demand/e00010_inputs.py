@@ -9,7 +9,8 @@ Three column sets are added, each of three columns:
 
 - `price_lag7d`, `price_min_lag7d`, `price_max_lag7d`: the price at the half-hour, and the minimum
   and maximum of the 48 half-hours ending there.
-- `shuffled_*`: the same three, taken from one earlier week, 1 to 4 weeks further back, drawn with a fixed seed.
+- `shuffled_*`: the same three, taken from one earlier week (1 to 4 weeks further back than the
+  true lag), drawn with a fixed seed.
 - `demand_lag7d`, `wind_lag7d`, `residual_range_lag7d`: national demand (INDO) and wind (FUELHH
   `WIND`) at the half-hour, and the range of demand minus wind over the 48 half-hours ending there.
 
