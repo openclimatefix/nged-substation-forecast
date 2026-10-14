@@ -1,5 +1,6 @@
 # ML experiments
 
-Each experiment has a folder `<id>-<slug>/` holding one `result.md`: its front matter is the
-hypothesis record (hypothesis, prediction, decision rule, benchmark, row set, metric, verdict), and
-its body is the write-up. The layout follows the plan in the `ml-experiment` skill (PR #1187).
+Each folder here is one small experiment that tests one hypothesis about improving the production
+forecast, named `<id>-<slug>`. The id is a five-digit integer that orders the experiments by the
+order in which they were started. The folder holds `result.md` and its figures, and the front matter
+of `result.md` states the hypothesis, the prediction, the decision rule, and the verdict.

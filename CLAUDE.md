@@ -71,6 +71,7 @@ one, the mistake is already written.
 | `prose-review` | reviewing, reordering or simplifying prose that already exists — structure first, then one pass per rule |
 | `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
 | `study` | planning, running, re-running, charting, writing up, or reviewing a study under `studies/`, or changing `packages/studies/` |
+| `ml-experiment` | planning, running, or writing up a small experiment that tests one hypothesis about improving the production forecast, under `ml-experiments/`, or running a night's agreed experiments |
 | `data-download` | writing or resuming a bulk-download script (e.g. `studies/*/fetch_*.py`) that makes more than a handful of requests |
 | `data-validation` | trusting the output of a finished download or data build — gaps, duplicate keys, nulls and NaNs, implausible values, grid orientation, timestamp convention |
 
@@ -573,7 +574,7 @@ in
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
 | `baseline_forecasters` | Naive baseline `BaseForecaster` implementations the trained forecasting models must beat, currently `manual_heuristic` and `climatology` |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
-| `studies` | The tested machinery the one-off studies under `studies/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score, the data paths, and the common rows the past-weather studies share. Study scripts import only their own folder, `studies.*`, and the other reviewed packages, and nothing in `src/` or any other package imports `studies` (see "Import rules for studies") |
+| `studies` | The tested machinery the one-off studies under `studies/` and the experiments under `ml-experiments/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score, the data paths, and the common rows the past-weather studies share. Study scripts import only their own folder, `studies.*`, and the other reviewed packages, and nothing in `src/` or any other package imports `studies` (see "Import rules for studies") |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
 | `notebooks` | Marimo exploration notebooks |
 
@@ -585,7 +586,8 @@ package under `packages/` except `packages/studies` must never import `studies` 
 because humans review that code and the study code is fast-moving and agent-written. Code that two
 study folders need moves into `packages/studies/src/studies/` with its tests.
 `packages/studies/tests/test_study_boundaries.py` enforces both halves, and the `study` skill's
-"Where a study's pieces live" section says how to apply them.
+"Where a study's pieces live" section says how to apply them. A script under `ml-experiments/`
+follows the same rules, and the same test covers it.
 
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
 

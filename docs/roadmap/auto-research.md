@@ -1,7 +1,7 @@
 # Experiments run by an LLM agent (agentic ML research)
 
-> **Status: 🚧 Phase 1 under way; phase 2 planned.** Phase 1, in which Claude runs studies overnight
-> and posts their scores to the leaderboard, is tracked in [issue #1031 (Tracking: phase 1 of
+> **Status: 🚧 Phase 1 under way; phase 2 planned.** Phase 1, in which Claude runs experiments
+> overnight, each testing one hypothesis, is tracked in [issue #1031 (Tracking: phase 1 of
 > agentic ML research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1031) in
 > the v0.3 milestone. Phase 2, the careful search that the rest of this page describes, is tracked
 > in [issue #1169 (Tracking: phase 2 of agentic ML
@@ -13,9 +13,9 @@
 XGBoost forecasting model, in two phases.** Flexpectation is the forecasting system this project
 builds for National Grid Electricity Distribution (NGED). Flexpectation's current forecaster is an
 XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, which is under way,
-Claude runs studies overnight from a plan that the maintainer and Claude agreed the previous day. In
-phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the list of
-ideas for improving the XGBoost forecasting model, so that people implement properly only the
+Claude runs experiments overnight from a plan that the maintainer and Claude agreed the previous
+day. In phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the
+list of ideas for improving the XGBoost forecasting model, so that people implement properly only the
 promising ideas. The phase 2 agent implements each idea, scores each implementation, and combines
 the ideas that help, in the style of [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch), with no human in the loop during a round.
@@ -196,7 +196,7 @@ section](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test
 leaderboard design names the risk of scoring hundreds of experiments on one fold. He et al.'s
 separation addresses that risk.
 
-## Phase 1: studies run overnight
+## Phase 1: experiments run overnight
 
 **Phase 1 lasts until an XGBoost model beats `manual_heuristic` on CRPS on the leaderboard fold.**
 Until then, most gains come from fixing bugs and conceptual faults in the data pipeline and in the
@@ -206,20 +206,25 @@ percentage points of capacity.
 
 **Phase 1 assumes Claude is honest.** The leaderboard scorer keeps only the checks that catch honest
 mistakes, such as a study that scores fewer rows than the reference experiment.
-Each study's adversarial reviews look for broken and leaky implementations, as the `study` skill
-already requires.
+Each experiment's reviews look for broken and leaky implementations, as the `ml-experiment` skill
+requires.
 
 **Phase 1 runs on a daily rhythm.** During the day, the maintainer and Claude read the latest
-results and agree the next study plan. Overnight, a Claude session runs the plan with the `study`
-skill, on the current data, as the maintainer's own Unix user. Within a budget the plan sets, Claude
-may add arms that combine the night's winners, and each arm the plan did not name is labelled post
-hoc. The next day's discussion decides which ideas to keep. The ideas worth keeping are
-re-implemented in production in reviewed pull requests.
+results and agree the next night's experiments. Overnight, a Claude session runs them with the
+`ml-experiment` skill, on the current data, as the maintainer's own Unix user. Within a budget the
+plan sets, Claude may add experiments that combine the night's winners, and each experiment the plan
+did not name is labelled post hoc. The next day's discussion decides which ideas to keep. The ideas
+worth keeping are re-implemented in production in reviewed pull requests.
 
-**Each study will post its scores to the leaderboard as a `study/` experiment** ([issue #1168 (Make
-the study skill post scores to the leaderboard and run studies
-overnight)](https://github.com/openclimatefix/nged-substation-forecast/issues/1168)). The `study/`
-prefix labels the rows, and promotion to production never picks a `study/` run.
+**Each ml-experiment tests one hypothesis and ends in a verdict.** The experiment's `result.md`
+holds the hypothesis, the verdict, the best arm, and the lessons learned, and it has the same fields
+that phase 2's hypothesis store records for an idea, so the research lead can read phase 1's
+experiments directly.
+
+**A study or an experiment whose output fits the leaderboard scorer may post its scores as a
+`study/` experiment.** Posting is optional, because an experiment may use its own metric or its own
+probabilistic output. The `study/` prefix labels the rows, and promotion to production never picks a
+`study/` run.
 
 **A `study/` score on the leaderboard fold is biased low, because the study chose its arms on that
 fold.** The bias is likely to be small next to gains as large as the Quick wins study found. Once

@@ -9,7 +9,9 @@ code stays where they can find and re-run it.
 carries `experiment_name` and `ml_flow_experiment_id`, and the forecasts Delta table is partitioned
 by `experiment_name`, so in this repository an experiment is one MLflow-tracked run of the
 production pipeline. A study of whether a weather product's published field carries information is a
-different kind of thing.
+different kind of thing. The small experiments that test one hypothesis about improving the
+production forecast live in `ml-experiments/` instead, and a script there follows the import rules
+below.
 
 **A script under `studies/` may import from its own folder, from `studies.*` (`packages/studies`),
 and from the other reviewed packages in `packages/*`.** `src/` and every package under `packages/`

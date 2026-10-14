@@ -46,7 +46,7 @@ best-estimate, not a guarantee.
   the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
   a promotion criterion.
 - [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent
-  searching for improvements to the XGBoost forecasting model in two phases: studies run overnight
+  searching for improvements to the XGBoost forecasting model in two phases: experiments run overnight
   from a plan agreed the day before, then a careful search in which the agent runs as a separate
   Unix user that never sees the leaderboard's validation window. The page also summarises what
   published research agents found. A person re-implements every idea that survives either phase.
@@ -151,8 +151,9 @@ AWS.*
       ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
     - Score every leaderboard experiment under each scenario, against `manual_heuristic`
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
-- **Phase 1 of agentic ML research** — Claude runs studies overnight, and each study posts its
-  scores to the leaderboard as a `study/` experiment; the scorer drops the checks that exist only to
+- **Phase 1 of agentic ML research** — Claude runs experiments overnight, each testing one
+  hypothesis and ending in a verdict; an experiment whose output fits the scorer may post its scores
+  to the leaderboard as a `study/` experiment, and the scorer drops the checks that exist only to
   stop deliberate cheating
   ([#1031](https://github.com/openclimatefix/nged-substation-forecast/issues/1031)); see
   [Experiments run by an LLM agent](auto-research.md)

@@ -95,6 +95,28 @@ Mean absolute error, points of capacity, with 95% intervals that resample whole 
   (wind) points** and the ERA5-trained error by 0.23 (solar) and 0 (wind). The first run's control,
   with 24 production columns, looked like it memorised calendar position.
 
+## Effect of the feature lists (post hoc)
+
+**Removing the hour and day-of-year columns helped the ENS-trained model a lot and the ERA5-trained
+model little.** The first run gave every arm those four calendar columns, and the production
+control also had 24 production columns including power lags. The table gives each change in mean
+absolute error over all leads, in points of capacity, with 95% month-resampled intervals. Every
+row is post hoc. The first run's arms are the `*_calendar` arms, scored on the same cases.
+
+![Change in error from the feature lists, by lead band](figure_4.svg)
+
+| change | solar | wind |
+| --- | --- | --- |
+| ERA5-trained, calendar columns removed (F1) | -0.23 (-0.47 to -0.08) | +0.03 (-0.08 to +0.15) |
+| ENS-trained, calendar columns removed (F2) | -1.13 (-1.71 to -0.65) | -3.40 (-4.81 to -1.97) |
+| ENS-trained, 24 production columns replaced by the common columns (E13) | -0.49 (-0.70 to -0.29) | -1.99 (-2.73 to -1.31) |
+
+- **The ENS-trained model with calendar columns is the one that does worse.** The ENS training
+  frame repeats each valid time about 15 times, once per lead, so a model given the calendar
+  position can learn the weather of that day rather than a weather-to-power relation.
+- **The first run's headline against the production control was largely this effect.** The common
+  feature list, with no calendar column, is used in every arm of the revised contrasts.
+
 ## Gains in the tails (exploratory)
 
 **For wind, the gain from ERA5 training is much larger on the largest outputs; for solar it is
