@@ -28,6 +28,9 @@ nearest-term piece is the **two-stage
 
 ---
 
+**See also [A staged probabilistic forecast](staged-probabilistic-forecast.md)**, which reuses the
+stage 1 weather-to-power baseline for switching detection.
+
 ## The approaches
 
 The work is organised as a set of **named approaches**, tried in the order set out just below. The

@@ -12,4 +12,4 @@ its evidence, and a plan begins by reading `advice` across every `result.md`.
 
 The [research log](research-log.md) lists every finished experiment in the order it was started,
 with its question, headline result, and link. The [research plan](research-plan.md) lists the
-experiments that are planned or proposed, in the order they should run.
+experiments that are planned or proposed, sorted by priority.

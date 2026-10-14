@@ -13,6 +13,9 @@
 > disaggregation](disaggregation.md). The Python in this document is illustrative sketch code, not
 > the implementation. See the [roadmap index](index.md) for status conventions.
 
+**See also [A staged probabilistic forecast](staged-probabilistic-forecast.md)**, whose PV ratio
+target needs a per-site clear-sky scale, which is an effective-capacity estimate.
+
 ## The problem
 
 A generator's effective capacity drifts over time — turbines fail, inverters drop out, panels soil
