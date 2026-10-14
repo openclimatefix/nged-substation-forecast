@@ -2,6 +2,8 @@
 
 > **Draft study.** Original pipeline, lean-feature and robustness comparisons are complete.
 > The requested minimal-feature extension and final scientific reviews remain pending.
+> Results evaluate frozen PR revisions. The final merged radiation revision has not been scored;
+> its performance remains an open part of the latest-PR question.
 
 This study compares two changes to the weather-feature pipeline and revisits the lean solar and
 wind inputs in Part 1b of [issue 1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156).
@@ -10,7 +12,7 @@ It follows the [feature-fault diagnostic audit](production-feature-faults.md) an
 refit of the production XGBoost configuration. Production here means the training recipe fitted
 on the study's historical data, rather than a deployed model artifact.
 
-**Correcting radiation processing consistently improves solar forecasts; correcting wind
+**The evaluated radiation correction consistently improves solar forecasts; correcting wind
 processing does not establish a general forecast improvement.** Across both historical folds
 and both training settings, radiation-only processing lowers solar loss, and the combined
 corrections lower overall and solar loss within each reference recipe. Wind-only processing
@@ -24,7 +26,9 @@ These are weekly-initialisation diagnostics for a fixed population, with a retro
 denominator. The original lean-wind improvement persists across the completed settings and
 controls; the requested smaller feature sets and final reviews remain pending.
 
-![Input fixes and recipe comparison.](../assets/fixed-pipeline-lean-features/headline-fold-a.svg)
+![Input fixes and recipe comparison on the executed frozen revisions.](../assets/fixed-pipeline-lean-features/headline-fold-a.svg)
+
+The figure evaluates the frozen implementations; it does not score the final merged radiation revision.
 
 > **How this page was made.** A human supplied the research question. OpenAI Codex wrote this
 > study's new code, analysis and text, using existing repository study machinery. Independent
@@ -33,7 +37,7 @@ controls; the requested smaller feature sets and final reviews remain pending.
 
 ## Key findings
 
-- **Radiation correction consistently helps solar.** With the production configuration, its
+- **The evaluated radiation revision consistently helps solar.** With the production configuration, its
   main-setting common pinball difference is -0.337 capacity points in Fold A (95% paired
   month-and-seed interval -0.473 to -0.236) and -0.346 in retrospective Fold B (-0.498 to -0.237).
   Both sensitivity settings also support lower solar loss. These comparisons cover six solar
@@ -59,6 +63,8 @@ controls; the requested smaller feature sets and final reviews remain pending.
 
 [PR 1166](https://github.com/openclimatefix/nged-substation-forecast/pull/1166) reconstructs
 half-hourly radiation from the means over the intervals ending at the weather timestamps.
+The measured radiation treatment is its frozen revision `0f094c3`; the final merged `01ddf53`
+changes short-wave shaping and support validation and requires a separate matched input audit.
 [PR 1167](https://github.com/openclimatefix/nged-substation-forecast/pull/1167) interpolates wind
 components before deriving speed and bearing. This avoids interpolating a bearing through south
 when it crosses north. Interpolating components also changes intermediate wind speeds, so the
@@ -1129,6 +1135,15 @@ Radiation PR 1166 was at `99a40cf586f93524f1034608faf285ae7cb91c2d`, incorporati
 ordering already represented by the study's combined runtime. Those updates preserve the
 calculations used for the frozen frames. The requested feature comparisons reuse those frames;
 they do not evaluate subsequent changes to either implementation.
+
+**The merged radiation revision changes the dawn/dusk calculation and has not been evaluated here.**
+PR 1166 subsequently merged at `01ddf5332063e369827787c5f23ec75d58a607a6`. Among its changes,
+the minimum native clear-sky mean for an index to influence neighbouring windows rises from
+1 to 20 W/m². Each window still retains its own native radiation energy. The merged revision
+also changes daylight-block and neighbouring-index processing and adds source-schedule and
+solar-coordinate validation. These changes prevent an equivalence claim with the executed
+snapshot. The recorded forecasts and requested feature comparisons retain the frozen inputs;
+their scores do not measure the final merged radiation implementation.
 
 **Reproduction requires the registered private snapshots.** Old and radiation-only frames use
 polar archive version 1830; wind-only and combined frames use component archive version 924.

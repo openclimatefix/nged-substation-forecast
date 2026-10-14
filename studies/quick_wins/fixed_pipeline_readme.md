@@ -86,6 +86,46 @@ Raw frame exports, models, row-level scores and manifests containing private ide
 under the private study data directory. Public reports contain type aggregates and feature names.
 Never copy private manifests into the documentation.
 
+## Requested feature extension
+
+The separate post hoc plan is `plans/issue-1156-requested-minimal-features.md`. It fixes two solar
+sets and three wind sets with 2, 11, 5, 9 and 7 real inputs respectively. It retains the cleaned
+per-series point recipe, the two folds, both hyperparameter settings and three fitting seeds.
+Untargeted series keep the full-input policy. Main-setting unpadded checks supplement the
+equal-width comparisons; they do not replace them or reopen the stopped solar ladder.
+
+`requested_features_frames.py` adds solar position, half-hour clear-sky irradiance, reconstructed
+wind components and circular bearings to separate immutable frame copies. Minimal solar and
+five-input wind consume the original combined frames. Expanded solar, wind plus u/v and circular
+wind consume the augmented copies. The added wind representations derive from processed polar
+values and contain no new upstream weather information. Missing precipitation remains missing.
+
+Before fitting, the `reuse_preflight` phase of `requested_features_audit.py` checks preparation,
+feature order, training counts and the limited target-specific windchill guard argument in all
+six fold/setting/padding scopes. `requested_fit_queue.py` requires their completed proofs and
+the exact reviewed execution bindings. It serializes ninety CUDA fits and one CPU numerical
+diagnostic, writes private receipts and stops on failure. The queue and its private job inventory
+are not public reproduction records or evidence that unfinished fits completed.
+
+After each scope's fifteen new CUDA fits finish, the audit's `prediction_audit` phase compares
+forecasts for untargeted series with the matching full-input controls. The existing reporter
+then evaluates the fixed post hoc contrasts, and the existing table selector exports the
+eighteen typed result tables. `requested_features_charts.py` draws the paired-loss figure.
+`requested_feature_importance.py` reads saved point boosters from the sixty equal-width fits;
+`requested_feature_importance_charts.py` draws all five importance figures. Both chart scripts
+require text export and review before rendering. Gain remains descriptive training credit.
+
+The requested comparisons use diagnostic fair CRPS as their deciding loss because every
+compared forecast has the same 51-value point-model construction. Mean absolute error,
+19-midpoint pinball and coverage are secondary diagnostics. Publication uses the scoped table
+headings and metric explanation; the generic private report preamble's cross-recipe pinball
+statement applies to the original comparisons between different distribution constructions.
+
+The extension is in progress. Actual completed artifacts, source hashes and separate review
+records govern reporting and publication. Private path-bearing queue, audit and chart
+specifications stay private; reproduction copies must bind the reader's own authorised paths
+and freshly generated artifacts. Further Part 2 implementation and experiments are on hold.
+
 ## Scores and decisions
 
 The common cross-recipe score is twice mean pinball loss at 19 midpoint probabilities. Delivered
