@@ -123,8 +123,8 @@ result for the 20 series 00006 scored:
 **The listed group has two members, one of them with a 0.37 MW battery, so the mechanism cannot be
 tested well with this series set.** C4 compares two listed series with the rest. The verdict
 therefore rests on C1 and C2 at B2, the only series with a battery that is large against the
-series. P4 is reported beside B2. The advice for a later experiment is to repeat the test on a series set
-with more battery sites. No series is added after seeing results.
+series. P4 is reported beside B2. The advice for a later experiment is to repeat the test on a
+series set with more battery sites. No series is added after seeing results.
 
 ## Resources and sizing
 
