@@ -29,7 +29,7 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/11
 # Does a stage 2 calibrator beat the pooled stage 1a mixture?
 
 **Verdict: the pooled ERA5-trained mixture beats the ENS-trained quantile model, and the stage 2
-calibrator and learned blend add nothing on top of it.** Study 2b ran in one held-out year (fold A,
+calibrator and learned blend did not improve on it, and were worse for solar.** Study 2b ran in one held-out year (fold A,
 53 weekly runs) for 6 solar farms and 3 wind farms. The full write-up is the `Results` section of
 `studies/stage1_pilot/README_stage2.md`.
 
@@ -66,12 +66,12 @@ CRPS in points of capacity.
 
 ## What else the study found
 
-- **The long ERA5 history changes the CRPS by 0.01 to 0.09 points**, against the history from the
-  ENS months only.
+- **For the mixture and stage 2 arms, the long ERA5 history changes the CRPS by 0.01 to 0.09
+  points** against stage 1a trained on the ENS months only.
 - **In the tail the ERA5-trained gain for wind is not larger than at the centre of the
   distribution.** The exceedance Brier scores of the 90th and 95th percentiles improve by 0.50 and
   0.27 over the ENS-trained arm.
-- **The ENS-trained arm under-forecasts wind exceedances**, and stage 2 does not repair that.
+- **The ENS-trained arm under-forecasts wind exceedances**, and stage 2's bins above 0.30 are also under-forecast.
 - **The learned blend does not help reliably.** It changes the CRPS by +0.00 to +0.08 for stage 2.
 
 ## Failures and limits
@@ -83,6 +83,6 @@ CRPS in points of capacity.
 
 ## Lessons for later experiments
 
-- Fit a stage 2 model only against a pooled mixture reference.
+- Report the pooled mixture beside any stage 2 arm, because the mixture is the reference stage 2 has to beat.
 - Predictions are under `data/studies/per_study/stage2_pilot/` and are not yet in
   `data/ml-experiments/` with a manifest.

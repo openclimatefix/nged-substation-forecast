@@ -28,7 +28,7 @@ and calibrator models use the 2a feature lists (no calendar column, no power lag
 | Arm | What it is |
 | --- | --- |
 | `a_ens_quantile` | Arm (a). The `ens_trained` recipe as a quantile model: stage 1a's columns, trained on the ENS control member 2024-04 to 2025-06, 9 quantile levels, applied to each of the 51 members and pooled as a mixture. |
-| `b_mixture_full` | Arm (b). Stage 1a refitted with the 9 quantile levels on ERA5 from 2019-09 to 2025-06-16, applied to each member's weather, member quantiles pooled as a mixture. No second model. |
+| `b_mixture_full` | Arm (b). Stage 1a refitted with the 9 quantile levels on ERA5 from the long history to 2025-06-16, applied to each member's weather, member quantiles pooled as a mixture. No second model. |
 | `b_mixture_short` | As `b_mixture_full` with stage 1a trained on ERA5 from 2024-04 only (the ENS months). |
 | `c_stage2_full` | Arm (c). Stage 2 given `b_mixture_full`'s stage 1a quantiles: a shared per-technology calibrator on each member, a pooled mixture, then a learned blend. |
 | `c_stage2_short` | As `c_stage2_full` with the short-trained stage 1a. |
@@ -129,20 +129,20 @@ All numbers are printed by `stage2_report.py` into
 is better) on 175,795 solar and 107,121 wind half-hours per arm and seed. Intervals resample whole
 months, as in study 2a. Only Q1 to Q3 are planned contrasts; every other number is exploratory.
 
-**Verdict: the pooled stage 1a mixture is the best arm for wind and for the first six days of solar.
-Stage 2 did not beat it, and the learned blend added nothing reliable.**
+**Verdict: the pooled stage 1a mixture is the best unblended arm for wind and for the first six days
+of solar. Stage 2 did not beat it, and the learned blend added nothing reliable.**
 
-- **Q1 (stage 2 with blend minus the pooled mixture) is not material for either technology.**
-  Solar CRPS is worse by 0.40 points (interval +0.26 to +0.61; 0 of 12 months better). Wind CRPS is
-  worse by 0.26 points (interval -0.17 to +0.64).
+- **Q1 (stage 2 with blend minus the pooled mixture) is not material for either technology.** Solar
+  CRPS is worse by 0.40 points (interval +0.26 to +0.61; 0 of 12 months better). Wind CRPS is worse
+  by 0.26 points (interval -0.17 to +0.64).
 - **Q2 (stage 2 with blend minus the ENS-trained quantile arm) is material for wind only.** Wind
-  CRPS is better by 0.36 points (interval -0.59 to -0.12; 10 of 12 months). Solar is not
-  better overall (+0.17; interval -0.03 to +0.50). Solar is better at 0 to 24 h (-0.43) and 1 to 2
-  days (-0.32) and worse at 7 to 15 days.
+  CRPS is better by 0.36 points (interval -0.59 to -0.12; 10 of 12 months). Solar is not better
+  overall (+0.17; interval -0.03 to +0.50). Solar is better at 0 to 24 h (-0.43) and 1 to 2 days
+  (-0.32) and worse at 7 to 15 days.
 - **Q3 (the pooled mixture minus the ENS-trained quantile arm) is material for both.** Solar CRPS is
-  better by 0.24 points (interval -0.36 to -0.06; 11 of 12 months) and wind by 0.62 points
-  (interval -0.99 to -0.26; 10 of 12 months). The MAE of the median agrees: -0.40 for solar and
-  -0.99 for wind, both material.
+  better by 0.24 points (interval -0.36 to -0.06; 11 of 12 months) and wind by 0.62 points (interval
+  -0.99 to -0.26; 10 of 12 months). The MAE of the median agrees: -0.40 for solar and -0.99 for
+  wind, both material.
 
 ### Absolute scores
 
@@ -157,22 +157,21 @@ CRPS over all leads, in points of capacity:
 
 - **Beyond day 6 no arm beats climatology by much.** At 7 to 10 days the wind arms score 13.0 to
   13.5 against climatology's 12.9, and the solar arms score 5.5 to 6.2 against 5.84. Stage 2 is the
-  worst solar arm there (6.13 to 6.23).
-- **Gains are concentrated in the first six days.** For wind, Q3 is -1.77 points at 0 to 24 h,
-  -2.32 at 1 to 2 days, and -0.96 at 3 to 6 days. At 7 to 10 days and 11 to 15 days it is positive
-  but its interval includes zero.
+  worst solar arm there (6.12 to 6.23).
+- **Gains are concentrated in the first six days.** For wind, Q3 is -1.77 points at 0 to 24 h, -2.32
+  at 1 to 2 days, and -0.96 at 3 to 6 days. At 7 to 10 days and 11 to 15 days it is positive but its
+  interval includes zero.
 
 ### Does the long ERA5 history matter for generators?
 
 - **Mostly not at the CRPS.** Exploratory contrasts X5 to X7 compare stage 1a trained on ERA5 from
-  2019-09 against ERA5 from 2024-04 only. The differences are 0.01 to 0.09 points for solar and 0.01
-  to 0.03 for wind, and the largest interval (X7, solar, +0.02 to +0.16) hardly clears zero. In
-  study 2a the same history made a clear difference to the point forecast of the member-averaged
-  model; here the pooled mixture and the calibrator close most of that gap.
-- **The short history gives narrower intervals.** `b_mixture_short` covers 85.0% (solar) and 77.9%
-  (wind) of cases with its 10 to 90 interval, against 88.6% and 81.9% for the full history
-  (nominal 80%). The full history is slightly better at the 0.9 and 0.95 pinball levels (0.04 to
-  0.06 points, intervals above zero for wind).
+  2019-09 onward against ERA5 from 2024-04 only. The differences are 0.01 to 0.09 points for solar
+  and 0.01 to 0.03 for wind, and the largest interval (X7, solar, +0.02 to +0.16) hardly clears
+  zero.
+- **The short history gives lower coverage.** `b_mixture_short` covers 85.0% (solar) and 77.9%
+  (wind) of cases with its 10 to 90 interval, against 88.6% and 81.9% for the full history (nominal
+  80%). The full history is slightly better at the 0.9 and 0.95 pinball levels (0.04 to 0.06 points;
+  the pinball intervals for X6 are above zero for both technologies).
 
 ### The tails
 
@@ -180,16 +179,18 @@ CRPS over all leads, in points of capacity:
   The CRPS is twice the mean pinball loss over the levels, so half the CRPS gain is the typical
   per-level gain. Over all leads, Q3 gives -0.31 of that typical gain against -0.24 (interval -0.53
   to +0.06) at level 0.9 and -0.18 (-0.35 to -0.02) at level 0.95. At 0 to 24 h the tail gains
-  (-1.10 and -0.76) bracket the typical -0.88. Both are material at 0 to 6 days and absent beyond
-  day 6.
+  (-1.10 and -0.76) bracket the typical -0.88. Both tail levels are material at 0 to 6 days and
+  absent beyond day 6.
 - **The exceedance forecasts do improve for wind.** The Brier scores of exceeding the 90th and 95th
-  training percentiles of wind power give Q3 of -0.50 (interval -0.85 to -0.21; 12 of 12 months)
-  and -0.27 (-0.42 to -0.12; 10 of 12 months).
-- **For solar the tails show no ERA5-trained gain.** Q3 is -0.02 at level 0.9 and 0.00 at level
-  0.95, and its Brier scores have intervals that include zero (-0.22 and -0.04).
+  training percentiles of wind power give Q3 of -0.50 (interval -0.85 to -0.21; 12 of 12 months) and
+  -0.27 (-0.42 to -0.12; 10 of 12 months).
+- **For solar the tails show no ERA5-trained gain over all leads (at 0 to 24 h, Q3 is -0.15 at level
+  0.9 and -0.53 on the Brier score of the 90th percentile, both material).** Q3 is -0.02 at level
+  0.9 and 0.00 at level 0.95, and its Brier scores have intervals that include zero (-0.22 and
+  -0.04).
 - **The ENS-trained arm under-forecasts wind exceedances.** In the reliability table for exceeding
-  the series' 90th percentile, cases where it forecasts a probability of 0.20 to 0.30 exceed
-  the threshold 48% of the time, and cases forecast at 0.30 to 0.50 exceed it 70% of the time. The
+  the series' 90th percentile, cases where it forecasts a probability of 0.20 to 0.30 exceed the
+  threshold 48% of the time, and cases forecast at 0.30 to 0.50 exceed it 70% of the time. The
   pooled mixture's matching bins are 0.24 forecast against 0.24 observed, and 0.38 against 0.44. The
   same pattern holds at the 95th percentile.
 - **Stage 2 is not more reliable in the tail.** At the 90th percentile of wind its bins above 0.30
@@ -199,8 +200,8 @@ CRPS over all leads, in points of capacity:
 
 ### Coverage and the blend
 
-- **The 10 to 90 interval over-covers for most arms.** It covers 83% to 89% (nominal 80%), apart from
-  stage 2 without the blend for solar (83.9%) and the short mixtures. For wind the ENS-trained arm
+- **The 10 to 90 interval over-covers for most arms.** It covers 81% to 89% (nominal 80%), apart
+  from the unblended short mixtures (85.0% solar, 77.9% wind). For wind the ENS-trained arm
   under-covers beyond day 6 (79.4% to 79.6%).
 - **The blend did not help.** For stage 2, X1 is +0.00 (solar) and +0.08 (wind) points of CRPS,
   neither clearly different from zero. For the mixture and the ENS-trained arm, the blend helps wind
