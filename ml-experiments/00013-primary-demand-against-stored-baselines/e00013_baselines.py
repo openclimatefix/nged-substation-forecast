@@ -51,7 +51,7 @@ def stored_quantiles(*, experiment_name: str, series: pl.DataFrame, inits: list)
             "capacity": series["effective_capacity_mw"].cast(pl.Float64),
         }
     ).lazy()
-    return (
+    frame = (
         pl.scan_delta(str(POWER_FORECASTS))
         .filter(
             (pl.col("experiment_name") == experiment_name)
@@ -66,6 +66,7 @@ def stored_quantiles(*, experiment_name: str, series: pl.DataFrame, inits: list)
                 for level, name in zip(common.LEVELS, common.LEVEL_COLUMNS, strict=True)
             ],
             members=pl.col("ensemble_member").n_unique(),
+            stored_rows=pl.len(),
         )
         .join(capacity, on="time_series_id", how="left", validate="m:1")
         .with_columns(*[pl.col(name) / pl.col("capacity") for name in common.LEVEL_COLUMNS])
@@ -73,6 +74,10 @@ def stored_quantiles(*, experiment_name: str, series: pl.DataFrame, inits: list)
         .collect(engine="streaming")
         .sort("time_series_id", "power_fcst_init_time", "valid_time")
     )
+    if frame.filter(pl.col("members") != pl.col("stored_rows")).height:
+        msg = f"{experiment_name}: a (series, run, valid time) holds duplicate member rows"
+        raise ValueError(msg)
+    return frame
 
 
 def main() -> None:

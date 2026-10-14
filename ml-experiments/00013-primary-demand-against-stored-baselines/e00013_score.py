@@ -35,6 +35,7 @@ REFERENCE_ARMS: Final[dict[str, str]] = {"s1": "r0_from2023", "r1": "r1", "r2": 
 SCOPES: Final[tuple[str, ...]] = (
     "all leads",
     "up to 48 h",
+    "3 d or more",
     "0-24 h",
     "1-2 d",
     "3-6 d",
@@ -45,6 +46,8 @@ GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
 HEADLINE_GROUP: Final[str] = "Primary"
 PLANNED_LEVEL: Final[float] = 99.0
 N_RESAMPLES: Final[int] = 10_000
+DECISION_SCOPES: Final[tuple[str, ...]] = ("all leads", "up to 48 h", "3 d or more")
+"""Planned contrasts are read at 99% in these scopes; every other scope is exploratory at 95%."""
 DEFAULT_RESAMPLES: Final[int] = 2_000
 PLANNED: Final[dict[str, tuple[str, str]]] = {
     "C1 (primary): N1 minus manual_heuristic": ("n1", "manual_heuristic"),
@@ -136,7 +139,7 @@ def prepare(*, arms: dict[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
         quantiles = np.sort(kept.select(common.LEVEL_COLUMNS).to_numpy(), axis=1)
         actual = kept["actual"].to_numpy()
         out[name] = (
-            kept.join(groups, on="time_series_id", how="left")
+            kept.join(groups, on="time_series_id", how="left", maintain_order="left")
             .with_columns(
                 lead_hours=(
                     pl.col("valid_time") - pl.col("power_fcst_init_time")
@@ -189,6 +192,8 @@ def _scope(*, frame: pl.DataFrame, scope: str, group: str) -> pl.DataFrame:
         return frame
     if scope == "up to 48 h":
         return frame.filter(pl.col("lead_hours") < 48.0)
+    if scope == "3 d or more":
+        return frame.filter(pl.col("lead_hours") >= 72.0)
     low, high = next((lo, hi) for name, lo, hi in common.LEAD_BANDS if name == scope)
     return frame.filter((pl.col("lead_hours") >= low) & (pl.col("lead_hours") < high))
 
@@ -213,7 +218,7 @@ def contrast(
             for name in (treatment, reference)
         }
     )
-    decisive = level == PLANNED_LEVEL and group == HEADLINE_GROUP and scope == "all leads"
+    decisive = level == PLANNED_LEVEL and group == HEADLINE_GROUP and scope in DECISION_SCOPES
     lower, upper = bootstrap.bootstrap_difference_at_level(
         losses=losses,
         treatment=treatment,
@@ -252,13 +257,73 @@ def contrast(
     }
 
 
+def _fmt(row: dict) -> str:
+    return f"{row['difference']:+.2f} ({row['lower']:+.2f} to {row['upper']:+.2f})"
+
+
+def verdict(*, contrasts: pl.DataFrame) -> str:
+    """Return the pre-registered verdict lines from C1, C3, and C5, for the Primary substations."""
+
+    def read(label: str, scope: str, metric: str) -> dict:
+        return contrasts.filter(
+            pl.col("label").str.starts_with(label)
+            & (pl.col("scope") == scope)
+            & (pl.col("metric") == metric)
+        ).to_dicts()[0]
+
+    c1_mae, c1_qs = (
+        read("C1", "all leads", "median_error"),
+        read("C1", "all leads", "quantile_score"),
+    )
+    c1_short = read("C1", "up to 48 h", "median_error")
+    c3 = read("C3", "all leads", "median_error")
+    c3_long, c5_long = (
+        read("C3", "3 d or more", "median_error"),
+        read("C5", "3 d or more", "median_error"),
+    )
+    gain = c1_mae["upper"] < 0
+    both = gain and c1_qs["upper"] < 0
+    refuted = c1_mae["lower"] > 0 or c3["lower"] <= 0
+    short_pass = c1_short["difference"] <= -0.5
+    long_pass = c1_mae["difference"] <= -0.2
+    ratio = c5_long["difference"] / c3_long["difference"]
+    outcome = (
+        "refuted"
+        if refuted
+        else "supported"
+        if both
+        else "partly supported"
+        if gain
+        else "inconclusive"
+    )
+    lines = [
+        f"C1 all leads MAE {_fmt(c1_mae)}, quantile score {_fmt(c1_qs)}",
+        f"C1 up to 48 h MAE {_fmt(c1_short)}",
+        f"C1 thresholds: up to 48 h <= -0.5: {short_pass}; all leads <= -0.2: {long_pass}",
+        f"C3 all leads MAE {_fmt(c3)}",
+        f"C5 / C3 beyond 3 d: {ratio:+.2f} (needs <= -0.5)",
+        f"verdict: {outcome}",
+    ]
+    return "\n".join(lines)
+
+
 def main() -> None:
     """Score every arm and write the tables and the report."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     series = common.series_table()
     cases = _actual_table(series=series)
     raw = collect_arms(cases=cases)
+    for name in (*REFERENCE_ARMS, *N1_ARMS, *STORED_ARMS):
+        seeds = set(raw[name]["seed"].unique().to_list())
+        expected = {0} if name == "n1_nocal" else set(common.SEEDS)
+        if seeds != expected:
+            msg = f"arm {name} holds seeds {sorted(seeds)}, expected {sorted(expected)}"
+            raise ValueError(msg)
     arms = prepare(arms=raw)
+    rows = {name: frame.height // frame["seed"].n_unique() for name, frame in arms.items()}
+    if len(set(rows.values())) != 1:
+        msg = f"arms hold different numbers of shared cases per seed: {rows}"
+        raise ValueError(msg)
     save_predictions(arms=arms)
     arm_rows = {name: frame.height // frame["seed"].n_unique() for name, frame in arms.items()}
     absolute = []
@@ -285,7 +350,7 @@ def main() -> None:
                 scope=scope,
                 group=group,
                 metric=metric,
-                level=PLANNED_LEVEL if label in PLANNED else 95.0,
+                level=PLANNED_LEVEL if label in PLANNED and scope in DECISION_SCOPES else 95.0,
             ),
         }
         for label, (treatment, reference) in {**PLANNED, **EXPLORATORY}.items()
@@ -330,6 +395,7 @@ def main() -> None:
     )
     by_series.write_parquet(RESULTS_DIR / "by_series.parquet")
     print("rows per seed:", arm_rows)
+    print(verdict(contrasts=pl.DataFrame(contrasts)))
     print(
         pl.DataFrame(absolute)
         .filter((pl.col("group") == HEADLINE_GROUP) & (pl.col("scope") == "all leads"))

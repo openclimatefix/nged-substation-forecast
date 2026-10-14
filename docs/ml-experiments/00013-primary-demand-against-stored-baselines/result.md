@@ -85,8 +85,8 @@ headline; BSP and GSP (2 series each) are reported separately and never averaged
 
 **The three lags.** The origin `T` is the NWP run time plus 9 hours. The newest usable observation
 is the latest half-hour at or before `T` minus 3.5 hours. NGED's files cover 6-hour windows, and the
-live ingest downloads each window 3 hours after it ends, so at 09:00 UTC the 03:00 to 06:00 window's
-last half-hour is the newest value. The lags are the power at that newest half-hour, the power at the
+live ingest downloads each window 3 hours after it ends, so at 09:00 UTC the 03:00 to 06:00 window has just arrived.
+The plan keeps one half-hour of margin, so the newest value is the one stamped 05:30. The lags are the power at that newest half-hour, the power at the
 latest earlier time with the same half-hour of day as the valid time, and the power at the latest
 earlier time with the same weekday and half-hour. All three are zero-lookahead by construction. The
 telemetry delay is an assumption, not a measurement of NGED's delay; the live ingest's download time
@@ -110,7 +110,8 @@ and the ladder PROD, S1, N1-nolag, N1 shows which step recovers the gap.
 - **C4:** N1 minus N1-nolag (what origin lags add).
 - **C5:** N1-nolag minus S1 (ENS-trained quantile against ERA5-trained, both lag-free).
 
-Every other contrast is exploratory and read at 95%, including each lead band.
+The planned contrasts are read at 99% over all leads, over leads up to 48 hours, and over leads of
+3 days or more. Every other contrast is exploratory and read at 95%, including each lead band.
 
 ## Past weather
 

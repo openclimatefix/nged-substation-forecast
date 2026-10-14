@@ -82,6 +82,9 @@ def fit_series(
     *, row: dict, arrays: common.SeriesArrays, train: pl.DataFrame, variant: str, seed: int
 ) -> xgb.Booster:
     """Fit one series' quantile model for a variant and seed."""
+    if train["ensemble_member"].unique().to_list() != [0]:
+        msg = "the training frame must hold the control member (0) only"
+        raise ValueError(msg)
     own = train.filter(
         (pl.col("time_series_id") == row["time_series_id"])
         & pl.col("power").is_finite()
@@ -114,6 +117,9 @@ def predict_series(
         run = common.with_derived(frame=run, latitude=row["latitude"], longitude=row["longitude"])
         run = add_lags(frame=run, power=arrays.power).sort("valid_time", "ensemble_member")
         members = run["ensemble_member"].n_unique()
+        if run.height != run.select(*KEYS).n_unique() * members:
+            msg = "every valid time must hold every member"
+            raise ValueError(msg)
         if run["ensemble_member"].min() != 0:
             msg = "member 0, the control, must be the first member"
             raise ValueError(msg)
