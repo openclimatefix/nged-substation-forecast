@@ -157,10 +157,12 @@ statistics need more substations or a continuous measure of capacity.
 **Experiment 00010 ran a first version and was inconclusive; a follow-up on all series is proposed.**
 Experiment 00010 added the price from exactly 7 days earlier to the stage 1a demand model and judged
 it at the two series known to host batteries, of which only one had training history. The follow-up
-the maintainer asked for on 2026-10-14 tests the price on all 20 series, to explain unmetered
-price-sensitive generators, with the pooled effect as the headline. It would try several lags and the
-known day-ahead price for the nearest leads, and keep the shuffled-price control and a climatology
-row that 00010 lacked.
+the maintainer asked for on 2026-10-14 does not forecast and uses no lags. It trains a stage 1 demand
+model that maps the intra-day price at time t, with the weather at time t, to power at time t, on all
+20 series, with the pooled effect as the headline. A later experiment could feed that model the
+observed prices to estimate the power that should have been metered in the past, and so measure how
+unusual the actual lagged power was. The follow-up keeps the shuffled-price control and adds the
+climatology row that 00010 lacked.
 
 **The price proposal asks a different question from price forecasting.** Future electricity prices
 are hard to predict, so a price forecast is not the input. The proposal is to use prices that have
