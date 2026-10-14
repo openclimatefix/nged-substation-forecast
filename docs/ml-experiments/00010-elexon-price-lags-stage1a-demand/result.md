@@ -10,13 +10,16 @@ hypothesis: >-
 prediction: >-
   Against the experiment 00006 Primary input set, the price columns lower the mean absolute error of
   the median at the listed substation (B2) by at least 0.5 points of capacity, and by less than 0.1
-  points at the unlisted series. The same-lag national demand and wind control lowers the error at B2
-  by less than half as much as the price columns.
+  points at the unlisted series.
 decision_rule: >-
-  Supported if C1 and C2 are both material at B2: the 99% month-resampled interval (Bonferroni across
-  the four planned contrasts) excludes zero and the point estimate is at least 0.1 points in the
-  direction stated. Refuted if C1 at B2 is within 0.1 points of zero with an interval that excludes
-  a gain of 0.3 points. Otherwise inconclusive. C4, the listed against unlisted comparison, rests on
+  Supported if C1 and C2 are both material at B2: the 98.3% month-resampled interval (95% familywise,
+  Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point estimate is at least 0.1 points in the
+  direction stated. Refuted if the C1 interval at B2 excludes a gain of 0.3 points. Otherwise
+  inconclusive. The selection year decides; the confirmation year is scored once, and if its
+  C1 interval at B2 excludes the selection year's point estimate the verdict is inconclusive.
+  Before any fit, the half-width of B2's interval is computed from experiment 00006's per-month
+  losses; if it exceeds 0.3 points the refuted branch is dropped and the best possible verdict is
+  supported or inconclusive. C4, the listed against unlisted comparison, rests on
   two listed series and is reported but cannot change the verdict.
 benchmark: >-
   The experiment 00006 Primary input set with recency weights (arm BASE), and a month-by-half-hour
@@ -67,8 +70,11 @@ lineage note. Findings, all from `e00010_fetch_prices.py`:
 `data/studies/downloads/market/` cover only 2025-09 to 2026-09, so the same free Insights API
 pull is repeated for 2019 to 2026 before any fit, with the same validation.
 
-**Training years with missing prices are not dropped.** XGBoost handles a missing value natively,
-and every validation half-hour from 2024-07 has a price at lag 7 days.
+**Training years with missing prices are not dropped.** XGBoost handles a missing value natively.
+`price_lag7d` is missing when its half-hour is missing or has zero volume. The minimum and maximum
+are missing when fewer than 40 of the 48 half-hours are available. About 23 half-hours in the
+validation and confirmation years have a zero-volume price, so a few rows there carry missing
+price columns; the report counts them. No lead beyond 7 days is scored.
 
 ## Design
 
@@ -80,14 +86,14 @@ subsampling), seeds, and the 7-day purge are those of 00006.
 | Arm | Adds to BASE |
 | --- | --- |
 | BASE | nothing |
-| PRICE | `price_lag7d` (price at the same half-hour 7 days earlier), `price_min_lag7d` and `price_max_lag7d` (the minimum and maximum over the 48 half-hours of the day 7 days earlier) |
-| CONTROL | the same three summaries of GB national demand outturn (Elexon `INDO`) and of wind generation (Elexon `FUELHH`) at lag 7 days, neither containing a price |
-| SHUFFLED | the PRICE columns taken from another week of the same weekday and half-hour (a negative control) |
+| PRICE | `price_lag7d` (price at the same half-hour 7 days earlier), `price_min_lag7d` and `price_max_lag7d` (the minimum and maximum over the 48 half-hours ending at the valid time minus 7 days, so nothing post-dates the valid time minus 7 days) |
+| CONTROL | three columns with no price in them, matching PRICE's count: GB national demand outturn (Elexon `INDO`) at the same half-hour 7 days earlier, wind generation (Elexon `FUELHH`) at the same half-hour 7 days earlier, and the range of demand minus wind over the 48 half-hours ending 7 days earlier |
+| SHUFFLED | the three PRICE columns, all taken from one other week of the same weekday and half-hour, drawn with a fixed seed from within 4 weeks of the true week (a negative control) |
 
 **Weather and timing caveat.** The weather block is ERA5 read at the valid time, as in 00006, so
 every score is a ceiling for the same reason 00005's was: ERA5 arrives about 5 days late. The
-columns this experiment adds are available at forecast time: Elexon publishes the Market Index Data
-and the national demand and wind outturn within minutes of each half-hour.
+columns this experiment adds are available at forecast time because
+they are at least 7 days old.
 
 **Calendar memorisation control.** Hour and weekday are in BASE (as in 00006), so the price
 columns can stand in for the calendar. SHUFFLED keeps the calendar structure and removes the
@@ -109,7 +115,11 @@ with a month-resampled interval at the level a Bonferroni correction over four c
 **The list comes from NGED's Embedded Capacity Register (August 2026 release), which is
 independent of the outcome.** A series is listed if the register's connected storage rows under
 the series' name sum to a maximum export capacity of at least 5% of the series' effective capacity.
-The register names the primary, bulk supply point, and grid supply point each row connects to. The
+The 5% threshold is a round number chosen before the sums were run; P4 passed it by 0.1 points,
+which is why the plan reports it only beside B2. The register has no commissioning dates, so a
+listed battery may have been absent for part of the training years or of the selection year, and
+batteries also earn from balancing and frequency response, not only the index price. A gain at B2
+is therefore weak evidence of a battery response. The register names the primary, bulk supply point, and grid supply point each row connects to. The
 result for the 20 series 00006 scored:
 
 - **Listed: B2, a bulk supply point,** with 9.5 MW of connected storage against 47.6 MW of effective
