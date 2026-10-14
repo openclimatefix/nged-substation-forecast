@@ -21,7 +21,7 @@ the maintainer to confirm.
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Map the ENS shortwave onto CAMS (a stage 0 quantile mapping) before a CAMS-trained stage 1a reads it | The year's mean is corrected but individual months are up to 18.6% off, and the member spread widens by 27% |
 | [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Train the stage 1a demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day error correction | The correction needs live power 2 days old, and every gain is on ERA5 weather |
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
-| [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing helped solar |
+| [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
 
 ## The experiments so far
 
@@ -287,12 +287,12 @@ and the spread factor against the production recipe's pooled ERA5-trained mixtur
 component in turn, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
 
 - **Headline result:** wind full stack minus recipe, -0.071 (99.58% interval -0.133 to -0.014); solar
-  full stack minus recipe, +0.035 (-0.075 to +0.116).
+  full stack minus the production recipe, +0.035 (-0.075 to +0.116).
 - **Components:** the wind base margin alone gives -0.055 (-0.110 to -0.007). For solar, CAMS-trained
   gives -0.009, stage 0 +0.036, and the spread factor +0.006, each with an interval that includes
   zero.
 - **Finding for later experiments:** the stage 0 quantile mapping widens the member spread by about a
-  quarter and leaves monthly ratios to CAMS from 0.83 to 1.10, so it is not worth porting for solar.
+  quarter and leaves monthly ratios to CAMS from 0.83 to 1.10, and it did not lower the solar CRPS in this experiment.
 - **Write-up and pull request:** [result](00020-solar-wind-stack-cams-stage0-spread-margin/result.md),
   [PR #1226 (Experiment 20: do the candidate changes for solar and wind add up to a better pooled
   mixture?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1226).
