@@ -16,7 +16,8 @@ prediction: >-
 decision_rule: >-
   Supported if C1 (PRICE − BASE) and C2 (PRICE − SHUFFLED), pooled over fitted series, each have a
   point estimate of at most −0.1 points and a 97.5% month-resampled interval (95% familywise,
-  Bonferroni across C1 and C2, deliberately conservative) that excludes zero in the selection year, and in the confirmation
+  Bonferroni across C1 and C2, deliberately conservative) that excludes zero in the selection year,
+and in the confirmation
   year, scored once, both intervals also exclude zero with the same sign. Refuted if the C1
   interval lies wholly above −0.1 points in both years. Otherwise inconclusive. C3, C4, and the
   residual breakdowns are descriptive and do not enter the rule.
@@ -38,8 +39,9 @@ pull_request: null
 
 # Does the same-time electricity price help a stage 1 demand model explain power?
 
-**Status: planned.** Written before any fit. Follows [experiment 10](../00010-elexon-price-lags-stage1a-demand/result.md),
-which tested the price from 7 days earlier at two battery sites and was inconclusive.
+**Status: planned.** Written before any fit. Follows
+[experiment 10](../00010-elexon-price-lags-stage1a-demand/result.md), which tested the price from
+7 days earlier at two battery sites and was inconclusive.
 
 ## Purpose
 
@@ -72,11 +74,19 @@ cannot run at forecast time. That is intended, because the model scores past pow
 the experiment 10 pull of `APXMIDP`, 98.5% complete and fully complete from 2024-04-14. Training
 rows before 2021 can have a missing price, which XGBoost handles natively.
 
-**Rows and row sets.** All arms are scored on the same validation rows. A half-hour with a missing price is still predicted, because XGBoost treats the missing value natively. The climatology row drops a row whose calendar cell holds no training sample. The selection year's row set is `era5_val_2024_07_to_2025_06_v1`, and the confirmation year's is `era5_val_2025_07_to_2026_06_v1`.
+**Rows and row sets.** All arms are scored on the same validation rows. A half-hour with a missing
+price is still predicted, because XGBoost treats the missing value natively. The climatology row
+drops a row whose calendar cell holds no training sample. The selection year's row set is
+`era5_val_2024_07_to_2025_06_v1`, and the confirmation year's is `era5_val_2025_07_to_2026_06_v1`.
 
-**Timing.** The Elexon `time` column is the UTC start of the half-hour, and the join uses `valid_time` minus 30 minutes in UTC. The shuffled price moves a whole week at a time, so the shuffle can misalign a half-hour by one hour in the weeks that contain a clock change.
+**Timing.** The Elexon `time` column is the UTC start of the half-hour, and the join uses
+`valid_time` minus 30 minutes in UTC. The shuffled price moves a whole week at a time, so the
+shuffle can misalign a half-hour by one hour in the weeks that contain a clock change.
 
-**What a pass means.** The price follows national demand and wind. A pass of C1 and C2 therefore shows that the price carries information beyond the weather and the clock, and C3 says whether it carries any beyond national demand and wind. Without C3 the price may only be a proxy for national conditions, so the write-up states C3 beside the verdict.
+**What a pass means.** The price follows national demand and wind. A pass of C1 and C2 therefore
+shows that the price carries information beyond the weather and the clock, and C3 says whether it
+carries any beyond national demand and wind. Without C3 the price may only be a proxy for national
+conditions, so the write-up states C3 beside the verdict.
 
 **Calendar memorisation.** BASE has hour and weekday, so the price column could stand in for the
 calendar. SHUFFLED keeps the price's calendar structure and removes its information, and C2 is the
@@ -93,11 +103,16 @@ interval, pooled over the fitted series and the 3 seeds.
 - **C3 (descriptive):** PRICE − CONTROL.
 - **C4 (descriptive):** C1 by local hour of day, in 4-hour blocks.
 
-**With 12 months, a month-resampled interval is close to the range of the monthly differences.** The report therefore also prints the 12 paired monthly differences of C1 and C2 and the number of months with the sign the prediction gives, and the write-up reads the interval together with them.
+**With 12 months, a month-resampled interval is close to the range of the monthly differences.** The
+report therefore also prints the 12 paired monthly differences of C1 and C2 and the number of months
+with the sign the prediction gives, and the write-up reads the interval together with them.
 
 **Residual breakdowns, descriptive.** For each local hour and each series, the report gives the
 mean absolute error of BASE and PRICE, and the share of BASE's squared residual that PRICE removes.
-This is the number the later experiment needs. Beside each cell the report gives PRICE − SHUFFLED, the noise floor that a cell of this size shows with an uninformative price. The report uses absolute residuals as the headline and the squared share as a second view. The B2 gain is reported beside the pooled gain.
+This is the number the later experiment needs. Beside each cell the report gives PRICE − SHUFFLED,
+the noise floor that a cell of this size shows with an uninformative price. The report uses absolute
+residuals as the headline and the squared share as a second view. The B2 gain is reported beside the
+pooled gain.
 
 ## Sizing
 
@@ -107,7 +122,9 @@ which controls), fixed above. Code whose callers could not be named without sear
 reuses experiment 10's. This is medium: one Sonnet plan review, one Sonnet code review, one Sonnet
 write-up review.
 
-**Limits.** The later experiment needs out-of-fold residuals over the whole history. This experiment scores two validation years only, so it shows that the price helps and where, and it does not produce those residuals.
+**Limits.** The later experiment needs out-of-fold residuals over the whole history. This experiment
+scores two validation years only, so it shows that the price helps and where, and it does not
+produce those residuals.
 
 **Resources.** Slot B, 8 CPU cores, one thread per fit, no GPU.
 
