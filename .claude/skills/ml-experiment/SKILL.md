@@ -66,9 +66,10 @@ review as `implement-issue` does.
   to the navigation in `mkdocs.yml`, under "ML experiments" and titled with the hypothesis, in the
   commit that first adds the page. When two experiments finish together, the two navigation lines
   conflict on rebase; keep both.
-- **The research log:** `docs/ml-experiments/research-log.md` lists every experiment in the order it
-  was started, with its question, headline result, date, and links, and it lists the planned
-  experiments. Keep it current in the same PR that changes an experiment's state, as the next
+- **The research log and plan:** `docs/ml-experiments/research-log.md` lists every finished
+  experiment in the order it was started, with its question, headline result, date, and links.
+  `docs/ml-experiments/research-plan.md` lists the planned and proposed experiments in the order
+  they should run. Keep both current in the same PR that changes an experiment's state, as the next
   section says.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
@@ -123,15 +124,17 @@ session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 ## Keep the research log current
 
-**Update `docs/ml-experiments/research-log.md` in the PR that commits the `planned` `result.md`,
-and again in the PR that adds the finished write-up.** The first PR adds a row under "Planned
-experiments" with the id, the question in one line, and the state. The finished PR moves that row
-into the table at the top and adds a short entry: the question, the verdict in one sentence, the
+**Update `docs/ml-experiments/research-plan.md` in the PR that commits the `planned` `result.md`,
+and `docs/ml-experiments/research-log.md` in the PR that adds the finished write-up.** The first PR
+updates the experiment's row in the table of `research-plan.md` with its id, the question in one
+line, the priority, what it waits for, and the state. The finished PR deletes that row and its
+section from `research-plan.md`, adds the experiment to the table at the top of `research-log.md`,
+and adds a short entry: the question, the verdict in one sentence, the
 headline number with its interval, any finding that changes how later experiments are run, links
 to `result.md` and the PR, and one figure. An idea the maintainer has agreed to run but that has no
-folder yet goes in the planned table marked "Proposed". An experiment that ends `invalid` or
-`failed` keeps its entry, and the entry says why. Write the entry for a reader who has not opened
-`result.md`.
+folder yet goes in the table of `research-plan.md` marked "Proposed". An experiment that ends
+`invalid` or `failed` keeps its entry, and the entry says why. Write the entry for a reader who has
+not opened `result.md`.
 
 ## When a winner reaches production
 

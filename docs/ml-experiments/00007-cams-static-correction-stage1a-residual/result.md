@@ -63,7 +63,7 @@ adopted_in: none
 # Experiment 7: does a static CAMS correction remove the stage 1a daytime residual?
 
 **This is the cheap first test that gates P4 and the rest of P2 in the
-[research log](../research-log.md#p2-embedded-solar-capacity-from-lagged-residuals).** The result
+[research plan](../research-plan.md#p2-embedded-solar-capacity-from-lagged-residuals).** The result
 says whether the daytime residual of the stage 1a demand model tracks a fixed error in the ERA5
 irradiance input, or a change in embedded solar capacity that a correction with fixed coefficients
 cannot follow. The plan was committed before the code ran; the Results section reports the run.
