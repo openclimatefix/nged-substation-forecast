@@ -112,3 +112,48 @@ idea that has no folder yet is marked "proposed".
 | 00005 | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Planned, in [PR #1195 (Experiment 00005 (planned): where lagged power enters a two-stage demand forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195) |
 | 00006 | Which input features are best for the demand weather-to-power model (stage 1a), trained on ERA5, for Primary, BSP, and GSP substations? | Running. Runs first, and its chosen columns feed 00005 |
 | Proposed | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |
+| Proposed | Can summaries of the stage 1a residuals over recent days show that a substation's embedded solar capacity has changed since the model was trained? The three candidate statistics are described below the table | Waits for 00005 and 00006, which gives the residual's correlation with solar irradiance |
+| Proposed | Does the historical electricity price, as an input at lag times, help the demand model understand generation and storage that respond to price? | Needs a source of historical prices |
+
+**The embedded-solar proposal rests on one finding from experiment 00006.** In [PR #1202
+(Experiment 00006: which input features work best for the ERA5-trained demand
+model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202), the residual of the
+chosen-feature model at Primary substation 12 (P12), the median-error Primary substation, was -5 to
+-6 points of capacity from 08:00 to 17:00 in June to August 2025, and about -1 at night. In July
+2025 the hourly residual correlated -0.44 with satellite irradiance from the Copernicus Atmosphere
+Monitoring Service (CAMS) and -0.23 with ERA5 shortwave. CAMS alone explained 19% of the residual's
+variance, ERA5 alone 5%, and both together 25%. The evidence is one substation, one month, and a CAMS
+site 10.3 km away, so it is indicative only. Its direction fits embedded solar generation that ERA5's
+31 km grid cells under-represent.
+
+**The three candidate statistics each compare what stage 1a expected with what the substation
+metered.** Each uses the residual, the metered power over capacity minus stage 1a's prediction at the
+observed weather.
+
+- **The solar slope:** regress the residual on irradiance over the trailing 14 to 28 days, in
+  daylight hours only. A more negative slope means more embedded solar than stage 1a learned.
+- **The day-minus-night residual:** the mean daylight residual over the trailing week minus the mean
+  night-time residual. Demand drift affects both periods, so the difference isolates the part that
+  depends on the sun. A version that uses sunny days only is cleaner.
+- **The ratio to a long-run baseline:** the 28-day slope divided by the 365-day slope, or their
+  difference. The ratio shows how far recent solar capacity sits from the average that stage 1a
+  trained on.
+
+**Pass the correction to stage 2 in power units, not as a raw slope.** XGBoost cannot multiply two
+features and cannot extrapolate beyond its training range, and embedded solar capacity grows steadily.
+The proposal is to give stage 2 the product of the slope and the forecast shortwave at each lead,
+which is the expected adjustment in points of capacity. A linear correction in stage 1b would
+extrapolate correctly where trees cannot. The experiment should compute each statistic twice, from
+ERA5 shortwave alone and from CAMS and ERA5 together, and use CAMS irradiance downloaded at each
+substation's own coordinates ([PR #1201 (Download and validate CAMS irradiance at the demand series'
+locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201)). CAMS has no
+forecast, so it can feed the statistics only at lag times. A cheap diagnostic comes first: plot each
+substation's trailing slope against time, and proceed only if it trends at the substations with the
+most solar.
+
+**The price proposal asks a different question from price forecasting.** Future electricity prices
+are hard to predict, so a price forecast is not the input. The proposal is to use the prices that
+have already been published, at lag times, as inputs that carry the response of price-dependent
+generation and storage to the recent past, for example a battery that charges when prices are low.
+The first step is to find a source of historical half-hourly prices and to check that the response
+shows up in the stage 1a residuals of substations that host batteries or flexible generation.
