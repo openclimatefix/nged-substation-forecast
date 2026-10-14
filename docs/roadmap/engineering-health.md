@@ -23,9 +23,9 @@ plus general cleanup.
   not window construction): assert no *training* row has `valid_time >= val_start` for its fold —
   i.e. the training window `trained_cv_model` builds from `fold.train_start` and `fold.train_end`
   never bleeds into validation.
-- **Leaderboard fairness**: two different experiments over the same fold are scored on the
+- **Leaderboard fairness**: two different CV runs over the same fold are scored on the
   **identical** `(time_series_id, fold)` population — a regression guard on the
-  experiment-independence of `eligible_time_series`.
+  independence of `eligible_time_series` from the CV run.
 - **Determinism**: training a fold twice with a fixed `random_seed` yields identical predictions.
   Determinism underpins idempotent retries and a stable leaderboard.
   `test_random_seed_makes_training_deterministic` exists and evidences this at the forecaster level
@@ -53,10 +53,10 @@ plus general cleanup.
 
 **Part 3 — docs freshness pass.** The permanent-docs migration from the old `dagster_plan.md` is
 already done (July 2026): `docs/architecture/ml-orchestration.md` and
-`docs/ml_experimentation/cross-validation-folds.md` capture its important ideas. What remains:
+`docs/cross-validation/cross-validation-folds.md` capture its important ideas. What remains:
 
 - Check `docs/` against the code after the live service and monitoring land — in particular extend
-  `docs/ml_experimentation/dagster-workflow.md` with the live-forecast and monitoring flows, and
+  `docs/cross-validation/dagster-workflow.md` with the live-forecast and monitoring flows, and
   update the "Known limitation" and MLflow-logging notes in `docs/architecture/ml-orchestration.md`
   if the implementations diverged from the plans.
 - Run the ship-time triage (per the `github-issue-pr-workflow` skill) on any roadmap content the

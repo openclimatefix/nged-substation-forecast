@@ -118,7 +118,7 @@ Three places where a positional argument is right:
   code or deleted files. This is the same rule as "Write about the present, not the past" in
   `CLAUDE.md`, applied to code.
 - **Code links only to durable docs** — `docs/design-philosophy/`, `docs/background/`,
-  `docs/techniques/`, `docs/architecture/`, `docs/ml_experimentation/`, `docs/live_service/`. Never
+  `docs/techniques/`, `docs/architecture/`, `docs/cross-validation/`, `docs/live_service/`. Never
   link from code *or* docs to `plans/` files, and never from code to `docs/roadmap/` pages or to any
   "Implementation details (deleted when this ships)" section — all of those are deleted when the
   work lands, so the reference rots. (Docs-to-docs links into `docs/roadmap/` are fine; retargeting
@@ -338,7 +338,7 @@ after the confusing failure:
   a different view of the data supplies a different `FeatureEngineer` rather than changing the
   shared feature pipeline. `XGBoostForecaster`, `ManualHeuristicForecaster`, and
   `ClimatologyForecaster` are the implementations so far.
-- **Use MLflow for experiment tracking.**
+- **Use MLflow to track CV runs.**
 - **Choosing an optimisation tool: convex estimation subproblems → CVXPY; learning shapes, or
   anything needing posteriors → PyTorch.** "Non-convex" comes in grades, and the grade decides the
   tool — the full rule is [Where PyTorch is the right

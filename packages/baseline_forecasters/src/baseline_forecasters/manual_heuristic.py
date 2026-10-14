@@ -38,7 +38,6 @@ class ManualHeuristicForecaster(BaseForecaster):
     """
 
     MODEL_NAME = "manual_heuristic"
-    MODEL_VERSION = 1
     CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]] = BaseForecasterConfig
 
     feature_engineer: ClassVar[FeatureEngineer] = NwpRunRowsWithoutWeatherFeatureEngineer()
@@ -134,7 +133,7 @@ class ManualHeuristicForecaster(BaseForecaster):
                 power_fcst=pl.col("lag_value").cast(pl.Float32),
                 nwp_init_time=pl.lit(None, dtype=UTC_DATETIME_DTYPE),
                 power_fcst_model_name=pl.lit(self.MODEL_NAME),
-                power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
+                power_fcst_model_version=pl.lit(config.model_release, dtype=pl.Int16),
                 ml_flow_experiment_id=pl.lit(config.ml_flow_experiment_id, dtype=pl.Int32),
                 experiment_name=pl.lit(config.experiment_name),
                 fold_id=pl.lit(fold_id),

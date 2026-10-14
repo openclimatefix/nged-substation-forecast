@@ -116,35 +116,35 @@ image](../architecture/production-deployment.md#bake-the-model-into-the-image-at
 The code that implements the best-performing model in R&D *is* the code we deploy. Note the
 direction of travel: this is emphatically **not** "push the research notebook to production" — it is
 the opposite. Research runs on the production pipeline, so research code is held to production
-standards from the first experiment onwards. Exploratory notebooks are still allowed, but an idea
-becomes an *experiment* — a candidate that can be promoted to production — only once it is
-implemented in the pipeline's own code, behind the same data contracts and tests as everything else.
-There is then no "now rewrite the research code for production" step, because there was never a
-second, scruffier implementation to rewrite (and this should *accelerate* research, not slow it
+standards from the first cross-validation run (CV run) onwards. Exploratory notebooks are still
+allowed, but an idea becomes a *CV run* — a candidate that can be promoted to production — only once
+it is implemented in the pipeline's own code, behind the same data contracts and tests as everything
+else. There is then no "now rewrite the research code for production" step, because there was never
+a second, scruffier implementation to rewrite (and this should *accelerate* research, not slow it
 down). This is also what makes a one-command promotion *safe* rather than merely fast: the model
 that won the leaderboard is, bit for bit, the model that serves, so there is no re-implementation
 whose divergence from the measured version can only be discovered in production.
 
 *Without it:* research code is rewritten for production, the two implementations drift apart, and
-the deployed model no longer does what the winning experiment measured. And it takes *longer* to get
+the deployed model no longer does what the winning CV run measured. And it takes *longer* to get
 the best model into production, which is bad for users, and bad for developers too because the
 *true* test of forecasting skill is to test the model in production. The price of avoiding that is
-real — every experiment has to run on production-quality pipeline code from day one — and we pay it
+real — every CV run has to use production-quality pipeline code from day one — and we pay it
 deliberately.
 
 *Decided:* this was the argument that settled Dagster over Airflow, and it is why splitting the live
 service onto a second orchestrator remains rejected.
 
-*Serves:* [Hypothesis 2: a hundred experiments per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month), [Hypothesis
+*Serves:* [Hypothesis 2: a hundred CV runs per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month), [Hypothesis
 3: one-click promotion, and one-click
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 *Detail:* [Nothing gets rewritten on the way to
-production](../ml_experimentation/index.md#nothing-gets-rewritten-on-the-way-to-production), [Why
+production](../cross-validation/index.md#nothing-gets-rewritten-on-the-way-to-production), [Why
 Dagster, not Airflow?](../architecture/why-dagster-not-airflow.md).
 
-### 4 — An experiment must be cheap to try, and cheap to abandon
+### 4 — A CV run must be cheap to try, and cheap to abandon
 
 Most research ideas fail — that is the normal condition of research, not a symptom of a bad team —
 so the number of good ideas a project finds is set by how many it can attempt, which is in turn set
@@ -152,11 +152,11 @@ by what a single attempt costs: wall-clock time, money, and how much shared code
 We treat that marginal cost as a design constraint in its own right, rather than as a pleasant
 side-effect of tidy architecture. It is also the deliberate counterweight to [principle 3 ("*one
 execution path from research to production*")](#3-one-execution-path-from-research-to-production):
-insisting that every experiment runs on production-quality pipeline code is only affordable while an
-experiment stays cheap, so when that price starts to climb, the answer is to make the shared
+insisting that every CV run uses production-quality pipeline code is only affordable while a
+CV run stays cheap, so when that price starts to climb, the answer is to make the shared
 pipeline easier to extend — never to quietly reopen a research-only shortcut.
 
-*Without it:* trying an unusual idea means editing code that every other experiment depends on, so a
+*Without it:* trying an unusual idea means editing code that every other CV run depends on, so a
 speculative idea has to clear a far higher bar than a safe idea before it is worth attempting — and
 since the wilder ideas are also the likeliest to fail, the cost of failure is exactly what decides
 whether they are ever tried at all.
@@ -167,17 +167,17 @@ model that wants a different view of the data — a CNN wanting a spatial NWP cr
 — swaps its
 [`feature_engineer`](../api/ml_core/index.md#ml_core.base_forecaster.BaseForecaster.feature_engineer)
 for a different [`FeatureEngineer`](../api/ml_core/index.md#ml_core.features.FeatureEngineer)
-implementation, instead of editing shared feature-engineering code; most experiments are a config
+implementation, instead of editing shared feature-engineering code; most CV runs are a config
 change rather than a code change, and can be tried without provisioning anything; and an abandoned
-experiment leaves nothing behind but its own partition, which nothing else depends on.
+CV run leaves nothing behind but its own partition, which nothing else depends on.
 
-*Serves:* [Hypothesis 2: a hundred experiments per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month), [Hypothesis
+*Serves:* [Hypothesis 2: a hundred CV runs per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month), [Hypothesis
 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money).
 
 *Detail:* [The Universal Model
-Interface](../architecture/overview.md#the-universal-model-interface), [Tweaking a config for an
-experiment](../ml_experimentation/model-configuration.md#tweaking-a-config-for-an-experiment),
+Interface](../architecture/overview.md#the-universal-model-interface), [Tweaking a config for a
+CV run](../cross-validation/model-configuration.md#tweaking-a-config-for-a-cv-run),
 [Getting started on your laptop](../getting-started.md).
 
 ### 5 — Everything around the model is general-purpose
@@ -191,8 +191,8 @@ enters as data and configuration — coordinates, capacities, a boundary polygon
 confined to a thin, named layer rather than sprinkled through the pipeline. This is not portability
 for its own sake, and we are not paying today to make some hypothetical other country easier
 tomorrow: we want it because it is the same property that lets a new model be tried without editing
-shared code ([principle 4, "*an experiment must be cheap to try, and cheap to
-abandon*"](#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon)), and that lets one pipeline
+shared code ([principle 4, "*a CV run must be cheap to try, and cheap to
+abandon*"](#4-a-cv-run-must-be-cheap-to-try-and-cheap-to-abandon)), and that lets one pipeline
 serve 32 time series or 2,500 without being rewritten. What makes this affordable rather than merely
 tidy is lazy evaluation: because each layer only ever describes work, the engine can fuse the
 layers' constraints at the end and pay nothing for their mutual ignorance — see [principle 11
@@ -211,9 +211,9 @@ is handed rather than from a hard-coded bounding box; `BaseForecaster` deliberat
 sub-model per time series, a single global model, or anything in between.
 
 *Serves:* [Hypothesis 5: scale without
-redesign](engineering-hypotheses.md#h5-scale-without-redesign), [Hypothesis 2: a hundred experiments
+redesign](engineering-hypotheses.md#h5-scale-without-redesign), [Hypothesis 2: a hundred CV runs
 per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month).
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month).
 
 *Detail:* [The Universal Model
 Interface](../architecture/overview.md#the-universal-model-interface). The principle is not yet
@@ -277,8 +277,8 @@ a second code path — point at the cloud instead:
 - the 13-bit significand rounding that makes the archive locally storable was adopted on measured,
   not assumed, compression.
 
-*Serves:* [Hypothesis 2: a hundred experiments per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month), [Hypothesis
+*Serves:* [Hypothesis 2: a hundred CV runs per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month), [Hypothesis
 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money).
 
 *Detail:* [Which settings for which
@@ -319,13 +319,13 @@ contracts](../architecture/forecast-delivery.md#strict-data-contracts-machine-ve
 Postel's law](inherent-stability.md#not-postels-law), [The guiding
 principle](../architecture/ecmwf-ens-known-issues.md#the-guiding-principle).
 
-### 8 — Every experiment is scored identically
+### 8 — Every CV run is scored identically
 
 What varies is the model, never the measurement. A leaderboard is only worth having if two numbers
 on it are genuinely comparable, which requires the population, the folds, the metric definitions,
 and the pipeline to be held constant *by construction rather than by discipline*. Note what this
-does **not** say: it does not say that an experiment may change only one variable at a time. The
-space of ideas worth trying is far larger than the compute budget, so a single experiment will often
+does **not** say: it does not say that a CV run may change only one variable at a time. The
+space of ideas worth trying is far larger than the compute budget, so a single CV run will often
 bundle several changes — two new features at once, or a feature together with a hyperparameter — and
 spending a scarce budget that way is usually the right call. The price of bundling is *attribution*:
 you learn that the bundle helped, not which part of it did, and buying that attribution back is what
@@ -340,13 +340,13 @@ folds, another on hard folds — and every "which idea won?" decision is built o
 config; a fold enters the leaderboard only once its validation window is complete; a new data source
 is assessed by a controlled ablation before it may enter the leaderboard at all.
 
-*Serves:* [Hypothesis 2: a hundred experiments per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month).
+*Serves:* [Hypothesis 2: a hundred CV runs per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month).
 
-*Detail:* [Eligibility](../ml_experimentation/cross-validation-folds.md#eligibility), [Complete
+*Detail:* [Eligibility](../cross-validation/cross-validation-folds.md#eligibility), [Complete
 validation windows only](../architecture/ml-orchestration.md#complete-validation-windows-only),
 [Evaluating a data source whose history is shorter than the
-folds](../ml_experimentation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
+folds](../cross-validation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
 
 ### 9 — Provenance travels with the forecast data
 
@@ -373,8 +373,8 @@ and
 which are internal-only and projected out at the delivery boundary. Every MLflow run is stamped with
 the git SHA and the Delta table versions it read.
 
-*Serves:* [Hypothesis 2: a hundred experiments per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month), [Hypothesis
+*Serves:* [Hypothesis 2: a hundred CV runs per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month), [Hypothesis
 5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign).
 
 *Detail:* [Two metric
@@ -398,7 +398,7 @@ keeps principle 1 honest: with an atomic store, an interrupted write leaves the 
 place, so a consumer sees *stale* data — a state the [degradation ladder](inherent-stability.md)
 already knows how to handle — rather than *torn* data, which nothing downstream can handle.
 
-*Without it:* a retry double-counts the rows it appended before failing; one experiment's crash
+*Without it:* a retry double-counts the rows it appended before failing; one CV run's crash
 corrupts a neighbour's results; a dashboard or a downstream asset reads a table mid-write and
 quietly forecasts from half a weather run; and re-running anything first requires working out what
 state the last run left behind.
@@ -407,7 +407,7 @@ state the last run left behind.
 commit, and an in-progress write is never visible to a reader, on a laptop's local filesystem
 exactly as on object storage, so the development loop exercises the same semantics production
 depends on; re-materialising a fold overwrites its `(experiment_name, fold_id)` partition rather
-than appending, so a retry cannot silently double-count; parallel experiments write to disjoint
+than appending, so a retry cannot silently double-count; parallel CV runs write to disjoint
 partition directories and never touch each other.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
@@ -559,7 +559,7 @@ run status a precondition for another's*".
 
 Changing a transform that runs at ingest means re-downloading and re-writing the whole archive.
 Changing a transform that runs in feature engineering means editing a function and re-running an
-experiment. Feature engineering is therefore the default home for a transform, and one earns a place
+CV run. Feature engineering is therefore the default home for a transform, and one earns a place
 in the ingest only when a measurement says it should be there — almost always a storage measurement,
 written down next to the decision.
 
@@ -567,7 +567,7 @@ The test is what the transform destroys. A transform that throws information awa
 it buys: the H3 spatial aggregation and the 13-bit significand rounding both did, and both are a
 large part of why the archive fits on a laptop. A transform that merely rewrites the same
 information in a different form has nothing to show, because feature engineering can produce that
-form on demand, differently for each experiment. In exact arithmetic, converting wind's `u` and
+form on demand, differently for each CV run. In exact arithmetic, converting wind's `u` and
 `v` components into speed and direction is reversible. Rounding the stored speed and bearing
 loses precision, so reconstructing components from that archive does not recover the original
 native values exactly. Storing direction also hands every later stage an angle that wraps at
@@ -578,16 +578,16 @@ that component storage uses 8.90% more Parquet bytes than polar storage. The mai
 the increase to keep signed wind components through interpolation. The [measurement](../studies/forecasts/wind-storage.md)
 describes the sample and its limits.
 
-*Without it:* a stored transform becomes an assumption every later experiment inherits. Arithmetic
+*Without it:* a stored transform becomes an assumption every later CV run inherits. Arithmetic
 on a direction that wraps at 360° can silently produce invalid bearings.
 
 *Decided:* H3 spatial aggregation and 13-bit significand rounding stay in ingest because each
 substantially reduces storage in measurements. Wind stays as u/v through storage and interpolation; feature
 engineering derives speed and bearing. Derived bearings still require circular handling.
 
-*Serves:* [Hypothesis 2: a hundred experiments per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month) — a transform
-frozen into the archive cannot be varied by an experiment.
+*Serves:* [Hypothesis 2: a hundred CV runs per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month) — a transform
+frozen into the archive cannot be varied by a CV run.
 
 *Detail:* [NWP variable conventions](../architecture/nwp-variable-conventions.md), [Storage
 formats](../architecture/performance.md#storage-formats-measured-not-assumed).
@@ -800,9 +800,9 @@ return. And a principle that stops deciding anything should be deleted rather th
 decoration — the same discipline the hypotheses page applies to its thresholds.
 
 **Before copying a principle into another system, check the assumption it is a bet on.** Most of the
-list is portable as-is — strict contracts, one execution path, identically-scored experiments,
+list is portable as-is — strict contracts, one execution path, identically-scored CV runs,
 provenance, atomic and idempotent writes, telemetry that names its own cause, and
-measure-don't-assume are close to unconditional good practice, and cheap experiments are too for any
+measure-don't-assume are close to unconditional good practice, and cheap CV runs are too for any
 project that is doing research rather than only operating a fixed model. [Principle 1 ("*the power
 forecast never stops*")](#1-the-power-forecast-never-stops) is the contingent one: it is downstream
 of the fact that [an outage is cheap here](../background/requirements.md#uptime-lenient-by-design)

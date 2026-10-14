@@ -51,6 +51,10 @@ plugins:
         studies/blending-weather-products.md: studies/past-weather/blending.md
         studies/ens-forecast-horizons.md: studies/forecasts/ens-horizons.md
         studies/nwp-forecasts-at-matched-leads.md: studies/forecasts/matched-lead.md
+        ml_experimentation/index.md: cross-validation/index.md
+        ml_experimentation/dagster-workflow.md: cross-validation/dagster-workflow.md
+        ml_experimentation/model-configuration.md: cross-validation/model-configuration.md
+        ml_experimentation/cross-validation-folds.md: cross-validation/cross-validation-folds.md
 
 nav:
   - Home: index.md
@@ -129,20 +133,23 @@ nav:
           - "Which cheap changes lower the production XGBoost forecast's error?": studies/forecasts/quick-wins.md
           - "Production feature faults: diagnosis and forecast effects": studies/forecasts/production-feature-faults.md
           - "Can a language model label a solar plant's capacity changes?": studies/forecasts/llm-capacity-labeller.md
-  - ML experimentation:
-      - Overview: ml_experimentation/index.md
-      - Model configuration: ml_experimentation/model-configuration.md
-      - Running an ML experiment end-to-end: ml_experimentation/dagster-workflow.md
-      - Cross-validation folds: ml_experimentation/cross-validation-folds.md
+  - Cross-validation:
+      - Overview: cross-validation/index.md
+      - Model configuration: cross-validation/model-configuration.md
+      - Running the cross-validation pipeline end-to-end: cross-validation/dagster-workflow.md
+      - Cross-validation folds: cross-validation/cross-validation-folds.md
   - ML experiments:
       - Overview: ml-experiments/README.md
+      - Research log: ml-experiments/research-log.md
       - "Does an ERA5-trained weather-to-power model beat the same model trained on ENS?": ml-experiments/00001-era5-trained-stage1a-vs-ens-trained/result.md
       - "Does a stage 2 calibrator beat the pooled stage 1a mixture?": ml-experiments/00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md
+      - "Does an ERA5-trained model beat the same model trained on ENS, for demand series?": ml-experiments/00003-era5-trained-stage1a-vs-ens-trained-demand/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
       - Connecting to the AWS control plane: live_service/connecting.md
       - Operating the live service: live_service/operations.md
+      - Model releases: live_service/model-releases.md
       - Intervention log: live_service/intervention-log.md
       - Setting up Sentry telemetry: live_service/sentry.md
       - Backing up the workstation: live_service/backup.md

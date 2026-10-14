@@ -1,6 +1,6 @@
 # Notebooks
 
-Marimo notebooks for exploratory data analysis and ad-hoc experimentation.
+Marimo notebooks for exploratory data analysis and ad-hoc analysis.
 
 ## Why this package exists
 
@@ -14,7 +14,7 @@ package, so a notebook that stops working stops working alone.
 **Roughness is acceptable here because a notebook is never the route into production.** [Design
 principle 3 — one execution path from research to
 production](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#3-one-execution-path-from-research-to-production)
-holds that an idea becomes an experiment — a candidate that can enter the leaderboard, and therefore
+holds that an idea becomes a CV run — a candidate that can enter the leaderboard, and therefore
 be promoted to production — only once the idea is implemented in the pipeline's own code, behind the
 same data contracts and tests as everything else. The leaderboard is the ranked table that scores
 candidate models against each other. The winner is what the live service serves. A data contract is

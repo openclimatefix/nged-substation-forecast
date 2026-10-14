@@ -26,7 +26,7 @@ instead.
 Dagster assets writing one fold run: ``trained_cv_model``, ``cv_power_forecasts``, and
 ``metrics``. Each of the three can be on a different code revision and at a different set of
 Delta table versions. The fourth is the ``register_experiment`` op inside
-``register_experiment_job``, which stamps the experiment's parent run; the ``metrics`` asset
+``register_experiment_job``, which stamps the CV run's parent run; the ``metrics`` asset
 stamps that parent run too. Un-prefixed keys would clobber one another, and the prefix preserves
 every writer's provenance snapshot side by side.
 """

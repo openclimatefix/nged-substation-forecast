@@ -5,13 +5,13 @@ anyway because the findings it produced are cited elsewhere.** A study answers a
 answer goes into `docs/`, and a reader who doubts the answer needs the code that produced it, so the
 code stays where they can find and re-run it.
 
-**"Study" rather than "experiment", because `experiment` already names a column.** `PowerForecast`
-carries `experiment_name` and `ml_flow_experiment_id`, and the forecasts Delta table is partitioned
-by `experiment_name`, so in this repository an experiment is one MLflow-tracked run of the
-production pipeline. A study of whether a weather product's published field carries information is a
-different kind of thing. The small experiments that test one hypothesis about improving the
-production forecast live in `ml-experiments/` instead, and a script there follows the import rules
-below.
+**"Study" rather than "experiment", because "experiment" means only an ml-experiment here.** An
+ml-experiment is a small test of one hypothesis about improving the production forecast. It lives in
+`ml-experiments/`, and a script there follows the import rules below. One pass of the production
+pipeline over the cross-validation folds is a cross-validation run (CV run), even though
+`PowerForecast` names it with the columns `experiment_name` and `ml_flow_experiment_id` and the
+forecasts Delta table is partitioned by `experiment_name`. A study of whether a weather product's
+published field carries information is a different kind of thing from both.
 
 **A script under `studies/` may import from its own folder, from `studies.*` (`packages/studies`),
 and from the other reviewed packages in `packages/*`.** `src/` and every package under `packages/`
@@ -55,10 +55,10 @@ branch. The directory is not an attic.
 **A study that reports a forecast skill number hands a predictions file to
 `scripts/forecasting/score_study.py`, and the `metrics` asset produces the number.** The script
 takes a file of `PowerForecast` rows, a study name, and a leaderboard fold. The script stores the
-rows in `power_forecasts` under the experiment name `study/<study name>`, and scores them in
+rows in `power_forecasts` under the `experiment_name` `study/<study name>`, and scores them in
 leaderboard scope. Before the script writes anything, it refuses a file whose `(time_series_id,
 power_fcst_init_time, valid_time, ensemble_member)` keys differ from the keys of the reference
-experiment that `conf/cv/default.yaml` names for the same fold. A study therefore cannot raise its
+CV run that `conf/cv/default.yaml` names for the same fold. A study therefore cannot raise its
 score by leaving out the rows it forecasts worst, or by choosing its own ensemble members. The
 script checks which rows the file holds, not how the forecast was made. A reviewer must therefore
 confirm that the study fitted only on observations up to the fold's `train_end`, and used later
@@ -66,7 +66,7 @@ observations only as lags earlier than each forecast's initialisation time. The 
 attempt, scored or refused, and tags the study's fold run with the number of attempts at the fold so
 far. The `metrics` asset repeats the row-key check when it scores the study. Every leaderboard skill
 number on a study page must trace to a `forecast_metrics` row. The `study/` prefix keeps a study's
-forecasts out of the promotion candidates, and lets a reader filter the study experiments out of the
+forecasts out of the promotion candidates, and lets a reader filter the studies out of the
 leaderboard.
 
 **A study reads observed power through `studies.power.scan_power`.** The function returns every

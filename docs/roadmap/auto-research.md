@@ -23,8 +23,8 @@ In neither phase does the agent write production code.
 
 **Every forecasting experiment here is trained on one stretch of past data and scored on a later
 stretch, the validation window, that the training never saw.** A training stretch paired with its
-validation window is called a fold. The leaderboard, the table that ranks every experiment, scores
-every experiment on the same fold. In phase 2, the agent never sees the leaderboard fold's
+validation window is called a fold. The leaderboard, the table that ranks every CV run, scores
+every CV run on the same fold. In phase 2, the agent never sees the leaderboard fold's
 validation window, and scores ideas on earlier folds. The maintainer then scores the best
 implementation of each of the most promising ideas on the leaderboard fold, and re-implements the
 ideas that survive.
@@ -193,7 +193,7 @@ organised like coverage-guided fuzz testing of software. A cheap signal of inter
 guides the choice of the next experiment. A validator the search cannot query adaptively determines
 whether a result counts as a discovery. The [selection-bias
 section](metrics-and-leaderboard.md#fold-hygiene-selection-bias-and-a-final-test-window) of the
-leaderboard design names the risk of scoring hundreds of experiments on one fold. He et al.'s
+leaderboard design names the risk of scoring hundreds of CV runs on one fold. He et al.'s
 separation addresses that risk.
 
 ## Phase 1: experiments run overnight
@@ -205,7 +205,7 @@ wins](../studies/forecasts/quick-wins.md) study, quantile training alone lowered
 percentage points of capacity.
 
 **Phase 1 assumes Claude is honest.** The leaderboard scorer keeps only the checks that catch honest
-mistakes, such as a study that scores fewer rows than the reference experiment.
+mistakes, such as a study that scores fewer rows than the reference CV run.
 Each experiment's reviews look for broken and leaky implementations, as the `ml-experiment` skill
 requires.
 
@@ -222,9 +222,9 @@ that phase 2's hypothesis store records for an idea, so the research lead can re
 experiments directly.
 
 **A study or an experiment whose output fits the leaderboard scorer may post its scores as a
-`study/` experiment.** Posting is optional, because an experiment may use its own metric or its own
-probabilistic output. The `study/` prefix labels the rows, and promotion to production never picks a
-`study/` run.
+`study/` MLflow experiment.** Posting is optional, because an experiment may use its own metric or
+its own probabilistic output. The `study/` prefix labels the rows, and promotion to production never
+picks a `study/` run.
 
 **A `study/` score on the leaderboard fold is biased low, because the study chose its arms on that
 fold.** The bias is likely to be small next to gains as large as the Quick wins study found. Once
@@ -256,7 +256,7 @@ could pass for them.** The rest of this page describes the phase 2 design.
 ### The agent screens ideas; people decide what ships
 
 **A finding from the agent reaches production only as a reviewed re-implementation, scored on the
-leaderboard like any other experiment.** The person writing the pull request reads the winning
+leaderboard like any other CV run.** The person writing the pull request reads the winning
 implementation's diff, writes the idea up, and re-implements the idea through the usual review. No
 code the agent writes is merged into `main`. The re-implementation discards the agent's code. A
 score that came from a bug or from an edited metric therefore ends in a wasted re-implementation
@@ -291,7 +291,7 @@ full power data or the leaderboard runs as the maintainer's own user.**
 
 | Unix user | What runs as that user |
 |---|---|
-| The maintainer's user | The one-off setup; Dagster, which runs the data pipeline; the leaderboard; the maintainer's MLflow store, which records every experiment's settings and scores; the finalist reviews and the scoring of finalists; and the re-implementation of the winning ideas |
+| The maintainer's user | The one-off setup; Dagster, which runs the data pipeline; the leaderboard; the maintainer's MLflow store, which records every CV run's settings and scores; the finalist reviews and the scoring of finalists; and the re-implementation of the winning ideas |
 | `researcher` | Claude Code (the research lead, its workers, and its pre-screening reviewers), the screening harness, and every line of code the agent writes |
 
 **Unix file permissions enforce the cutoff, because a convention would not hold.** Any script that
@@ -317,7 +317,7 @@ setup. The one-off setup is:
    `effective_capacity` table holds each series' 99th percentile (P99) of absolute power over the
    full history, validation window included. The leaderboard divides each error by that P99.
 
-**The maintainer's MLflow store is off limits because it holds every experiment's score on the
+**The maintainer's MLflow store is off limits because it holds every CV run's score on the
 validation window.** Reading those scores would let the research lead steer towards ideas that did
 well on the validation window. The research lead learns from the hypothesis store instead. The
 `researcher` user has an MLflow store of its own for the screening runs.

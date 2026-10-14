@@ -18,6 +18,8 @@ benchmark: >-
 row_set_id: fold_a_tuesdays_v1
 metric: mean absolute error of the ensemble-mean forecast, points of capacity
 verdict: supported
+production_status: candidate
+adopted_in: none
 best_arm: s1_memberavg
 headline: >-
   P1 (revised), s1_memberavg minus ens_trained, all leads: wind -1.70 (-2.33 to -1.08), solar

@@ -155,7 +155,6 @@ class ClimatologyForecaster(BaseForecaster):
     """
 
     MODEL_NAME = "climatology"
-    MODEL_VERSION = 1
     CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]] = BaseForecasterConfig
 
     feature_engineer: ClassVar[FeatureEngineer] = NwpRunRowsWithoutWeatherFeatureEngineer()
@@ -168,7 +167,7 @@ class ClimatologyForecaster(BaseForecaster):
 
         Raises:
             ValueError: ``model_params.selected_features`` is not empty. Climatology reads no
-                feature, so a non-empty list would describe an experiment that is not the one
+                feature, so a non-empty list would describe a CV run that is not the one
                 running, and a power lag would widen the power scan for nothing.
         """
         super().__init__(model_params)
@@ -286,7 +285,7 @@ class ClimatologyForecaster(BaseForecaster):
                 power_fcst="quantile_value",
                 nwp_init_time=pl.lit(None, dtype=UTC_DATETIME_DTYPE),
                 power_fcst_model_name=pl.lit(self.MODEL_NAME),
-                power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
+                power_fcst_model_version=pl.lit(config.model_release, dtype=pl.Int16),
                 ml_flow_experiment_id=pl.lit(config.ml_flow_experiment_id, dtype=pl.Int32),
                 experiment_name=pl.lit(config.experiment_name),
                 fold_id=pl.lit(fold_id),

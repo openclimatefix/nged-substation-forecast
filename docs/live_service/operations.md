@@ -4,8 +4,8 @@ How to get a champion model producing live, 6-hourly forecasts, and how to backf
 missed.
 
 There are two layers. **Promotion** (step 1–2) is manual and occasional — you do it once per
-champion model, whenever a better candidate clears the [ML
-Experimentation](../ml_experimentation/index.md) leaderboard. **Inference** (step 3) is automatic —
+champion model, whenever a better candidate clears the
+[cross-validation](../cross-validation/index.md) leaderboard. **Inference** (step 3) is automatic —
 once a model is promoted, the 6-hourly schedule keeps producing forecasts from it with no further
 action, as long as Dagster's daemon is running.
 
@@ -43,16 +43,16 @@ yourself — today from your laptop, as step 2 says — whichever environment se
 **Trigger:** Materialise `promotable_model_runs` (unpartitioned — no config needed) from the Dagster
 UI, then open its output metadata.
 
-This asset lists every MLflow fold run tagged `cv_role=fold` — i.e. every model any experiment has
+This asset lists every MLflow fold run tagged `cv_role=fold` — i.e. every model any CV run has
 trained — as a metadata table: `run_id`, `experiment_name`, `fold_id`, `last_finished_at`. It writes
 nothing to disk and has no dependents; materialise it any time you want to refresh the list before
 picking a champion. Runs sort by their most recent MLflow finish time, including later metrics
 writes; missing end times appear as `Not recorded` and sort last. The pick itself is still by eye:
-metrics vary per experiment, so there is no single sort key that could automate "which run is best"
+metrics vary per CV run, so there is no single sort key that could automate "which run is best"
 — cross-check candidates against the
 leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` →
-`http://localhost:5000`; see [ML Experimentation: Viewing results in the MLflow
-UI](../ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
+`http://localhost:5000`; see [Cross-validation: Viewing results in the MLflow
+UI](../cross-validation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
 
 A run trained before a feature was renamed in the code cannot be served, and nothing in the table
 marks it. Step 2 refuses it rather than letting you discover that at the next 6-hourly tick.
@@ -82,8 +82,9 @@ its container image at build time.
    the config it records.
 3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
    at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
-4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
-   `n_trained_time_series` as output metadata, so you can confirm the right model landed.
+4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, `model_release`, and
+   `n_trained_time_series` as output metadata, so you can confirm the right model landed. Promote a
+   numbered release for a deployment; `model_release: 0` means the run is not a release.
 
 Promotion is a Dagster materialisation rather than a bare script, so every promotion is recorded in
 Dagster's run history — an audit trail for free. Re-promoting with a different `mlflow_run_id`
@@ -146,7 +147,7 @@ UTC (the key itself) to 2026-07-04 06:00 UTC (the next tick), so *that* partitio
 6. **Idempotent write:** overwrites only this partition's rows (matching `experiment_name`,
    `fold_id="live"`, and this `power_fcst_init_time`), so re-running or replaying a slot never
    duplicates rows or disturbs any other partition.
-7. Logs **nothing** to MLflow — a 6-hourly production run is not an experiment. Live performance
+7. Logs **nothing** to MLflow — a 6-hourly production run is not a CV run. Live performance
    will be tracked by production monitoring once it exists (not yet implemented — see [roadmap:
    Production monitoring](../roadmap/live-service.md#production-monitoring)).
 
@@ -159,12 +160,11 @@ champion's `mlflow_run_id`. Because promotion **replaces** the artifact director
 than merging into it, there is nothing to undo — the previous model returns exactly as it was, and
 the next scheduled tick picks it up.
 
-The one thing to get right is finding the run id you are rolling back *to*. The current
-`promotion.json` records only the champion serving right now, and it is overwritten on every
-promotion, so the history lives in **Dagster's run history**: open Assets → `promoted_model` →
-"Runs", and read `PromotedModelConfig.mlflow_run_id` off the previous successful materialisation.
-It is cheaper to keep a note of the outgoing run id *before* you promote than to look it up under
-pressure afterwards.
+The one thing to get right is finding the run id you are rolling back *to*. The [model release
+log](model-releases.md) records, for each release, the MLflow run id of the promoted fold run and the
+image tag, so read both off the previous row. Releases that predate the log are in **Dagster's run
+history**: open Assets → `promoted_model` → "Runs", and read `PromotedModelConfig.mlflow_run_id` off
+the previous successful materialisation.
 
 On AWS there is the same extra leg as for promotion: rebuild and push the image, then point the task
 definition at the tag — see [Redeploying a new champion
@@ -515,8 +515,8 @@ readings are lost: after the fix, the next run ingests the whole backlog.
 
 ## Inspecting a live forecast
 
-Use the `view_forecasts` dashboard app — the same app [ML
-Experimentation](../ml_experimentation/dagster-workflow.md#inspecting-a-forecast-the-view_forecasts-dashboard)
+Use the `view_forecasts` dashboard app — the same app that [Running the cross-validation pipeline
+end-to-end](../cross-validation/dagster-workflow.md#inspecting-a-forecast-the-view_forecasts-dashboard)
 uses to inspect backtest forecasts — on your laptop:
 
 ```bash

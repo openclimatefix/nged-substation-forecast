@@ -1,6 +1,6 @@
 """`BaseForecaster`: the interface every forecasting model implements.
 
-Also holds `BaseForecasterConfig`, which carries a trained model's experiment identity.
+Also holds `BaseForecasterConfig`, which carries a trained model's CV run identity.
 """
 
 import tarfile
@@ -15,7 +15,7 @@ import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
 from mlflow.exceptions import MlflowException
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from ml_core.features import FeatureEngineer, TabularFeatureEngineer
 
@@ -199,15 +199,19 @@ class BaseForecasterConfig(BaseModel):
     a model YAML's ``model_params`` validates them at load time. Every ``conf/model/*.yaml`` file
     carries both tag fields under ``model_params``.
 
-    ``experiment_name`` is the per-experiment key, set to the MLflow experiment name at
+    ``experiment_name`` is the per-CV-run key, set to the MLflow experiment name at
     registration and stored in the saved config. Every ``PowerForecast`` row carries
     ``experiment_name``, distinct from the model-family ``MODEL_NAME``. ``random_seed`` is
     threaded into each model's training so that re-training a fold reproduces the same model —
     keeping retries and the leaderboard stable.
 
-    Model identity (name and version) lives on the ``BaseForecaster`` class itself as
-    ``MODEL_NAME`` and ``MODEL_VERSION``. Both constants are properties of the implementation,
-    not of the experiment config.
+    ``model_release`` is the number of the production model release this config trains, stamped
+    onto every ``PowerForecast`` row as ``power_fcst_model_version``. ``0`` means "not a release",
+    which is every CV run that is not a numbered release. The bounds are the range of the
+    contract's Int16 column: ``predict`` casts the value to Int16, so a value outside the range
+    would raise on every live forecast, and the bound rejects it at registration instead. The
+    model family's name lives on the ``BaseForecaster`` class as ``MODEL_NAME``, a property of the
+    implementation.
 
     **Serialisation must be canonical.** A config is compared and stored as its serialised form:
     ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
@@ -224,7 +228,7 @@ class BaseForecasterConfig(BaseModel):
     fails at registration. A *stored* config carrying a key the current code no longer declares
     is refused rather than silently losing that key. The recovery is to re-train, never to
     hand-edit. Why this is worth failing over:
-    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
+    <https://openclimatefix.github.io/nged-substation-forecast/cross-validation/model-configuration/#tweaking-a-config-for-a-cv-run>.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -235,6 +239,7 @@ class BaseForecasterConfig(BaseModel):
     weather_source: str = ""
     training_strategy: str = ""
     random_seed: int = 0
+    model_release: int = Field(default=0, ge=0, le=32767)
 
     @field_serializer("selected_features")
     def _serialise_selected_features(self, selected_features: set[str]) -> list[str]:
@@ -248,12 +253,12 @@ class BaseForecaster(ABC):
     Every forecasting model subclasses this abstract base to allow shared Dagster assets and
     evaluation code to remain completely agnostic to the underlying model implementation.
 
-    Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION``, and ``CONFIG_CLASS`` as class-level
-    constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row
-    at predict time. ``MODEL_NAME`` is also stamped on the experiment's parent MLflow run, as
-    that run's ``model_family`` tag. The MLflow experiment name comes from neither constant: the
-    name is the ``experiment_name`` the launcher hands to ``register_experiment``. Bumping
-    ``MODEL_VERSION`` requires a code change (intentional), not a config edit.
+    Subclasses must define ``MODEL_NAME`` and ``CONFIG_CLASS`` as class-level constants.
+    ``MODEL_NAME`` is stamped onto every ``PowerForecast`` row at predict time, beside the config's
+    ``model_release`` (as ``power_fcst_model_version``). ``MODEL_NAME`` is also stamped on the CV
+    run's parent MLflow run, as that run's ``model_family`` tag. The MLflow experiment name does
+    not come from the constant: the name is the ``experiment_name`` the launcher hands to
+    ``register_experiment``.
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in. Collecting early wastes memory and prevents
@@ -275,7 +280,6 @@ class BaseForecaster(ABC):
     """
 
     MODEL_NAME: ClassVar[str]
-    MODEL_VERSION: ClassVar[int]
 
     CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]]
     """The config class that ``load`` rebuilds from a saved ``model_params`` mapping.
@@ -295,7 +299,7 @@ class BaseForecaster(ABC):
     """
 
     def __init__(self, model_params: BaseForecasterConfig) -> None:
-        """Store the config that carries this model's hyper-parameters and experiment identity."""
+        """Store the config that carries this model's hyper-parameters and CV run identity."""
         self.model_params = model_params
 
     @property
@@ -456,9 +460,9 @@ class BaseForecaster(ABC):
             One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``
             present in ``data``. Each row holds the predicted ``power_fcst``, in megawatts (MW) or
             megavolt-amperes (MVA) according to that series' unit in ``TimeSeriesMetadata``. Each
-            row also holds the model-family identity (``power_fcst_model_name``,
-            ``power_fcst_model_version``), the experiment identity the config carries
-            (``experiment_name``, ``ml_flow_experiment_id``), and ``fold_id`` set to the given
-            ``fold_id``. Eager, not lazy: this is the model boundary where the caller's
+            row also holds the model-family identity (``power_fcst_model_name``), the model release
+            the config carries (``power_fcst_model_version``), the CV run identity the config
+            carries (``experiment_name``, ``ml_flow_experiment_id``), and ``fold_id`` set to the
+            given ``fold_id``. Eager, not lazy: this is the model boundary where the caller's
             ``pt.LazyFrame[AllFeatures]`` is finally materialised.
         """

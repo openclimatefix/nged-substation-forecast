@@ -146,7 +146,7 @@ and where the **latent-demand inversion** of the forward model is realised in fu
 
 ## Is the beam/diffuse split worth having?
 
-**A throw-away experiment on the trial area's six metered solar farms has since run that
+**A throw-away study on the trial area's six metered solar farms has since run that
 comparison, and the answer depends on the product's resolution.** On a 5 km satellite retrieval,
 giving the model the product's own beam field rather than a separation model's estimate from the
 same product's global irradiance cut error by about 1.5% relative. On a 31 km reanalysis it added
@@ -158,11 +158,11 @@ rather than merged,
 
 **Which product feeds the model matters far more than which split it sees.** Swapping the 31 km
 reanalysis for the 5 km retrieval moved mean absolute error by 4.29 points of P99 output, against
-0.126 points for the largest split contrast anywhere in that experiment. Any effort spent on the
+0.126 points for the largest split contrast anywhere in that study. Any effort spent on the
 beam field is worth weighing against effort spent on the retrieval that carries it.
 
 **A 30-minute timestamp error is absorbed into a physical model's fitted azimuth, which is how a
-model-chain comparison can silently answer a different question.** In that experiment the fitted
+model-chain comparison can silently answer a different question.** In that study the fitted
 azimuths move by about 35 degrees when the timestamps are shifted by one half-hour — whether the
 timestamp marks the start or the end of the averaging window. Settle the timestamp convention
 before comparing chains that fit orientation.
@@ -208,13 +208,13 @@ would learn its own corrections either way.
 
 **The physics chain requires the split, so the question is only which source should supply it.**
 The test is the one [this page already sets](#evaluating-disaggregation): held-out metered
-photovoltaic output, which is what the experiment above ran on six sites.
+photovoltaic output, which is what the study above ran on six sites.
 
 **A gradient-boosted tree settles the question for the tree path alone.** A tree fed the split as
 extra features can ignore those features, where the physics chain cannot proceed without the split.
 A null result from a tree is therefore evidence about the [tree
 path](xgboost-improvements.md#several-nwp-sources-as-features-v21), and does not justify dropping
-the direct beam from the physics plan. The experiment above used a tree as its primary instrument
+the direct beam from the physics plan. The study above used a tree as its primary instrument
 and a fitted physical model as a second one, and the two disagreed on the sign — the physical
 model divides the horizontal beam by the cosine of the solar zenith angle, which magnifies a beam
 error without limit near the horizon, so the physical model answers a different question rather than

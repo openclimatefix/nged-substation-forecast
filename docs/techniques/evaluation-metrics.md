@@ -30,7 +30,7 @@ simply $m = 1$). Scoring proceeds in two steps:
 
 Results land in two places: the `forecast_metrics` Delta table holds the **full** detail (one row
 per `(time_series_id, fold_id, horizon_slice, metric_name, metric_param)`), and MLflow receives
-per-experiment aggregates under a [restricted headline
+per-CV-run aggregates under a [restricted headline
 subset](#where-the-numbers-live-delta-vs-mlflow).
 
 Notation below: $y_t$ is the observed power at valid time $t$; $x_{t,1}, \dots, x_{t,m}$ are the
@@ -278,7 +278,7 @@ Interval width uses the same six bands as PICP.
 
 > **Status: designed, not yet in the leaderboard.** The metrics pipeline computes none of the
 > metrics in this section. The Fractions Skill Score has been computed once, in an offline
-> experiment.
+> study.
 > The delivery plan is [Metrics & leaderboard → Tail & exceedance
 > metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
 > The principles (which selections of hours are safe to score on, and why) are durable and apply
@@ -461,9 +461,9 @@ never replacing either as a ranking column. And the half-hourly target already a
 which puts the informative window widths at one to four steps: a spike moved 4 hours is a
 different day's weather rather than a timing error.
 
-**In the beam/diffuse split experiment, forgiving one hour of displacement raised the score by
+**In the beam/diffuse split study, forgiving one hour of displacement raised the score by
 roughly 0.10 for every irradiance source and every arm**, measured against each site's 90th
-percentile of metered power. Timing is therefore a large share of that experiment's error, though a
+percentile of metered power. Timing is therefore a large share of that study's error, though a
 share that moved together across the arms rather than separating them. The same runs showed the
 score is a blunter instrument than MAE, because reducing each hour to a yes-or-no exceedance throws
 the magnitude away. A contrast MAE resolved cleanly can sit inside the Fractions Skill Score's
@@ -510,7 +510,7 @@ limit typically lives", not operational breach prediction:
 ## Where the numbers live: Delta vs MLflow
 
 The `forecast_metrics` Delta table always holds the complete detail: all 13 pinball levels, all six
-bands, every horizon slice, per series. MLflow — the leaderboard — receives per-experiment
+bands, every horizon slice, per series. MLflow — the leaderboard — receives per-CV-run
 aggregates (unweighted means across series) under keys built from a token that is `{metric_name}`
 for scalar metrics and `{metric_name}_{metric_param}` for parametric metrics, in three families:
 `{token}__all` (overall), `{token}__{type_slug}` (per `time_series_type`), and
@@ -529,7 +529,7 @@ Anything not in MLflow is still one Polars filter away in Delta.
   (U-shaped = underdispersed, domed = overdispersed). A histogram is not a scalar, so it does not
   fit the tall metrics schema; it is computed in ad-hoc analyses (e.g. when choosing the [Phase C
   calibration](../roadmap/metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-diagnosis)
-  approach) rather than stored per experiment.
+  approach) rather than stored per CV run.
 - **Histogram of errors** — same reason; planned as a visual check on the
   [roadmap](../roadmap/metrics-and-leaderboard.md#evaluation-metrics).
 

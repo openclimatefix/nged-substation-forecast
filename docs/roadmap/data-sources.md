@@ -805,7 +805,7 @@ supply risk.
 ### What comparing weather products on the trial area's solar farms found
 
 **The satellite retrieval beat the reanalysis by 4.29 points of mean absolute error on the six
-metered solar farms, which is the largest effect anything in that experiment varied.** On the
+metered solar farms, which is the largest effect anything in that study varied.** On the
 124,849 hours both products cover, CAMS cut an XGBoost forecast's error from 9.66% to 5.37% of P99
 output — the 99th percentile of each site's own metered output, which every figure there is
 normalised by — and a fitted five-parameter physical model's from 10.03% to 6.20%. The largest
@@ -885,7 +885,7 @@ than two products; restrict to the shared hours first.
 retrieval, giving a model the product's own split rather than running a separation model locally cut
 error by about 1.5% relative. On the 31 km reanalysis it added nothing detectable. Whether the
 retrieval's beam field is worth paying for depends on what a supplier charges for it, which that
-experiment does not know.
+study does not know.
 
 ### Met Office weather-station observations (MIDAS Open)
 
@@ -951,7 +951,7 @@ can be checked against the Met Office's files is essentially the era Open-Meteo 
 the earlier half cannot be checked against anything.
 
 **A Met Office upgrade moved how much UKV's published split improves the forecast, by more than
-the backfill boundary does.** In the beam/diffuse split experiment, the gain from UKV's direct-beam
+the backfill boundary does.** In the beam/diffuse split study, the gain from UKV's direct-beam
 share is five and a half times larger over the 8 months after Parallel Suite 47 became operational
 on 2026-01-21 than over the 47 months before. Neither other source steps over those same months:
 the satellite source's contrast moved by about a third, from −0.100 to −0.068 percentage points,

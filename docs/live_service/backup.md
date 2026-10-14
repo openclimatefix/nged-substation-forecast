@@ -79,7 +79,7 @@ relative to the checkout the script runs from.
 ## Read the output
 
 **A warning naming an MLflow experiment means that experiment's trained models are not being backed
-up.** MLflow stores each experiment's artifact location as an absolute path, and an experiment
+up.** MLflow stores each MLflow experiment's artifact location as an absolute path, and an experiment
 created from a git worktree stores its models inside that worktree rather than in `mlruns/`. Move
 the models into `mlruns/`, or accept that they are lost when the worktree is removed.
 
