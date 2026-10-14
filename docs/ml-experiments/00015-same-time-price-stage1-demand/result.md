@@ -29,22 +29,27 @@ metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
 verdict: inconclusive
 best_arm: >-
-  No arm is separated from the others, because only PRICE against BASE in the selection year has an interval that excludes zero. The lowest pooled scores were PRICE's 9.34 in the selection year and CONTROL's 8.50 in the confirmation year.
+  No arm is separated from the others, because only PRICE against BASE in the selection year has an
+  interval that excludes zero. The lowest pooled scores were PRICE's 9.34 in the selection year and
+  CONTROL's 8.50 in the confirmation year.
 headline: >-
   C1, price against no price, pooled: -0.52 points (97.5% interval -0.88 to -0.11) in the selection
   year and -0.18 (-0.50 to +0.08) in the confirmation year. C2, price against a price from another
   week: -0.07 (-0.17 to +0.03) and -0.06 (-0.18 to +0.07).
 lessons: >-
   Most of the gain from adding a price column came from any price column carrying the week's price
-  level, because the point estimates say a price from another week matched 0.45 of the 0.52 points. The gain was largest
-  from 12:00 to 20:00 and at the series with the largest errors, and it did not repeat at B2.
+  level, because the point estimates say a price from another week matched 0.45 of the 0.52 points.
+  The gain was largest from 12:00 to 20:00 and at the series with the largest errors, and it did
+  not repeat at B2.
 advice:
   - >-
     Do not use the same-time price as the estimator of expected past power, because C2 shows a
     price from another week removes most of its gain and C1 did not repeat in the confirmation year
     (C1, C2).
   - >-
-    Try national demand and wind at time t as extra inputs of the expected-power model, because they did no worse than the price in either year and scored 0.43 points lower pooled in the confirmation year (C3, whose intervals include zero).
+    Try national demand and wind at time t as extra inputs of the expected-power model, because they
+    did no worse than the price in either year and scored 0.43 points lower pooled in the
+    confirmation year (C3, whose intervals include zero).
   - >-
     Keep a price from another week as the control in any later price experiment, because it
     removed most of the gain here (C2).

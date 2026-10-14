@@ -18,6 +18,7 @@ the maintainer to confirm.
 | [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Train the weather-to-power model on ERA5 and apply it to ENS members | Needs the staged design, and helps only up to day 6 |
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs | The Christmas column needs its 14-day window, a 2023 start needs a fresh year, and windchill can go |
+| [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Map the ENS shortwave onto CAMS (a stage 0 quantile mapping) before a CAMS-trained stage 1a reads it | The year's mean is corrected but individual months are up to 18.6% off, and the member spread widens by 27% |
 
 ## The experiments so far
 
@@ -32,6 +33,9 @@ the maintainer to confirm.
 | [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | 2026-10-14 |
 | [00009](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, when both are applied to ENS members? | Refuted: a gain of 0.035 points, not 0.2 | Not for production | 2026-10-14 |
 | [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | 2026-10-14 |
+| [00011](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written (inconclusive as intended): no gain in any window | Not for production | 2026-10-14 |
+| [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
+| [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | Not yet merged |
 | [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -146,6 +150,26 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
 
 ![Error on the confirmation year by arm and substation type](00006-stage1a-demand-input-feature-sweep/figure_1.svg)
 
+### 00012: inputs and training start for the solar and wind stage 1a model
+
+**No input change lowered the solar or wind error by the 0.15 points the plan counted as a gain.**
+The experiment tested a CAMS-trained model, a stage 0 model that calibrates ENS irradiance to CAMS, a
+clear-sky-ratio target (solar), a power-curve base margin (wind), a smaller weather block, and two
+later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** CAMS-trained minus ERA5-trained for solar is -0.140 points of capacity (99.5%
+  interval -0.277 to -0.044), largest within 24 h at -0.35. The stage 0 model made the 51-member
+  average 0.160 higher (-0.017 to +0.382), although it improved the control member alone from
+  8.34 to 7.82. The clear-sky-ratio target (-0.048) and the base margin (-0.030) were equivalent to
+  the benchmark.
+- **Finding for later experiments:** training starts in 2023-09 and 2024-04 were within 0.3 points
+  of 2019-09 for solar and wind, and a gain of 0.15 points is not ruled out.
+- **Write-up and pull request:** [result](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md),
+  [PR #1217 (Plan experiment 12: inputs and training start for the solar and wind stage 1a
+  model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1217).
+
+![Planned contrasts](00012-solar-wind-stage1a-inputs-cams-and-training-start/figure_2.svg)
+
 ### What the experiments taught us so far
 
 - **Check for calendar memorisation.** When the same valid time repeats across many ENS runs, a model
@@ -161,6 +185,12 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
 - **Put recent power in the stage 2 calibrator, and calibrate before judging it.** For Primary
   substations, the calibrator with recent-origin inputs beat a stage 1b correction, and a lag-free
   calibrator is worth about 1 point of capacity at short leads (00005).
+- **The term and return-to-work columns showed no detectable gain on top of the Christmas column for
+  Primary demand.** Over the three validation years, the return and term columns moved the Primary
+  error by +0.06 points from 2 to 20 January (99.2% interval -0.17 to +0.30), +0.20 at Easter (-0.19
+  to +0.59), and -0.29 over the half terms (-0.68 to +0.07), and Both was not 0.2 points better than
+  a calendar shifted by 17 days (00011). The arm with the full history and the COVID indicator
+  scored 0.26 points higher on the whole year than the base arm.
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -212,6 +242,23 @@ shortwave?)](https://github.com/openclimatefix/nged-substation-forecast/pull/121
 
 ![Contrast of the CAMS-trained arm by scope](00009-cams-trained-stage1a-vs-era5-trained-demand/figure_1.svg)
 
+### 00014: a stage 0 for the CAMS-trained demand model
+
+**Mapping the ENS shortwave onto CAMS lowered the Primary quantile score of the CAMS-trained stage
+1a by 0.067 points of capacity, but the verdict is inconclusive.** The contrast over all leads at
+the 16 Primary substations is -0.067 (97.5% interval -0.094 to -0.039), in 12 of 12 months and
+entirely in daylight, so the CAMS-trained arm with stage 0 is 0.102 points better than the
+ERA5-trained arm. The pre-registered rule also required the corrected shortwave to stay within 5%
+of CAMS in every month, and it was up to 18.6% off in December although the year's mean matched
+(ratio 1.000). The gain is smallest in the first day, whose interval reaches zero. The mapping
+widened the member spread by 27%, against a predicted 10%, and a post hoc monthly mapping did no
+better. See [`result.md`](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) and
+[PR #1219 (Experiment 14: does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained
+demand
+model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1219).
+
+![Ratio of ENS daylight shortwave to CAMS](00014-cams-trained-stage1-with-stage0-ens-correction-demand/figure_1.svg)
+
 ### 00010: the lagged electricity price in the stage 1a demand model
 
 **Adding the Elexon price from 7 days earlier to the ERA5-trained demand model did not reliably
@@ -235,6 +282,33 @@ an earlier week.
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1215).
 
 ![Planned contrasts with 98.3% intervals](00010-elexon-price-lags-stage1a-demand/figure_2.svg)
+
+### 00011: school-term and return-to-work columns in the stage 1a demand model
+
+**The return-to-work and school-term columns did not lower the Primary demand error after Christmas,
+at Easter, or over the half-term holidays.** All 20 series lie in a box that is essentially
+Lincolnshire, so the experiment used Lincolnshire County Council's recommended term calendar for
+2021-22 to 2025-26, collected by hand and validated by script. The base arm was the XGBoost arm of
+experiment 00006 with the 14-day Christmas column, trained from 2021-09-01.
+
+- **Headline result:** for Primary substations, the return and term columns together changed the
+  error by +0.06 points of capacity from 2 to 20 January (99.2% interval -0.17 to +0.30), +0.20 over
+  Easter (-0.19 to +0.59), and -0.29 over the half terms (-0.68 to +0.07), against 7.18 for the base
+  arm over the whole year. Both was not 0.2 points better than either calendar shifted by 17 days,
+  so C6 failed, and C5 failed because its interval reaches -0.11.
+- **Verdict wording:** the rule as pre-registered gives "refuted". Its refutation clause was looser
+  than intended. Read as intended, the verdict is inconclusive for Easter and the half terms,
+  because the data do not rule out a gain of 0.15 points there.
+- **Finding for later experiments:** the base arm's Primary error averages 8.4 points from 2 to 20
+  January, and the new columns change it by +0.06. The arm with the full history and the COVID
+  indicator scored 0.26 points higher on the whole year than the base arm (99.2% interval 0.12 to
+  0.43).
+- **Write-up and pull request:**
+  [result](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md), [PR #1214
+  (Experiment 11: school-term and return-to-work columns for the stage 1a demand
+  model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214).
+
+![Change in error by window and column set](00011-school-term-and-return-to-work-columns-stage1a-demand/figure_1.svg)
 
 ### 00015: the same-time electricity price in a stage 1 demand model
 

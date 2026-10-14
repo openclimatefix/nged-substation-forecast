@@ -22,11 +22,8 @@ sooner.
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | P6 | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
-| [P17](#p17-input-features-for-solar-and-wind) | Which input features and which training start are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
-| [P20](#p20-a-cams-trained-stage-1-with-a-stage-0-for-demand) | For Primary, BSP, and GSP demand series, does a stage 1 model trained on CAMS irradiance and fed ENS irradiance for all 51 members beat the ERA5-trained stage 1, and does a stage 0 model that maps ENS irradiance to CAMS irradiance help further? | 2 | Nothing; CAMS values must exist at the BSP and GSP series | Proposed; the follow-up to experiment 00009, which tested Primary substations only, without stage 0 |
-| [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Planned as experiment 00011, in [PR #1214 (Plan experiment 11: school-term and return-to-work columns for the stage 1a demand model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214), with no fits yet |
-| [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 and P17 | Proposed |
-| [P12](#p12-calibration-of-the-pooled-mixture-for-solar-and-wind) | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage for wind and solar, wind first? | 4 | P17 | Proposed; the demand part is in P7 |
+| [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 | Proposed |
+| [P12](#p12-calibration-of-the-pooled-mixture-for-solar-and-wind) | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage for wind and solar, wind first? | 4 | Nothing | Proposed; the demand part is in P7 |
 
 ## Deferred until the first results are in
 
@@ -39,7 +36,7 @@ model.** Each keeps its section below, and a result may promote it.
 | [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | P7 | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, so revisit it only if N1 wins P7 |
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | P6 | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and P12 | Deferred; no consumer needs coherent members yet |
-| [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | P7 and P17 | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand depends less on weather than generation does |
+| [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | P7 | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand depends less on weather than generation does |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
 
 ## Proposals in detail
@@ -130,35 +127,6 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
-
-### P4: return-to-work and school-term columns for the holiday periods
-
-**Experiment 00006 found that the windowed days to Christmas lowers the Primary error in the weeks
-around Christmas, and left the error after 5 January unchanged.** Over the three Christmases scored,
-the Primary error with the windowed column was 6.4 to 9.3 points of capacity from 25 December to 1
-January, against a base of 8.8 to 14.7. From 5 to 8 January it was 9.3 to 10.3, against a base of
-9.8 to 10.5, so the column gains almost nothing there. Each of those days is a mean over three
-Christmases. A day count from 25 December cannot encode a return to work or to school that is
-staggered across a week or more. Easter and the summer school holidays have no column that encodes
-them, and the existing holiday flags help Primary substations at Easter and hurt bulk supply points
-and grid supply points.
-
-**The plan has to fix its windows and contrasts before any fit.** A candidate design compares the
-windowed Christmas column of 00006 with the same column plus the days since the first working day
-after New Year, plus a school-term column by nation and by local authority, scored on the Christmas,
-Easter, and half-term windows over all three folds, with a day-count control and a half-year control
-as in the Christmas control of 00006. School-term dates have to be collected and checked by hand,
-which is the data step the 00006 screen left out. The experiment stays out of 00006 because a column
-designed after seeing early-January errors cannot be pre-registered there.
-
-**Resolution limit.** All 20 series are in Lincolnshire, so the school-term column takes the same
-value for every series and carries no variation across series. The Easter and half-term effects each
-rest on three instances. The experiment can resolve the Christmas effect only, and it cannot
-separate a school effect from a calendar effect.
-
-The [quick-wins study](../studies/forecasts/quick-wins.md) found that holiday and ordinal-day
-columns did not help demand on 15 months of ENS-era data (+0.06 points of CRPS), while experiment
-00006 found that a windowed Christmas column helped on a longer history.
 
 ### P6: Primary substation demand against the stored baselines
 
@@ -293,46 +261,6 @@ the maintainer's approval of the cost. The issue also ties autonomous use of the
 scorer-protection work in issue 958. Every experiment since 00003 scores the same year on the same
 16 series, so choices tuned there overfit it, and an earlier fold is the remedy. For demand, a
 longer training history has hurt so far, so the backfill is valuable first as validation data.
-
-### P17: input features for solar and wind
-
-**An arm for the 6 solar farms trains stage 1 on CAMS irradiance in place of ERA5 shortwave.** The
-maintainer asked for it on 2026-10-14, after experiment 00009 found no gain from a CAMS-trained stage
-1a for demand (-0.035 points). The arm applies the CAMS-trained model to ENS irradiance, and a
-variant adds a small stage 0 model that calibrates ENS irradiance to CAMS first. The two contrasts
-are kept separate: CAMS-trained against ERA5-trained, then stage 0 against plain CAMS-trained.
-
-**No experiment has screened inputs for solar or wind.** Experiments 00001 and 00002 used one fixed
-list of 9 columns for the 6 solar farms and 6 columns for the 3 wind farms, with no calendar column
-and no power lag. The screen follows 00006: select on 2024-07 to 2025-06 only and confirm once on
-2025-07 to 2026-06, with the windchill-style columns in the production recipe tested for use, the
-clear-sky ratio target for solar (power divided by clear-sky power, weighted by clear-sky power),
-and a `base_margin` from a power curve of wind speed for wind. 9 generator series in two weather
-regions cannot resolve gains under about 0.3 points of capacity, so the experiment reports every
-score per technology and flags the claim as resting on 6 solar farms and 3 wind farms.
-
-**The experiment also tests the training start for generators.** Generators change less over the
-years than demand does, so a longer training window may help them where it hurt demand. Experiment
-00001 found that a stage 1 trained on only the ENS-era months gave the same errors as one trained on
-7 years, which is evidence of no difference, not of a benefit, so the test is an open one. The arms
-are a start in 2019-09, a start in 2023-09, and the ENS-era months only, scored with the same
-contrast on 9 generator series.
-
-**Resolution limit.** 6 solar farms in one weather region and 3 wind farms cannot resolve gains
-under about 0.3 points of capacity, so the claim rests on those farms.
-
-### P20: a CAMS-trained stage 1 with a stage 0 for demand
-
-**Experiment 00009 found no gain from training stage 1a on CAMS irradiance for Primary demand, and
-this follow-up adds a stage 0 model and the other substation types.** The maintainer asked for it on
-2026-10-14. Stage 1 trains on CAMS irradiance and is fed ENS irradiance for each of the 51 members
-at inference. Stage 0 is a small model that maps ENS irradiance to CAMS irradiance, trained on the
-period when both exist, and its output feeds stage 1. The arms are ERA5-trained stage 1,
-CAMS-trained stage 1 without stage 0, and CAMS-trained stage 1 with stage 0, on Primary, BSP, and
-GSP series, scored by type. Two contrasts, kept separate: CAMS-trained against ERA5-trained, then
-stage 0 against plain CAMS-trained. The plan has to check first that CAMS values exist at the BSP
-and GSP series ([PR #1201](https://github.com/openclimatefix/nged-substation-forecast/pull/1201)
-covers the 22 series of 00003), and has to reuse the code of 00009.
 
 ### P18: lagged power and summaries of recent power for solar and wind
 
