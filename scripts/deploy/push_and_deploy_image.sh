@@ -15,8 +15,9 @@
 #
 # Zero arguments by design, so nothing can be mistyped or drift:
 #   - The image tag is the first 12 hex chars of the promoted MLflow run id, read from
-#     data/production_model/promotion.json. build_and_verify_image.sh derives the tag exactly the
-#     same way. So this script can only ever push the image that script built and verified.
+#     data/production_model/promotion.json, then a hyphen and the short git commit hash.
+#     build_and_verify_image.sh derives the tag exactly the same way. So this script can only ever
+#     push the image that script built and verified, from the commit that is checked out now.
 #   - The AWS account id comes from `aws sts get-caller-identity` — never typed by hand.
 #   - Region, repository, task-definition family, and container name are the fixed names the
 #     runbook establishes (eu-west-2 / nged-forecast everywhere). Region is passed explicitly on
@@ -63,17 +64,19 @@ if [[ ! -f "$PROMOTION_JSON" ]]; then
 fi
 
 RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
-LOCAL_IMAGE="${REPO}:${RUN_ID:0:12}"
+IMAGE_TAG="${RUN_ID:0:12}-$(git rev-parse --short=8 HEAD)"
+LOCAL_IMAGE="${REPO}:${IMAGE_TAG}"
 
 if ! docker image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
   echo "error: local image ${LOCAL_IMAGE} not found — run" >&2
   echo "       scripts/deploy/build_and_verify_image.sh first (aws.md Step 4), so only a" >&2
-  echo "       built-and-verified image can be pushed." >&2
+  echo "       built-and-verified image can be pushed. The tag includes the git commit, so" >&2
+  echo "       rebuild if HEAD has moved since the build." >&2
   exit 2
 fi
 
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-REMOTE_IMAGE="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}:${RUN_ID:0:12}"
+REMOTE_IMAGE="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}:${IMAGE_TAG}"
 
 echo "==> Pushing ${LOCAL_IMAGE} to ${REMOTE_IMAGE}"
 aws ecr get-login-password --region "$REGION" \

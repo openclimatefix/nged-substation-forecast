@@ -93,9 +93,8 @@ def test_predict_output_schema() -> None:
     # ml_flow_experiment_id=None → every row is null
     assert result["ml_flow_experiment_id"].is_null().all()
 
-    # Model-family identity comes from the class constants, not the config.
+    # The model family's name comes from the class constant, not the config.
     assert (result["power_fcst_model_name"] == XGBoostForecaster.MODEL_NAME).all()
-    assert (result["power_fcst_model_version"] == XGBoostForecaster.MODEL_VERSION).all()
     # Experiment identity comes from the config, and stays distinct from model-family identity.
     assert (result["experiment_name"] == experiment_name).all()
 
@@ -119,10 +118,22 @@ def test_predict_ignores_untrained_ts_ids() -> None:
     assert len(result) == len(df)
 
 
+@pytest.mark.parametrize(("config_overrides", "expected"), [({"model_release": 7}, 7), ({}, 0)])
+def test_predict_stamps_the_configured_model_release(
+    config_overrides: dict[str, int], expected: int
+) -> None:
+    df = _make_df()
+    lf = pt.LazyFrame.from_existing(df.lazy())
+
+    result = _trained(df, **config_overrides).predict(lf)
+
+    assert result["power_fcst_model_version"].unique().to_list() == [expected]
+
+
 def test_save_load_roundtrip(tmp_path: Path) -> None:
     df = _make_df()
     lf = pt.LazyFrame.from_existing(df.lazy())
-    forecaster = _trained(df)
+    forecaster = _trained(df, model_release=7)
 
     save_dir = tmp_path / "model"
     forecaster.save(save_dir)
@@ -133,6 +144,7 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
 
     loaded = XGBoostForecaster.load(save_dir)
     assert loaded.model_params == forecaster.model_params
+    assert loaded.model_params.model_release == 7
 
     sort_cols = ["time_series_id", "valid_time", "ensemble_member"]
     orig = forecaster.predict(lf).sort(sort_cols)

@@ -105,7 +105,7 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 | `nwp_init_time` | `datetime` (UTC), nullable | When the NWP model was initialised. Uniquely identifies the NWP ensemble member, and matters when NWP is delayed or when we deliberately use lagged NWP runs to grow the ensemble. Null for models that do not use NWP (e.g. persistence baselines). |
 | `power_fcst_init_time` | `datetime` (UTC) | When OCF's power-forecast model was initialised (the "t0"). |
 | `power_fcst_model_name` | `string` | Name of OCF's model, e.g. `"xgboost_baseline"`. Set by the `BaseForecaster` subclass. |
-| `power_fcst_model_version` | `int16` | Version of OCF's model. |
+| `power_fcst_model_version` | `int16` | Number of the OCF model release, from the [release log](../live_service/model-releases.md). |
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
 `PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id` (`int32`,

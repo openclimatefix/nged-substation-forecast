@@ -93,7 +93,8 @@ implementation. Each subclass of `BaseForecaster` is responsible for defining:
   file per `time_series_id` plus a `meta.json` containing the full serialised `XGBoostConfig`. (This
   may change later. We may switch to saving models using native MLflow flavors (e.g.,
   `mlflow.xgboost.log_model`), which serialize the raw model object directly.)
-* _Identity_: `MODEL_NAME` and `MODEL_VERSION` are class-level constants on each `BaseForecaster`
-  subclass, separate from `BaseForecasterConfig`. `experiment_name` and `ml_flow_experiment_id`
-  travel in the config instead. Both levels are stamped onto every `PowerForecast` row at predict
-  time, so each row is self-describing.
+* _Identity_: `MODEL_NAME` is a class-level constant on each `BaseForecaster` subclass, separate
+  from `BaseForecasterConfig`. `experiment_name`, `ml_flow_experiment_id`, and `model_release` (the
+  number of the production model release, `0` when the run is not a release) travel in the config
+  instead. All of them are stamped onto every `PowerForecast` row at predict time, so each row is
+  self-describing. The [model release log](../live_service/model-releases.md) records each release.

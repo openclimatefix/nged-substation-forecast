@@ -44,6 +44,7 @@ def _save_trained_model_to_mlflow(
     n_estimators: int,
     selected_features: set[str] | None = None,
     time_series_ids: tuple[int, ...] = (1,),
+    model_release: int = 0,
 ) -> str:
     """Train a tiny real ``XGBoostForecaster`` on synthetic data and save it to a new MLflow run.
 
@@ -72,6 +73,7 @@ def _save_trained_model_to_mlflow(
         selected_features=features,
         experiment_name=experiment_name,
         n_estimators=n_estimators,
+        model_release=model_release,
     )
     forecaster = XGBoostForecaster(config)
     forecaster.train(train_data, time_series_ids=list(time_series_ids))
@@ -97,7 +99,7 @@ def _save_trained_model_to_mlflow(
 def test_promoted_model_promotes_and_populates_directory(
     env: dict[str, str], dagster_instance: DagsterInstance
 ) -> None:
-    run_id = _save_trained_model_to_mlflow("promo_test", n_estimators=5)
+    run_id = _save_trained_model_to_mlflow("promo_test", n_estimators=5, model_release=7)
 
     result = materialize(
         [promoted_model],
@@ -120,6 +122,7 @@ def test_promoted_model_promotes_and_populates_directory(
     assert metadata["mlflow_run_id"].value == run_id
     assert metadata["model_class"].value == "xgboost_forecaster.forecaster.XGBoostForecaster"
     assert metadata["experiment_name"].value == "promo_test"
+    assert metadata["model_release"].value == 7
     assert metadata["n_trained_time_series"].value == 1
 
 
