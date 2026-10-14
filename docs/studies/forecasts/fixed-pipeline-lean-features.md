@@ -1067,7 +1067,9 @@ coherence. This study changes no production code or forecast contract.
 comparison with original lean wind changes the wind conclusion.** These post hoc results cover both
 main and sensitivity settings in the forward Fold A and retrospective Fold B. All four equal-padding
 reports and both main-setting unpadded robustness reports are complete. The labels PV2, PV11,
-Wind5, Wind9 u/v, and Wind7 circular refer to the [exact input sets](#requested-minimal-feature-extension), with their own inputs duplicated to width 24 for the
+Wind5, Wind9 u/v, and Wind7 circular refer to the [exact input
+sets](#requested-minimal-feature-extension), with their own inputs duplicated to width 24 for
+the
 primary comparisons. Full input means the 24-input Part 1b point control; original lean wind means
 the 16-input `lean_wind` recipe, not the production configuration or pooled quick-wins winner.
 
@@ -1173,7 +1175,8 @@ and lead comparisons do not provide multiplicity-adjusted family-wide significan
 main-setting robustness reports are complete. The [authoritative generated
 tables](fixed-pipeline-feature-results-tables.md#requested-minimal-feature-comparisons) include the
 completed robustness and lead-specific comparisons. Training gain describes fitted-model use;
-a large gain share does not establish a held-out feature benefit. No deployment or feature adoption recommendation follows yet.
+a large gain share does not establish a held-out feature benefit. No deployment or feature
+adoption recommendation follows yet.
 
 ### Training gain for each requested feature set
 

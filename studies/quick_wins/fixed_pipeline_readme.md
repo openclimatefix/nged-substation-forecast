@@ -5,9 +5,9 @@ inputs, then rebuilds the lean solar and wind feature sets from issue 1156. Prod
 configuration refit, as in the original quick-wins study. The deployed model artifact is outside
 this comparison.
 
-The preregistration is `plans/issue-1156-fixed-pipeline-and-lean-features.md`. The review record
-is `fixed_pipeline_review_log.md`. Results remain provisional until the scientific reviews of
-the results and page are complete.
+The published study records the planned comparisons and completed scientific reviews in
+`docs/studies/forecasts/fixed-pipeline-lean-features.md`. The review record is
+`fixed_pipeline_review_log.md`.
 
 ## Isolated code and frozen inputs
 
@@ -88,8 +88,8 @@ Never copy private manifests into the documentation.
 
 ## Requested feature extension
 
-The separate post hoc plan is `plans/issue-1156-requested-minimal-features.md`. It fixes two solar
-sets and three wind sets with 2, 11, 5, 9 and 7 real inputs respectively. It retains the cleaned
+The published study documents two post hoc solar sets and three wind sets with 2, 11, 5, 9
+and 7 real inputs respectively. The extension retains the cleaned
 per-series point recipe, the two folds, both hyperparameter settings and three fitting seeds.
 Untargeted series keep the full-input policy. Main-setting unpadded checks supplement the
 equal-width comparisons; they do not replace them or reopen the stopped solar ladder.

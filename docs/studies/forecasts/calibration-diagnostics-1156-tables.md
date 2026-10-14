@@ -40,7 +40,8 @@ the table's scope and does not guarantee complete month support for every series
 
 **Lead and era summaries remain descriptive.** Lead bands are below 72 hours, 72 to below
 264 hours and 264 hours onward. November source eras use weather initialisation time around
-13 November 2024 at 00:00 UTC, the verified archive categorical-precipitation-type availability boundary; differing
+13 November 2024 at 00:00 UTC, the verified archive categorical-precipitation-type availability
+boundary; differing
 seasons, target support and training exposure confound era comparisons. The archive grouping
 does not evaluate the operational upgrade cycle at 12 November 2024 at 06:00 UTC. That exact
 operational-cycle comparison has not been evaluated, and the separate comparison around

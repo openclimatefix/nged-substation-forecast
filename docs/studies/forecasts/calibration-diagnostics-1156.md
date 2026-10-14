@@ -600,7 +600,8 @@ earlier data. Shared weather episodes, frozen capacities, missing targets and sp
 support limit interpretation beyond the observed period and population.
 
 Source-era summaries use recorded weather initialisation times before or from
-13 November 2024 at 00:00 UTC, the verified archive categorical-precipitation-type availability boundary. This
+13 November 2024 at 00:00 UTC, the verified archive categorical-precipitation-type availability
+boundary. This
 grouping differs from the operational upgrade cycle at 12 November 2024 at 06:00 UTC and does
 not evaluate that cycle's effect. Different seasons and training exposure prevent a causal
 upgrade interpretation. The separate comparison around 12 May 2026 at 06:00 UTC remains pending;
