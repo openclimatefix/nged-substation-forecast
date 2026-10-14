@@ -59,6 +59,9 @@ review as `implement-issue` does.
 - **The id and the slug.** Call `studies.experiment_store.reserve_experiment(slug=...)`. It returns
   the next id, written as five digits, and creates `data/ml-experiments/<id>-<slug>/`. Make the slug
   descriptive.
+  **Write the id without leading zeros in the title of a pull request or an issue**, as in
+  "Experiment 6: which input features work best", never "Experiment 00006". The five digits belong
+  to folder and file names only.
 - **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it. Add it
   to the navigation in `mkdocs.yml`, under "ML experiments" and titled with the hypothesis, in the
   commit that first adds the page. When two experiments finish together, the two navigation lines
@@ -138,12 +141,14 @@ worth considering for the next model release, and to `not-for-production` for a 
 refuted idea, or a stage that failed its test. The log's "Candidates for the next release" section
 is the agenda for the maintainer's release review.
 
-**The pull request that ports a winner into the production pipeline records why.** In the same
-change, set `production_status` to `adopted` and `adopted_in` to the model release number in the
-experiment's `result.md`, move its row in the research log, and add a row to
-`docs/live_service/model-releases.md` listing the experiments the release incorporates. A later
-experiment that overturns an adopted result sets `production_status` to `superseded` on the old
-experiment and names the new one in the log.
+**The pull request that cuts a model release records which experiments it adopted.** In that pull
+request, set `production_status` to `adopted` and `adopted_in` to the model release number in each
+incorporated experiment's `result.md`, move the experiment's row in the research log, and add a row
+to `docs/live_service/model-releases.md` listing the experiments the release incorporates. The pull
+requests that port the winners earlier do not set `adopted_in`, because the release number does not
+exist until the release is cut. A later experiment that overturns an adopted result sets
+`production_status` to `superseded` on the old experiment and names the new one in the log. The
+`release-model` skill describes the whole routine.
 
 ## The write-up
 
