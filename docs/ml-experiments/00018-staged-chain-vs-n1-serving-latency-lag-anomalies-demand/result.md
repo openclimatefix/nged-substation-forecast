@@ -110,8 +110,9 @@ from 2024-04-01 to 2025-06-30). They differ only in the recent-origin inputs. Se
 - **CH-E-nodelay (replicates 00005's L3):** final ERA5 and a 0.5-hour delay, as 00005 had.
 - **CH-S-spread:** CH-S quantiles with the spread scaled about the median, `q50 + k (q - q50)`, by
   one factor `k` for the Primary substations (and one each for the bulk and grid supply points).
-  `k` is chosen from the grid 1.00 to 1.60 in steps of 0.05 on held-out calibration rows: a calibrator fitted on the calibration runs before 2025-01-01 scored on
-  the runs from 2025-01-01 to 2025-06-30 by quantile score. The scored arm uses the full-window
+  `k` is chosen from the grid 1.00 to 1.60 in steps of 0.05 on held-out calibration rows: a
+  calibrator fitted on the calibration runs before 2025-01-01 scored on the runs from 2025-01-01 to
+  2025-06-30 by quantile score. The scored arm uses the full-window
   calibrator and that `k`. No validation row influences `k`. N1 gets no equivalent tuning, so C6 is
   descriptive and the verdict never rests on it.
 - **References from stored predictions:** N1 (00013), `manual_heuristic`, `climatology`, and the

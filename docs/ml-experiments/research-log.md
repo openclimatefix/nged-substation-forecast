@@ -19,6 +19,8 @@ the maintainer to confirm.
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs | The Christmas column needs its 14-day window, a 2023 start needs a fresh year, and windchill can go |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Map the ENS shortwave onto CAMS (a stage 0 quantile mapping) before a CAMS-trained stage 1a reads it | The year's mean is corrected but individual months are up to 18.6% off, and the member spread widens by 27% |
+| [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Train the stage 1a demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day error correction | The correction needs live power 2 days old, and every gain is on ERA5 weather |
+| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
 
 ## The experiments so far
 
@@ -37,6 +39,9 @@ the maintainer to confirm.
 | [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
 | [00013](00013-primary-demand-against-stored-baselines/result.md) | Where does Primary substation demand stand: does an upgraded ENS-trained quantile model (N1) beat `manual_heuristic`, and why does the production recipe lose to it? | Inconclusive: N1 is level with `manual_heuristic`; the production recipe trails it by 1.69 points | Not for production | 2026-10-14 |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | Not yet merged |
+| [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error? | Supported | Candidate | 2026-10-14 |
+| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
+| [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -333,3 +338,68 @@ experiment 00006 with the 14-day Christmas column, trained from 2021-09-01.
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214).
 
 ![Change in error by window and column set](00011-school-term-and-return-to-work-columns-stage1a-demand/figure_1.svg)
+
+### 00017: training window, recency, and retraining rule for demand
+
+**Question.** Does training the stage 1a demand model on recent rows, retraining it monthly, or
+correcting it by its last 14 days of error lower the Primary substation demand error, as drift
+suggests?
+
+**Verdict: supported.** On 16 Primary substations, with monthly rolling origins from January 2022 to
+June 2026 on ERA5 weather, all-history training retrained monthly scores 7.62 points of capacity.
+The 14-day correction lowers it by 1.52 points (99.44% interval 1.13 to 1.95), a half-life of 0.5
+years by 0.92 (0.64 to 1.22), and a 12-month window by 0.84 (0.53 to 1.19). Retraining yearly instead
+of monthly adds 0.52 points, and a model never retrained adds 3.80.
+
+**What changes later experiments.** The bias of the all-history model runs from forecast too high
+(2022 to 2025) to too low (2026), so a window change needs several years of rolling origins to be
+judged. The correction stacks with a 0.5-year half-life (5.82 points, post hoc).
+
+![Contrasts against the all-history model](00017-training-window-and-retraining-rule-drift-demand/figure_1.svg)
+
+Details: [result.md](00017-training-window-and-retraining-rule-drift-demand/result.md),
+[PR #1223](https://github.com/openclimatefix/nged-substation-forecast/pull/1223).
+
+### 00016: calibration of the pooled mixture for solar and wind
+
+**A scalar spread factor brings the pooled mixture's 5% to 95% band for solar from about 95% to
+about 90% coverage, with no change in the CRPS.** The experiment corrected the pooled mixture of
+00002's ERA5-trained stage 1a with a spread factor, a spread factor per lead band, a
+location-and-scale calibrator, and a free quantile calibrator, each fitted on earlier validation
+months, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** uncorrected solar covers 94.3% to 95.3% of non-trivial cases in every lead
+  band, and `spread` gives 89.5% to 91.8% with a CRPS change of +0.006 points of capacity (99.4%
+  interval -0.004 to +0.024).
+- **Wind:** the uncorrected band covers 95.3% and 94.4% in the first two bands and about 90% after
+  that. No planned arm brings the first two bands within 2.5 points of 90, and the fit per lead band
+  existed for only 3 months of the first band. A post hoc spread factor on two lead groups
+  does, with a CRPS change of -0.021 (-0.042 to -0.002), a small gain.
+- **Finding for later experiments:** a location-and-scale calibrator per lead band undershoots
+  90% in two wind bands (86.7% and 83.9%) and its CRPS interval is 0.36 points wide.
+- **Write-up and pull request:** [result](00016-pooled-mixture-calibration-solar-wind/result.md),
+  [PR #1221 (Experiment 16: calibration of the pooled mixture for solar and
+  wind)](https://github.com/openclimatefix/nged-substation-forecast/pull/1221).
+
+![Coverage of the 5% to 95% band by lead band](00016-pooled-mixture-calibration-solar-wind/figure_1.svg)
+
+### 00015: the same-time electricity price in a stage 1 demand model
+
+**The price at the same half-hour as the target lowered the pooled demand error in the selection
+year, but a price from another week did almost as well, and the gain did not repeat in the
+confirmation year.** The stage 1 demand model maps the observed price and ERA5 weather at time t to
+power at time t
+on 17 series (18 in the confirmation year), scored at observed values.
+
+- **Headline result:** price against no price, pooled: -0.52 points of capacity (97.5% interval
+  -0.88 to -0.11) in the selection year and -0.18 (-0.50 to +0.08) in the confirmation year. Price
+  against a price from another week: -0.07 (-0.17 to +0.03) and -0.06 (-0.18 to +0.07).
+- **Finding for later experiments:** national demand and wind at time t did no worse than the price
+  in either year (pooled intervals include zero; 0.43 points lower in the confirmation year), so the
+  price may be a proxy for national conditions. The gain was largest from 12:00 to 20:00 and at the
+  series with the largest errors, and the other-week price reproduced most of it there.
+- **Write-up and pull request:** [result](00015-same-time-price-stage1-demand/result.md), [PR #1220
+  (Experiment 15: same-time price in a stage 1 demand
+  model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1220).
+
+![Pooled contrasts with 97.5% intervals](00015-same-time-price-stage1-demand/figure_1.svg)

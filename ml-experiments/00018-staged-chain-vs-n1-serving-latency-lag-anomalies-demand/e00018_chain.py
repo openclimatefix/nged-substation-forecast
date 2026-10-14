@@ -41,6 +41,8 @@ STAT_COLUMNS: Final[tuple[str, ...]] = ("mean", "std", "q10", "q50", "q90")
 K_GRID: Final[np.ndarray] = np.round(np.arange(1.0, 1.601, 0.05), 2)
 K_SPLIT: Final[datetime] = datetime(2025, 1, 1, tzinfo=UTC)
 CALIBRATOR_THREADS: Final[int] = 8
+MIN_EARLY_ROWS: Final[int] = 5_000
+"""A series with fewer observed early calibration rows has no say in the spread factor."""
 
 
 def source_predictions(
@@ -247,10 +249,10 @@ def main() -> None:
                         )
                     )
                 )
-                if name == "s":
-                    early = (train["power_fcst_init_time"] < K_SPLIT).to_numpy() & (
-                        train["valid_time"] < K_SPLIT
-                    ).to_numpy()
+                early = (train["power_fcst_init_time"] < K_SPLIT).to_numpy() & (
+                    train["valid_time"] < K_SPLIT
+                ).to_numpy()
+                if name == "s" and np.isfinite(y_train[early]).sum() >= MIN_EARLY_ROWS:
                     early_model = fit_calibrator(x=x_train[early], y=y_train[early], seed=seed)
                     held = (train["power_fcst_init_time"] >= K_SPLIT).to_numpy() & np.isfinite(
                         y_train
