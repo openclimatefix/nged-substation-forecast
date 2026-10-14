@@ -159,6 +159,7 @@ nav:
       - "Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error?": ml-experiments/00017-training-window-and-retraining-rule-drift-demand/result.md
       - "Does the same-time electricity price help a stage 1 demand model explain power?": ml-experiments/00015-same-time-price-stage1-demand/result.md
       - "Does the staged chain beat the single-stage model for Primary substation demand?": ml-experiments/00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md
+      - "Does stacking small gains beat manual_heuristic for Primary substation demand?": ml-experiments/00019-primary-demand-stack-vs-manual-heuristic/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md

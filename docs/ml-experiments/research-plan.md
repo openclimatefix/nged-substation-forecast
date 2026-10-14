@@ -18,6 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) (was P21) | Does stacking the 14-day error correction, the 0.5-year recency half-life, and the 1.15 spread factor on N1 beat `manual_heuristic` for Primary substation demand on ENS weather? | 1 | Nothing | Planned; fits and scoring not yet run |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | Nothing | Proposed; experiment 00018 found lag anomalies add little to raw lagged power for demand |
 
