@@ -14,6 +14,8 @@ Arms (see the README):
   weather (`stage1_fit_enstrained.py`), without and with stage 1a's prediction as a column.
 - `s1_short`: `s1_memberavg` with stage 1a trained on ERA5 from 2024-04 only.
 - `s1_control`: stage 1a on ENS member 0's weather.
+- `ens_trained_control`: `ens_trained` applied to ENS member 0's weather only, the like-for-like
+  reference for `s1_control`.
 - `s1_memberavg`: stage 1a on each of the 51 members' weather, predictions averaged.
 - `s1_cams` (solar farms): `s1_memberavg` with stage 1a trained on CAMS irradiance.
 - `climatology`: mean power by local month and half-hour of day, 2019-09 to 2025-06.
@@ -51,6 +53,7 @@ MEMBER_ARMS: Final[tuple[str, ...]] = (
 ARMS: Final[tuple[str, ...]] = (
     *MEMBER_ARMS,
     "s1_control",
+    "ens_trained_control",
     "climatology",
     "era5_ceiling",
     "cams_ceiling",
@@ -224,6 +227,16 @@ def score_seed(*, seed: int, sites: pl.DataFrame) -> pl.DataFrame:
             pl.col("era5_power").alias("point"),
         )
         pieces.append(_point_rows(cases=cases, point=control, arm="s1_control", seed=seed))
+        ens_control = (
+            pl.read_parquet(ENS_TRAINED_DIR / "ens_trained" / f"seed{seed}" / path.name)
+            .filter((pl.col("ensemble_member") == 0) & pl.col("time_series_id").is_in(ids))
+            .select(
+                "time_series_id", "power_fcst_init_time", "valid_time", point=pl.col("power_fcst")
+            )
+        )
+        pieces.append(
+            _point_rows(cases=cases, point=ens_control, arm="ens_trained_control", seed=seed)
+        )
         pieces.append(
             _point_rows(
                 cases=cases,

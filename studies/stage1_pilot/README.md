@@ -54,6 +54,7 @@ weather.
 | `ens_trained` | Stage 1a's columns trained on the ENS control member's weather, 2024-04 to 2025-06. Applied to each of the 51 members and averaged. The paired control for every stage 1a arm. |
 | `s1_memberavg` | Stage 1a (ERA5-trained, 2019-09 to 2025-06-16) applied to each of the 51 members' weather, predictions averaged. |
 | `s1_control` | Stage 1a applied to ENS member 0's weather. |
+| `ens_trained_control` | `ens_trained` applied to ENS member 0's weather only: the like-for-like reference for `s1_control`. |
 | `s1_short` | `s1_memberavg` with stage 1a trained on ERA5 from 2024-04 only, the months `ens_trained` trains on. Separates the training weather from the training length. |
 | `s1_cams` | Solar farms only. As `s1_memberavg`, with stage 1a trained on CAMS irradiance. |
 | `ens_trained_plus_s1` | `ens_trained` with stage 1a's prediction as an extra column. Training rows carry a forward-chained out-of-fold value (one model per month, trained on ERA5 up to 14 days before the month starts); validation rows carry the pre-validation model's prediction for the row's own member. |
@@ -238,8 +239,9 @@ lead band is named, with 95% intervals in brackets.
   at 11 to 15 days by 0.10 for solar (-0.41 to +0.24) and 1.03 for wind (-1.81 to -0.39). The
   ENS-trained control is no better than climatology beyond day 6 (+0.02 solar and -0.42 wind at
   11 to 15 days, both intervals spanning zero).
-- **The gain is associated with the training weather, not the training length.** `s1_short` (ERA5
-  from 2024-04 only) minus `ens_trained` is -0.60 for solar (-0.90 to -0.35) and -1.70 for wind
+- **The gain is associated with the training weather, not the training length.** With the 51
+  members averaged in both arms, `s1_short` (ERA5 from 2024-04 only) minus `ens_trained` is -0.60
+  for solar (-0.90 to -0.35) and -1.70 for wind
   (-2.28 to -1.13). `s1_memberavg` minus `s1_short` is +0.02 and -0.01. Both contrasts are
   exploratory.
 - **Absolute levels, all leads.** Solar: `ens_trained` 8.25, `s1_memberavg` 7.67 (`s1_cams` 7.54),
@@ -248,8 +250,15 @@ lead band is named, with 95% intervals in brackets.
   place of ERA5 as stage 1a's input, error is 1.70 points higher for solar and 7.49 higher for
   wind. At 0 to 24 h for solar, `s1_memberavg` (5.57) is not worse than `era5_ceiling` (5.63), so
   the ceiling is not a bound.
-- **Averaging 51 members helps.** `s1_memberavg` minus `s1_control` is -0.70 for solar and -2.23
-  for wind over all leads, and the gain is larger at long leads (wind -4.28 at 11 to 15 days).
+- **Averaging the 51 members helps the ERA5-trained model much more than the ENS-trained one.**
+  `s1_memberavg` minus `s1_control` is -0.70 for solar and -2.23 for wind over all leads (wind
+  -4.28 at 11 to 15 days). `ens_trained` minus `ens_trained_control` (the ENS-trained model on the
+  control member alone) is -0.15 for solar (-0.30 to -0.05) and -0.22 for wind (-0.41 to -0.05).
+- **With the control member alone, ERA5 training helps only at short leads.** `s1_control` minus
+  `ens_trained_control` is -1.07 (solar) and -2.75 (wind) at 0 to 24 h, -1.06 and -3.56 at 1 to 2
+  days, and +0.55 and +2.09 at 7 to 10 days, and +0.64 and +2.94 at 11 to 15 days. Over all leads it
+  is -0.02 (-0.30 to +0.32) for solar and +0.31 (-0.49 to +1.06) for wind. Both are exploratory.
+  The P1 gain therefore needs both ERA5 training and averaging the members.
 
 **Figure 2 (the planned contrasts):** drawn to `charts/figure_2.svg` by `stage1_charts.py`.
 
