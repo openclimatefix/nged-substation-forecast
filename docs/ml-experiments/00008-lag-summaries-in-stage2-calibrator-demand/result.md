@@ -53,12 +53,14 @@ folder without refitting, so every arm sees identical stage 1 inputs. Training w
 
 **The six summaries.** All are computed from observed power over effective capacity, using only
 observations up to the newest half-hour before the forecast's initialisation time `T`. Missing
-half-hours are ignored; a window with none gives null.
+half-hours are ignored, and a window with fewer than 24 observed half-hours gives null. Weekdays
+are UTC weekdays.
 
 - **Last 24 hours:** the minimum, mean, and maximum of the 48 half-hours ending at `T - 0.5 h`.
 - **Same weekday:** the minimum, mean, and maximum of the 48 half-hours of the most recent UTC
-  calendar day that falls on the target's weekday and ends at or before `T - 0.5 h`. For a lead of
-  under a day this is the previous week's day; for a longer lead it is the latest complete such day.
+  calendar day that falls on the target's weekday and whose last half-hour is no later than
+  `T - 0.5 h`. For a lead of under a day this is the previous week's day; for a longer lead it is
+  the latest complete such day.
 
 Neither summary depends on weather, so both are available at forecast time. The five residuals and
 the four lag anomalies use ERA5 weather at the lag time, which production does not have in time, so
@@ -87,10 +89,23 @@ because four are planned):
 - **C3:** S3 minus L3 (do summaries beat all the lag columns).
 - **C4:** S4 minus R0c (do summaries help when no ERA5 residual is available).
 
-C1 to C3 are scored over leads up to 48 hours (the decision scope) and by lead band. The same four
-are computed for the BSP and GSP series and reported as descriptive. Everything else, such as S4
-minus L3, is exploratory, read at 95%, and labelled so. The write-up reports the number of series
-and of months that agree with each mean, and the absolute score of every arm by lead band.
+C1 to C3 are scored over leads up to 48 hours (the decision scope) and by lead band. C2
+and C3 are bundle contrasts: each drops inputs and adds the summaries, so a loss cannot be
+attributed to either change. The exploratory contrast S1 minus S2 isolates the raw power lags.
+Because L3 and S1 keep the ERA5 residuals, C1 to C3 are ceilings, and a supported verdict
+reads "supported as a ceiling"; C4 is the contrast that can support a claim about production.
+The same four are computed for the BSP and GSP series and reported as descriptive. The second
+clause of the prediction (the gain from 3 to 6 d onward) is descriptive and cannot change
+the verdict. The 98.75% level is a uniform Bonferroni convention across the four contrasts,
+although only C1 decides the verdict. The rule is asymmetric on purpose: a difference between
+0 and +0.15 is inconclusive. C1 uses the refitted L3, which runs through the same code as S1.
+The refit must reproduce 00005's L3 score up to 48 h within 0.05 points; if it does not, the
+write-up says so and the cause is investigated before any result is reported. The same-weekday
+summary goes stale as the lead grows (a week old at short leads, about a day old at 6 to 7
+d), so results are reported by lead band. Everything else, such as S4 minus L3 and S1 minus
+S2, is exploratory, read at 95%, and labelled so. The write-up reports the number of series
+(by series sign) and of months that agree with each mean, and the absolute score of every
+arm by lead band.
 
 **Calendar guard.** The calibrator has no calendar column, and no arm uses early stopping, so no
 inner split is needed.
