@@ -67,7 +67,10 @@ ARM_COLUMNS: Final[tuple[str, ...]] = (
 
 
 def _stats() -> pl.DataFrame:
-    """Return every ENS run's quantiles of both arms from `e00009_fit.py`.
+    """Return every ENS run's quantiles of every arm from `e00009_fit.py`.
+
+    Returns:
+        The 73 runs' rows with `arm`, `seed`, the 9 quantile columns, and `actual`.
 
     Raises:
         FileNotFoundError: If the fit has not written all 73 runs.

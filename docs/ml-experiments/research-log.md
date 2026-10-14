@@ -120,9 +120,9 @@ ERA5 weather at past times.
 
 **The clock is the largest single input for Primary substations, but it lowers the error by only
 about 0.5 points of capacity, and the choice of training window matters as much.** The experiment
-trained one XGBoost model per substation on ERA5 weather and scored held-out ERA5 months (it does
-not forecast), for 14 scored Primary substations, two bulk supply points, and two grid supply
-points. It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06.
+trained one XGBoost model per substation on ERA5 weather and scored held-out ERA5 months (it does not
+forecast), for 14 scored Primary substations, two bulk supply points, and two grid supply points.
+It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06.
 
 - **Headline result:** hour and weekday lower the Primary error by 0.55 points (99.4% interval
   -0.71 to -0.41) on the selection year and 0.46 (-0.61 to -0.30) on the confirmation year, against

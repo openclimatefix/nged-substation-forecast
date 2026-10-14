@@ -57,17 +57,17 @@ def _dot_and_interval(
     scale = alt.Scale(domain=list(domain))
     x = alt.X("difference:Q", title=x_title, scale=scale)
     zero = alt.Chart(pl.DataFrame({"x": [0.0], "text": [zero_label]}))
-    rules = zero.mark_rule(color="#444444", strokeDash=[4, 3]).encode(x=alt.X("x:Q", scale=scale))
-    words = zero.mark_text(align="left", dx=4, dy=-6, baseline="bottom", fontSize=11).encode(
+    rules = zero.mark_rule(color="#444444", strokeDash=[4, 3]).encode(x=alt.X("x:Q", scale=scale))  # ty: ignore[unresolved-attribute]
+    words = zero.mark_text(align="left", dx=4, dy=-6, baseline="bottom", fontSize=11).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("x:Q", scale=scale), y=alt.value(0), text="text:N"
     )
     return (
         rules
         + words
-        + base.mark_rule(strokeWidth=2).encode(
+        + base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lower:Q", title=x_title, scale=scale), x2="upper:Q"
         )
-        + base.mark_circle(size=70, opacity=1.0).encode(x=x)
+        + base.mark_circle(size=70, opacity=1.0).encode(x=x)  # ty: ignore[unresolved-attribute]
     ).properties(
         width=CONTENT_WIDTH_PX - LABEL_PX - 20,
         height=ROW_HEIGHT_PX * len(order),
@@ -124,9 +124,9 @@ def figure_1(*, planned: pl.DataFrame, exploratory: pl.DataFrame) -> None:
         pl.DataFrame({"x": [PLANNED_THRESHOLD], "text": ["planned gain: 0.2 points"]})
     )
     scale = alt.Scale(domain=[-0.25, 0.06])
-    layers = planned_rule.mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[2, 2]).encode(
+    layers = planned_rule.mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[2, 2]).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("x:Q", scale=scale)
-    ) + planned_rule.mark_text(
+    ) + planned_rule.mark_text(  # ty: ignore[unresolved-attribute]
         align="left", dx=4, dy=-6, baseline="bottom", fontSize=11, color=ocf.BRAND_ORANGE
     ).encode(x=alt.X("x:Q", scale=scale), y=alt.value(0), text="text:N")
     _save(chart=chart + layers, name="figure_1")
