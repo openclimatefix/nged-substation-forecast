@@ -7,6 +7,10 @@ CAMS are on disk only for them. It is exploratory and autonomous: it changes no 
 imports only from this folder, `studies.*`, and the reviewed packages in `packages/*`. This README
 was written before the first fit. Everything not listed under "Planned contrasts" is exploratory.
 
+## Status: the headline is provisional
+
+An outside-expert review found that the ENS-trained control (`c0`) may memorise calendar position instead of mapping weather to power, and that it scores worse than a month-by-hour climatology at long leads on wind. The contrast P1 (stage 1a minus `c0`) and the null in P2 are therefore provisional until a climatology arm and a de-memorised ENS-trained control are scored.
+
 ## Question
 
 **Does a weather-to-power XGBoost model trained on ERA5 and CAMS (a "perfect prognosis" model,
