@@ -17,7 +17,7 @@ decision_rule: >-
 benchmark: >-
   ens_trained (the same columns trained on the ENS control member, 2024-04 to 2025-06), with two
   climatology rows as references.
-row_set_id: fold_a_tuesdays_v1
+row_set_id: fold_a_every5d_v1
 metric: mean absolute error of the ensemble-mean forecast, points of capacity
 verdict: pending
 best_arm: pending
@@ -43,11 +43,17 @@ disaggregated primary-substation demand series, 4 bulk-supply and grid-supply po
 others (a battery and a biofuel generator). The results report the three groups separately. Each
 series takes ERA5 weather from the nearest cell of the 121-cell stage 1 box.
 
-**Row set and folds.** Fold A of the quick-wins study, as in 00001: training 2024-04 to 2025-06
-for the ENS-trained arms (control member only), validation 2025-07-01 to 2026-06-30, 53 runs
-every 7 days at 00:00 UTC. Every run starts on a Tuesday, so the weekday of the forecast origin
-is fixed, while the valid times cover every weekday. Stage 1a trains on valid times from 2019-09
-to 14 days before the first run. Seeds 0, 1, and 2.
+**Row set and folds.** Validation 2025-07-01 to 2026-06-30, on the 73 runs of the row set
+`fold_a_every5d_v1`: every fifth day at 00:00 UTC from 2025-07-01. The fold A frames of the
+quick-wins study hold Tuesday runs only (row set `fold_a_tuesdays_v1`), which puts every case at
+lead 0 to 1 day on a Tuesday or Wednesday. The five-day step cycles the run's weekday, so every
+lead band has about 14% of its cases on each weekday of the valid time. The ENS-trained arms train
+on the control member of every daily run from 2024-04-01 to 2025-06-30, keeping valid times up to
+2025-06-30. Both sets of rows come from `demand_build_ens.py`, which reads the ENS archive and uses
+production's half-hourly resampling; for the 2025-07-01 run it reproduces the fold A frame's
+weather and lag columns exactly. Stage 1a trains on valid times from 2019-09 to 14 days before the
+first run. Seeds 0, 1, and 2. A first fit on the Tuesday runs was run before this row set was
+chosen and has not been scored; it is kept as a labelled reference.
 
 **Weather columns, the same in every arm** (ENS serves each; ERA5 gives the same quantity):
 `temperature_2m`, `dew_point_temperature_2m`, `shortwave`, `longwave`, `pressure_surface`,
@@ -96,6 +102,10 @@ months and the three fitting seeds, as in 00001. Absolute scores are reported fo
 compared with ERA5's hour-ending convention, and the result is reported in the write-up, in case
 the label is shifted. The weather columns of ENS member 0 at short lead are compared with ERA5 at
 the same valid time, as in 00001.
+
+**To be added.** A CAMS arm: stage 1a with CAMS shortwave irradiance in place of ERA5's in
+training only, as in 00001, at the 22 locations. It needs a CAMS download at those locations and
+is scoped separately.
 
 **Not tested here.** Where lagged power should enter a two-stage forecast, several weather
 models, quantile forecasts, and a second fold.
