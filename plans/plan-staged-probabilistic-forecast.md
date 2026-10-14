@@ -109,14 +109,17 @@ removed.
 
 ## 4. The candidate design
 
-**The best-guess design has three learned stages with fixed roles, and the studies test simpler
-challengers against it.** Stage 1 is the weather-to-power function, trained on ERA5 and CAMS. Stage
-2 calibrates each product's stage 1 power with one shared calibrator and blends the products.
-Coupling turns the result back into coherent ensemble members. Every stage always runs, and each has
-one job. The main challenger is a single-stage quantile XGBoost model on ENS statistics with a small
-correction per additional product. It has one stage fewer, and it is the baseline that stage 2 must
-beat or tie. A learned weather-correction stage ("stage 0") is not in the first design; see the
-alternatives.
+**The best-guess design has three learned stages with fixed roles, and stage 2 must earn its
+place.** Stage 1 is the weather-to-power function, trained on ERA5 and CAMS. Stage 2 calibrates each
+product's stage 1 power with one shared calibrator and blends the products. Coupling turns the
+result back into coherent ensemble members. Every stage always runs, and each has one job. Study 2b
+found that, for solar and wind forecast from ECMWF ENS alone, stage 1 with a pooled mixture over
+members beats the single-stage ENS model and stage 2 adds nothing to the mixture. Stage 2 is
+expected to help only when it has more to do: several weather products, or lagged power. The studies
+therefore test it under those two conditions, and ENS-only generators may need no separate stage 2.
+The main challenger is a single-stage quantile XGBoost model on ENS statistics with a small
+correction per additional product. A learned weather-correction stage ("stage 0") is not in the
+first design; see the alternatives.
 
 ```text
 NWP n, member m ─▶ adapter ─▶ canonical weather ─▶ Stage 1 (1a, 1b) ─▶ power(n,m,s,t)
@@ -458,10 +461,14 @@ as such. Studies write code under `studies/` only.
       and CAMS from 2019-09 and applied to ENS members, scored by MAE against the ENS-trained
       control (results in section 4). Open: the climatology arm and a de-memorised control, and fold
       B. Demand series wait for ERA5 temperature at their locations.
-    - **2b, the first test of the best guess (solar and wind).** The stage 2 calibrator and blend
-      fed by stage 1a quantiles, against the pooled stage 1 mixture and the fixed single-stage
-      champion, with CRPS, MAE of the median, and coverage by lead band. Stage 1a is refitted with 9
-      quantile levels if needed.
+    - **2b, the first test of stage 2 (solar and wind, ENS only; done).** Results are in section 4.
+      Stage 2 did not beat the pooled mixture. It is retested when it has more to do: study 3 and 4
+      (several products) and the lag experiment below.
+    - **Lag experiment (demand series, ml-experiment).** Where should lagged power enter? Arms: (L1)
+      lags only as inputs to the single-stage ENS model; (L2) lags only through stage 1b's residual
+      persistence; (L3) lags and lag anomalies in the stage 2 calibrator, with a lag-free stage 1;
+      (L2 plus L3) both. Contrasts: L3 against pooled stage 1 without lags, and L2 against L3. Uses
+      the rotating-weekday row set, lag nullification by lead, and the calendar-memorisation guard.
     - **A, the single-stage baseline:** an XGBoost model on ensemble statistics (arms: control
       member, ensemble mean, mean plus spread and percentiles), quantile loss at 19 levels, with
       spread rescaling and EMOS as calibration baselines.
@@ -484,11 +491,11 @@ as such. Studies write code under `studies/` only.
       lockdown period excluded, and, only if either helps, with a lockdown scalar.
     - **Coupling:** ECC-Q (with the interpolation, tail, and tie rules above) against the Schaake
       shuffle at short leads, scored by lead band.
-    - **Deciding contrasts:** C against B (stage 2 beats the pooled mixture), and C against A plus
-      1a and 1b (the chain beats the single-stage model that has the same inputs), by lead band. If
-      the single-stage model ties C, the single-stage model stays unless C helps a short-history NWP
-      in study 3 or 4. If stage 1 adds nothing on the ENS era, stage 1 leaves the forecast chain and
-      remains an offline artifact for aim 3.
+    - **Deciding contrasts:** stage 1 pooled over members is the baseline. Stage 2 stays only if it
+      beats the pooled mixture (several products, or lags) or ties it and helps a short-history NWP
+      in study 3 or 4, and it must also beat or tie the single-stage model with the same inputs. If
+      stage 1 adds nothing on the ENS era, stage 1 leaves the forecast chain and remains an offline
+      artifact for aim 3.
 3. **How few months of history does a new product need in stage 2?** Fit the shared calibrator and
    blend with products genuinely different from ENS: ENS before and after the 12 November 2024
    upgrade treated as two products, the ENS control member as a deterministic product, and a
@@ -639,6 +646,9 @@ This section is a record of what changed; it is not part of the design.
   baseline that stage 2 must beat or tie. A review of study 2a found that the ENS-trained control
   memorises calendar position, so every study now includes a climatology arm and a de-memorised
   control.
+- **Study 2b changed the emphasis (maintainer, after the result):** stage 2 added nothing for
+  ENS-only solar and wind, so the best guess keeps stage 2 as a role that must be shown under
+  several products or lags, and the lag experiment on demand series is added.
 - **Not yet reviewed:** this version of the plan, and the documentation and issue plan in sections 6
   and 7.
 
