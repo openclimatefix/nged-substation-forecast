@@ -22,7 +22,6 @@ sooner.
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | Nothing | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | Nothing | Proposed |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 | Proposed |
-| [P12](#p12-calibration-of-the-pooled-mixture-for-solar-and-wind) | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage for wind and solar, wind first? | 4 | Nothing | Proposed; the demand part is in P7 |
 
 ## Deferred until the first results are in
 
@@ -34,7 +33,7 @@ model.** Each keeps its section below, and a result may promote it.
 | [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 5 | Knowing what the production model will look like | Deferred; its size depends on the shape of the model |
 | [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | P7 | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, so revisit it only if N1 wins P7 |
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | Nothing | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
-| [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and P12 | Deferred; no consumer needs coherent members yet |
+| [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 | [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | P7 | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand depends less on weather than generation does |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
 
@@ -174,21 +173,6 @@ P16) has low priority for demand.
 **The arms are the member mean, spread, and 10th and 90th percentiles of temperature and irradiance,
 against rows from the control member only.** The planned contrast is the statistics arm against the
 control-member arm.
-
-### P12: calibration of the pooled mixture for solar and wind
-
-**Calibration is open for every technology.** Experiment 00006 found the 5% to 95% band of the
-Primary substations covering about 83% to 85%, and the closed study of pipeline fixes (PR #1175)
-found pooled wind quantiles under-covering and solar 80% bands covering above their label. The arms
-are no correction, a scalar spread factor per technology, a location-and-scale calibrator, a free
-quantile calibrator, and, for solar and wind, the PV ratio target and the wind `base_margin`. The
-planned contrast is coverage and CRPS of the best arm against no correction, demand first.
-
-The demand part of the calibration question moved into P7.
-
-**Resolution limit.** 9 generator series in two weather regions cannot resolve coverage
-differences of a few percentage points, so the result should be read per technology and as
-descriptive.
 
 ### P13: perfect-prognosis and ceiling checks
 

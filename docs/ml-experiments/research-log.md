@@ -19,6 +19,7 @@ the maintainer to confirm.
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs | The Christmas column needs its 14-day window, a 2023 start needs a fresh year, and windchill can go |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Map the ENS shortwave onto CAMS (a stage 0 quantile mapping) before a CAMS-trained stage 1a reads it | The year's mean is corrected but individual months are up to 18.6% off, and the member spread widens by 27% |
+| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
 
 ## The experiments so far
 
@@ -37,6 +38,7 @@ the maintainer to confirm.
 | [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
 | [00013](00013-primary-demand-against-stored-baselines/result.md) | Where does Primary substation demand stand: does an upgraded ENS-trained quantile model (N1) beat `manual_heuristic`, and why does the production recipe lose to it? | Inconclusive: N1 is level with `manual_heuristic`; the production recipe trails it by 1.69 points | Not for production | 2026-10-14 |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | Not yet merged |
+| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
 | [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -334,6 +336,29 @@ experiment 00006 with the 14-day Christmas column, trained from 2021-09-01.
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214).
 
 ![Change in error by window and column set](00011-school-term-and-return-to-work-columns-stage1a-demand/figure_1.svg)
+
+### 00016: calibration of the pooled mixture for solar and wind
+
+**A scalar spread factor brings the pooled mixture's 5% to 95% band for solar from about 95% to
+about 90% coverage, with no change in the CRPS.** The experiment corrected the pooled mixture of
+00002's ERA5-trained stage 1a with a spread factor, a spread factor per lead band, a
+location-and-scale calibrator, and a free quantile calibrator, each fitted on earlier validation
+months, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** uncorrected solar covers 94.3% to 95.3% of non-trivial cases in every lead
+  band, and `spread` gives 89.5% to 91.8% with a CRPS change of +0.006 points of capacity (99.4%
+  interval -0.004 to +0.024).
+- **Wind:** the uncorrected band covers 95.3% and 94.4% in the first two bands and about 90% after
+  that. No planned arm brings the first two bands within 2.5 points of 90, and the fit per lead band
+  existed for only 3 months of the first band. A post hoc spread factor on two lead groups
+  does, with a CRPS change of -0.021 (-0.042 to -0.002), a small gain.
+- **Finding for later experiments:** a location-and-scale calibrator per lead band undershoots
+  90% in two wind bands (86.7% and 83.9%) and its CRPS interval is 0.36 points wide.
+- **Write-up and pull request:** [result](00016-pooled-mixture-calibration-solar-wind/result.md),
+  [PR #1221 (Experiment 16: calibration of the pooled mixture for solar and
+  wind)](https://github.com/openclimatefix/nged-substation-forecast/pull/1221).
+
+![Coverage of the 5% to 95% band by lead band](00016-pooled-mixture-calibration-solar-wind/figure_1.svg)
 
 ### 00015: the same-time electricity price in a stage 1 demand model
 
