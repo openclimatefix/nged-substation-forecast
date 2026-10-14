@@ -22,11 +22,11 @@ sooner.
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
 | [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 2 | P6 | Proposed |
 | [P10](#p10-one-pooled-model-against-one-model-per-series) | Does one model pooled across series, with capacity-normalised targets and series columns, match one model per series? | 2 | P6 | Proposed |
-| [P17](#p17-input-features-for-solar-and-wind) | Which input features are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
+| [P17](#p17-input-features-for-solar-and-wind) | Which input features and which training start are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Needs school-term dates, and follows 00006 |
 | [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 3 | P6 | Proposed |
 | [P12](#p12-calibration-of-the-pooled-mixture) | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage, demand first, then wind and solar? | 3 | P6 | Proposed |
-| [P18](#p18-lagged-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, with lag anomalies from the sources serving has, help solar and wind farms, as it helps Primary substations in 00005? | 3 | P5 and P17 | Proposed |
+| [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P5 and P17 | Proposed |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | 4 | A plan; the price source is chosen | Source chosen (Elexon Market Index Data); needs a plan |
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 4 | P6 | Proposed; mostly a generator question |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 4 | The scoring harness and P12 | Proposed |
@@ -311,10 +311,19 @@ and a `base_margin` from a power curve of wind speed for wind. Nine generator se
 regions cannot resolve gains under about 0.3 points of capacity, so the experiment reports every
 score per technology and flags the claim as resting on 6 solar farms and 3 wind farms.
 
-### P18: lagged power for solar and wind
+**The experiment also tests the training start for generators.** Generators change less over the
+years than demand does, so a longer training window may help them where it hurt demand. Experiment
+00001 found that a stage 1 trained on only the ENS-era months gave the same errors as one trained on
+7 years, which is evidence of no difference, not of a benefit, so the test is an open one. The arms
+are a start in 2019-09, a start in 2023-09, and the ENS-era months only, scored with the same
+contrast on 9 generator series.
+
+### P18: lagged power and summaries of recent power for solar and wind
 
 **Generators depend on weather more than demand does, so lags may help less.** The experiment
 repeats the 00005 comparison for solar and wind farms: no lags, lagged power in the stage 2
-calibrator, and lag anomalies built from the sources serving has (P5). Lagged power can also carry
-curtailment and capacity that the weather does not explain. The planned contrast is the lagged
-calibrator against the lag-free calibrated stage 1, per technology.
+calibrator, and lag anomalies built from the sources serving has (P5). It also repeats experiment
+00008, which tested summaries of recent power (the minimum, mean, and maximum of the latest 24 hours
+and of the latest day on the same weekday) for demand: raw lags against summaries against both.
+Lagged power can also carry curtailment and capacity that the weather does not explain. The planned
+contrast is the lagged calibrator against the lag-free calibrated stage 1, per technology.
