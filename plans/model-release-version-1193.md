@@ -35,10 +35,14 @@ exactly one model release because the image contains it.
       their tests are known, but every `PowerForecast` fixture hard-codes a `1`.
 - **Reviews: both plan reviews, the simplicity review (Sonnet) and the correctness review (Opus).**
   The diff gets all three `implement-issue` diff reviews, including the mutation pass.
-- **Departures from the maintainer's summary:** none in design. The plan adds that the release log
-  records the MLflow run id of the promoted fold run, because rollback needs it. The simplicity
-  review removed the `promotion.json` field and the `design-evidence.md` column that the first draft
-  had, and found a caller the first draft missed (`studies/quick_wins/report_production_arm.py`).
+- **Departures from the issue body:** the issue says `promotion.json` carries the release. The
+  plan drops that, because nothing would read it (`meta.json` already holds the number, and
+  `promoted_model` reports it), and edits the issue body to match. The plan adds that the release log
+  records the MLflow run id of the promoted fold run and the image tag, because rollback needs them,
+  and that the two deploy scripts add the git commit to the image tag, because a software-only
+  release would otherwise overwrite the previous image's tag. The simplicity review removed the
+  `design-evidence.md` column that the first draft had, and found a caller the first draft missed
+  (`studies/quick_wins/report_production_arm.py`).
 
 ## Solution
 
@@ -48,7 +52,7 @@ exactly one model release because the image contains it.
 
 To ship a release, the maintainer folds the supported ml-experiments' winners into the production
 pipeline code and registers a release CV run: `register_experiment_job` with `experiment_name`
-`model-release-12` and `config_overrides` that include `model_release: 12`. `_forecaster_from_yaml`
+`model-release-12` and `config_overrides` that include `model_release: 12`. `_resolve_forecaster_config`
 builds the config through `CONFIG_CLASS(**model_params)`, so the new
 `BaseForecasterConfig.model_release` field validates there, and `_identity_tags` stores it in the
 `config` tag. The release number is therefore part of that CV run's identity, and re-registering
@@ -78,7 +82,9 @@ fields for those ml-experiments, as the `ml-experiment` skill already requires.
   `self.model_params.model_release`, which is `0` unless a config sets it, so the baselines read
   the same field and no class constant is left.
 - **A software release with no new model** keeps the image's model, so its release-log row is the
-  previous model release and only the software column changes.
+  previous model release and only the software column changes. The image tag now includes the git
+  commit as well as the run id, so the rebuilt image gets a new tag and the older image stays in
+  the registry as a rollback target (see the scripts below).
 - **A model saved before this change** has no `model_release` in `meta.json`, and loads with the
   default `0`.
 
@@ -96,10 +102,13 @@ fields for those ml-experiments, as the `ml-experiment` skill already requires.
 
 ## What changes, file by file
 
-- **`packages/ml_core/src/ml_core/base_forecaster.py`.** Add `model_release: int = 0` to
-  `BaseForecasterConfig`, with a docstring saying `0` means "not a release". Remove the
-  `MODEL_VERSION: ClassVar[int]` declaration and update the class and config docstrings, which say
-  that `MODEL_NAME` and `MODEL_VERSION` are class-level and stamped from the class.
+- **`packages/ml_core/src/ml_core/base_forecaster.py`.** Add `model_release: int = Field(default=0,
+  ge=0, le=32767)` to `BaseForecasterConfig`, with a docstring saying `0` means "not a release" and
+  why the bounds exist: the value is cast to the contract's Int16 in `predict`, so a value outside
+  the range would raise on every live forecast, and the bound rejects it at registration instead.
+  Remove the `MODEL_VERSION: ClassVar[int]` declaration and update the class and config docstrings
+  and the `predict` docstring (which calls `power_fcst_model_version` "model-family identity"),
+  which say that `MODEL_NAME` and `MODEL_VERSION` are class-level and stamped from the class.
 - **`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py`.** Remove
   `MODEL_VERSION = 2`. In `predict`, stamp `power_fcst_model_version` from
   `cfg.model_release`. Update the README paragraph at `packages/xgboost_forecaster/README.md` that
@@ -109,15 +118,26 @@ fields for those ml-experiments, as the `ml-experiment` skill already requires.
 - **`src/nged_substation_forecast/defs/promotion_assets.py`.** `promoted_model` adds `model_release`
   (from `model_params.get("model_release", 0)`) to its output metadata.
 - **`studies/quick_wins/report_production_arm.py`.** Line 100 prints
-  `XGBoostForecaster.MODEL_VERSION`, which the plan removes. The sentence drops its "the forecaster
-  class is version N" clause, because the stamped versions it prints are the evidence.
+  `XGBoostForecaster.MODEL_VERSION`, which the plan removes, so the sentence drops its "the
+  forecaster class is version N" clause. The comparison at lines 83 to 87 of the stored `config`
+  tag against `production_config().model_dump()` gains `model_release` in its ignored fields, so a
+  run registered earlier does not report a spurious difference.
+- **`scripts/deploy/build_and_verify_image.sh` and `scripts/deploy/push_and_deploy_image.sh`.** Both
+  derive the image tag as `${RUN_ID:0:12}`; both change to `${RUN_ID:0:12}-$(git rev-parse
+  --short=8 HEAD)`. The push script then refuses to push when `HEAD` has moved since the build,
+  which fits its rule that only a built-and-verified image is pushed.
 - **`packages/contracts/src/contracts/power_schemas.py`.** Change the description of
   `power_fcst_model_version` to the model release: `0` for a CV run that is not a release. No dtype
   change, and no change to the other fields.
 - **Docs.**
     - `docs/live_service/model-releases.md` (new): the release log and the two-identifier rule.
     - `docs/live_service/operations.md`: the promotion steps report `model_release`, and the
-      rollback recipe reads the release log for the run id instead of Dagster's run history.
+      rollback recipe reads the release log for the run id and the image tag instead of Dagster's
+      run history.
+    - `docs/live_service/aws.md`: the image tag is the run id's prefix plus the commit, and the
+      statement that tags are "already unique per promoted model" is rewritten.
+    - `docs/cross-validation/model-configuration.md`: a `model_release` row in the table of the
+      universal config fields.
     - `CLAUDE.md` ("ML Model Interface"), `docs/architecture/overview.md`,
       `docs/design-philosophy/design-principles.md`, `docs/roadmap/delivery-tables.md`,
       `packages/contracts/README.md`, and the stale `MODEL_VERSION = 1` line in
@@ -150,12 +170,21 @@ Each new test asserts what fails on `main` today.
 
 - `packages/xgboost_forecaster/tests/test_forecaster.py`: a forecaster trained with
   `model_release=7` stamps `power_fcst_model_version == 7` on every row, and one with the default
-  stamps `0`. On `main`, the stamp is the class constant `2`.
-- `packages/baseline_forecasters/tests/test_climatology.py` and `test_manual_heuristic.py`: the same two assertions for both baselines. On `main`
-  the baselines stamp `1`.
-- `packages/ml_core/tests/test_base_forecaster.py`: `model_release` round-trips through
-  `save`/`load` (read back from `meta.json`), and a `meta.json` without the field loads with `0`.
-  Existing tests that define `MODEL_VERSION = 1` on a stub subclass are updated.
+  stamps `0`. On `main`, the stamp is the class constant `2`. The existing assertion at line 98
+  (`== XGBoostForecaster.MODEL_VERSION`) is replaced. The same file tests `XGBoostForecaster.save`
+  then `load`: `model_release` is read back from `meta.json`, and a `meta.json` without the field
+  loads with `0`.
+- `packages/baseline_forecasters/tests/test_climatology.py` and `test_manual_heuristic.py`: the same
+  two stamp assertions for both baselines. On `main` the baselines stamp `1`. The existing
+  assertion at `test_climatology.py:202` (`== [1]`) becomes `== [0]`.
+- `packages/ml_core/tests/test_production_helpers.py`: `_check_meta_is_servable` accepts a
+  `meta.json` that has no `model_release` (a model saved before this change), and a config with
+  `model_release` out of the Int16 range, negative or above 32767, is rejected by
+  `BaseForecasterConfig` (a test in `test_base_forecaster.py`).
+- `tests/test_promoted_model.py`: `promoted_model` reports `model_release` in its output metadata,
+  from the promoted `meta.json`, and reports `0` when the field is absent.
+- `packages/ml_core/tests/test_base_forecaster.py`: existing tests that define `MODEL_VERSION = 1`
+  on a stub subclass are updated.
 - The `PowerForecast` contract test already covers the Int16 dtype; no new test.
 
 ## Docs to update
@@ -188,8 +217,11 @@ uv run pre-commit run --all-files
    a reviewer reads it. A check would add a rule about names to the registration job.
 3. **Sentry tag.** Tagging live-service events with `model_release` is the natural next step and
    needs a look at where the live assets attach tags. I recommend a follow-up issue.
-4. **Image tag.** The image tag stays as the runbook has it (derived from the run id). Adding
-   `model-12` to the tag is a runbook change the maintainer can make with no code.
+4. **Image tag.** The runbook derives the tag from the run id alone, so a software release that ships
+   the same model would overwrite the previous image's tag (ECR tags are mutable here), and
+   a rollback to that tag would fetch the new code. The plan adds the git commit to the tag in both
+   deploy scripts. The maintainer may prefer the software version (`v0.2.2`) in the tag instead,
+   which needs a git tag at build time. I recommend the commit, because it needs no extra step.
 5. **Rows already stored.** Old rows keep their `1` and `2`, which read as releases 1 and 2. I
    recommend accepting this, because no serious model has been trained.
 6. **`MODEL_VERSION` removal is a breaking change** to any code naming it. `grep` finds only the three
