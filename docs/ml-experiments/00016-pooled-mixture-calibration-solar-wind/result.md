@@ -1,7 +1,7 @@
 ---
 id: "00016"
 slug: pooled-mixture-calibration-solar-wind
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 6 solar farms and 3 wind farms, a correction fitted on earlier validation months (a scalar
@@ -42,24 +42,113 @@ benchmark: >-
 row_set_id: fold_a_tuesdays_v1
 metric: >-
   CRPS estimated from 9 quantile levels, points of capacity; coverage of the 5% to 95% band, percent
-verdict: pending
-production_status: not-for-production
+verdict: partly supported
+best_arm: >-
+  `spread` for solar (one factor per technology, between 0.90 and 1.00); for wind, the post hoc
+  `spread_two_groups`, which is outside the planned contrasts
+headline: >-
+  Solar: the uncorrected 5% to 95% band covers 94.3% to 95.3% of non-trivial cases, and `spread`
+  brings every lead band to 89.5% to 91.8% with a CRPS change of +0.006 (99.4% interval -0.004 to
+  +0.024). Wind: no planned arm brings the first two lead bands within 2.5 points of 90 (best
+  94.4% and 91.1%); post hoc `spread_two_groups` does, with a CRPS change of -0.021 (-0.042 to
+  -0.002).
+lessons: >-
+  The pooled mixture over-covers for solar in every lead band, and for wind in the first two days.
+  A scalar spread factor fixes solar without changing the CRPS. For wind, the fit per lead band
+  fails because the short-lead bands hold too few cases for a fit until late in the year, and
+  pooling the bands into two groups works.
+advice:
+  - >-
+    Scale the solar mixture's quantiles about the median by a factor near 0.95 (fitted 0.90 to
+    1.00), refitted monthly on earlier cases, to bring the 5% to 95% band to 90% coverage without
+    changing the CRPS (C2).
+  - >-
+    Fit the wind spread factor on two lead groups (0 to 2 days, 3 to 15 days) and not on five
+    lead bands, because the short bands hold under 7,000 cases a year and a fit per band existed
+    for only 3 months of 0 to 24 h (post hoc H1, parameter table).
+  - >-
+    Do not fit a location-and-scale calibrator per lead band on this sample. It moved wind
+    coverage to 86.7% and 83.9% in two of five bands and its CRPS interval was 0.36 points wide
+    (C5).
+production_status: candidate
 adopted_in: none
 code: ml-experiments/00016-pooled-mixture-calibration-solar-wind/
-pull_request: pending
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1221
 ---
 
 # Does a correction bring the pooled mixture's 5% to 95% band to 90% coverage for solar and wind?
 
+**Verdict: partly supported.** For solar, the planned spread factor brings the 5% to 95% band of the
+pooled mixture from 94% to 95% coverage to about 90% in every lead band, at no change in the CRPS.
+For wind, no planned arm brings the first two lead bands within 2.5 points of 90. A post hoc arm
+that pools the lead bands into two groups does. ENS is the ECMWF ensemble, ERA5 its reanalysis of
+past weather, CRPS the continuous ranked probability score, and stage 1a an XGBoost model per series
+trained on ERA5. The page is proposal P12 in the [research plan](../research-plan.md), and the
+corrected pooled mixture of 00002's ERA5-trained stage 1a, with no new fit, is the input.
+
+## Results
+
+![Coverage of the 5% to 95% band by lead band](figure_1.svg)
+
+![CRPS of each correction minus the uncorrected mixture's](figure_2.svg)
+
+- **Uncorrected solar over-covers in every band.** Coverage is 95.3%, 94.5%, 95.1%, 94.3%, and 94.7%
+  from the first band to the last, against a target of 90%. The prediction said 2 to 3 points above
+  90 in at least one band, and the result is 4 to 5 points in all five.
+- **Uncorrected wind over-covers in the first two days only.** Coverage is 95.3%, 94.4%, 90.4%,
+  89.5%, and 90.1%, as predicted.
+- **Solar: `spread`, `spread_band`, and `free_quantile` reach 90%.** Every band lies within 2.5
+  points of 90 (for example `spread` at 91.8%, 89.9%, 91.4%, 89.5%, and 90.5%). The CRPS changes by
+  +0.006 for `spread` (C2, 99.4% interval -0.004 to +0.024), +0.003 for `spread_band` (C4), and
+  -0.011 for `free_quantile` (C8, -0.022 to +0.005). The fitted factor is 0.90 to 1.00, median 0.95.
+- **Wind: no planned arm reaches 90%.** The best planned arms for the first two bands are
+  `spread_band` (94.7% and 91.1%) and `free_quantile` (94.6% and 92.0%). The fitted factor per band
+  is 0.90 for the first two bands but exists in only 3 months (0 to 24 h) and 8 months (1 to 2
+  days), because the 5,000-case minimum is reached late. A single factor is 1.00 to 1.05, since the
+  longer bands under-cover slightly and outweigh the short ones (C1 -0.002, C3 -0.010).
+- **Wind: the location-and-scale arm is worse than no correction for coverage.** It gives 93.4%,
+  86.7%, 83.9%, 87.9%, and 88.6% (C5 -0.147 with interval -0.317 to +0.047).
+- **Post hoc, wind: a spread factor on two lead groups reaches 90%.** Coverage is 92.5%, 90.7%,
+  91.0%, 91.1%, and 91.5%, and the CRPS change is -0.021 (-0.042 to -0.002), a small gain: the
+  interval excludes zero and the estimate is far below any size worth a port. It was chosen after
+  seeing the planned results, and is outside the decision rule.
+- **Reference arms.** The beta-transform blend of 00002 has the lowest wind CRPS (10.92, against
+  11.11 uncorrected) and 90.0% to 94.6% wind coverage. The stage 2 calibrator is worse than no
+  correction on CRPS for both technologies (solar 5.43, wind 11.29).
+- **Absolute CRPS** (points of capacity, all leads): solar uncorrected 5.03, `spread` 5.03,
+  `locscale` 5.04, climatology 5.63; wind uncorrected 11.11, `spread` 11.11, `free_quantile` 10.93,
+  climatology 13.03. Seed spread is at most 0.002.
+
+## Failures and limits
+
+- **The claims rest on 6 solar farms and 3 wind farms in one validation year.** Farms of one
+  technology differ: in 00002's scores wind farm coverage ranged from 88% to 95%, and a factor per
+  technology cannot remove that.
+- **The first month cannot be corrected, and the short wind bands stay uncorrected for most of the
+  year.** Coverage over the corrected months alone is in the report. For solar `spread_band` it is
+  87.1% to 90.9%, and for wind `spread_band`, the corrected months give 93.3% and 89.0% in the first
+  two bands.
+- **The ENS validation year is the only year the stored mixture covers,** so each correction is
+  scored once and not selected on a second year.
+
+## Lessons
+
+- **A scalar factor is the right size of correction for solar.** The mixture is too wide by about
+  5%, a factor near 0.95 removes the excess, and the CRPS does not move.
+- **A calibrator with more freedom than the sample can fit does worse.** The location-and-scale arm
+  has a 0.36-point-wide CRPS interval and undershoots 90% coverage in two wind bands.
+- **Pooling lead bands when fitting gives the short-lead wind bands enough cases.**
+
 ## Size
 
-**The size is complex, because the experiment adds new methods and admits more than one defensible design.**
+**The size is complex, because the experiment adds new methods and admits more than one defensible
+design.**
 
 - **What gets stored:** private predictions only. No schema in `packages/contracts/` changes.
 - **Production serving path:** not touched. The calibrators run on stored quantiles after the fact.
 - **Degradation rule:** not touched.
-- **More than one defensible design:** yes. The correction can scale about the median or about
-  each quantile, and can be fitted globally or per lead band.
+- **More than one defensible design:** yes. The correction can scale about the median or about each
+  quantile, and can be fitted globally or per lead band.
 - **Code whose callers cannot be named without searching:** no. The mixture arithmetic copies
   `studies/stage1_pilot/stage2_common.py`, and the stored member quantiles are experiment 00002's.
 
@@ -68,30 +157,30 @@ pull_request: pending
 - **Followed:** pool the ERA5-trained quantiles over the ECMWF ensemble (ENS) members before any
   calibrator (00002); report the pooled mixture beside every calibrated arm (00002); fit the
   correction on earlier validation months only, as 00002's beta-transform blend does.
-- **Departs from:** nothing. No arm uses lagged power, so the advice on lagged power does not
-  apply.
+- **Departs from:** nothing. No arm uses lagged power, so the advice on lagged power does not apply.
 - **Not tested:** the PV ratio target and the wind `base_margin` that the research plan lists for
-  this proposal. Experiment 00012 found the two within 0.05 points of its benchmark (C3, C4), and both change
-  stage 1a and not its calibration.
+  this proposal. Experiment 00012 found the two within 0.05 points of its benchmark (C3, C4), and
+  both change stage 1a and not its calibration.
 
 ## Setup
 
 **Rows and series.** The 6 solar farms (labels A to F) and 3 wind farms (W1 to W3) of
-`fold_a_tuesdays_v1`: 53 runs on Tuesdays, valid times from 2025-07-01 to 2026-06-30, every
-valid time with an observed power. Labels are anonymised in the write-up.
+`fold_a_tuesdays_v1`: 53 runs on Tuesdays, valid times from 2025-07-01 to 2026-06-30, every valid
+time with an observed power. Labels are anonymised in the write-up.
 
 **Inputs.** Stage 1a is an XGBoost model per series, trained on ERA5 weather and fitted before
 2025-06-17, so every validation case is out of sample. The stage 2 calibrator of 00002 is not used
-here. The 9 quantile levels (5%, 10%, 25%, 40%, 50%, 60%, 75%, 90%, 95%) of each of the 51
-ENS members, from the ERA5-trained stage 1a of experiment 00002 (`full` variant), pooled into a mixture as in 00002
-separately for each fitting seed (0, 1, 2); each seed is corrected and scored on its own. ERA5 is used only in training, so no past weather enters at
-forecast time, and no arm uses a lag or a calendar column.
+here. The 9 quantile levels (5%, 10%, 25%, 40%, 50%, 60%, 75%, 90%, 95%) of each of the 51 ENS
+members, from the ERA5-trained stage 1a of experiment 00002 (`full` variant), pooled into a mixture
+as in 00002 separately for each fitting seed (0, 1, 2); each seed is corrected and scored on its
+own. ERA5 is used only in training, so no past weather enters at forecast time, and no arm uses a
+lag or a calendar column.
 
 **Fitting the corrections.** The cases of a scored month are the runs whose initialisation time
 falls in that month. Each arm is fitted per technology on the cases with valid times before the
-first run of the scored month, so that a fit sees no outcome later than the earliest forecast it
-is applied to. A fit uses only non-trivial cases, those whose uncorrected 95% quantile exceeds 1%
-of capacity, and trivial cases (night-time solar zeros) are left uncorrected. A fit needs at least
+first run of the scored month, so that a fit sees no outcome later than the earliest forecast it is
+applied to. A fit uses only non-trivial cases, those whose uncorrected 95% quantile exceeds 1% of
+capacity, and trivial cases (night-time solar zeros) are left uncorrected. A fit needs at least
 5,000 earlier non-trivial cases (per lead band for the band arms); with fewer the arm returns the
 uncorrected mixture, so the first months of the year, which cannot be fitted, are scored
 uncorrected. The write-up states which months and bands this affects, gives the number of earlier
@@ -108,13 +197,14 @@ situation), and reports coverage over the corrected months alone as well as over
 | `locscale` | `m + a + k (q - m)`, one `(a, k)` per technology and lead band, minimising the mean CRPS on a grid (`a` from -0.05 to +0.05 in steps of 0.01, `k` as above) |
 | `free_quantile` | `q_t + d_t`, where `d_t` is the t-quantile of the observed power minus `q_t` over the fitted cases, per technology, lead band, and level |
 
-The `locscale` fit draws at most 30,000 of the fitting cases, at random with a fixed seed, to
-limit the cost of its grid search. Each corrected quantile is clipped to 0 to 1 of capacity and the nine are then sorted.
+The `locscale` fit draws at most 30,000 of the fitting cases, at random with a fixed seed, to limit
+the cost of its grid search. Each corrected quantile is clipped to 0 to 1 of capacity and the nine
+are then sorted.
 
 ## Planned contrasts
 
-Each is the arm's CRPS minus that of `none`, in points of capacity, per technology, over all
-leads (the lead-band tables are descriptive).
+Each is the arm's CRPS minus that of `none`, in points of capacity, per technology, over all leads
+(the lead-band tables are descriptive).
 
 | Id | Technology | Arm |
 |---|---|---|
@@ -128,8 +218,14 @@ leads (the lead-band tables are descriptive).
 - **Reproduction.** `none`, averaged over the three seeds, must reproduce 00002's `b_mixture_full`
   mean CRPS to within 0.05 points per technology (11.11 for wind and 5.05 for solar), or the
   experiment stops.
-- **Leakage review.** A reviewer reads the code to confirm that no fit reads a case whose valid
-  time is not before the first run of the scored month.
+- **Leakage review.** A reviewer reads the code to confirm that no fit reads a case whose valid time
+  is not before the first run of the scored month.
+
+## Post hoc arm
+
+`spread_two_groups` (script `e00016_posthoc.py`) fits one spread factor per technology and lead
+group (0 to 2 days, 3 to 15 days) by the `spread` rule. It is outside the pre-registered contrasts,
+and its CRPS contrasts H1 and H2 are descriptive.
 
 ## Resolution limit
 

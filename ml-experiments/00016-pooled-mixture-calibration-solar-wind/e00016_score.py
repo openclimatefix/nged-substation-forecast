@@ -22,6 +22,7 @@ from e00016_common import (
     KEY_COLUMNS,
     LEAD_BANDS,
     LEVEL_COLUMNS,
+    POST_HOC_ARM,
     ROW_SET_ID,
     SCORES_DIR,
     SEEDS,
@@ -176,10 +177,20 @@ def absolute_table(*, rows: dict[str, pl.DataFrame]) -> pl.DataFrame:
     return pl.DataFrame(out)
 
 
-def planned_contrasts(*, rows: dict[str, pl.DataFrame]) -> pl.DataFrame:
-    """Score the 8 planned CRPS contrasts at `PLANNED_LEVEL`."""
+POST_HOC: Final[tuple[tuple[str, TechnologyType, ArmType], ...]] = (
+    ("H1", "wind", POST_HOC_ARM),
+    ("H2", "solar", POST_HOC_ARM),
+)
+
+
+def planned_contrasts(
+    *,
+    rows: dict[str, pl.DataFrame],
+    contrasts: tuple[tuple[str, TechnologyType, ArmType], ...] = PLANNED,
+) -> pl.DataFrame:
+    """Score CRPS contrasts against `none` at `PLANNED_LEVEL` (the 8 planned ones by default)."""
     out = []
-    for contrast, technology, arm in PLANNED:
+    for contrast, technology, arm in contrasts:
         losses = experiment_store.losses_for_bootstrap(
             arm_losses={
                 name: rows[name]
@@ -278,6 +289,7 @@ def write_report(
     *,
     absolute: pl.DataFrame,
     contrasts: pl.DataFrame,
+    post_hoc: pl.DataFrame,
     coverage: pl.DataFrame,
     verdict: dict[TechnologyType, str],
     reproduction_lines: list[str],
@@ -302,7 +314,7 @@ def write_report(
     lines += [
         f"| {r['contrast']} | {r['technology']} | {r['arm']} | {r['difference']:+.3f} | "
         f"{r['lower']:+.3f} to {r['upper']:+.3f} |"
-        for r in contrasts.iter_rows(named=True)
+        for r in pl.concat([contrasts, post_hoc]).iter_rows(named=True)
     ]
     bands = [name for name, _, _ in LEAD_BANDS]
     for months in ("all", "corrected"):
@@ -332,7 +344,7 @@ def write_report(
 
 def main() -> None:
     """Score every arm, write the report, and save the tables."""
-    rows: dict[str, pl.DataFrame] = {arm: arm_rows(arm=arm) for arm in ARMS}
+    rows: dict[str, pl.DataFrame] = {arm: arm_rows(arm=arm) for arm in (*ARMS, POST_HOC_ARM)}
     for frame in rows.values():
         if frame.height != rows["none"].height:
             msg = "arms hold different numbers of cases"
@@ -341,15 +353,18 @@ def main() -> None:
     absolute = absolute_table(rows=rows)
     reproduction_lines = reproduction(absolute=absolute)
     contrasts = planned_contrasts(rows=rows)
+    post_hoc = planned_contrasts(rows=rows, contrasts=POST_HOC)
     coverage = coverage_table(rows=rows, corrected=corrected_months())
     verdict = verdicts(coverage=coverage, contrasts=contrasts)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     absolute.write_parquet(RESULTS_DIR / "absolute.parquet")
     contrasts.write_parquet(RESULTS_DIR / "contrasts.parquet")
+    post_hoc.write_parquet(RESULTS_DIR / "post_hoc.parquet")
     coverage.write_parquet(RESULTS_DIR / "coverage.parquet")
     report = write_report(
         absolute=absolute,
         contrasts=contrasts,
+        post_hoc=post_hoc,
         coverage=coverage,
         verdict=verdict,
         reproduction_lines=reproduction_lines,

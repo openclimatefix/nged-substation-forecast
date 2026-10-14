@@ -29,8 +29,10 @@ WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}" 
 
 TechnologyType = Literal["solar", "wind"]
 TECHNOLOGIES: Final[tuple[TechnologyType, ...]] = ("solar", "wind")
-ArmType = Literal["none", "spread", "spread_band", "locscale", "free_quantile"]
+ArmType = Literal["none", "spread", "spread_band", "locscale", "free_quantile", "spread_two_groups"]
 ARMS: Final[tuple[ArmType, ...]] = ("none", "spread", "spread_band", "locscale", "free_quantile")
+POST_HOC_ARM: Final[ArmType] = "spread_two_groups"
+"""The post hoc arm of `e00016_posthoc.py`, outside the planned contrasts."""
 
 LEVELS: Final[np.ndarray] = np.array([0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95])
 LEVEL_COLUMNS: Final[tuple[str, ...]] = (
