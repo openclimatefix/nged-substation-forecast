@@ -50,22 +50,20 @@ colour a group of products instead and put every product's name on the axis.
 
 **Size a chart to the page's text column, so the chart shows at about 1:1 scale in the built site.**
 Stack panels vertically rather than side by side, let the plot area fill the column's width, put
-every key above the plot, and keep subtitles short. `studies.charts` draws every figure
+every key above the plot, and keep subtitles short in total words. `studies.charts` draws every figure
 `CONTENT_WIDTH_PX` (`packages/studies/src/studies/charts.py`) wide for this reason, the width of
 `docs/`'s text column; match that width for a chart outside `docs/studies/` too, and check that the
 text is legible in the built site, not only in the SVG.
 
-**Make the plot area fill the figure's full width, and wrap the title and subtitle lines to the
-plot area's width.** Vertical space is the scarce resource on a docs page, so every row of the
-figure should go to the plot rather than to text. A figure whose plot area covers only the left
-half of the width, under subtitle lines that run past the plot area's right edge, leaves the right
-half blank and forces the text to take many short lines above the plot. Instead, size the plot area
-to the figure's width (in Altair, `width` for the plot area plus the axis and legend margins equals
-`CONTENT_WIDTH_PX`, not a smaller fixed number), and wrap each title and subtitle line to that same
-width (in Altair, split the text into a list of lines at the character count that fits the plot
-area, rather than one line per sentence). Fewer, longer lines of text give each panel more height
-for its marks. Check the render for two faults: blank space to the right of any plot area, and text
-that is wider or narrower than the plot area beneath.
+**Wrap the title and subtitle lines to the plot area's width.** Vertical space is the scarce
+resource on a docs page, so every row of the figure should go to the plot rather than to text. A
+figure whose subtitle lines run past the plot area's right edge, or whose plot area covers only the
+left half of the width, leaves the right half blank. That layout also forces the text onto many
+short lines above the plot. Wrap each title and subtitle line to the plot area's width, so that
+the text takes as few lines as possible. In Altair, pass the text as a list of lines split at the
+character count that fits the plot area, rather than one line per sentence. Fewer, longer lines
+give each panel more height for its marks. Check the render for two faults: blank space to the
+right of any plot area, and text that is wider or narrower than the plot area beneath.
 
 **Write SVG, then optimise it, and check the render before committing.** `CLAUDE.md`'s "Chart
 images" section has the full rule: run the export through `npx svgo@4 --multipass --precision=1
