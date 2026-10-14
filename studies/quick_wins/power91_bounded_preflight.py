@@ -28,8 +28,9 @@ if any(os.environ.get(name) != "8" for name in THREADS):
     raise SystemExit("Preflight requires seven thread caps8 before imports")
 
 import fixed_pipeline_frames as builder  # noqa: E402
+import patito as pt  # noqa: E402
 import polars as pl  # noqa: E402
-from contracts.power_schemas import PowerTimeSeries  # noqa: E402
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata  # noqa: E402
 from contracts.settings import Settings  # noqa: E402
 from deltalake import DeltaTable  # noqa: E402
 from deltalake.exceptions import DeltaError  # noqa: E402
@@ -194,9 +195,15 @@ def _power(*, binding: JsonObject, settings: Settings) -> JsonObject:
     for filename in ("metadata.parquet", "bounded_power.parquet"):
         _pin(record={"path": str(root / filename), "sha256": manifest["files"][filename]})
     metadata = pl.read_parquet(root / "metadata.parquet")
-    _require(condition=builder._digest_frame(frame=metadata) == context["input_hashes"]["metadata"])
     ids = sorted(metadata["time_series_id"].to_list())
     _require(condition=len(ids) == 31 and len(set(ids)) == 31)
+    selected = builder.inputs.series_metadata(settings=settings, time_series_ids=ids)
+    selected = pl.DataFrame(
+        pt.DataFrame(selected.sort("time_series_id")).set_model(TimeSeriesMetadata)
+    )
+    _exact(left=metadata, right=selected)
+    # Historical IPC precedes Parquet; pinned readback bytes can differ in representation.
+    _require(condition=builder._digest_frame(frame=selected) == context["input_hashes"]["metadata"])
     frozen = pl.read_parquet(root / "bounded_power.parquet")
     current = builder._power(settings=settings, version=91, series_ids=ids)
     for frame in (frozen, current):
@@ -209,10 +216,9 @@ def _power(*, binding: JsonObject, settings: Settings) -> JsonObject:
         )
     _exact(left=frozen, right=current)
     expected = context["input_hashes"]["bounded_power"]
-    _require(
-        condition=builder._digest_frame(frame=frozen) == expected
-        and builder._digest_frame(frame=current) == expected
-    )
+    # File pin + exact semantic equality + current historical IPC binds the old values.
+    # Requiring readback IPC as well would incorrectly constrain Parquet representation.
+    _require(condition=builder._digest_frame(frame=current) == expected)
     return {
         "root": str(root),
         "manifest_sha256": binding["manifest_sha256"],
@@ -237,8 +243,14 @@ def main() -> None:
     spec_path = _plain(value=str(args.spec))
     spec_hash = _sha(path=spec_path)
     spec = json.loads(spec_path.read_bytes())
-    _require(condition=set(spec) == {"sources", "frozen", "archive"})
-    _require(condition=set(spec["sources"]) == {"builder", "power", "storage", "preflight"})
+    _require(
+        condition=set(spec)
+        == {"sources", "frozen", "archive", "current_metadata", "metadata_diagnostic"}
+    )
+    _require(
+        condition=set(spec["sources"])
+        == {"builder", "power", "storage", "preflight", "input_reader"}
+    )
     for record in spec["sources"].values():
         _pin(record=record)
     _require(
@@ -246,6 +258,7 @@ def main() -> None:
         and spec["sources"]["power"]["path"] == inspect.getfile(power)
         and spec["sources"]["preflight"]["path"] == str(Path(__file__).resolve())
         and spec["sources"]["storage"]["path"] == inspect.getfile(power.scan_cleaned_power)
+        and spec["sources"]["input_reader"]["path"] == inspect.getfile(builder.inputs)
         and builder.scan_power is power.scan_power
     )
     _require(
@@ -257,6 +270,29 @@ def main() -> None:
         == "bef0e4a6c4c95057f5b674ff9d350dfd2fefe502e8725f0bd929d2792c6560a4"
     )
     _require(condition=set(spec["frozen"]) == {"fold_a", "fold_b"})
+    diagnostic = spec["metadata_diagnostic"]
+    for record in diagnostic.values():
+        _pin(record=record)
+    diagnosis = json.loads(_pin(record=diagnostic["result"]).read_bytes())
+    diagnostic_spec = json.loads(_pin(record=diagnostic["spec"]).read_bytes())
+    _require(
+        condition=diagnostic_spec["frozen"] == spec["frozen"]
+        and diagnostic_spec["current_metadata"] == spec["current_metadata"]
+        and diagnosis["diagnostic_completed"] is True
+        and diagnosis["authorises_reuse_or_build"] is False
+        and set(diagnosis["folds"]) == {"fold_a", "fold_b"}
+    )
+    for result in diagnosis["folds"].values():
+        _require(
+            condition=result["context_binding_passed"] is True
+            and result["frozen_file_pin_passed"] is True
+            and result["current_ipc_matches_historical"] is True
+            and result["current_roundtrip_ipc_matches_historical"] is False
+            and result["frozen_ipc_matches_historical"] is False
+            and all(value is True for value in result["current_vs_frozen"].values())
+            and all(value is True for value in result["current_parquet_roundtrip"].values())
+        )
+    metadata_path = _pin(record=spec["current_metadata"])
     output = _plain(value=str(args.output))
     _require(condition=not output.exists() and output.parent.is_dir())
     for binding in spec["frozen"].values():
@@ -264,6 +300,7 @@ def main() -> None:
         _require(condition=not output.is_relative_to(root) and not root.is_relative_to(output))
     output.mkdir(mode=0o700)
     settings = Settings()
+    _require(condition=str(settings.metadata_path) == str(metadata_path))
     with (
         (output / "private.log").open("w") as log,
         contextlib.redirect_stdout(log),
@@ -289,9 +326,14 @@ def main() -> None:
                 _pin(record={"path": str(root / name), "sha256": manifest["files"][name]})
         for record in spec["sources"].values():
             _pin(record=record)
+        _pin(record=spec["current_metadata"])
+        for record in diagnostic.values():
+            _pin(record=record)
         _require(condition=_sha(path=spec_path) == spec_hash)
     proof = {
         "complete": True,
+        "metadata_diagnostic": diagnostic,
+        "current_metadata": spec["current_metadata"],
         "spec_sha256": spec_hash,
         "source_sha256": _sha(path=Path(__file__).resolve()),
         "frozen": frozen,
