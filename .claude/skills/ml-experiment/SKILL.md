@@ -56,7 +56,10 @@ review as `implement-issue` does.
 - **The id and the slug.** Call `studies.experiment_store.reserve_experiment(slug=...)`. It returns
   the next id, written as five digits, and creates `data/ml-experiments/<id>-<slug>/`. Make the slug
   descriptive.
-- **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it.
+- **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it. Add it
+  to the navigation in `mkdocs.yml`, under "ML experiments" and titled with the hypothesis, in the
+  commit that first adds the page. When two experiments finish together, the two navigation lines
+  conflict on rebase; keep both.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
   `ml-experiments/` may share a basename. A script imports its own folder, `studies.*`, and the
@@ -131,8 +134,8 @@ with status `planned`. The overnight session:
 ## Merging
 
 **An experiment's PR may be merged without waiting for the maintainer when all three hold:** the
-diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews
-its size calls for, with the findings triaged; and the checks pass (`ci` green, no closing keyword
-in the PR body or commit messages, no `data/` or `.env` file, the branch contains `main`, a merge
-commit and not a squash). A change to `packages/studies/` stops at a reviewed PR, as
-`implement-issue` does.
+diff touches only `ml-experiments/`, `docs/ml-experiments/`, and the experiment's line in
+`mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged; and
+the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no `data/` or
+`.env` file, the branch contains `main`, a merge commit and not a squash). A change to
+`packages/studies/` stops at a reviewed PR, as `implement-issue` does.

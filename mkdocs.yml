@@ -129,6 +129,8 @@ nav:
           - "Which cheap changes lower the production XGBoost forecast's error?": studies/forecasts/quick-wins.md
           - "Production feature faults: diagnosis and forecast effects": studies/forecasts/production-feature-faults.md
           - "Can a language model label a solar plant's capacity changes?": studies/forecasts/llm-capacity-labeller.md
+  - ML experiments:
+      - Overview: ml-experiments/README.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md

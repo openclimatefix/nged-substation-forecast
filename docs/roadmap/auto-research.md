@@ -14,8 +14,8 @@ XGBoost forecasting model, in two phases.** Flexpectation is the forecasting sys
 builds for National Grid Electricity Distribution (NGED). Flexpectation's current forecaster is an
 XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, which is under way,
 Claude runs experiments overnight from a plan that the maintainer and Claude agreed the previous
-day. In phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the list of
-ideas for improving the XGBoost forecasting model, so that people implement properly only the
+day. In phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the
+list of ideas for improving the XGBoost forecasting model, so that people implement properly only the
 promising ideas. The phase 2 agent implements each idea, scores each implementation, and combines
 the ideas that help, in the style of [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch), with no human in the loop during a round.
