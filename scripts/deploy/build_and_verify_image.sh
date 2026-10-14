@@ -90,7 +90,7 @@ fi
 
 # The MLflow run id is read from the directory the build COPYs from, so the OCI label can never
 # drift from the model actually baked in. The image tag is that run id's first 12 hex chars plus
-# the git commit's first 8, so a software release that ships the same model gets a new tag and
+# the short git commit hash, so a software release that ships the same model gets a new tag and
 # the previous image stays available for rollback.
 RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
 IMAGE="nged-forecast:${RUN_ID:0:12}-$(git rev-parse --short=8 HEAD)"

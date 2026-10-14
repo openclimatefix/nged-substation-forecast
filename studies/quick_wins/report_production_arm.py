@@ -71,8 +71,8 @@ def _score_stored(
 def _stored_config(*, experiment: str) -> str:
     """Describe whether the stored experiment's registered configuration equals the yaml's.
 
-    The comparison drops the two fields that name the experiment, and the stored forecast rows'
-    model version is compared with the forecaster class's. The stored rows' `power_fcst` was
+    The comparison drops the two fields that name the experiment, and `model_release`, which
+    is not a model setting. The stored rows' `power_fcst` was
     rounded to a reduced significand on write, which the refit's unrounded values are not.
     """
     mlflow.set_tracking_uri(Settings().mlflow_tracking_uri)

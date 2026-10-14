@@ -194,8 +194,8 @@ the one-time fix (`docker run --privileged --rm tonistiigi/binfmt --install arm6
 > `_internal.TableNotFoundError: Local path
 "/app/data/NWP" does not exist or you don't have access!`. That halt is correct behaviour.
 
-The script builds the image tagged with the promoted model's run id, runs it offline, and prints the
-container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded, arbitrary
+The script builds the image tagged with the promoted model's run id and the git commit, runs it
+offline, and prints the container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded, arbitrary
 partition key — the offline run fails at the NWP lookup long before the slot's validity could
 matter, so there is no key worth choosing.) It hard-fails only if the runtime touches MLflow — the
 hermeticity guarantee worth automating — and otherwise asks you to confirm by eye that the run
@@ -473,7 +473,7 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       container** at **Yes**.
     - **Image URI**: `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>` from [Step
       6](#step-6-push-the-image-to-ecr) — `<tag>` is the first 12 characters of the promoted model's
-      MLflow run id, a hyphen, and the first 8 characters of the git commit the image was built
+      MLflow run id, a hyphen, and the short git commit hash the image was built
       from. Step 6's script prints the full URI as it pushes; to recover it later, copy it from the
       pushed image in the ECR console, or read it from the [model release log](model-releases.md).
     - **Port mappings**: **Remove** the pre-filled port-80/HTTP row — every task here is a batch run
@@ -851,8 +851,8 @@ docker pull "$REGISTRY/nged-forecast:<tag>"
 `REGISTRY` builds itself from the box's own 12-digit account id, which `aws sts get-caller-identity`
 reads from the instance role ([Step 11](#step-11-launch-the-control-plane-box)) — so there is
 nothing to paste for the account id. **You do still have to fill in `<tag>`**: it is the first 12
-characters of the promoted model's MLflow run id, a hyphen, and the first 8 characters of the git
-commit the image was built from, naming exactly which image to deploy. Step 6's script prints the
+characters of the promoted model's MLflow run id, a hyphen, and the short git
+commit hash the image was built from, naming exactly which image to deploy. Step 6's script prints the
 full URI as it pushes; to recover it later, copy it from the pushed image in the ECR console, or
 read it from the [model release log](model-releases.md).
 

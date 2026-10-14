@@ -460,9 +460,9 @@ class BaseForecaster(ABC):
             One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``
             present in ``data``. Each row holds the predicted ``power_fcst``, in megawatts (MW) or
             megavolt-amperes (MVA) according to that series' unit in ``TimeSeriesMetadata``. Each
-            row also holds the model-family identity (``power_fcst_model_name``,
-            ``power_fcst_model_version``), the CV run identity the config carries
-            (``experiment_name``, ``ml_flow_experiment_id``), and ``fold_id`` set to the given
+            row also holds the model-family identity (``power_fcst_model_name``), the model release
+            the config carries (``power_fcst_model_version``), the CV run identity the config
+            carries (``experiment_name``, ``ml_flow_experiment_id``), and ``fold_id`` set to the given
             ``fold_id``. Eager, not lazy: this is the model boundary where the caller's
             ``pt.LazyFrame[AllFeatures]`` is finally materialised.
         """

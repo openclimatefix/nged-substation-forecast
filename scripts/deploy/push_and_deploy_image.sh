@@ -15,7 +15,7 @@
 #
 # Zero arguments by design, so nothing can be mistyped or drift:
 #   - The image tag is the first 12 hex chars of the promoted MLflow run id, read from
-#     data/production_model/promotion.json, then a hyphen and the first 8 chars of the git commit.
+#     data/production_model/promotion.json, then a hyphen and the short git commit hash.
 #     build_and_verify_image.sh derives the tag exactly the same way. So this script can only ever
 #     push the image that script built and verified, from the commit that is checked out now.
 #   - The AWS account id comes from `aws sts get-caller-identity` — never typed by hand.
