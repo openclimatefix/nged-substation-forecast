@@ -16,8 +16,9 @@ keeps the previous model release, and only the software column of the log change
 
 ## How to cut a model release
 
-1. Port the supported ml-experiments' winners into the production pipeline, adding the
-   [design-evidence](../architecture/design-evidence.md) rows as the `ml-experiment` skill says.
+1. Port the supported ml-experiments' winners into the production pipeline. Set each experiment's
+   `production_status` to `adopted` and its `adopted_in` to the release number, and update the
+   [research log](../ml-experiments/research-log.md), as the `ml-experiment` skill says.
 2. Register a cross-validation run named `model-release-N` whose `config_overrides` include
    `model_release: N`. The number is part of the run's registered configuration, so it travels
    with the saved model in `meta.json`.

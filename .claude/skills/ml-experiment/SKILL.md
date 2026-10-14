@@ -63,6 +63,10 @@ review as `implement-issue` does.
   to the navigation in `mkdocs.yml`, under "ML experiments" and titled with the hypothesis, in the
   commit that first adds the page. When two experiments finish together, the two navigation lines
   conflict on rebase; keep both.
+- **The research log:** `docs/ml-experiments/research-log.md` lists every experiment in the order it
+  was started, with its question, headline result, date, and links, and it lists the planned
+  experiments. Keep it current in the same PR that changes an experiment's state, as the next
+  section says.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
   `ml-experiments/` may share a basename. A script imports its own folder, `studies.*`, and the
@@ -77,8 +81,8 @@ the code runs, so the commit order proves the hypothesis came first. Its front m
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
 the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
 `failed`), the best arm with its headline number, and the lessons learned. A finished experiment
-whose winner is ported into production also has an `informs` field, naming the production setting
-it decided (a configuration key or a code path). Every result has the same front matter, so a later
+also has `production_status` (`candidate`, `adopted`, `superseded`, or `not-for-production`) and
+`adopted_in` (the model release number, or `none`). Every result has the same front matter, so a later
 session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 ## How to score
@@ -114,17 +118,32 @@ session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
 
+## Keep the research log current
+
+**Update `docs/ml-experiments/research-log.md` in the PR that commits the `planned` `result.md`,
+and again in the PR that adds the finished write-up.** The first PR adds a row under "Planned
+experiments" with the id, the question in one line, and the state. The finished PR moves that row
+into the table at the top and adds a short entry: the question, the verdict in one sentence, the
+headline number with its interval, any finding that changes how later experiments are run, links
+to `result.md` and the PR, and one figure. An idea the maintainer has agreed to run but that has no
+folder yet goes in the planned table marked "Proposed". An experiment that ends `invalid` or
+`failed` keeps its entry, and the entry says why. Write the entry for a reader who has not opened
+`result.md`.
+
 ## When a winner reaches production
 
-**The pull request that ports an experiment's winner into the production pipeline records why.** In
-the same change, set `informs` in the experiment's `result.md` to the setting the experiment
-decided, and add a row to the table in `docs/architecture/design-evidence.md`: the production
-setting, what production now does, a link to the experiment, and its verdict. A `supported` or
-`refuted` verdict earns a row, and an `inconclusive` or `invalid` one does not. The first row
-replaces the "None yet" placeholder. An experiment that later overturns a row changes the row in
-place, and a row whose setting production drops is deleted. A pull request that numbers a model
-release also adds a row to `docs/live_service/model-releases.md`, listing the experiments the
-release incorporates.
+**Flag each finished experiment for the next model release.** Set `production_status` in
+`result.md` to `candidate` when the verdict is `supported` or `partly supported` and the result is
+worth considering for the next model release, and to `not-for-production` for a diagnostic, a
+refuted idea, or a stage that failed its test. The log's "Candidates for the next release" section
+is the agenda for the maintainer's release review.
+
+**The pull request that ports a winner into the production pipeline records why.** In the same
+change, set `production_status` to `adopted` and `adopted_in` to the model release number in the
+experiment's `result.md`, move its row in the research log, and add a row to
+`docs/live_service/model-releases.md` listing the experiments the release incorporates. A later
+experiment that overturns an adopted result sets `production_status` to `superseded` on the old
+experiment and names the new one in the log.
 
 ## The write-up
 
@@ -152,7 +171,7 @@ with status `planned`. The overnight session:
 
 **An experiment's PR may be merged without waiting for the maintainer when all three hold:** the
 diff touches only `ml-experiments/`, `docs/ml-experiments/`, and the experiment's line in
-`mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged; and
-the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no `data/` or
-`.env` file, the branch contains `main`, a merge commit and not a squash). A change to
-`packages/studies/` stops at a reviewed PR, as `implement-issue` does.
+`mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged, and
+the research log is updated; and the checks pass (`ci` green, no closing keyword in the PR body or
+commit messages, no `data/` or `.env` file, the branch contains `main`, a merge commit and not a
+squash). A change to `packages/studies/` stops at a reviewed PR, as `implement-issue` does.
