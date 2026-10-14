@@ -43,10 +43,11 @@ headline: >-
   recipe loses to manual_heuristic at every lead, and N1 does not beat it with an interval that
   excludes zero.
 lessons: >-
-  Every arm trained on April 2024 to June 2025 forecasts the next year 2 to 3 points of capacity too
-  low, which explains about 0.6 of the 1.69 points by which the production recipe trails
-  manual_heuristic. Lagged power from the forecast origin is worth 1.15 points (C4), and the quantile loss, the 00006 columns, and the
-  recency weights are worth no more than 0.32 points of error of the median.
+  Every arm trained on April 2024 to June 2025 forecasts the next year 2 to 3 points of capacity
+  too low, which explains about 0.6 of the 1.69 points by which the production recipe trails
+  manual_heuristic. Lagged power from the forecast origin is worth 1.15 points (C4), and the
+  quantile loss, the 00006 columns, and the recency weights are worth no more than 0.32 points of
+  error of the median.
 advice:
   - >-
     Compare every later Primary substation arm against manual_heuristic (8.23 points of capacity over

@@ -143,23 +143,26 @@ climatology row that 00010 lacked.
 ### P7: the staged chain against the upgraded single-stage model
 
 **P7 is the go or no-go for the staged design on demand.** It compares the chain (stage 1 plus the
-stage 2 calibrator) with N1 and with `manual_heuristic` (N1 did not beat it in [experiment 13](00013-primary-demand-against-stored-baselines/result.md)), by lead band. Every lagged arm of experiment 00005 is a
-ceiling, because the lag anomaly (observed power at a lag time minus stage 1's expectation at that
-time) used ERA5 weather at past times. P7 builds the lag anomalies from the sources serving has:
-ERA5T and CAMS at their serving latency, and the analysis proxy (the early leads of the latest ENS
-run), and it allows for NGED's real telemetry delay at the forecast origin, which 00005 assumed
-away. The arms are lag anomalies from ERA5, from the serving sources, from the analysis proxy, and
-none (raw lagged power only). P7 also adds a spread-factor arm, because the 5% to 95% band of the
-Primary substations covers only 83% to 85%. The planned contrasts are the chain with serving-latency
-lag anomalies against the lag-free calibrated stage 1 (the 1.80-point contrast of 00005, measured
-again), and against N1. A chain that does not beat N1 on Primary substations leaves the staged
-design for demand, and stage 2 stays only for the multi-product work.
+stage 2 calibrator) with N1 and with `manual_heuristic` (N1 did not beat it in [experiment
+13](00013-primary-demand-against-stored-baselines/result.md)), by lead band. Every lagged arm of
+experiment 00005 is a ceiling, because the lag anomaly (observed power at a lag time minus stage 1's
+expectation at that time) used ERA5 weather at past times. P7 builds the lag anomalies from the
+sources serving has: ERA5T and CAMS at their serving latency, and the analysis proxy (the early
+leads of the latest ENS run), and it allows for NGED's real telemetry delay at the forecast origin,
+which 00005 assumed away. The arms are lag anomalies from ERA5, from the serving sources, from the
+analysis proxy, and none (raw lagged power only). P7 also adds a spread-factor arm, because the 5%
+to 95% band of the Primary substations covers only 83% to 85%. The planned contrasts are the chain
+with serving-latency lag anomalies against the lag-free calibrated stage 1 (the 1.80-point contrast
+of 00005, measured again), and against N1. A chain that does not beat N1 on Primary substations
+leaves the staged design for demand, and stage 2 stays only for the multi-product work.
 
 ### P8: training window and drift
 
-**Experiments 00003, 00006, and 13 all point at drift as the largest lever.** In experiment 13 every arm forecast the validation year 1.3 to 3.1 points of capacity too low, so a correction from the last 14 days of observed error is one of the arms. The arms are sliding
-windows of 6, 12, and 18 months, recency half-lives, and a monthly retrain against a frozen model,
-scored rolling-origin on the winner of P7.
+**Experiments 00003, 00006, and 13 all point at drift as the largest lever.** In experiment 13 every
+arm forecast the validation year 1.3 to 3.1 points of capacity too low, so a correction from the
+last 14 days of observed error is one of the arms. The arms are sliding windows of 6, 12, and 18
+months, recency half-lives, and a monthly retrain against a frozen model, scored rolling-origin on
+the winner of P7.
 
 **Resolution limit.** One confirmation year cannot rank windows of 6, 12, and 18 months, because the
 ranking would rest on one year of drift. A cheaper design scores stage 1a on ERA5 with rolling
