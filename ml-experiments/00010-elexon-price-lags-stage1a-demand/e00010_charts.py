@@ -42,11 +42,11 @@ def per_series_chart() -> alt.VConcatChart:
             .otherwise(pl.lit("Other"))
         )
         order = data.sort("price_gain")["site"].to_list()
-        zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=GREY).encode(x="x:Q")
+        zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=GREY).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         dots = (
             alt.Chart(data)
             .mark_circle(size=70)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "price_gain:Q",
                     title="Change in error from adding the price (points of capacity)",
@@ -95,11 +95,11 @@ def contrast_chart() -> alt.VConcatChart:
         ]
         data = pl.DataFrame(rows)
         order = data["label"].to_list()
-        rule = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=GREY).encode(x="x:Q")
+        rule = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=GREY).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         bars = (
             alt.Chart(data)
             .mark_rule(strokeWidth=3, color=BLUE)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "lower:Q",
                     title="Difference in error (points of capacity), 98.3% interval",
@@ -111,7 +111,7 @@ def contrast_chart() -> alt.VConcatChart:
         points = (
             alt.Chart(data)
             .mark_circle(size=70, color=ORANGE)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x="difference:Q",
                 y=alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=260)),
             )

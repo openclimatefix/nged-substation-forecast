@@ -27,7 +27,7 @@ OUTPUT_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00010-elexon-price-lags-stage1a-demand" / "prices"
 )
 THREADS: Final[int] = 4
-SCHEMA: Final[dict[str, pl.DataType]] = {
+SCHEMA: Final[dict[str, type[pl.DataType]]] = {
     "startTime": pl.String,
     "dataProvider": pl.String,
     "settlementDate": pl.String,

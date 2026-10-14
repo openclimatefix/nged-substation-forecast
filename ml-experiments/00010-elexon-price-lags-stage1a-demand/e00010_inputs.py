@@ -117,7 +117,10 @@ def build() -> pl.DataFrame:
     prices = price_table()
     controls = control_table()
     origin = features["valid_time"].min()
-    offsets = shuffle_weeks(n_weeks=int((features["valid_time"].max() - origin).days // 7) + 2)
+    n_days = features.select(
+        (pl.col("valid_time").max() - pl.col("valid_time").min()).dt.total_days()
+    ).item()
+    offsets = shuffle_weeks(n_weeks=int(n_days) // 7 + 2)
     frame = features.with_columns(
         start=pl.col("valid_time") - HALF_HOUR,
         week=((pl.col("valid_time") - origin).dt.total_days() // 7).cast(pl.Int64),
