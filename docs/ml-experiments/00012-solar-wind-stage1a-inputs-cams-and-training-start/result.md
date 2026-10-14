@@ -37,8 +37,8 @@ metric: >-
   times 100)
 verdict: inconclusive
 best_arm: >-
-  `cams` for the 6 solar farms (7.50 points against 7.64 for the benchmark `w`); no arm separates
-  from `w` for the 3 wind farms
+  `cams` for the 6 solar farms (7.50 points against 7.64 for the benchmark `w`); for the 3 wind
+  farms `base_margin` is 0.03 points lower than `w`, inside the equivalence band
 headline: >-
   C1, CAMS-trained minus ERA5-trained, solar: -0.140 (99.5% interval -0.277 to -0.044), short of the
   -0.15 that counts as a gain. C2, stage 0 against plain CAMS-trained: +0.160 (-0.017 to +0.382).
@@ -46,31 +46,33 @@ headline: >-
   -0.030 (-0.061 to -0.007).
 lessons: >-
   Of the four planned changes, only CAMS training came near the planned gain, and it fell just short.
-  A training start later than 2019-09 made no difference for solar or wind. Stage 0 helped a single
-  ENS member but not the 51-member average.
+  A training start later than 2019-09 changed the error by less than 0.3 points for solar and wind,
+  and a gain of 0.15 is not ruled out. Stage 0 helped a single ENS member and gave no gain on the
+  51-member average.
 advice:
   - >-
     Leave the clear-sky-ratio target out of the solar stage 1a and the power-curve base margin out
     of the wind stage 1a, because their gains were 0.05 and 0.03 points (C3, C4).
   - >-
     Keep the training start at 2019-09 for solar and wind. Starts in 2023-09 and 2024-04 were
-    equivalent to within 0.3 points (C5 to C8), so a shorter history gives no gain here.
+    within 0.3 points of it (C5 to C8), so a shorter history shows no gain here, although a gain
+    of 0.15 points is not ruled out.
   - >-
     Test CAMS-trained solar stage 1a again on more than 6 farms or a second year before adopting it.
     The gain was -0.14 (interval -0.28 to -0.04) and largest within 24 h, at -0.35 (C1, lead-band
     table).
   - >-
-    Do not calibrate ENS irradiance to CAMS with a stage 0 model fitted on the ENS control member
-    alone. The 51-member average got worse by 0.16 points (C2), although the control member alone
-    got better, from 8.34 to 7.82 (absolute-error table).
+    A stage 0 model fitted on the ENS control member alone gave no gain on the member average: the
+    error was 0.16 points higher, with an interval that includes zero (C2). The control member
+    alone improved, from 8.34 to 7.82 (absolute-error table).
   - >-
     Report an error from every ENS member as well as the member average when testing a correction
     of ENS weather. The correction can help one member and not their average (C2, absolute-error
     table).
   - >-
-    Plan a gain of 0.15 points or less only with an interval narrower than 0.15 points, which this
-    row set gives for contrasts that change one input (C3, C4) and not for contrasts that change the
-    training or application weather (C1, C2).
+    To detect a gain of 0.15 points, use a contrast whose interval is narrower than 0.15 points.
+    This row set gives such intervals for contrasts that change one input column (C3, C4) and not
+    for contrasts that change the training or application weather (C1, C2).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00012-solar-wind-stage1a-inputs-cams-and-training-start/
@@ -82,9 +84,12 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 **Verdict: inconclusive.** None of the four planned input changes (CAMS-trained stage 1a, the stage 0
 model, the clear-sky-ratio target for solar, and the power-curve base margin for wind) lowered the
 error by the 0.15 points the plan counted as a gain, and the interval of the CAMS-trained arm (C1)
-did not rule a gain out. The training start and the weather block made no detectable difference.
-Arm `w` reproduces experiment 00001's scores exactly (7.641 for solar and 15.386 for wind). The page
-is proposal P17 in the [research plan](../research-plan.md).
+did not rule a gain out. The training start moved the error by less than 0.3 points, and the weather
+block by less than 0.15 points for wind (C10) and unresolved for solar (C9).
+ENS is the European Centre for Medium-Range Weather Forecasts' ensemble forecast, ERA5 is its
+reanalysis of past weather, and CAMS is the Copernicus Atmosphere Monitoring Service's satellite
+irradiance estimate. Arm `w` reproduces experiment 00001's scores exactly (7.641 for solar and
+15.386 for wind). The page is proposal P17 in the [research plan](../research-plan.md).
 
 ## Results
 
@@ -94,17 +99,19 @@ is proposal P17 in the [research plan](../research-plan.md).
 
 - **Absolute scores, all leads (points of capacity):** solar `w` 7.64, `cams` 7.50, `csr` 7.59,
   `start_2023` 7.62, `start_2024` 7.62, `small_block` 7.64, `cams_stage0` 7.66, climatology 8.62,
-  and an ERA5-weather ceiling of 5.92. Wind `w` 15.39, `base_margin` 15.36, `start_2023` 15.37,
+  and a ceiling of 5.92 (the arm `w` given ERA5 weather, which is not a forecast). Wind `w` 15.39,
+  `base_margin` 15.36, `start_2023` 15.37,
   `start_2024` 15.39, `speed_block` 15.39, climatology 19.15, and ceiling 7.90. Seed spread is
   at most 0.007 points.
 - **C1, CAMS-trained minus ERA5-trained (solar):** -0.140 (99.5% interval -0.277 to -0.044). The
   interval lies below zero, but the estimate misses the -0.15 threshold, so the rule scores it
   unresolved. The gain is largest within 24 h (-0.35) and shrinks to -0.06 beyond day 7.
 - **C2, stage 0 minus plain CAMS-trained (solar):** +0.160 (-0.017 to +0.382). The stage 0 model
-  lowers the error of the control member alone, from 8.34 to 7.82, but raises the error of the
-  51-member average, from 7.50 to 7.66. A fit that stops before the last 6 weeks maps ENS shortwave
-  to CAMS with a mean absolute error of 120 W/m2, against 123 W/m2 for the raw ENS value, and moves
-  the bias from +19.5 to -27.6 W/m2.
+  lowers the error of the control member alone, from 8.34 to 7.82, and leaves the error of the
+  51-member average 0.16 points higher, from 7.50 to 7.66, with an interval that includes zero. For
+  seed 0 and the control member, a fit that stops before the last 6 weeks maps ENS shortwave to CAMS
+  with a mean absolute error of 120 W/m2, against 123 W/m2 for the raw ENS value, and the bias
+  grows in size, from +19.5 to -27.6 W/m2.
 - **C3 and C4:** the clear-sky-ratio target changes solar by -0.048 (-0.093 to +0.024), and the
   power-curve base margin changes wind by -0.030 (-0.061 to -0.007). Both are equivalent to `w`
   within the 0.15-point band.
@@ -121,8 +128,9 @@ is proposal P17 in the [research plan](../research-plan.md).
 - **The first fit crashed after training** on a missing `lead_hours` column in the validation
   frames and then on a mixed Float32 and Float64 stack. Both were fixed before any score was read.
 - **The claims rest on 6 solar farms and 3 wind farms in one validation year,** and on one weather
-  region each. Nine series cannot resolve gains under about 0.3 points, and only the paired
-  contrasts, whose intervals are 0.05 to 0.4 points wide, are narrower than that.
+  region each. The absolute-error intervals are 4 to 6 points wide. The paired contrasts have
+  intervals 0.05 to 0.4 points wide, so a gain under 0.15 points is resolved only for the contrasts
+  with the narrowest intervals.
 - **No selection year exists for ENS-applied scores,** so each contrast was scored once on fold A.
   The experiment did not combine winners.
 - **The wind farms' ERA5 cells hold no temperature or pressure,** so windchill and air density were
@@ -132,12 +140,13 @@ is proposal P17 in the [research plan](../research-plan.md).
 
 ## Lessons
 
-- **Input changes to a stage 1a model that already reads the ERA5 weather block move the solar and
-  wind error by hundredths of a point.** The differences between arms are far smaller than the
-  distance to the ERA5 ceiling (1.7 points for solar, 7.5 for wind), so the remaining error is in
-  the ENS weather and not in the inputs.
-- **A correction of ENS weather has to be scored on the member average.** The control member alone
-  improved by 0.52 points under stage 0, and the 51-member average worsened by 0.16.
+- **Input changes to a stage 1a model that already reads the ERA5 weather block moved the solar and
+  wind error by hundredths of a point, except CAMS training (-0.14) and stage 0 (+0.16).** The
+  differences between arms are far smaller than the gap to the ERA5 ceiling (1.7 points for solar,
+  7.5 for wind). The ceiling reads ERA5 weather at forecast time, so the gap mostly reflects the
+  change of weather source, and the changes tested closed little of it.
+- **A correction of ENS weather was worth scoring on the member average.** The control member alone
+  improved by 0.52 points under stage 0, and the 51-member average was 0.16 higher.
 
 ## Size
 

@@ -155,11 +155,11 @@ later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesda
 
 - **Headline result:** CAMS-trained minus ERA5-trained for solar is -0.140 points of capacity (99.5%
   interval -0.277 to -0.044), largest within 24 h at -0.35. The stage 0 model made the 51-member
-  average worse by 0.160 (-0.017 to +0.382), although it improved the control member alone from
+  average 0.160 higher (-0.017 to +0.382), although it improved the control member alone from
   8.34 to 7.82. The clear-sky-ratio target (-0.048) and the base margin (-0.030) were equivalent to
   the benchmark.
-- **Finding for later experiments:** training starts in 2023-09 and 2024-04 were equivalent to
-  2019-09 for solar and wind within 0.3 points, unlike demand.
+- **Finding for later experiments:** training starts in 2023-09 and 2024-04 were within 0.3 points
+  of 2019-09 for solar and wind, and a gain of 0.15 points is not ruled out.
 - **Write-up and pull request:** [result](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md),
   [PR #1217 (Plan experiment 12: inputs and training start for the solar and wind stage 1a
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1217).
