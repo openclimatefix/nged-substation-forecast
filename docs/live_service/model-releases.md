@@ -16,6 +16,11 @@ keeps the previous model release, and only the software column of the log change
 
 ## How to cut a model release
 
+The [`release-model`
+skill](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/release-model/SKILL.md)
+covers the work before step 1: choosing the experiments, testing them together, and planning the
+port.
+
 1. Port the supported ml-experiments' winners into the production pipeline. Set each experiment's
    `production_status` to `adopted` and its `adopted_in` to the release number, and update the
    [research log](../ml-experiments/research-log.md), as the `ml-experiment` skill says.
