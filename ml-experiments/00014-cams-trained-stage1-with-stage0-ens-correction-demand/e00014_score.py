@@ -90,7 +90,10 @@ def post_hoc_dir() -> Path:
 
 
 def _stats() -> pl.DataFrame:
-    """Return every ENS run's quantiles of every arm and input from `e00014_fit.py`.
+    """Return every ENS run's quantiles of every arm and input from the fit scripts.
+
+    Returns:
+        The 73 runs' rows with `arm`, `seed`, the 9 quantile columns, and `actual`.
 
     Raises:
         FileNotFoundError: If the fit has not written all 73 runs.
