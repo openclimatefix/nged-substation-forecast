@@ -93,7 +93,7 @@ def collect_arms(*, cases: pl.DataFrame) -> dict[str, pl.DataFrame]:
     """Return every arm's quantiles keyed by series, run, valid time, and seed, with `actual`."""
     arms: dict[str, pl.DataFrame] = {}
     for name in STORED_ARMS:
-        stored = pl.read_parquet(ARMS_DIR / f"{name}.parquet").select(KEYS, *common.LEVEL_COLUMNS)
+        stored = pl.read_parquet(ARMS_DIR / f"{name}.parquet").select(*KEYS, *common.LEVEL_COLUMNS)
         arms[name] = pl.concat(
             [stored.with_columns(seed=pl.lit(seed).cast(pl.Int8)) for seed in common.SEEDS]
         )
@@ -151,6 +151,7 @@ def prepare(*, arms: dict[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
                 median_error=pl.Series(np.abs(quantiles[:, 4] - actual) * 100.0),
                 signed_error=pl.Series((quantiles[:, 4] - actual) * 100.0),
             )
+            .with_columns(pl.col("quantile_score", "median_error", "signed_error").cast(pl.Float64))
             .drop(*common.LEVEL_COLUMNS, "actual")
         )
     return out
@@ -167,7 +168,7 @@ def save_predictions(*, arms: dict[str, pl.DataFrame]) -> None:
             ]
             or [
                 pl.read_parquet(ARMS_DIR / f"{name}.parquet")
-                .select(KEYS, *common.LEVEL_COLUMNS)
+                .select(*KEYS, *common.LEVEL_COLUMNS)
                 .join(
                     pl.DataFrame({"seed": list(common.SEEDS)}, schema={"seed": pl.Int8}),
                     how="cross",
@@ -178,7 +179,9 @@ def save_predictions(*, arms: dict[str, pl.DataFrame]) -> None:
             experiment_store.write_predictions(
                 experiment_id=common.EXPERIMENT_ID,
                 name=name,
-                frame=stored.select(*KEYS, "seed", *common.LEVEL_COLUMNS),
+                frame=stored.filter(pl.col("valid_time") < HOLDOUT).select(
+                    *KEYS, "seed", *common.LEVEL_COLUMNS
+                ),
                 kind="quantiles",
                 row_set_id=common.ROW_SET_ID,
             )
