@@ -25,7 +25,7 @@ def promotable_model_runs(context: AssetExecutionContext) -> None:
     Purely informational: materialise this on demand (it has no dependents and writes nothing to
     disk) to refresh the candidate list as a metadata table in the Dagster UI, then copy the
     champion's ``run_id`` into ``promoted_model``'s launchpad. The champion is still picked by
-    eye off the MLflow leaderboard (metrics vary per experiment, so there is no single sort key
+    eye off the MLflow leaderboard (metrics vary per CV run, so there is no single sort key
     to automate the pick) — this just saves retyping/misremembering the run id.
     """
     settings = Settings()
@@ -71,8 +71,8 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
     ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
 
-    A run from a ``study/`` experiment holds no model archive, so fetching its artifacts raises
-    before the directory is replaced.
+    A run from a ``study/`` MLflow experiment holds no model archive, so fetching its artifacts
+    raises before the directory is replaced.
 
     Promotion refuses a model whose saved config this code cannot rebuild — a feature name it
     cannot parse, or a ``model_params`` key it no longer declares — and refuses it before the

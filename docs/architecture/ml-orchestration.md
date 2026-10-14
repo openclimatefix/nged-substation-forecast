@@ -1,19 +1,19 @@
-# ML Experiment Orchestration — Design Decisions
+# ML Orchestration — Design Decisions
 
-This page records the design decisions behind the Dagster/MLflow experiment layer (registration →
-training → forecasting → metrics) and the alternatives we rejected, so the reasoning stays
-auditable. The step-by-step *how-to* is [Running an experiment
-end-to-end](../ml_experimentation/dagster-workflow.md).
+This page records the design decisions behind the Dagster/MLflow cross-validation layer
+(registration → training → forecasting → metrics) and the alternatives we rejected, so the
+reasoning stays auditable. The step-by-step *how-to* is [Running the cross-validation pipeline
+end-to-end](../cross-validation/dagster-workflow.md).
 
 ## Key concepts
 
 | Concept | Definition |
 |---|---|
-| **Experiment** | One specific combination of model class + config (features, hyperparameters), identified by a human-readable `experiment_name`. Stamped onto every forecast row in a dedicated `experiment_name` column — **not** overloaded onto `power_fcst_model_name`, which keeps its meaning as the model *family* (`MODEL_NAME`). |
-| **CV fold** | One expanding-window train/validation split, identified by a short `fold_id` label. Date ranges live in `conf/cv/default.yaml` and are immutable per leaderboard epoch (see [Cross-validation folds](../ml_experimentation/cross-validation-folds.md)). |
-| **Dagster partition key** | `"{experiment_name}__{fold_id}"` on a `DynamicPartitionsDefinition`. Encodes both dimensions; unique by construction because MLflow enforces unique experiment names. |
-| **MLflow experiment** | One per `experiment_name`; carries the resolved config as tags and holds all of the experiment's runs. |
-| **MLflow parent run** | One per experiment (`cv_summary`, tagged `cv_role=parent`). Holds the flattened config params and the mean-across-folds aggregate metrics — the row the leaderboard sorts on. |
+| **Cross-validation run (CV run)** | One specific combination of model class + config (features, hyperparameters), trained and scored on one or more CV folds, identified by a human-readable `experiment_name`. Stamped onto every forecast row in a dedicated `experiment_name` column — **not** overloaded onto `power_fcst_model_name`, which keeps its meaning as the model *family* (`MODEL_NAME`). |
+| **CV fold** | One expanding-window train/validation split, identified by a short `fold_id` label. Date ranges live in `conf/cv/default.yaml` and are immutable per leaderboard epoch (see [Cross-validation folds](../cross-validation/cross-validation-folds.md)). |
+| **Dagster partition key** | `"{experiment_name}__{fold_id}"` on a `DynamicPartitionsDefinition`. Encodes both dimensions; unique by construction because MLflow enforces unique MLflow experiment names. |
+| **MLflow experiment** | One per `experiment_name`; carries the resolved config as tags and holds the parent run and the fold runs of that CV run. |
+| **MLflow parent run** | One per CV run (`cv_summary`, tagged `cv_role=parent`). Holds the flattened config params and the mean-across-folds aggregate metrics — the row the leaderboard sorts on. |
 | **MLflow fold run** | One per fold, nested under the parent (tagged `cv_role=fold`, `fold_id=…`). Holds per-fold training tags (`train_start`, `train_end`, `n_eligible_time_series`, `n_trained_time_series` — tags, not params, because the run is reused on every re-materialisation), per-fold metrics, and the trained model artifacts. |
 
 ## Cross-process run resolution: discover by tag, never pass handles
@@ -38,29 +38,30 @@ fold can run — so the get-or-create in the assets is only a self-healing fallb
 collide because each fold is a distinct Dagster partition.
 
 The complementary decision — the resolved config is stamped onto the MLflow experiment at
-registration and read back by the assets, never re-read from YAML — is explained in [Running an
-experiment end-to-end](../ml_experimentation/dagster-workflow.md).
+registration and read back by the assets, never re-read from YAML — is explained in [Running the
+cross-validation pipeline end-to-end](../cross-validation/dagster-workflow.md).
 
-## Re-registering an experiment under a changed config is rejected
+## Re-registering a CV run under a changed config is rejected
 
-**An experiment's identity is its config**, not its `experiment_name` alone, so a changed config is
-treated as a *new* experiment: `register_experiment_job` rejects a re-registration that would change
-it. Why an experiment carries one config, and what the operator should do instead, is in [An
-experiment's identity is its
-config](../ml_experimentation/dagster-workflow.md#an-experiments-identity-is-its-config).
+**A CV run's identity is its config**, not its `experiment_name` alone, so a changed config is
+treated as a *new* CV run: `register_experiment_job` rejects a re-registration that would change
+it. Why a CV run carries one config, and what the operator should do instead, is in [A CV
+run's identity is its
+config](../cross-validation/dagster-workflow.md#a-cv-runs-identity-is-its-config).
 
 **The rejection compares two identity tags: the canonical JSON dump of the resolved config, and the
 forecaster's class target.** Both are compared against what MLflow already has stored for that
-`experiment_name`. A tag absent from the stored experiment does not count as a change, because an
-absent tag is what `get_or_create_experiment` leaves behind when its self-healing fallback creates
-an untagged experiment, and this registration is entitled to complete that experiment.
+`experiment_name`. A tag absent from the stored MLflow experiment does not count as a change,
+because an absent tag is what `get_or_create_experiment` leaves behind when its self-healing
+fallback creates an untagged MLflow experiment, and this registration is entitled to complete that
+MLflow experiment.
 
-**A rejected re-registration leaves the experiment exactly as it found it.** The comparison runs,
+**A rejected re-registration leaves the CV run exactly as it found it.** The comparison runs,
 and any rejection happens, before the registration writes a single MLflow param or tag.
 
-**The `description` tag is excluded from the comparison, so an experiment's prose stays freely
-editable by re-registering.** What an experiment is called and what it is for are not part of what
-makes an experiment that experiment — only the config and the forecaster class are.
+**The `description` tag is excluded from the comparison, so a CV run's prose stays freely
+editable by re-registering.** What a CV run is called and what it is for are not part of what
+makes a CV run that CV run — only the config and the forecaster class are.
 
 ## Model artifacts: one replaceable archive, no local cache
 
@@ -131,14 +132,14 @@ that consumer's own invalidation needs is tracked in
 fold **overwrites** its partition rather than appending — an append would silently duplicate every
 row on retry and double-count in metrics. Two consequences:
 
-- **Parallel experiments are safe**: they write to disjoint `experiment_name` partition directories
+- **Parallel CV runs are safe**: they write to disjoint `experiment_name` partition directories
   and never touch each other.
-- The only residual risk is the *same* fold of the *same* experiment launched twice simultaneously,
+- The only residual risk is the *same* fold of the *same* CV run launched twice simultaneously,
   which delta-rs surfaces as a transaction-log conflict; Dagster's per-partition run concurrency
   normally prevents this, and a retry resolves it.
 
-Partitioning by `experiment_name` (not `power_fcst_model_name`) is deliberate: many experiments
-share one model family, and the partition must isolate experiments, not families.
+Partitioning by `experiment_name` (not `power_fcst_model_name`) is deliberate: many CV runs
+share one model family, and the partition must isolate CV runs, not families.
 
 ## Complete validation windows only
 
@@ -150,7 +151,7 @@ asset's `ad_hoc` evaluation scope, which never feeds the leaderboard.
 ## Fold-design alternatives considered
 
 We considered three other ways to slice the limited honest data and chose the [single
-fold](../ml_experimentation/cross-validation-folds.md#current-state-a-single-fold). These are
+fold](../cross-validation/cross-validation-folds.md#current-state-a-single-fold). These are
 recorded so the decision is auditable and so we can revisit them as more data lands.
 
 ### Monthly expanding CV — rejected (redundant folds)
@@ -187,7 +188,7 @@ Rejected: ERA5 is *reanalysis* (it ingests future observations), so validating o
 model's response to near-perfect weather, not **forecast** skill — systematically misleading — and a
 leaderboard mixing reanalysis folds and ECMWF-forecast folds is apples-to-oranges. Reanalysis is
 valuable, but for **pre-training** (see [Cross-validation folds:
-Target](../ml_experimentation/cross-validation-folds.md#target-multiple-yearly-folds)), not for
+Target](../cross-validation/cross-validation-folds.md#target-multiple-yearly-folds)), not for
 validation.
 
 Rejecting ERA5-backed folds excludes reanalysis only as a *promotion criterion*, not as a
@@ -205,7 +206,7 @@ answer different questions:
 | | **MLflow** | **`forecast_metrics` Delta** |
 |---|---|---|
 | Granularity | Coarse: per-`time_series_type` + `"all"` aggregates | Full cube: per `time_series_id` × slice × fold × scope |
-| Volume | Tens of scalars per run | Thousands of rows per experiment |
+| Volume | Tens of scalars per run | Thousands of rows per CV run |
 | Consumers | Leaderboard UI, sorting/grouping | Dashboards, drill-down analysis |
 | Shape | Key→value metric store | Queryable table (Polars/SQL) |
 
@@ -221,10 +222,10 @@ Recorded so we don't re-litigate them:
   orchestration with ML logic; the whole asset re-runs on any failure.
 - **Dagster `DynamicOut` job instead of assets** — job run history would be the only record; no
   stable, addressable per-fold artifact in the asset catalog; poor lineage.
-- **Static fold partitions shared across experiments** — two experiments would appear to materialise
-  the same partition, corrupting history; static keys can't support dynamically created experiments
+- **Static fold partitions shared across CV runs** — two CV runs would appear to materialise
+  the same partition, corrupting history; static keys can't support dynamically created CV runs
   (hyperparameter sweeps).
-- **One YAML config file per experiment in git** — thousands of files; programmatic sweeps would
+- **One YAML config file per CV run in git** — thousands of files; programmatic sweeps would
   have to commit files. MLflow is the canonical resolved-config store instead.
 - **MLflow pyfunc / model registry for persistence** — significant complexity (environment
   snapshotting, custom loaders, registry states) for no benefit over the simple `save`/`load` +

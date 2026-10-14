@@ -12,10 +12,10 @@ This page answers four questions in turn:
 
 1. **What does the MLOps literature say?**
 2. **Why did we choose Dagster when we designed the system (August 2025)?** At the time the choice
-   was clear-cut: Airflow could not support the experiment workflow we wanted.
+   was clear-cut: Airflow could not support the CV run workflow we wanted.
 3. **Would it be possible to migrate to Airflow today?** Yes — and it is a closer call than it was
    at design time, because Airflow 3.2 and 3.3 (April–July 2026) closed several of the gaps. The
-   remaining gap is day-to-day experiment observability, not the data model.
+   remaining gap is day-to-day CV run observability, not the data model.
 4. **What would a port actually look like?** The mechanics, the trickiest parts, where Airflow would
    be genuinely better, and the options — ending with our recommendation to stay put for now.
 
@@ -44,12 +44,13 @@ energy-forecasting pipeline rather than the better of the two tools.
 ## Why we chose Dagster (August 2025)
 
 This project is heavy on machine-learning research and development by design. Beyond improving
-demand-forecast skill, the [requirements](../background/requirements.md#ml-experimentation-at-scale)
-span switching-event detection, effective-capacity estimation, faulty-meter detection, and the
-disaggregation of distributed energy resources (DERs). The infrastructure therefore has to support
-running **on the order of hundreds of ML experiments per month**, make each run as frictionless as
-possible, and land every result on a standardised leaderboard. Orchestrator ergonomics for
-experimentation are not a nice-to-have here; they are load-bearing for the project's core output.
+demand-forecast skill, the
+[requirements](../background/requirements.md#cross-validation-runs-at-scale) span switching-event
+detection, effective-capacity estimation, faulty-meter detection, and the disaggregation of
+distributed energy resources (DERs). The infrastructure therefore has to support running **on the
+order of hundreds of CV runs per month**, make each run as frictionless as possible, and land every
+result on a standardised leaderboard. Orchestrator ergonomics for cross-validation runs are not a
+nice-to-have here; they are load-bearing for the project's core output.
 
 **That premise is a bet this project is making rather than a result the literature has settled.**
 The energy-forecasting review found [no study measuring what adopting MLOps practice
@@ -59,7 +60,7 @@ iteration](../background/energy-forecasting-review.md#fast-comparable-iteration-
 rests on a structural argument and on practitioner testimony instead. Naming the bet matters here,
 because the orchestrator choice is staked on that bet.
 
-**Conducting experiments is only half the loop.** A winning experiment must then move into
+**Conducting CV runs is only half the loop.** A winning CV run must then move into
 production as easily and as safely as possible, which is why R&D and production share a single
 unified codebase — promotion is an [audited
 materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
@@ -69,8 +70,8 @@ service)](#option-b-port-only-the-live-service-promising-with-a-real-two-orchest
 
 Concretely, the workflow we designed for Flexpectation is: mint an `{experiment_name}__{fold_id}`
 partition key per cross-validation cell at runtime, and get individually addressable, retryable,
-observable materialisations per key — with a UI that shows at a glance which (experiment, fold)
-cells exist, succeeded, or failed, across every experiment ever run. Dagster's
+observable materialisations per key — with a UI that shows at a glance which (CV run, fold)
+cells exist, succeeded, or failed, across every CV run to date. Dagster's
 `DynamicPartitionsDefinition` provides exactly this; [ML Orchestration Design](ml-orchestration.md)
 documents the layer built on it.
 
@@ -81,7 +82,7 @@ When the system was designed in August 2025, the latest Airflow release was 3.0.
   stop. [AIP-76, an Airflow Improvement Proposal, on Asset
   Partitions](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=311626969) was an
   unshipped proposal; it did not begin landing until Airflow 3.2.0 in April 2026. The
-  experiment×fold dynamic-partition design simply had no Airflow analogue.
+  CV run × fold dynamic-partition design simply had no Airflow analogue.
 - **The fallback pattern was compromised in the then-current release.** The natural Airflow shape
   for cross-validation — dynamic task mapping, one mapped task instance per fold — was undermined by
   a live regression in the 3.0.x series ([#54779](https://github.com/apache/airflow/issues/54779)):
@@ -99,7 +100,7 @@ When the system was designed in August 2025, the latest Airflow release was 3.0.
   Flexpectation is 3.14-only.
 
 So the design-time claim is straightforward: in August 2025, Airflow could not deliver the ML
-experiment workflow this project was built around. Airflow's nearest substitute had a broken
+CV run workflow this project was built around. Airflow's nearest substitute had a broken
 per-fold retry story in the release we would have deployed. Choosing Dagster was not a matter of
 taste. Nor was choosing Dagster contrarian within OCF: we already ran Dagster for our on-prem data
 pipelines. (The later organisational shift towards possibly standardising on Airflow post-dates this
@@ -117,7 +118,7 @@ Airflow 3.2.0 (April 2026) and 3.3.0 (July 2026) closed several of the gaps abov
   added](https://airflow.apache.org/blog/airflow-3.3.0/) the `PartitionedAtRuntime` timetable and
   `outlet_events[asset].add_partitions(...)`, which lets a task mint arbitrary string partition keys
   decided in code — the direct conceptual analogue of Dagster's `DynamicPartitionsDefinition`. An
-  `{experiment}__{fold}` key scheme is directly expressible.
+  `{experiment_name}__{fold_id}` key scheme is directly expressible.
 - **The backfill-conf bug class is fixed.** [#59043](https://github.com/apache/airflow/issues/59043)
   (conf silently not applied to runs with existing logical dates) was fixed in Airflow 3.2.2,
   released 29 May 2026. No open issues in that class remain. One live caveat: Amazon Web Services'
@@ -127,15 +128,15 @@ Airflow 3.2.0 (April 2026) and 3.3.0 (July 2026) closed several of the gaps abov
   and `NwpVariableWhollyMissing`, fail fast on genuine bugs" is now expressible directly.
 - **Airflow runs Python 3.14** (since 3.2.0).
 
-### What an Airflow-native experiment workflow would look like
+### What an Airflow-native CV run workflow would look like
 
 A fair assessment has to judge Airflow's *native* redesign, not a mechanical translation of our
 Dagster code. That redesign is well established in the Airflow world: one triggered DAG run per
-experiment, carrying the experiment config as `conf` (with a meaningful `run_id` — the trigger UI,
+CV run, carrying the CV run config as `conf` (with a meaningful `run_id` — the trigger UI,
 command-line interface, and `TriggerDagRunOperator` all support custom run IDs), and one dynamically
 mapped task instance per fold (`.expand()` over a fold list computed from `conf`). Astronomer's
 [MLOps guidance](https://www.astronomer.io/docs/learn/airflow-mlops) documents exactly this pattern,
-with MLflow as the system of record for experiment results.
+with MLflow as the system of record for CV run results.
 
 The native redesign gets further than one might expect — in particular, **per-fold observability and
 retry are not lost**:
@@ -155,7 +156,7 @@ and retry, which is what that rejection was protecting.
 
 Three gaps remain, and they are affordances we use daily rather than blockers in principle:
 
-- **No all-time experiment×fold status catalog.** Airflow's history is run-oriented: the Grid view
+- **No all-time CV run × fold status catalog.** Airflow's history is run-oriented: the Grid view
   is a date-ordered run×task matrix, with fold status collapsed one click deep and expandable only
   per run, and mapped instances are not searchable by rendered name
   ([#45100](https://github.com/apache/airflow/issues/45100)). The new AIP-76 partitions have the
@@ -163,8 +164,8 @@ Three gaps remain, and they are affordances we use daily rather than blockers in
   failed, all time"; AIP-76 lists partition observability as future work, and the feature is weeks
   old versus Dagster partitions' years of production maturity. Dagster's at-a-glance partition grid
   has no Airflow surface today.
-- **Extending a past experiment is structurally awkward.** A run's `conf` is immutable, so "add one
-  more fold to last month's experiment" means triggering a second run under a second run ID, and
+- **Extending a past CV run is structurally awkward.** A run's `conf` is immutable, so "add one
+  more fold to last month's CV run" means triggering a second run under a second run ID, and
   nothing native re-aggregates the two. In Dagster, the new fold is one more key minted into the
   same partition set, with unified status.
 - **Materialisation metadata is raw JSON.** Since Airflow 2.10 a task can attach an `extra` dict to
@@ -179,11 +180,11 @@ Three gaps remain, and they are affordances we use daily rather than blockers in
 A migration is possible today, and the case against it is narrower than it was in August 2025. The
 honest framing is no longer "Airflow can't do ML R&D" — it demonstrably can, and its data model
 closed the dynamic-partition gap in July 2026. The framing is: **Airflow can run the workload; what
-it lacks is the catalog** — the persistent per-cell status surface and in-place experiment extension
+it lacks is the catalog** — the persistent per-cell status surface and in-place CV run extension
 that Dagster gives us for free — and re-platforming to chase a weeks-old partition feature whose
-observability UI is still on the roadmap would be premature. At our [experiment
-volume](../background/requirements.md#ml-experimentation-at-scale) — hundreds of runs a month, with
-routine re-runs of old experiments — small per-experiment friction compounds into a real tax on the
+observability UI is still on the roadmap would be premature. At our [CV run
+volume](../background/requirements.md#cross-validation-runs-at-scale) — hundreds of runs a month,
+with routine re-runs of old CV runs — small per-CV-run friction compounds into a real tax on the
 project's core output.
 
 ## What would a port look like?
@@ -197,7 +198,7 @@ The orchestration layer was built thin on purpose, and three properties make it 
   Delta, and reports metadata. The business logic — feature engineering, training, metrics, storage
   policy — has no Dagster imports and would not change at all.
 - **No state crosses processes through the orchestrator.** Data crosses run boundaries via Delta
-  tables; experiment state crosses via MLflow, resolved [by tag, never by
+  tables; CV run state crosses via MLflow, resolved [by tag, never by
   handle](ml-orchestration.md#cross-process-run-resolution-discover-by-tag-never-pass-handles); the
   production model crosses as a directory baked into the image. Any orchestrator that can run a
   Python function on a schedule can drive this system.
@@ -208,8 +209,8 @@ The Dagster-specific surface is roughly 2,700 lines across 6 files (`defs/assets
 `defs/cv_assets.py`, `defs/live_forecast_assets.py`, `defs/promotion_assets.py`, `defs/jobs.py`,
 `defs/schedules.py`) plus
 `definitions.py`, `dagster.yaml`, and the Docker Compose control plane. Beyond code, a dozen docs
-pages — most of `docs/live_service/` and [Running an experiment
-end-to-end](../ml_experimentation/dagster-workflow.md) — are written around the Dagster UI and would
+pages — most of `docs/live_service/` and [Running the cross-validation pipeline
+end-to-end](../cross-validation/dagster-workflow.md) — are written around the Dagster UI and would
 need rewriting.
 
 ### What we actually use from Dagster, and how it maps
@@ -221,7 +222,7 @@ need rewriting.
 | Concurrency pool (`pool="ECMWF"`) | `ecmwf_ens` | Airflow pools | Direct equivalent |
 | In-run retry-with-wait (`RetryRequested`) | `ecmwf_ens` NWP wait | Deferrable sensor | Airflow is **better** (see below) |
 | Typed run config + Launchpad | `availability_mode`, `MetricsConfig`, `PromotedModelConfig` | DAG `params` with schema-validated trigger forms | Workable; less strongly typed |
-| `DynamicPartitionsDefinition` (`{experiment}__{fold}`) | CV (cross validation) layer | `PartitionedAtRuntime` + `add_partitions` (3.3.0), or run-per-experiment + mapped folds | Data model now matches; the status-grid UI does not (see above) |
+| `DynamicPartitionsDefinition` (`{experiment_name}__{fold_id}`) | CV (cross validation) layer | `PartitionedAtRuntime` + `add_partitions` (3.3.0), or one Airflow run per CV run + mapped folds | Data model now matches; the status-grid UI does not (see above) |
 | Per-fold retry and observability | CV (cross validation) layer | Dynamic task mapping (per-instance state, logs, clear; `map_index_template`) | Good on ≥3.1.4 |
 | Per-partition backfills with run config | `live_forecasts` replay | Backfills take `--dag-run-conf`; conf-dropped bug fixed in 3.2.2 | Good on ≥3.2.2; MWAA (3.2.1) still affected |
 | `add_output_metadata` tables, asset catalog, lineage | every asset | Asset-event `extra` JSON (2.10+) in the events list | Partial — raw JSON, no rendered tables or history plots |
@@ -241,13 +242,13 @@ by hand rather than inherit.
 #### The CV (cross validation) layer: right data model, missing status surface
 
 A port of the CV (cross validation) layer would face a choice between two imperfect shapes. Adopting
-AIP-76 runtime partitions keeps the `{experiment}__{fold}` key scheme but stakes the daily workflow
-on a weeks-old feature with no partition-status UI. Remodelling as run-per-experiment with mapped
-folds is mature and keeps per-fold retry, but fragments the catalog: "which cells have been
-materialised, ever" would have to be answered by MLflow (which becomes the system of record for
-experiment progress) or a hand-rolled query over Airflow's task-instance table, and extending a past
-experiment becomes a second, disconnected run. Either way, the at-a-glance grid we use daily is gone
-until Airflow ships partition observability.
+AIP-76 runtime partitions keeps the `{experiment_name}__{fold_id}` key scheme but stakes the daily
+workflow on a weeks-old feature with no partition-status UI. Remodelling as one Airflow run per CV
+run with mapped folds is mature and keeps per-fold retry, but fragments the catalog: "which cells
+have been materialised, ever" would have to be answered by MLflow (which becomes the system of
+record for CV run progress) or a hand-rolled query over Airflow's task-instance table, and extending
+a past CV run becomes a second, disconnected run. Either way, the at-a-glance grid we use daily is
+gone until Airflow ships partition observability.
 
 #### Replay backfills: fixed upstream, still deserving of explicit verification
 
@@ -310,13 +311,13 @@ their intended behaviour documented, so rewriting them as DAGs is days of work. 
 redesign of the CV (cross validation) layer around the missing partition-status surface, the
 verification of orchestration behaviour (schedules ticking, backfills replaying without lookahead
 leakage, ECS dispatch — inherently wall-clock-bound), the docs rewrite, and the deployment cutover.
-Realistically several weeks end-to-end, landing on an experimentation workflow with fewer of the
+Realistically several weeks end-to-end, landing on a cross-validation workflow with fewer of the
 affordances we rely on today.
 
 #### Option B: port only the live service — promising, with a real two-orchestrator cost
 
 Move the production side to Airflow — `power_time_series_and_metadata`, `ecmwf_ens`,
-`live_forecasts`, `h3_grid_weights`, and their schedules — and keep everything experiment-shaped
+`live_forecasts`, `h3_grid_weights`, and their schedules — and keep everything CV-run-shaped
 (registration, training, CV (cross validation) forecasts, metrics, promotion) on Dagster.
 
 Porting only the live service works because **the seam already exists**: the [R&D/production
@@ -362,7 +363,7 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
   wants fail-fast and would be perfectly content with blocking data-quality tasks — is the half that
   stays on Dagster. That is backwards with respect to the
   [inherent-stability](../design-philosophy/inherent-stability.md) design.
-- The audit trail fragments: production run history in Airflow, promotion and experiment history in
+- The audit trail fragments: production run history in Airflow, promotion and CV run history in
   Dagster/MLflow.
 - If the deployment target were MWAA at its current version (3.2.1), the backfill-conf bug would sit
   exactly on the ported surface (replay mode), the most correctness-critical operation being moved.
@@ -399,7 +400,7 @@ We would happily revisit this page if any of the following happens:
 - [Production Deployment — Design](production-deployment.md) — the accepted control-plane
   architecture and its rejected alternatives, several of which (EventBridge, Fargate control plane)
   rehearse the same portability arguments.
-- [ML Orchestration Design](ml-orchestration.md) — the experiment layer whose Dagster capabilities
+- [ML Orchestration Design](ml-orchestration.md) — the CV run layer whose Dagster capabilities
   are the main challenge for a full port.
 - [Handover to NGED](../roadmap/handover.md) — the handover plan whose constraints (simplicity, no
   bespoke glue) weigh on both sides of this assessment.

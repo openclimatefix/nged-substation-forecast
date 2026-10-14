@@ -168,7 +168,7 @@ class ClimatologyForecaster(BaseForecaster):
 
         Raises:
             ValueError: ``model_params.selected_features`` is not empty. Climatology reads no
-                feature, so a non-empty list would describe an experiment that is not the one
+                feature, so a non-empty list would describe a CV run that is not the one
                 running, and a power lag would widen the power scan for nothing.
         """
         super().__init__(model_params)

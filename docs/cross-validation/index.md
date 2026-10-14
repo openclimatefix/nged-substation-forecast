@@ -1,13 +1,13 @@
-# ML Experimentation
+# Cross-validation
 
-How we run and evaluate ML forecasting experiments — the durable home for this methodology once it
-leaves the [roadmap](../roadmap/index.md), per the [Documentation
+How we run and evaluate forecasting models in cross-validation runs (CV runs) — the durable home
+for this methodology once it leaves the [roadmap](../roadmap/index.md), per the [Documentation
 Guide](../documentation-guide.md#how-planning-works).
 
 ## Documents
 
-- [Running an ML experiment end-to-end](dagster-workflow.md) — step-by-step recipe for going from
-  raw data to a trained, MLflow-tracked model using the Dagster pipeline; explains why
+- [Running the cross-validation pipeline end-to-end](dagster-workflow.md) — step-by-step recipe for
+  going from raw data to a trained, MLflow-tracked model using the Dagster pipeline; explains why
   `trained_cv_model` reads config from MLflow rather than YAML.
 - [Model configuration](model-configuration.md) — how to set hyperparameters and choose features;
   the full feature vocabulary and the lookahead-bias guardrails.
@@ -20,28 +20,28 @@ Guide](../documentation-guide.md#how-planning-works).
 Modern machine-learning-operations (MLOps) practice, as used in this project, changes throughput and
 closes the translation gap:
 
-1. **Throughput.** The grunt work of an experiment — assembling features, training,
+1. **Throughput.** The grunt work of a CV run — assembling features, training,
    cross-validating, recording results — is automated, so a small team can run hundreds of
-   experiments per month instead of one or two. Humans still decide what to try; the infrastructure
-   runs those experiments. (See [Running an ML experiment end-to-end](dagster-workflow.md).) This
-   project is betting that the throughput produces a better forecast; the literature has not settled
-   the question. The energy-forecasting review found [no study measuring what adopting
-   machine-learning-operations practice
+   CV runs per month instead of one or two. Humans still decide what to try; the infrastructure
+   runs those CV runs. (See [Running the cross-validation pipeline
+   end-to-end](dagster-workflow.md).) This project is betting that the throughput produces a better
+   forecast; the literature has not settled the question. The energy-forecasting review found [no
+   study measuring what adopting machine-learning-operations practice
    delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves),
    and the case for [fast, comparable
    iteration](../background/energy-forecasting-review.md#fast-comparable-iteration-is-argued-for-not-measured)
    rests on a structural argument and on practitioner testimony instead.
-2. **No translation gap.** The artifact we experimented on *is* the artifact we deploy. There is no
-   "now rewrite the research code for production" step, because every experiment runs on the exact
+2. **No translation gap.** The artifact we cross-validated *is* the artifact we deploy. There is no
+   "now rewrite the research code for production" step, because every CV run uses the exact
    same code as the production pipeline from the start. The gap is closed by raising research to the
    production standard, not by lowering production to accept a research notebook: an idea can be
-   explored anywhere, but it only becomes a runnable experiment once it lives in the pipeline's own
+   explored anywhere, but it only becomes a runnable CV run once it lives in the pipeline's own
    code. The debt this avoids has a name: [Sculley et al.
    (2015)](https://papers.nips.cc/paper/5656-hidden-technical-debt-in-machine-learning-systems) call
    the code written to bridge research and production *glue code*, and the tangle that glue code
    grows into *pipeline jungles*. Sculley et al.'s list of debts also constrains how the gap is
-   allowed to close, because *dead experimental codepaths* is what accrues when experiments run as
-   conditional branches inside production code. In contrast, an ML experiment in a modern MLOps
+   allowed to close, because *dead experimental codepaths* is what accrues when trial runs live as
+   conditional branches inside production code. In contrast, a CV run in a modern MLOps
    pipeline selects a different [configuration](model-configuration.md) and runs the same code path,
    rather than adding a branch the production pipeline then has to carry.
 
@@ -61,7 +61,7 @@ it. Promotion to production takes minutes, and that speed is a *consequence* of 
 against it. By the time promotion is on the table, the candidate has already been trained,
 cross-validated (see [Cross-validation folds](cross-validation-folds.md)), and evaluated on the same
 pipeline, under the same standardised protocol, as every model before it. Holding that protocol
-fixed is what makes two experiments comparable at all. That is the reason [Karpathy's
+fixed is what makes two CV runs comparable at all. That is the reason [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch) fixes every training run to the same
 5-minute budget: a fixed budget "makes experiments directly comparable regardless of what the agent
 changes".
@@ -79,8 +79,8 @@ approach to training neural networks does not work and only leads to suffering".
 autonomous study is code that an agent writes under `studies/` and runs without anyone reviewing it
 first. The study code therefore runs outside the production pipeline. The study's predictions file
 is scored by `scripts/forecasting/score_study.py`, which stores the rows under a `study/`-prefixed
-experiment name and runs the same `metrics` asset as every reviewed experiment. The `metrics` asset
-refuses a study whose row keys differ from the reference experiment's (see [What the `metrics` asset
+`experiment_name` and runs the same `metrics` asset as every reviewed CV run. The `metrics` asset
+refuses a study whose row keys differ from the reference CV run's (see [What the `metrics` asset
 refuses to score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score)). A `study/`
 run is never a promotion candidate. A finding reaches production only as a written specification and
 a reviewed re-implementation on the pipeline, never as merged study code.

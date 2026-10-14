@@ -18,8 +18,8 @@ STUDY_EXPERIMENT_PREFIX: Final[str] = "study/"
 ``scripts/forecasting/score_study.py`` scores.
 
 The prefix keeps a study's rows out of the promotion path, lets a reader filter a study's rows from
-the leaderboard, and marks the experiments on which the ``metrics`` asset runs the study checks and
-which an unfiltered ``metrics`` run skips. No reviewed experiment may use the prefix.
+the leaderboard, and marks the forecasts on which the ``metrics`` asset runs the study checks and
+which an unfiltered ``metrics`` run skips. No reviewed CV run may use the prefix.
 """
 
 
@@ -128,15 +128,15 @@ class CvConfig(BaseModel):
     val_start-to-val_end span that follows. The window expands because each later fold keeps the
     earlier folds' training history and adds more to it.
 
-    The folds list defines the evaluation protocol shared by all experiments on the leaderboard.
+    The folds list defines the evaluation protocol shared by all CV runs on the leaderboard.
     All models must be evaluated against the same folds to ensure apples-to-apples comparison.
 
     min_training_months controls which time series are eligible for each fold. A time series is
     included only if it has at least min_training_months months of data before val_start, and
     data through val_end.
 
-    ``reference_experiment_name`` names the experiment whose forecast row keys a study's forecasts
-    must match exactly before the ``metrics`` asset scores them. The reference experiment's
+    ``reference_experiment_name`` names the CV run whose forecast row keys a study's forecasts
+    must match exactly before the ``metrics`` asset scores them. The reference CV run's
     name must not start with ``STUDY_EXPERIMENT_PREFIX``, because a study cannot be its own
     reference.
     """
@@ -147,7 +147,7 @@ class CvConfig(BaseModel):
 
     @model_validator(mode="after")
     def _check_reference(self) -> Self:
-        """Reject a study as the reference experiment."""
+        """Reject a study as the reference CV run."""
         if self.reference_experiment_name.startswith(STUDY_EXPERIMENT_PREFIX):
             raise ValueError(
                 f"reference_experiment_name={self.reference_experiment_name!r} must not start with "
@@ -159,7 +159,7 @@ class CvConfig(BaseModel):
     def fold_ids(self) -> list[str]:
         """The fold ids in declaration order (e.g. ``["mid_2025_to_mid_2026", "smoke_test"]``).
 
-        Used to build the ``cv_experiment_folds`` partitions and to expand experiment
+        Used to build the ``cv_experiment_folds`` partitions and to expand CV run
         registration into per-fold partition keys — always read from config, never hard-coded.
         """
         return [fold.fold_id for fold in self.folds]
@@ -197,7 +197,7 @@ def load_cv_config(path: Path) -> CvConfig:
     """Load and validate the cross-validation config from a YAML file.
 
     The CV folds are the leaderboard's evaluation protocol and must be read from
-    ``conf/cv/default.yaml`` (never hard-coded) so every experiment and asset shares one
+    ``conf/cv/default.yaml`` (never hard-coded) so every CV run and asset shares one
     canonical definition.
 
     Args:

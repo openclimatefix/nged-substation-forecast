@@ -86,7 +86,7 @@ one-off case, but the delivery/internal split is driven by root derivation, not 
 overrides).
 
 > **Design choice: NGED sees every CV/backtest fold, not just live production forecasts.** The
-> `power_forecasts` table holds every CV/backtest experiment alongside live production forecasts,
+> `power_forecasts` table holds every CV/backtest run alongside live production forecasts,
 > distinguished by `fold_id` (`"live"` for production — see [Operating the live
 > service](operations.md)). It is deliberate to point the whole table at the delivery bucket, not an
 > accidental side effect of the bucket split: doing so lets NGED see how each of OCF's model

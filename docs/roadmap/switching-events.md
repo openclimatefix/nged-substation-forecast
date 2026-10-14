@@ -304,8 +304,8 @@ flag, event age, attributed magnitude) are themselves natural features for this 
   thresholds were calibrated on in-sample residuals therefore meets a systematically wider,
   differently-shaped distribution in production. The standard stacking remedy applies: every
   residual the booster trains on should be **out-of-sample** for the baseline that produced it
-  (rolling-origin refits within the training period). Both directions make the experiment pipeline
-  more work to build than adding an ordinary feature.
+  (rolling-origin refits within the training period). Both directions make the cross-validation
+  pipeline more work to build than adding an ordinary feature.
 - **No lookahead.** Residual lags must obey the same nullification rule as raw power lags
   (`_nullify_leaky_lags()`). The expected-power values at past lag times must be hindcast from NWP
   runs that had been published by forecast time. The existing freshest-NWP-for-past-target-times

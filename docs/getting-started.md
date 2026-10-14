@@ -135,10 +135,10 @@ window for a fast end-to-end check), so the concrete values below target it:
    `mid_2025_to_mid_2026`) to match the run below — otherwise training finds an empty population and
    raises.
 
-Then register an experiment and train a model. [Running an ML experiment
-end-to-end](ml_experimentation/dagster-workflow.md) has the full recipe — the run config for each
-job, what `smoke_test` versus `full_cv` does, and how the trained model is tracked in MLflow.
-Register the experiment with `run_mode="smoke_test"` to check the whole pipeline is wired up before
+Then register a CV run and train a model. [Running the cross-validation
+pipeline end-to-end](cross-validation/dagster-workflow.md) has the full recipe — the run config for
+each job, what `smoke_test` versus `full_cv` does, and how the trained model is tracked in MLflow.
+Register the CV run with `run_mode="smoke_test"` to check the whole pipeline is wired up before
 committing to a long `full_cv` training run.
 
 ## Running the live service on your laptop
@@ -179,14 +179,14 @@ drives against an in-process `moto` server.)
 
 ## Where to go next
 
-- [Running an ML experiment end-to-end](ml_experimentation/dagster-workflow.md) — the data-to-model
-  recipe in full, plus [Model configuration](ml_experimentation/model-configuration.md) for choosing
-  features and hyperparameters.
+- [Running the cross-validation pipeline end-to-end](cross-validation/dagster-workflow.md) — the
+  data-to-model recipe in full, plus [Model configuration](cross-validation/model-configuration.md)
+  for choosing features and hyperparameters.
 - [Configuration reference](live_service/setup.md) — every `.env` setting, the storage-root model,
   and how to point the data tables at real S3.
 - The [dashboard
   README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard#readme)
   — Marimo apps for inspecting forecasts, and the `.env.s3` toggle for viewing production data.
 - [Viewing results in the MLflow
-  UI](ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui) — inspecting your
+  UI](cross-validation/dagster-workflow.md#viewing-results-in-the-mlflow-ui) — inspecting your
   training runs (`uv run mlflow ui --gunicorn-opts "--workers 1"`).

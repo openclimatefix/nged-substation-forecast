@@ -488,9 +488,10 @@ class PowerForecast(pt.Model):
     experiment_name: str = pt.Field(
         dtype=pl.String,
         description=(
-            "Per-experiment key identifying the experiment that produced this forecast."
+            "Per-run key identifying the CV run, or the study submission, that produced this"
+            " forecast."
             " Distinct from `power_fcst_model_name`, which is the model-family identity"
-            " (`MODEL_NAME`); do not overload that with experiment identity."
+            " (`MODEL_NAME`); do not overload that with CV run identity."
             " Forecasts are partitioned in Delta by (experiment_name, fold_id)."
             " INTERNAL-ONLY: projected out of the `power_forecast` table delivered to NGED."
         ),

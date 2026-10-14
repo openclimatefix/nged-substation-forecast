@@ -3,7 +3,7 @@
 A forecast here is an *ensemble*: for one time series and one forecast run, the model emits many
 member predictions of the same future half-hour, and those members are what the probabilistic
 scores below measure. A cross-validation (CV) fold is one train-and-validate split of the
-history, identified by a ``fold_id``. MLflow is the experiment tracker the scores are logged to,
+history, identified by a ``fold_id``. MLflow is the CV run tracker the scores are logged to,
 and its leaderboard is the ranked comparison of one run's scores against another's.
 
 Four scoring functions, in the order the cross-validation Dagster assets call them.
@@ -15,7 +15,7 @@ writes to Delta. ``build_mlflow_aggregate_metrics`` takes the un-enriched frame 
 ``compute_metrics`` returned. That function reduces the frame to the flat key/value dictionary
 the MLflow leaderboard displays. The ``require_*`` functions beside the four scoring functions
 refuse a group the scorer must not score: rows outside the fold's window, and a study whose row
-keys differ from the reference experiment's.
+keys differ from the reference CV run's.
 
 Every function here is pure: no Dagster, no MLflow, and no IO. Each function is therefore
 unit-testable on an in-memory frame. The asset that calls the function owns every read and write.
@@ -81,9 +81,9 @@ therefore carries the reference's ensemble-member labels, and so the reference's
 COMPARABLE_KEY_COLUMNS: Final[tuple[str, ...]] = tuple(
     column for column in ROW_KEY_COLUMNS if column != "ensemble_member"
 )
-"""The columns of ``ROW_KEY_COLUMNS`` that name the same forecast problem in any experiment.
+"""The columns of ``ROW_KEY_COLUMNS`` that name the same forecast problem in any CV run.
 
-``row_key_fingerprint`` hashes these columns, so a reviewed experiment with 13 members and a
+``row_key_fingerprint`` hashes these columns, so a reviewed CV run with 13 members and a
 reference with 51 members have the same fingerprint when they forecast the same series,
 initialisation times, and valid times.
 """
@@ -94,7 +94,7 @@ class RowsOutsideWindowError(ValueError):
 
 
 class RowKeyMismatchError(ValueError):
-    """Raised when a study's forecast row keys differ from the reference experiment's."""
+    """Raised when a study's forecast row keys differ from the reference CV run's."""
 
 
 def require_valid_times_within_window(
@@ -145,13 +145,13 @@ def require_same_row_keys(
     reference_label: str,
     series_batch_size: int,
 ) -> None:
-    """Refuse a study whose forecast row keys differ from the reference experiment's.
+    """Refuse a study whose forecast row keys differ from the reference CV run's.
 
     The keys are ``ROW_KEY_COLUMNS``. A study that omits a row the reference forecasts, or adds a
     row the reference does not, cannot raise its score by abstaining on hard rows, by adding easy
     series, by forecasting only at short lead times, or by choosing its own number of ensemble
     members. The reference's own forecasts are trusted:
-    they come from a reviewed experiment.
+    they come from a reviewed CV run.
 
     The series sets are compared first. The keys are then compared in batches of
     ``series_batch_size`` series, with a distinct-key anti-join in each direction, so peak memory
@@ -159,10 +159,10 @@ def require_same_row_keys(
 
     Args:
         study: Lazy scan of the study's forecast rows, carrying at least ``ROW_KEY_COLUMNS``.
-        reference: Lazy scan of the reference experiment's rows for the same fold and the same
+        reference: Lazy scan of the reference CV run's rows for the same fold and the same
             ``valid_time`` filter, carrying at least ``ROW_KEY_COLUMNS``.
         group_label: ``"{experiment_name}, {fold_id}"`` of the study, for the error message.
-        reference_label: The reference experiment's name, for the error message.
+        reference_label: The reference CV run's name, for the error message.
         series_batch_size: How many ``time_series_id`` values to compare at once.
 
     Raises:
@@ -172,8 +172,8 @@ def require_same_row_keys(
     reference_ids = _distinct_series_ids(reference)
     if not reference_ids:
         raise RowKeyMismatchError(
-            f"Reference experiment {reference_label!r} has no forecast rows for group "
-            f"({group_label}). Materialise the reference experiment for this fold first."
+            f"Reference CV run {reference_label!r} has no forecast rows for group "
+            f"({group_label}). Materialise the reference CV run for this fold first."
         )
     study_ids = _distinct_series_ids(study)
     if study_ids != reference_ids:
@@ -211,7 +211,7 @@ def require_same_row_keys(
 def row_key_fingerprint(*, forecasts: pl.LazyFrame, series_batch_size: int) -> str:
     """Return a hash of the distinct ``COMPARABLE_KEY_COLUMNS`` keys in ``forecasts``.
 
-    Two experiments have the same fingerprint exactly when they forecast the same series, from the
+    Two CV runs have the same fingerprint exactly when they forecast the same series, from the
     same initialisation times, for the same valid times, however many ensemble members each holds
     and in whatever row order. The ``metrics`` asset stamps the fingerprint on every leaderboard
     fold run, so a reader can see whether two scores rest on the same forecast problem, and whether
@@ -704,7 +704,7 @@ def compute_metrics(
     )
 
     # Every scored series must have a metadata row. A null here would drop the series out of every
-    # per-type MLflow aggregate while still counting towards the overall mean. Two experiments
+    # per-type MLflow aggregate while still counting towards the overall mean. Two CV runs
     # scored over the same population would then not be comparable.
     missing_type = metrics_tall.filter(pl.col("time_series_type").is_null())["time_series_id"]
     if missing_type.len() > 0:
@@ -831,7 +831,7 @@ def enrich_metrics_rows(
 
     Args:
         per_series_metrics: Frame produced by ``compute_metrics()``.
-        experiment_name: Experiment that produced these forecasts.
+        experiment_name: CV run that produced these forecasts.
         evaluation_scope: ``"leaderboard"`` or ``"ad_hoc"``.
         window_start: Inclusive start of the evaluated ``valid_time`` window.
         window_end: Inclusive end of the evaluated ``valid_time`` window.

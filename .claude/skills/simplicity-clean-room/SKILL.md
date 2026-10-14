@@ -184,7 +184,7 @@ searches come up empty:
    the reason?
 2. **The tests** — is there a test that fails if you simplify it? Make the change, run it, see.
 3. **The docs** — `docs/architecture/`, `docs/design-philosophy/`, `docs/techniques/`,
-   `docs/ml_experimentation/`, `.claude/skills/`. This project writes its reasons down.
+   `docs/cross-validation/`, `.claude/skills/`. This project writes its reasons down.
 4. **The callers** — does anything outside the target depend on it? Grep `packages/` and `src/`.
 5. **The constraints** — does a data volume, memory ceiling, dtype or null semantic make the simpler
    form wrong at production scale? Is there a measured number?

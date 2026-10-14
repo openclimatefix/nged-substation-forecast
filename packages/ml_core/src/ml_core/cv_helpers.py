@@ -18,9 +18,9 @@ from contracts.config_schemas import CvFoldConfig
 from pydantic import BaseModel
 
 CV_PARTITION_KEY_SEPARATOR: Final[str] = "__"
-"""Separator between experiment name and fold id in a CV partition key.
+"""Separator between CV run name and fold id in a CV partition key.
 
-A double-underscore reduces collision risk with experiment names that contain single underscores.
+A double-underscore reduces collision risk with CV run names that contain single underscores.
 """
 
 
@@ -71,7 +71,7 @@ def eligible_time_series_ids(
     before the fold's ``val_start`` **and** observations through the fold's ``val_end``.
 
     Eligibility is a function of the **data only**: eligibility depends on neither the model nor the
-    experiment config. Every experiment therefore evaluates a fold on the identical population. That
+    CV run config. Every CV run therefore evaluates a fold on the identical population. That
     identical population is what makes leaderboard comparisons fair.
 
     Args:
@@ -97,8 +97,8 @@ def parse_cv_partition_key(partition_key: str) -> tuple[str, str]:
     """Return ``(experiment_name, fold_id)`` from a CV partition key.
 
     Partition key format: ``"{experiment_name}__{fold_id}"``. The separator is a
-    double-underscore to reduce collision risk with experiment names that contain single
-    underscores. Splitting from the right keeps ``__`` inside the experiment name intact.
+    double-underscore to reduce collision risk with CV run names that contain single
+    underscores. Splitting from the right keeps ``__`` inside the CV run name intact.
     """
     experiment_name, fold_id = partition_key.rsplit(CV_PARTITION_KEY_SEPARATOR, maxsplit=1)
     return experiment_name, fold_id
