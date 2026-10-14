@@ -358,6 +358,22 @@ question. `data/NGED/` stays outside it: the pipeline's own power and metadata t
 reads and does not own.
 """
 
+
+ML_EXPERIMENTS_DATA_DIR: Final[Path] = REPO_DATA_DIR / "ml-experiments"
+"""Where every ml-experiment keeps its predictions, under `<id>-<slug>/predictions/`.
+
+The folder sits beside `STUDIES_DATA_DIR`, not under it, because the `ml-experiment` skill and the
+`study` skill keep separate stores. `.ids/` inside it holds one marker folder per reserved id.
+"""
+
+ML_EXPERIMENTS_DOCS_DIR: Final[Path] = _main_checkout(PROJECT_ROOT) / "docs" / "ml-experiments"
+"""The main checkout's `docs/ml-experiments/`, where every ml-experiment's `result.md` lives.
+
+An experiment id is never reused, so `reserve_experiment` reads this folder as well as the data
+folder. The main checkout's copy is the one that holds every merged experiment, even from a linked
+worktree.
+"""
+
 DOWNLOADS_DIR: Final[Path] = STUDIES_DATA_DIR / "downloads"
 """The layer of `data/studies/` that holds shared downloads, one folder per kind of data.
 
