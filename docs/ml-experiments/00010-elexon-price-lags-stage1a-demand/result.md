@@ -1,7 +1,7 @@
 ---
 id: "00010"
 slug: elexon-price-lags-stage1a-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   Adding the Elexon Market Index Data price from exactly 7 days earlier to the ERA5-trained stage 1a
@@ -29,17 +29,101 @@ benchmark: >-
 row_set_id: era5_val_2024_07_to_2025_06_v1
 metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
-verdict: null
-advice: []
-production_status: null
+verdict: inconclusive
+best_arm: >-
+  BASE, the experiment 00006 Primary input set with recency weights. No arm that adds a price,
+  demand, or wind column beat it with an interval that excludes zero at the series the plan listed.
+headline: >-
+  C1 at B2, price against base: -0.92 points (98.3% interval -2.10 to +0.07) in the selection year
+  and -0.06 (-0.38 to +0.23) in the confirmation year. C4, the gain at the listed series minus the
+  gain at the others: -0.55 (-1.43 to +0.20) in the selection year and +0.47 (+0.06 to +0.91) in
+  the confirmation year, the wrong sign.
+lessons: >-
+  The apparent selection-year gain at B2 is mostly a calendar-structure effect, not a price signal,
+  because the shuffled price (from an earlier week) gives most of it. The gain disappears in the
+  confirmation year. With one listed series that has training history, the test cannot separate a
+  battery response from noise.
+advice:
+  - >-
+    Do not add lagged price columns to the stage 1a demand model on this evidence, because the
+    selection-year gain at B2 did not survive the confirmation year and the shuffled price matched
+    most of it (C3, C1).
+  - >-
+    Test a battery mechanism on series with known, large, long-lived batteries, because only B2
+    had enough battery capacity and history here, and P4 had too little training history to be
+    fitted in the selection year (section "The listed substations").
+  - >-
+    Keep a shuffled-price control in any experiment that adds lagged price columns, because the
+    unshuffled gain at B2 was mostly reproduced by price columns from another week (C3).
+  - >-
+    Add a month-by-half-hour climatology row to every experiment's scored arms, which this one
+    omitted (section "Failures").
+production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00010-elexon-price-lags-stage1a-demand/
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1215
 ---
 
 # Does the lagged electricity price help the demand model at substations with batteries?
 
-**Status: planned. No fit has run.** The code reuses experiment 00006's fit and report scripts by
-copying their patterns.
+**Verdict: inconclusive.** Adding the Elexon price from 7 days earlier did not lower the error of
+the stage 1a demand model at the substation hosting the largest battery (B2) with an interval that
+excludes zero, and the gain seen in the selection year disappeared in the confirmation year. The
+pre-registered mechanism test (C4) failed in the selection year and pointed the wrong way in the
+confirmation year, so the experiment cannot support a price response by batteries.
+
+**Absolute scores** (mean absolute error of the median, points of capacity, 3 seeds; 95% intervals
+are in the results tables):
+
+| Scope and year | BASE | PRICE | CONTROL | SHUFFLED |
+| --- | --- | --- | --- | --- |
+| B2, selection | 10.98 | 10.05 | 10.91 | 10.21 |
+| Other series (16), selection | 9.79 | 9.40 | 9.78 | 9.47 |
+| Primary, selection | 6.97 | 7.01 | 7.03 | 7.04 |
+| B2, confirmation | 10.12 | 10.06 | 9.89 | 10.09 |
+| P4, confirmation | 4.22 | 5.33 | 4.16 | 4.42 |
+| Other series (16), confirmation | 9.35 | 9.41 | 9.13 | 9.29 |
+| Primary, confirmation | 7.11 | 7.15 | 6.92 | 7.04 |
+
+![Change in error from adding the price, by series and year](figure_1.svg)
+
+![Planned contrasts with 98.3% intervals](figure_2.svg)
+
+## What the contrasts say
+
+- **C1, price against base, B2:** -0.92 (-2.10 to +0.07) in the selection year, so not material
+  (the interval includes zero). In the confirmation year -0.06 (-0.38 to +0.23).
+- **C2, price against demand and wind, B2:** -0.86 (-2.10 to +0.21) in the selection year, so not
+  material, and +0.18 (-0.08 to +0.41) in the confirmation year.
+- **C3, price against shuffled price, B2:** -0.16 (-0.53 to +0.17). The shuffled price gives about
+  five sixths of the gain, so most of the selection-year gain does not depend on the price's value
+  at the right time.
+- **C4, gain at the listed series minus gain at the others:** -0.55 (-1.43 to +0.20) in the
+  selection year, and +0.47 (+0.06 to +0.91) in the confirmation year, where the listed series got
+  worse by more than the others.
+- **The gain was concentrated at the series with the largest errors, not at the listed series.** In
+  the selection year the largest gains were at G1 (-4.89), P2 (-1.89), and G2 (-1.34). In the
+  confirmation year G1 got worse by +1.34 while P2 still gained -2.35.
+
+## Failures and deviations
+
+- **P4 could not be fitted in the selection year,** because it has only 14,615 half-hours of
+  training data before the purge, under the 17,520 the fit requires. The listed group in the
+  selection year is B2 alone. P4 was fitted in the confirmation year, and the price made it worse
+  by +1.11 (+0.23 to +2.85). Two further series have too little history in both years, so 17
+  series were fitted in the selection year and 18 in the confirmation year, not 20.
+- **No month-by-half-hour climatology row was scored,** which the `ml-experiment` skill asks for.
+- **The refuted branch of the decision rule was unreachable,** as the power check predicted.
+- **No Opus review was run;** a Sonnet review of the plan and one of the code ran, as the
+  manager's brief asked. The code review found that the shuffled arm read prices from later weeks;
+  that was fixed before any fit.
+
+## Lessons
+
+**The selection-year gain at B2 came mostly from a calendar-structure effect, not the price
+signal.** Price columns taken from a week earlier gave most of the gain. The experiment did not
+test why, so the gain may come from the price level, the weekly rhythm, or the extra columns alone. The advice list
+in the front matter carries the actions.
 
 ## Why the price, and why only a lag
 

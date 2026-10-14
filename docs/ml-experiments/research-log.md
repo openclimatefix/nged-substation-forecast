@@ -29,6 +29,8 @@ the maintainer to confirm.
 | [00005](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | Not yet merged |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
 | [00007](00007-cams-static-correction-stage1a-residual/result.md) | Does a static CAMS correction fitted on one year remove most of the next year's daytime stage 1a residual? | Inconclusive | Not for production | Not yet merged |
+| [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | Not yet merged |
+| [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -172,3 +174,44 @@ does a static CAMS correction remove the stage 1a daytime
 residual?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1210).
 
 ![Share removed by substation](00007-cams-static-correction-stage1a-residual/figure_1.svg)
+
+### 00008: summaries of recent power in the stage 2 calibrator
+
+**Adding the minimum, mean, and maximum of the last 24 hours and of the same weekday to the
+calibrator with raw lags changed the score by no resolvable amount.** The experiment reused 00005's
+stage 1 statistics on the same 73 runs, and every arm with ERA5 residuals is a ceiling.
+
+- **Headline result:** C1 (summaries added to L3) was -0.02 points of capacity for leads up to 48
+  hours (98.75% interval -0.14 to +0.13). Replacing the raw power lags with summaries was worse
+  (+0.29).
+- **Finding for later experiments:** summaries alone, without ERA5 residuals, scored 1.18 points
+  better than no recent power up to 48 hours. They are available at forecast time, but the stage 1
+  statistics beneath them come from an ERA5-trained stage 1a.
+- **Write-up and pull request:** [result](00008-lag-summaries-in-stage2-calibrator-demand/result.md),
+  [PR #1209 (Plan experiment 00008: summaries of recent power in the stage 2
+  calibrator)](https://github.com/openclimatefix/nged-substation-forecast/pull/1209).
+
+![Summaries alone clearly beat no recent power](00008-lag-summaries-in-stage2-calibrator-demand/figure_2.svg)
+
+### 00010: the lagged electricity price in the stage 1a demand model
+
+**Adding the Elexon price from 7 days earlier to the ERA5-trained demand model did not help at the
+substation hosting the largest battery, and the experiment could not test a battery response.** The
+price is Elexon's Market Index Data (the `APXMIDP` half-hourly index, free, 98.5% of half-hours
+covered from 2019). The comparison arms were demand and wind at the same lag, and a price taken from
+an earlier week.
+
+- **Headline result:** at B2, the only listed series with enough history in the selection year, the
+  price lowered the error by 0.92 points of capacity (98.3% interval -2.10 to +0.07), and by 0.06
+  (-0.38 to +0.23) in the confirmation year. The pre-registered contrast C4, the gain at the listed
+  series minus the gain at the others, was -0.55 (-1.43 to +0.20) and then +0.47 (+0.06 to +0.91),
+  the wrong sign.
+- **Finding for later experiments:** NGED's register lists battery storage of at least 5% of
+  capacity at only 2 of the 20 series (B2 and P4), and P4 has too little history for the selection
+  year, so this series set cannot test a battery response. The shuffled price from an earlier week
+  gave about five sixths of the selection-year gain.
+- **Write-up and pull request:** [result](00010-elexon-price-lags-stage1a-demand/result.md),
+  [PR #1215 (Experiment 10: lagged electricity price in the stage 1a demand
+  model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1215).
+
+![Planned contrasts with 98.3% intervals](00010-elexon-price-lags-stage1a-demand/figure_2.svg)

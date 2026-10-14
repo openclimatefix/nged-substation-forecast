@@ -120,7 +120,7 @@ def main() -> None:
         "listed (B2, P4)": rows.filter(pl.col("site").is_in(LISTED)),
         "B2": rows.filter(pl.col("site") == "B2"),
         "P4": rows.filter(pl.col("site") == "P4"),
-        "others (18)": rows.filter(~pl.col("site").is_in(LISTED)),
+        "other series": rows.filter(~pl.col("site").is_in(LISTED)),
         "Primary": rows.filter(pl.col("substation_type") == "Primary"),
     }
     levels, contrasts = [], []
