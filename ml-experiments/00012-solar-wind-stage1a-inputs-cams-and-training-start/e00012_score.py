@@ -114,6 +114,16 @@ def climatology_points(*, cases: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFr
 def arm_rows(*, points: pl.DataFrame, cases: pl.DataFrame, arm: str, seed: int) -> pl.DataFrame:
     """Return one arm's per-case absolute error for one seed.
 
+    Args:
+        points: The arm's forecasts: the key columns and `point_norm` (a fraction of capacity).
+        cases: `validation_cases(...)`.
+        arm: The arm's name, for the error message.
+        seed: The fitting seed.
+
+    Returns:
+        The keys, `lead_hours`, `actual_norm`, `point_norm`, `seed`, and `abs_error` (points of
+        capacity) of every case of the series the arm covers.
+
     Raises:
         ValueError: If a case of the arm's series has no forecast.
     """
@@ -163,6 +173,13 @@ def all_arm_rows(*, cases: pl.DataFrame, sites: pl.DataFrame) -> dict[str, pl.Da
 
 def reproduction(*, rows: dict[str, pl.DataFrame], sites: pl.DataFrame) -> list[str]:
     """Compare arms `w` and `cams` with experiment 00001's `s1_memberavg` and `s1_cams`.
+
+    Args:
+        rows: Each arm's per-case errors, from `all_arm_rows`.
+        sites: `common.site_table()`.
+
+    Returns:
+        Markdown lines of a table of the two scores per technology.
 
     Raises:
         ValueError: If arm `w` differs from `s1_memberavg` by more than `REPRODUCTION_TOLERANCE`
