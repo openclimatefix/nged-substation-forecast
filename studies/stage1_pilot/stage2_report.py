@@ -15,10 +15,10 @@ from typing import Final
 import polars as pl
 import stage1_inputs as inputs
 import stage1_stats as stats
-from stage2_common import STAGE2_ROOT
+from stage2_common import stage2_subfolder
 
-SCORE_DIR: Final[Path] = STAGE2_ROOT / "scores"
-RESULT_DIR: Final[Path] = STAGE2_ROOT / "results"
+SCORE_DIR: Final[Path] = stage2_subfolder(name="scores")
+RESULT_DIR: Final[Path] = stage2_subfolder(name="results")
 BANDS: Final[tuple[str, ...]] = ("all", *(name for name, _, _ in inputs.LEAD_BANDS))
 TECHNOLOGIES: Final[tuple[str, ...]] = ("solar", "wind")
 METRICS: Final[dict[str, str]] = {

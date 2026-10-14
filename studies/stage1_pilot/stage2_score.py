@@ -63,6 +63,9 @@ def member_fine_quantiles(*, directory: Path, seed: int, cases: pl.DataFrame) ->
         directory: Holds `seed<s>/init=<date>.parquet` files of per-member quantile columns.
         seed: The fitting seed.
         cases: The scored cases sorted by initialisation time, series, then valid time.
+
+    Returns:
+        Array of shape (cases, 199).
     """
     keys = cases.select(CASE_KEYS)
     pieces = []
@@ -93,6 +96,9 @@ def tuned_blend(
         fine: Shape (cases, 199) mixture quantile functions.
         actual: Observed fraction of capacity per case.
         cases: The cases, with `technology`, `band`, `month`, and `valid_time`.
+
+    Returns:
+        The blended quantiles, the two parameter arrays, and the parameter table.
     """
     generator = np.random.default_rng(BLEND_SEED)
     out = np.empty((fine.shape[0], LEVELS.size), dtype=np.float32)

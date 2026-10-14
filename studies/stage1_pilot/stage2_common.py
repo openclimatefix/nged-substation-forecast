@@ -16,9 +16,23 @@ import stage1_inputs as inputs
 from scipy.stats import beta as beta_distribution
 
 STAGE2_ROOT: Final[Path] = inputs.OUTPUT_ROOT.parent / "stage2_pilot"
-STAGE1_SCORE_DIR: Final[Path] = inputs.OUTPUT_ROOT / "scores"
-ENS_FEATURES_DIR: Final[Path] = inputs.OUTPUT_ROOT / "inputs" / "ens_features"
-ANALYSIS_PATH: Final[Path] = inputs.OUTPUT_ROOT / "inputs" / "analysis_features.parquet"
+
+
+def stage2_subfolder(*, name: str) -> Path:
+    """Return one of study 2b's output folders, such as `scores` or `results`.
+
+    Args:
+        name: The folder's name under study 2b's output root.
+
+    Returns:
+        The folder's path.
+    """
+    return STAGE2_ROOT / name
+
+
+STAGE1_SCORE_DIR: Final[Path] = inputs.study_subfolder(name="scores")
+ENS_FEATURES_DIR: Final[Path] = inputs.INPUTS_DIR / "ens_features"
+ANALYSIS_PATH: Final[Path] = inputs.INPUTS_DIR / "analysis_features.parquet"
 
 LEVELS: Final[np.ndarray] = np.array([0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95])
 LEVEL_COLUMNS: Final[tuple[str, ...]] = (
@@ -106,6 +120,9 @@ def crps_estimate(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndarray:
     Args:
         quantiles: Shape (cases, 9).
         actual: Shape (cases,).
+
+    Returns:
+        The estimate per case, shape (cases,).
     """
     difference = actual[:, None] - quantiles
     pinball = np.where(difference >= 0, LEVELS * difference, (LEVELS - 1) * difference)
