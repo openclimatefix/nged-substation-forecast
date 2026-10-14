@@ -284,8 +284,8 @@ experiment 00006 with the 14-day Christmas column, trained from 2021-09-01.
   indicator scored 0.26 points higher on the whole year than the base arm (99.2% interval 0.12 to
   0.43).
 - **Write-up and pull request:**
-  [result](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md), [PR #1214 (Plan
-  experiment 11: school-term and return-to-work columns for the stage 1a demand
+  [result](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md), [PR #1214
+  (Experiment 11: school-term and return-to-work columns for the stage 1a demand
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214).
 
 ![Change in error by window and column set](00011-school-term-and-return-to-work-columns-stage1a-demand/figure_1.svg)
