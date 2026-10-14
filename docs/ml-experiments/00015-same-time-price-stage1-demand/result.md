@@ -29,16 +29,14 @@ metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
 verdict: inconclusive
 best_arm: >-
-  CONTROL (national demand and wind at time t) in the confirmation year, 8.50 points pooled; PRICE
-  in the selection year, 9.34, level with CONTROL at 9.35. No arm that adds the price beat the
-  price from another week with an interval that excludes zero.
+  No arm is separated from the others, because only PRICE against BASE in the selection year has an interval that excludes zero. The lowest pooled scores were PRICE's 9.34 in the selection year and CONTROL's 8.50 in the confirmation year.
 headline: >-
   C1, price against no price, pooled: -0.52 points (97.5% interval -0.88 to -0.11) in the selection
   year and -0.18 (-0.50 to +0.08) in the confirmation year. C2, price against a price from another
   week: -0.07 (-0.17 to +0.03) and -0.06 (-0.18 to +0.07).
 lessons: >-
   Most of the gain from adding a price column came from any price column carrying the week's price
-  level, because a price from another week reproduced 0.45 of the 0.52 points. The gain was largest
+  level, because the point estimates say a price from another week matched 0.45 of the 0.52 points. The gain was largest
   from 12:00 to 20:00 and at the series with the largest errors, and it did not repeat at B2.
 advice:
   - >-
@@ -46,9 +44,7 @@ advice:
     price from another week removes most of its gain and C1 did not repeat in the confirmation year
     (C1, C2).
   - >-
-    Try national demand and wind at time t as the extra inputs of the expected-power model instead
-    of the price, because they matched the price in the selection year and beat it by 0.43 points
-    in the confirmation year (C3).
+    Try national demand and wind at time t as extra inputs of the expected-power model, because they did no worse than the price in either year and scored 0.43 points lower pooled in the confirmation year (C3, whose intervals include zero).
   - >-
     Keep a price from another week as the control in any later price experiment, because it
     removed most of the gain here (C2).
@@ -88,26 +84,30 @@ confirmation year. Follows
 ## What the contrasts say
 
 - **C1 passed in the selection year only.** −0.52 (−0.88 to −0.11), with 10 of 12 months below
-  zero. In the confirmation year it is −0.18 (−0.50 to +0.08), with 6 of 12 months below zero.
+  zero. In the confirmation year C1 is −0.18 (−0.50 to +0.08), with 6 of 12 months below zero.
 - **C2 failed.** The price against the other-week price is −0.07 (−0.17 to +0.03) in the selection
   year and −0.06 (−0.18 to +0.07) in the confirmation year, so the point estimate misses the
   −0.1 threshold and the interval includes zero. The other-week price carries the week's price
-  level and so removes 0.45 of the 0.52 points. This is a gain from any price column, not from the
-  price at time t.
+level, and the point estimates say it matches 0.45 of the 0.52 points. That match has no interval of
+its own, and the C2 interval allows the share to lie between about 0.35 and 0.55 points, so the gain
+probably comes largely from any price column and not from the price at time t.
 - **C3, price against national demand and wind:** −0.01 (−0.39 to +0.41) in the selection year and
-  +0.43 (−0.03 to +0.86) in the confirmation year. National demand and wind explain the demand
-  series as well as the price in one year and better in the other, so the price at time t is a
-  proxy for national conditions here.
+  +0.43 (−0.03 to +0.86) in the confirmation year. Both intervals include zero, so national demand
+and wind did no worse than the price. Only at B2 in the confirmation year does the interval exclude
+zero (+0.90, 0.55 to 1.21, in favour of national demand and wind).
 - **C4, by hour (selection year):** −0.27 (0 to 4), −0.56 (8 to 12), −0.78 (12 to 16), −0.83 (16 to
   20), and −0.40 (20 to 24). In the confirmation year the gain is −0.30 (8 to 12), −0.38 (12 to
   16), −0.31 (16 to 20), and +0.07 (20 to 24). The prediction that the gain peaks from 16:00 to
-  20:00 held in the selection year only.
+20:00 held in the selection year only. The predicted pooled gain of 0.1 to 0.3 points was exceeded
+in the selection year (0.52) and met in the confirmation year (0.18).
 - **B2:** −1.09 (−2.25 to −0.10) in the selection year, where the other-week price gave about the
   same (−1.20 against BASE). In the confirmation year B2 gained 0.00.
 - **By series:** in the selection year the price removes 0.11 to 0.19 of the squared residual at B1,
   B2, G1, G2, P2, and P6, and 0.05 or less at the other 11. Beside the other-week price it removes
-  a further 0.06 or less at those six, so most of the gain at them is price-level signal and not the
-  price at time t. At G1 the price lowers the error by 4.34 points, and by 0.54 points more than the
+  a further 0.06 or less at those six, so at most of them the price-level signal accounts for most
+of the gain. B2 is the exception: the other-week price gained 0.11 points more than the price did.
+Eight of the 11 other series get no gain at all, P15 (+0.79) and P8 (+0.26) the worst. At G1 the
+price lowers the error by 4.34 points, and by 0.54 points more than the
   other-week price does. In the confirmation year only P2 (0.21) and P6 (0.15) keep a gain, and P2
   gains 1.04 points more than from the other-week price.
 
@@ -117,17 +117,19 @@ confirmation year. Follows
   series were fitted in the selection year and 18 in the confirmation year, as in experiment 10.
 - **The decision rule gives `inconclusive`:** C1 and C2 did not both pass in the selection year,
   and the refuted branch needed the C1 interval wholly above −0.1 in both years, which it was
-  not. This is not a small gain, because C2 includes zero.
+  not. The result is not a small gain by the skill's definition, because C2's interval includes
+zero.
 - **The residual breakdowns do not give out-of-fold residuals over the whole history,** which the
   later experiment needs.
 - **No Opus review was run.** Sonnet reviewed the plan and the code; the code review found no
   bug. The shuffled price is built over the whole history, so a training row within 4 weeks of the
-  fold's end can carry a price from the purge or validation weeks. That is a price, not a
-  target, so no outcome leaks.
+  fold's end can carry a price from the purge or validation weeks. The shuffled column holds a price
+and no target, so no outcome leaks.
 
 ## Purpose
 
-**The model is a tool for a later experiment, not a forecaster.** It maps the observed price and
+**The stage 1 demand model is a tool for a later experiment, not a forecaster.** The model maps the
+observed price and
 weather at time t to power at time t. A later experiment could feed it the prices of the past to
 estimate the power that should have been metered, and so measure how unusual the actual lagged power
 was. That use needs two facts from this experiment: whether the price adds information beyond the
@@ -151,8 +153,9 @@ before the purge to be fitted in a fold, so the count fitted is reported for eac
 | CONTROL | GB national demand outturn (`INDO`) and wind output (`FUELHH`) at the same half-hour, the non-price national signals the price follows |
 | CLIMATOLOGY | not a fit: the month-by-half-hour median of the fold's training window, as `ClimatologyForecaster` computes it |
 
-**Weather and price source.** The weather is ERA5, which arrives about 5 days late, so the model
-cannot run at forecast time. That is intended, because the model scores past power. The price is
+**Weather and price source.** The weather is ERA5, which arrives about 5 days late, so the stage 1
+demand model cannot run at forecast time. The ERA5 dependence is intended, because the model scores
+past power. The price is
 the experiment 10 pull of `APXMIDP`, 98.5% complete and fully complete from 2024-04-14. Training
 rows before 2021 can have a missing price, which XGBoost handles natively.
 
@@ -191,7 +194,8 @@ with the sign the prediction gives, and the write-up reads the interval together
 
 **Residual breakdowns, descriptive.** For each local hour and each series, the report gives the
 mean absolute error of BASE and PRICE, and the share of BASE's squared residual that PRICE removes.
-This is the number the later experiment needs. Beside each cell the report gives PRICE − SHUFFLED,
+The squared share is the number the later experiment needs. Beside each cell the report gives PRICE
+− SHUFFLED,
 the noise floor that a cell of this size shows with an uninformative price. The report uses absolute
 residuals as the headline and the squared share as a second view. The B2 gain is reported beside the
 pooled gain.
