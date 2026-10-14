@@ -36,6 +36,26 @@ headline: >-
   Primary substations, leads up to 48 h, C1 (L2c minus L3): +0.84 (+0.28 to +1.50 at 99%), 3 of 12
   months negative; L3 scores 5.31 against 6.14 for L2c and 7.11 for R0c. Refuted: lagged power
   helps more in the stage 2 calibrator than in stage 1b.
+advice:
+  - >-
+    Put recent power, as lags and recent residuals, into the stage 2 calibrator before building a
+    residual-persistence stage 1b. For Primary substations the calibrator placement scored 0.84
+    points of capacity better up to 48 h (C1), and adding stage 1b to it lowered the score by at
+    most 0.12 points.
+  - >-
+    Compare any arm with lagged power against a calibrated arm without it. A lag-free calibrator
+    lowered the quantile score by about 1 point of capacity at short leads, so a comparison against
+    uncalibrated stage 1a overstates what lags add.
+  - >-
+    Replace the ERA5 weather at lag times with weather that is available at forecast time before
+    relying on a lagged arm. Every lagged arm here is a ceiling.
+  - >-
+    Report how many series agree with each mean. C1 favoured the calibrator placement on average,
+    and stage 1b was better in 8 of the 16 Primary series up to 48 h.
+  - >-
+    Train a demand stage 1a from 2023-09, not from 2019-09, and keep BSP and GSP separate from
+    Primary. The later window lowered stage 1a's score by 0.95 points (E10), and the GSP error is
+    dominated by drift.
 code: ml-experiments/00005-lag-placement-stage1b-vs-stage2-demand/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1195
 ---
