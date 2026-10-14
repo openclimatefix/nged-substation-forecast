@@ -122,7 +122,9 @@ decided, and add a row to the table in `docs/architecture/design-evidence.md`: t
 setting, what production now does, a link to the experiment, and its verdict. A `supported` or
 `refuted` verdict earns a row, and an `inconclusive` or `invalid` one does not. The first row
 replaces the "None yet" placeholder. An experiment that later overturns a row changes the row in
-place, and a row whose setting production drops is deleted.
+place, and a row whose setting production drops is deleted. A pull request that numbers a model
+release also adds a row to `docs/live_service/model-releases.md`, listing the experiments the
+release incorporates.
 
 ## The write-up
 
