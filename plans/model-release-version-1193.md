@@ -14,8 +14,8 @@ serving now and is overwritten on every promotion, so the history sits in Dagste
 **The solution.** The model release becomes an integer carried by the forecaster's saved config and
 stamped into `power_fcst_model_version`, and the `MODEL_VERSION` class constant is removed. A CV run
 that is not a release stamps `0`, and the release CV run, named `model-release-12`, stamps `12`. A
-release log (a docs page) records each release. The `promoted_model` asset and `promotion.json`
-report the release they promote. The software release keeps SemVer, and a software release pins
+release log (a docs page) records each release, and the `promoted_model` asset reports the release it
+promotes. The software release keeps SemVer, and a software release pins
 exactly one model release because the image contains it.
 
 ## Verdict, size, and departures
@@ -25,8 +25,7 @@ exactly one model release because the image contains it.
   files, and `promotion.json` is overwritten per promotion.
 - **Size: complex.**
     - What gets stored: fires. A new field in the saved `meta.json` config and in the MLflow `config`
-      tag and params, a changed meaning for a stored `PowerForecast` column, a new field in
-      `promotion.json`, and a release log.
+      tag and params, a changed meaning for a stored `PowerForecast` column, and a release log.
     - Production serving path: fires. `XGBoostForecaster.predict` stamps `power_fcst_model_version`
       on every live forecast row.
     - Degradation rule: does not fire. The change adds no failure of a missing or stale input.
@@ -37,7 +36,9 @@ exactly one model release because the image contains it.
 - **Reviews: both plan reviews, the simplicity review (Sonnet) and the correctness review (Opus).**
   The diff gets all three `implement-issue` diff reviews, including the mutation pass.
 - **Departures from the maintainer's summary:** none in design. The plan adds that the release log
-  records the MLflow run id of the promoted fold run, because rollback needs it.
+  records the MLflow run id of the promoted fold run, because rollback needs it. The simplicity
+  review removed the `promotion.json` field and the `design-evidence.md` column that the first draft
+  had, and found a caller the first draft missed (`studies/quick_wins/report_production_arm.py`).
 
 ## Solution
 
@@ -60,15 +61,14 @@ The CV assets train and score the folds. `XGBoostForecaster.save` writes the con
 config, so no row can carry a version that its model's config does not.
 
 The maintainer picks the champion fold run off the leaderboard and materialises `promoted_model`
-with its run id. `fetch_model_artifacts` reads the staged `meta.json`, copies `model_release` into
-`promotion.json` (`{"mlflow_run_id", "promoted_at", "model_release"}`), and `promoted_model` reports
-`model_release` as output metadata. The maintainer builds the image, tags it as today, and adds a
+with its run id. `promoted_model` reads back the promoted `meta.json`, as it does today for
+`experiment_name`, and reports `model_release` as output metadata, so the maintainer can confirm
+the right release landed. The maintainer builds the image, tags it as today, and adds a
 row to the release log (`docs/live_service/model-releases.md`): the release number, the date, the
 git tag `model-12`, the run's `experiment_name`, the MLflow run id of the promoted fold run (the
 rollback target), the software release (`v0.2.2`) that first shipped it, and the ml-experiments it
 incorporated, each linked. The same pull request adds the `design-evidence.md` rows and `informs`
-fields for those ml-experiments, as the `ml-experiment` skill already requires, with a new "since
-model release N" column in `design-evidence.md`.
+fields for those ml-experiments, as the `ml-experiment` skill already requires.
 
 #### The main branches off the happy path
 
@@ -106,24 +106,25 @@ model release N" column in `design-evidence.md`.
   says model-family identity is `MODEL_NAME` and `MODEL_VERSION`.
 - **`packages/baseline_forecasters/src/baseline_forecasters/climatology.py` and
   `manual_heuristic.py`.** Remove `MODEL_VERSION = 1`, and stamp from the config.
-- **`packages/ml_core/src/ml_core/production_helpers.py`.** `fetch_model_artifacts` writes
-  `model_release` (read from `meta["model_params"].get("model_release", 0)`) into `promotion.json`.
 - **`src/nged_substation_forecast/defs/promotion_assets.py`.** `promoted_model` adds `model_release`
-  to its output metadata.
+  (from `model_params.get("model_release", 0)`) to its output metadata.
+- **`studies/quick_wins/report_production_arm.py`.** Line 100 prints
+  `XGBoostForecaster.MODEL_VERSION`, which the plan removes. The sentence drops its "the forecaster
+  class is version N" clause, because the stamped versions it prints are the evidence.
 - **`packages/contracts/src/contracts/power_schemas.py`.** Change the description of
   `power_fcst_model_version` to the model release: `0` for a CV run that is not a release. No dtype
   change, and no change to the other fields.
 - **Docs.**
     - `docs/live_service/model-releases.md` (new): the release log and the two-identifier rule.
-    - `docs/live_service/operations.md` and `docs/live_service/aws.md`: the promotion steps and the
-      rollback recipe read the release log for the run id, and the `promotion.json` description
-      gains `model_release`.
-    - `docs/architecture/design-evidence.md`: a "since model release" column.
+    - `docs/live_service/operations.md`: the promotion steps report `model_release`, and the
+      rollback recipe reads the release log for the run id instead of Dagster's run history.
     - `CLAUDE.md` ("ML Model Interface"), `docs/architecture/overview.md`,
       `docs/design-philosophy/design-principles.md`, `docs/roadmap/delivery-tables.md`,
-      `packages/contracts/README.md`: replace the "`MODEL_VERSION` is a class constant" account.
-    - `.claude/skills/ml-experiment/SKILL.md`: the "When a winner reaches production" section
-      mentions the release log and `model_release`.
+      `packages/contracts/README.md`, and the stale `MODEL_VERSION = 1` line in
+      `docs/roadmap/metrics-and-leaderboard.md` (a planned persistence forecaster): replace the
+      "`MODEL_VERSION` is a class constant" account.
+    - `.claude/skills/ml-experiment/SKILL.md`: one sentence in "When a winner reaches production"
+      saying that the release log gets a row too.
     - `mkdocs.yml`: nav entry for the new page.
 - **Tests.** The `PowerForecast` fixtures that hard-code `power_fcst_model_version: 1` stay as they
   are, because the field's dtype and range are unchanged.
@@ -155,11 +156,6 @@ Each new test asserts what fails on `main` today.
 - `packages/ml_core/tests/test_base_forecaster.py`: `model_release` round-trips through
   `save`/`load` (read back from `meta.json`), and a `meta.json` without the field loads with `0`.
   Existing tests that define `MODEL_VERSION = 1` on a stub subclass are updated.
-- `packages/ml_core/tests/test_production_helpers.py`: `fetch_model_artifacts` writes `model_release`
-  into `promotion.json`, and writes `0` for a `meta.json` without the field.
-- `tests/test_register_experiment_job.py`: a config with `model_release` is part of the identity,
-  so re-registering the same name with a different number raises `ExperimentIdentityChangedError`
-  naming `config.model_release`.
 - The `PowerForecast` contract test already covers the Int16 dtype; no new test.
 
 ## Docs to update
@@ -198,3 +194,12 @@ uv run pre-commit run --all-files
    recommend accepting this, because no serious model has been trained.
 6. **`MODEL_VERSION` removal is a breaking change** to any code naming it. `grep` finds only the three
    classes, their tests, and docs, all updated here.
+
+## Findings considered and rejected
+
+- **Drop the git tag `model-N`** (simplicity review): rejected. The maintainer accepted tags when
+  the identifiers were agreed, and the tag pins the commit for a release in the log.
+- **Put the release log in `operations.md` instead of a new page** (simplicity review): rejected. A
+  growing table in a runbook rots, and the page costs one nav line.
+- **Fill stored-config defaults in `_config_differences`** (the review's optional free fix): not
+  adopted. Risk 1 stays as the maintainer's accepted cost of a retrain.
