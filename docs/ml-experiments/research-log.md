@@ -32,6 +32,7 @@ the maintainer to confirm.
 | [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | Not yet merged |
 | [00009](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, when both are applied to ENS members? | Refuted: a gain of 0.035 points, not 0.2 | Not for production | Not yet merged |
 | [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | Not yet merged |
+| [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -144,6 +145,26 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202).
 
 ![Error on the confirmation year by arm and substation type](00006-stage1a-demand-input-feature-sweep/figure_1.svg)
+
+### 00012: inputs and training start for the solar and wind stage 1a model
+
+**No input change lowered the solar or wind error by the 0.15 points the plan counted as a gain.**
+The experiment tested a CAMS-trained model, a stage 0 model that calibrates ENS irradiance to CAMS, a
+clear-sky-ratio target (solar), a power-curve base margin (wind), a smaller weather block, and two
+later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** CAMS-trained minus ERA5-trained for solar is -0.140 points of capacity (99.5%
+  interval -0.277 to -0.044), largest within 24 h at -0.35. The stage 0 model made the 51-member
+  average worse by 0.160 (-0.017 to +0.382), although it improved the control member alone from
+  8.34 to 7.82. The clear-sky-ratio target (-0.048) and the base margin (-0.030) were equivalent to
+  the benchmark.
+- **Finding for later experiments:** training starts in 2023-09 and 2024-04 were equivalent to
+  2019-09 for solar and wind within 0.3 points, unlike demand.
+- **Write-up and pull request:** [result](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md),
+  [PR #1217 (Plan experiment 12: inputs and training start for the solar and wind stage 1a
+  model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1217).
+
+![Planned contrasts](00012-solar-wind-stage1a-inputs-cams-and-training-start/figure_2.svg)
 
 ### What the experiments taught us so far
 

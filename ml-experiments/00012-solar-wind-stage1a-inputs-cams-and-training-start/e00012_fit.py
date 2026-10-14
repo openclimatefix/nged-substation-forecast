@@ -230,7 +230,9 @@ def member_average(*, frame: pl.DataFrame, point: np.ndarray, arm: str) -> pl.Da
     """
     averaged = (
         frame.select(*common.KEY_COLUMNS)
-        .with_columns(point_norm=pl.Series(point), ensemble_member=frame["ensemble_member"])
+        .with_columns(
+            point_norm=pl.Series(point.astype(np.float64)), ensemble_member=frame["ensemble_member"]
+        )
         .group_by(common.KEY_COLUMNS)
         .agg(
             pl.col("point_norm").mean(),
