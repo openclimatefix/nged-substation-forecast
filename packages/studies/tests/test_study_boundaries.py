@@ -474,18 +474,45 @@ RAW_POWER_TABLE_NAME: Final[re.Pattern[str]] = re.compile(r"(?<!\w)power_time_se
 `Settings` attribute both do."""
 
 
+def raw_power_table_offenders(*, repo_root: Path) -> list[str]:
+    """Return each study, experiment, or `studies` package script that names the raw power table."""
+    scripts = [
+        *(repo_root / "packages" / "studies" / "src").rglob("*.py"),
+        *(repo_root / "studies").rglob("*.py"),
+        *(repo_root / EXPERIMENTS_FOLDER).rglob("*.py"),
+    ]
+    return sorted(
+        script.relative_to(repo_root).as_posix()
+        for script in scripts
+        if RAW_POWER_TABLE_NAME.search(script.read_text())
+    )
+
+
 def test_no_study_names_the_raw_power_table():
     # `studies.power.scan_power` is the one reader of observed power. A study that names the raw
     # table instead reads rows the leaderboard scorer never sees.
-    studies_package = REPO_ROOT / "packages" / "studies" / "src"
-    scripts = [
-        *studies_package.rglob("*.py"),
-        *(REPO_ROOT / "studies").rglob("*.py"),
-        *(REPO_ROOT / EXPERIMENTS_FOLDER).rglob("*.py"),
+    assert raw_power_table_offenders(repo_root=REPO_ROOT) == []
+
+
+def test_the_raw_power_table_is_found_in_each_of_the_three_places_scripts_live(tmp_path: Path):
+    offender = "table = 'power_time_series'\n"
+    _write(root=tmp_path / "packages" / "studies" / "src", files={"studies/a.py": offender})
+    _write(root=tmp_path / "studies", files={"alpha/b.py": offender})
+    _write(root=tmp_path / "ml-experiments", files={"e00001-demo/e00001_c.py": offender})
+
+    assert raw_power_table_offenders(repo_root=tmp_path) == [
+        "ml-experiments/e00001-demo/e00001_c.py",
+        "packages/studies/src/studies/a.py",
+        "studies/alpha/b.py",
     ]
-    offenders = [
-        script.relative_to(REPO_ROOT).as_posix()
-        for script in scripts
-        if RAW_POWER_TABLE_NAME.search(script.read_text())
-    ]
-    assert offenders == []
+
+
+def test_a_script_nested_in_an_experiment_folder_is_scanned(tmp_path: Path):
+    studies = tmp_path / "studies"
+    experiments = tmp_path / "ml-experiments"
+    _write(root=studies, files={"alpha/one.py": ""})
+    _write(root=experiments, files={"e00001-demo/deep/e00001_x.py": "import one\n"})
+
+    assert crossing_imports(studies_dir=studies, extra_dirs=[experiments]) == {
+        "ml-experiments/e00001-demo/deep/e00001_x.py": ["one"]
+    }

@@ -1,4 +1,5 @@
 import json
+import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from studies.experiment_store import (
     reserve_experiment,
     write_predictions,
 )
+from studies.sources import ML_EXPERIMENTS_DATA_DIR, ML_EXPERIMENTS_DOCS_DIR, REPO_DATA_DIR
 
 from studies import experiment_store
 
@@ -75,7 +77,9 @@ def test_a_marker_taken_between_listing_and_creation_moves_the_id_on(
     assert _reserve(tmp_path=tmp_path) == 2
 
 
-@pytest.mark.parametrize("slug", ["", "a/b", "..", "Upper", "two--hyphens", "-lead", "has space"])
+@pytest.mark.parametrize(
+    "slug", ["", "a/b", "..", "Upper", "two--hyphens", "-lead", "trail-", "has space", "a\n"]
+)
 def test_a_bad_slug_is_rejected(tmp_path: Path, slug: str):
     with pytest.raises(ValueError, match="slug"):
         _reserve(tmp_path=tmp_path, slug=slug)
@@ -173,8 +177,10 @@ def test_a_valid_time_on_or_after_the_holdout_start_is_refused_on_write_and_on_r
     [
         pl.DataFrame({"power_fcst": [1.0]}),
         pl.DataFrame({"valid_time": [datetime(2026, 1, 1)]}),
+        pl.DataFrame({"valid_time": [datetime(2026, 1, 1).date()]}),
+        pl.DataFrame({"valid_time": ["2026-01-01"]}),
     ],
-    ids=["no valid_time", "naive valid_time"],
+    ids=["no valid_time", "naive valid_time", "date valid_time", "string valid_time"],
 )
 def test_a_frame_without_a_utc_valid_time_is_refused(tmp_path: Path, frame: pl.DataFrame):
     experiment_id = _reserve(tmp_path=tmp_path)
@@ -183,11 +189,85 @@ def test_a_frame_without_a_utc_valid_time_is_refused(tmp_path: Path, frame: pl.D
         _write(tmp_path=tmp_path, experiment_id=experiment_id, frame=frame)
 
 
-def test_a_bad_set_name_is_refused(tmp_path: Path):
+@pytest.mark.parametrize(
+    "name", ["../escape", "Upper", "a--b", "a__b", "a-", "_a", "", "a\n", ".hidden"]
+)
+def test_a_bad_set_name_is_refused(tmp_path: Path, name: str):
     experiment_id = _reserve(tmp_path=tmp_path)
 
     with pytest.raises(ValueError, match="set name"):
-        _write(tmp_path=tmp_path, experiment_id=experiment_id, name="../escape")
+        _write(tmp_path=tmp_path, experiment_id=experiment_id, name=name)
+
+
+def test_a_set_name_with_underscores_and_hyphens_is_accepted(tmp_path: Path):
+    experiment_id = _reserve(tmp_path=tmp_path)
+
+    assert _write(
+        tmp_path=tmp_path, experiment_id=experiment_id, name="era5_pre-trained-v2"
+    ).is_dir()
+
+
+def test_the_id_search_reads_every_source_and_takes_the_largest(tmp_path: Path):
+    (tmp_path / "docs" / "00003-a").mkdir(parents=True)
+    (tmp_path / "data" / "00007-b").mkdir(parents=True)
+    (tmp_path / "data" / ".ids" / "00005").mkdir(parents=True)
+
+    assert _reserve(tmp_path=tmp_path) == 8
+
+
+@pytest.mark.parametrize(
+    ("where", "name"),
+    [("data", "00009-x"), ("data/.ids", "00009"), ("docs", "00009-x")],
+)
+def test_each_source_of_ids_counts_alone(tmp_path: Path, where: str, name: str):
+    (tmp_path / where / name).mkdir(parents=True)
+
+    assert _reserve(tmp_path=tmp_path) == 10
+
+
+@pytest.mark.parametrize("junk", ["000012-x", "00012x", "a00012-x", "abc", "0012-x"])
+def test_a_folder_that_is_not_five_digits_then_a_hyphen_is_not_an_id(tmp_path: Path, junk: str):
+    (tmp_path / "docs" / junk).mkdir(parents=True)
+
+    assert _reserve(tmp_path=tmp_path) == 1
+
+
+def test_two_folders_with_one_id_or_none_make_the_experiment_unreadable(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    (data_dir / "00004-a").mkdir(parents=True)
+    (data_dir / "00004-b").mkdir()
+
+    for experiment_id in (4, 5):
+        with pytest.raises(ValueError, match="expected one folder"):
+            _write(tmp_path=tmp_path, experiment_id=experiment_id)
+
+
+def test_the_manifest_records_the_row_set_it_was_given(tmp_path: Path):
+    experiment_id = _reserve(tmp_path=tmp_path)
+    _write(tmp_path=tmp_path, experiment_id=experiment_id, row_set_id="another_row_set")
+
+    read_predictions(
+        experiment_id=experiment_id,
+        name="arm-a",
+        row_set_id="another_row_set",
+        data_dir=tmp_path / "data",
+    )
+
+
+def test_one_valid_time_before_the_holdout_does_not_excuse_another_after_it(tmp_path: Path):
+    experiment_id = _reserve(tmp_path=tmp_path)
+    frame = pl.DataFrame(
+        {"valid_time": [datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 7, 2, tzinfo=UTC)]}
+    )
+
+    with pytest.raises(ValueError, match="holdout"):
+        _write(tmp_path=tmp_path, experiment_id=experiment_id, frame=frame)
+
+
+def test_the_stores_folders_are_named_as_the_skill_says():
+    assert ML_EXPERIMENTS_DATA_DIR.parent == REPO_DATA_DIR
+    assert ML_EXPERIMENTS_DATA_DIR.name == "ml-experiments"
+    assert ML_EXPERIMENTS_DOCS_DIR.parts[-2:] == ("docs", "ml-experiments")
 
 
 def _arm(*, loss: float, seeds: tuple[int, ...] = (0,)) -> pl.DataFrame:
@@ -269,8 +349,48 @@ def test_a_frame_that_already_has_a_built_column_is_refused(column: str):
         losses_for_bootstrap(arm_losses={"a": _arm(loss=1.0).with_columns(**{column: pl.lit("x")})})
 
 
-def test_the_code_state_is_a_full_commit_hash_and_a_flag():
-    commit, dirty = _real_code_state()
+def test_arms_whose_seeds_are_listed_in_different_orders_are_compared():
+    first = _arm(loss=1.0, seeds=(0, 1))
+    second = _arm(loss=2.0, seeds=(1, 0)).sort("seed", descending=True)
 
-    assert len(commit) == 40
-    assert isinstance(dirty, bool)
+    assert losses_for_bootstrap(arm_losses={"a": first, "b": second}).height == 48
+
+
+def test_two_rows_that_differ_only_in_seed_are_not_duplicates():
+    assert losses_for_bootstrap(arm_losses={"a": _arm(loss=1.0, seeds=(0, 1))}).height == 24
+
+
+def test_a_first_arm_missing_rows_that_a_later_arm_has_is_refused():
+    with pytest.raises(ValueError, match="same rows"):
+        losses_for_bootstrap(arm_losses={"a": _arm(loss=1.0).head(5), "b": _arm(loss=1.0)})
+
+
+def _git(*, repo: Path, arguments: list[str]) -> None:
+    subprocess.run(["git", *arguments], cwd=repo, check=True, capture_output=True)
+
+
+def test_the_code_state_is_the_commit_of_the_checkout_and_whether_it_is_dirty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _git(repo=tmp_path, arguments=["init", "-q"])
+    (tmp_path / "file.txt").write_text("one")
+    _git(repo=tmp_path, arguments=["add", "file.txt"])
+    _git(
+        repo=tmp_path,
+        arguments=["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "one"],
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    monkeypatch.setattr(experiment_store, "PROJECT_ROOT", tmp_path)
+
+    assert _real_code_state() == (head, False)
+
+    (tmp_path / "file.txt").write_text("two")
+
+    assert _real_code_state() == (head, True)
+
+    (tmp_path / "untracked.txt").write_text("new")
+    _git(repo=tmp_path, arguments=["checkout", "--", "file.txt"])
+
+    assert _real_code_state() == (head, True)
