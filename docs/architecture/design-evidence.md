@@ -13,10 +13,10 @@ decision rule, the verdict, and the numbers.
 production code or configuration it informs is named.** A study, a literature finding, or an
 experiment whose winner has not been ported into production does not get an entry. The
 [`ml-experiment` skill](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/ml-experiment/SKILL.md)
-tells whoever ports a winner into production to add the entry in the same change, so the page
-cannot fall behind the code. A later experiment that overturns an entry changes the entry in
-place, and an entry whose setting production drops is deleted. The experiment's `result.md` names the production setting in its `informs` front matter field, so the
-experiment and this page point at each other.
+tells whoever ports a winner into production to add the entry in the same change, so the page cannot
+fall behind the code. A later experiment that overturns an entry changes the entry in place, and an
+entry whose setting production drops is deleted. The experiment's `result.md` names the production
+setting in its `informs` front matter field, so the experiment and this page point at each other.
 
 ## The entries
 
