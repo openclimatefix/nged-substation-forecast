@@ -37,7 +37,7 @@ the maintainer to confirm.
 | [00011](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written (inconclusive as intended): no gain in any window | Not for production | 2026-10-14 |
 | [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | Not yet merged |
-| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Partly supported: solar yes, wind only after pooling lead bands (post hoc) | Candidate | 2026-10-15 |
+| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -323,12 +323,11 @@ months, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
   band, and `spread` gives 89.5% to 91.8% with a CRPS change of +0.006 points of capacity (99.4%
   interval -0.004 to +0.024).
 - **Wind:** the uncorrected band covers 95.3% and 94.4% in the first two bands and about 90% after
-  that. No planned arm brings the first two bands within 2.5 points of 90, because a fit per lead
-  band has too few cases until late in the year. A post hoc spread factor on two lead groups
-  does, with a CRPS change of -0.021 (-0.042 to -0.002).
+  that. No planned arm brings the first two bands within 2.5 points of 90, and the fit per lead band
+  existed for only 3 months of the first band. A post hoc spread factor on two lead groups
+  does, with a CRPS change of -0.021 (-0.042 to -0.002), a small gain.
 - **Finding for later experiments:** a location-and-scale calibrator per lead band undershoots
-  90% in two wind bands (86.7% and 83.9%), so a calibrator needs a sample larger than 9 series in
-  one year.
+  90% in two wind bands (86.7% and 83.9%) and its CRPS interval is 0.36 points wide.
 - **Write-up and pull request:** [result](00016-pooled-mixture-calibration-solar-wind/result.md),
   [PR #1221 (Experiment 16: calibration of the pooled mixture for solar and
   wind)](https://github.com/openclimatefix/nged-substation-forecast/pull/1221).
