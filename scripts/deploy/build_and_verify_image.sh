@@ -89,10 +89,11 @@ if [[ ! -f "$TRAINED_METADATA" ]]; then
 fi
 
 # The MLflow run id is read from the directory the build COPYs from, so the OCI label can never
-# drift from the model actually baked in. The image tag is that run id's first 12 hex chars — unique
-# per promoted model and human-readable.
+# drift from the model actually baked in. The image tag is that run id's first 12 hex chars plus
+# the git commit's first 8, so a software release that ships the same model gets a new tag and
+# the previous image stays available for rollback.
 RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
-IMAGE="nged-forecast:${RUN_ID:0:12}"
+IMAGE="nged-forecast:${RUN_ID:0:12}-$(git rev-parse --short=8 HEAD)"
 
 # See the header: the deployment is ARM end-to-end, so the build always targets linux/arm64. On a
 # non-ARM host the build needs a QEMU binfmt handler registered with the kernel. So fail fast with

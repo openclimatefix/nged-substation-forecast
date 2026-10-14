@@ -82,8 +82,9 @@ its container image at build time.
    the config it records.
 3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
    at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
-4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, and
-   `n_trained_time_series` as output metadata, so you can confirm the right model landed.
+4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, `model_release`, and
+   `n_trained_time_series` as output metadata, so you can confirm the right model landed. Promote a
+   numbered release for a deployment; `model_release: 0` means the run is not a release.
 
 Promotion is a Dagster materialisation rather than a bare script, so every promotion is recorded in
 Dagster's run history — an audit trail for free. Re-promoting with a different `mlflow_run_id`
@@ -159,12 +160,11 @@ champion's `mlflow_run_id`. Because promotion **replaces** the artifact director
 than merging into it, there is nothing to undo — the previous model returns exactly as it was, and
 the next scheduled tick picks it up.
 
-The one thing to get right is finding the run id you are rolling back *to*. The current
-`promotion.json` records only the champion serving right now, and it is overwritten on every
-promotion, so the history lives in **Dagster's run history**: open Assets → `promoted_model` →
-"Runs", and read `PromotedModelConfig.mlflow_run_id` off the previous successful materialisation.
-It is cheaper to keep a note of the outgoing run id *before* you promote than to look it up under
-pressure afterwards.
+The one thing to get right is finding the run id you are rolling back *to*. The [model release
+log](model-releases.md) records, for each release, the MLflow run id of the promoted fold run and the
+image tag, so read both off the previous row. Releases that predate the log are in **Dagster's run
+history**: open Assets → `promoted_model` → "Runs", and read `PromotedModelConfig.mlflow_run_id` off
+the previous successful materialisation.
 
 On AWS there is the same extra leg as for promotion: rebuild and push the image, then point the task
 definition at the tag — see [Redeploying a new champion

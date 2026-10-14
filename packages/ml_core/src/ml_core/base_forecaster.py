@@ -15,7 +15,7 @@ import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
 from mlflow.exceptions import MlflowException
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from ml_core.features import FeatureEngineer, TabularFeatureEngineer
 
@@ -205,9 +205,13 @@ class BaseForecasterConfig(BaseModel):
     threaded into each model's training so that re-training a fold reproduces the same model —
     keeping retries and the leaderboard stable.
 
-    Model identity (name and version) lives on the ``BaseForecaster`` class itself as
-    ``MODEL_NAME`` and ``MODEL_VERSION``. Both constants are properties of the implementation,
-    not of the CV run config.
+    ``model_release`` is the number of the production model release this config trains, stamped
+    onto every ``PowerForecast`` row as ``power_fcst_model_version``. ``0`` means "not a release",
+    which is every CV run that is not a numbered release. The bounds are the range of the
+    contract's Int16 column: ``predict`` casts the value to Int16, so a value outside the range
+    would raise on every live forecast, and the bound rejects it at registration instead. The
+    model family's name lives on the ``BaseForecaster`` class as ``MODEL_NAME``, a property of the
+    implementation.
 
     **Serialisation must be canonical.** A config is compared and stored as its serialised form:
     ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
@@ -235,6 +239,7 @@ class BaseForecasterConfig(BaseModel):
     weather_source: str = ""
     training_strategy: str = ""
     random_seed: int = 0
+    model_release: int = Field(default=0, ge=0, le=32767)
 
     @field_serializer("selected_features")
     def _serialise_selected_features(self, selected_features: set[str]) -> list[str]:
@@ -248,12 +253,12 @@ class BaseForecaster(ABC):
     Every forecasting model subclasses this abstract base to allow shared Dagster assets and
     evaluation code to remain completely agnostic to the underlying model implementation.
 
-    Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION``, and ``CONFIG_CLASS`` as class-level
-    constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row
-    at predict time. ``MODEL_NAME`` is also stamped on the CV run's parent MLflow run, as
-    that run's ``model_family`` tag. The MLflow experiment name comes from neither constant: the
-    name is the ``experiment_name`` the launcher hands to ``register_experiment``. Bumping
-    ``MODEL_VERSION`` requires a code change (intentional), not a config edit.
+    Subclasses must define ``MODEL_NAME`` and ``CONFIG_CLASS`` as class-level constants.
+    ``MODEL_NAME`` is stamped onto every ``PowerForecast`` row at predict time, beside the config's
+    ``model_release`` (as ``power_fcst_model_version``). ``MODEL_NAME`` is also stamped on the CV
+    run's parent MLflow run, as that run's ``model_family`` tag. The MLflow experiment name does
+    not come from the constant: the name is the ``experiment_name`` the launcher hands to
+    ``register_experiment``.
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in. Collecting early wastes memory and prevents
@@ -275,7 +280,6 @@ class BaseForecaster(ABC):
     """
 
     MODEL_NAME: ClassVar[str]
-    MODEL_VERSION: ClassVar[int]
 
     CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]]
     """The config class that ``load`` rebuilds from a saved ``model_params`` mapping.

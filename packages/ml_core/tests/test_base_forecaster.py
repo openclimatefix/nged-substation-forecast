@@ -42,7 +42,6 @@ class _FakeForecaster(BaseForecaster):
     """Minimal forecaster: a string payload plus one file per trained ``time_series_id``."""
 
     MODEL_NAME = "fake"
-    MODEL_VERSION = 1
     CONFIG_CLASS = BaseForecasterConfig
 
     def __init__(
@@ -127,7 +126,6 @@ def test_trained_time_series_ids_is_abstract() -> None:
 
     class _MissingPopulation(BaseForecaster):
         MODEL_NAME = "missing"
-        MODEL_VERSION = 1
 
         def save(self, path: Path) -> None: ...
 
@@ -499,3 +497,9 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
         fetch_model_artifacts(run_id=modelless_run_id, dest=dest)
 
     assert _FakeForecaster.load(dest).payload == "hello-model"
+
+
+@pytest.mark.parametrize("model_release", [-1, 32768])
+def test_model_release_outside_the_int16_range_is_rejected(model_release: int) -> None:
+    with pytest.raises(ValueError, match="model_release"):
+        BaseForecasterConfig(selected_features=set(), model_release=model_release)

@@ -83,7 +83,6 @@ class XGBoostForecaster(BaseForecaster):
     """
 
     MODEL_NAME = "xgboost"
-    MODEL_VERSION = 2
     CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = XGBoostConfig
 
     model_params: XGBoostConfig  # narrows the base class annotation for type checkers
@@ -193,7 +192,7 @@ class XGBoostForecaster(BaseForecaster):
             ).with_columns(
                 pl.Series("power_fcst", predictions, dtype=pl.Float32),
                 power_fcst_model_name=pl.lit(self.MODEL_NAME),
-                power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
+                power_fcst_model_version=pl.lit(cfg.model_release, dtype=pl.Int16),
                 ml_flow_experiment_id=pl.lit(cfg.ml_flow_experiment_id, dtype=pl.Int32),
                 experiment_name=pl.lit(cfg.experiment_name),
                 fold_id=pl.lit(fold_id),
