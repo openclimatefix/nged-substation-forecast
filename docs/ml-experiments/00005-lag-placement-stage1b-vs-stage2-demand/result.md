@@ -137,7 +137,7 @@ weather-driven forecast and the substation. That rule for the worst run is unfav
 
 - **Put recent power in the calibrator first.** For Primary substations, the calibrator with
   recent-origin inputs beat the calibrator plus stage 1b up to 48 h by 0.84 points, and using both
-  placements added at most 0.12 points.
+  placements lowered the quantile score by at most 0.12 points.
 - **Calibrate stage 1a before judging lags.** At short leads the lag-free calibrator is worth about
   1 point of capacity on the quantile score, so a comparison against uncalibrated stage 1a
   overstates what lags add. It does not improve the median.

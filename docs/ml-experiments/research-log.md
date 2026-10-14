@@ -100,7 +100,7 @@ ERA5 weather at past times.
 - **Headline result:** the primary contrast, stage 1b with a calibrator minus the calibrator with
   lags, was +0.84 points of capacity for leads up to 48 hours (99% interval +0.28 to +1.50, 9 of 12
   months favouring the calibrator). Lagged power in the calibrator scored 5.31 against 6.14 for
-  stage 1b and 7.11 for no lags. Using both placements added at most 0.12 points.
+  stage 1b and 7.11 for no lags. Using both placements lowered the quantile score by at most 0.12 points.
 - **Finding for later experiments:** a lag-free calibrator lowered the quantile score by about 1
   point of capacity at short leads and raised the median's error. Stage 1a alone scored no better
   than day-type climatology. The grid supply points' error is dominated by drift.
