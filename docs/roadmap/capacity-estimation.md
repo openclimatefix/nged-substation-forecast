@@ -122,7 +122,7 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
 
 **Ask for the raw export cap rather than a derived curtailment volume, and treat the cap as a
 constraint rather than as a label.** Joining both to six metered solar farms in the [beam/diffuse
-experiment](../studies/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
+study](../studies/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
 found one of the six under active network management. Its cap sits at the connection limit for
 80.7% of the half-hours since the scheme went live, and on the bright hours where the cap never
 moved the site's yield matches the other five
@@ -599,9 +599,9 @@ Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-brit
 > would. Worth weighing before we commit either feed to the real-time critical path; it shapes the
 > [live-service cadence](../architecture/aws-costs.md#workload-model).
 
-## What the beam/diffuse experiment measured on this fleet
+## What the beam/diffuse study measured on this fleet
 
-**A throw-away experiment on the six metered solar farms in the trial area fitted a five-parameter
+**A throw-away study on the six metered solar farms in the trial area fitted a five-parameter
 physical model per site, and several of its by-products bear directly on this plan.** The write-up
 is [Does a weather product's beam/diffuse split help a PV
 forecast?](../studies/beam-diffuse-split.md); the code is in a pull request kept open for reference
@@ -681,14 +681,14 @@ fleet, which bounds what this estimator can be expected to buy a forecast.** An 
 subtracts each arm's own mean signed error inside every site-year, reading that mean off the rows
 being scored, so it beats any real estimator working at annual resolution. It takes the reference
 arm from 5.333 to 5.266% of P99 output; repeating it inside every site-month reaches 5.124. Both
-leave every contrast in that experiment where it was, to within 0.0003 points. Two readings follow.
+leave every contrast in that study where it was, to within 0.0003 points. Two readings follow.
 A dynamic capacity estimate is worth having for the quantity itself rather than for the forecast
 accuracy it returns, so the [judging criteria](#the-head-to-head-protocol) are right to score the
 capacity trace rather than a downstream forecast. And a forecasting experiment on this fleet does
 not need one, because the error a static denominator leaves is shared across whatever arms are
 being compared.
 
-**Changing the capacity denominator changes the units and nothing else.** That experiment
+**Changing the capacity denominator changes the units and nothing else.** That study
 normalises every error by each site's 99th percentile of output. Recomputing the headline against
 the 99.9th percentile, against the highest reading, and against a daylight-only 99th percentile
 moves the absolute figure between −0.096 and −0.086 percentage points and leaves the relative
@@ -716,7 +716,7 @@ export](../background/network.md#active-network-management-caps-what-a-generator
 measured.** One trial-area solar farm climbed to its settled output through eight months of discrete
 multi-day plateaus, reaching its settled level on 6 October 2024 — exactly the upward,
 piecewise-constant movement [the metered-capacity
-prior](#metered-effective-capacity-can-go-up-or-down) is built for. The forecasting experiment cuts
+prior](#metered-effective-capacity-can-go-up-or-down) is built for. The forecast in that study drops
 those rows because a forecast has no ceiling to clamp to; an estimator should track them instead,
 and the plateau dates and levels make a ready-made test case. The figure and the method are under
 [how a new solar farm reaches full output in
@@ -732,7 +732,7 @@ where no neighbour is available. At roughly 2,500 series neither is free.
 
 **Two studies on the six metered solar plants in the trial area tested capacity estimators, and
 neither showed that a dynamic estimator is worth building yet.** Both studies are throw-away
-experiments on one small area. Neither study settles which of the candidates above to build.
+analyses on one small area. Neither study settles which of the candidates above to build.
 
 **In the first study, no capacity estimate lowered the day-ahead forecast error detectably, and the
 Kalman filter that the study's rule selected raised it.** The write-up is [No estimate of a solar

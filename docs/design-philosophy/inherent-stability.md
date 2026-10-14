@@ -280,8 +280,8 @@ Two qualifiers keep it honest.
   once a failure-scenario suite exists to measure it.
 
 The principle does not license unbounded training complexity, either: a training harness nobody can
-run is also a production risk, because [H2, a hundred experiments per person in a peak
-month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month) and [H3,
+run is also a production risk, because [H2, a hundred CV runs per person in a peak
+month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month) and [H3,
 one-click promotion and one-click
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) depend on
 retraining staying cheap and promotion staying one command.
@@ -430,7 +430,7 @@ imputation, already happening, chosen
 by nobody — which inverts the obvious worry: the risk is not that someone might later "fix" this by
 imputing, it is that the fill already exists and is unbounded, unflagged, and unmeasured. Making it
 deliberate is [a planned
-experiment](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
+ml-experiment](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
 Set it against spatial renormalisation, and the contrast is the argument for preferring one: a
 spatial mean over a cell's own grid points at the same step stays inside one member's trajectory and
 one ~250 km² hexagon, whereas a temporal bridge spans 6 to 12 hours of a *rate* variable.
@@ -515,7 +515,7 @@ contracts](../architecture/forecast-delivery.md#strict-data-contracts-machine-ve
 ### Not blast radius
 
 Blast radius is a **different axis**: *how much* fails, not *which way* it fails. Our daily and
-6-hourly partitioning, and the per-(experiment, fold) partitioning of the experiment layer, are
+6-hourly partitioning, and the per-(CV run, fold) partitioning of the cross-validation layer, are
 blast-radius properties. Both matter; conflating them muddles the prose.
 
 ### R&D fails the other way

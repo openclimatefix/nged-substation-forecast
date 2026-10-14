@@ -5,8 +5,8 @@ a falsifiable [engineering hypothesis](engineering-hypotheses.md) with a number 
 
 - [H1: a service that mostly runs
   itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
-- [H2: a hundred experiments per person in a peak
-  month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)
+- [H2: a hundred CV runs per person in a peak
+  month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month)
 - [H3: safe one-click promotion, and one-click
   rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback)
 - [H4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money)

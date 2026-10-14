@@ -67,7 +67,7 @@ infrastructure steps around those two scripts stay in the AWS console.
 
 - `build_and_verify_image.sh` — builds the production image with the champion model baked in, then
   smoke-tests it with no network access and no credentials, failing hard if MLflow appears anywhere
-  in the runtime log. MLflow is the experiment-tracking server used during training. Baking the
+  in the runtime log. MLflow is the server that tracks CV runs during training. Baking the
   champion model into the image is what frees production inference from needing MLflow at all, so a
   mention of MLflow in the runtime log means that guarantee has gone. The runbook runs it at
   Step 4.
@@ -75,19 +75,19 @@ infrastructure steps around those two scripts stay in the AWS console.
   new Elastic Container Service task-definition revision pointing at the pushed image. The runbook
   runs it at Step 6.
 
-## `forecasting/` — ad-hoc experiment and maintenance runs
+## `forecasting/` — ad-hoc CV run and maintenance scripts
 
 None of these four scripts is on a schedule. `run_baseline_experiment.py` and
 `export_baseline_forecasts.py` are run in sequence when the weather-and-calendar-only baseline is
 rebuilt. `rewrite_nwp_row_groups.py` is a migration that is run once per Delta table and then left
 alone. `score_study.py` is run whenever a study hands over a predictions file to be scored.
 
-- `run_baseline_experiment.py` — runs the weather-and-calendar-only baseline experiment end to end
-  in one process, in five steps: register the experiment, train the model on one cross-validation
+- `run_baseline_experiment.py` — runs the weather-and-calendar-only baseline CV run end to end
+  in one process, in five steps: register the CV run, train the model on one cross-validation
   fold, forecast, materialise `effective_capacity` (the denominator of the normalised mean absolute
-  error), then compute the leaderboard metrics that rank this experiment against the others. Takes
+  error), then compute the leaderboard metrics that rank this CV run against the others. Takes
   no arguments.
-- `export_baseline_forecasts.py` — exports one cross-validation experiment's forecasts to three
+- `export_baseline_forecasts.py` — exports one CV run's forecasts to three
   self-contained parquet files (the full ensemble of about 51 members from the European Centre for
   Medium-Range Weather Forecasts' (ECMWF) ensemble, the mean across those members, and quantiles
   across those members) for offline analysis, each carrying the observed power beside the forecast
@@ -97,12 +97,12 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   read can skip the rest of the partition. A one-off migration: the script measures before writing,
   skips a partition that is already aligned, and therefore resumes cleanly after an interruption.
 
-- `score_study.py` — stores a study's predictions file in `power_forecasts` under the experiment
-  name `study/<study name>` and scores it with the `metrics` asset in leaderboard scope. The script
-  refuses a file whose `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` keys
-  differ from those of the reference experiment named in `conf/cv/default.yaml`. The script appends
-  every attempt, scored or refused, to `study_submissions.jsonl`, and overwrites an earlier
-  submission only when passed `--replace`.
+- `score_study.py` — stores a study's predictions file in `power_forecasts` under the
+  `experiment_name` `study/<study name>` and scores it with the `metrics` asset in leaderboard
+  scope. The script refuses a file whose `(time_series_id, power_fcst_init_time, valid_time,
+  ensemble_member)` keys differ from those of the reference CV run named in `conf/cv/default.yaml`.
+  The script appends every attempt, scored or refused, to `study_submissions.jsonl`, and overwrites
+  an earlier submission only when passed `--replace`.
 
 ## `diagnostics/` — checking and illustrating processing behaviour
 

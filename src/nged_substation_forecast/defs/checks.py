@@ -881,7 +881,7 @@ class PromotedModelFacts:
     """
 
     experiment_name: str | None
-    """Which ``power_forecasts`` experiment partition this model's slots are written to."""
+    """Which ``power_forecasts`` CV run partition this model's slots are written to."""
 
     trained_time_series_ids: tuple[int, ...] | None
     """The population every slot is expected to forecast (the train==predict invariant)."""
@@ -904,11 +904,11 @@ def _read_live_forecast_rows(
 
     ``experiment_name`` scopes the read to the promoted model's own rows, because
     ``write_power_forecasts`` replaces one ``(experiment_name, fold_id)`` partition at a time and
-    promoting a champion from a *different* experiment leaves the outgoing experiment's rows for
+    promoting a champion from a *different* CV run leaves the outgoing CV run's rows for
     the same slot in place:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
     ``None`` means the promoted model's ``meta.json`` is absent or unreadable, so there is no name
-    to scope to; the read then falls back to reading every live experiment, which over-reports
+    to scope to; the read then falls back to reading every live CV run, which over-reports
     rather than under-reports.
 
     The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
@@ -980,7 +980,7 @@ def _nwp_init_times_on_disk(settings: Settings) -> list[datetime]:
 
 
 def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts:
-    """Read the promoted model's experiment name and trained population from its ``meta.json``.
+    """Read the promoted model's CV run name and trained population from its ``meta.json``.
 
     One read for both, because both come from the same file that ``BaseForecaster.save`` wrote.
     Any absence or malformation degrades to ``_UNKNOWN_PROMOTED_MODEL`` rather than raising: the
@@ -1006,7 +1006,7 @@ def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts
             # `BaseForecaster.save` always writes `model_params.experiment_name`, so its absence
             # means this file is not one we wrote. Degrade both facts together rather than half of
             # them: keeping the trained population while losing the name to scope the read to would
-            # let an unfiltered union of two experiments' rows pass for one complete population,
+            # let an unfiltered union of two CV runs' rows pass for one complete population,
             # and would blame this slot for an outgoing champion's rows.
             return _UNKNOWN_PROMOTED_MODEL
         return PromotedModelFacts(

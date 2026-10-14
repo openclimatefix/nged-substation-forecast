@@ -1,6 +1,6 @@
-"""Reproduce the issue #179 weather/calendar-only baseline experiment end-to-end, headless.
+"""Reproduce the issue #179 weather/calendar-only baseline CV run end-to-end, headless.
 
-The experiment is the "shared baseline" for switching-event detection: the production XGBoost
+The CV run is the "shared baseline" for switching-event detection: the production XGBoost
 forecaster configured with **no power-lag features**, so weather and calendar covariates only.
 The forecaster's residual (observed - expected) therefore isolates switching events. A power-lag
 feature would give the model the substation's own measured power from 24 hours, 48 hours, one week
@@ -85,7 +85,7 @@ def _register(instance: DagsterInstance) -> None:
                     config_overrides={
                         "selected_features": SELECTED_FEATURES,
                         # The base tag "horizon_as_feature" is inaccurate here (no lead-time
-                        # feature, no lags); label this experiment for what it is.
+                        # feature, no lags); label this CV run for what it is.
                         "training_strategy": "weather_calendar_only",
                     },
                     run_mode="full_cv",
@@ -102,7 +102,7 @@ def _register(instance: DagsterInstance) -> None:
 
 
 def _report_metrics() -> None:
-    """Print the leaderboard aggregate metrics logged to the experiment's parent cv_summary run."""
+    """Print the leaderboard aggregate metrics logged to the CV run's parent cv_summary run."""
     client = MlflowClient()
     experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
     if experiment is None:
@@ -157,7 +157,7 @@ def _run_pipeline(instance: DagsterInstance) -> None:
 
 
 def main() -> None:
-    """Run the baseline experiment end to end against an ephemeral Dagster instance."""
+    """Run the baseline CV run end to end against an ephemeral Dagster instance."""
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 

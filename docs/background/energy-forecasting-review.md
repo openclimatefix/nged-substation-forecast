@@ -91,16 +91,16 @@ largely from being able to quickly test many ideas under identical conditions an
 performance. We have built a machine-learning operations (MLOps) framework that should allow us to
 test research ideas as efficiently as possible.
 
-**The platform for running those experiments is already built, and built for speed.** Flexpectation
+**The platform for testing those ideas is already built, and built for speed.** Flexpectation
 has hundreds of machine learning (ML) ideas to test. The software platform is therefore designed to
-make each experiment quick to run, quick to validate, and directly comparable with every experiment
-before it. That speed makes failure fast and low-effort. Fast, low-effort failure is what makes
-trying hundreds of ideas realistic.
+make each cross-validation run (CV run) quick to run, quick to validate, and directly comparable
+with every CV run before it. That speed makes failure fast and low-effort. Fast, low-effort failure
+is what makes trying hundreds of ideas realistic.
 
 **The fact that the industry doesn't yet know the state of the art is a huge opportunity for the
 Flexpectation project.** We are in a very privileged position where we can try hundreds of ideas,
 and test the best ideas in the real world. We have an opportunity to make a significant contribution
-to the energy forecasting community by publishing leaderboards of ML experiments, and hence help the
+to the energy forecasting community by publishing leaderboards of CV runs, and hence help the
 industry as a whole to better understand how multiple approaches perform.
 
 ## AI disclosure
@@ -2393,7 +2393,7 @@ is setting itself.
 ## Leaderboards of machine learning results
 
 **Flexpectation is building a leaderboard, not a public ML competition, and the distinction changes
-which published lessons apply.** Our leaderboards carry our own experiments, one per class of time
+which published lessons apply.** Our leaderboards carry our own CV runs, one per class of time
 series. For example, solar farms, wind farms, batteries, and the demand at primary substations each
 get their own leaderboard. Results for individual generators are published without the generator's
 name or ID. The leaderboards are public to view and reproducible, but we are not inviting other
@@ -2549,7 +2549,7 @@ manual heuristic as the point on the yardstick a new model has to reach.
 result, so the winner's reported skill is optimistically biased.** The fold that Flexpectation
 currently reports serves as both the model-selection set and the reported result. Every
 hyperparameter choice and feature ablation is therefore adjudicated on the same 12 months the
-leaderboard publishes. With hundreds of experiments planned, that bias will grow. A leaderboard
+leaderboard publishes. With hundreds of CV runs planned, that bias will grow. A leaderboard
 wears out through repeated use. [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015),
 who has co-organised a forecasting competition, expects that wear: "over-study of a single benchmark
 data set means that methods will eventually over-fit the published test data. I suspect this has
@@ -2562,7 +2562,7 @@ carries just as a small row count would. The structural fix is a final-test wind
 selection is allowed to touch, and that final-test window is scheduled. Until the final-test window
 lands, three limits hold: leaderboard numbers are selection metrics rather than estimates of future
 skill, differences smaller than fold-level noise should not drive decisions, and the number of
-experiments run against a fold is itself a statistic worth publishing beside the fold's results.
+CV runs run against a fold is itself a statistic worth publishing beside the fold's results.
 
 **Rankings travel better than absolute numbers do.** Where a benchmark has enough data behind it,
 the ordering of models survives a change of test set even when the accuracy level does not. The
@@ -2643,7 +2643,7 @@ network, so we should expect our published numbers to flatter what happens at sc
 so each time we publish them. A benchmark of 32 series is also small enough that the constraint on
 what can be learned from it is likely to be its size. That is an argument for extending the
 leaderboard to the wider distribution network as soon as the data allows rather than for running
-more experiments against the trial area.
+more CV runs against the trial area.
 
 ## Publishing results that others can compare against
 
@@ -2707,7 +2707,7 @@ a whole.
   training — unless the comparison described under challenge 3 above shows the normalisation is not
   needed — and that estimate is tracked as it changes.
 - **Negative results are published too**, including whether an off-the-shelf model given none of our
-  data matches our own, and whether sustained experimentation stops yielding improvements.
+  data matches our own, and whether sustained iteration stops yielding improvements.
 
 ## What the literature says about machine-learning operations (MLOps)
 
@@ -2725,16 +2725,16 @@ and no paper we read giving a retraining cadence a network operator could act on
 solar-and-wind forecast error at Europe's transmission operators has been measured roughly doubling
 over 5 years.
 
-**That absence sets the terms for what Flexpectation can claim for its own experiment framework.**
-The practice this project is betting on is fast, comparable iteration. The case for fast, comparable
-iteration rests on a structural argument about how fields make progress, together with testimony
-from senior practitioners, rather than on a controlled measurement. And the documentation needed to
-run a controlled measurement is itself largely missing from published work. The better-documented
-precedent lies outside machine learning: operational meteorology has tied production-model changes
-to measured changes in forecast skill for decades. One finding cuts against this project directly,
-and the section below sets the finding out rather than quoting around the finding: the same
-structural argument predicts that fields which cannot share their data will fall behind in their
-rate of progress, and the substation telemetry this project uses is not published.
+**That absence sets the terms for what Flexpectation can claim for its own cross-validation
+framework.** The practice this project is betting on is fast, comparable iteration. The case for
+fast, comparable iteration rests on a structural argument about how fields make progress, together
+with testimony from senior practitioners, rather than on a controlled measurement. And the
+documentation needed to run a controlled measurement is itself largely missing from published work.
+The better-documented precedent lies outside machine learning: operational meteorology has tied
+production-model changes to measured changes in forecast skill for decades. One finding cuts against
+this project directly, and the section below sets the finding out rather than quoting around the
+finding: the same structural argument predicts that fields which cannot share their data will fall
+behind in their rate of progress, and the substation telemetry this project uses is not published.
 
 ### Recommended papers to read
 
@@ -2939,7 +2939,7 @@ as licence to hurry, writing that "a 'fast and furious' approach to training neu
 not work and only leads to suffering" ([Karpathy
 (2019)](https://karpathy.github.io/2019/04/25/recipe/)).
 
-**Two limits on that testimony bound what Flexpectation can claim for its own experiment
+**Two limits on that testimony bound what Flexpectation can claim for its own cross-validation
 framework.** The first limit is that the accounts above, though the accounts come from senior
 practitioners across several organisations whose results can be checked independently, are testimony
 rather than measurement. Each account describes a different quantity — a rate at which ideas fail, a
@@ -3216,14 +3216,14 @@ itself. Neither expectation is measured here. We expect the answer to differ by 
 is part of why the differentiable-physics strand matters: the differentiable-physics strand is the
 one family in which capacity, weather response, and demand are estimated jointly by construction.
 
-**One reason for confidence is that one more experiment takes compute time rather than staff time.**
-The core forecast already exists and runs today, on an experiment framework that makes one more
-experiment take compute time rather than staff time. That low marginal effort is what makes it
-realistic to run on the order of hundreds of machine-learning experiments a month. The introduction
+**One reason for confidence is that one more CV run takes compute time rather than staff time.**
+The core forecast already exists and runs today, on a cross-validation framework that makes one more
+CV run take compute time rather than staff time. That low marginal effort is what makes it
+realistic to run on the order of hundreds of CV runs a month. The introduction
 to this review makes the same argument. The project states the claim as a falsifiable hypothesis:
-when experimentation is the active workstream, one person can register at least 100 leaderboard
-experiments in a month
-([H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)).
+when cross-validation is the active workstream, one person can register at least 100 leaderboard
+CV runs in a month
+([H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month)).
 
 **Expecting several of the four model families to fail is what makes those model families research
 directions rather than engineering tasks, and both NGED and this project count a negative result as

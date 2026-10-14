@@ -1,7 +1,7 @@
 # Cross-validation folds
 
-How we split data into training and validation windows to score and compare forecasting experiments
-on the leaderboard.
+How we split data into training and validation windows to score and compare forecasts in
+cross-validation runs (CV runs) on the leaderboard.
 
 > **Status legend:**
 >
@@ -9,7 +9,7 @@ on the leaderboard.
 > - 🚧 Planned
 > - 🔬 Research
 
-The fold definitions live in `conf/cv/default.yaml` and are read by every experiment, so all models
+The fold definitions live in `conf/cv/default.yaml` and are read by every CV run, so all models
 are scored on the **same** folds (apples-to-apples). The fold windowing in `ml_core.cv_helpers` is
 generic over arbitrary `train_start/train_end/val_start/val_end` dates, so changing the fold set is
 a config edit, not a code change.
@@ -46,7 +46,7 @@ point the validation window has closed and validates on complete data.
 
 A single fold gives no across-fold variance estimate, but it is still ample for the leaderboard's
 main job: each fold scores ~22–32 time series × 51 ensemble members at half-hourly resolution —
-millions of prediction points, more than enough statistical power to **rank** experiments against
+millions of prediction points, more than enough statistical power to **rank** CV runs against
 each other.
 
 ### Eligibility
@@ -54,7 +54,7 @@ each other.
 A time series is eligible for a fold when its observed-power coverage has at least
 `min_training_months` (default **6**) of history *before* `val_start` **and** reaches `val_end`.
 Eligibility is derived from data coverage alone — never from the model or config — so every
-experiment evaluates the fold on the identical population. The eligible set is computed and frozen
+CV run evaluates the fold on the identical population. The eligible set is computed and frozen
 per leaderboard epoch by the `eligible_time_series` asset.
 
 ---
@@ -64,7 +64,7 @@ per leaderboard epoch by the `eligible_time_series` asset.
 **Once more years of ECMWF ENS history are available, we will move to the original target
 protocol**: an expanding training window with one **complete-year** validation fold per year (2022,
 2023, 2024, 2025, …), validated on real forecast NWP throughout. Adding those folds starts a **new
-leaderboard epoch** (every experiment is re-scored against the new fold set), and is a
+leaderboard epoch** (every CV run is re-scored against the new fold set), and is a
 `conf/cv/default.yaml` edit with no schema change.
 
 Two routes could deliver the extra history. Dynamical.org's own Zarr backfill was estimated at
@@ -117,16 +117,16 @@ source only exists from (say) 2026, the shared window must live within its avail
 
 - Pick an evaluation window bounded by the new source's history; split it into train/validation
   within that window.
-- **Baseline experiment:** existing features only (e.g. `weather_source = "ecmwf"`).
-- **Treatment experiment:** existing + new-source features (e.g. `weather_source = "ecmwf_icon"`).
+- **Baseline CV run:** existing features only (e.g. `weather_source = "ecmwf"`).
+- **Treatment CV run:** existing + new-source features (e.g. `weather_source = "ecmwf_icon"`).
 - Both train on the **identical rows** and are scored on the **identical rows** — same
   `time_series_id` population, same `power_fcst_init_time` grid — differing *only* in the feature
   set. Score both with `evaluation_scope="ad_hoc"` over the same `PopulationFilter`.
 
 To inherit the leaderboard's same-population guarantee for this off-leaderboard window, materialise
-a **frozen ad-hoc eligibility set** for the window that both experiments read, rather than letting
+a **frozen ad-hoc eligibility set** for the window that both CV runs read, rather than letting
 each pick its own population. (`trained_time_series_ids` forces train == predict *per model*, but
-does not by itself force the *two* experiments to share a population — the frozen set does.)
+does not by itself force the *two* CV runs to share a population — the frozen set does.)
 
 ### The confounded comparison, which must not be read as the ablation
 
@@ -145,7 +145,7 @@ now, not why.
 
 Once the new source has accumulated enough history (roughly 1–2 complete years), promote it via a
 **new leaderboard epoch**: a fold set over source-era complete years in which the new source is
-canonically available, with every experiment re-scored against that fold set for apples-to-apples
+canonically available, with every CV run re-scored against that fold set for apples-to-apples
 comparison. The ad-hoc ablation is the **interim** signal obtained before enough history exists to
 do this properly; it should never be presented with leaderboard rigour.
 
@@ -181,7 +181,7 @@ target half-hour is still scored many times: `extended_range` spans 168 hours an
 6-hourly initialisations, roughly 28 forecasts therefore land in that band for a single target.
 Those are not 28 independent measurements of skill — they share the weather, the recent load and
 most of the model state. The leaderboard's per-slice counts therefore overstate how much independent
-evidence separates two experiments. A naive significance test on them would report more confidence
+evidence separates two CV runs. A naive significance test on them would report more confidence
 than the data supports.
 
 We have not fixed the "overlapping forecasts" issue. The [energy-forecasting literature
@@ -200,7 +200,7 @@ not a sample size.
 ## What the `metrics` asset refuses to score
 
 **The `metrics` asset is the only source of a leaderboard number, so it checks its input before it
-scores anything.** Two refusals protect the number against an experiment or a study that could
+scores anything.** Two refusals protect the number against a CV run or a study that could
 otherwise raise its own score by changing which rows are scored. Each refusal raises, because the
 metrics asset is research code that fails fast. Every group is checked before any group is scored,
 so a refusal leaves no rows or MLflow runs behind.
@@ -208,10 +208,10 @@ so a refusal leaves no rows or MLflow runs behind.
 - **Rows inside the fold window.** In leaderboard scope, every forecast row's `valid_time` must lie
   between the fold's `val_start` and `val_end`. Without this check, rows outside the fold's window
   would be scored and labelled as the fold's window.
-- **The reference row keys, for a study.** In leaderboard scope, an
-  experiment whose name starts with `study/` holds a forecast submitted through
+- **The reference row keys, for a study.** In leaderboard scope, a
+  forecast whose `experiment_name` starts with `study/` was submitted through
   `scripts/forecasting/score_study.py`. The rows of a study must have exactly the keys
-  `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` of the experiment named by
+  `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` of the CV run named by
   `reference_experiment_name` in the same config, for the same fold. A study that omits a row the
   reference forecasts, adds a series, forecasts only at short lead times, or uses ensemble-member
   labels other than the reference's is refused. The row key includes `power_fcst_init_time`, so a
@@ -229,18 +229,18 @@ study's leaderboard number is therefore out-of-sample only if a reviewer has con
 study used no observation after the fold's `train_end`, except as a lag earlier than each forecast's
 initialisation time.
 
-**An unfiltered run of the `metrics` asset skips study experiments rather than refusing them.**
-Re-materialising the reference experiment can change its row keys, so a study scored earlier stops
+**An unfiltered run of the `metrics` asset skips submitted studies rather than refusing them.**
+Re-materialising the reference CV run can change its row keys, so a study scored earlier stops
 matching. A run whose population filter names no `experiment_name` therefore lists every study
-experiment in the `skipped_study_experiments` metadata and scores the reviewed experiments without
-them. A run whose population filter names a study's `experiment_name` scores that study.
+in the `skipped_study_experiments` metadata and scores the reviewed CV runs without them. A run
+whose population filter names a study's `experiment_name` scores that study.
 
 **The `metrics` asset also records what each score rests on, so that a reader can compare scores
 safely.** Four tags and metrics record this, and only the fingerprint is on every leaderboard fold
 run:
 
 - **A study is scored beside the reference, in the same run.** The `metrics` asset adds the
-  reference experiment's group to any run that scores a study, so the study and the reference share
+  reference CV run's group to any run that scores a study, so the study and the reference share
   one snapshot of the observed power and of `effective_capacity`, which both change as data arrives
   and as cleaning rules change. The study's fold run holds each score minus the reference's under
   `vs_reference__`, such as `vs_reference__nmae__all`. Compare a study with the reference through
@@ -249,12 +249,12 @@ run:
   leaves its parent run alone.
 - **Every fold run carries a fingerprint of its forecast problem.** `row_key_fingerprint` hashes the
   distinct `(time_series_id, power_fcst_init_time, valid_time)` keys of the group, ignoring
-  `ensemble_member`, so a reviewed experiment with 13 members and the reference with 51 members have
+  `ensemble_member`, so a reviewed CV run with 13 members and the reference with 51 members have
   the same fingerprint when they forecast the same series, initialisation times, and valid times.
   The tag `row_keys_match_reference` says whether a group's fingerprint equals the reference's. A
-  reviewed experiment whose fingerprint differs is scored and tagged `false`, not refused, because a
-  reviewed experiment such as `manual_heuristic` may forecast a different set of series. A reviewed
-  experiment's score is comparable with the reference's only where that experiment's fold run
+  reviewed CV run whose fingerprint differs is scored and tagged `false`, not refused, because a
+  reviewed CV run such as `manual_heuristic` may forecast a different set of series. A reviewed
+  CV run's score is comparable with the reference's only where the fold run of that CV run
   carries `row_keys_match_reference` set to `true`.
 - **An unfiltered run marks each study it skips as stale or current.** The tag
   `stale_against_reference` is `true` when the reference's fingerprint for the fold no longer equals
@@ -273,6 +273,6 @@ run:
 
 We weighed three other ways to slice the limited honest data — monthly expanding CV, quarterly
 non-overlapping walk-forward, and yearly folds backed by ERA5 reanalysis — before settling on the
-single fold above. The reasoning for rejecting or deferring each is recorded in [ML Experiment
+single fold above. The reasoning for rejecting or deferring each is recorded in [Cross-Validation
 Orchestration — Design
 Decisions](../architecture/ml-orchestration.md#fold-design-alternatives-considered).

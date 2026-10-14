@@ -81,10 +81,10 @@ that needs OCF intervention is a falsification of T1.4 for that exercise, and a 
 fix. Stating it as a test is what turns the game days into a measurement rather than purely a
 training exercise.
 
-## H2 — a hundred experiments per person in a peak month
+## H2 — a hundred CV runs per person in a peak month
 
-> When experimentation is the active workstream, one person can register at least 100 leaderboard
-> experiments in a month.
+> When cross-validation is the active workstream, one person can register at least 100 leaderboard
+> CV runs in a month.
 
 **Why a hundred, rather than "as many as we can manage"?** Because a low hit rate is the normal
 condition of machine-learning (ML) research, and it makes throughput the denominator of everything
@@ -94,18 +94,18 @@ feature of doing research rather than as evidence of doing it badly — his answ
 is failure in research?* in his [Nobel Week
 interview](https://www.nobelprize.org/prizes/chemistry/2024/jumper/interview/) (recorded 6 December
 2024; that section starts at 14:12). If roughly one idea in ten survives contact with the data then
-ten attempts is simply the price of one result. A team that can run five experiments a month is not
+ten attempts is simply the price of one result. A team that can run five CV runs a month is not
 doing research ten times more slowly than a team that can run fifty. It is answering a different,
 much smaller set of questions.
 
 The sharper consequence is that throughput changes *which* ideas are worth attempting, not merely
-how quickly they are worked through. When an experiment is expensive, a speculative idea has to
+how quickly they are worked through. When a CV run is expensive, a speculative idea has to
 clear a far higher bar of prior plausibility than a safe idea before it is worth the cost. The wild
 ideas are therefore the first to be cut, and they are exactly where the large wins live, because an
 idea everybody already expects to work is rarely worth much. Cheap failure is what makes a
 low-probability, high-payoff attempt rational. That is why the corresponding design principle is
-expressed as a *cost* rule — [an experiment must be cheap to try, and cheap to
-abandon](design-principles.md#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon) — rather
+expressed as a *cost* rule — [a CV run must be cheap to try, and cheap to
+abandon](design-principles.md#4-a-cv-run-must-be-cheap-to-try-and-cheap-to-abandon) — rather
 than as a speed one.
 
 **And an idea is not scored just once.** Because H1 claims graceful degradation, a serious candidate
@@ -123,10 +123,10 @@ events](../background/switching-events.md) and reconstructing the demand that wo
 metered without them, [estimating the effective capacity](../roadmap/capacity-estimation.md) of
 metered generators, and [disaggregating](../roadmap/disaggregation.md) unmetered PV and wind from a
 substation's net load — each an open question in its own right, each with its own pile of attempts
-that will not work. A hundred experiments in a month is not one question examined a hundred ways; it
+that will not work. A hundred CV runs in a month is not one question examined a hundred ways; it
 is several distinct questions each getting enough attempts to reach an answer worth reporting. The
-project-specific statement of this is [ML experimentation at
-scale](../background/requirements.md#ml-experimentation-at-scale): nearly every objective in the
+project-specific statement of this is [Cross-validation runs at
+scale](../background/requirements.md#cross-validation-runs-at-scale): nearly every objective in the
 brief is an open research question, and we hold far more ideas than we can try at once.
 
 **The same case has been made before, by senior practitioners across several organisations, and the
@@ -136,7 +136,7 @@ measured](../background/energy-forecasting-review.md#fast-comparable-iteration-i
 in the literature review. H2 and T2.1 exist to supply this project's own measurement rather than to
 add a fifth testimonial to the pile.
 
-**T2.1 — Experiment throughput.** Registered leaderboard experiments per person per month, taken
+**T2.1 — CV run throughput.** Registered leaderboard CV runs per person per month, taken
 from MLflow run timestamps. Two framing choices are deliberate.
 
 T2.1 is a **peak** claim. There will be months spent hardening the production service or writing
@@ -144,18 +144,18 @@ documentation, and a quiet month is not a falsification — the claim is about w
 allows when we lean on it.
 
 And T2.1 is **count-only**. A single N-configuration sweep can inflate the number, and we accept
-that, because a simple count that MLflow already records beats a "decision-grade experiments"
-qualifier that would need a human-effort log to measure. If the threshold is ever met only by config
-sweeps, that will be obvious from reading the runs, and the fix is to *append a T2.2* then — never
-to redefine T2.1.
+that, because a simple count that MLflow already records beats a "decision-grade" qualifier that
+would need a human-effort log to measure. If the threshold is ever met only by config sweeps, that
+will be obvious from reading the runs, and the fix is to *append a T2.2* then — never to redefine
+T2.1.
 
 **A count of T2.1 leaves out every MLflow experiment named with the prefix `study/`.** A study's
-forecasts are scored through `scripts/forecasting/score_study.py` under such an experiment, which
-never goes through experiment registration, and the promotion path never offers a `study/`
-experiment as a candidate. T2.1 counts registered experiments, so the count filters out the prefix
-and T2.1's definition does not change. A study finding reaches production
+forecasts are scored through `scripts/forecasting/score_study.py` under such an MLflow experiment,
+which never goes through CV run registration, and the promotion path never offers a `study/`
+MLflow experiment as a candidate. T2.1 counts registered CV runs, so the count filters out the
+prefix and T2.1's definition does not change. A study finding reaches production
 only through a reviewed re-implementation, so a count of studies would say little about how fast the
-project learns what to ship. If studies come to outnumber reviewed experiments, a new appended
+project learns what to ship. If studies come to outnumber reviewed CV runs, a new appended
 hypothesis can count what studies produce, and T2.1 stays as written.
 
 ## H3 — one-click promotion, and one-click rollback
@@ -170,7 +170,7 @@ becomes available to run:
 
 - **The candidate was scored against every model already on the board, identically.** The same
   population, the same folds, the same metric definitions, held constant by construction rather than
-  by discipline — the *every experiment is scored identically* principle. So "it won" is a claim
+  by discipline — the *every CV run is scored identically* principle. So "it won" is a claim
   about the model rather than about the conditions it happened to be measured under.
 - **The code that scored well is the code that serves.** Research runs on the production pipeline,
   behind the same data contracts and the same test suite, so nothing is re-implemented between the
@@ -210,7 +210,7 @@ pinned to are in [AWS Running Costs](../architecture/aws-costs.md): ~£27–40/m
 projected ~£70–140/month at v2. The thresholds sit above those estimates deliberately, so that the
 hypothesis is a claim about the architecture rather than a restatement of the spreadsheet.
 
-**T4.1 and T4.2 — Cost.** Read the monthly AWS bill. No per-experiment instrumentation is needed:
+**T4.1 and T4.2 — Cost.** Read the monthly AWS bill. No per-run instrumentation is needed:
 training today runs on laptops, the planned weekly AWS retrain is bounded at ~£1/month, and a
 backtest on AWS is bounded at well under £1 per run at v1 scale — all inside the bill either way.
 
@@ -235,7 +235,7 @@ restructured asset graph does.
 | T1.2 | Graceful degradation | Every series emits a forecast; beats `manual_heuristic` at rungs 0–2 | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
 | T1.3 | Faithful uncertainty | PICP within ±5 percentage points of nominal in every degradation regime (tolerance provisional until [#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)) | v0.5 |
 | T1.4 | Operability from the runbooks alone | Every game-day exercise recovered from the runbooks alone | Handover phase |
-| T2.1 | Experiment throughput | ≥100 registered experiments per person, in a peak month | v0.5 |
+| T2.1 | CV run throughput | ≥100 registered CV runs per person, in a peak month | v0.5 |
 | T3.1 | Promotion effort | ≤1 command | v0.3 |
 | T3.2 | Rollback effort | ≤1 command | v0.3 |
 | T4.1 | Cost at v1 scale | ≤£50/month for the whole running service | v1.0, from the AWS bill |

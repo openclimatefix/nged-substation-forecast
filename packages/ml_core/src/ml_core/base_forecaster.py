@@ -1,6 +1,6 @@
 """`BaseForecaster`: the interface every forecasting model implements.
 
-Also holds `BaseForecasterConfig`, which carries a trained model's experiment identity.
+Also holds `BaseForecasterConfig`, which carries a trained model's CV run identity.
 """
 
 import tarfile
@@ -199,7 +199,7 @@ class BaseForecasterConfig(BaseModel):
     a model YAML's ``model_params`` validates them at load time. Every ``conf/model/*.yaml`` file
     carries both tag fields under ``model_params``.
 
-    ``experiment_name`` is the per-experiment key, set to the MLflow experiment name at
+    ``experiment_name`` is the per-CV run key, set to the MLflow experiment name at
     registration and stored in the saved config. Every ``PowerForecast`` row carries
     ``experiment_name``, distinct from the model-family ``MODEL_NAME``. ``random_seed`` is
     threaded into each model's training so that re-training a fold reproduces the same model —
@@ -207,7 +207,7 @@ class BaseForecasterConfig(BaseModel):
 
     Model identity (name and version) lives on the ``BaseForecaster`` class itself as
     ``MODEL_NAME`` and ``MODEL_VERSION``. Both constants are properties of the implementation,
-    not of the experiment config.
+    not of the CV run config.
 
     **Serialisation must be canonical.** A config is compared and stored as its serialised form:
     ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
@@ -224,7 +224,7 @@ class BaseForecasterConfig(BaseModel):
     fails at registration. A *stored* config carrying a key the current code no longer declares
     is refused rather than silently losing that key. The recovery is to re-train, never to
     hand-edit. Why this is worth failing over:
-    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
+    <https://openclimatefix.github.io/nged-substation-forecast/cross-validation/model-configuration/#tweaking-a-config-for-a-cv-run>.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -250,7 +250,7 @@ class BaseForecaster(ABC):
 
     Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION``, and ``CONFIG_CLASS`` as class-level
     constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row
-    at predict time. ``MODEL_NAME`` is also stamped on the experiment's parent MLflow run, as
+    at predict time. ``MODEL_NAME`` is also stamped on the CV run's parent MLflow run, as
     that run's ``model_family`` tag. The MLflow experiment name comes from neither constant: the
     name is the ``experiment_name`` the launcher hands to ``register_experiment``. Bumping
     ``MODEL_VERSION`` requires a code change (intentional), not a config edit.
@@ -295,7 +295,7 @@ class BaseForecaster(ABC):
     """
 
     def __init__(self, model_params: BaseForecasterConfig) -> None:
-        """Store the config that carries this model's hyper-parameters and experiment identity."""
+        """Store the config that carries this model's hyper-parameters and CV run identity."""
         self.model_params = model_params
 
     @property
@@ -457,7 +457,7 @@ class BaseForecaster(ABC):
             present in ``data``. Each row holds the predicted ``power_fcst``, in megawatts (MW) or
             megavolt-amperes (MVA) according to that series' unit in ``TimeSeriesMetadata``. Each
             row also holds the model-family identity (``power_fcst_model_name``,
-            ``power_fcst_model_version``), the experiment identity the config carries
+            ``power_fcst_model_version``), the CV run identity the config carries
             (``experiment_name``, ``ml_flow_experiment_id``), and ``fold_id`` set to the given
             ``fold_id``. Eager, not lazy: this is the model boundary where the caller's
             ``pt.LazyFrame[AllFeatures]`` is finally materialised.

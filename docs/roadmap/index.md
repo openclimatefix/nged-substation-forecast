@@ -128,7 +128,7 @@ AWS.*
 *Epic: [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6)*
 
 - Implement the ML energy forecasting "leaderboard" (cross-fold validation metrics in MLflow), ready
-  for systematic ML experimentation ✓ (CV assets added)
+  for systematic cross-validation runs ✓ (CV assets added)
 - Metrics: MBE, MAE, NMAE, RMSE, Pinball loss, PICP, interval width, CRPS, Spread-Skill Ratio — all
   ✅ (definitions in the [evaluation-metrics reference](../techniques/evaluation-metrics.md); plan
   and remaining 🚧 items in [Metrics & leaderboard](metrics-and-leaderboard.md))
@@ -149,12 +149,12 @@ AWS.*
       under failure scenarios](metrics-and-leaderboard.md#scoring-under-failure-scenarios)
     - Degradation smoke-tests in CI
       ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
-    - Score every leaderboard experiment under each scenario, against `manual_heuristic`
+    - Score every leaderboard CV run under each scenario, against `manual_heuristic`
       ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
 - **Phase 1 of agentic ML research** — Claude runs experiments overnight, each testing one
   hypothesis and ending in a verdict; an experiment whose output fits the scorer may post its scores
-  to the leaderboard as a `study/` experiment, and the scorer drops the checks that exist only to
-  stop deliberate cheating
+  to the leaderboard as a `study/` MLflow experiment, and the scorer drops the checks that exist
+  only to stop deliberate cheating
   ([#1031](https://github.com/openclimatefix/nged-substation-forecast/issues/1031)); see
   [Experiments run by an LLM agent](auto-research.md)
 - One-command rollback for `promoted_model`
@@ -361,9 +361,9 @@ milestones above. Items so far:
 Genuinely optional experiments worth trying **if the schedule allows**, sitting between the
 operational polish of v0.8 and the v1.0 trial-service milestone. Nothing downstream depends on any
 of them — if we are short on time, none of it blocks v1.0. Each lands as its own registered
-leaderboard experiment or controlled ad-hoc ablation, so we keep the result either way.
+leaderboard CV run or controlled ad-hoc ablation, so we keep the result either way.
 
-- **Neural net vs XGBoost as a leaderboard experiment**
+- **Neural net vs XGBoost as a leaderboard CV run**
   ([#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362)): does a simple
   neural net — an MLP with a per-series embedding and quantile-regression heads — beat
   gradient-boosted trees? XGBoost suits the current per-series regime (one model per series, on the
@@ -380,7 +380,7 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   the comparison for a reason that has nothing to do with model family (zero is a real physical
   value — see [Encoders → Handling missing
   inputs](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill)), and
-  it should be scored under the failure-scenario suite like any other experiment.
+  it should be scored under the failure-scenario suite like any other CV run.
 - **Additional NWP source, e.g. ICON-EU**
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore whether
   adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the v1
@@ -395,13 +395,13 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history), under
   research, could let ICON-EU into the forecast sooner. See [Evaluating a data source whose history
   is shorter than the
-  folds](../ml_experimentation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
+  folds](../cross-validation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
 - **Handle NWP model upgrades**
   ([#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)): an upgraded
   weather model arrives on time and passes validation, so nothing in the live service notices it,
   yet the promoted model was trained on the old version. The plan records the NWP model cycle on
   every row, keeps a dated list of upgrades, treats an upgrade as a degradation that widens the
-  uncertainty bands, and retrains early. It starts with an experiment measuring how fast a model
+  uncertainty bands, and retrains early. It starts with a study measuring how fast a model
   recovers after the Met Office's January 2026 upgrade of UKV. See [Live service → NWP model
   upgrades](live-service.md#nwp-model-upgrades).
 

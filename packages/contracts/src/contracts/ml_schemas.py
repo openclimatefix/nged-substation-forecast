@@ -274,7 +274,7 @@ class Metrics(pt.Model):
 
     Primary key: `(time_series_id, power_fcst_model_name, experiment_name, fold_id,
     evaluation_scope, horizon_slice, metric_name, metric_param, window_start, window_end)`. At
-    most one metric value per series, model, experiment, fold, evaluation scope, horizon slice,
+    most one metric value per series, model, CV run, fold, evaluation scope, horizon slice,
     metric, parameter, and window. Recomputing an existing key replaces that row rather than
     duplicating it.
     """
@@ -394,7 +394,7 @@ class Metrics(pt.Model):
         dtype=pl.String,  # String (not Categorical) — Delta partition column, see fold_id above.
         allow_missing=True,
         description=(
-            "Experiment that produced these forecasts. Delta partition key alongside fold_id. "
+            "CV run that produced these forecasts. Delta partition key alongside fold_id. "
             "Populated by the metrics Dagster asset after compute_metrics() returns; "
             "allow_missing so compute_metrics() itself need not produce it."
         ),
@@ -470,7 +470,7 @@ class EligibleTimeSeries(pt.Model):
     and read by ``trained_cv_model``. ``cv_power_forecasts`` does not read this table; it
     inherits the same population through the trained model's ``trained_time_series_ids``.
     Eligibility depends on data coverage and the fold dates **only**, never on the model or
-    experiment config. Every experiment therefore trains and scores a fold on the identical
+    CV run config. Every CV run therefore trains and scores a fold on the identical
     population, which is what makes leaderboard comparisons apples-to-apples.
 
     One row per eligible ``(fold_id, time_series_id)``.

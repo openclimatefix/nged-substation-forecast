@@ -16,8 +16,11 @@ forecast's CRPS", and ends in a verdict: supported, refuted, or inconclusive. Th
 a screen long. An experiment is free to use its own metric or its own probabilistic output, so it
 often cannot post to the leaderboard. A **study** is the other kind of work: a long report that
 answers several scientific questions, often on a new dataset, run with the `study` skill.
-`docs/ml_experimentation/` describes running the production pipeline's cross-validation, which is
-neither.
+
+**"Experiment" means only an ml-experiment.** A pass of the production pipeline over the
+cross-validation folds is a cross-validation run, and `docs/cross-validation/` describes it. Adding
+an improvement to the production pipeline after an experiment supports it is updating the pipeline,
+and the cross-validation run that follows checks the update. It is not a second experiment.
 
 **Work autonomously by default.** Plan, run, review, and write up without waiting for the
 maintainer. When the maintainer asks to review the plan first, push the plan, say so, and wait for
@@ -73,8 +76,10 @@ review as `implement-issue` does.
 the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
 the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
-`failed`), the best arm with its headline number, and the lessons learned. Every result has the same
-front matter, so a later session finds results with `grep` over `docs/ml-experiments/*/result.md`.
+`failed`), the best arm with its headline number, and the lessons learned. A finished experiment
+whose winner is ported into production also has an `informs` field, naming the production setting
+it decided (a configuration key or a code path). Every result has the same front matter, so a later
+session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 ## How to score
 
@@ -108,6 +113,15 @@ front matter, so a later session finds results with `grep` over `docs/ml-experim
 
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
+
+## When a winner reaches production
+
+**The pull request that ports an experiment's winner into the production pipeline records why.** In
+the same change, set `informs` in the experiment's `result.md` to the setting the experiment
+decided, and add a row to the table in `docs/architecture/design-evidence.md`: the production
+setting, what production now does, a link to the experiment, and its verdict. A `supported` or
+`refuted` verdict earns a row, and an `inconclusive` or `invalid` one does not. An experiment that
+later overturns a row changes the row in place, and a row whose setting production drops is deleted.
 
 ## The write-up
 

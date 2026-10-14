@@ -378,7 +378,7 @@ AIFS-ENS, from 2025-07-02, is the real short-history case, entering as a blend w
 controls are the weather-response model fed raw forecast members with no product calibrator, an
 XGBoost model trained natively on the same N months, and the ENS champion trained on its full fold,
 which is a [confounded
-comparison](../ml_experimentation/cross-validation-folds.md#the-confounded-comparison-which-must-not-be-read-as-the-ablation)
+comparison](../cross-validation/cross-validation-folds.md#the-confounded-comparison-which-must-not-be-read-as-the-ablation)
 read only as the deployment reference.
 
 **The design may improve calibration more than headline skill, so the study sets its kill criterion
@@ -555,7 +555,7 @@ ingests carry the connection dates needed to check.
   much of our error is the weather *forecast's* fault and so gates how much to invest in the weather
   input at all. It lands as a new `evaluation_scope`, not as a new fold, so leaderboard folds stay
   ENS-only and both [principle
-  8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically) and the
+  8](../design-philosophy/design-principles.md#8-every-cv-run-is-scored-identically) and the
   [rejection of reanalysis-backed validation
   folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation)
   stand.

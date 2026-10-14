@@ -92,18 +92,19 @@ Further down the same continuum:
 * Disaggregate and forecast other distributed energy resources (DERs): EV chargers, heat pumps,
   price-sensitive batteries.
 
-## ML experimentation at scale
+## Cross-validation runs at scale
 
 Nearly every objective above is an open research question — improving NRA forecast skill, detecting
 switching events, estimating effective capacity, flagging faulty meters, disaggregating DERs — and
-we hold far more ideas than we can try at once. That turns experimentation throughput into an
-infrastructure requirement in its own right: we need to run **on the order of hundreds of ML
-experiments per month**, and the workflow must make each experiment as frictionless as possible.
+we hold far more ideas than we can try at once. That turns the throughput of cross-validation runs
+(CV runs) into an infrastructure requirement in its own right: we need to run **on the order of
+hundreds of CV runs per month**, and the workflow must make each CV run as frictionless as
+possible.
 That the throughput produces a better forecast is a bet this project is making rather than a result
 the literature has settled, for the reasons set out in [Our approach to
-MLOps](../ml_experimentation/index.md#our-approach-to-mlops). [H2, a hundred experiments per person
+MLOps](../cross-validation/index.md#our-approach-to-mlops). [H2, a hundred CV runs per person
 in a peak
-month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)
+month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month)
 is the pre-registered version of that requirement, deliberately relaxed to a peak-month, per-person
 claim so that months spent hardening the service are not spurious falsifications. The promotion
 half below is [H3, one-click promotion and one-click
@@ -113,21 +114,21 @@ Three properties matter as much as raw throughput:
 
 * **Re-runnability.** We will inevitably find and fix bugs that invalidate earlier results — in
   feature engineering, in evaluation, in the data itself. When that happens we must be able to
-  re-run old experiments cheaply and confidently (same configuration, same folds), so that results
+  re-run old CV runs cheaply and confidently (same configuration, same folds), so that results
   reflect the fixed world rather than a mixture of before and after.
-* **A standardised leaderboard.** Every experiment's metrics land in one comparable place, computed
+* **A standardised leaderboard.** Every CV run's metrics land in one comparable place, computed
   the same way, so "is this idea better?" is a lookup, not an analysis project. See [Metrics &
   Leaderboard](../roadmap/metrics-and-leaderboard.md).
-* **A short, safe path from R&D to production.** Conducting experiments is only half the loop: an
-  experiment that wins on the leaderboard must move into the live service as easily and as safely as
+* **A short, safe path from R&D to production.** Conducting CV runs is only half the loop: a
+  CV run that wins on the leaderboard must move into the live service as easily and as safely as
   possible. This is why R&D and production share a single unified codebase — the exact
-  feature-engineering and model code that won the experiment is what runs in production, and
+  feature-engineering and model code that won the CV run is what runs in production, and
   promotion is an [audited configuration
   change](../architecture/production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
   not a rewrite or a port between systems.
 
-This requirement shapes the architecture: it is why the experiment layer is built around
-per-(experiment, fold) partitions that can be run — and re-run — individually (see [ML Orchestration
+This requirement shapes the architecture: it is why the cross-validation layer is built around
+per-(CV run, fold) partitions that can be run — and re-run — individually (see [ML Orchestration
 Design](../architecture/ml-orchestration.md)), why R&D and production live in one repository and one
 execution path rather than separate codebases, and it was decisive in choosing Dagster over Airflow
 (see [Why Dagster, not Airflow?](../architecture/why-dagster-not-airflow.md)).

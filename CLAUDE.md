@@ -82,7 +82,7 @@ ordering (`docs/roadmap/`), the portable design principles, engineering hypothes
 inherent-stability argument (`docs/design-philosophy/`), durable explainers of solution methods
 (`docs/techniques/`), background/requirements context (`docs/background/`), design rationale for
 what's already built (`docs/architecture/`), and step-by-step operational how-to for what's already
-built (`docs/ml_experimentation/`, `docs/live_service/` — design and how-to are deliberately
+built (`docs/cross-validation/`, `docs/live_service/` — design and how-to are deliberately
 separate pages, cross-linked via "See also"). When planning new features, check `docs/` for relevant
 prior discussion before proposing an approach.
 
@@ -649,11 +649,11 @@ its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time
 
 Identity is split across two levels. **Model-family identity** — `MODEL_NAME` and `MODEL_VERSION` —
 are class-level constants on each `BaseForecaster` subclass (properties of the implementation;
-bumping `MODEL_VERSION` is a deliberate code change). **Experiment identity** — `experiment_name`
+bumping `MODEL_VERSION` is a deliberate code change). **CV run identity** — `experiment_name`
 and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with the saved model.
 Both levels are stamped onto every `PowerForecast` row at predict time:
 `power_fcst_model_name`/`power_fcst_model_version` from the class, and the dedicated
-`experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse experiment
+`experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse CV run
 identity into `power_fcst_model_name`.
 
 Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer]` — a strategy

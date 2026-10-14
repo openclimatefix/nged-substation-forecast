@@ -1,4 +1,4 @@
-"""Manually launched Dagster jobs for experiment lifecycle management.
+"""Manually launched Dagster jobs for CV run lifecycle management.
 
 These are jobs (not assets) because they manage MLflow state and the ``cv_experiment_folds``
 dynamic partition set rather than producing a data artifact. Their ops use ``OpExecutionContext``
@@ -170,27 +170,27 @@ def _resolve_forecaster_config(
 
 
 IdentityTagType = Literal["config", "forecaster_target"]
-"""Type annotation for the experiment tags that together define an experiment's identity."""
+"""Type annotation for the CV run tags that together define a CV run's identity."""
 
 IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_target")
 """Runtime tuple — iterated when comparing a re-registration against the stored identity.
 
-The ``description`` tag is deliberately absent: prose about an experiment is not part of what
-makes an experiment that experiment, so it stays freely editable by re-registering. A tag absent
-from the *stored* experiment is likewise not a change — that is the untagged experiment
+The ``description`` tag is deliberately absent: prose about a CV run is not part of what
+makes a CV run that CV run, so it stays freely editable by re-registering. A tag absent
+from the *stored* CV run is likewise not a change — that is the untagged CV run
 ``get_or_create_experiment`` leaves behind, and this registration is entitled to complete it.
 Fuller reasoning:
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-a-cv-run-under-a-changed-config-is-rejected>
 """
 
 IdentityTagsType = dict[IdentityTagType, str]
-"""An experiment's identity, as the tag values that carry it."""
+"""A CV run's identity, as the tag values that carry it."""
 
 
 class ExperimentIdentityChangedError(ValueError):
-    """Raised when re-registering an existing experiment under a changed config.
+    """Raised when re-registering an existing CV run under a changed config.
 
-    A distinct subclass so a caller (or a test) can tell "this experiment name is already taken
+    A distinct subclass so a caller (or a test) can tell "this CV run name is already taken
     by a different config" apart from the ordinary ``ValueError``s raised while resolving the
     config itself.
     """
@@ -199,7 +199,7 @@ class ExperimentIdentityChangedError(ValueError):
 def _identity_tags(
     forecaster_cls: type[BaseForecaster], forecaster_config: BaseForecasterConfig
 ) -> IdentityTagsType:
-    """Return the experiment tags that define this experiment's identity.
+    """Return the CV run tags that define this CV run's identity.
 
     Args:
         forecaster_cls: The resolved forecaster class.
@@ -255,18 +255,18 @@ def _reject_changed_identity(
 ) -> None:
     """Raise if re-registering ``experiment_name`` would change its identity.
 
-    An experiment's identity **is** its config: every fold of an experiment must be trained and
+    A CV run's identity **is** its config: every fold of a CV run must be trained and
     scored under one config, or its leaderboard row silently mixes two different models. Folds
     already materialised under the old config cannot be un-trained, and the assets read the config
-    back from the experiment tag (``load_experiment_forecaster``), so re-pointing that tag
-    mid-flight would poison every comparison built on the experiment. A changed config is therefore
-    a *new* experiment, and the only correct answer is to reject it — before anything has been
+    back from the CV run tag (``load_experiment_forecaster``), so re-pointing that tag
+    mid-flight would poison every comparison built on the CV run. A changed config is therefore
+    a *new* CV run, and the only correct answer is to reject it — before anything has been
     written. Fuller reasoning:
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-a-cv-run-under-a-changed-config-is-rejected>
 
-    Called with the experiment's stored tags before any write, so a rejection leaves MLflow exactly
+    Called with the CV run's stored tags before any write, so a rejection leaves MLflow exactly
     as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged
-    experiment ``get_or_create_experiment`` creates as its self-healing fallback, which this
+    CV run ``get_or_create_experiment`` creates as its self-healing fallback, which this
     registration is entitled to complete.
 
     The decision to reject *is* the list of differences to report, so the error can never claim a
@@ -274,7 +274,7 @@ def _reject_changed_identity(
 
     Args:
         experiment_name: The MLflow experiment name, for the error message.
-        stored_tags: The existing experiment's tags (empty for a brand-new experiment).
+        stored_tags: The existing CV run's tags (empty for a brand-new CV run).
         requested_tags: The identity this registration is asking for, from ``_identity_tags``.
 
     Raises:
@@ -314,10 +314,10 @@ def _fold_ids_for_run_mode(run_mode: str, cv_config: CvConfig) -> list[str]:
 
 @op
 def register_experiment(context: OpExecutionContext, config: RegisterExperimentConfig) -> None:
-    """Create the MLflow experiment + parent run and add the experiment's CV partition keys.
+    """Create the MLflow experiment + parent run and add the CV run's CV partition keys.
 
     Idempotent for the *same* config: re-running with the same ``experiment_name`` resolves the
-    existing experiment, parent run, and partition keys rather than duplicating them, and may
+    existing CV run, parent run, and partition keys rather than duplicating them, and may
     freely update the ``description`` and add the other run mode's folds. Re-running with a
     **changed** config is rejected outright — see ``_reject_changed_identity``. Materialises no
     assets — the user materialises ``trained_cv_model`` / ``cv_power_forecasts`` for the new
@@ -326,12 +326,12 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     Args:
         context: The Dagster execution context, supplied by the framework rather than by a caller.
             Used for logging.
-        config: The experiment to register — its name, description, base model config and any
+        config: The CV run to register — its name, description, base model config and any
             config overrides. Dagster builds it from the run config the launcher was given.
 
     Raises:
         ExperimentIdentityChangedError: If ``experiment_name`` is already registered under a
-            different config. Raised before any MLflow write, so the experiment is left exactly
+            different config. Raised before any MLflow write, so the CV run is left exactly
             as it was.
     """
     settings = Settings()
@@ -348,7 +348,7 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
 
     # get_or_create_experiment writes nothing when the name already exists, so the check below
     # still runs before this registration's first write. On a brand-new name it creates the
-    # (untagged) experiment, which has no stored identity to conflict with.
+    # (untagged) CV run, which has no stored identity to conflict with.
     experiment_id = get_or_create_experiment(config.experiment_name)
     client = MlflowClient()
     _reject_changed_identity(
@@ -357,14 +357,14 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
         requested_tags=identity_tags,
     )
 
-    # Log the params before the experiment tags. MLflow params are write-once, so this is the one
+    # Log the params before the CV run tags. MLflow params are write-once, so this is the one
     # write the tracking store can reject; doing it first means a rejection can never leave the
-    # experiment tagged with a config that its params contradict. The check above should make such
-    # a rejection unreachable, but an experiment registered before that check existed may already
+    # CV run tagged with a config that its params contradict. The check above should make such
+    # a rejection unreachable, but a CV run registered before that check existed may already
     # carry params that disagree with its tag, and the ordering keeps even that case one-sided.
     # log_params is not itself atomic — a batch containing one conflicting key still writes the
     # batch's other keys before raising — so this bounds the damage to the params rather than
-    # eliminating it. Reaching that requires an experiment whose tags failed to write on an earlier
+    # eliminating it. Reaching that requires a CV run whose tags failed to write on an earlier
     # registration, which is why the tags are the last thing written.
     parent_run_id = get_or_create_parent_run(experiment_id)
     with mlflow.start_run(run_id=parent_run_id):
@@ -373,7 +373,7 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
             {
                 "model_family": forecaster_cls.MODEL_NAME,
                 "weather_source": forecaster_config.weather_source,
-                # Provenance: which code registered this experiment. Registration reads no data
+                # Provenance: which code registered this CV run. Registration reads no data
                 # tables, so no Delta versions here — those are stamped at train/predict/metrics.
                 **provenance_tags("register"),
             }
@@ -410,28 +410,28 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
 
 @job
 def register_experiment_job() -> None:
-    """Register a new experiment: create its MLflow records and CV partition keys.
+    """Register a new CV run: create its MLflow records and CV partition keys.
 
     Manually launched from the Dagster UI launchpad with a ``RegisterExperimentConfig`` —
     ``experiment_name``, a ``base_model_config`` YAML path, optional ``config_overrides``, and a
     ``run_mode``. Resolves the forecaster class and config from the YAML, creates the MLflow
-    experiment and its parent run if they do not already exist, and adds this experiment's CV
+    CV run and its parent run if they do not already exist, and adds this CV run's CV
     fold partition keys to the ``cv_experiment_folds`` dynamic partition set:
     ``run_mode="smoke_test"`` (the default) adds the non-leaderboard dev folds, and ``"full_cv"``
     / ``"register_only"`` add the leaderboard folds from ``conf/cv/default.yaml``. Materialises
     no assets itself.
 
     Idempotent for the *same* config: re-running with the same ``experiment_name`` resolves the
-    existing experiment, parent run, and partition keys rather than duplicating them, and may
+    existing CV run, parent run, and partition keys rather than duplicating them, and may
     freely update the ``description`` and add the other run mode's folds on top. Re-running with
-    a **changed** config is rejected outright, before any MLflow write — an experiment's identity
+    a **changed** config is rejected outright, before any MLflow write — a CV run's identity
     is its config; see
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>.
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-a-cv-run-under-a-changed-config-is-rejected>.
     Register the changed config under a new ``experiment_name`` instead.
 
     Next manual step: materialise ``trained_cv_model`` for the partition keys this run added,
     then ``cv_power_forecasts``, then ``metrics`` to populate the leaderboard. See
-    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#step-6-launch-register_experiment_job>
+    <https://openclimatefix.github.io/nged-substation-forecast/cross-validation/dagster-workflow/#step-6-launch-register_experiment_job>
     for the full walkthrough.
     """
     register_experiment()

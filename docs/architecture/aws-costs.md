@@ -18,9 +18,9 @@ are in [Forecast Delivery: Securing it](forecast-delivery.md#securing-it).
 The Fargate rates used throughout: x86 £0.0349/vCPU-hr + £0.0038/GB-hr; **ARM 20% cheaper**
 (£0.0279 + £0.0031), and polars/XGBoost run fine on arm64, so every task below is ARM.
 
-**These estimates exclude ML experimentation but include routine re-training.** For v1 we expect
-most — maybe all — experimental training to run on our own laptops; the only experimentation AWS
-sees is an optional UI-launched backtest, priced per run below. (At v2 scale that assumption weakens
+**These estimates exclude cross-validation runs (CV runs) but include routine re-training.** For v1
+we expect most — maybe all — CV-run training to run on our own laptops; the only CV run AWS sees is
+an optional UI-launched backtest, priced per run below. (At v2 scale that assumption weakens
 — see [Backtests and training at v2](#backtests-and-training-scale-with-forecast-rows-too).)
 Re-training the *deployed* model is different: we plan to re-train it roughly **once a week**,
 probably on a GPU, and both estimates below carry a line for it. Fargate offers no GPUs, so the
@@ -32,8 +32,8 @@ terminate); the GPU rates are from the price-list API on 2026-07-23, converted a
 
 **Headline cost: ~£27–40/month.** The headline covers everything needed to keep the deployed service
 running unattended: the always-on control plane, every scheduled Fargate run (inference, ingest, and
-polling), S3 storage and requests, data transfer, and the planned weekly re-train. It excludes ML
-experimentation — backtests are priced per run rather than per month, and laptop training costs AWS
+polling), S3 storage and requests, data transfer, and the planned weekly re-train. It excludes CV
+runs — backtests are priced per run rather than per month, and laptop training costs AWS
 nothing — and anything NGED spend on their own AWS account to read the delivery bucket. It is made
 up of:
 
@@ -71,7 +71,7 @@ Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_me
 materialisations/day ≈ 1,000/month**. This cadence ingests only ECMWF ENS and the NGED power feed
 today; near-real-time CAMS and ERA5 ingests would join it *only if* live capacity estimation is made
 to depend on them — new external dependencies we may prefer to avoid by [keeping capacity estimation
-offline](../roadmap/capacity-estimation.md#irradiance-inputs). A backtest experiment today is ~4–6
+offline](../roadmap/capacity-estimation.md#irradiance-inputs). A backtest CV run today is ~4–6
 materialisations (`eligible_time_series` + `trained_cv_model` + `cv_power_forecasts` per fold, plus
 `metrics`; single leaderboard fold), rising to ~15–20 under the future multi-yearly-fold epoch.
 
@@ -141,7 +141,7 @@ not follow it:
 compute. The headline includes the same components as v1's: the control plane, every scheduled run
 (with inference on a larger task), storage and requests (now growing ~£5/month with each further
 year of history), and the weekly GPU re-train at its heavier-model bracket. It excludes the same
-items too — per-run backtests and experimentation, and NGED's read-side compute — plus any
+items too — per-run backtests and other CV runs, and NGED's read-side compute — plus any
 internet-egress spend if NGED pull bulk history over the public internet rather than reading from
 eu-west-2 (both priced below). It is made up of:
 
@@ -200,9 +200,9 @@ bulk reads that way would make this line item real rather than ≈0.
 A v1 backtest is ~£0.65/run (2 hours, 8 vCPU / 32 GB). Its compute is dominated by the same
 row-proportional work as inference, so a v2-scale backtest lands **very roughly at £10–50 per run**
 (strict 78× linear scaling gives ~£50; the fixed NWP-reading share pulls it below that). At those
-prices a heavy experimentation month becomes a real line item — and training 2,500 per-series models
+prices a month with many CV runs becomes a real line item — and training 2,500 per-series models
 may also outgrow the laptop assumption in the [pricing basis](#pricing-basis) — so re-cost this
-properly before planning sustained v2 experimentation.
+properly before planning sustained v2 CV runs.
 
 The weekly re-train scales the same way. We may also adopt somewhat heavier models at v2, so the
 ~10-minute v1 laptop train (~£1/month as an AWS GPU run — see the [v1 estimate](#v1-32-time-series))

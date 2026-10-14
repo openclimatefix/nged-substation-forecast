@@ -1,9 +1,9 @@
-# Running an ML experiment end-to-end
+# Running the cross-validation pipeline end-to-end
 
 How to go from raw data to a trained, MLflow-tracked model using the Dagster pipeline.
 
 The pipeline has two layers. The **data layer** (steps 1–5) is built once and refreshed as new data
-arrives; it is shared by all experiments. The **experiment layer** (steps 6–9) is repeated for each
+arrives; it is shared by all CV runs. The **model layer** (steps 6–9) is repeated for each
 new model or hyperparameter configuration — see [Model configuration](model-configuration.md) for
 how to choose features and set hyperparameters.
 
@@ -49,7 +49,7 @@ observations through `val_end`. The result is written to `eligible_time_series.d
 idempotent partition overwrite, so re-materialising replaces rather than appends.
 
 Eligibility is a function of data coverage only — it is independent of any model or config — so
-every experiment is scored on the identical population for a given fold. **Do not skip this step
+every CV run is scored on the identical population for a given fold. **Do not skip this step
 before training.**
 
 ## Step 5 — Materialise `effective_capacity`
@@ -84,12 +84,12 @@ the full pipeline is wired up before committing to a potentially long `full_cv` 
 
 1. Loads `base_model_config` as plain YAML and applies `config_overrides` to `model_params`.
 2. Constructs the forecaster's `CONFIG_CLASS`, so pydantic validates every hyperparameter before the
-   experiment is registered.
-3. Creates the MLflow experiment (or resolves the existing experiment if the name already exists),
-   and rejects the registration outright if that name is already registered under a *different*
-   config — see "An experiment's identity is its config" below.
-4. Creates the experiment's parent run (`cv_summary`) and logs the config as flattened params.
-5. Stamps three tags onto the experiment: the resolved config as JSON (`config`), the
+   CV run is registered.
+3. Creates the MLflow experiment (or resolves the existing MLflow experiment if the name already
+   exists), and rejects the registration outright if that name is already registered under a
+   *different* config — see "A CV run's identity is its config" below.
+4. Creates the CV run's parent run (`cv_summary`) and logs the config as flattened params.
+5. Stamps three tags onto the MLflow experiment: the resolved config as JSON (`config`), the
    fully-qualified Python class path of the forecaster (`forecaster_target`), and your
    `description`. The config class needs no tag of its own — it is the forecaster's `CONFIG_CLASS`.
 6. Adds dynamic partition keys (`"{experiment_name}__{fold_id}"`) to the `cv_experiment_folds`
@@ -99,19 +99,19 @@ The job is **idempotent** for a given config: re-running it with the same `exper
 the existing MLflow experiment and partition keys rather than creating duplicates. You may freely
 re-run it to edit the `description` or to add the other run mode's folds.
 
-### An experiment's identity is its config
+### A CV run's identity is its config
 
 Re-running the job with the same `experiment_name` but a **changed** config is refused, with an
 error naming the fields that differ. Register the new config under a new `experiment_name`.
 
-Every fold of an experiment must be trained and scored under one config, or the experiment's
+Every fold of a CV run must be trained and scored under one config, or the CV run's
 leaderboard row silently mixes two different models. Folds already materialised cannot be
-un-trained, and `trained_cv_model` reads the config back from the experiment's `config` tag (see
-"Why `trained_cv_model` reads config from MLflow, not from YAML" below), so re-pointing that tag
-mid-flight would change what later folds train on.
+un-trained, and `trained_cv_model` reads the config back from the MLflow experiment's `config` tag
+(see "Why `trained_cv_model` reads config from MLflow, not from YAML" below), so re-pointing that
+tag mid-flight would change what later folds train on.
 
-[Re-registering an experiment under a changed config is
-rejected](../architecture/ml-orchestration.md#re-registering-an-experiment-under-a-changed-config-is-rejected)
+[Re-registering a CV run under a changed config is
+rejected](../architecture/ml-orchestration.md#re-registering-a-cv-run-under-a-changed-config-is-rejected)
 explains how the refusal decides that a config changed — which tags it compares, and why an absent
 tag does not count as a change.
 
@@ -157,7 +157,7 @@ which is also what resolves the run by it), so it is not logged again here.
 The MLflow run structure after training looks like this:
 
 ```text
-Experiment "xgboost_smoke_test"
+MLflow experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
     └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end,
@@ -209,19 +209,20 @@ uv run marimo edit packages/dashboard/view_forecasts.py
 
 Pick the population with the dropdowns: the **Fold** dropdown lists every `fold_id` present in the
 `power_forecasts` table (a CV fold label, a smoke-test fold, or `live` for production forecasts),
-and an **Experiment** dropdown appears when the chosen fold holds more than one `experiment_name`.
-Then choose a **time series** (the dropdown groups the 32 series by type, so all the PV sites or all
-the primaries sit together), a **forecast date**, and one of that day's **forecast runs**.
+and an **Experiment** dropdown appears (it lists the `experiment_name` of each CV run) when the
+chosen fold holds more than one `experiment_name`. Then choose a **time series** (the dropdown
+groups the 32 series by type, so all the PV sites or all the primaries sit together), a **forecast
+date**, and one of that day's **forecast runs**.
 
-**Compare with** optionally adds a second experiment's ensemble in orange for the same fold, series,
-and forecast init time. The default is **No comparison**. If the second experiment has no matching
+**Compare with** optionally adds a second CV run's ensemble in orange for the same fold, series,
+and forecast init time. The default is **No comparison**. If the second CV run has no matching
 rows, a warning appears and the primary forecast stays visible. The NWP panel shows the primary
-experiment's weather run.
+CV run's weather run.
 
 **Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
-without restarting marimo. Its new experiment appears in the **Experiment** dropdown; **Fold**,
-**forecast date** and **forecast run** go back to their defaults, and the chosen time series is
-kept.
+without restarting marimo. Its new `experiment_name` appears in the **Experiment** dropdown;
+**Fold**, **forecast date** and **forecast run** go back to their defaults, and the chosen time
+series is kept.
 
 The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
 including past the init time) as a thick blue line, and a vertical rule at the forecast init time,
@@ -244,8 +245,8 @@ run config dialog before launching.
 
 | Field | Example | Notes |
 |---|---|---|
-| `population_filter.experiment_name` | `"xgboost_smoke_test"` | Filters `power_forecasts` to one experiment; leave null to score all experiments at once |
-| `population_filter.fold_id` | `"mid_2025_to_mid_2026"` | Filters to one fold; leave null to score all folds for the experiment |
+| `population_filter.experiment_name` | `"xgboost_smoke_test"` | Filters `power_forecasts` to one CV run; leave null to score all CV runs at once |
+| `population_filter.fold_id` | `"mid_2025_to_mid_2026"` | Filters to one fold; leave null to score all folds for the CV run |
 | `population_filter.valid_time_min/max` | `"2025-10-01T00:00:00+00:00"` | ISO-8601 UTC; trims the valid_time window. Allowed only with `evaluation_scope="ad_hoc"` |
 | `evaluation_scope` | `"leaderboard"` | `"leaderboard"` logs to MLflow; `"ad_hoc"` writes Delta only |
 
@@ -253,7 +254,7 @@ run config dialog before launching.
 
 1. Scans `power_forecasts` Delta, applying any non-null `PopulationFilter` predicates. The partition
    columns (`experiment_name` / `fold_id`) are `String`, matching what delta-rs stores, so the
-   predicates push straight into the Delta scan: naming an experiment/fold prunes to just that
+   predicates push straight into the Delta scan: naming a CV run/fold prunes to just that
    partition rather than reading the whole (unbounded) table.
 2. In `leaderboard` scope, drops any group whose `fold_id` is not a leaderboard fold in the CV
    config, naming the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. The
@@ -262,11 +263,11 @@ run config dialog before launching.
    scope dates its evaluation window from the CV config's leaderboard folds and has none for those
    rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
    takes the window from the forecast rows themselves.
-3. Discovers the matching `(experiment_name, fold_id)` groups, skips every `study/` experiment of an
+3. Discovers the matching `(experiment_name, fold_id)` groups, skips every `study/` CV run of an
    unfiltered run (naming them in the `skipped_study_experiments` metadata), and checks every
    remaining group before scoring any, raising on a refusal; see [What the `metrics` asset refuses
    to score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score). A run that scores
-   a study also scores the reference experiment's group for the same fold, so the study's fold run
+   a study also scores the reference CV run's group for the same fold, so the study's fold run
    can hold each score minus the reference's. In leaderboard scope, the skipped studies are tagged
    stale or current, and every fold run is tagged with a row-key fingerprint.
 4. Scores each group in batches of four `time_series_id` values at a time — peak memory is one
@@ -294,7 +295,7 @@ run config dialog before launching.
 After step 9, the MLflow run structure looks like this:
 
 ```text
-Experiment "xgboost_smoke_test"
+MLflow experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
     │   metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← mean across folds
@@ -311,7 +312,7 @@ from metadata so per-type queries need only a simple filter.
 
 ## Viewing results in the MLflow UI
 
-To browse experiments, compare the leaderboard, and inspect per-fold metrics and artifacts, launch
+To browse CV runs, compare the leaderboard, and inspect per-fold metrics and artifacts, launch
 the MLflow web UI against the same tracking store the pipeline writes to:
 
 ```bash
@@ -335,7 +336,7 @@ Every run carries the code and data provenance needed to answer "exactly which c
 produced this?". Each asset stamps **stage-prefixed** MLflow tags on the run it writes:
 
 - `register_git_sha` / `register_git_dirty` on the **parent run** — the code that registered the
-  experiment. (`git_dirty` is `true` when the working tree had uncommitted changes.)
+  CV run. (`git_dirty` is `true` when the working tree had uncommitted changes.)
 - `train_*`, `predict_*`, `metrics_*` on the **fold run** — one snapshot per stage, because
   `trained_cv_model`, `cv_power_forecasts` and `metrics` all write to the same fold run and may run
   days apart on different code. Each carries that stage's `git_sha` / `git_dirty` plus a
@@ -356,21 +357,21 @@ version=<train_delta_version__power_time_series>)`.
 When `register_experiment_job` runs, it resolves the base YAML plus any overrides into a single
 concrete config and stamps it as a JSON tag on the MLflow experiment. **The YAML file is only read
 at registration time.** From that point on, the MLflow experiment record is the authoritative source
-for the experiment's config.
+for the CV run's config.
 
 `trained_cv_model` reads the config back from those MLflow tags (via
 `load_experiment_forecaster(experiment_name)`) for three reasons:
 
 1. **Immutability.** The YAML on disk is mutable — someone could edit it between registering the
-   experiment and training fold 2. Reading from MLflow guarantees every fold of the same experiment
+   CV run and training fold 2. Reading from MLflow guarantees every fold of the same CV run
    trains on exactly the config that was registered, no matter when it runs. The tag is immutable in
-   turn: re-registering the experiment name under a changed config is refused rather than
+   turn: re-registering the CV run name under a changed config is refused rather than
    re-pointing it (see step 6 above).
 
 2. **Process independence.** Each `trained_cv_model` materialisation is a separate Dagster process.
    There is no live handle to pass between the job and the asset; the MLflow experiment name is the
    only shared identifier. The asset discovers everything it needs — forecaster class, config — by
-   looking up the experiment by name.
+   looking up the MLflow experiment by name.
 
 3. **Safe retries.** If a training run fails and Dagster retries it, the asset re-reads the same
    MLflow tags and resumes the same MLflow fold run (which is identified by tag, not by a transient

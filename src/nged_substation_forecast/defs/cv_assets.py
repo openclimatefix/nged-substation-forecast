@@ -1,6 +1,6 @@
 """Cross-validation Dagster assets.
 
-These assets implement the experiment-independent, fold-partitioned CV layer. Each asset is a
+These assets implement the fold-partitioned CV layer, independent of the CV run. Each asset is a
 thin orchestration shell delegating its logic to the pure helpers in ``ml_core.cv_helpers`` so
 the logic stays fast to unit-test and the assets stay readable.
 """
@@ -74,7 +74,7 @@ from nged_substation_forecast.defs._engineering_inputs import (
 from nged_substation_forecast.defs._tags import RESEARCH_LAYER_TAGS
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
-# (never hard-coded) so every experiment and asset agrees on the same folds. Loaded at import so
+# (never hard-coded) so every CV run and asset agrees on the same folds. Loaded at import so
 # the partition keys are available when Dagster builds the asset graph. The raw CV_CONFIG_PATH
 # env var is read directly here (rather than instantiating Settings, which needs the .env
 # secrets) so the partition set can be built without any credentials — while still respecting
@@ -85,7 +85,7 @@ _cv_config = load_cv_config(
 )
 
 cv_fold_partitions = StaticPartitionsDefinition(_cv_config.fold_ids)
-"""One partition per canonical CV fold (by fold year, e.g. "2022"). Experiment-independent."""
+"""One partition per canonical CV fold (by fold year, e.g. "2022"). Independent of the CV run."""
 
 CV_EXPERIMENT_FOLDS_NAME: Final[str] = "cv_experiment_folds"
 """Name of the dynamic partition set keyed by ``"{experiment_name}__{fold_id}"``.
@@ -95,10 +95,10 @@ A named constant so callers (``register_experiment_job``) pass a definite ``str`
 """
 
 cv_experiment_folds = DynamicPartitionsDefinition(name=CV_EXPERIMENT_FOLDS_NAME)
-"""One partition per (experiment, fold); key format ``"{experiment_name}__{fold_id}"``.
+"""One partition per (CV run, fold); key format ``"{experiment_name}__{fold_id}"``.
 
 Keys are added by ``register_experiment_job`` and consumed by the per-fold CV assets
-(``trained_cv_model`` / ``cv_power_forecasts``). Dynamic (not static) because experiments are
+(``trained_cv_model`` / ``cv_power_forecasts``). Dynamic (not static) because CV runs are
 registered at runtime and there can be thousands of them.
 """
 
@@ -125,10 +125,10 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     table, which ``clean_nged_power_data`` writes. An absent table gives an empty population. A time
     series is eligible for a fold when its coverage has at least ``min_training_months`` of history
     before the fold's ``val_start`` *and* reaches the fold's ``val_end``. Eligibility is derived
-    from data coverage alone (not from any model/config), so every experiment evaluates the fold on
+    from data coverage alone (not from any model/config), so every CV run evaluates the fold on
     the identical population — this is what keeps the leaderboard apples-to-apples.
     See "Eligibility" in
-    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/cross-validation-folds/#eligibility>
+    <https://openclimatefix.github.io/nged-substation-forecast/cross-validation/cross-validation-folds/#eligibility>
     for the fold definitions this population is computed against.
 
     The result is written to the ``eligible_time_series`` Delta table as one partition per
@@ -336,9 +336,9 @@ def _load_time_series_metadata(
     deps=["clean_nged_power_data", "ecmwf_ens", "eligible_time_series"],
 )
 def trained_cv_model(context: AssetExecutionContext) -> None:
-    """Train one forecaster for a single ``(experiment, fold)`` partition and save it to MLflow.
+    """Train one forecaster for a single ``(CV run, fold)`` partition and save it to MLflow.
 
-    Reads the experiment's resolved config from MLflow (the immutable record registered by
+    Reads the CV run's resolved config from MLflow (the immutable record registered by
     ``register_experiment_job``), the fold's canonical eligible ``time_series_id`` population
     from the ``eligible_time_series`` asset, and the observed power + gridded NWP over the fold's
     **inclusive** training window. Features are engineered through the forecaster's own
@@ -475,7 +475,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     deps=["trained_cv_model"],
 )
 def cv_power_forecasts(context: AssetExecutionContext) -> None:
-    """Predict the validation window for one ``(experiment, fold)`` partition and persist forecasts.
+    """Predict the validation window for one ``(CV run, fold)`` partition and persist forecasts.
 
     Loads the model ``trained_cv_model`` saved for this fold back from MLflow, then forecasts the
     fold's **inclusive** validation window across **all** NWP ensemble members — the
@@ -568,7 +568,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         if forecasts.height == 0 and not is_first:
             continue
 
-        # The first chunk overwrites the (experiment, fold) partition, clearing any prior run;
+        # The first chunk overwrites the (CV run, fold) partition, clearing any prior run;
         # later chunks append into the partition the first chunk established.
         write_power_forecasts(
             forecasts,
@@ -638,7 +638,7 @@ class PopulationFilter(Config):
     """Typed filter over ``power_forecasts`` rows to score.
 
     Every field is tabulated with a worked example under "Step 9 — Materialise ``metrics``":
-    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
+    <https://openclimatefix.github.io/nged-substation-forecast/cross-validation/dagster-workflow/>
 
     All fields default to ``None`` (= no filter on that dimension). A mistyped field name is a
     Dagster config validation error, not a silent wrong population — that is the whole point of
@@ -691,7 +691,7 @@ class MetricsConfig(Config):
     """Run config for the ``metrics`` asset.
 
     Filled in from the Dagster run-config dialog; see "Step 9 — Materialise ``metrics``":
-    <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/>
+    <https://openclimatefix.github.io/nged-substation-forecast/cross-validation/dagster-workflow/>
     """
 
     population_filter: PopulationFilter = PopulationFilter()
@@ -699,7 +699,7 @@ class MetricsConfig(Config):
     """Which evaluation scope this run produces.
 
     - ``"leaderboard"``: logs per-fold + aggregate metrics to the golden leaderboard MLflow
-      experiments (canonical complete-window folds only). The population filter may not
+      CV runs (canonical complete-window folds only). The population filter may not
       set ``valid_time_min`` or ``valid_time_max`` in this scope, because a trimmed window would be
       scored under the full fold's label.
     - ``"ad_hoc"``: writes to ``forecast_metrics`` Delta only; no MLflow logging.
@@ -789,15 +789,15 @@ def _validate_group(
     an earlier group's ``forecast_metrics`` rows or MLflow runs behind.
 
     Two checks, each raising, both in leaderboard scope only. Every row's ``valid_time`` must lie
-    inside the fold's window. A ``study/`` experiment must additionally carry exactly the reference
-    experiment's row keys for the fold, so it cannot abstain on hard rows.
+    inside the fold's window. A ``study/`` forecast must additionally carry exactly the reference
+    CV run's row keys for the fold, so it cannot abstain on hard rows.
 
     Args:
-        exp_name: Experiment name of the group.
+        exp_name: CV run name of the group.
         fold_id: Fold identifier of the group.
         group_scan: Lazy scan of this group's forecast rows.
         scan: Typed lazy scan of the whole ``power_forecasts`` table, from which the reference
-            experiment's rows are read.
+            CV run's rows are read.
         evaluation_scope: ``"leaderboard"`` or ``"ad_hoc"``.
 
     Returns:
@@ -854,7 +854,7 @@ def _group_scan(
     Args:
         pruned_scan: The ``pt.LazyFrame[PowerForecast]`` returned by ``PopulationFilter.apply``
             (partition predicates already applied).
-        exp_name: Experiment name of the group.
+        exp_name: CV run name of the group.
         fold_id: Fold identifier of the group.
 
     Returns:
@@ -872,15 +872,15 @@ FINGERPRINT_TAG: Final[str] = "row_key_fingerprint"
 """The MLflow fold-run tag holding ``row_key_fingerprint`` of the group's forecast rows."""
 
 REFERENCE_FINGERPRINT_TAG: Final[str] = "reference_row_key_fingerprint"
-"""The MLflow fold-run tag holding the reference experiment's fingerprint for the same fold."""
+"""The MLflow fold-run tag holding the reference CV run's fingerprint for the same fold."""
 
 MATCHES_REFERENCE_TAG: Final[str] = "row_keys_match_reference"
-"""``"true"`` when the group and the reference experiment forecast the same series, initialisation
+"""``"true"`` when the group and the reference CV run forecast the same series, initialisation
 times, and valid times, so their scores rest on the same forecast problem; otherwise ``"false"``.
-A reviewed experiment that differs from the reference is scored and tagged, never refused."""
+A reviewed CV run that differs from the reference is scored and tagged, never refused."""
 
 STALE_TAG: Final[str] = "stale_against_reference"
-"""``"true"`` on a study's fold run once the reference experiment's series, initialisation times, or
+"""``"true"`` on a study's fold run once the reference CV run's series, initialisation times, or
 valid times have changed since the study was scored. A change in the reference's ensemble members
 alone is not detected, because ``row_key_fingerprint`` ignores ``ensemble_member``. An unfiltered
 ``metrics`` run sets the tag on every study it skips."""
@@ -892,7 +892,7 @@ observed power and of ``effective_capacity``."""
 
 
 def _reference_fingerprint(scan: pt.LazyFrame[PowerForecast], fold_id: str) -> str:
-    """Return the row-key fingerprint of the reference experiment's rows for ``fold_id``."""
+    """Return the row-key fingerprint of the reference CV run's rows for ``fold_id``."""
     reference = PopulationFilter(
         experiment_name=_cv_config.reference_experiment_name, fold_id=fold_id
     ).apply(scan)
@@ -979,9 +979,9 @@ def _with_reference_groups(
     scan: pt.LazyFrame[PowerForecast],
     evaluation_scope: EvalScopeType,
 ) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
-    """Add the reference experiment's group for every study fold, and put studies last.
+    """Add the reference CV run's group for every study fold, and put studies last.
 
-    A study is scored beside the reference experiment in the same run, so the two scores share one
+    A study is scored beside the reference CV run in the same run, so the two scores share one
     snapshot of the observed power and of ``effective_capacity``. The population filter names only
     the study, so the added group is read from the whole table. A reference with no rows for the
     fold is not added, because the study's own check then refuses it by name.
@@ -1098,7 +1098,7 @@ def _read_scoring_inputs(
 def _log_parent_aggregates(
     experiment_fold_metrics: dict[str, dict[str, list[float]]], metrics_provenance: MlflowTags
 ) -> None:
-    """Log each experiment's mean-across-folds metrics to its MLflow parent run."""
+    """Log each CV run's mean-across-folds metrics to its MLflow parent run."""
     for exp_name, fold_metrics in experiment_fold_metrics.items():
         experiment_id = get_or_create_experiment(exp_name)
         parent_run_id = get_or_create_parent_run(experiment_id)
@@ -1168,7 +1168,7 @@ def _score_forecast_group(
     whole group, since the raise aborts the loop before later batches load.
 
     Args:
-        exp_name: Experiment name for this group.
+        exp_name: CV run name for this group.
         fold_id: Fold identifier for this group.
         group_scan: Lazy scan of this single ``(exp_name, fold_id)`` group's forecast rows
             (from ``_group_scan``); materialised one series batch at a time.
@@ -1268,7 +1268,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     ``forecast_metrics`` Delta table partitioned by ``(experiment_name, fold_id)``.
 
     For ``evaluation_scope="leaderboard"``, also logs per-type + overall aggregate metrics to each
-    fold's MLflow child run and the mean-across-folds aggregates to the experiment's parent run.
+    fold's MLflow child run and the mean-across-folds aggregates to the CV run's parent run.
     Lookup is by tag — never by a handle passed between assets — so this is idempotent under
     Dagster retries and safe across processes; see "Cross-process run resolution" in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/>.
@@ -1283,20 +1283,20 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     Every group is checked before any group is scored, and each check raises. In leaderboard scope,
     every row's ``valid_time`` must lie inside the fold's window.
 
-    Experiments whose name starts with ``study/`` hold forecasts submitted through
-    ``scripts/forecasting/score_study.py``. In leaderboard scope each study experiment must carry
+    CV runs whose name starts with ``study/`` hold forecasts submitted through
+    ``scripts/forecasting/score_study.py``. In leaderboard scope each study must carry
     exactly the row keys ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)`` of
     the CV config's ``reference_experiment_name`` for the same fold, so a study cannot abstain on
     hard rows or choose its own ensemble members. A run whose population filter names no
-    ``experiment_name`` skips study experiments, naming them in a warning and in the
+    ``experiment_name`` skips studies, naming them in a warning and in the
     ``skipped_study_experiments`` output metadata; a run whose population filter names a study's
     ``experiment_name`` scores that study.
 
-    In leaderboard scope, a run that scores a study also scores the reference experiment's group for
+    In leaderboard scope, a run that scores a study also scores the reference CV run's group for
     the same fold, so the study and the reference share one snapshot of the observed power and of
     the effective capacity. The study's fold run then holds each score minus the reference's, under
     the ``vs_reference__`` metric prefix. Every fold run is tagged with ``row_key_fingerprint``, the
-    reference's fingerprint for the fold, and ``row_keys_match_reference``. A reviewed experiment
+    reference's fingerprint for the fold, and ``row_keys_match_reference``. A reviewed CV run
     whose row keys differ from the reference's is tagged, not refused. A run that skips studies tags
     each skipped study's fold run ``stale_against_reference``, ``"true"`` when the reference's
     fingerprint has changed since the study was scored.
@@ -1344,10 +1344,10 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # window to be scored against; skip them rather than fail the whole run on the first one. Ad-hoc
     # scope takes its window from the rows themselves and is the supported way to score live output
     # or dev folds.
-    # `study/` experiments hold forecasts submitted through scripts/forecasting/score_study.py, each
-    # checked against the reference experiment when it is scored. An unfiltered run skips them: a
+    # `study/` forecasts are submitted through scripts/forecasting/score_study.py, each
+    # checked against the reference CV run when it is scored. An unfiltered run skips them: a
     # study goes stale when the reference is re-materialised, and one stale study must not stop the
-    # reviewed experiments being scored. A run that names a study's `experiment_name` scores it.
+    # reviewed CV runs being scored. A run that names a study's `experiment_name` scores it.
     skipped_study_experiments: list[str] = []
     skipped_study_groups: list[tuple[str, str]] = []
     if config.population_filter.experiment_name is None:
@@ -1424,7 +1424,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
     # Structure: {experiment_name: {mlflow_metric_key: [value_per_fold, ...]}}
     # e.g. {"xgboost_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}}
-    # After the loop, each list is averaged and logged to the experiment's MLflow parent run.
+    # After the loop, each list is averaged and logged to the CV run's MLflow parent run.
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
     fold_metrics_by_group: dict[tuple[str, str], dict[str, float]] = {}
     reference_fingerprints: dict[str, str] = {}
