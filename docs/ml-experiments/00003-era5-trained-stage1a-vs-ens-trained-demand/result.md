@@ -211,6 +211,33 @@ All rows below are exploratory.
   the 16 primary-substation series and +2.56 for the 4 bulk and grid supply flows, and +3.35 for the
   battery and biofuel series. The grid-flow interval (+0.19 to +5.28) rests on 4 series.
 
+## Is the long history's loss bad early data or drift? (post hoc)
+
+**Bad early data explains almost none of the loss; the error falls steadily as the training start
+moves later.** The ERA5-trained model was refitted with different training windows, in the weather
+only and weather plus calendar variants (`demand_history_check.py`). The table gives each window's
+error against the 2019-onward model, with 95% month-resampled intervals.
+
+| training window | weather only | with calendar |
+| --- | --- | --- |
+| 2019 onward (reference) | 15.04 | 13.00 |
+| first 6 months of each long series dropped | -0.09 (-0.12 to -0.05) | -0.11 (-0.18 to -0.05) |
+| from 2020-09 | -0.07 (-0.12 to -0.01) | -0.15 (-0.21 to -0.08) |
+| from 2021-09 | -0.37 (-0.49 to -0.25) | -0.42 (-0.53 to -0.31) |
+| from 2022-09 | -0.90 (-1.28 to -0.57) | -0.91 (-1.24 to -0.62) |
+| from 2023-09 | -1.32 (-1.81 to -0.90) | -1.49 (-1.88 to -1.11) |
+| from 2024-04 | -1.07 (-1.76 to -0.48) | -1.29 (-1.81 to -0.83) |
+
+- **The early months look normal.** Monthly levels and spreads of the three series with the largest
+  gap show no flat runs and no implausible values. The first-6-months cut changes the error by about
+  0.1 points.
+- **Three series carry most of the gap.** Weather-only error for D6 and D1 (grid flows) and D8
+  (primary demand) falls by 9.2, 3.9, and 8.6 points between the 2019 and the 2024-04 start. For 13
+  of the 22 series the windows differ by less than 0.5 points.
+- **The levels of those series shifted over the years.** D8's median power over capacity falls from
+  about 0.75 to about 0.3, and D6's changes sign. This is consistent with changes in the electricity
+  network or in embedded generation, which the study does not isolate.
+
 ## Failures and limits
 
 - One held-out year, one fold, 73 runs. The 22 series include 6 that are not demand (4 flows, a
