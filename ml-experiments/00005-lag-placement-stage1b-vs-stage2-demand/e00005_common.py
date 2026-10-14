@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
-import holidays  # ty: ignore[unresolved-import]  # `uv run --with holidays`
+import holidays
 import numpy as np
 import polars as pl
 import xgboost as xgb
