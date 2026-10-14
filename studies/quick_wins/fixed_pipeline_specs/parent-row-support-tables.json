@@ -1,0 +1,52 @@
+{
+  "tables": [
+    {
+      "heading": "Target-supported validation rows: Fold A",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/old_reference_main_v2/levels.parquet",
+      "filters": {
+        "label": "old_production",
+        "metric": "pinball19_norm",
+        "lead_band": "all"
+      },
+      "columns": [
+        "group",
+        "series",
+        "rows_per_seed",
+        "seeds",
+        "months"
+      ],
+      "decimal_places": 0,
+      "column_display_names": {
+        "group": "Series type",
+        "series": "Series",
+        "rows_per_seed": "Forecast cases per seed",
+        "seeds": "Fitting seeds",
+        "months": "Validation months"
+      }
+    },
+    {
+      "heading": "Target-supported validation rows: Fold B",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/old_reference_fold_b_main/levels.parquet",
+      "filters": {
+        "label": "old_production",
+        "metric": "pinball19_norm",
+        "lead_band": "all"
+      },
+      "columns": [
+        "group",
+        "series",
+        "rows_per_seed",
+        "seeds",
+        "months"
+      ],
+      "decimal_places": 0,
+      "column_display_names": {
+        "group": "Series type",
+        "series": "Series",
+        "rows_per_seed": "Forecast cases per seed",
+        "seeds": "Fitting seeds",
+        "months": "Validation months"
+      }
+    }
+  ]
+}

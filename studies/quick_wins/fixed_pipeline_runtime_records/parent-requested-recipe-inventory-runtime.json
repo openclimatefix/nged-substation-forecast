@@ -1,0 +1,102 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "recipe_inventory/requested_features",
+  "recorded_configuration": {
+    "configuration_kind": "provenance-derived recipe inventory; two synthetic rows and no fitted models",
+    "command_shape": "python studies/quick_wins/fixed_pipeline_recipe_inventory.py --output PRIVATE_NEW_OUTPUT --recipes solar_minimal_requested solar_expanded_requested wind_minimal_requested wind_minimal_uv_requested wind_minimal_circular_requested",
+    "recipes": [
+      "solar_minimal_requested",
+      "solar_expanded_requested",
+      "wind_minimal_requested",
+      "wind_minimal_uv_requested",
+      "wind_minimal_circular_requested"
+    ],
+    "padding": "equal",
+    "source_hashes": {
+      "fixed_pipeline_recipe_inventory.py": "58f7bc9323b8553a6341032503277cc8b198db3f77a5bf0d94884ac0fbaa3102",
+      "fixed_pipeline_fit.py": "96249cf95590d045764157fc49dea2fb2c1993ff83faa0a9262ebb57037b96ac",
+      "arms.py": "9e0ee05a39d054932f014b5cb9e99a111b3168b584152859304ca5bff9f03150",
+      "fit_arms.py": "8a33ecfc55a7dcb3f59b13a7004d25629a9098a3a574fdedac46346d50b1a0af",
+      "xgboost.yaml": "5b9bd6078453ed578b3f69da3fc08acda529c251a19fb71e2aa0934c89fd4178"
+    },
+    "feature_sets": [
+      {
+        "recipe": "solar_minimal_requested",
+        "real_features": [
+          "downward_short_wave_radiation_flux_surface",
+          "temperature_2m"
+        ],
+        "real_feature_count": 2,
+        "padded_width": 24
+      },
+      {
+        "recipe": "solar_expanded_requested",
+        "real_features": [
+          "categorical_precipitation_type_surface",
+          "clear_sky_irradiance",
+          "dew_point_temperature_2m",
+          "downward_long_wave_radiation_flux_surface",
+          "downward_short_wave_radiation_flux_surface",
+          "precipitation_surface",
+          "sun_east",
+          "sun_north",
+          "sun_up",
+          "temperature_2m",
+          "wind_speed_10m"
+        ],
+        "real_feature_count": 11,
+        "padded_width": 24
+      },
+      {
+        "recipe": "wind_minimal_requested",
+        "real_features": [
+          "temperature_2m",
+          "wind_direction_100m",
+          "wind_direction_10m",
+          "wind_speed_100m",
+          "wind_speed_10m"
+        ],
+        "real_feature_count": 5,
+        "padded_width": 24
+      },
+      {
+        "recipe": "wind_minimal_uv_requested",
+        "real_features": [
+          "temperature_2m",
+          "wind_direction_100m",
+          "wind_direction_10m",
+          "wind_speed_100m",
+          "wind_speed_10m",
+          "wind_u_100m",
+          "wind_u_10m",
+          "wind_v_100m",
+          "wind_v_10m"
+        ],
+        "real_feature_count": 9,
+        "padded_width": 24
+      },
+      {
+        "recipe": "wind_minimal_circular_requested",
+        "real_features": [
+          "temperature_2m",
+          "wind_direction_100m_cos",
+          "wind_direction_100m_sin",
+          "wind_direction_10m_cos",
+          "wind_direction_10m_sin",
+          "wind_speed_100m",
+          "wind_speed_10m"
+        ],
+        "real_feature_count": 7,
+        "padded_width": 24
+      }
+    ],
+    "trained_columns_definition": "Equal padding expands each changed target-type input set to 24 columns. Full ordered recipe and trained lists are in the original inventory report; this record does not fit or recompute them."
+  },
+  "executed_provenance_sha256": "b426086845f1ffd4d246ef5e3abd68ee18f0a436cadb39b5f7a93789a4b5b094",
+  "reported_output_sha256": {
+    "recipe_inventory.parquet": "94cd0166a55177eed455576cbf3a31038ef2d6f1a934a94810fa23d0d06cafa8",
+    "report.md": "0815fd77d35ea76b4bf4541d6d1d76bd670f9c91cea404522d0da36c12ab3c69"
+  },
+  "artifact_privacy": "Only this abstract configuration record is proposed for copying; private manifest and paths remain private, output values are anonymous hashes."
+}

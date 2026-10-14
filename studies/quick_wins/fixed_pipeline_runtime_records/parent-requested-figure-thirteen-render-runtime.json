@@ -1,0 +1,58 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "figures/requested_features/figure_13/render",
+  "recorded_configuration": {
+    "configuration_kind": "provenance-derived final figure configuration; not original executed JSON or recovered argv",
+    "figure_number": 13,
+    "phase": "render",
+    "title": "100 m and 10 m speeds lead circular-wind training gain (frozen radiation inputs)",
+    "extra_caption": [
+      "These training gains use frozen radiation revision 0f094c3, not merged 01ddf53. The training gains do not establish held-out input benefit or a deployment recommendation."
+    ],
+    "command_shape": "python studies/quick_wins/requested_feature_importance_charts.py --spec PRIVATE_REVIEWED_SPEC --output PRIVATE_NEW_OUTPUT --reviewed-text PRIVATE_REVIEWED_TEXT",
+    "original_specification_sha256": "67a3b396ad5f5e57ace294f589b2bb6ae4b14aa0dde0227f704337bc7d35426f",
+    "script_sha256": "3f59a49516c02eee2054e6bc13c9703ea16a9c60f62580b59f14b97af344382b",
+    "text_only": false,
+    "reviewed_text_sha256": "68c1de8b1c3cbd98f5829d5200685f5de56aab8f16c82324616ab3c8c0e3893e",
+    "statistics_recomputed": false,
+    "exact_final_text_sha256": "68c1de8b1c3cbd98f5829d5200685f5de56aab8f16c82324616ab3c8c0e3893e",
+    "dependencies": {
+      "altair": "6.3.0",
+      "polars": "2.0.0",
+      "vl-convert-python": "1.9.0.post1"
+    },
+    "scope": "Post hoc descriptive frozen radiation 0f094c3 results; no merged01ddf53 evaluation or deployment/adoption recommendation.",
+    "recipe": "wind_minimal_circular_requested",
+    "report_manifest_sha256": "6f0c3fab1d17db81dce0f36a9d7f043fe25d2b721ee0d3d035e20b5b100cc14b",
+    "report_output_hashes": {
+      "importance.parquet": "45b159317f2976d4c56e8d43bfe05dd1a07463e51cbe4dfb7a3cacf69d5c1bbe",
+      "refit_importance.parquet": "0b27a4ae91d3d540ed2b30699f568178007183db3fb925c3c94be57da918441c",
+      "report.md": "36286c5d8ca5d8faa1aac78dc7bbbb3090a363bc5f8358840b4ad3cd1949efc8",
+      "spec.json": "02173c9d482b4f595f09742c2a8d3c26b675bd192c770693db868073af0a8cb0"
+    },
+    "shared_sources_sha256": {
+      "old_importance_chart": "5efd0581c69d9f9229b8e36f09734fe31319ba48e16190f150575c02a1e5bce1",
+      "new_gain_report": "e14996c36f35b2b3b63aab1e86ba0f221b9041ac2449b963def53f317211b836",
+      "charts": "b622104fc726d5f126cba94cfa56a4b0788b177fd9c63f801bc21182ef9674f1",
+      "theme": "61627ce5ca1524c82b2617e0fb7ce29d637358c34b5b3a43a6fa5e6c97614e4c"
+    },
+    "real_features": [
+      "temperature_2m",
+      "wind_direction_100m_cos",
+      "wind_direction_100m_sin",
+      "wind_direction_10m_cos",
+      "wind_direction_10m_sin",
+      "wind_speed_100m",
+      "wind_speed_10m"
+    ],
+    "feature_count": 7
+  },
+  "executed_provenance_sha256": "7b3c0334745babb42a4af18a57704b53c5c6b7e6f15541e4f922d9438d9356d6",
+  "reported_output_sha256": {
+    "figure-text.md": "68c1de8b1c3cbd98f5829d5200685f5de56aab8f16c82324616ab3c8c0e3893e",
+    "requested_feature_importance_13.svg": "0d14ed688729a49677d13c12ea90097d2f8de0c9e69b297228f3fe49a65dda0b",
+    "requested_feature_importance_13.png": "57cbff71f34b5c884d9247e5b4f954a5653e19ac4f1089ffa377d26e0b451137"
+  },
+  "artifact_privacy": "Only this explicitly typed abstract configuration and anonymous output fingerprints are proposed for copying; original exact config/provenance/private paths are not copied."
+}

@@ -652,14 +652,16 @@ vl-convert-python 1.9.0.post1. Diagnostics use bootstrap seed 20261012 and 2,000
 | Executed combined integration patch | `23f4f76a30687b1c741b897273aba67fb5319dc43b6e51fdf062dc5083cf47a9` |
 | Published equivalent integration patch | `fca0456fde5f6009290908c3c9b895bba285b4af7cdfa98972745a0adcc116b3` |
 
-**The final public reproduction inventory is still being prepared.** Completed artifacts retain
-original run configurations, input and output hashes, dependency versions and completion records.
-The private preparation inventory includes unexecuted jobs, so that inventory alone is not a
-completion record. Publication of the sanitised configurations and complete hash inventory remains
-pending final reconciliation. Remaining public files are the four completed scoring configurations,
-the four primary publication-table specifications, the supplementary table specification and their
-sanitised hash inventory. Their public destinations have not been established, so no configuration
-download links are asserted here. Whole private manifests are not public reproduction artifacts.
+**Public reproduction records cover the existing diagnostics.** The
+[executed-specification index](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/forecast_calibration/diagnostic_specs/index.json)
+contains the four primary publication-table specifications and the supplementary table
+specification. The [derived-record index](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/forecast_calibration/diagnostic_runtime_records/index.json)
+contains the four scoring configurations and separate text and render records for the coverage
+figure. Each index binds file and executed-provenance hashes. Derived records document completed
+configurations; the records are not original execution
+specifications or historical shell transcripts.
+Whole private manifests, fitted boosters, and row-level predictions remain private. No calibration
+correction or coherence implementation is included.
 
 ## Reproducing the figures
 
@@ -669,8 +671,9 @@ from the repository root with the recorded environment. Set `STUDY_DATA_ROOT` to
 be absent. The recipe and seed loops name the exact completed fit-directory layout. These are
 portable reproduction commands, not a claim that new runs have been executed. They omit the
 untriggered best-point refit. The [supplementary tables](calibration-diagnostics-1156-tables.md)
-copy the completed selector output; reproducing that selection also requires the public
-specification whose publication remains pending.
+copy the completed selector output. Reproducing that selection also requires a separately labelled
+copy of the corresponding public table specification, with its input paths and required report
+hashes updated to match the reproduced reports. Preserve the archived specification unchanged.
 
 ```bash
 set -euo pipefail

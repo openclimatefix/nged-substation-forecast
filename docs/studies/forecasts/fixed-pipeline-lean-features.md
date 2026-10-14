@@ -222,12 +222,14 @@ training exposure, so their comparison is descriptive rather than a causal upgra
 
 ### Requested minimal-feature extension
 
-**Five fixed feature sets form a separate post hoc extension.** They were requested after the
-original results and do not continue the stopped solar ladder. They inherit the historical
-cleaned per-series point recipe; untargeted series retain its full inputs. None of the five
+**Five fixed feature sets form a separate post hoc extension.** The five feature sets were requested
+after the original results and do not continue the stopped solar ladder. The five feature sets
+inherit the historical cleaned per-series point recipe; untargeted series retain its full inputs.
+None of the five
 targeted sets includes power lags, calendar fields, a site identifier, or windchill. The
 [generated inventory](fixed-pipeline-feature-inventory.md#requested-post-hoc-feature-sets)
-prints their exact ordered real and trained columns.
+prints their exact ordered real and trained columns. PV means photovoltaic in the solar result
+labels.
 
 | Result label / saved recipe | Target | Real input count | Exact real input columns, in fitted order |
 |---|---|---|---|
@@ -237,26 +239,27 @@ prints their exact ordered real and trained columns.
 | Wind9 u/v / `wind_minimal_uv_requested` | Wind | 9 | `temperature_2m`, `wind_direction_100m`, `wind_direction_10m`, `wind_speed_100m`, `wind_speed_10m`, `wind_u_100m`, `wind_u_10m`, `wind_v_100m`, `wind_v_10m` |
 | Wind7 circular / `wind_minimal_circular_requested` | Wind | 7 | `temperature_2m`, `wind_direction_100m_cos`, `wind_direction_100m_sin`, `wind_direction_10m_cos`, `wind_direction_10m_sin`, `wind_speed_100m`, `wind_speed_10m` |
 
-**The result labels identify real information, while padding identifies the trained width.**
-PV2, PV11, Wind5, Wind9 u/v and Wind7 circular name exactly the columns in this table in every
+**The result labels count real input columns, while padding identifies the trained width.**
+PV2, PV11, Wind5, Wind9 u/v, and Wind7 circular name exactly the columns in this table in every
 requested-feature result and importance plot. The primary comparisons and both hyperparameter
 settings append deterministic duplicates of each set's own columns to reach 24 trained columns;
-the duplicates add no new measurements. The main-setting unpadded checks use exactly 2, 11, 5,
-9 and 7 trained columns respectively. The generated inventory prints the padding names and
+the duplicates add no new measurements. The main-setting unpadded checks use exactly 2, 11, 5, 9,
+and 7 trained columns respectively. The generated inventory prints the padding names and
 complete trained order. These five targeted sets contain no unlisted lags, calendar fields,
-windchill or series identifiers.
+windchill, or series identifiers.
 
 **Full 24 and original lean Wind16 identify separate reference input sets.** Full 24 is
 `production_cleaned`, the Part 1b point control defined above, rather than the production
-configuration or the pooled quick-wins winner. Original lean Wind16 is `lean_wind`: it retains
+configuration or the pooled quick-wins winner. Original lean Wind16 is `lean_wind`. The recipe
+retains
 `geopotential_height_500hpa`, `local_time_of_day_cos`, `local_time_of_day_sin`,
 `local_utc_offset_minutes`, `power_lag_168h`, `power_lag_24h`, `power_lag_336h`, `power_lag_48h`,
 `pressure_reduced_to_mean_sea_level`, `pressure_surface`, `temperature_2m`,
-`wind_direction_100m`, `wind_direction_10m`, `wind_speed_100m`, `wind_speed_10m` and `windchill`,
+`wind_direction_100m`, `wind_direction_10m`, `wind_speed_100m`, `wind_speed_10m`, and `windchill`,
 in that order, followed by eight duplicate columns in equal-width comparisons. The
 [complete reference inventory](fixed-pipeline-feature-inventory.md) also prints Full 24's exact
-columns and the production and pooled-winner recipes. A guarded-reference label changes
-windchill's domain handling, rather than removing the column or adding it to a requested set.
+columns and the production and pooled-winner recipes. A guarded-reference label changes the
+reference's windchill calculation; the input columns stay fixed.
 
 Expanded solar's seven weather fields are temperature, dewpoint, 10 m wind speed, downward
 long-wave and short-wave radiation, precipitation rate, and precipitation type. Sun position
@@ -264,15 +267,16 @@ uses the existing apparent zenith and azimuth at the midpoint of the half-hour e
 time. Three dimensionless components are `east = sin(zenith) * sin(azimuth)`,
 `north = sin(zenith) * cos(azimuth)`, and `up = cos(zenith)`. The vertical component stays
 negative below the horizon. Clear-sky irradiance is Haurwitz global horizontal irradiance
-averaged at thirty one-minute midpoints over that preceding half-hour, in W/m². It is a
-deterministic model estimate, rather than measured irradiance or tilted-panel output.
+averaged at 30 one-minute midpoints over that preceding half-hour, in W/m². Clear-sky irradiance is
+a deterministic model estimate, rather than measured irradiance or tilted-panel output.
 Time and the fixed coordinates are known before forecast issuance; observed power is not used.
 
 For each wind height, the component representation uses `u = -speed * sin(bearing)` and
 `v = -speed * cos(bearing)`, after converting the meteorological bearing from degrees to radians.
 The circular representation instead supplies the bearing's sine and cosine without raw
-bearings or u/v. Both derive from the corrected, processed polar values, so they add no weather
-information and do not recover native upstream components. Calculations use Float64 and
+bearings or u/v. Both wind representations derive from the corrected, processed polar values, so the
+representations add no weather information and do not recover native upstream components.
+Calculations use Float64 and
 stored additions use Float32; nulls propagate without zero imputation or input-dependent
 row filtering. The augmented frames preserve every original column and copied support artifact.
 
@@ -290,9 +294,12 @@ Fair CRPS is the deciding score for these matched 51-value point forecasts. The 
 month-and-seed intervals, separate equal-month t-intervals, support counts, and unadjusted
 multiple-comparison limitations apply. These post hoc results are not independent confirmation
 on untouched folds. No new automatic adoption threshold or further feature search is specified.
-Five descriptive gain-importance figures show main and sensitivity settings separately, combining
-duplicate-padding credit with its real source and including zero-gain inputs. Their ranges
-describe variability across refits, rather than confidence intervals or evidence that an input helps.
+Training gain is the reduction in squared-error fitting loss credited to an input when a tree
+splits the training data. For each fitted model, duplicate columns return their credit to the
+original input, and each input's gain share is its credit divided by the total credit.
+Five descriptive gain-importance figures show main and sensitivity settings separately and include
+zero-gain inputs. Their ranges describe variability across refits, rather than confidence intervals
+or evidence that an input helps.
 
 ## Results
 
@@ -650,7 +657,8 @@ that check does not bypass the stopped ladder.
 ![Separate wind input additions in Fold A.](../assets/fixed-pipeline-lean-features/wind-addbacks-fold-a.svg)
 
 **Each tested calendar addition raises wind loss against the lean wind baseline in Fold A's
-main setting, statistically significant at the unadjusted 5% level under both interval methods.** The
+main setting, statistically significant at the unadjusted 5% level under both interval methods.**
+The
 annual-cycle sine and cosine and the three weekday columns are separate additions, each with
 the other lean inputs retained. Precipitation type also raises loss in this fold and setting,
 statistically significant at the unadjusted 5% level under both methods.
@@ -1058,7 +1066,8 @@ coherence. This study changes no production code or forecast contract.
 comparison with original lean wind changes the wind conclusion.** These post hoc results cover both
 main and sensitivity settings in the forward Fold A and retrospective Fold B. All four equal-padding
 reports and both main-setting unpadded robustness reports are complete; final scientific review
-remains pending. The labels PV2, PV11, Wind5, Wind9 u/v and Wind7 circular refer to the [exact input
+remains pending. The labels PV2, PV11, Wind5, Wind9 u/v, and Wind7 circular refer to the [exact
+input
 sets](#requested-minimal-feature-extension), with their own inputs duplicated to width 24 for the
 primary comparisons. Full input means the 24-input Part 1b point control; original lean wind means
 the 16-input `lean_wind` recipe, not the production configuration or pooled quick-wins winner.
@@ -1072,15 +1081,16 @@ separate equal-month estimate and t interval address a different estimand.
 
 **Temperature and short-wave radiation alone reduce solar fair CRPS in all four comparisons.**
 Against the full-input `production_cleaned` point control, the two-input solar set gives differences
-of −1.800 in Fold A main, −2.147 in Fold B main and −1.625 in Fold A sensitivity; Fold B sensitivity
+of −1.800 in Fold A main, −2.147 in Fold B main, and −1.625 in Fold A sensitivity; Fold B
+sensitivity
 also improves. Both interval methods support lower loss at the unadjusted 5% level in each
 comparison. For example, Fold B main has a paired bootstrap interval of [−2.769, −1.538], while its
-equal-month estimate is −2.142 with a t interval of [−2.849, −1.435]. These are comparisons of
-bundled feature policies under the fixed fitting procedure; they do not identify the individual
-contribution of each omitted input.
+equal-month estimate is −2.142 with a t interval of [−2.849, −1.435]. The solar comparisons assess
+bundled feature policies under the fixed fitting procedure; the comparisons do not identify the
+individual contribution of each omitted input.
 
 **The expanded solar bundle performs worse than the two-input set in both folds and settings.** Its
-fair-CRPS differences against the minimal set are +1.241 in Fold A main, +1.642 in Fold B main and
+fair-CRPS differences against the minimal set are +1.241 in Fold A main, +1.642 in Fold B main, and
 +1.316 in Fold B sensitivity; Fold A sensitivity also deteriorates. Both interval methods support
 deterioration at the unadjusted 5% level in all four comparisons. Against the full-input control,
 the expanded set improves loss in both Fold A settings and Fold B sensitivity, but Fold B main
@@ -1090,9 +1100,10 @@ weather and solar-geometry fields therefore do not establish an advantage over t
 these examined comparisons.
 
 **Wind5 improves on the full-input control but does not establish an improvement on the original
-lean-wind model.** The five-input set retains temperature, both wind speeds and both raw directions.
+lean-wind model.** The five-input set retains temperature, both wind speeds, and both raw
+directions.
 Against the full-input point control, fair-CRPS differences are −3.579 in Fold A main, −3.201 in
-Fold B main, −3.177 in Fold A sensitivity and −3.115 in Fold B sensitivity; both interval methods
+Fold B main, −3.177 in Fold A sensitivity, and −3.115 in Fold B sensitivity; both interval methods
 support lower loss. Against original lean wind, both Fold A settings remain unresolved, while both
 Fold B settings deteriorate. Fold B main gives +0.543, with bootstrap interval [+0.304, +0.805] and
 equal-month estimate +0.543 with t interval [+0.263, +0.823]; Fold B sensitivity gives +0.517, with
@@ -1102,11 +1113,13 @@ methods supporting those opposite directions. An all-lead gain against the full 
 insufficient grounds to replace original lean wind.
 
 **Wind representation changes show no fair-CRPS advantage here.** Adding u/v to Wind5 increases fair
-CRPS by +0.052 in Fold A main, +0.030 in Fold B main and +0.044 in Fold A sensitivity; both interval
+CRPS by +0.052 in Fold A main, +0.030 in Fold B main, and +0.044 in Fold A sensitivity; both
+interval
 methods support deterioration at the unadjusted 5% level. Fold B sensitivity remains unresolved:
 +0.018 with bootstrap interval [−0.002, +0.037], and equal-month estimate +0.018 with t interval
 [−0.003, +0.040]. Replacing raw directions with their sine/cosine pairs remains unresolved in both
-main folds but deteriorates in both sensitivity settings. Fold A sensitivity gives +0.037 with
+folds at the main setting but deteriorates in both sensitivity settings. Fold A sensitivity gives
++0.037 with
 bootstrap interval [+0.013, +0.064]; Fold B sensitivity gives +0.031 with [+0.010, +0.055], and both
 equal-month t intervals are above zero. Both representations derive from the same corrected
 processed wind values and add no upstream weather information. These results do not isolate
@@ -1121,21 +1134,25 @@ identify each padded reference explicitly; sensitivity-setting fits retain equal
 
 **Mean absolute error gives a less favourable view of Wind5 than fair CRPS against Wind16.**
 In Fold A main, the Wind5-minus-original-lean mean-absolute-error difference is +0.277 capacity
-points, with bootstrap interval [-0.045, +0.555], while fair CRPS is -0.249 [-0.554, +0.026].
-Both are unresolved, with opposite central signs. In Fold A sensitivity, mean absolute error
-increases by +0.391 [+0.114, +0.650], supported by both interval methods, while fair CRPS remains
-unresolved at -0.185 [-0.467, +0.089]. The five-input set therefore does not establish an
+points, with bootstrap interval [-0.045, +0.555], while the fair-CRPS difference is -0.249 [-0.554,
++0.026].
+Both loss differences are unresolved, with opposite central signs. In Fold A sensitivity, mean
+absolute error
+increases by +0.391 [+0.114, +0.650], supported by both interval methods, while the fair-CRPS
+difference remains unresolved at -0.185 [-0.467, +0.089]. The five-input set therefore does not
+establish an
 across-metric advantage over the original 16-input set.
 
 **Secondary loss and coverage diagnostics qualify the deciding result.** Minimal solar and Wind5
 also reduce mean absolute error and pinball loss against the full-input control in the completed
 reports, but the representation comparisons are less uniform. For expanded versus minimal solar in
 Fold A main, the mean-absolute-error bootstrap interval excludes zero while the equal-month t
-interval includes it; for circular versus raw-direction Wind5 in Fold A sensitivity, the same
+interval includes zero; for circular versus raw-direction Wind5 in Fold A sensitivity, the same
 interval disagreement occurs for mean absolute error. Lower fair CRPS does not establish calibrated
 uncertainty: in Fold B main, minimal solar's nominal 80% and 90% intervals cover 57.274% and 65.290%
 of cases, and Wind5's cover 24.507% and 32.750%. These descriptive coverage values are well below
-their nominal levels; they are not evidence of calibrated forecasts or a calibration improvement.
+their nominal levels; the coverage values are not evidence of calibrated forecasts or a calibration
+improvement.
 
 **Lead-specific and precipitation support constrain interpretation of the expanded solar bundle.**
 In both completed Fold A settings, solar comparisons on days 0 to 2 and from day 11 onward have one
@@ -1148,16 +1165,17 @@ corruption limitations and must not be described as wholly absent in that era. T
 support limitations of these fields are distinct. Neither the bundle comparison nor an
 availability-era slice isolates precipitation information or an operational upgrade effect.
 
-**These results support a bounded frozen-source finding, not an adoption decision.** They use
-radiation revision `0f094c3`, not the final merged `01ddf53` implementation. A matched input and
+**These results support a bounded frozen-source finding, not an adoption decision.** The
+requested-feature results use radiation revision `0f094c3`, not the final merged `01ddf53`
+implementation. A matched input and
 preparation audit is required before carrying a processing or feature conclusion to that merged
 source; the existing frozen fits do not need automatic rerunning. The many post hoc feature, metric
 and lead comparisons do not provide multiplicity-adjusted family-wide significance. The two
 main-setting robustness reports are complete. The [authoritative generated
 tables](fixed-pipeline-feature-results-tables.md#requested-minimal-feature-comparisons) include the
 completed robustness and lead-specific comparisons. Final scientific and prose reviews remain
-pending. Gain importance describes fitted-model use rather than establishes a held-out feature
-benefit. No deployment or feature adoption recommendation follows yet.
+pending. Training gain describes fitted-model use; a large gain share does not establish a held-out
+feature benefit. No deployment or feature adoption recommendation follows yet.
 
 ### Training gain for each requested feature set
 
@@ -1168,7 +1186,8 @@ show the range across six fold-and-seed refits. These ranges are descriptive var
 confidence intervals. Duplicate padding columns return their gain to the original input before
 normalisation.
 
-Short-wave radiation dominates the two-input solar fit. Clear-sky irradiance and the vertical sun
+**Short-wave radiation dominates the two-input solar fit.** Clear-sky irradiance and the vertical
+sun
 component receive much of the expanded solar fit's gain, although that bundle has worse held-out
 fair CRPS than the two-input set. Both wind speeds receive the largest gain shares in all three
 requested wind representations. A large gain share therefore does not establish that adding an
@@ -1176,7 +1195,7 @@ input improves forecasting.
 
 ![Figure 9: training-gain shares for the two-input solar set, PV2.](../assets/fixed-pipeline-lean-features/requested_feature_importance_9.svg)
 
-![Figure 10: training-gain shares for the eleven-input solar set, PV11.](../assets/fixed-pipeline-lean-features/requested_feature_importance_10.svg)
+![Figure 10: training-gain shares for the 11-input solar set, PV11.](../assets/fixed-pipeline-lean-features/requested_feature_importance_10.svg)
 
 ![Figure 11: training-gain shares for the five-input wind set, Wind5.](../assets/fixed-pipeline-lean-features/requested_feature_importance_11.svg)
 
@@ -1206,7 +1225,8 @@ windchill, which can change tree predictions and forecast spread. Source inspect
 demonstrated defect explaining the score deterioration, and these experiments do not isolate
 those mechanisms or compare the interpolated weather with observations. The requested u/v
 and circular tests examine downstream representations of the already processed values;
-they do not isolate the interpolation algorithm or recover native wind information.
+the requested u/v and circular tests do not isolate the interpolation algorithm or recover native
+wind information.
 
 **The corrected winner remains a stronger distributional-loss benchmark than refitted
 production, while its coverage requires separate assessment.** The deciding score evaluates
@@ -1278,6 +1298,13 @@ The runs use XGBoost 3.4.1 and Polars 2.0.0. Fit manifests record source and dep
 parameters, data snapshots, seeds and hardware selection; report provenance verifies saved fit
 artifacts before aggregation.
 
+Commit `af5201f2` preserves the executed requested-feature producer, audit, and chart source
+versions.
+Later type-check corrections add annotations and identity casts while preserving the calculations.
+Reproducing the archived requested-feature artifacts requires that recorded revision because their
+manifests verify exact source hashes. Keep the original execution receipts and use new output
+directories for reproductions.
+
 A subsequent check found PR 1167 at `70dd58f9da75c2500bcf7a3f6dc5ad1b663ffb95`.
 It moves the wind-derivation function to `weather_utils` without changing its executable
 syntax tree or its placement after interpolation. The added storage schema guard, dashboard
@@ -1289,8 +1316,8 @@ At the subsequent 13 October check, wind PR 1167 was merged at
 `754954a66fdbfa540ce068e38716f9774a5c5f7e`; its additional changes were comments and documentation.
 Radiation PR 1166 was at `99a40cf586f93524f1034608faf285ae7cb91c2d`, incorporating the wind caller
 ordering already represented by the study's combined runtime. Those updates preserve the
-calculations used for the frozen frames. The requested feature comparisons reuse those frames;
-they do not evaluate subsequent changes to either implementation.
+calculations used for the frozen frames. The requested feature comparisons reuse those frames; the
+comparisons do not evaluate subsequent changes to either implementation.
 
 **The merged radiation revision changes the dawn/dusk calculation and has not been evaluated here.**
 PR 1166 subsequently merged at `01ddf5332063e369827787c5f23ec75d58a607a6`. Among its changes,
@@ -1309,13 +1336,14 @@ bounds recorded separately. The frozen effective-capacity denominator is a full-
 percentile and can include readings after that cutoff. It enters scoring only; normalised scores
 therefore remain retrospective and conditional on this common snapshot.
 
-**The public configuration inventory is not yet final.** The intended indexes are
-`studies/quick_wins/fixed_pipeline_specs/index.json` and
-`studies/quick_wins/fixed_pipeline_runtime_records/index.json`.
-TODO: reconcile completed artifacts, publish the reviewed entries and hashes, and verify these
-destinations before treating them as available downloads. Exact executed JSON specifications
-must be distinguished from records reconstructed from completed provenance: a derived CLI record
-is neither an original executed JSON specification nor a transcript of historical shell arguments.
+**The public inventory separates executed specifications from derived configuration records.**
+The [executed-specification index](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/quick_wins/fixed_pipeline_specs/index.json)
+contains 97 files. The [derived-record index](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/quick_wins/fixed_pipeline_runtime_records/index.json)
+contains 27 files, including separate text and render records for the requested figures.
+Each index records file and executed-provenance hashes. A derived record is neither an original
+executed JSON specification nor a transcript of historical shell arguments. The
+[reproduction guide](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/quick_wins/fixed_pipeline_runtime/README.md)
+explains the source revisions and the categorical-precipitation limitation in archived gate text.
 Dependency snapshots document the recorded environment; they do not constitute a complete
 environment lock or guarantee numerical equality on different hardware. Prepared queues and the
 full recipe registry are not evidence that every listed job completed. Private manifests and
@@ -1390,7 +1418,7 @@ historical fitting path. Both use no padding. The Part 1b `production_cleaned`, 
 `lean_wind` controls, the registered wind add-backs, guarded-windchill arms, negative controls and
 first solar rung use their separately recorded padding and setting. The unpadded controls are
 distinct main-setting checks. Select the completed fits from the exact executed report
-specifications in the forthcoming public spec index. Each report lists its runs, including fit
+specifications in the public executed-specification index. Each report lists its runs, including fit
 path, frames, label and seed, together with fold, setting and padding. The canonical fit path
 `fits/<treatment>/<fold>/<recipe>/<setting>/<device>_seed<seed>_<padding>` identifies the treatment,
 recipe and device; check these against the fit manifest. The derived runtime index does not
@@ -1420,13 +1448,17 @@ failed in both folds, so it was not run. The solar ladder starts with `solar_add
 that rung and apply the registered stopping rule before considering another. Listing later
 rungs in the registry does not establish their execution or authorise bypassing that rule.
 
-**Regenerate reports and publication artifacts from reviewed specifications.** Select the exact
-completed report, table, chart and importance specifications from the forthcoming public spec
-index. Retain the original executed bytes and their hashes. If input or output paths need to
-change, make a separately labelled reproduction copy bound to the rebuilt artifacts; it is a
-derived configuration, not the original executed specification. TODO: finalise the public
-inventory and its path-rebinding instructions. Until then, the following variables are explicit
-placeholders for selected, reviewed copies, rather than asserted public filenames:
+**Regenerate reports and publication artifacts from reviewed specifications.** The executed index
+provides the report, table, original importance, and original chart specifications. The requested
+gain producer and Figures 8 to 13 use derived configuration records; reconstruct their private
+bindings from the saved manifests and the corresponding script's specification schema. Retain
+original executed bytes and their hashes. If input or output paths need to change, make a
+separately labelled reproduction copy bound to the rebuilt artifacts; it is a
+derived configuration, not the original executed specification. Replace each consumed input path
+with its corresponding rebuilt artifact, update the required manifest and file hashes, and keep
+the reproduced configuration separate from the archived original. Derived records document
+parameters and hashes; reconstruct their private path bindings from the saved run manifests.
+The following variables select those reviewed reproduction copies:
 
 ```bash
 : "${STUDY_REPORT_SPEC:?Select and rebind the reviewed report specification}"
@@ -1504,3 +1536,52 @@ rebinding `STUDY_IMPORTANCE_SPEC` from the public index, regenerate its aggregat
 After reviewing that text, render with `fixed_pipeline_importance_charts.py` using the same
 `--report` and `--number 6`, a new `--output` directory and
 `--reviewed-text "$STUDY_REPRO_ROOT/importance/text/figure-text.md"`.
+
+**Figures 8 to 13 use the requested-feature scripts.** Prepare separately labelled specifications
+from their derived records and private manifests before selecting the archived source revision
+`af5201f2`. The gain specification binds all 60 saved equal-padding fits. The paired specification
+binds the four completed fold/setting reports. Each recipe's chart specification binds the gain
+report being reproduced. Set the following variables to those reviewed private copies:
+
+```bash
+: "${REQUESTED_GAIN_SPEC:?Bind the 60 saved fits and original frame manifests}"
+: "${REQUESTED_PAIRED_SPEC:?Bind the four matched equal-padding reports}"
+: "${REQUESTED_CHART_SPEC_DIR:?Select the five rebound chart specifications}"
+export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+export MKL_NUM_THREADS=8 NUMEXPR_NUM_THREADS=8 VECLIB_MAXIMUM_THREADS=8 BLIS_NUM_THREADS=8
+mkdir -p "$STUDY_REPRO_ROOT/requested/text" "$STUDY_REPRO_ROOT/requested/figures"
+.venv/bin/python studies/quick_wins/requested_feature_importance.py \
+  --spec "$REQUESTED_GAIN_SPEC" --output "$STUDY_REPRO_ROOT/requested/gain-report"
+```
+
+After the gain report completes, set each chart specification's `report.path` to the reproduced
+gain-report directory and `report.manifest_sha256` to its actual manifest hash. The chart script
+verifies the output hashes recorded in that manifest. Bind the paired specification to the four
+reproduced aggregate reports before exporting the texts:
+
+```bash
+.venv/bin/python studies/quick_wins/requested_features_charts.py \
+  --spec "$REQUESTED_PAIRED_SPEC" --output "$STUDY_REPRO_ROOT/requested/paired-text" --text-only
+for recipe in solar_minimal_requested solar_expanded_requested wind_minimal_requested \
+  wind_minimal_uv_requested wind_minimal_circular_requested; do
+  .venv/bin/python studies/quick_wins/requested_feature_importance_charts.py \
+    --spec "$REQUESTED_CHART_SPEC_DIR/$recipe.json" \
+    --output "$STUDY_REPRO_ROOT/requested/text/$recipe" --text-only
+done
+```
+
+Review the six exported texts before rendering. Each render requires its exact reviewed text and
+a new output directory:
+
+```bash
+.venv/bin/python studies/quick_wins/requested_features_charts.py \
+  --spec "$REQUESTED_PAIRED_SPEC" --output "$STUDY_REPRO_ROOT/requested/paired-figure" \
+  --reviewed-text "$STUDY_REPRO_ROOT/requested/paired-text/figure-text.md"
+for recipe in solar_minimal_requested solar_expanded_requested wind_minimal_requested \
+  wind_minimal_uv_requested wind_minimal_circular_requested; do
+  .venv/bin/python studies/quick_wins/requested_feature_importance_charts.py \
+    --spec "$REQUESTED_CHART_SPEC_DIR/$recipe.json" \
+    --output "$STUDY_REPRO_ROOT/requested/figures/$recipe" \
+    --reviewed-text "$STUDY_REPRO_ROOT/requested/text/$recipe/figure-text.md"
+done
+```

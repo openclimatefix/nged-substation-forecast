@@ -1,0 +1,44 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "part2",
+  "artifact": "publication/coverage_fold_a_main_render_v5",
+  "recorded_configuration": {
+    "configuration_kind": "coverage_figure_render",
+    "script_sha256": "21cc9fde248b27b45790374dc154e9bc94e955d4f62bf6a343e603882d61dbda",
+    "report_hashes": {
+      "manifest.json": "37df489a0f958e733334e3ed4e1ada0107b9bd3e5838192e34282046bca4fb9e",
+      "contrasts.parquet": "be9de7c373309c8b0bddb4b2507b30a769a108c989e4a876954b543ab59fa3f5",
+      "sample_semantics.parquet": "b2cedd2515508c8c8ed45c59f89b11cadc68e8550ed0e01db8a24ca59877fdf6",
+      "absolute.parquet": "67f3b9cb168a95ea280e687922d0537e7fe9367f6e663d0c73ed2ae2b842016f",
+      "source_inventory.parquet": "fa26f8bc5690f7d850c6dde02d44ef6cc9f29cbd8d30379f428c41ac2826132f",
+      "report.md": "3d78b56c86e3da87fab468c24c771d971ed172706b1f2bceed64909f2236d63b",
+      "synthetic.parquet": "88f75adffc8d5e272998727e03fa70b2353b64f52c31df32fff27c9a7048a51d",
+      "scorer": "adba37654e98da9f49f8be1dfad906e1318a537b25250821f0a36108253dd5c7"
+    },
+    "render_dependencies": {
+      "source_sha256": {
+        "studies.charts": "b622104fc726d5f126cba94cfa56a4b0788b177fd9c63f801bc21182ef9674f1",
+        "plotting.ocf_theme": "61627ce5ca1524c82b2617e0fb7ce29d637358c34b5b3a43a6fa5e6c97614e4c"
+      },
+      "versions": {
+        "altair": "6.3.0",
+        "polars": "2.0.0",
+        "vl-convert-python": "1.9.0.post1"
+      }
+    },
+    "text_only": false,
+    "reviewed_text_sha256": "517f75e7cff826e01e2985e8edf143cdfb958a13d820b119f9154c7aca469708",
+    "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_a_main",
+    "record_scope": "Configuration fields and hashes are recorded directly in completed provenance, except report: that directory is inferred from matching report hashes. This record does not assert an unrecorded original shell argv.",
+    "report_path_origin": "Inferred from the directory whose report hashes match original provenance; original provenance has no report path field."
+  },
+  "omitted_private_workspace_path_fields": [],
+  "path_omission_policy": "Only private workspace paths are omitted and replaced by hashes of their exact recorded strings; no replacement runtime path is invented. Private inventory retains exact values.",
+  "executed_provenance_sha256": "84e1b284982c190221c05b9cf18c705298d20be821c6daac267e0d9f408a1987",
+  "reported_output_sha256": {
+    "delivered_coverage.png": "785af889a714bbc6c85b002c47f46c96941617e55fd99227d7a76df1a66dc4db",
+    "delivered_coverage.svg": "31b32c843db70a5eb60793d604faf1cffac0f213515acf52e78fba900ef0ee73",
+    "figure-text.md": "517f75e7cff826e01e2985e8edf143cdfb958a13d820b119f9154c7aca469708"
+  },
+  "artifact_privacy": "Artifact hashes only; no row data or private metadata values."
+}

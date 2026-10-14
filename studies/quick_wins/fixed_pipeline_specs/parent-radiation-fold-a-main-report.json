@@ -1,0 +1,55 @@
+{
+  "runs": [
+    {
+      "label": "old_production",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_a/production/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_a"
+    },
+    {
+      "label": "old_production",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_a/production/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_a"
+    },
+    {
+      "label": "old_production",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_a/production/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_a"
+    },
+    {
+      "label": "radiation_production",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/radiation/fold_a/production/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/radiation/fold_a"
+    },
+    {
+      "label": "radiation_production",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/radiation/fold_a/production/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/radiation/fold_a"
+    },
+    {
+      "label": "radiation_production",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/radiation/fold_a/production/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/radiation/fold_a"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "Radiation correction minus old pipeline",
+      "left": "radiation_production",
+      "right": "old_production",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "crps_norm",
+        "abs_error_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    }
+  ]
+}

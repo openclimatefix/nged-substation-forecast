@@ -1,0 +1,269 @@
+{
+  "runs": [
+    {
+      "label": "old_production",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/production/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "old_production",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/production/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "old_production",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/production/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "radiation_production",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/radiation/fold_b/production/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/radiation/fold_b"
+    },
+    {
+      "label": "radiation_production",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/radiation/fold_b/production/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/radiation/fold_b"
+    },
+    {
+      "label": "radiation_production",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/radiation/fold_b/production/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/radiation/fold_b"
+    },
+    {
+      "label": "wind_production",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/wind/fold_b/production/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/wind/fold_b"
+    },
+    {
+      "label": "wind_production",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/wind/fold_b/production/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/wind/fold_b"
+    },
+    {
+      "label": "wind_production",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/wind/fold_b/production/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/wind/fold_b"
+    },
+    {
+      "label": "combined_production",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_production",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_production",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "old_winner",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/r2_e1_c1_a3w_d3/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "old_winner",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/r2_e1_c1_a3w_d3/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "old_winner",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/r2_e1_c1_a3w_d3/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "combined_winner",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/r2_e1_c1_a3w_d3/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_winner",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/r2_e1_c1_a3w_d3/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_winner",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/r2_e1_c1_a3w_d3/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "old_cleaned",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/production_cleaned/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "old_cleaned",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/production_cleaned/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "old_cleaned",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/old/fold_b/production_cleaned/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b"
+    },
+    {
+      "label": "combined_cleaned",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_cleaned",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_cleaned",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "Radiation correction minus old pipeline",
+      "left": "radiation_production",
+      "right": "old_production",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    },
+    {
+      "label": "Wind correction minus old pipeline",
+      "left": "wind_production",
+      "right": "old_production",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    },
+    {
+      "label": "Both corrections minus old pipeline",
+      "left": "combined_production",
+      "right": "old_production",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    },
+    {
+      "label": "Wind correction with radiation corrected",
+      "left": "combined_production",
+      "right": "radiation_production",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    },
+    {
+      "label": "Radiation correction with wind corrected",
+      "left": "combined_production",
+      "right": "wind_production",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    },
+    {
+      "label": "Both corrections on quick-wins winner",
+      "left": "combined_winner",
+      "right": "old_winner",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    },
+    {
+      "label": "Corrected quick-wins winner minus corrected production configuration",
+      "left": "combined_winner",
+      "right": "combined_production",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    },
+    {
+      "label": "Both corrections on cleaned feature baseline",
+      "left": "combined_cleaned",
+      "right": "old_cleaned",
+      "kind": "planned",
+      "metrics": [
+        "pinball19_norm",
+        "abs_error_norm",
+        "crps_norm",
+        "coverage80",
+        "coverage90"
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "label": "Interaction between wind and radiation corrections",
+      "kind": "planned",
+      "combined": "combined_production",
+      "radiation": "radiation_production",
+      "wind": "wind_production",
+      "old": "old_production",
+      "metrics": [
+        "pinball19_norm",
+        "crps_norm",
+        "abs_error_norm"
+      ]
+    }
+  ]
+}

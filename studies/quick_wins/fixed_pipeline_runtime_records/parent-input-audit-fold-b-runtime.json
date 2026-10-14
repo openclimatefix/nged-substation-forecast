@@ -1,0 +1,33 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "input_audit/fold_b",
+  "recorded_configuration": {
+    "configuration_kind": "input_audit",
+    "script_sha256": "7b40553696b762a6d68ba204724023496f3e7572ab2d22ce9644edc2b1b82353",
+    "frame_directories": {
+      "old": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/old/fold_b",
+      "combined": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b",
+      "radiation": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/radiation/fold_b",
+      "wind": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/wind/fold_b"
+    },
+    "configuration_sha256": "d971ab7161b0aa15c06a877be8eb14c5282fa8e0fea5210f09043537f6c26d7a",
+    "frame_manifest_bindings": {
+      "old": "ec23a455ef44ccf3d002de3e2e7ece77ae3ab27588e3949aed16388763052f10",
+      "combined": "d686af577b44e09811c1a84d4fe234af2337a2ae40f29c3c67f374b40e669073",
+      "radiation": "bd522078932fc30184a06509b581bc3c9405073b21e1e7f98e1fd03888e98036",
+      "wind": "5a63e862aee7be7567f9188b134d3b4fab99549c0f936a18767d6b6d8b2073d3"
+    },
+    "record_scope": "Exact fields recorded in completed provenance, not an assertion of an unrecorded original shell argv."
+  },
+  "omitted_private_workspace_path_fields": [],
+  "path_omission_policy": "Only private workspace paths are omitted and replaced by hashes of their exact recorded strings; no replacement runtime path is invented. Private inventory retains exact values.",
+  "executed_provenance_sha256": "d85717650eba9440a1ccbdbe27228fd161aabe40deb171e918857407010c5fcf",
+  "reported_output_sha256": {
+    "domain_flags.parquet": "8d94df8b22f270179b47d3a6d0c6ca870271594fe97b0af131a2f6ee46611a93",
+    "feature_changes.parquet": "0cf54ec0cacce39ef29c6c89cd0edc297aae6712fb17c869012018cb65309301",
+    "report.md": "de1dacf6140a26e7f1489939c1a3f3f13094c5c22b4e0666d3e4dfdadacd54b3",
+    "timing_correlations.parquet": "6c8602aed882a6b4ed26644da4b84a8c7e86985bfad7a76b737cde850b071887"
+  },
+  "artifact_privacy": "Artifact hashes only; no row data or private metadata values."
+}

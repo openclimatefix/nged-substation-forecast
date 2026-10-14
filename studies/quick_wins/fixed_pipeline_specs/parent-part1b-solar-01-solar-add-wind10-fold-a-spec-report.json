@@ -1,0 +1,65 @@
+{
+  "runs": [
+    {
+      "label": "lean_pv",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_pv/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_pv/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_pv/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "solar_add_wind10",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/solar_add_wind10/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "solar_add_wind10",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/solar_add_wind10/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "solar_add_wind10",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/solar_add_wind10/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "solar_add_wind10 minus lean_pv",
+      "left": "solar_add_wind10",
+      "right": "lean_pv",
+      "kind": "planned",
+      "groups": [
+        "PV"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    }
+  ],
+  "preparation_only": true,
+  "fold": "fold_a",
+  "setting": "main",
+  "padding": "equal",
+  "decision_metric": "crps_norm",
+  "execution_gate": "Run only this next solar rung after the previous retained rung is available. Fold A three-seed equal-series fair-CRPS gain >=0.15 points permits the next rung; stop at the first smaller gain. No later rung is unconditional. Fold B is confirmation after Fold A retention; it does not select the rung."
+}

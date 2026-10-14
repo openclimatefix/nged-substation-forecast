@@ -1,0 +1,105 @@
+{
+  "decimal_places": 2,
+  "tables": [
+    {
+      "heading": "Old-pipeline reproduction: common pinball score (% capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/old_reference_main_v2/levels.parquet",
+      "filters": {
+        "group": "all",
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "label",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months"
+      ],
+      "column_display_names": {
+        "label": "Recipe",
+        "value": "Estimate",
+        "lower95": "Lower 95%",
+        "upper95": "Upper 95%",
+        "seeds": "Seeds",
+        "months": "Months"
+      }
+    },
+    {
+      "heading": "Old-pipeline reproduction: fair CRPS diagnostic (% capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/old_reference_main_v2/levels.parquet",
+      "filters": {
+        "group": "all",
+        "lead_band": "all",
+        "metric": "crps_norm"
+      },
+      "columns": [
+        "label",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months"
+      ],
+      "column_display_names": {
+        "label": "Recipe",
+        "value": "Estimate",
+        "lower95": "Lower 95%",
+        "upper95": "Upper 95%",
+        "seeds": "Seeds",
+        "months": "Months"
+      }
+    },
+    {
+      "heading": "Old-pipeline reproduction: nominal 80% coverage (% cases)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/old_reference_main_v2/levels.parquet",
+      "filters": {
+        "group": "all",
+        "lead_band": "all",
+        "metric": "coverage80"
+      },
+      "columns": [
+        "label",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months"
+      ],
+      "column_display_names": {
+        "label": "Recipe",
+        "value": "Estimate",
+        "lower95": "Lower 95%",
+        "upper95": "Upper 95%",
+        "seeds": "Seeds",
+        "months": "Months"
+      }
+    },
+    {
+      "heading": "Old-pipeline reproduction contrasts: common pinball score (points of capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/old_reference_main_v2/contrasts.parquet",
+      "filters": {
+        "group": "all",
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "contrast",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better",
+        "months"
+      ],
+      "column_display_names": {
+        "contrast": "Contrast",
+        "difference": "Difference",
+        "lower95": "Lower 95%",
+        "upper95": "Upper 95%",
+        "months_better": "Months lower",
+        "months": "Months"
+      }
+    }
+  ]
+}

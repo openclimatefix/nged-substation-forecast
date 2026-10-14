@@ -1,0 +1,63 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "recipe_inventory",
+  "recorded_configuration": {
+    "recipes": [
+      "lean_pv",
+      "lean_pv_guarded_windchill",
+      "lean_wind",
+      "lean_wind_guarded_windchill",
+      "production",
+      "production_cleaned",
+      "production_cleaned_guarded_windchill",
+      "r2_c4_c2_c1_a3w_d3",
+      "r2_e1_c1_a3w_d3",
+      "solar_add_height",
+      "solar_add_longwave",
+      "solar_add_pressure",
+      "solar_add_wind10",
+      "solar_replace_clock",
+      "wind_add_categorical_precipitation_type_surface",
+      "wind_add_dew_point_temperature_2m",
+      "wind_add_downward_short_wave_radiation_flux_surface",
+      "wind_add_local_day_of_week",
+      "wind_add_local_day_of_week_cos",
+      "wind_add_local_day_of_week_sin",
+      "wind_add_local_time_of_year_cos",
+      "wind_add_local_time_of_year_sin",
+      "without_local_day_of_week",
+      "without_local_utc_offset_minutes"
+    ],
+    "padding": "equal"
+  },
+  "source_code_bindings": [
+    {
+      "repository_relative_path": "studies/quick_wins/fixed_pipeline_recipe_inventory.py",
+      "sha256": "58f7bc9323b8553a6341032503277cc8b198db3f77a5bf0d94884ac0fbaa3102"
+    },
+    {
+      "repository_relative_path": "studies/quick_wins/fixed_pipeline_fit.py",
+      "sha256": "b073be43f8809290746d952bf1acf988ea1f01cf61a7e2ed11e6f51f2de57ca3"
+    },
+    {
+      "repository_relative_path": "studies/quick_wins/arms.py",
+      "sha256": "9e0ee05a39d054932f014b5cb9e99a111b3168b584152859304ca5bff9f03150"
+    },
+    {
+      "repository_relative_path": "studies/quick_wins/fit_arms.py",
+      "sha256": "8a33ecfc55a7dcb3f59b13a7004d25629a9098a3a574fdedac46346d50b1a0af"
+    },
+    {
+      "repository_relative_path": "conf/model/xgboost.yaml",
+      "sha256": "5b9bd6078453ed578b3f69da3fc08acda529c251a19fb71e2aa0934c89fd4178"
+    }
+  ],
+  "source_code_path_policy": "Recorded workspace prefixes omitted; repository-relative suffixes retained from manifest paths.",
+  "executed_provenance_sha256": "ee6dcc7a2e626db83972a25f44dfb994e7c4e215bf680fb4aadf005b30606641",
+  "outputs_sha256": {
+    "recipe_inventory.parquet": "af9bba5775eb1e0b61442746698ceda6e094a7048b3d83c2331ad0c6738535f3",
+    "report.md": "a7becc89bced956e0b1c6b63f89c358eb8579ff8465dbf3457fc63330e1504cf"
+  },
+  "scope_note": "Recipe registry inventory includes conditional recipes that were not executed as fits."
+}

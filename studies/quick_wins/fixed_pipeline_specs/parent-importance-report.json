@@ -1,0 +1,40 @@
+{
+  "runs": [
+    {
+      "label": "combined_cleaned_point",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "combined_cleaned_point",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "combined_cleaned_point",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "combined_cleaned_point",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_cleaned_point",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "combined_cleaned_point",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    }
+  ]
+}

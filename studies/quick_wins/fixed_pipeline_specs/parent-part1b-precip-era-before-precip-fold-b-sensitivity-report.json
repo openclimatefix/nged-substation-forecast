@@ -1,0 +1,71 @@
+{
+  "runs": [
+    {
+      "label": "lean_wind",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b",
+      "source_era": "before_precip"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b",
+      "source_era": "before_precip"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b",
+      "source_era": "before_precip"
+    },
+    {
+      "label": "wind_add_categorical_precipitation_type_surface",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/wind_add_categorical_precipitation_type_surface/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b",
+      "source_era": "before_precip"
+    },
+    {
+      "label": "wind_add_categorical_precipitation_type_surface",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/wind_add_categorical_precipitation_type_surface/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b",
+      "source_era": "before_precip"
+    },
+    {
+      "label": "wind_add_categorical_precipitation_type_surface",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/wind_add_categorical_precipitation_type_surface/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b",
+      "source_era": "before_precip"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "wind_add_categorical_precipitation_type_surface minus lean_wind",
+      "left": "wind_add_categorical_precipitation_type_surface",
+      "right": "lean_wind",
+      "kind": "planned",
+      "groups": [
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    }
+  ],
+  "preparation_only": true,
+  "fold": "fold_b",
+  "setting": "sensitivity",
+  "padding": "equal",
+  "decision_metric": "crps_norm",
+  "execution_gate": "Descriptive source-run availability-era diagnostic only. Before 2024-11-13 00Z precipitation is wholly missing; era contrast does not identify precipitation information or upgrade causality. Requires all forecast source hashes/inventory."
+}

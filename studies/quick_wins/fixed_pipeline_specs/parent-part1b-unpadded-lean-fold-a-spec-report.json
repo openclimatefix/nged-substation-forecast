@@ -1,0 +1,100 @@
+{
+  "runs": [
+    {
+      "label": "production_cleaned",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_pv/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_pv/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_pv/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_wind/main/cuda_seed0_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_wind/main/cuda_seed1_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_wind/main/cuda_seed2_none",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "lean_pv minus production_cleaned",
+      "left": "lean_pv",
+      "right": "production_cleaned",
+      "kind": "planned",
+      "groups": [
+        "PV"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "lean_wind minus production_cleaned",
+      "left": "lean_wind",
+      "right": "production_cleaned",
+      "kind": "planned",
+      "groups": [
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    }
+  ],
+  "preparation_only": true,
+  "fold": "fold_a",
+  "setting": "main",
+  "padding": "none",
+  "decision_metric": "crps_norm",
+  "execution_gate": "Separate all-none fits required. Do not mix equal and none artifacts; full production_cleaned has 24 columns under either flag but output fingerprints remain distinct."
+}

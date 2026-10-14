@@ -1,0 +1,541 @@
+{
+  "decimal_places": 3,
+  "tables": [
+    {
+      "heading": "Fold A, main: delivered empirical-CDF bin shares (% of cases)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_a_main/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "source_era": "all",
+        "metric": [
+          "cdf_bin_00",
+          "cdf_bin_01",
+          "cdf_bin_02",
+          "cdf_bin_03",
+          "cdf_bin_04",
+          "cdf_bin_05",
+          "cdf_bin_06",
+          "cdf_bin_07",
+          "cdf_bin_08",
+          "cdf_bin_09"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold A, main: delivered diagnostics by lead band (coverage in % of cases; loss, width, bias and spread in % of frozen capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_a_main/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "days 0 to 2",
+          "days 3 to 10",
+          "days 11 onward"
+        ],
+        "source_era": "all",
+        "metric": [
+          "pinball19",
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90",
+          "bias",
+          "spread"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "lead_band",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "lead_band": "Lead band",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold A, sensitivity: delivered empirical-CDF bin shares (% of cases)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_a_sensitivity/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "source_era": "all",
+        "metric": [
+          "cdf_bin_00",
+          "cdf_bin_01",
+          "cdf_bin_02",
+          "cdf_bin_03",
+          "cdf_bin_04",
+          "cdf_bin_05",
+          "cdf_bin_06",
+          "cdf_bin_07",
+          "cdf_bin_08",
+          "cdf_bin_09"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold A, sensitivity: delivered diagnostics by lead band (coverage in % of cases; loss, width, bias and spread in % of frozen capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_a_sensitivity/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "days 0 to 2",
+          "days 3 to 10",
+          "days 11 onward"
+        ],
+        "source_era": "all",
+        "metric": [
+          "pinball19",
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90",
+          "bias",
+          "spread"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "lead_band",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "lead_band": "Lead band",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), main: delivered empirical-CDF bin shares (% of cases)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "source_era": "all",
+        "metric": [
+          "cdf_bin_00",
+          "cdf_bin_01",
+          "cdf_bin_02",
+          "cdf_bin_03",
+          "cdf_bin_04",
+          "cdf_bin_05",
+          "cdf_bin_06",
+          "cdf_bin_07",
+          "cdf_bin_08",
+          "cdf_bin_09"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), main: delivered diagnostics by lead band (coverage in % of cases; loss, width, bias and spread in % of frozen capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "days 0 to 2",
+          "days 3 to 10",
+          "days 11 onward"
+        ],
+        "source_era": "all",
+        "metric": [
+          "pinball19",
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90",
+          "bias",
+          "spread"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "lead_band",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "lead_band": "Lead band",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), main: delivered descriptive diagnostics by November source era (coverage in % of cases; loss, width, bias and spread in % of frozen capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "source_era": [
+          "before November 2024 boundary",
+          "after November 2024 boundary"
+        ],
+        "metric": [
+          "pinball19",
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90",
+          "bias",
+          "spread"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "source_era",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "source_era": "Source era",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), sensitivity: delivered empirical-CDF bin shares (% of cases)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_sensitivity/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "source_era": "all",
+        "metric": [
+          "cdf_bin_00",
+          "cdf_bin_01",
+          "cdf_bin_02",
+          "cdf_bin_03",
+          "cdf_bin_04",
+          "cdf_bin_05",
+          "cdf_bin_06",
+          "cdf_bin_07",
+          "cdf_bin_08",
+          "cdf_bin_09"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), sensitivity: delivered diagnostics by lead band (coverage in % of cases; loss, width, bias and spread in % of frozen capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_sensitivity/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "days 0 to 2",
+          "days 3 to 10",
+          "days 11 onward"
+        ],
+        "source_era": "all",
+        "metric": [
+          "pinball19",
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90",
+          "bias",
+          "spread"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "lead_band",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "lead_band": "Lead band",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), sensitivity: delivered descriptive diagnostics by November source era (coverage in % of cases; loss, width, bias and spread in % of frozen capacity)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_sensitivity/absolute.parquet",
+      "filters": {
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "type": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "source_era": [
+          "before November 2024 boundary",
+          "after November 2024 boundary"
+        ],
+        "metric": [
+          "pinball19",
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90",
+          "bias",
+          "spread"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "source_era",
+        "metric",
+        "value_percent",
+        "seed_spread_points",
+        "seeds",
+        "series",
+        "months",
+        "rows_per_seed"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Series type",
+        "source_era": "Source era",
+        "metric": "Metric",
+        "value_percent": "Value (%)",
+        "seed_spread_points": "Seed spread (percentage points)",
+        "seeds": "Fitting seeds",
+        "series": "Series",
+        "months": "Supported months",
+        "rows_per_seed": "Forecast cases per seed"
+      }
+    }
+  ]
+}

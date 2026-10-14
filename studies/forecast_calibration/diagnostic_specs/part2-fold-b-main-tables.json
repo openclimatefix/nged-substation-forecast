@@ -1,0 +1,169 @@
+{
+  "decimal_places": 3,
+  "tables": [
+    {
+      "heading": "Fold B (retrospective), main: delivered overall diagnostics",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/absolute.parquet",
+      "filters": {
+        "type": "all",
+        "lead_band": "all",
+        "source_era": "all",
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "metric": [
+          "pinball19",
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90",
+          "bias"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "metric",
+        "value_percent"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "metric": "Metric",
+        "value_percent": "Value (%)"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), main: solar and wind interval diagnostics",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/absolute.parquet",
+      "filters": {
+        "type": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "source_era": "all",
+        "recipe": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "variant": "delivered",
+        "metric": [
+          "coverage80",
+          "coverage90",
+          "width80",
+          "width90"
+        ]
+      },
+      "columns": [
+        "recipe",
+        "type",
+        "metric",
+        "value_percent"
+      ],
+      "column_display_names": {
+        "recipe": "Recipe",
+        "type": "Generation type",
+        "metric": "Metric",
+        "value_percent": "Value (%)"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), main: native, rearranged and pooled nine-level diagnostics",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/absolute.parquet",
+      "filters": {
+        "type": "all",
+        "lead_band": "all",
+        "source_era": "all",
+        "recipe": "r2_e1_c1_a3w_d3",
+        "variant": [
+          "control_native",
+          "control_rearranged",
+          "pooled_nine"
+        ],
+        "metric": [
+          "pinball9",
+          "coverage80",
+          "width80",
+          "crossing_rate",
+          "invalid_interval_rate"
+        ]
+      },
+      "columns": [
+        "variant",
+        "metric",
+        "value_percent"
+      ],
+      "column_display_names": {
+        "variant": "Distribution variant",
+        "metric": "Metric",
+        "value_percent": "Value (%)"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), main: paired nine- and nineteen-level losses",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/contrasts.parquet",
+      "filters": {
+        "type": "all",
+        "lead_band": "all",
+        "source_era": "all",
+        "treatment": "r2_e1_c1_a3w_d3",
+        "variant": [
+          "delivered",
+          "pooled_nine"
+        ],
+        "reference": [
+          "production",
+          "r2_e1_c1_a3w_d3"
+        ],
+        "reference_variant": [
+          "delivered",
+          "control_native",
+          "control_rearranged"
+        ],
+        "metric": [
+          "pinball19",
+          "pinball9"
+        ]
+      },
+      "columns": [
+        "variant",
+        "reference",
+        "reference_variant",
+        "metric",
+        "difference_points",
+        "lower95_points",
+        "upper95_points",
+        "months_lower_loss"
+      ],
+      "column_display_names": {
+        "variant": "Treatment variant",
+        "reference": "Reference recipe",
+        "reference_variant": "Reference variant",
+        "metric": "Pinball metric",
+        "difference_points": "Difference (capacity points)",
+        "lower95_points": "95% interval lower (capacity points)",
+        "upper95_points": "95% interval upper (capacity points)",
+        "months_lower_loss": "Months with lower loss"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective), main: analytic finite-sample interval references",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/calibration_diagnostics_1156/reports/fold_b_main/sample_semantics.parquet",
+      "columns": [
+        "sample_count",
+        "nominal_coverage_percent",
+        "lower_rank_one_based",
+        "upper_rank_one_based",
+        "continuous_iid_reference_coverage_percent"
+      ],
+      "column_display_names": {
+        "sample_count": "Sample count",
+        "nominal_coverage_percent": "Nominal coverage (% of cases)",
+        "lower_rank_one_based": "Lower endpoint rank (one-based)",
+        "upper_rank_one_based": "Upper endpoint rank (one-based)",
+        "continuous_iid_reference_coverage_percent": "Analytic continuous iid coverage (% of cases)"
+      }
+    }
+  ]
+}

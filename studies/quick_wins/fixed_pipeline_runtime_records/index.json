@@ -1,0 +1,166 @@
+{
+  "runtime_records": [
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-old-fold-a-runtime.json",
+      "sha256": "a8abfa6d6ad3c358a4b68d0150bf46813053b96047914c4242ae6556f7521925",
+      "executed_provenance_sha256": "021836cd4fa67c00ce12f4df16f9b048d15145cb534f58b1fdafc34d9868eabe",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-old-fold-b-runtime.json",
+      "sha256": "632bd70f8f9dfba7c8e82f60383fbdaafe9a5c8459f9aed76f4775a4962332c4",
+      "executed_provenance_sha256": "ec23a455ef44ccf3d002de3e2e7ece77ae3ab27588e3949aed16388763052f10",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-radiation-fold-a-runtime.json",
+      "sha256": "4a53aa13d05e126a95d9e3e11e018fe373bd76e852ebd1ae61046b821e04aaf0",
+      "executed_provenance_sha256": "b67e9faa28326a3bdbb2b80af5e4cb43511cd0d9155027350f7706fdd7913f71",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-radiation-fold-b-runtime.json",
+      "sha256": "397fb4f990a0c965350f43a9062a5bcd8b81965bb8535284a6cbfc2b0abfaac8",
+      "executed_provenance_sha256": "bd522078932fc30184a06509b581bc3c9405073b21e1e7f98e1fd03888e98036",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-wind-fold-a-runtime.json",
+      "sha256": "8edcf296f844f930c21f2a8edd39b6ab03bf18358db32f461305bb2fc0d64d9b",
+      "executed_provenance_sha256": "47d22e67b7b6b88ee8f336e023f3ca353286560a9ddf666ed87970dd9272a27c",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-wind-fold-b-runtime.json",
+      "sha256": "43938495e64f532d59d4e0697140c05cbfd5e12762fd922e930a674d87825a46",
+      "executed_provenance_sha256": "5a63e862aee7be7567f9188b134d3b4fab99549c0f936a18767d6b6d8b2073d3",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-combined-fold-a-runtime.json",
+      "sha256": "d2b4d29a7d5c0fc27a8c8a2be1dcd966fa0d0380f3273f426b2805646f38ad4b",
+      "executed_provenance_sha256": "7cdbcf9fd8583555338ab8018b92f462d7fa9dc81af4c12efa663f5913624742",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-frames-combined-fold-b-runtime.json",
+      "sha256": "34d4d74eaf20624e9ee9eb2351619997be24d8c30f4130bd0a397eca0a78a74d",
+      "executed_provenance_sha256": "d686af577b44e09811c1a84d4fe234af2337a2ae40f29c3c67f374b40e669073",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-input-audit-fold-a-runtime.json",
+      "sha256": "086e40633e599c4bf3722c93cea778dc9b62615208d74f85bb4b092a91736fe4",
+      "executed_provenance_sha256": "d04ea4cacfbf2b53562c1939195a2daa2a9a1a1407580dc4a2141fdbb72ad25e",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-input-audit-fold-b-runtime.json",
+      "sha256": "709a2dbd80cc12ad9cc34ccef2899a407307fbada2ef37f9a759b95634cb679e",
+      "executed_provenance_sha256": "d85717650eba9440a1ccbdbe27228fd161aabe40deb171e918857407010c5fcf",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-publication-importance-figure6-text-v4-runtime.json",
+      "sha256": "bb0fc201db38924a0bec7dd1072e30dfa53591263a0e24bcda18e23ef8d51a50",
+      "executed_provenance_sha256": "5628cb2b9c0c99d948205d82e2e9fbe948b7d75fd8317454f1bba730e887034d",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-publication-importance-figure6-render-v6-runtime.json",
+      "sha256": "62de1c35505cfbe87b4ebe61c11516cfcbcbf11c3753efb7837f37b74aa075b7",
+      "executed_provenance_sha256": "c1f46595d5dcaf64ee48068ec72170671136a0c76e4a76c40b0293daff7f0ca0",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-recipe-inventory-runtime.json",
+      "sha256": "8052b3eb1a33121a1a65ec45495b1499084ce4db1d05f66eb2a1f0bcc8531416",
+      "executed_provenance_sha256": "ee6dcc7a2e626db83972a25f44dfb994e7c4e215bf680fb4aadf005b30606641",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-feature-importance-runtime.json",
+      "sha256": "5de4a6d6ee7ae80f3e18694fd48356cbdc7c04ccec65190ec68b103cabc8d520",
+      "executed_provenance_sha256": "6f0c3fab1d17db81dce0f36a9d7f043fe25d2b721ee0d3d035e20b5b100cc14b",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-recipe-inventory-runtime.json",
+      "sha256": "8cf6efd8f49d379efbb220fe07a9f90782e28915213b8384b858a032e8e819a5",
+      "executed_provenance_sha256": "b426086845f1ffd4d246ef5e3abd68ee18f0a436cadb39b5f7a93789a4b5b094",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-eight-text-runtime.json",
+      "sha256": "7ce35efb914ff0206f1fbd597d553851f1eedb49b123fcba1a39286b1025bca1",
+      "executed_provenance_sha256": "c835ea09b05878cb3915f75d71bd5e741baa6497ded76cb6299acc820d6fcf08",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-eight-render-runtime.json",
+      "sha256": "f72d828964600d2e82943e48a4271ef727b006e334738ca1b41c4acaf4ca40ba",
+      "executed_provenance_sha256": "1aa36d062422653dc59760bb734ab9960e71e37e43f285f368ac08f3798db047",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-nine-text-runtime.json",
+      "sha256": "a99b3fa5b876de9986a75482fb087ff12c2454ca823975234668f1502f3f5850",
+      "executed_provenance_sha256": "8c4cd83d7b65f46a87ca560fac6f435e424e0ff39fd33982087da2cdb5854e58",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-nine-render-runtime.json",
+      "sha256": "bdb0c994ff07865db5f29b2c80dc95c33359f03e72771c348a63c260f04751a3",
+      "executed_provenance_sha256": "91fa661d2dd47cf670711fcf856ff91dad7ac93fb2e932ad0114a15d74a68e35",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-ten-text-runtime.json",
+      "sha256": "c26a8a6238cefc760f5fe0e2636ec0581db0c06b8458e72e694368a16326f569",
+      "executed_provenance_sha256": "4d9b16705dce38613df2527dd37579d8eaa033a059c2e356164ddd202235b507",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-ten-render-runtime.json",
+      "sha256": "5bf531866cd61b0bbe7799b101f10e85a06aad1d23948a2cf637f219af0e0da8",
+      "executed_provenance_sha256": "ab00acc00de19f1c194eb33a8d0208404bc895dfa3e301594ec48813470e7b65",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-eleven-text-runtime.json",
+      "sha256": "3cc9b928006978af08d911317eabf7d56c8c790ee956da90f745099eacaba1e6",
+      "executed_provenance_sha256": "96282aec2a74d5e29ef6ad59f1471f34d7ffbbdde6046bb99a0999400b967eab",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-eleven-render-runtime.json",
+      "sha256": "791e55da0c0eda019c1e4c7b21f3199d24b26c99e85f54020166368be8c44767",
+      "executed_provenance_sha256": "605e12d75a67b3f92302fab64495f6c7c8572b4d6e7d9615614c6e0c764d7f6b",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-twelve-text-runtime.json",
+      "sha256": "5a9b3e1856c6fd4c1874947bbad7e3aca371d450f11f74555c5b39bfc0ac9989",
+      "executed_provenance_sha256": "5e9725ae4e88c66532daa8b820af93fa4fabca80d0200e1f0cded34e40e8a90d",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-twelve-render-runtime.json",
+      "sha256": "3c43194aa79525c318b2bbd6c9ce0a6b1b4a7e96cc54fd1817cc056d777329fe",
+      "executed_provenance_sha256": "29ba6bd132bc05968d82c709dd48af16f2025abc0b03350cee32c147658100fd",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-thirteen-text-runtime.json",
+      "sha256": "63e512cd1a8c5e68414223a23a96d6bca2b58a8a9675e960f978b366b41c1227",
+      "executed_provenance_sha256": "6ec51d21439362f1f28b5f2ba3f2fa0fb365f9d77332b724512991f572e1c37b",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_runtime_records/parent-requested-figure-thirteen-render-runtime.json",
+      "sha256": "bf45446c639ef826179be1c558367d5d1bdf59878c1d86ca76e38721d60880b5",
+      "executed_provenance_sha256": "7b3c0334745babb42a4af18a57704b53c5c6b7e6f15541e4f922d9438d9356d6",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "frames/radiation/fold_b",
+  "recorded_configuration": {
+    "configuration_kind": "frame_build",
+    "script_sha256": null,
+    "pipeline_tag": "radiation",
+    "pipeline_revision": "0f094c35",
+    "archive": "/mnt/data/nged-substation-forecast/data/NWP",
+    "archive_version": 1830,
+    "power_version": 70,
+    "capacity_version": 1,
+    "population_version": 1,
+    "study_end_exclusive": "2026-07-01T00:00:00+00:00",
+    "max_validation_runs": null,
+    "window": {
+      "fold_id": "backwards_2025_07_to_2026_06",
+      "train_end": "2026-06-30T23:59:59+00:00",
+      "train_start": "2025-07-01T00:00:00+00:00",
+      "val_end": "2025-06-30T23:59:59+00:00",
+      "val_start": "2024-04-01T00:00:00+00:00"
+    },
+    "dependencies": {
+      "deltalake": "1.6.6",
+      "numpy": "2.5.3",
+      "patito": "0.8.6",
+      "polars": "2.0.0",
+      "pvlib": "0.16.1"
+    },
+    "python": "3.14.7 (main, Aug 25 2026, 14:02:56) [Clang 22.1.3 ]",
+    "input_fingerprint": "abce949725772111d5a328c2e5cbe9649d4d16a32ae25691cbd7987ebf2b711d",
+    "private_input_metadata_hashes": {
+      "bounded_power": "dbedb1ed2492812c15b51a8c18f21e7d5e3332d4d0259595befcb861b989bed7",
+      "capacity": "921e7b14dc22516fac5653d9f6c84d805e70d4b46b4a6e68db0965011da29457",
+      "metadata": "6f1e98bc89c2574539967b8404457347fda4a4fc9ee75cfab64a30abebf293b0",
+      "population": "745ccc35f20baee1a7f47edf8ca9f9bc67f2d07520a7c812df2818f03fdd0f8e"
+    },
+    "source_code_hashes": [
+      {
+        "source_basename": "__init__.py",
+        "sha256": "ed8906f9a25c9a0b7291b22e0b09a2d716888309d31185dea531fc257f8ce04e"
+      },
+      {
+        "source_basename": "_lags.py",
+        "sha256": "72ca38b6e8b34cde2222763afafe0a43fa138e8c4c8f0848018870fdb7717cfd"
+      },
+      {
+        "source_basename": "_nwp.py",
+        "sha256": "fdcffd6110ad6fdaff5d1e9e127086b8611dbd73bba9c5ad411cf6dbdfd840ff"
+      },
+      {
+        "source_basename": "_parsed_features.py",
+        "sha256": "a15bd0103fff885e6d6e912646a8a858223bd2e8d4f4bb3301001246249fe6fa"
+      },
+      {
+        "source_basename": "_radiation.py",
+        "sha256": "8674145d8baa4404171a90e52e544101a2e375e7015da5fac026aaedd29798a4"
+      },
+      {
+        "source_basename": "feature_engineer.py",
+        "sha256": "88db21f4958a8ad06397e34926a0f3378d00e018575d18336df3058901312084"
+      },
+      {
+        "source_basename": "tabular_feature_engineer.py",
+        "sha256": "f519076446d27a83470b60e34f5a4bf7e6abfc74fb82e4c5b5b71b5bdf1aa737"
+      },
+      {
+        "source_basename": "xgboost.yaml",
+        "sha256": "5b9bd6078453ed578b3f69da3fc08acda529c251a19fb71e2aa0934c89fd4178"
+      },
+      {
+        "source_basename": "solar.py",
+        "sha256": "5527ea74ab2722f7b44b244f6f441ee03bb50575ef88ecf270db6230b0aaaa71"
+      },
+      {
+        "source_basename": "fixed_pipeline_frames.py",
+        "sha256": "715d6cf3806528b308ca159e59957b8f95cae76fe5013412f6e53014b8c23a79"
+      },
+      {
+        "source_basename": "quick_wins_inputs.py",
+        "sha256": "7a47d38aaac76967df7bea39fb843e821d32a6029740ddd65c2bd86b7ed81ad0"
+      }
+    ],
+    "record_scope": "Exact fields recorded in completed provenance, not an assertion of an unrecorded original shell argv.",
+    "engineered_features": [
+      "categorical_precipitation_type_surface",
+      "dew_point_temperature_2m",
+      "downward_long_wave_radiation_flux_surface",
+      "downward_short_wave_radiation_flux_surface",
+      "geopotential_height_500hpa",
+      "local_day_of_week",
+      "local_day_of_week_cos",
+      "local_day_of_week_sin",
+      "local_time_of_day_cos",
+      "local_time_of_day_sin",
+      "local_time_of_year_cos",
+      "local_time_of_year_sin",
+      "local_utc_offset_minutes",
+      "nwp_lead_time_hours",
+      "power_lag_168h",
+      "power_lag_24h",
+      "power_lag_336h",
+      "power_lag_48h",
+      "precipitation_surface",
+      "pressure_reduced_to_mean_sea_level",
+      "pressure_surface",
+      "temperature_2m",
+      "temperature_2m_rolling_mean_24h",
+      "temperature_2m_rolling_mean_72h",
+      "wind_direction_100m",
+      "wind_direction_10m",
+      "wind_speed_100m",
+      "wind_speed_10m",
+      "windchill"
+    ],
+    "key_columns": [
+      "time_series_id",
+      "valid_time",
+      "nwp_init_time",
+      "power_fcst_init_time",
+      "ensemble_member",
+      "power"
+    ],
+    "metadata_source": "/mnt/data/nged-substation-forecast/data/NGED/metadata.parquet",
+    "capacity_source": "/mnt/data/nged-substation-forecast/data/effective_capacity",
+    "population_source": "/mnt/data/nged-substation-forecast/data/eligible_time_series",
+    "power_source": "/mnt/data/nged-substation-forecast/data/NGED/cleaned_power_time_series.delta",
+    "data_path_internal": "/mnt/data/nged-substation-forecast/data",
+    "data_path_delivery": "/mnt/data/nged-substation-forecast/data"
+  },
+  "omitted_private_workspace_path_fields": [],
+  "path_omission_policy": "Only private workspace paths are omitted and replaced by hashes of their exact recorded strings; no replacement runtime path is invented. Private inventory retains exact values.",
+  "executed_provenance_sha256": "bd522078932fc30184a06509b581bc3c9405073b21e1e7f98e1fd03888e98036",
+  "reported_output_sha256": {
+    "bounded_power.parquet": "4e80d4767ec3b44755698ded1b0a6ca913548e5c3c08f3129f06935c1a0aacca",
+    "capacity.parquet": "3d4b219142b739a49c51a80d97ce65ab058aeb63547583cbf6e83a3638017018",
+    "metadata.parquet": "aea373ea7b28824aecbcfce817e9fb3964107efe50274c691bce215e5a15ad1c",
+    "train.parquet": "99270d5e5ff0482cf50adac50c39a518b6372e9acb6da2ad62be841886353565",
+    "val/init=2024-04-01.parquet": "de3069688aba09bc88aac9735c8f85ce0f9bff33ed5ebc5ca095e5766b17bedc",
+    "val/init=2024-04-08.parquet": "6f8164958d6ab0d9004f3bb30d71b1b712ab97482fda82af67b19e7ccd2deada",
+    "val/init=2024-04-15.parquet": "3216d48c464b3876bd4af1c36dc296465d4fa5d9eaebaf69b65c00d3b245200e",
+    "val/init=2024-04-22.parquet": "772498ac01c559adf0ec78d297112b77052b9a7c7b0021545b986fb554934d49",
+    "val/init=2024-04-29.parquet": "afa03c487a7ffd277ffdcef1e39fc634087f704433107e7cae902346579b03f3",
+    "val/init=2024-05-06.parquet": "a776b7d85f2470261a7f37a23ccf10ee29b9e16628c4d65db88a06249a7a26f5",
+    "val/init=2024-05-13.parquet": "f9dc65fe65fbee315b293a3fa6cea79e19a0ed20bd5d04053ecefaca8d589aec",
+    "val/init=2024-05-20.parquet": "7d8bb43e4198fe27311d96b2ef53f2522776a67de2fc6902576a62d08f536b5e",
+    "val/init=2024-05-27.parquet": "aa6c9d8ecbdcc872393fa03f117b4ae50b493201ddaacce033ff2d7cab464663",
+    "val/init=2024-06-03.parquet": "9602b974d6c5aaf76f36f864d0fd9c7bb45411b313652902cbb9e0880919c2ef",
+    "val/init=2024-06-10.parquet": "35757c4832ce9b3ec99d3e273031f2ab9350a02549f9c9a38077632097f3d11f",
+    "val/init=2024-06-17.parquet": "bf72739d7d40b5fbbce3f8a7f5f16db9e63e7af1162812ae3b9b7574f5b6ee5c",
+    "val/init=2024-06-24.parquet": "48e9941d4acc851aa1fccffd49a7e28e31ae06618d06f387f041d013262ed9f2",
+    "val/init=2024-07-01.parquet": "a62dd9ed01d64b76a88a55926b9bb5c2da82799f14a40f25cccaa39eb8e4ff5e",
+    "val/init=2024-07-08.parquet": "af07de575e17e109bd5a6d4b98020d560d4b7de574c6d790ce9600c5cdaa43c0",
+    "val/init=2024-07-15.parquet": "a541fa1017109adc37f01d3bb42a6d84cd61bf704c099aaa40c23fc2b087969e",
+    "val/init=2024-07-22.parquet": "8327182b361ac8edb1e869ed446a474af515fe09b2a5599838b27a3e014bda72",
+    "val/init=2024-07-29.parquet": "4c210b422b8cd128f70a644fe721f8cdaae95f4821e6d78763a5f1bfdfec669a",
+    "val/init=2024-08-05.parquet": "f625d424f3a94890028bb2006478e8b3cf49199a703e01359ea12af48cbac19a",
+    "val/init=2024-08-12.parquet": "b8a11d1089052b96d7da0fe4eb1c9ff2d907cb1f6214134da234ef7b943555cd",
+    "val/init=2024-08-19.parquet": "f09abd1132715806e572d5025ad4a9f22780cda32ca7e3b71b661c76f263db22",
+    "val/init=2024-08-26.parquet": "67c5b12b90ce607357c2a42088f56a3a876c81708bd9921d5ecf48838b1c03b0",
+    "val/init=2024-09-02.parquet": "bd5d5a7e10f905e9812ed314bf9619e90d3ad746fbea53b3b81f5d1c77dcf113",
+    "val/init=2024-09-09.parquet": "1a41e568a07e45ac749a1e75e3ae7a303129952c31d2fd5ffce715ea7bc65433",
+    "val/init=2024-09-16.parquet": "9c5a325894a7f3b870ca9b24dacac9dc51859ab383090524fbdb065b597a2469",
+    "val/init=2024-09-23.parquet": "c668d0375d9ebdb36891c23513b6523850d3d205ba35306632bdbea300d7d545",
+    "val/init=2024-09-30.parquet": "cd105712076832d37a8ef6cc958521ed563706326a8e15acdc0f86f771eea9e5",
+    "val/init=2024-10-07.parquet": "baf90cfaca4d9695870eafa70144a77dea59759c5c4dce563dec7c23fadd7a23",
+    "val/init=2024-10-14.parquet": "722fedd8c5331b2482747c5cede1110f52b524c2c2b051dc0018d9e329100f3c",
+    "val/init=2024-10-21.parquet": "24e656c893ead75e5d53045862074f144a24f4741e9af044571a6a2c6230cade",
+    "val/init=2024-10-28.parquet": "030af08227878d9d38c86fe8c0ea2f03c01cd0a362d8aaa3b70e01d768dff8b6",
+    "val/init=2024-11-04.parquet": "be63c34816abc57e673355082db3e9c4f64ee236b8f30fc1026a19a2c74ccada",
+    "val/init=2024-11-11.parquet": "e9a7f3da7ee93fe5ee980df36dd5200483fcf6f17d977d7b9adc8143f081d9e8",
+    "val/init=2024-11-18.parquet": "15858fe6a5e5f043c46218eef13691c8dedfb9d9124e013c75c5582654cf4245",
+    "val/init=2024-11-25.parquet": "8ca66fcf302f434e73c8bc994871a42f0a067df3c0cf8c03e0dabafb03a113dc",
+    "val/init=2024-12-02.parquet": "01217f331a06b241aaa038c70531e7974650805ef6160705c9d046322016e869",
+    "val/init=2024-12-09.parquet": "d264aa3e1986c9bbbc55cdfbe60f6cef8cb808f13208ba7faa8e1f6df4f0d355",
+    "val/init=2024-12-16.parquet": "4c3dfa1c78d991608e20a231f6a63810e46b3f71bd0b336f823805e3a7c35ae2",
+    "val/init=2024-12-23.parquet": "81afbf5fab1d750f3c4735f909e99f121719de8b934f12c5fec2c45afb907e15",
+    "val/init=2024-12-30.parquet": "4b6d7e07596774f75227f67c75d076c21b70a710fe3dc2ce5345696f33c210d9",
+    "val/init=2025-01-06.parquet": "6430f1bbdb3f511cf65aa61182a2cdd763fa6673794cdbf97216b09cbbaa6f9e",
+    "val/init=2025-01-13.parquet": "4bbe1093a130f6955d63c5af806490e0e73da412a4281edd13a188e32c179f2a",
+    "val/init=2025-01-20.parquet": "e8445a7e010343ca80791c33dbb8a87deef4fdb32600e81fc279ec80b17ef259",
+    "val/init=2025-01-27.parquet": "a65e1fc4d95ea3d1e01fd0c60e8df6cd08179cf39ce0e81245dcbf761e0c7233",
+    "val/init=2025-02-03.parquet": "c0fd940b06ba65d788f78f2facc14e74dcad2116679952b0252327bd4b49cca7",
+    "val/init=2025-02-10.parquet": "7a15edc458b2eb2e909066ac9464afd19dd706010bad03f13b83e3970632d0e2",
+    "val/init=2025-02-17.parquet": "cec4ba1e316e884a49f31bee406fc4501a66b87650b4c84f5897687eda5d578f",
+    "val/init=2025-02-24.parquet": "300155c16313767b64472bd856ca5016b9405d6f56a9074087f805186d9eebc5",
+    "val/init=2025-03-03.parquet": "214923567d99c9d1b9ca37786439066117f11b038d80a9d2a544427898e5701c",
+    "val/init=2025-03-10.parquet": "1a2e5567115a81b3592e6952c5e579c1b8a963984d565eda524985e37a1da06d",
+    "val/init=2025-03-17.parquet": "868a8c70274af095478ad0c25471e6a27defcbd25beb0048fd8be686edfbaea8",
+    "val/init=2025-03-24.parquet": "9febdcbe35eef4927c3f3cd029ef8da1cfb994a99c8c0373d2b09aa20795cda4",
+    "val/init=2025-03-31.parquet": "05228bdaba3afdd54df37bb11e897b59603a5e261d05b9d21792c8da826e3e73",
+    "val/init=2025-04-07.parquet": "0fc0a9b768a10078316d32ea7bea81d1c294787103c7de51143b1f9e99e2e8cd",
+    "val/init=2025-04-14.parquet": "3ec16661cac500566d97f3aeaccc65a5f590d724921785feb1cdef7851510317",
+    "val/init=2025-04-21.parquet": "c4f4c9cbec3998535031e09ffc3584deba77e41d6b30c6b9923bf2e6e4e0b2bb",
+    "val/init=2025-04-28.parquet": "5713ae662c096cbe0ad847ab70bffb0ce52eac2f39635eb5c1c5fcd62c97dab4",
+    "val/init=2025-05-05.parquet": "1dfb9e6000f5efaed0219e044198f042a53e4fc0e92b6598586fce87fd3f051e",
+    "val/init=2025-05-12.parquet": "cec93a003fc62b5f1dd3cec6aef410c0a32fa81bd004dbc1fb31574d16548b0c",
+    "val/init=2025-05-19.parquet": "03cb70307b5e65e3f0e2b635598410d7dc4ae2726ab305c7aae023fe2fa33631",
+    "val/init=2025-05-26.parquet": "bd2c386f52f32aa06e2cc43faf457a31e9c854b9f78b347567f13922752600b6",
+    "val/init=2025-06-02.parquet": "07514151a8d9574485ba27dc9341f58f30a3aa454e20cbb22988f7bd940f9f86",
+    "val/init=2025-06-09.parquet": "435d328988b2c8900d2f703bb5a693433565bf19d11b2139e1589b3aa4136b7f",
+    "val/init=2025-06-16.parquet": "16709a52c79252443130aea6d30bc30ca80b864348bc9985ffb42875d7815dfa",
+    "val/init=2025-06-23.parquet": "7d2b42519142625934d26f084483f955402212ec753003d2ebe29f2ddb5e463a",
+    "val/init=2025-06-30.parquet": "8b551fc9a857dd3d4e7925f60e3079e36be81f214300273c1bde12f692c5af22"
+  },
+  "artifact_privacy": "Artifact hashes only; no row data or private metadata values."
+}

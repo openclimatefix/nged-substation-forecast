@@ -1,0 +1,305 @@
+{
+  "decimal_places": 3,
+  "tables": [
+    {
+      "heading": "solar-01-solar_add_wind10-fold_a; main; padding equal — absolute fair CRPS (capacity points)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_a-spec/levels.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "lean_pv",
+          "solar_add_wind10"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Bootstrap 95% lower",
+        "upper95": "Bootstrap 95% upper"
+      }
+    },
+    {
+      "heading": "solar-01-solar_add_wind10-fold_a; main; padding equal — planned paired fair CRPS (left minus right)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_a-spec/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "contrast": [
+          "solar_add_wind10 minus lean_pv"
+        ],
+        "kind": "planned"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired bootstrap 95% lower",
+        "upper95": "Paired bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      }
+    },
+    {
+      "heading": "solar-01-solar_add_wind10-fold_a; sensitivity; padding equal — absolute fair CRPS (capacity points)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_a-spec-sensitivity/levels.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "lean_pv",
+          "solar_add_wind10"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Bootstrap 95% lower",
+        "upper95": "Bootstrap 95% upper"
+      }
+    },
+    {
+      "heading": "solar-01-solar_add_wind10-fold_a; sensitivity; padding equal — planned paired fair CRPS (left minus right)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_a-spec-sensitivity/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "contrast": [
+          "solar_add_wind10 minus lean_pv"
+        ],
+        "kind": "planned"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired bootstrap 95% lower",
+        "upper95": "Paired bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      }
+    },
+    {
+      "heading": "solar-01-solar_add_wind10-fold_b; main; padding equal — absolute fair CRPS (capacity points)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_b-spec/levels.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "lean_pv",
+          "solar_add_wind10"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Bootstrap 95% lower",
+        "upper95": "Bootstrap 95% upper"
+      }
+    },
+    {
+      "heading": "solar-01-solar_add_wind10-fold_b; main; padding equal — planned paired fair CRPS (left minus right)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_b-spec/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "contrast": [
+          "solar_add_wind10 minus lean_pv"
+        ],
+        "kind": "planned"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired bootstrap 95% lower",
+        "upper95": "Paired bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      }
+    },
+    {
+      "heading": "solar-01-solar_add_wind10-fold_b; sensitivity; padding equal — absolute fair CRPS (capacity points)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_b-spec-sensitivity/levels.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "lean_pv",
+          "solar_add_wind10"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Bootstrap 95% lower",
+        "upper95": "Bootstrap 95% upper"
+      }
+    },
+    {
+      "heading": "solar-01-solar_add_wind10-fold_b; sensitivity; padding equal — planned paired fair CRPS (left minus right)",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_solar-01-solar_add_wind10-fold_b-spec-sensitivity/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "contrast": [
+          "solar_add_wind10 minus lean_pv"
+        ],
+        "kind": "planned"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired bootstrap 95% lower",
+        "upper95": "Paired bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      }
+    }
+  ]
+}

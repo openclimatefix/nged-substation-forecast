@@ -1,0 +1,112 @@
+{
+  "preparation_only": false,
+  "direction_text": "Negative differences mean lower loss with lean wind inputs; positive differences mean higher loss.",
+  "figures": [
+    {
+      "number": 7,
+      "title": "Wind forecasts using fewer inputs have lower historical forecast error under the tested conditions",
+      "subtitle": [
+        "A separate XGBoost model predicts power for each wind meter using the input set labelled on each row.",
+        "The forecasting method, XGBoost, combines decision trees trained to reduce squared prediction errors.",
+        "All XGBoost models use the corrected wind and radiation processing.",
+        "A means training April 2024\u2013June 2025 and scoring July 2025\u2013June 2026. B means training July 2025\u2013June 2026 and scoring April 2024\u2013June 2025, and is retrospective.",
+        "Lean wind retains 16 of the full control\u2019s 24 real inputs, removing selected weather and calendar inputs.",
+        "All scored forecast times are included. Each row shows forecast error with lean inputs minus forecast error with full inputs under the labelled conditions.",
+        "Each decision tree ends in leaves, which supply prediction values. Tree depth limits successive splits; learning rate controls each update\u2019s size. Minimum child weight limits small leaves; the L2 penalty discourages large fitted leaf values.",
+        "Main uses 500 trees, maximum depth 6, learning rate 0.05, minimum child weight 1, and L2 penalty 1.",
+        "Sensitivity, labelled alt, uses 1200 trees, maximum depth 4, learning rate 0.03, minimum child weight 50, and L2 penalty 5.",
+        "Both training settings sample 80% of training rows per tree and allow all input columns.",
+        "Padded rows duplicate retained inputs to keep 24 training columns. Unpadded rows use the 16 lean or 24 full real inputs without duplicates.",
+        "Ordinary rows use the original windchill formula. Guarded rows use that formula only at temperatures at most 10\u00b0C and 10 m wind speeds at least 4.8 km/h; otherwise windchill equals air temperature.",
+        "Each power forecast contains 51 values, one from each alternative weather prediction supplied by the weather ensemble.",
+        "Continuous ranked probability score (CRPS) compares the forecast power distribution with observed power; lower is better.",
+        "Fair CRPS adjusts for the finite number of forecast values, assuming independent samples from the forecast distribution. That assumption is not established for these weather-ensemble values; the corrected score is a diagnostic comparison.",
+        "Each row uses matched forecasts and observations and weights wind meters and three random-seed fits equally. A seed sets a training run\u2019s random choices.",
+        "Ranges describe variation across whole months and individual fits, rather than uncertainty in the three-fit mean or transfer to new meters.",
+        "These separate loss contrasts do not directly test differences between the guard, training-setting, or padding effects and establish no causal mechanism.",
+        "Frozen capacity is each meter\u2019s full-history 99th percentile of absolute power, including later readings. Each forecast loss is divided by its meter\u2019s capacity and expressed as a percentage before averaging meters. Capacity is used only for scoring.",
+        "Each interval draw resamples whole months and selects one training seed shared by the lean and full XGBoost models."
+      ],
+      "panels": [
+        {
+          "title": "Wind farms: forecast loss with lean inputs minus forecast loss with full inputs",
+          "metric": "crps_norm",
+          "axis_title": "Fair CRPS difference (percentage points of capacity)",
+          "zero_label": "No difference",
+          "rows": [
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_lean-fold_a-spec",
+              "label": "A \u00b7 main \u00b7 ordinary \u00b7 padded",
+              "contrast": "lean_wind minus production_cleaned",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_guarded-windchill-fold_a-spec",
+              "label": "A \u00b7 main \u00b7 guarded \u00b7 padded",
+              "contrast": "lean_wind_guarded_windchill minus production_cleaned_guarded_windchill",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_lean-fold_a-spec-sensitivity",
+              "label": "A \u00b7 alt \u00b7 ordinary \u00b7 padded",
+              "contrast": "lean_wind minus production_cleaned",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_guarded-windchill-fold_a-spec-sensitivity",
+              "label": "A \u00b7 alt \u00b7 guarded \u00b7 padded",
+              "contrast": "lean_wind_guarded_windchill minus production_cleaned_guarded_windchill",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_lean-fold_b-spec",
+              "label": "B \u00b7 main \u00b7 ordinary \u00b7 padded",
+              "contrast": "lean_wind minus production_cleaned",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_guarded-windchill-fold_b-spec",
+              "label": "B \u00b7 main \u00b7 guarded \u00b7 padded",
+              "contrast": "lean_wind_guarded_windchill minus production_cleaned_guarded_windchill",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_lean-fold_b-spec-sensitivity",
+              "label": "B \u00b7 alt \u00b7 ordinary \u00b7 padded",
+              "contrast": "lean_wind minus production_cleaned",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_guarded-windchill-fold_b-spec-sensitivity",
+              "label": "B \u00b7 alt \u00b7 guarded \u00b7 padded",
+              "contrast": "lean_wind_guarded_windchill minus production_cleaned_guarded_windchill",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_unpadded-lean-fold_a-spec",
+              "label": "A \u00b7 main \u00b7 ordinary \u00b7 unpadded",
+              "contrast": "lean_wind minus production_cleaned",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_unpadded-lean-fold_b-spec",
+              "label": "B \u00b7 main \u00b7 ordinary \u00b7 unpadded",
+              "contrast": "lean_wind minus production_cleaned",
+              "group": "Wind",
+              "lead_band": "all"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

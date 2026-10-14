@@ -1,0 +1,705 @@
+{
+  "preparation_only": true,
+  "execution_state": "PREPARED_NOT_AUTHORIZED",
+  "fold": "fold_b",
+  "setting": "main",
+  "padding": "equal",
+  "decision_metric": "crps_norm",
+  "secondary_metrics": [
+    "abs_error_norm",
+    "pinball19_norm",
+    "coverage80",
+    "coverage90"
+  ],
+  "execution_gate": "Fresh review of this exact specification; approved source/augmentation/reuse and prediction audits; all referenced fits complete with immutable runtime bindings; actual source/output hashes rechecked; absent report destination. No automatic fallback controls.",
+  "runs": [
+    {
+      "label": "solar_minimal_requested",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/solar_minimal_requested/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "solar_minimal_requested",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/solar_minimal_requested/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "solar_minimal_requested",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/solar_minimal_requested/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "solar_expanded_requested",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/solar_expanded_requested/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "solar_expanded_requested",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/solar_expanded_requested/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "solar_expanded_requested",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/solar_expanded_requested/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "wind_minimal_requested",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_requested/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "wind_minimal_requested",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_requested/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "wind_minimal_requested",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_requested/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "wind_minimal_uv_requested",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_uv_requested/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "wind_minimal_uv_requested",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_uv_requested/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "wind_minimal_uv_requested",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_uv_requested/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "wind_minimal_circular_requested",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_circular_requested/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "wind_minimal_circular_requested",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_circular_requested/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "wind_minimal_circular_requested",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/requested_features/fits/combined/fold_b/wind_minimal_circular_requested/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/requested_features/fold_b"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned_guarded_windchill",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned_guarded_windchill/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned_guarded_windchill",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned_guarded_windchill/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned_guarded_windchill",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned_guarded_windchill/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind_guarded_windchill",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind_guarded_windchill/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind_guarded_windchill",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind_guarded_windchill/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind_guarded_windchill",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind_guarded_windchill/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "solar_minimal_requested minus production_cleaned",
+      "left": "solar_minimal_requested",
+      "right": "production_cleaned",
+      "kind": "post_hoc_deciding",
+      "groups": [
+        "PV"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "solar_expanded_requested minus production_cleaned",
+      "left": "solar_expanded_requested",
+      "right": "production_cleaned",
+      "kind": "post_hoc_deciding",
+      "groups": [
+        "PV"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "solar_expanded_requested minus solar_minimal_requested",
+      "left": "solar_expanded_requested",
+      "right": "solar_minimal_requested",
+      "kind": "post_hoc_deciding",
+      "groups": [
+        "PV"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_requested minus production_cleaned",
+      "left": "wind_minimal_requested",
+      "right": "production_cleaned",
+      "kind": "post_hoc_deciding",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_requested minus lean_wind",
+      "left": "wind_minimal_requested",
+      "right": "lean_wind",
+      "kind": "post_hoc_deciding",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_uv_requested minus wind_minimal_requested",
+      "left": "wind_minimal_uv_requested",
+      "right": "wind_minimal_requested",
+      "kind": "post_hoc_deciding",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_circular_requested minus wind_minimal_requested",
+      "left": "wind_minimal_circular_requested",
+      "right": "wind_minimal_requested",
+      "kind": "post_hoc_deciding",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "solar_minimal_requested minus lean_pv",
+      "left": "solar_minimal_requested",
+      "right": "lean_pv",
+      "kind": "post_hoc_exploratory",
+      "groups": [
+        "PV"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "solar_expanded_requested minus lean_pv",
+      "left": "solar_expanded_requested",
+      "right": "lean_pv",
+      "kind": "post_hoc_exploratory",
+      "groups": [
+        "PV"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_uv_requested minus production_cleaned",
+      "left": "wind_minimal_uv_requested",
+      "right": "production_cleaned",
+      "kind": "post_hoc_exploratory",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_uv_requested minus lean_wind",
+      "left": "wind_minimal_uv_requested",
+      "right": "lean_wind",
+      "kind": "post_hoc_exploratory",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_circular_requested minus production_cleaned",
+      "left": "wind_minimal_circular_requested",
+      "right": "production_cleaned",
+      "kind": "post_hoc_exploratory",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_circular_requested minus lean_wind",
+      "left": "wind_minimal_circular_requested",
+      "right": "lean_wind",
+      "kind": "post_hoc_exploratory",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_circular_requested minus wind_minimal_uv_requested",
+      "left": "wind_minimal_circular_requested",
+      "right": "wind_minimal_uv_requested",
+      "kind": "post_hoc_exploratory",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "solar_minimal_requested minus production_cleaned_guarded_windchill",
+      "left": "solar_minimal_requested",
+      "right": "production_cleaned_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "PV"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "solar_expanded_requested minus production_cleaned_guarded_windchill",
+      "left": "solar_expanded_requested",
+      "right": "production_cleaned_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "PV"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_requested minus production_cleaned_guarded_windchill",
+      "left": "wind_minimal_requested",
+      "right": "production_cleaned_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_uv_requested minus production_cleaned_guarded_windchill",
+      "left": "wind_minimal_uv_requested",
+      "right": "production_cleaned_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_circular_requested minus production_cleaned_guarded_windchill",
+      "left": "wind_minimal_circular_requested",
+      "right": "production_cleaned_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_requested minus lean_wind_guarded_windchill",
+      "left": "wind_minimal_requested",
+      "right": "lean_wind_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_uv_requested minus lean_wind_guarded_windchill",
+      "left": "wind_minimal_uv_requested",
+      "right": "lean_wind_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "wind_minimal_circular_requested minus lean_wind_guarded_windchill",
+      "left": "wind_minimal_circular_requested",
+      "right": "lean_wind_guarded_windchill",
+      "kind": "post_hoc_guard_diagnostic",
+      "groups": [
+        "Wind"
+      ],
+      "bands": [
+        "all",
+        "days 0 to 2",
+        "days 3 to 10",
+        "days 11 onward"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    }
+  ]
+}

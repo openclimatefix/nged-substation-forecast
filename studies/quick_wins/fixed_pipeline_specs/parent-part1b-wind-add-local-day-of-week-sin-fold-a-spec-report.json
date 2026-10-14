@@ -1,0 +1,65 @@
+{
+  "runs": [
+    {
+      "label": "lean_wind",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_wind/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_wind/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/lean_wind/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "wind_add_local_day_of_week_sin",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/wind_add_local_day_of_week_sin/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "wind_add_local_day_of_week_sin",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/wind_add_local_day_of_week_sin/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "wind_add_local_day_of_week_sin",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/wind_add_local_day_of_week_sin/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "wind_add_local_day_of_week_sin minus lean_wind",
+      "left": "wind_add_local_day_of_week_sin",
+      "right": "lean_wind",
+      "kind": "planned",
+      "groups": [
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    }
+  ],
+  "preparation_only": true,
+  "fold": "fold_a",
+  "setting": "main",
+  "padding": "equal",
+  "decision_metric": "crps_norm",
+  "execution_gate": "After lean_wind main equal seed0/1/2 completes; one addition at a time against lean_wind, not a cumulative wind ladder."
+}

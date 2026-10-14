@@ -1,0 +1,74 @@
+{
+  "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/baselines_fold_a_main",
+  "figures": [
+    {
+      "number": 1,
+      "title": "Input fixes help solar; the quick-wins recipe gains more",
+      "subtitle": [
+        "Forecasting models train on April 2024\u2013June 2025; their forecasts are scored July 2025\u2013June 2026.",
+        "Primary training settings; all forecast leads.",
+        "Panel 1 changes wind and radiation processing; panel 2 compares the whole quick-wins recipe with production.",
+        "Comparisons match forecasts and observations; each row weights its meters and three training runs equally.",
+        "A seed sets the random choices in a training run.",
+        "The 31 series include demand, solar, wind, biofuel, and battery storage.",
+        "Loss scores predicted power probabilities against observed power; lower is better. It uses pinball loss, which penalises predicted power thresholds above or below observed power, averaged over 19 probability levels and multiplied by two.",
+        "Frozen capacity is each meter\u2019s 99th percentile of absolute power over the full available history, including readings after the scored period."
+      ],
+      "panels": [
+        {
+          "title": "Corrected production minus old production: both input fixes, same recipe",
+          "metric": "pinball19_norm",
+          "axis_title": "Loss difference (percentage points of capacity)",
+          "zero_label": "No difference",
+          "rows": [
+            {
+              "label": "All series",
+              "contrast": "Both corrections minus old pipeline",
+              "group": "all",
+              "lead_band": "all"
+            },
+            {
+              "label": "Solar farms",
+              "contrast": "Both corrections minus old pipeline",
+              "group": "PV",
+              "lead_band": "all"
+            },
+            {
+              "label": "Wind farms",
+              "contrast": "Both corrections minus old pipeline",
+              "group": "Wind",
+              "lead_band": "all"
+            }
+          ]
+        },
+        {
+          "title": "Quick-wins minus production: same corrected weather pipeline",
+          "metric": "pinball19_norm",
+          "axis_title": "Loss difference (percentage points of capacity)",
+          "zero_label": "No difference",
+          "rows": [
+            {
+              "label": "All series",
+              "contrast": "Corrected quick-wins winner minus corrected production configuration",
+              "group": "all",
+              "lead_band": "all"
+            },
+            {
+              "label": "Solar farms",
+              "contrast": "Corrected quick-wins winner minus corrected production configuration",
+              "group": "PV",
+              "lead_band": "all"
+            },
+            {
+              "label": "Wind farms",
+              "contrast": "Corrected quick-wins winner minus corrected production configuration",
+              "group": "Wind",
+              "lead_band": "all"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "direction_text": "Negative loss differences favour the forecast named before minus in each panel."
+}

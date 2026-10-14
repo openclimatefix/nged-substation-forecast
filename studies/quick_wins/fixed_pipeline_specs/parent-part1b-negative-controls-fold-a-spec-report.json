@@ -1,0 +1,102 @@
+{
+  "runs": [
+    {
+      "label": "production_cleaned",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "without_local_utc_offset_minutes",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/without_local_utc_offset_minutes/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "without_local_utc_offset_minutes",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/without_local_utc_offset_minutes/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "without_local_utc_offset_minutes",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/without_local_utc_offset_minutes/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "without_local_day_of_week",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/without_local_day_of_week/main/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "without_local_day_of_week",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/without_local_day_of_week/main/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    },
+    {
+      "label": "without_local_day_of_week",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_a/without_local_day_of_week/main/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_a"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "without_local_utc_offset_minutes minus production_cleaned",
+      "left": "without_local_utc_offset_minutes",
+      "right": "production_cleaned",
+      "kind": "planned",
+      "groups": [
+        "PV",
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "without_local_day_of_week minus production_cleaned",
+      "left": "without_local_day_of_week",
+      "right": "production_cleaned",
+      "kind": "planned",
+      "groups": [
+        "PV",
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    }
+  ],
+  "preparation_only": true,
+  "fold": "fold_a",
+  "setting": "main",
+  "padding": "equal",
+  "decision_metric": "crps_norm",
+  "execution_gate": "Negative controls for weather-driven PV/Wind types only; demand weekday information is not a negative control. Separate from wind weekday add-backs."
+}

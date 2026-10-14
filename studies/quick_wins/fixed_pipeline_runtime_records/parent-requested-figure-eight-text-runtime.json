@@ -1,0 +1,61 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "figures/requested_features/figure_8/text",
+  "recorded_configuration": {
+    "configuration_kind": "provenance-derived final figure configuration; not original executed JSON or recovered argv",
+    "figure_number": 8,
+    "phase": "text",
+    "title": "Two solar inputs beat full and expanded sets; Wind5 has no established gain over original lean wind",
+    "extra_caption": [
+      "These results use frozen radiation revision 0f094c3, not merged 01ddf53. No deployment or feature adoption recommendation is established.",
+      "Fair CRPS is the deciding loss for these matched 51-point ensembles; secondary loss metrics and lead-band robustness are reported separately."
+    ],
+    "command_shape": "python studies/quick_wins/requested_features_charts.py --spec PRIVATE_REVIEWED_SPEC --output PRIVATE_NEW_OUTPUT --text-only",
+    "original_specification_sha256": "665842ab8870050d38a61db497b82a6018b8284eedb338d87b21903e9f8c2990",
+    "script_sha256": "d63b81b76d2f48c521bde5deaf8cc45d674029e66b1bc1845c6e625e3160fb18",
+    "text_only": true,
+    "reviewed_text_sha256": null,
+    "statistics_recomputed": false,
+    "exact_final_text_sha256": "cc4cb0fd89bd64e8b9518e091db524f11fb63da573ba334b8f261c0ed338c6e4",
+    "dependencies": {
+      "altair": "6.3.0",
+      "polars": "2.0.0",
+      "vl-convert-python": "1.9.0.post1"
+    },
+    "scope": "Post hoc descriptive frozen radiation 0f094c3 results; no merged01ddf53 evaluation or deployment/adoption recommendation.",
+    "report_inputs": {
+      "fold_a_main_equal": {
+        "contrasts.parquet": "3b826a8b274685767527b350be4c1f0beaa3adf2ec0c9d68643715812164c15b",
+        "levels.parquet": "e0078fb307c12e17dcf7c5db1bd292fa53866e6875290e188e77142908a6a3a4",
+        "report.md": "4768d287a0fc3c76aa984c44e3e99932410e399a69a44117a85365822c57ae69",
+        "provenance.json": "544e61aee6b711c206c21b2f92cdb614e60e92eeef52fa0cc7d278ef9a100477"
+      },
+      "fold_a_sensitivity_equal": {
+        "contrasts.parquet": "0a58b3ec068ff6defac2274ea4a1c1921ee16a689f75f67b370e202a84e83c73",
+        "levels.parquet": "6b310fc917b6a3982dc285e541bf0d46626461ab51b8c78179a244aa00f8970c",
+        "report.md": "eeadb2ab78f78dbec136ab299167ca51e64534955d022d648f1583b0d42ae759",
+        "provenance.json": "e718a5a3e65eac40fbaf2bdf0c4a0908ef10591454925f7f70657a2088e852ad"
+      },
+      "fold_b_main_equal": {
+        "contrasts.parquet": "1c5e37d2a779435d53998aa561dfe9ae728c15a5b54b0113b94b58db18c5e053",
+        "levels.parquet": "2bb470b3e0fbbd49a26ab75881a06cbb855a7d0295a625f05b3f9d3e2c520a77",
+        "report.md": "2a5425d5a9ec63a5a8b9844c26984991c478983c5392a073225fe1fe49b2dfd5",
+        "provenance.json": "d4a03bc33836db49ec6dc36f25172e747897b88862b9b42fdc5429e8180a418d"
+      },
+      "fold_b_sensitivity_equal": {
+        "contrasts.parquet": "fa901271a770106314d6969e0ef493b74d0ea4b47ffeb8dcfd36c23f1b3f89be",
+        "levels.parquet": "9bf76c48e2abf4b991149fae8ada02fecfe6168106514c9fb706cc4ec65a7913",
+        "report.md": "b702d60e321a98e98341e9207c6cb6f2d27f13ab0f06c3d9093a6b19fa2d3d8d",
+        "provenance.json": "c1dc13f4df551971999cdc93d6828877651b69b61dc587a6d886a7e3290b390d"
+      }
+    },
+    "paired_rows_per_setting": 14
+  },
+  "executed_provenance_sha256": "c835ea09b05878cb3915f75d71bd5e741baa6497ded76cb6299acc820d6fcf08",
+  "reported_output_sha256": {
+    "figure-text.md": "cc4cb0fd89bd64e8b9518e091db524f11fb63da573ba334b8f261c0ed338c6e4",
+    "selected-aggregates.md": "d7fe1caa9578e581da83f9ce17a539b77dc864004a93f58f8287df9d62899719"
+  },
+  "artifact_privacy": "Only this explicitly typed abstract configuration and anonymous output fingerprints are proposed for copying; original exact config/provenance/private paths are not copied."
+}

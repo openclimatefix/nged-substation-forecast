@@ -1,0 +1,929 @@
+{
+  "preparation_only": true,
+  "execution_state": "PREPARED_NOT_AUTHORIZED",
+  "decimal_places": 3,
+  "tables": [
+    {
+      "heading": "Post hoc fold_a_main_equal: PV absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_main_equal/levels.parquet",
+      "filters": {
+        "group": "PV",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "solar_minimal_requested",
+          "solar_expanded_requested",
+          "production_cleaned",
+          "lean_pv",
+          "production_cleaned_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_main_equal: Wind absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_main_equal/levels.parquet",
+      "filters": {
+        "group": "Wind",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "wind_minimal_requested",
+          "wind_minimal_uv_requested",
+          "wind_minimal_circular_requested",
+          "production_cleaned",
+          "lean_wind",
+          "production_cleaned_guarded_windchill",
+          "lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_main_equal: paired diagnostic fair CRPS, left minus right; classes shown explicitly",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_main_equal/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "kind": [
+          "post_hoc_deciding",
+          "post_hoc_exploratory",
+          "post_hoc_guard_diagnostic"
+        ],
+        "contrast": [
+          "solar_minimal_requested minus production_cleaned",
+          "solar_expanded_requested minus production_cleaned",
+          "solar_expanded_requested minus solar_minimal_requested",
+          "wind_minimal_requested minus production_cleaned",
+          "wind_minimal_requested minus lean_wind",
+          "wind_minimal_uv_requested minus wind_minimal_requested",
+          "wind_minimal_circular_requested minus wind_minimal_requested",
+          "solar_minimal_requested minus lean_pv",
+          "solar_expanded_requested minus lean_pv",
+          "wind_minimal_uv_requested minus production_cleaned",
+          "wind_minimal_uv_requested minus lean_wind",
+          "wind_minimal_circular_requested minus production_cleaned",
+          "wind_minimal_circular_requested minus lean_wind",
+          "wind_minimal_circular_requested minus wind_minimal_uv_requested",
+          "solar_minimal_requested minus production_cleaned_guarded_windchill",
+          "solar_expanded_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_uv_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_circular_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_uv_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_circular_requested minus lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "contrast",
+        "kind",
+        "left",
+        "right",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "kind": "Post hoc comparison class",
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired whole-month/seed bootstrap 95% lower",
+        "upper95": "Paired whole-month/seed bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_sensitivity_equal: PV absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_sensitivity_equal/levels.parquet",
+      "filters": {
+        "group": "PV",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "solar_minimal_requested",
+          "solar_expanded_requested",
+          "production_cleaned",
+          "lean_pv",
+          "production_cleaned_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_sensitivity_equal: Wind absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_sensitivity_equal/levels.parquet",
+      "filters": {
+        "group": "Wind",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "wind_minimal_requested",
+          "wind_minimal_uv_requested",
+          "wind_minimal_circular_requested",
+          "production_cleaned",
+          "lean_wind",
+          "production_cleaned_guarded_windchill",
+          "lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_sensitivity_equal: paired diagnostic fair CRPS, left minus right; classes shown explicitly",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_sensitivity_equal/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "kind": [
+          "post_hoc_deciding",
+          "post_hoc_exploratory",
+          "post_hoc_guard_diagnostic"
+        ],
+        "contrast": [
+          "solar_minimal_requested minus production_cleaned",
+          "solar_expanded_requested minus production_cleaned",
+          "solar_expanded_requested minus solar_minimal_requested",
+          "wind_minimal_requested minus production_cleaned",
+          "wind_minimal_requested minus lean_wind",
+          "wind_minimal_uv_requested minus wind_minimal_requested",
+          "wind_minimal_circular_requested minus wind_minimal_requested",
+          "solar_minimal_requested minus lean_pv",
+          "solar_expanded_requested minus lean_pv",
+          "wind_minimal_uv_requested minus production_cleaned",
+          "wind_minimal_uv_requested minus lean_wind",
+          "wind_minimal_circular_requested minus production_cleaned",
+          "wind_minimal_circular_requested minus lean_wind",
+          "wind_minimal_circular_requested minus wind_minimal_uv_requested",
+          "solar_minimal_requested minus production_cleaned_guarded_windchill",
+          "solar_expanded_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_uv_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_circular_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_uv_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_circular_requested minus lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "contrast",
+        "kind",
+        "left",
+        "right",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "kind": "Post hoc comparison class",
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired whole-month/seed bootstrap 95% lower",
+        "upper95": "Paired whole-month/seed bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_main_none: PV absolute diagnostic fair CRPS; includes equal-padding aliases for direct padding checks",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_main_none/levels.parquet",
+      "filters": {
+        "group": "PV",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "solar_minimal_requested",
+          "solar_expanded_requested",
+          "production_cleaned",
+          "lean_pv",
+          "solar_minimal_requested__padded",
+          "solar_expanded_requested__padded"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_main_none: Wind absolute diagnostic fair CRPS; includes equal-padding aliases for direct padding checks",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_main_none/levels.parquet",
+      "filters": {
+        "group": "Wind",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "wind_minimal_requested",
+          "wind_minimal_uv_requested",
+          "wind_minimal_circular_requested",
+          "production_cleaned",
+          "lean_wind",
+          "wind_minimal_requested__padded",
+          "wind_minimal_uv_requested__padded",
+          "wind_minimal_circular_requested__padded"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_a_main_none: paired diagnostic fair CRPS, left minus right; classes shown explicitly",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_a_main_none/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "kind": [
+          "post_hoc_deciding",
+          "post_hoc_exploratory",
+          "post_hoc_padding_diagnostic"
+        ],
+        "contrast": [
+          "solar_minimal_requested minus production_cleaned",
+          "solar_expanded_requested minus production_cleaned",
+          "solar_expanded_requested minus solar_minimal_requested",
+          "wind_minimal_requested minus production_cleaned",
+          "wind_minimal_requested minus lean_wind",
+          "wind_minimal_uv_requested minus wind_minimal_requested",
+          "wind_minimal_circular_requested minus wind_minimal_requested",
+          "solar_minimal_requested minus lean_pv",
+          "solar_expanded_requested minus lean_pv",
+          "wind_minimal_uv_requested minus production_cleaned",
+          "wind_minimal_uv_requested minus lean_wind",
+          "wind_minimal_circular_requested minus production_cleaned",
+          "wind_minimal_circular_requested minus lean_wind",
+          "wind_minimal_circular_requested minus wind_minimal_uv_requested",
+          "solar_minimal_requested__padded minus solar_minimal_requested",
+          "solar_expanded_requested__padded minus solar_expanded_requested",
+          "wind_minimal_requested__padded minus wind_minimal_requested",
+          "wind_minimal_uv_requested__padded minus wind_minimal_uv_requested",
+          "wind_minimal_circular_requested__padded minus wind_minimal_circular_requested"
+        ]
+      },
+      "columns": [
+        "contrast",
+        "kind",
+        "left",
+        "right",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "kind": "Post hoc comparison class",
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired whole-month/seed bootstrap 95% lower",
+        "upper95": "Paired whole-month/seed bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_main_equal: PV absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_main_equal/levels.parquet",
+      "filters": {
+        "group": "PV",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "solar_minimal_requested",
+          "solar_expanded_requested",
+          "production_cleaned",
+          "lean_pv",
+          "production_cleaned_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_main_equal: Wind absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_main_equal/levels.parquet",
+      "filters": {
+        "group": "Wind",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "wind_minimal_requested",
+          "wind_minimal_uv_requested",
+          "wind_minimal_circular_requested",
+          "production_cleaned",
+          "lean_wind",
+          "production_cleaned_guarded_windchill",
+          "lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_main_equal: paired diagnostic fair CRPS, left minus right; classes shown explicitly",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_main_equal/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "kind": [
+          "post_hoc_deciding",
+          "post_hoc_exploratory",
+          "post_hoc_guard_diagnostic"
+        ],
+        "contrast": [
+          "solar_minimal_requested minus production_cleaned",
+          "solar_expanded_requested minus production_cleaned",
+          "solar_expanded_requested minus solar_minimal_requested",
+          "wind_minimal_requested minus production_cleaned",
+          "wind_minimal_requested minus lean_wind",
+          "wind_minimal_uv_requested minus wind_minimal_requested",
+          "wind_minimal_circular_requested minus wind_minimal_requested",
+          "solar_minimal_requested minus lean_pv",
+          "solar_expanded_requested minus lean_pv",
+          "wind_minimal_uv_requested minus production_cleaned",
+          "wind_minimal_uv_requested minus lean_wind",
+          "wind_minimal_circular_requested minus production_cleaned",
+          "wind_minimal_circular_requested minus lean_wind",
+          "wind_minimal_circular_requested minus wind_minimal_uv_requested",
+          "solar_minimal_requested minus production_cleaned_guarded_windchill",
+          "solar_expanded_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_uv_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_circular_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_uv_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_circular_requested minus lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "contrast",
+        "kind",
+        "left",
+        "right",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "kind": "Post hoc comparison class",
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired whole-month/seed bootstrap 95% lower",
+        "upper95": "Paired whole-month/seed bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_sensitivity_equal: PV absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_sensitivity_equal/levels.parquet",
+      "filters": {
+        "group": "PV",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "solar_minimal_requested",
+          "solar_expanded_requested",
+          "production_cleaned",
+          "lean_pv",
+          "production_cleaned_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_sensitivity_equal: Wind absolute diagnostic fair CRPS; equal-padding controls",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_sensitivity_equal/levels.parquet",
+      "filters": {
+        "group": "Wind",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "wind_minimal_requested",
+          "wind_minimal_uv_requested",
+          "wind_minimal_circular_requested",
+          "production_cleaned",
+          "lean_wind",
+          "production_cleaned_guarded_windchill",
+          "lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_sensitivity_equal: paired diagnostic fair CRPS, left minus right; classes shown explicitly",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_sensitivity_equal/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "kind": [
+          "post_hoc_deciding",
+          "post_hoc_exploratory",
+          "post_hoc_guard_diagnostic"
+        ],
+        "contrast": [
+          "solar_minimal_requested minus production_cleaned",
+          "solar_expanded_requested minus production_cleaned",
+          "solar_expanded_requested minus solar_minimal_requested",
+          "wind_minimal_requested minus production_cleaned",
+          "wind_minimal_requested minus lean_wind",
+          "wind_minimal_uv_requested minus wind_minimal_requested",
+          "wind_minimal_circular_requested minus wind_minimal_requested",
+          "solar_minimal_requested minus lean_pv",
+          "solar_expanded_requested minus lean_pv",
+          "wind_minimal_uv_requested minus production_cleaned",
+          "wind_minimal_uv_requested minus lean_wind",
+          "wind_minimal_circular_requested minus production_cleaned",
+          "wind_minimal_circular_requested minus lean_wind",
+          "wind_minimal_circular_requested minus wind_minimal_uv_requested",
+          "solar_minimal_requested minus production_cleaned_guarded_windchill",
+          "solar_expanded_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_uv_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_circular_requested minus production_cleaned_guarded_windchill",
+          "wind_minimal_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_uv_requested minus lean_wind_guarded_windchill",
+          "wind_minimal_circular_requested minus lean_wind_guarded_windchill"
+        ]
+      },
+      "columns": [
+        "contrast",
+        "kind",
+        "left",
+        "right",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "kind": "Post hoc comparison class",
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired whole-month/seed bootstrap 95% lower",
+        "upper95": "Paired whole-month/seed bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_main_none: PV absolute diagnostic fair CRPS; includes equal-padding aliases for direct padding checks",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_main_none/levels.parquet",
+      "filters": {
+        "group": "PV",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "solar_minimal_requested",
+          "solar_expanded_requested",
+          "production_cleaned",
+          "lean_pv",
+          "solar_minimal_requested__padded",
+          "solar_expanded_requested__padded"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_main_none: Wind absolute diagnostic fair CRPS; includes equal-padding aliases for direct padding checks",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_main_none/levels.parquet",
+      "filters": {
+        "group": "Wind",
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "label": [
+          "wind_minimal_requested",
+          "wind_minimal_uv_requested",
+          "wind_minimal_circular_requested",
+          "production_cleaned",
+          "lean_wind",
+          "wind_minimal_requested__padded",
+          "wind_minimal_uv_requested__padded",
+          "wind_minimal_circular_requested__padded"
+        ]
+      },
+      "columns": [
+        "label",
+        "group",
+        "value",
+        "lower95",
+        "upper95",
+        "seeds",
+        "months",
+        "series",
+        "rows_per_seed",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "value": "Fair CRPS (capacity points)",
+        "lower95": "Whole-month/seed bootstrap 95% lower",
+        "upper95": "Whole-month/seed bootstrap 95% upper"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Post hoc fold_b_main_none: paired diagnostic fair CRPS, left minus right; classes shown explicitly",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/requested_features/fold_b_main_none/contrasts.parquet",
+      "filters": {
+        "group": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "crps_norm",
+        "kind": [
+          "post_hoc_deciding",
+          "post_hoc_exploratory",
+          "post_hoc_padding_diagnostic"
+        ],
+        "contrast": [
+          "solar_minimal_requested minus production_cleaned",
+          "solar_expanded_requested minus production_cleaned",
+          "solar_expanded_requested minus solar_minimal_requested",
+          "wind_minimal_requested minus production_cleaned",
+          "wind_minimal_requested minus lean_wind",
+          "wind_minimal_uv_requested minus wind_minimal_requested",
+          "wind_minimal_circular_requested minus wind_minimal_requested",
+          "solar_minimal_requested minus lean_pv",
+          "solar_expanded_requested minus lean_pv",
+          "wind_minimal_uv_requested minus production_cleaned",
+          "wind_minimal_uv_requested minus lean_wind",
+          "wind_minimal_circular_requested minus production_cleaned",
+          "wind_minimal_circular_requested minus lean_wind",
+          "wind_minimal_circular_requested minus wind_minimal_uv_requested",
+          "solar_minimal_requested__padded minus solar_minimal_requested",
+          "solar_expanded_requested__padded minus solar_expanded_requested",
+          "wind_minimal_requested__padded minus wind_minimal_requested",
+          "wind_minimal_uv_requested__padded minus wind_minimal_uv_requested",
+          "wind_minimal_circular_requested__padded minus wind_minimal_circular_requested"
+        ]
+      },
+      "columns": [
+        "contrast",
+        "kind",
+        "left",
+        "right",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months",
+        "seeds",
+        "provisional",
+        "min_supported_months",
+        "max_supported_months",
+        "series_with_missing_months",
+        "bootstrap_draws_dropping_series",
+        "max_dropped_series_per_draw"
+      ],
+      "column_display_names": {
+        "kind": "Post hoc comparison class",
+        "difference": "Equal-series difference (capacity points)",
+        "lower95": "Paired whole-month/seed bootstrap 95% lower",
+        "upper95": "Paired whole-month/seed bootstrap 95% upper",
+        "equal_month_difference": "Equal-month difference (capacity points)",
+        "t_lower95": "Equal-month t 95% lower",
+        "t_upper95": "Equal-month t 95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    }
+  ]
+}

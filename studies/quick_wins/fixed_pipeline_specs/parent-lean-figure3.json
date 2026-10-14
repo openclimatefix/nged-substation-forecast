@@ -1,0 +1,56 @@
+{
+  "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_lean-fold_a-spec",
+  "figures": [
+    {
+      "number": 3,
+      "title": "Lean wind inputs lower loss; lean solar inputs raise loss in Fold A",
+      "subtitle": [
+        "XGBoost tree models train on April 2024\u2013June 2025; forecasts are scored July 2025\u2013June 2026.",
+        "Each XGBoost model uses 500 squared-error trees, maximum depth 6, and learning rate 0.05; each tree samples 80% of rows and can use all columns.",
+        "These training and scoring dates define Fold A. All scored forecast times are included.",
+        "Solar retains 13 real inputs and wind 16 of the full control\u2019s 24, cutting selected weather and weekday inputs.",
+        "Both input comparisons use corrected weather processing; duplicate retained inputs keep all XGBoost models at 24 training columns.",
+        "Squared-error models fit each meter separately. Each power forecast contains 51 values, one from each alternative weather prediction supplied by the weather ensemble.",
+        "Continuous ranked probability score (CRPS) compares the forecast power distribution with observed power; lower is better.",
+        "The fair-CRPS correction assumes independent draws; its use with weather-ensemble values is diagnostic.",
+        "Matched forecasts and observations; each plotted comparison weights its meters and three random-seed fits equally.",
+        "A seed sets the random choices in a training run.",
+        "Ranges describe variation across whole months and individual fits, rather than uncertainty in the three-fit mean or transfer to new meters.",
+        "Solar\u2019s equal-month t-interval includes zero: that estimate weights months equally and averages the three fits first.",
+        "Frozen capacity is each meter\u2019s full-history 99th percentile of absolute power, including later readings. Frozen capacity is used only for scoring.",
+        "Panels use separate horizontal scales."
+      ],
+      "panels": [
+        {
+          "title": "Solar: lean minus full inputs (separate scale)",
+          "metric": "crps_norm",
+          "axis_title": "Fair CRPS difference (percentage points of capacity)",
+          "zero_label": "No difference",
+          "rows": [
+            {
+              "label": "Solar farms",
+              "contrast": "lean_pv minus production_cleaned",
+              "group": "PV",
+              "lead_band": "all"
+            }
+          ]
+        },
+        {
+          "title": "Wind: lean minus full inputs (separate scale)",
+          "metric": "crps_norm",
+          "axis_title": "Fair CRPS difference (percentage points of capacity)",
+          "zero_label": "No difference",
+          "rows": [
+            {
+              "label": "Wind farms",
+              "contrast": "lean_wind minus production_cleaned",
+              "group": "Wind",
+              "lead_band": "all"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "direction_text": "Negative differences mean lower loss with lean inputs; positive differences mean higher loss."
+}

@@ -1,0 +1,689 @@
+{
+  "specifications": [
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-radiation-fold-a-main-report.json",
+      "sha256": "b2cf102125b1644ff5d0f9ce4340f5a9ce24023b41ec38d904f8f33989ff1a3c",
+      "executed_provenance_sha256": [
+        "1919db029d7cbfa92ad4cd8ec3ffa0168b5610b0ef725189db63dc5bb12786f8"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-radiation-fold-a-sensitivity-report.json",
+      "sha256": "d43408c87dc3454c2c331377249cb8f0682f5fca9b1703a1a0c26c976b23a5fc",
+      "executed_provenance_sha256": [
+        "d8a78746765fae0f9b9ce693b316e0f77ff50d0752b00115024c0d01529f4b1e"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-radiation-fold-b-main-report.json",
+      "sha256": "1530351221735d641f8d76e32f70dc1283b85fcb9bc258cac89b5286f0ff2dd0",
+      "executed_provenance_sha256": [
+        "c842e8c9bf028af7286f05c180fd0b6bacdff4cc4ef964e1b0da18a93963bd4f"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-radiation-fold-b-sensitivity-report.json",
+      "sha256": "2defee01f0f05f38f7a2d0fc871cc55f619974f65a8f62853bec2754fbdac37d",
+      "executed_provenance_sha256": [
+        "10f3c21f6f5fafeeafa6b28dc508b62c45ac14157151d0818c26b9238ccf5cdf"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-old-reference-fold-a-main-report.json",
+      "sha256": "02011aa377da528db4675e6bfbdf73c57e9caab5ad9b3d554f2355e447a7fdd6",
+      "executed_provenance_sha256": [
+        "e7ab1d2c5aa81e6410abcd4d54934d08b05d18308d37f8f7954433a8badc2de0"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-old-reference-fold-b-main-report.json",
+      "sha256": "2527e6d692c39f7e722e5e58f467629842fcf3dad6703d9642579c38ea1a9fa5",
+      "executed_provenance_sha256": [
+        "d1e328cb387074c1e53d649eacf598409a2dd55c5c804f7419d509c55de1cd2e"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-baselines-fold-a-main-report.json",
+      "sha256": "cfd97693285fa44a10cf3a134d432cc6cac7029bc70c6fcb1d01f753b25c2ddb",
+      "executed_provenance_sha256": [
+        "3193b7191085b75962f98e7c004bc2df5f5009256f7bfdcef7a3b5655bd979a1"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-baselines-fold-b-main-report.json",
+      "sha256": "9228ac6a9980e7a16409527deb211bbb1d3a1bc3ea49cbf06ea411c7f7cd3e17",
+      "executed_provenance_sha256": [
+        "0281ab503db2497758205f844189f22fd28c187531b9baf968c21830a3e1916c"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-old-reference-tables.json",
+      "sha256": "eb8665f880293ac15c7ae6a6b23042671f179ff6baaa9eb85e2e71bfb33b3640",
+      "executed_provenance_sha256": [
+        "f0c06ce7e00cb1842923b79e11988f912db7b77cd9c0bd19ac530376d4667590"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-row-support-tables.json",
+      "sha256": "de41249d82550cea1006cfd84bfa6e00a1b986eb8423832cfcd2a3087f34f06b",
+      "executed_provenance_sha256": [
+        "4aa33cf7b8539995323026d8c1b1d321fd1d1f8fa8690f4ef08a1e37dda0d5ae"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-radiation-tables.json",
+      "sha256": "e1297a38c9e1f6b9df81dc60b19efbd9cbcc92be2ddf0740379a76183aaf57d7",
+      "executed_provenance_sha256": [
+        "065dab5b64676331edde98b8c1d467ec772904e10490b357fc952e15de335d87"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-stage1-fold-a-main-tables.json",
+      "sha256": "1725482b894de38dae3c451926bfaa3e841fd04bb19f10e6d12dee704e2d19d1",
+      "executed_provenance_sha256": [
+        "f3c452911ef02ae140057de2e4df0b742a420222e238caf1763aee0d1e8ee37e"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-stage1-fold-b-main-tables.json",
+      "sha256": "08b65597eb74371ac0664a6ff16c7eec784db907c84e991a4b71f5f01702ea64",
+      "executed_provenance_sha256": [
+        "0221f8385a9f18d1ae4a148589d6fbcace5862c2d0d2c2d42d7e996e6252ca3f"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-headline-figure1.json",
+      "sha256": "dfbfff27006a230e035ff933bada002c47dd869a076ec7064fac667534307490",
+      "executed_provenance_sha256": [
+        "c32deebd86aab51f2556d1cefdc4da0f57b8eb021e2d3f7454ea9b2096f41631",
+        "f2f7cddd7b3d094b466ca57f4521a74f53fbfc837ba3b4c0cdf4269fa06c23f3"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-radiation-figure2.json",
+      "sha256": "9fd57fc4bfd82f8d9c124d7c3fb38380d019329bf6c24bee687156bf59bb1eae",
+      "executed_provenance_sha256": [
+        "bcdd49498ab94fe5e0c0c5cfbae5daa761dc8807cb0ae78bab3ee92c3ae033be",
+        "1b3a44cf0479191fe7639a3a0a18dd9d32f371dfd4f984d2a50042a5c73aa302"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-importance-report.json",
+      "sha256": "4133c89f568655fb98897e40bfbab50ab15fbb56357d7439e825adc546377ddb",
+      "executed_provenance_sha256": [
+        "dc1c240f3eae57de02e74b8ee9816cd196ace0f8b33c8fc5b6668155ea550cf1"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-baselines-fold-a-sensitivity-report.json",
+      "sha256": "251f8ab122c658dad512427414f419672fd0a8f2468baf0ae042994adcd8abf2",
+      "executed_provenance_sha256": [
+        "b67b3be0320262a6ea7d5ca7be9472ba9359c396c3c0fffd59b91d6310531a20"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-stage1-fold-a-sensitivity-full-tables.json",
+      "sha256": "12f130108dd8741cfd6fd6ed430cf51b92458d73390e1dfad83a64e3d12c4e83",
+      "executed_provenance_sha256": [
+        "f53803a0d8e53a793ef5f0907f016d487fac339820fc00812d13a50c464f8431"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-stage1-fold-a-sensitivity-page-tables.json",
+      "sha256": "e5c348a2ca53b81c28726a7fcf9fc7adba2ce1139716058ae12d093c4f15bd2f",
+      "executed_provenance_sha256": [
+        "67dabc2777be9ea1137b02daa04712ed114e29cfd1d1e320fbf2ba2dd95da16e"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/input-audit-public-tables.json",
+      "sha256": "568ed18f6ba3d5b30d3aa16919483f9aff09e2eec5a55bb631f4804ee08eb25d",
+      "executed_provenance_sha256": [
+        "7f2eeccbbd10147e7879d79f22f8e65001bb2cac46d831ac19751b4232c76ea2"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-baselines-fold-b-sensitivity-report.json",
+      "sha256": "09860182aeaa9431318bba4750ebd88705c07f6640a3d150b7fbc4fda2e42285",
+      "executed_provenance_sha256": [
+        "38eb3117b5b6ce95c1411b63b1fd88f16eed5386c0bd421806c3a3028c8ef639"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-stage1-fold-b-sensitivity-full-tables.json",
+      "sha256": "eeb4bf71e72aed5cbf7b0b97b9ab90690e90707eb3227f4a1fd910fd78d813bf",
+      "executed_provenance_sha256": [
+        "68bae151817dd815d3c58c898ffcb3188005538c98ac1877a93b97b59f2cd460"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-stage1-fold-b-sensitivity-page-tables.json",
+      "sha256": "3a0820c04eaa8c555551b90334d3e5c42fbaeaf69de03bd8b083cad1564e059b",
+      "executed_provenance_sha256": [
+        "fd69914e40383ec2d1e85f6e73007c39df408430217c1e156025ddda746a2838"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-lean-figure3.json",
+      "sha256": "bebb6d989efe1d51ec9598b98129257569518d92c1d9e79b0a4f703162d19036",
+      "executed_provenance_sha256": [
+        "fb8e44e811657678dcf55a8b436e571c006b1b07c1f4c83098a668e42e3dc94e",
+        "c8f49b453fbe44e0a3f61b49920c968b92788fb3876c41772b68acb606622f06"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-solar-first-figure4.json",
+      "sha256": "c1270242f56ce889d96b8e1e5f5e34d7ba965d861c6b924b6ceeeb9373da1e26",
+      "executed_provenance_sha256": [
+        "40ddcff4dc53b0c366757f9ad801e1b005159df9f8f5c927e4bfa558ea58bf8d",
+        "a9d33e88d840ba9bf2f6ffdcb0f1483f4ff240dc1f81b5c51b661696bf27d957"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-wind-addbacks-figure5.json",
+      "sha256": "faec013a623f13fcbbd6cca619100fc638c8c407e7b9cc9eb332b1ce087d3a10",
+      "executed_provenance_sha256": [
+        "3c8fa5b5181ed0f188d8467b2e8721febc14fc3769d7ca99fa17c5a9e2c291f7",
+        "1691bfeb96c34e0ed0afef37506a0933b061b3e096975ce509fdb27725793e83"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-lean-fold-a-spec-report.json",
+      "sha256": "2594ffb3083a1761ed9d48f8b332aa194b08be7f26014db68a9e97ebb873e53b",
+      "executed_provenance_sha256": [
+        "01c62294ef2347231dd57bee5ee8339831228ed03b45887872fac2bad751f4fc"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-lean-fold-b-spec-report.json",
+      "sha256": "9a49190596af2bde12259ccbcfd1fadc53f355252c50269de36e5c4ee4e89259",
+      "executed_provenance_sha256": [
+        "79121f438d7884c516e0bac04d05d29bfa897a02d53225ae946892aea62d6a25"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-solar-01-solar-add-wind10-fold-a-spec-report.json",
+      "sha256": "85db3f57445e9eaa3966cb244823737a071238305c626ba78768e4ab945a7faa",
+      "executed_provenance_sha256": [
+        "b2ebe77f1691cd72f36e510251050de16d9bd761e1d7f228c4b356c31cd41281"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-solar-01-solar-add-wind10-fold-b-spec-report.json",
+      "sha256": "48c758e4b9610f34cf3e0c0d58e7d27666e5407574cb8da4181182485cf0b7ee",
+      "executed_provenance_sha256": [
+        "03dcf20f9075d887c0e77c33492ea07ddf8fdd4b89495ac8655cfa392f2c9d62"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-categorical-precipitation-type-surface-fold-a-spec-report.json",
+      "sha256": "a797e2fe6f5e4efc7e51e709562340173aee81df98156f26973f6a4c5fac296f",
+      "executed_provenance_sha256": [
+        "b78fde4d0d0c595c06156a6eaaae8f34961b128b7c1a308974227f8dd770931f"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-categorical-precipitation-type-surface-fold-b-spec-report.json",
+      "sha256": "1e27acc6612ed51345bb63523b86c8cf7d51743368c7d113671dd95d27f3a4ca",
+      "executed_provenance_sha256": [
+        "99f3d00d23e5eb9906b5621abf98621f67f390bebcfc488a0e186a2bd3117e89"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-dew-point-temperature-2m-fold-a-spec-report.json",
+      "sha256": "993fec1b2d9bbc2082282629cb78d637dfa48144c7862da11e6fdffe247a214f",
+      "executed_provenance_sha256": [
+        "ff05caaf9186f95913eab0c56ab6b2f20105e30942e199aa5e01ca1ef5c69c1c"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-dew-point-temperature-2m-fold-b-spec-report.json",
+      "sha256": "1f66c5a1542bb05aee34111666aae3a1a85553fce3e6ffb8a0d26b0b36179213",
+      "executed_provenance_sha256": [
+        "3860e0025c757bcf8e80685b59c256669cdd86b78068e0681ec2674260d70a95"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-downward-short-wave-radiation-flux-surface-fold-a-spec-report.json",
+      "sha256": "171d075bcab8ffaab7e717dc5af583bf1ed2dfb32092ab78c7010dad47dbbea7",
+      "executed_provenance_sha256": [
+        "11c4f7b8080a7313f607d914fce19d990132c8391db201664e577488eb0270cd"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-downward-short-wave-radiation-flux-surface-fold-b-spec-report.json",
+      "sha256": "fce5fd1f555b8a9bcf70fa098ce8b47ef84921205941b047413d64c765d87cc8",
+      "executed_provenance_sha256": [
+        "e462dd25a1f661ee37c45ff1a86fdeae3a87c7dae5d3698e856c322a6943c231"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-fold-a-spec-report.json",
+      "sha256": "57fdb47aade04a279b986c2f5a47bfae54aaa4571a4744f87790ffe860f976a5",
+      "executed_provenance_sha256": [
+        "e3f33ebdd8c3aa6d6885b55f6223994db19b190fcaeef3b9cfc28d4e3b3977b8"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-fold-b-spec-report.json",
+      "sha256": "b1f5af6de72e1dac10e51e9b0f2d91ef762fbed66f022a73957587793ecbd8c9",
+      "executed_provenance_sha256": [
+        "1b3fbdc47a15228efe1d60905c358aa19cd91734ad6006a5814e1e794c2dce24"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-cos-fold-a-spec-report.json",
+      "sha256": "cdeeff8fb589695433cd71da95619c89ef8855cf03dc95edeaf8e46810d86410",
+      "executed_provenance_sha256": [
+        "81750d436375750c0cda03ad945020a3b5ce19b3937b9c3b8dcded4e46c56db6"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-cos-fold-b-spec-report.json",
+      "sha256": "4e466fb1bdf5ad350f7d5e3db21f8cd68cbd03d577b7607c5f8c3248065babe0",
+      "executed_provenance_sha256": [
+        "979d5c5cc90475aad0993f4e6838265c319233e6a2a9915b1d9396acd10bf779"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-sin-fold-a-spec-report.json",
+      "sha256": "c9961fe1cd9c606f531452a36f1527dfcc5e480df53acb4f3ec37ad063d3a2ed",
+      "executed_provenance_sha256": [
+        "717bccaa0b56aeea0697a26987619ee4c0b284961d6cf62876b0f6deda56f6d2"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-sin-fold-b-spec-report.json",
+      "sha256": "45e0c055410e94d057f2e3e0694a25e447d66d319adcc638872012e031befce1",
+      "executed_provenance_sha256": [
+        "bced6c6091ab9530919b23a66685a3d6d566263923d7294dc1bb62643ace660f"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-cos-fold-a-spec-report.json",
+      "sha256": "aa73a1c4eefd2dff7f45a8b4cb39ced498bc3529302fd5fc6d317f326cd8b7c9",
+      "executed_provenance_sha256": [
+        "cac7f7477ac86e252af60a552d34a7ed7e9f1386e2b23490eb220646eb7cbbc1"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-cos-fold-b-spec-report.json",
+      "sha256": "8d5504913f4201bf8448f507fd221307d3189163289b24e40d3d87627c46aa29",
+      "executed_provenance_sha256": [
+        "ac3d0aa047ef9e6cc087466f1b5d215d7434d0373dae3a2fcc52fd8705aa0491"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-sin-fold-a-spec-report.json",
+      "sha256": "bbf7f9e6daefc13de34962cace8dcd085efa90e98d00db22ccd5bde8ad43a5ec",
+      "executed_provenance_sha256": [
+        "d5013c6e60376facf460c2027b8a965fce6b7138f477bb1f0406dfddd2ac32db"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-sin-fold-b-spec-report.json",
+      "sha256": "3e69238f6cf0cd39f1c4b3648ec527fd9cf54cf622a242038ba0e3c7bd4b8beb",
+      "executed_provenance_sha256": [
+        "966fed1af2b61679977cea1651077d99627e2f0f98310fddbb606fd20afb3ed9"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-guarded-windchill-fold-a-spec-report.json",
+      "sha256": "3e3fc2d533645d11faa04a8d49a689224491ee803e6c25ec0db6be0e6241f574",
+      "executed_provenance_sha256": [
+        "16399c27d321880e72571305d4faa3c02c3f100ac7a9e0b470c125923077f9f9"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-guarded-windchill-fold-b-spec-report.json",
+      "sha256": "4fcee9d19f630771c69d48c620f9af456ff9c30f73316d555323d97b187ad826",
+      "executed_provenance_sha256": [
+        "bef4bff69dfc8025d6cc24f0ea34e89a4dcdf72b034416eccf945bacdf5cf1a7"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-negative-controls-fold-a-spec-report.json",
+      "sha256": "4742f0b55abe83aa80ab690fa523966f9972d25d3190f99b004abb06bd173462",
+      "executed_provenance_sha256": [
+        "4ed8d9be69b3053442687cf22fb109cec19bd2fc6dc6e51e96f0580ccd3b1cc4"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-negative-controls-fold-b-spec-report.json",
+      "sha256": "1a575c15adb57177e80a0ad2fea97e0b00feeef57eb7c4ce02e165ab70471a0e",
+      "executed_provenance_sha256": [
+        "658dc8e7fdbb24f4502379cc32ba29e66741faab93867ea82a73c91c4b0d4c6d"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-unpadded-lean-fold-a-spec-report.json",
+      "sha256": "e2dd9f5ab84490156ffc5ec87cbce2d9e0dbaafdc0bae9f6a23e144c3a395445",
+      "executed_provenance_sha256": [
+        "46cf991f8668b622dacd85cfc9e1c58467ab789ae3a788e238d70f85fd0cff84"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-unpadded-lean-fold-b-spec-report.json",
+      "sha256": "76642f0ab807c6f8a93e5b51272d88eefc879aef4529adefd6d7cf4a03658496",
+      "executed_provenance_sha256": [
+        "817d38fb94814ae09456879f5984b399d31b84b38e70d033f78b34c27f49b8c5"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-precip-era-after-precip-fold-b-spec-report.json",
+      "sha256": "afb1bbd64e36c48fbb084ba6959100d4afd243c85bbd323d99ed19b95cdf9c5c",
+      "executed_provenance_sha256": [
+        "5050a95a77d25b2574c940b07a6b232d1f9586db97d973bf4ea1a2b581f54186"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-precip-era-before-precip-fold-b-spec-report.json",
+      "sha256": "c8f0061c5f897d08a9b2bd66dca892e9e5d816cb2f6d99fd232f708e58d420aa",
+      "executed_provenance_sha256": [
+        "ced8cbcc6aa07b8729185f222e9610d7e73d8cc5ce621d7b351cba4abeffe710"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-lean-fold-a-spec-sensitivity-report.json",
+      "sha256": "e1fb985285d3dddb9b8de386509b29c653ea14b91a5bc5d86f3e3cc4f449ffad",
+      "executed_provenance_sha256": [
+        "1904966018c075a87ea5f4760a5704b88714140430b77ac70e46343e37e38e80"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-lean-fold-b-spec-sensitivity-report.json",
+      "sha256": "ab58165096cfd394d5f9d252a056a147b85ac696b26ca856c20ea72d7186dab4",
+      "executed_provenance_sha256": [
+        "c8c49c61cefe301121e899e5f0ba977a9d0d6c006ec1a3b77b01924dd5451699"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-solar-01-solar-add-wind10-fold-a-spec-sensitivity-report.json",
+      "sha256": "93f322976dc713e9b07cef590519fe0df7aea679d81bfb45a5ce2615caeb5974",
+      "executed_provenance_sha256": [
+        "a96e9afc661fc0aca3bb1b80e9405a6e6fd6c551a8595797768d8f67df300140"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-solar-01-solar-add-wind10-fold-b-spec-sensitivity-report.json",
+      "sha256": "9f076e41b77183787b83e56da4c79cb5fd0113adc6b09f77cf3b0a2737fae696",
+      "executed_provenance_sha256": [
+        "0c2ce3749f58305866a858dd6ee1e55483b0058f7ea0aea672cb9e7319c50414"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-categorical-precipitation-type-surface-fold-a-spec-sensitivity-report.json",
+      "sha256": "2a3e8df5bd15268f6e98eee5f661f8002e0a568795c8c0c1dc38cff898fcd4a6",
+      "executed_provenance_sha256": [
+        "35bb9e297b04177b5e6baf26aaf715037f98bf559ec2d4529afc6b0d406c1914"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-categorical-precipitation-type-surface-fold-b-spec-sensitivity-report.json",
+      "sha256": "2eb1cc95d0424f87d78584e8d3f5631905d25d79cce741110dd7f2b87b009584",
+      "executed_provenance_sha256": [
+        "c943053f0c3d9b206761dca2869da862fed9f78c39fbc9a3b907a2c0cd839a94"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-dew-point-temperature-2m-fold-a-spec-sensitivity-report.json",
+      "sha256": "78b9c4188d4fa5d2b6f0b86f2901d5d666c8e5cc8fc8fd5569baf20d9d9afc52",
+      "executed_provenance_sha256": [
+        "4e826c806f198edd1b32f71a8de51e029970089a1b7f9d9f3c074160d1eaf591"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-dew-point-temperature-2m-fold-b-spec-sensitivity-report.json",
+      "sha256": "701209433d3305683407799af60961ca0130cedc07c3362e3889b8e21493a758",
+      "executed_provenance_sha256": [
+        "2d03d0aa209e19855ece449d76e8722254e3c44fd43ed02036624a927271866d"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-downward-short-wave-radiation-flux-surface-fold-a-spec-sensitivity-report.json",
+      "sha256": "213975013d069b3cf5f205d9258235cc9b7e79b80b046cb6698e231ebfecf3f8",
+      "executed_provenance_sha256": [
+        "3efe04569430961e30fff9661d2bfc4f90ec692e18399a86573668892523bc56"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-downward-short-wave-radiation-flux-surface-fold-b-spec-sensitivity-report.json",
+      "sha256": "2d0ddf1a3f39d96feb2aad267e71da64c5a84ef55f1f3b92118619f69be65d66",
+      "executed_provenance_sha256": [
+        "1046b430fd141750a88398a47077c80ef29fe9483ad7b975f484ceec0583d607"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-fold-a-spec-sensitivity-report.json",
+      "sha256": "bf98a36ef19aab784af5c17bfe33e41a92d127cdf2b831009cf65cd2bea3477c",
+      "executed_provenance_sha256": [
+        "5f1e04b500bf73fd4696680306dbd6a771ee0efdd42a2b3ec9fb6bf0b2681c49"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-fold-b-spec-sensitivity-report.json",
+      "sha256": "6a7206b2b6d2fccadba2841fe5749411971aecf577420c5732c2636abc2a747f",
+      "executed_provenance_sha256": [
+        "1e274eed13d273a78829e607b36a3874a631b58a7bf4e63e3c38c1cde2899516"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-cos-fold-a-spec-sensitivity-report.json",
+      "sha256": "e0d2236cc08b2c329ca6a492772b15fba9a97ae70d1540b70a8993e94c23c2e2",
+      "executed_provenance_sha256": [
+        "2d2392138ea16f1dc6f7188512e961fd533726cdf1461189b234b2e6b76778cd"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-cos-fold-b-spec-sensitivity-report.json",
+      "sha256": "b736d2e1afb01578ecfdada1a4e57e57576f5135e600e77aa276af7e5126e577",
+      "executed_provenance_sha256": [
+        "255e623dc9e21c92b8b1c9b4ef5843ce8fa5138ded4652b5f0309d7af4810b88"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-sin-fold-a-spec-sensitivity-report.json",
+      "sha256": "0b5661a10db0d3d968d099b3e3ac9a95f16a1282402234e048927da2d88ce4ef",
+      "executed_provenance_sha256": [
+        "aa969ee97e8e19b48caa8cf387b48c097be1cf46da39876bd37931e487583764"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-day-of-week-sin-fold-b-spec-sensitivity-report.json",
+      "sha256": "f659d77e52a28754447c3fa04dbd328477cab33e52f52f7fd68f6947c649052c",
+      "executed_provenance_sha256": [
+        "22f8955ec4b8a29e5ace000861bf3abc9e14bc8e654e27431ec87e941e7cdc2a"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-cos-fold-a-spec-sensitivity-report.json",
+      "sha256": "af99abe8f24e9b2dd378527bfb0d7c45fb3b7b44adb147a3ad985ad8332ed6ed",
+      "executed_provenance_sha256": [
+        "8736825d0290cf38828e4563eaaf40aa2c246bd64d1f58c56efea131dce6cc1d"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-cos-fold-b-spec-sensitivity-report.json",
+      "sha256": "309dcf9aba305e2e877e8e9fb9cb8265e7a4f0030d1aa683448e21061f684267",
+      "executed_provenance_sha256": [
+        "d0919778b5e05fc0201a6cb3370f9897bb25ec8fdf3bd2c334e0a4a17742c866"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-sin-fold-a-spec-sensitivity-report.json",
+      "sha256": "f8acde23ba23925a332844d74613986c23919979f225086ff1ff34ed47456895",
+      "executed_provenance_sha256": [
+        "5e803c0b379de2dc3884fec41e4872f1d1f0910729a61b0621ce6c06e7a51a96"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-add-local-time-of-year-sin-fold-b-spec-sensitivity-report.json",
+      "sha256": "35debba8f18746da7315c8e5a2ac60d58a85a1a24a004e234712cb17e8b6c1b0",
+      "executed_provenance_sha256": [
+        "b3a6c999aa3dc9270ac03770932c412e4ed3a600ba1235614a83903a10793513"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-guarded-windchill-fold-a-spec-sensitivity-report.json",
+      "sha256": "af8c272ffac4bde6bfb2c4365000bc2e389003acaa021df14014d06298e28ec1",
+      "executed_provenance_sha256": [
+        "64a6662c97a93fa10c0fa12f9366dd504bf3fa55eef2e4678343cd2c0a72a5ab"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-guarded-windchill-fold-b-spec-sensitivity-report.json",
+      "sha256": "a89dec9a6e9e43c575c14aff6d630df2aa366deda5b8b543710eebf50f7c7002",
+      "executed_provenance_sha256": [
+        "ee8c0a8ea01a2b97b4b4a229c0e7a048b9d21cc47fb2bb739109ec082bb0a35e"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-negative-controls-fold-a-spec-sensitivity-report.json",
+      "sha256": "aacc9cfd09b0bf1b0f51704d09ed4f346ec2c3fe556ac9f02229ec4443b1bf0d",
+      "executed_provenance_sha256": [
+        "acb099067012b458deb264e697f1daac2cdcafdd88c986a28e2280c42f0b8590"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-negative-controls-fold-b-spec-sensitivity-report.json",
+      "sha256": "f24f9cc9daff8a847984f5b27e92fc9b57cc8d8f14cb57e0987187cfeec2f6fe",
+      "executed_provenance_sha256": [
+        "8a5be9321dbed482e4a026c0e108dfb4b311d3a48d223ac4d5c7314bed498c5e"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-domain-guards-tables.json",
+      "sha256": "b1826f4c9c4c685eaad81d93d6d3c5b63da167d30f320804fb30b5c9d24c5855",
+      "executed_provenance_sha256": [
+        "9ec0e3458061fed767c24475364106ff458b1830b3f41558b151eb910cbb76c0"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-lean-tables.json",
+      "sha256": "183b870bb68b838db4b7164a910d871a5cd8072ab177e3d19a5fbd409df1cce7",
+      "executed_provenance_sha256": [
+        "3106e0ebf8ad5b11c6fd5236b38dfb464aad0acba06eef6c1ee9240b01a8aa61"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-negative-controls-tables.json",
+      "sha256": "e77847c1bbd0865ea28edbd05511d2335efb3b1d97776c42cd4701ada7784dc5",
+      "executed_provenance_sha256": [
+        "80d2956d05414b5f00f513c85003c3c5c1590c32a1e15b700ce63c1c77789b5f"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-precip-era-tables.json",
+      "sha256": "c2ef85a8ca4eca345baae9670aaae25bcc316f670299222e70b08980dfe1e94b",
+      "executed_provenance_sha256": [
+        "41c39fe49ee7f58d09db57d252d2227c6b98dd9bfd0440b93b9bfd3fadbf4ec1"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-solar-first-rung-tables.json",
+      "sha256": "a372b85790f01fca661ee807b19184ad0d086b1c18c1b56e3432906c85d2ea72",
+      "executed_provenance_sha256": [
+        "87676efd36c8eed18fac7d4b5eb3fc9624906b1000f2a0fcc4b2128ae26e7a27"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-unpadded-tables.json",
+      "sha256": "de46010144f98a2c22ac07bb8ccc2dcc14210cd2e7fd154b5ec787543e1d4c91",
+      "executed_provenance_sha256": [
+        "d61fa98769e234e0b06214d1820cce3f3dbd7783e49ff6ebae81e2b720d68309"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-wind-single-adds-tables.json",
+      "sha256": "f0ff3ab1d314885cd5e55b2fb5455a3d0c18e6df30e4b4b8978f472ef191aee6",
+      "executed_provenance_sha256": [
+        "afcddb91d197cd9c7c649351380dd8bd22559aaa0ffa81d11778ed9cfa7d3d6d"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-controls-figure7.json",
+      "sha256": "41a14cce8204e5fe5fa6bd8cde2c5b4e6f977a621befa03c088e961edc64ee77",
+      "executed_provenance_sha256": [
+        "a73969678cc214d6bfbd94c1a754f91ccdaaf2d33a125098be43b50d91f8eb6d",
+        "023ecfa5bede996fd3be7a60476d1748c60faeeefd414b305aefcd7a00b01e9e"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-precip-era-before-precip-fold-b-sensitivity-report.json",
+      "sha256": "e1088302309c51f1c55afa7be94788515dd0f4d5769071577806d3a6c7d6ec94",
+      "executed_provenance_sha256": [
+        "b20d848c2ae0f8b78d266d0e6c1b3b7ae169657797a3d96ba4c13b479f575710"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-precip-era-after-precip-fold-b-sensitivity-report.json",
+      "sha256": "af00e9a10ab6a95b3b46327a80556c4e1cc929f2709a7b1263c3ab06514bd748",
+      "executed_provenance_sha256": [
+        "0a7f97d6e5debee945ecc641c86ad0ab98cb000eac589788a209f9c8c0ba55b9"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-part1b-precip-era-sensitivity-tables.json",
+      "sha256": "5bef39715ec3335b3495c9dc07b16386db32008ec7ba56139f2374fa90c46249",
+      "executed_provenance_sha256": [
+        "d8ac3131bdf90e62a1961c37bd50854ddcbb925edbb81773bc86cd5c5f6523b2"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-fold-a-main-equal-report.json",
+      "sha256": "d15696db499064308a542507dacac8c430d4e90282167e5890d0c2221075bcae",
+      "executed_provenance_sha256": [
+        "544e61aee6b711c206c21b2f92cdb614e60e92eeef52fa0cc7d278ef9a100477"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-fold-a-sensitivity-equal-report.json",
+      "sha256": "6e3c52a13a6108c215f2d9b3339384860c686a201790872a753c9fd359a84959",
+      "executed_provenance_sha256": [
+        "e718a5a3e65eac40fbaf2bdf0c4a0908ef10591454925f7f70657a2088e852ad"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-fold-a-main-none-report.json",
+      "sha256": "33bd40fd214fff5967212f32dd692199a0587a1d57318eeaa5d090246ef3b82c",
+      "executed_provenance_sha256": [
+        "d1f5990e03f17b0eaf44fd0eaa46568334474c5130d443eb33ef0ec7ac356c6a"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-fold-b-main-equal-report.json",
+      "sha256": "4bf61800fb97ec86c1b795310e0a7f3946e417fa966033332cf33095231b0e79",
+      "executed_provenance_sha256": [
+        "d4a03bc33836db49ec6dc36f25172e747897b88862b9b42fdc5429e8180a418d"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-fold-b-sensitivity-equal-report.json",
+      "sha256": "c4ac4bd605523ac32cd4fc5de5224d7f46d84de733c6040c494bf4f5870d11a2",
+      "executed_provenance_sha256": [
+        "c1dc13f4df551971999cdc93d6828877651b69b61dc587a6d886a7e3290b390d"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-fold-b-main-none-report.json",
+      "sha256": "43511b713ec2e62366d56cabf38be6bb78c66bd3592b96ec600848237175cc5e",
+      "executed_provenance_sha256": [
+        "88a3b756fcf4fec5babd381cdada07784b4a0e2bb5ff3f035b5803066ef7b041"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-primary-tables.json",
+      "sha256": "566e2ecbb6d31cafb32166cf0d941adaa181cb819c8a527edad1f72625cdb324",
+      "executed_provenance_sha256": [
+        "23c055778b31b0ee0fd2afda42200593464c4774514bdfdfac018a4f66922bc7"
+      ]
+    },
+    {
+      "filename": "studies/quick_wins/fixed_pipeline_specs/parent-requested-lead-metrics-tables.json",
+      "sha256": "f3655b9c7eb6a0268aef72520ad1182edc630a3074016ee3f4abc28b9e4b7bbc",
+      "executed_provenance_sha256": [
+        "1368ee718c5491463ca477fc6acced07d0e836b9aea4edf13fbda341914b083f"
+      ]
+    }
+  ]
+}

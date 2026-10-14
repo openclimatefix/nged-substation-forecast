@@ -1,0 +1,96 @@
+{
+  "tables": [
+    {
+      "heading": "Radiation correction: July 2025\u2013June 2026, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/radiation_fold_a_main_canonical/contrasts.parquet",
+      "filters": {
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "group": "Series type",
+        "difference": "Loss difference",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months improved"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Radiation correction: July 2025\u2013June 2026, sensitivity setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/radiation_fold_a_sensitivity_canonical/contrasts.parquet",
+      "filters": {
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "group": "Series type",
+        "difference": "Loss difference",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months improved"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Radiation correction: April 2024\u2013June 2025, retrospective, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/radiation_fold_b_main_canonical/contrasts.parquet",
+      "filters": {
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "group": "Series type",
+        "difference": "Loss difference",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months improved"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Radiation correction: April 2024\u2013June 2025, retrospective, sensitivity setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/radiation_fold_b_sensitivity_canonical/contrasts.parquet",
+      "filters": {
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "group": "Series type",
+        "difference": "Loss difference",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months improved"
+      },
+      "decimal_places": 3
+    }
+  ]
+}

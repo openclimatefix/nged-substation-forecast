@@ -1,0 +1,39 @@
+{
+  "specifications": [
+    {
+      "filename": "studies/forecast_calibration/diagnostic_specs/part2-fold-a-main-tables.json",
+      "sha256": "0e66d258d6f67cd35ed7043308c96705b7f649a4ce2ff8d43fd195490920dc72",
+      "executed_provenance_sha256": [
+        "aa98e5cdc74bbd3aa93c63c2ab48cd591abdf05cf5aff88d0f0d55fbc9a2064b"
+      ]
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_specs/part2-fold-b-main-tables.json",
+      "sha256": "1414807ba18131e7a6cc5f74d66fc41fb22fcc8de6a1d29d1d04fd456dd0bff9",
+      "executed_provenance_sha256": [
+        "426010e3bd3ef3776115f231b22ebd4038f8cc9c0017ab651d0d694f04e1af94"
+      ]
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_specs/part2-fold-a-sensitivity-tables.json",
+      "sha256": "fa173044630a0fd2f3adc382d4cb29a5f32ff0bb31c0fdd0e60f1e5ce6e6cec2",
+      "executed_provenance_sha256": [
+        "8a4aec577ef75e9cecfde04fb6906d04c08e8f91f8bae3713c602dc46c34e81f"
+      ]
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_specs/part2-fold-b-sensitivity-tables.json",
+      "sha256": "fe54ea1e962420a77498e7d067421662e9bad1da1cb8b440138bd8f7af0b87d8",
+      "executed_provenance_sha256": [
+        "823a782d67a8aeec014c62caa0f45a10d9cd8c8b85a282eedb71e3eff4d83a0b"
+      ]
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_specs/part2-supplementary-tables.json",
+      "sha256": "c83e0968927869fb6dc990cf8b62a5d29b03c8e9038a5353456990c22703d2ac",
+      "executed_provenance_sha256": [
+        "c2dd04ef452b1977c53cb25ac481cc7efcae7a9cced51fd47ded47a7de9458fd"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "preparation_only": false,
+  "direction_text": "Negative differences mean lower loss after adding the named feature to the reduced wind-input recipe.",
+  "figures": [
+    {
+      "number": 5,
+      "title": "Restoring removed calendar inputs raises wind forecast loss for July 2025\u2013June 2026",
+      "subtitle": [
+        "XGBoost tree models train on April 2024\u2013June 2025; forecasts are scored July 2025\u2013June 2026.",
+        "Each XGBoost model uses 500 squared-error trees, maximum depth 6, and learning rate 0.05. Each tree samples 80% of rows and can use all columns.",
+        "These training and scoring dates define Fold A. All scored forecast times are included.",
+        "The reduced wind-input baseline retains 16 of the full control\u2019s 24 real inputs. Each plotted comparison adds one removed input to that baseline.",
+        "All input sets use corrected wind and radiation processing. Duplicate retained inputs keep all XGBoost models at 24 training columns.",
+        "Weekday ordinal is a day-of-week number. Weekday and time-of-year sine and cosine encode weekly and annual cycles.",
+        "Squared-error models fit each meter separately. Each power forecast contains 51 values, one from each alternative weather prediction supplied by the weather ensemble.",
+        "Continuous ranked probability score (CRPS) compares the forecast power distribution with observed power; lower is better.",
+        "The fair-CRPS correction assumes independent draws; its use with weather-ensemble values is diagnostic.",
+        "Each plotted comparison uses matched forecasts and observations and weights wind meters and three random-seed fits equally.",
+        "A seed sets the random choices in a training run.",
+        "Ranges describe variation across whole months and individual fits, rather than uncertainty in the three-fit mean or transfer to new meters.",
+        "The eight planned 95% intervals are unadjusted for multiple comparisons. This panel does not test differences between the added inputs.",
+        "The loss increase is statistically significant at the unadjusted 5% level for six of the eight additions under the primary month-and-seed intervals.",
+        "Dew-point temperature and downward short-wave radiation differences remain unresolved under the primary intervals.",
+        "Individual effects cannot be added together to explain the full-input versus reduced-input loss difference.",
+        "Frozen capacity is each meter\u2019s full-history 99th percentile of absolute power, including later readings. Frozen capacity is used only for scoring."
+      ],
+      "panels": [
+        {
+          "title": "Wind farms: one feature added minus reduced-input baseline",
+          "metric": "crps_norm",
+          "axis_title": "Fair CRPS difference (percentage points of capacity)",
+          "zero_label": "No difference",
+          "rows": [
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_categorical_precipitation_type_surface-fold_a-spec",
+              "label": "Precipitation type",
+              "contrast": "wind_add_categorical_precipitation_type_surface minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_dew_point_temperature_2m-fold_a-spec",
+              "label": "Dew-point temperature",
+              "contrast": "wind_add_dew_point_temperature_2m minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_downward_short_wave_radiation_flux_surface-fold_a-spec",
+              "label": "Downward short-wave radiation",
+              "contrast": "wind_add_downward_short_wave_radiation_flux_surface minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_local_day_of_week-fold_a-spec",
+              "label": "Weekday ordinal",
+              "contrast": "wind_add_local_day_of_week minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_local_day_of_week_cos-fold_a-spec",
+              "label": "Weekday cosine",
+              "contrast": "wind_add_local_day_of_week_cos minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_local_day_of_week_sin-fold_a-spec",
+              "label": "Weekday sine",
+              "contrast": "wind_add_local_day_of_week_sin minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_local_time_of_year_cos-fold_a-spec",
+              "label": "Time-of-year cosine",
+              "contrast": "wind_add_local_time_of_year_cos minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            },
+            {
+              "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/part1b_wind_add_local_time_of_year_sin-fold_a-spec",
+              "label": "Time-of-year sine",
+              "contrast": "wind_add_local_time_of_year_sin minus lean_wind",
+              "group": "Wind",
+              "lead_band": "all"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

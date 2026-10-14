@@ -1,0 +1,124 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "part2",
+  "artifact": "reports/fold_a_sensitivity",
+  "recorded_configuration": {
+    "configuration_kind": "aggregate_report",
+    "script_sha256": "adba37654e98da9f49f8be1dfad906e1318a537b25250821f0a36108253dd5c7",
+    "fold": "mid_2025_to_mid_2026",
+    "setting": "sensitivity",
+    "device": "cuda",
+    "bootstrap_seed": 20261012,
+    "resamples": 2000,
+    "primary_probabilities": [
+      0.02631578947368421,
+      0.07894736842105263,
+      0.13157894736842105,
+      0.18421052631578946,
+      0.23684210526315788,
+      0.2894736842105263,
+      0.34210526315789475,
+      0.39473684210526316,
+      0.4473684210526316,
+      0.5,
+      0.5526315789473685,
+      0.6052631578947368,
+      0.6578947368421053,
+      0.7105263157894737,
+      0.7631578947368421,
+      0.8157894736842105,
+      0.868421052631579,
+      0.9210526315789473,
+      0.9736842105263158
+    ],
+    "control_probabilities": [
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9
+    ],
+    "empirical_inverse_cdf": "ceil(n*q)-1",
+    "sample_counts": {
+      "production": 51,
+      "r2_e1_c1_a3w_d3": 459
+    },
+    "source_member_count": 51,
+    "reviewed_control_encoder_hashes": {
+      "arms.py": "9e0ee05a39d054932f014b5cb9e99a111b3168b584152859304ca5bff9f03150",
+      "fit_arms.py": "8a33ecfc55a7dcb3f59b13a7004d25629a9098a3a574fdedac46346d50b1a0af"
+    },
+    "reviewed_fitter_sha256": [
+      "6494889ab56a674b50d86553ab35ebaa04b37ab0d3943889c34f39f69fc20701",
+      "b073be43f8809290746d952bf1acf988ea1f01cf61a7e2ed11e6f51f2de57ca3"
+    ],
+    "dependencies": {
+      "numpy": "2.5.3",
+      "polars": "2.0.0",
+      "scipy": "1.18.1"
+    },
+    "frame_manifest_sha256": "7cdbcf9fd8583555338ab8018b92f462d7fa9dc81af4c12efa663f5913624742",
+    "input_fingerprint": "8d521d264ffdf5d37591c5ef7b6ea486896d42fc5005c426e1fb4daac76a079d",
+    "fits": [
+      {
+        "recipe": "production",
+        "seed": 0,
+        "control_encoding_verified": false,
+        "manifest_sha256": "aef7d36798349fb017ecb27601a97bffb25de35249ef0634700467d972fad930",
+        "completion_sha256": "47ed7eeaacf050e599429b72e2486f58e8d0fbcafed9ccd31e8e05e35017a213"
+      },
+      {
+        "recipe": "production",
+        "seed": 1,
+        "control_encoding_verified": false,
+        "manifest_sha256": "62ae173903b9a5d3d2fb441e5edb8392ea9c25359d03bef1d97a39076a9d6dc2",
+        "completion_sha256": "a687c912c22da41509dee3bac746b835812618dca372a398be765cbe3d353079"
+      },
+      {
+        "recipe": "production",
+        "seed": 2,
+        "control_encoding_verified": false,
+        "manifest_sha256": "57b1a088ff17d3b59e235f17a5f434d72060ca65c4ec8659d73f0b918ae69d96",
+        "completion_sha256": "6c6ea6ad6b2ca4540c3a7fb32694e9e787a0255791a8e2961e1ee411ee39d1c8"
+      },
+      {
+        "recipe": "r2_e1_c1_a3w_d3",
+        "seed": 0,
+        "control_encoding_verified": true,
+        "manifest_sha256": "09364088f039fa7fd7a54007272d1b4ab5f567e7f3b6a5ccce863e0f0d17cfcc",
+        "completion_sha256": "ec4bc6592e25565cc6680bbabf942ea1dc3d47d52e23f875755b5259d7dc555f"
+      },
+      {
+        "recipe": "r2_e1_c1_a3w_d3",
+        "seed": 1,
+        "control_encoding_verified": true,
+        "manifest_sha256": "69c7a37696495cdd96b85e3f733bb62f27e347f42319e5535631a7a1b9772cf2",
+        "completion_sha256": "3392db10e83f9d691a50964d28300d845042a94936daee6ab0d6e7e0665df6ed"
+      },
+      {
+        "recipe": "r2_e1_c1_a3w_d3",
+        "seed": 2,
+        "control_encoding_verified": true,
+        "manifest_sha256": "31221cf82f7f75036edebe4f67f54a37e24757a420832a856f07b3cc3b2d88b5",
+        "completion_sha256": "4e68c1a2b587642ff78416b820a1a3bc5bdee13cc7b797a2a11ec3ccb3885f43"
+      }
+    ],
+    "record_scope": "Exact fields recorded in completed provenance, not an assertion of an unrecorded original shell argv."
+  },
+  "omitted_private_workspace_path_fields": [],
+  "path_omission_policy": "Only private workspace paths are omitted and replaced by hashes of their exact recorded strings; no replacement runtime path is invented. Private inventory retains exact values.",
+  "executed_provenance_sha256": "75b03fe23a526d2c0aad21329a10f6ec85bd8f7dc47f9b1951217fa7c86f2aff",
+  "reported_output_sha256": {
+    "contrasts.parquet": "6f38565faf300bf4200e906669b8fada707fc3b0289aba8131fd634806e1feda",
+    "sample_semantics.parquet": "b2cedd2515508c8c8ed45c59f89b11cadc68e8550ed0e01db8a24ca59877fdf6",
+    "absolute.parquet": "869163116f08ca8c5828474e42e29e0748132492f58731ea092c695313db6216",
+    "source_inventory.parquet": "7513586888756c612a1f005eb0a8ed12a6cc141a825a657afe214061cb0e0af0",
+    "report.md": "6390228c038188fdc7a7438aea528503740d90433adf417c4be83a14f01ead96",
+    "synthetic.parquet": "88f75adffc8d5e272998727e03fa70b2353b64f52c31df32fff27c9a7048a51d"
+  },
+  "artifact_privacy": "Artifact hashes only; no row data or private metadata values."
+}

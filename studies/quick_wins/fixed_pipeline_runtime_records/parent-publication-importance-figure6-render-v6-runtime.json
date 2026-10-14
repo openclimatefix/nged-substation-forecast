@@ -1,0 +1,34 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "publication/importance_figure6_render_v6",
+  "recorded_configuration": {
+    "configuration_kind": "importance_figure_render",
+    "script_sha256": "5efd0581c69d9f9229b8e36f09734fe31319ba48e16190f150575c02a1e5bce1",
+    "configuration": {
+      "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/importance/combined_cleaned_point",
+      "number": "6",
+      "text_only": false
+    },
+    "configuration_sha256": "4fc48fb06b68b7ef7a6bba93b74c205d8997cc844c297fcfcb49c069dbe1cc53",
+    "dependencies": {
+      "altair": "6.3.0",
+      "polars": "2.0.0",
+      "vl-convert-python": "1.9.0.post1"
+    },
+    "chart_library_sha256": "b622104fc726d5f126cba94cfa56a4b0788b177fd9c63f801bc21182ef9674f1",
+    "theme_sha256": "61627ce5ca1524c82b2617e0fb7ce29d637358c34b5b3a43a6fa5e6c97614e4c",
+    "report_manifest_sha256": "dc1c240f3eae57de02e74b8ee9816cd196ace0f8b33c8fc5b6668155ea550cf1",
+    "reviewed_text_sha256": "da3547250a2a70124146db6fb4b656cc0e5df4134c5ae6f8c1470ba6c578245e",
+    "record_scope": "Exact fields recorded in completed provenance, not an assertion of an unrecorded original shell argv."
+  },
+  "omitted_private_workspace_path_fields": [],
+  "path_omission_policy": "Only private workspace paths are omitted and replaced by hashes of their exact recorded strings; no replacement runtime path is invented. Private inventory retains exact values.",
+  "executed_provenance_sha256": "c1f46595d5dcaf64ee48068ec72170671136a0c76e4a76c40b0293daff7f0ca0",
+  "reported_output_sha256": {
+    "figure-text.md": "da3547250a2a70124146db6fb4b656cc0e5df4134c5ae6f8c1470ba6c578245e",
+    "fixed_pipeline_importance.png": "5f1fb1a05df10ff8c5535656be859f25e5b516a5e77ea906c24137b6e8ec86e0",
+    "fixed_pipeline_importance.svg": "5e4699e579780cb4aabeec82a84480f3ebe96d1b1bdc182384942306799f468b"
+  },
+  "artifact_privacy": "Artifact hashes only; no row data or private metadata values."
+}

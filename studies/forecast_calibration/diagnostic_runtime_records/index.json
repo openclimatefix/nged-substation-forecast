@@ -1,0 +1,40 @@
+{
+  "runtime_records": [
+    {
+      "filename": "studies/forecast_calibration/diagnostic_runtime_records/part2-reports-fold-a-main-runtime.json",
+      "sha256": "17edbc0d6e9ba1531e0a4ac83d0df0e4e3746286caddac352410150a0cab940f",
+      "executed_provenance_sha256": "37df489a0f958e733334e3ed4e1ada0107b9bd3e5838192e34282046bca4fb9e",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_runtime_records/part2-reports-fold-b-main-runtime.json",
+      "sha256": "daac3feaa702dd336b34432f2972e23601bf61d3a3f2dcaaea615d1bc248d3c4",
+      "executed_provenance_sha256": "65a8d5779bb5c33b01fad3107e41877357fae51862aadccfc93df6d28f5e717f",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_runtime_records/part2-publication-coverage-fold-a-main-text-v5-runtime.json",
+      "sha256": "259499ef0298ea8b561fe993def4b389b66958eb019a722eda6cfccd4644933f",
+      "executed_provenance_sha256": "c0bc0f08bec22f457de02069cad8a9378b18607e04d9c4ee92fe656f3b30fe04",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_runtime_records/part2-publication-coverage-fold-a-main-render-v5-runtime.json",
+      "sha256": "06fbcc97868fad1df5ca7c6e9f94eac4348c3d772d86b043ee154ed4e5b4572d",
+      "executed_provenance_sha256": "84e1b284982c190221c05b9cf18c705298d20be821c6daac267e0d9f408a1987",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_runtime_records/part2-reports-fold-a-sensitivity-runtime.json",
+      "sha256": "9b46d07f6ba15f892a2083a852906e4f93fa2d27d922ae855325309a0be5acdb",
+      "executed_provenance_sha256": "75b03fe23a526d2c0aad21329a10f6ec85bd8f7dc47f9b1951217fa7c86f2aff",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    },
+    {
+      "filename": "studies/forecast_calibration/diagnostic_runtime_records/part2-reports-fold-b-sensitivity-runtime.json",
+      "sha256": "f466b899dcbbe6bca8691be9c43e3a5afd86bb8f67594f4a04ae1fc50e20d309",
+      "executed_provenance_sha256": "a68cc153febb9fcad689bb5b0a3faa93af6d463968ac8403cc7858723f0ddba2",
+      "record_type": "provenance-derived configuration; not original execution spec"
+    }
+  ]
+}

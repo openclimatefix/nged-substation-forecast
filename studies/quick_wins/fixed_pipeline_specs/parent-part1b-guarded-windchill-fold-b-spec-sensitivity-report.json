@@ -1,0 +1,206 @@
+{
+  "runs": [
+    {
+      "label": "production_cleaned",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned_guarded_windchill",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned_guarded_windchill/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned_guarded_windchill",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned_guarded_windchill/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "production_cleaned_guarded_windchill",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/production_cleaned_guarded_windchill/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv_guarded_windchill",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv_guarded_windchill/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv_guarded_windchill",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv_guarded_windchill/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_pv_guarded_windchill",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_pv_guarded_windchill/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind_guarded_windchill",
+      "seed": 0,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind_guarded_windchill/sensitivity/cuda_seed0_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind_guarded_windchill",
+      "seed": 1,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind_guarded_windchill/sensitivity/cuda_seed1_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    },
+    {
+      "label": "lean_wind_guarded_windchill",
+      "seed": 2,
+      "path": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/fits/combined/fold_b/lean_wind_guarded_windchill/sensitivity/cuda_seed2_equal",
+      "frames": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/frames/combined/fold_b"
+    }
+  ],
+  "contrasts": [
+    {
+      "label": "production_cleaned_guarded_windchill minus production_cleaned",
+      "left": "production_cleaned_guarded_windchill",
+      "right": "production_cleaned",
+      "kind": "planned",
+      "groups": [
+        "PV",
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "lean_pv_guarded_windchill minus production_cleaned_guarded_windchill",
+      "left": "lean_pv_guarded_windchill",
+      "right": "production_cleaned_guarded_windchill",
+      "kind": "planned",
+      "groups": [
+        "PV"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "lean_wind_guarded_windchill minus production_cleaned_guarded_windchill",
+      "left": "lean_wind_guarded_windchill",
+      "right": "production_cleaned_guarded_windchill",
+      "kind": "planned",
+      "groups": [
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "lean_pv_guarded_windchill minus lean_pv",
+      "left": "lean_pv_guarded_windchill",
+      "right": "lean_pv",
+      "kind": "planned",
+      "groups": [
+        "PV"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    },
+    {
+      "label": "lean_wind_guarded_windchill minus lean_wind",
+      "left": "lean_wind_guarded_windchill",
+      "right": "lean_wind",
+      "kind": "planned",
+      "groups": [
+        "Wind"
+      ],
+      "metrics": [
+        "crps_norm",
+        "abs_error_norm",
+        "pinball19_norm",
+        "coverage80",
+        "coverage90"
+      ],
+      "match_training_counts": true
+    }
+  ],
+  "preparation_only": true,
+  "fold": "fold_b",
+  "setting": "sensitivity",
+  "padding": "equal",
+  "decision_metric": "crps_norm",
+  "execution_gate": "Requires separate guarded fits and affected-row counts. Compare feature-cut verdict under the guarded baseline; this is distinct from PR-only pipeline contrasts."
+}

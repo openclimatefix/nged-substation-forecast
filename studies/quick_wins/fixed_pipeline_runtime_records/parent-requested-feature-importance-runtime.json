@@ -1,0 +1,111 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "importance/requested_features",
+  "recorded_configuration": {
+    "configuration_kind": "provenance-derived; original workspace-bearing executed spec remains private",
+    "command_shape": "python studies/quick_wins/requested_feature_importance.py --spec PRIVATE_REVIEWED_SPEC --output DATA/importance/requested_features",
+    "original_specification_sha256": "02173c9d482b4f595f09742c2a8d3c26b675bd192c770693db868073af0a8cb0",
+    "script_sha256": "e14996c36f35b2b3b63aab1e86ba0f221b9041ac2449b963def53f317211b836",
+    "fitter_sha256": "96249cf95590d045764157fc49dea2fb2c1993ff83faa0a9262ebb57037b96ac",
+    "completed_refits": 60,
+    "feature_sets": [
+      {
+        "recipe": "solar_minimal_requested",
+        "real_features": [
+          "downward_short_wave_radiation_flux_surface",
+          "temperature_2m"
+        ],
+        "real_feature_count": 2,
+        "padded_width": 24
+      },
+      {
+        "recipe": "solar_expanded_requested",
+        "real_features": [
+          "categorical_precipitation_type_surface",
+          "clear_sky_irradiance",
+          "dew_point_temperature_2m",
+          "downward_long_wave_radiation_flux_surface",
+          "downward_short_wave_radiation_flux_surface",
+          "precipitation_surface",
+          "sun_east",
+          "sun_north",
+          "sun_up",
+          "temperature_2m",
+          "wind_speed_10m"
+        ],
+        "real_feature_count": 11,
+        "padded_width": 24
+      },
+      {
+        "recipe": "wind_minimal_requested",
+        "real_features": [
+          "temperature_2m",
+          "wind_direction_100m",
+          "wind_direction_10m",
+          "wind_speed_100m",
+          "wind_speed_10m"
+        ],
+        "real_feature_count": 5,
+        "padded_width": 24
+      },
+      {
+        "recipe": "wind_minimal_uv_requested",
+        "real_features": [
+          "temperature_2m",
+          "wind_direction_100m",
+          "wind_direction_10m",
+          "wind_speed_100m",
+          "wind_speed_10m",
+          "wind_u_100m",
+          "wind_u_10m",
+          "wind_v_100m",
+          "wind_v_10m"
+        ],
+        "real_feature_count": 9,
+        "padded_width": 24
+      },
+      {
+        "recipe": "wind_minimal_circular_requested",
+        "real_features": [
+          "temperature_2m",
+          "wind_direction_100m_cos",
+          "wind_direction_100m_sin",
+          "wind_direction_10m_cos",
+          "wind_direction_10m_sin",
+          "wind_speed_100m",
+          "wind_speed_10m"
+        ],
+        "real_feature_count": 7,
+        "padded_width": 24
+      }
+    ],
+    "settings": [
+      "main",
+      "sensitivity"
+    ],
+    "folds": [
+      "backwards_2025_07_to_2026_06",
+      "mid_2025_to_mid_2026"
+    ],
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "padding": "equal",
+    "device": "CUDA",
+    "polars_version": "2.0.0",
+    "xgboost_version": "3.4.1",
+    "statistic_definition": "Padding gains summed with real source before per-booster normalization; equal target meters, then six fold/seed refits separately for each setting; min/max are refit variability.",
+    "scientific_scope": "Post hoc descriptive training gain on frozen radiation revision 0f094c3; no merged01ddf53 evaluation, held-out input benefit or adoption recommendation."
+  },
+  "executed_provenance_sha256": "6f0c3fab1d17db81dce0f36a9d7f043fe25d2b721ee0d3d035e20b5b100cc14b",
+  "reported_output_sha256": {
+    "importance.parquet": "45b159317f2976d4c56e8d43bfe05dd1a07463e51cbe4dfb7a3cacf69d5c1bbe",
+    "refit_importance.parquet": "0b27a4ae91d3d540ed2b30699f568178007183db3fb925c3c94be57da918441c",
+    "report.md": "36286c5d8ca5d8faa1aac78dc7bbbb3090a363bc5f8358840b4ad3cd1949efc8",
+    "spec.json": "02173c9d482b4f595f09742c2a8d3c26b675bd192c770693db868073af0a8cb0"
+  },
+  "artifact_privacy": "Only this abstract configuration record is proposed for copying. Original spec, manifests, refit-level files and private paths remain private; output values are anonymous hashes."
+}

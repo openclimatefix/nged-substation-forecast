@@ -1,0 +1,203 @@
+{
+  "decimal_places": 3,
+  "tables": [
+    {
+      "heading": "Absolute common 19-level pinball loss (% capacity): July 2025\u2013June 2026, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/baselines_fold_a_main/levels.parquet",
+      "filters": {
+        "label": [
+          "old_production",
+          "combined_production",
+          "old_winner",
+          "combined_winner"
+        ],
+        "group": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "label",
+        "group",
+        "value"
+      ],
+      "column_display_names": {
+        "label": "Forecast recipe and pipeline",
+        "group": "Series type",
+        "value": "Twice-mean pinball (% capacity)"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Deciding comparisons on common 19-level pinball loss: July 2025\u2013June 2026, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/baselines_fold_a_main/contrasts.parquet",
+      "filters": {
+        "contrast": [
+          "Both corrections minus old pipeline",
+          "Both corrections on quick-wins winner",
+          "Corrected quick-wins winner minus corrected production configuration"
+        ],
+        "group": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "contrast": "Comparison",
+        "group": "Series type",
+        "difference": "Loss difference (capacity points)",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Pipeline-isolation comparisons, common 19-level pinball loss: July 2025\u2013June 2026, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/baselines_fold_a_main/contrasts.parquet",
+      "filters": {
+        "contrast": [
+          "Radiation correction minus old pipeline",
+          "Wind correction minus old pipeline",
+          "Wind correction with radiation corrected",
+          "Radiation correction with wind corrected"
+        ],
+        "group": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "contrast": "Comparison",
+        "group": "Series type",
+        "difference": "Loss difference (capacity points)",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Wind\u2013radiation interaction (combined \u2212 radiation \u2212 wind + old), common 19-level pinball loss: July 2025\u2013June 2026, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/baselines_fold_a_main/contrasts.parquet",
+      "filters": {
+        "contrast": [
+          "Interaction between wind and radiation corrections"
+        ],
+        "group": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "contrast": "Comparison",
+        "group": "Series type",
+        "difference": "Interaction (capacity points)",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months with negative interaction"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "Cleaned-control pipeline comparison, common 19-level pinball loss: July 2025\u2013June 2026, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/baselines_fold_a_main/contrasts.parquet",
+      "filters": {
+        "contrast": [
+          "Both corrections on cleaned feature baseline"
+        ],
+        "group": [
+          "all",
+          "PV",
+          "Wind"
+        ],
+        "lead_band": "all",
+        "metric": "pinball19_norm"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "lower95",
+        "upper95",
+        "months_better"
+      ],
+      "column_display_names": {
+        "contrast": "Comparison",
+        "group": "Series type",
+        "difference": "Loss difference (capacity points)",
+        "lower95": "95% lower",
+        "upper95": "95% upper",
+        "months_better": "Months with lower loss"
+      },
+      "decimal_places": 3
+    },
+    {
+      "heading": "G3 material-fault gate: fair CRPS, combined production minus old production; July 2025\u2013June 2026, main setting",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/reports/baselines_fold_a_main/contrasts.parquet",
+      "filters": {
+        "contrast": "Both corrections minus old pipeline",
+        "group": "all",
+        "lead_band": "all",
+        "metric": "crps_norm"
+      },
+      "columns": [
+        "contrast",
+        "group",
+        "difference",
+        "equal_month_difference",
+        "t_lower95",
+        "t_upper95",
+        "months_better",
+        "months"
+      ],
+      "column_display_names": {
+        "contrast": "Comparison",
+        "group": "Series type",
+        "difference": "Fair CRPS difference (capacity points)",
+        "equal_month_difference": "Equal-month mean difference (capacity points)",
+        "t_lower95": "Month t-interval lower",
+        "t_upper95": "Month t-interval upper",
+        "months_better": "Months with lower loss",
+        "months": "Months scored"
+      },
+      "decimal_places": 3
+    }
+  ]
+}

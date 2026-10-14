@@ -1,0 +1,301 @@
+{
+  "decimal_places": 8,
+  "tables": [
+    {
+      "heading": "Fold A: combined-pipeline domain screens by existing lead and source-era groups",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/input_audit/fold_a/domain_flags.parquet",
+      "filters": {
+        "treatment": "combined",
+        "time_series_type": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "<72h",
+          "72..<264h",
+          ">=264h"
+        ],
+        "source_era": [
+          "2024-11-13 to 2026-05-11",
+          "2026-05-12 onward"
+        ],
+        "flag": [
+          "windchill_outside_domain",
+          "shortwave_negative",
+          "shortwave_above_1500_screen",
+          "shortwave_night_midpoint_screen",
+          "longwave_negative",
+          "longwave_above_1000_screen"
+        ]
+      },
+      "columns": [
+        "treatment",
+        "time_series_type",
+        "lead_band",
+        "source_era",
+        "flag",
+        "rows",
+        "supported",
+        "flagged",
+        "flagged_share"
+      ],
+      "column_display_names": {
+        "treatment": "Pipeline",
+        "time_series_type": "Series type",
+        "lead_band": "Lead band",
+        "source_era": "Source era",
+        "flag": "Domain screen",
+        "rows": "Rows (all weather members)",
+        "supported": "Supported rows",
+        "flagged": "Flagged rows",
+        "flagged_share": "Flagged share (fraction of supported rows)"
+      }
+    },
+    {
+      "heading": "Fold A: precipitation-type missingness and changes from old to combined pipeline",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/input_audit/fold_a/feature_changes.parquet",
+      "filters": {
+        "treatment": "combined",
+        "time_series_type": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "<72h",
+          "72..<264h",
+          ">=264h"
+        ],
+        "source_era": [
+          "2024-11-13 to 2026-05-11",
+          "2026-05-12 onward"
+        ],
+        "feature": "categorical_precipitation_type_surface"
+      },
+      "columns": [
+        "treatment",
+        "time_series_type",
+        "lead_band",
+        "source_era",
+        "feature",
+        "rows",
+        "old_null",
+        "new_null",
+        "old_nonfinite",
+        "new_nonfinite",
+        "paired_finite",
+        "changed",
+        "null_changed",
+        "old_null_share",
+        "new_null_share",
+        "old_nonfinite_share",
+        "new_nonfinite_share"
+      ],
+      "column_display_names": {
+        "treatment": "Pipeline",
+        "time_series_type": "Series type",
+        "lead_band": "Lead band",
+        "source_era": "Source era",
+        "feature": "Feature",
+        "rows": "Rows (all weather members)",
+        "old_null": "Old null rows",
+        "new_null": "Combined null rows",
+        "old_nonfinite": "Old nonfinite rows",
+        "new_nonfinite": "Combined nonfinite rows",
+        "paired_finite": "Paired finite rows",
+        "changed": "Changed finite rows",
+        "null_changed": "Changed null status rows",
+        "old_null_share": "Old null share (fraction of rows)",
+        "new_null_share": "Combined null share (fraction of rows)",
+        "old_nonfinite_share": "Old nonfinite share (fraction of rows)",
+        "new_nonfinite_share": "Combined nonfinite share (fraction of rows)"
+      }
+    },
+    {
+      "heading": "Fold A: descriptive control-member timing correlations with a one-hour delayed radiation control",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/input_audit/fold_a/timing_correlations.parquet",
+      "filters": {
+        "time_series_type": [
+          "PV",
+          "Wind"
+        ],
+        "construction": [
+          "original",
+          "one_hour_delayed"
+        ],
+        "offset_hours": [
+          -3,
+          -2,
+          -1,
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "columns": [
+        "time_series_type",
+        "construction",
+        "offset_hours",
+        "correlation",
+        "series",
+        "rows"
+      ],
+      "column_display_names": {
+        "time_series_type": "Series type",
+        "construction": "Construction",
+        "offset_hours": "Offset (hours)",
+        "correlation": "Equal-series correlation",
+        "series": "Supported series",
+        "rows": "Control-member rows"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective): combined-pipeline domain screens by existing lead and source-era groups",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/input_audit/fold_b/domain_flags.parquet",
+      "filters": {
+        "treatment": "combined",
+        "time_series_type": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "<72h",
+          "72..<264h",
+          ">=264h"
+        ],
+        "source_era": [
+          "before 2024-11-13",
+          "2024-11-13 to 2026-05-11"
+        ],
+        "flag": [
+          "windchill_outside_domain",
+          "shortwave_negative",
+          "shortwave_above_1500_screen",
+          "shortwave_night_midpoint_screen",
+          "longwave_negative",
+          "longwave_above_1000_screen"
+        ]
+      },
+      "columns": [
+        "treatment",
+        "time_series_type",
+        "lead_band",
+        "source_era",
+        "flag",
+        "rows",
+        "supported",
+        "flagged",
+        "flagged_share"
+      ],
+      "column_display_names": {
+        "treatment": "Pipeline",
+        "time_series_type": "Series type",
+        "lead_band": "Lead band",
+        "source_era": "Source era",
+        "flag": "Domain screen",
+        "rows": "Rows (all weather members)",
+        "supported": "Supported rows",
+        "flagged": "Flagged rows",
+        "flagged_share": "Flagged share (fraction of supported rows)"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective): precipitation-type missingness and changes from old to combined pipeline",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/input_audit/fold_b/feature_changes.parquet",
+      "filters": {
+        "treatment": "combined",
+        "time_series_type": [
+          "PV",
+          "Wind"
+        ],
+        "lead_band": [
+          "<72h",
+          "72..<264h",
+          ">=264h"
+        ],
+        "source_era": [
+          "before 2024-11-13",
+          "2024-11-13 to 2026-05-11"
+        ],
+        "feature": "categorical_precipitation_type_surface"
+      },
+      "columns": [
+        "treatment",
+        "time_series_type",
+        "lead_band",
+        "source_era",
+        "feature",
+        "rows",
+        "old_null",
+        "new_null",
+        "old_nonfinite",
+        "new_nonfinite",
+        "paired_finite",
+        "changed",
+        "null_changed",
+        "old_null_share",
+        "new_null_share",
+        "old_nonfinite_share",
+        "new_nonfinite_share"
+      ],
+      "column_display_names": {
+        "treatment": "Pipeline",
+        "time_series_type": "Series type",
+        "lead_band": "Lead band",
+        "source_era": "Source era",
+        "feature": "Feature",
+        "rows": "Rows (all weather members)",
+        "old_null": "Old null rows",
+        "new_null": "Combined null rows",
+        "old_nonfinite": "Old nonfinite rows",
+        "new_nonfinite": "Combined nonfinite rows",
+        "paired_finite": "Paired finite rows",
+        "changed": "Changed finite rows",
+        "null_changed": "Changed null status rows",
+        "old_null_share": "Old null share (fraction of rows)",
+        "new_null_share": "Combined null share (fraction of rows)",
+        "old_nonfinite_share": "Old nonfinite share (fraction of rows)",
+        "new_nonfinite_share": "Combined nonfinite share (fraction of rows)"
+      }
+    },
+    {
+      "heading": "Fold B (retrospective): descriptive control-member timing correlations with a one-hour delayed radiation control",
+      "source": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/input_audit/fold_b/timing_correlations.parquet",
+      "filters": {
+        "time_series_type": [
+          "PV",
+          "Wind"
+        ],
+        "construction": [
+          "original",
+          "one_hour_delayed"
+        ],
+        "offset_hours": [
+          -3,
+          -2,
+          -1,
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "columns": [
+        "time_series_type",
+        "construction",
+        "offset_hours",
+        "correlation",
+        "series",
+        "rows"
+      ],
+      "column_display_names": {
+        "time_series_type": "Series type",
+        "construction": "Construction",
+        "offset_hours": "Offset (hours)",
+        "correlation": "Equal-series correlation",
+        "series": "Supported series",
+        "rows": "Control-member rows"
+      }
+    }
+  ]
+}

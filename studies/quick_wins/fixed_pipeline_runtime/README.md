@@ -53,3 +53,26 @@ A source-hash match verifies package source, not dependencies, frozen data, hard
 outputs. The frame and fit manifests retain those separate provenance checks. The component
 archive must pass the full migration readiness gate before a wind or combined build; these source
 reconstruction commands supply no data and do not replace that gate.
+
+The executed JavaScript Object Notation (JSON) specifications are listed in
+[`../fixed_pipeline_specs/index.json`](../fixed_pipeline_specs/index.json). Separate
+[`../fixed_pipeline_runtime_records/index.json`](../fixed_pipeline_runtime_records/index.json)
+records describe configurations recovered from completed provenance. A derived record is not an
+original execution specification or a transcript of historical shell arguments. Both indexes bind
+each published file to its SHA-256 and executed provenance.
+
+The Part 2 diagnostic specifications and records have their own indexes under
+[`../../forecast_calibration/diagnostic_specs/`](../../forecast_calibration/diagnostic_specs/index.json)
+and [`../../forecast_calibration/diagnostic_runtime_records/`](../../forecast_calibration/diagnostic_runtime_records/index.json).
+The indexed records cover the existing diagnostics; calibration fitting and coherence experiments
+remain on hold.
+
+Historical precipitation-era specifications retain their exact executed bytes. Their
+`execution_gate` text saying precipitation was wholly missing before 13 November 2024 refers to
+**categorical precipitation type**. Precipitation amount/rate has different availability limitations;
+the study page describes the amount/rate limitations separately.
+
+Commit `af5201f2` preserves the requested-feature producer, audit, and chart sources used by the
+saved outputs. Later type-only corrections preserve calculations but change source hashes. Use
+the recorded revision when reproducing those source-bound artifacts, and write to new output
+directories. The private data, fitted boosters, and row-level forecasts remain necessary inputs.

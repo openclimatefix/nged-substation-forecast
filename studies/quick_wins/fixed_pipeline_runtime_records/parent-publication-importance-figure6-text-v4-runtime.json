@@ -1,0 +1,32 @@
+{
+  "record_type": "Provenance-derived runtime record, not an original executed JSON specification or historical shell argv",
+  "namespace": "parent",
+  "artifact": "publication/importance_figure6_text_v4",
+  "recorded_configuration": {
+    "configuration_kind": "importance_figure_text",
+    "script_sha256": "1e0ee4433ad6ec4449f01f1df216cb0805655f876cf5552a580223b684b40f1a",
+    "configuration": {
+      "report": "/mnt/data/nged-substation-forecast/data/studies/per_study/quick_wins_fixed_pipeline_1156/importance/combined_cleaned_point",
+      "number": "6",
+      "text_only": true
+    },
+    "configuration_sha256": "1c20b3b7c7c75382c139a7ba8522a97668f72c23cced08284754e6db4821c422",
+    "dependencies": {
+      "altair": "6.3.0",
+      "polars": "2.0.0",
+      "vl-convert-python": "1.9.0.post1"
+    },
+    "chart_library_sha256": "b622104fc726d5f126cba94cfa56a4b0788b177fd9c63f801bc21182ef9674f1",
+    "theme_sha256": "61627ce5ca1524c82b2617e0fb7ce29d637358c34b5b3a43a6fa5e6c97614e4c",
+    "report_manifest_sha256": "dc1c240f3eae57de02e74b8ee9816cd196ace0f8b33c8fc5b6668155ea550cf1",
+    "reviewed_text_sha256": null,
+    "record_scope": "Exact fields recorded in completed provenance, not an assertion of an unrecorded original shell argv."
+  },
+  "omitted_private_workspace_path_fields": [],
+  "path_omission_policy": "Only private workspace paths are omitted and replaced by hashes of their exact recorded strings; no replacement runtime path is invented. Private inventory retains exact values.",
+  "executed_provenance_sha256": "5628cb2b9c0c99d948205d82e2e9fbe948b7d75fd8317454f1bba730e887034d",
+  "reported_output_sha256": {
+    "figure-text.md": "da3547250a2a70124146db6fb4b656cc0e5df4134c5ae6f8c1470ba6c578245e"
+  },
+  "artifact_privacy": "Artifact hashes only; no row data or private metadata values."
+}
