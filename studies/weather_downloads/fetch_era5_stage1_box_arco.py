@@ -12,8 +12,8 @@ filename. The parquet files under `data/` hold the cells' coordinates, and `data
 published.
 
 Each hourly chunk of a single-level variable covers the whole globe, so a month of one variable
-reads about 720 chunks and keeps the cells. The geopotential array stores all 37 pressure levels in
-one chunk, so reading the 500 hPa level costs about 15 times a single-level variable. Each
+reads about 720 chunks and keeps the cells. Geopotential at 500 hPa is not fetched: ARCO stores all
+37 pressure levels in one 80 MB chunk per hour, which reads at about 0.5 hours per second. Each
 variable-month is checkpointed to its own parquet file under `_month_cache/<variable>/`, written
 through a `.partial` file, and a re-run skips every month whose file holds the expected rows.
 
@@ -63,7 +63,6 @@ MARGIN_CELLS: Final[int] = 3
 """How many cells the block enclosing the trial-area box is widened by in every direction."""
 
 EXPVER: Final[str] = "0001"
-GEOPOTENTIAL_LEVEL_HPA: Final[int] = 500
 ROUNDING_TOLERANCE: Final[float] = 1e-6
 """The share of a variable's upper limit by which float32 rounding may cross a limit.
 
@@ -85,7 +84,6 @@ class Stage1Variable:
         units: The unit ARCO documents for the array, which must match what is read.
         minimum: The physical lower limit in `units`.
         maximum: The physical upper limit in `units`.
-        level_hpa: The pressure level kept, for a variable stored on pressure levels, else `None`.
     """
 
     short_name: str
@@ -93,7 +91,6 @@ class Stage1Variable:
     units: str
     minimum: float
     maximum: float
-    level_hpa: int | None = None
 
 
 VARIABLES: Final[tuple[Stage1Variable, ...]] = (
@@ -111,9 +108,8 @@ VARIABLES: Final[tuple[Stage1Variable, ...]] = (
     Stage1Variable("fdir", "accumulation", "J m**-2", 0.0, 4.0e6),
     Stage1Variable("strd", "accumulation", "J m**-2", 0.0, 2.5e6),
     Stage1Variable("tp", "accumulation", "m", 0.0, 0.2),
-    Stage1Variable("z", "instantaneous", "m**2 s**-2", 40_000.0, 60_000.0, GEOPOTENTIAL_LEVEL_HPA),
 )
-"""The variables to fetch, cheapest first so that the geopotential is read last.
+"""The variables to fetch.
 
 `ptype` is ERA5's precipitation type, a code from table 4.201 (0 none, 1 rain, 3 freezing rain,
 5 snow, 6 wet snow, 7 mixture of rain and snow, 8 ice pellets, 12 freezing drizzle).
@@ -160,7 +156,6 @@ class ArcoStore:
             str(dataset[key].attrs.get("short_name", key)): str(dataset[key].attrs.get("units", ""))
             for key in keys
         }
-        self.levels: np.ndarray = dataset["level"].values
         self.latitude_q, self.longitude_q = cell_axes()
         self.lat_index = self._indices(dataset["latitude"].values, self.latitude_q)
         self.lon_index = self._indices(dataset["longitude"].values, self.longitude_q)
@@ -191,19 +186,12 @@ class ArcoStore:
         array = self.group[self.names[variable.short_name]]
         assert isinstance(array, zarr.Array)
         oindex: Any = array.oindex
-        level_index = (
-            int(np.flatnonzero(self.levels == variable.level_hpa)[0])
-            if variable.level_hpa is not None
-            else None
-        )
         positions = [self.time_position(hour=hour) for hour in hours]
 
         def read_one(position: int) -> np.ndarray:
             for attempt in range(READ_ATTEMPTS):
                 try:
-                    if level_index is None:
-                        return np.asarray(oindex[position, self.lat_index, self.lon_index])
-                    return np.asarray(oindex[position, level_index, self.lat_index, self.lon_index])
+                    return np.asarray(oindex[position, self.lat_index, self.lon_index])
                 except Exception:
                     if attempt == READ_ATTEMPTS - 1:
                         raise
@@ -391,8 +379,7 @@ def fetch_variable(
         source_address=f"gs://{ARCO_BUCKET_PATH}",
         request_description=(
             f"ARCO-ERA5 array {store.names[variable.short_name]}"
-            + (f" at {variable.level_hpa} hPa" if variable.level_hpa else "")
-            + f", hourly {FIRST_HOUR:%Y-%m-%d %H:%M} to {LAST_HOUR:%Y-%m-%d %H:%M} UTC, on the "
+            f", hourly {FIRST_HOUR:%Y-%m-%d %H:%M} to {LAST_HOUR:%Y-%m-%d %H:%M} UTC, on the "
             f"{len(store.latitude_q)} x {len(store.longitude_q)} cell block enclosing the "
             f"trial-area box, widened by {MARGIN_CELLS} cells in every direction"
         ),

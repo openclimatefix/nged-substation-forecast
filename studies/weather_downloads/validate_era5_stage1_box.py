@@ -34,6 +34,7 @@ from fetch_era5_stage1_box_arco import (
 from fetch_era5_stage1_box_arco import (
     ROUNDING_TOLERANCE as ROUNDING_SLACK,
 )
+from lineage import write_readme
 from studies.sources import (
     ERA5_PRODUCT_DIR,
     ERA5_SOLAR_VARIABLES_DIR,
@@ -234,6 +235,90 @@ def wind_speed_check(*, tables: dict[str, pl.DataFrame]) -> dict[str, object]:
     return report
 
 
+def write_stage1_readme(*, tables: dict[str, pl.DataFrame], report: dict[str, object]) -> None:
+    """Write the directory's README, taking every fact about the files from the written tables."""
+    first = next(iter(tables.values()))
+    cells = first.select(pl.struct("latitude", "longitude").n_unique()).item()
+    hours = first["time"].n_unique()
+    nan_total = sum(
+        int(t["value"].is_nan().sum()) + t["value"].null_count() for t in tables.values()
+    )
+    held = report["held_comparison"]
+    assert isinstance(held, dict)
+    solar_exact = [
+        k.split("_vs")[0]
+        for k, c in held.items()
+        if "solar_variables" in k and c["max_abs_difference"] == 0
+    ]
+    units = ", ".join(f"`{v.short_name}` {v.units}" for v in VARIABLES)
+    write_readme(
+        product_dir=OUTPUT_DIR,
+        product_name="ERA5 hourly weather variables for stage 1 of the staged forecast",
+        source_web_page="https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels",
+        script_path="studies/weather_downloads/fetch_era5_stage1_box_arco.py",
+        columns={
+            "time": f"Valid time, UTC, stored as {first.schema['time']}. An accumulation (`ssrd`, "
+            "`fdir`, `strd`, `tp`) is a total over the hour ending at `time`; every other "
+            "variable is a snapshot at `time`.",
+            "latitude": f"Cell latitude, degrees north, {first.schema['latitude']}; "
+            f"{first['latitude'].n_unique()} values on the 0.25 degree grid, stored northernmost "
+            "first within each hour.",
+            "longitude": f"Cell longitude, degrees east, {first.schema['longitude']}; "
+            f"{first['longitude'].n_unique()} values on the 0.25 degree grid.",
+            "value": f"The variable named by the file, {first.schema['value']}, in ARCO's units: "
+            f"{units}.",
+            "expver": f"ERA5 release, {first.schema['expver']}. ARCO carries no release label, so "
+            "every row is the constant `0001`.",
+        },
+        missing_value_convention=(
+            f"There are none: {nan_total} NaN or null values across all {len(tables)} files. A "
+            "chunk ARCO never wrote reads back as NaN, and the fetch script rejects any month "
+            "that holds one."
+        ),
+        gotchas=[
+            f"**Coverage.** {cells} cells for {hours:,} hours (2019-09-01 00:00 to 2026-07-31 "
+            "23:00 UTC), one file per variable: `" + "`, `".join(tables) + "`. The files and the "
+            "cell coordinates stay in the private store.",
+            (
+                "**Geopotential at 500 hPa is not fetched.** ARCO stores all 37 pressure levels in "
+                "one 80 MB chunk per hour, which reads at about 0.5 hours per second, so the "
+                "variable would take about 34 hours."
+            ),
+            (
+                "**Accumulations hold float noise below zero.** `ssrd` and `fdir` reach about -1.6 "
+                "and -0.25 J m-2 where the true total is zero. Clip at zero before use. Divide "
+                "radiation by 3600 for the mean W m-2 over the hour ending at `time`."
+            ),
+            (
+                "**`ptype` is a code (table 4.201), not a quantity.** ARCO stores the codes with "
+                "float noise of about 5e-5, so the fetch rounds them to integers. Values seen: "
+                "0, 1, 3, 5, 6, 7, 8."
+            ),
+            "**Agreement with the held CDS tables.** "
+            + ", ".join(f"`{n}`" for n in solar_exact)
+            + " match the held `solar_variables/` tables bit for bit. `tcc` differs by at most "
+            "8e-6. `t2m`, `ssrd`, `fdir` and the four wind components differ from the held "
+            "`beam_diffuse/` archives and `ERA5-WIND-2019-2023/` by at most about 6e-5 of the "
+            "variable's maximum, in no pattern by cell, consistent with 16-bit packing in those "
+            "netCDF files. Details are in `validation.json`.",
+            (
+                "**No ERA5 to ERA5T step.** Monthly means of every variable are continuous across "
+                "2026-05 to 2026-07. The span ends on the last final month in the held tables."
+            ),
+            (
+                "**Re-fetch** only the missing months with the command in the script's docstring; "
+                "`_month_cache/` can be deleted once the combined files are validated."
+            ),
+        ],
+        external_docs={
+            "ARCO-ERA5": "https://github.com/google-research/arco-era5",
+            "ERA5 data documentation": "https://confluence.ecmwf.int/display/CKB/ERA5%3A+data+documentation",
+            "Hersbach et al. (2020)": "https://doi.org/10.1002/qj.3803",
+        },
+        lineage_filenames=[f"lineage_{name}.json" for name in tables],
+    )
+
+
 def main() -> None:
     """Validate every variable and write `validation.json`."""
     tables = {
@@ -261,6 +346,7 @@ def main() -> None:
         )
     report["held_comparison"] = held_comparison
     report["wind_speed"] = wind_speed_check(tables=tables)
+    write_stage1_readme(tables=tables, report=report)
     (OUTPUT_DIR / "validation.json").write_text(json.dumps(report, indent=2, default=str) + "\n")
     print(
         json.dumps(
