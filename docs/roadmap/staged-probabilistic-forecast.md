@@ -1,9 +1,9 @@
 # A staged probabilistic forecast
 
-> **Status: 🔬 Research.** The design on this page is a best guess under test. The > [research
-log](../ml-experiments/research-log.md) holds the experiments that test it, and the > [research
-plan](../ml-experiments/research-log.md#planned-experiments) lists the experiments to run > next. No
-production code implements it.
+> **Status: 🔬 Research.** The design on this page is a best guess under test. The
+> [research log](../ml-experiments/research-log.md) holds the experiments that test it, and the
+> [research plan](../ml-experiments/research-plan.md) lists the experiments to run next. No
+> production code implements it.
 
 **The page describes a probabilistic power forecast in three parts with fixed roles.** Stage 1 turns
 weather into power, stage 2 calibrates the result, uses lagged power, and blends weather products,
@@ -558,9 +558,9 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
 ## Work still to do
 
 **The research plan lists the experiments to run next, and two pieces of infrastructure are tracked
-as GitHub issues because they change production-facing code.** The research plan is a section of the
-[research log](../ml-experiments/research-log.md#planned-experiments). The two pieces of
-infrastructure are:
+as GitHub issues because they change production-facing code.** The [research
+plan](../ml-experiments/research-plan.md) is a page next to the [research
+log](../ml-experiments/research-log.md). The two pieces of infrastructure are:
 
 - **The conventions adapter.** The radiation and wind rules have shipped. Remaining: step widths for
   hourly-stepped NWPs, the same adapter for ERA5 and CAMS, the per-NWP convention table, and the
