@@ -18,9 +18,7 @@ sooner.
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing for the second stage; the slope statistics wait for the second stage | Its cheap first test, experiment 00007, was inconclusive. The second stage is planned as experiment 00009, in [PR #1213 (Plan experiment 9: CAMS-trained stage 1a against ERA5-trained, for demand)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213), with no fits yet |
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | P6 | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
-| [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 2 | Approval against the £30 egress cap | Proposed; a study, not an experiment |
 | [P17](#p17-input-features-for-solar-and-wind) | Which input features and which training start are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
-| [P19](#p19-a-point-model-trained-on-absolute-error) | Does a point model trained on absolute error give a lower MAE than the median of the quantile model? | 2 | P6 | Proposed |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Planned as experiment 00011, in [PR #1214 (Plan experiment 11: school-term and return-to-work columns for the stage 1a demand model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214), with no fits yet |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 and P17 | Proposed |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | 4 | A plan; the price source is chosen | The Elexon Market Index Data pull is under way, and a plan follows it |
@@ -38,6 +36,7 @@ model.** Each keeps its section below, and a result may promote it.
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | P6 | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and P12 | Deferred; no consumer needs coherent members yet |
 | [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | P7 and P17 | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand barely responds to weather beyond the clock |
+| [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and it cannot run autonomously because the fetch needs a cloud machine in `us-west-2` |
 
 ## Proposals in detail
 
@@ -225,6 +224,10 @@ value for every series and carries no variation across series. The Easter and ha
 rest on three instances. The experiment can resolve the Christmas effect only, and it cannot
 separate a school effect from a calendar effect.
 
+The [quick-wins study](../studies/forecasts/quick-wins.md) found that holiday and ordinal-day
+columns did not help demand on 15 months of ENS-era data (+0.06 points of CRPS), while experiment
+00006 found that a windowed Christmas column helped on a longer history.
+
 ### P6: Primary substation demand against the stored baselines
 
 **The leaderboard already holds the baselines.** The `forecast_metrics` Delta table has scores for
@@ -244,6 +247,15 @@ the bar that every later experiment has to beat.
 P6 also diagnoses why the production recipe loses to `manual_heuristic` by about 2 points of
 capacity in every horizon slice, because that gap could be the largest mean absolute error gain
 available.
+
+The [quick-wins study](../studies/forecasts/quick-wins.md) already answered several questions that
+N1 should inherit and not repeat. Quantile loss at 9 levels lowered CRPS by 2.39 points against
+production, and the absolute-error objective lowered it by 0.42 points, so N1 uses quantile loss and
+takes its median as the point forecast. Early stopping lowered CRPS by 0.38 points. One model per
+series scored better than one model per type for substations. Cutting the training window from 15 to
+12 months raised CRPS by only 0.07 points. The study left a climatology column (built so that a
+row's own value never enters its own mean), training on CRPS, and features from the ensemble itself
+as ideas for future work.
 
 ### P7: the staged chain against the upgraded single-stage model
 
@@ -270,6 +282,12 @@ scored rolling-origin on the winner of P6 or P7.
 ranking would rest on one year of drift. A cheaper design scores stage 1a on ERA5 with rolling
 origins over 2021 to 2026, as experiment 00006 did, which needs no ENS data and gives several years
 of drift.
+
+The [quick-wins study](../studies/forecasts/quick-wins.md) found that recency weights with a
+half-life of 120 days did not help on 15 months of ENS-era data (+0.05 points of CRPS), and that
+cutting the window from 15 to 12 months changed CRPS by only 0.07. Experiment 00006 found that
+recency weights with a half-life of 2 years over 7 years of ERA5 helped. The two results use
+different data, so P8 repeats the question on purpose.
 
 ### P9: the demand weather ceiling
 
@@ -331,10 +349,13 @@ product, and does not run the learning curve.
 ### P16: a longer ENS history
 
 **The ENS backfill from Source Cooperative (2021-03 to 2024-03) could give an earlier validation
-fold.** Every experiment since 00003 scores the same year on the same 16 series, so choices tuned
-there overfit it. For demand, a longer training history has hurt so far, so the backfill is valuable
-first as validation data. Check whether [issue #959 (Extend ECMWF ENS training
-history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959) already covers it.
+fold, and it cannot run autonomously.** [Issue #959 (Extend ECMWF ENS training
+history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959) describes the
+fetch. The archive is in `us-west-2`, and fetching all 51 members needs about 30 TB and a cloud
+machine in that region, so the maintainer runs it and approves the cost. Every experiment since
+00003 scores the same year on the same 16 series, so choices tuned there overfit it, and an earlier
+fold is the remedy. For demand, a longer training history has hurt so far, so the backfill is
+valuable first as validation data.
 
 ### P17: input features for solar and wind
 
@@ -369,12 +390,3 @@ contrast is the lagged calibrator against the lag-free calibrated stage 1, per t
 
 **Resolution limit.** With 9 generator series, a lag effect smaller than about 0.3 points of
 capacity will not be resolved, so the result should be read per technology.
-
-### P19: a point model trained on absolute error
-
-**Experiments 00005 to 00008 optimised the quantile score, and the target is the mean absolute
-error.** Experiment 00005 found that a lag-free calibrator lowered the quantile score while it
-raised the median's absolute error. The arms are the median of the quantile model, a point model
-trained on absolute error, and a point model trained on squared error, on the Primary substations.
-The planned contrast is the best point arm against the median of the quantile model, in MAE by lead
-band.
