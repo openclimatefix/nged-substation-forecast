@@ -243,7 +243,7 @@ def run_statistics(
                 summary = _summary(member_forecasts=values)
                 pieces.append(
                     pl.DataFrame(
-                        summary, schema=["mean", "std", *common.LEVEL_COLUMNS]
+                        summary, schema=["mean", "std", *common.LEVEL_COLUMNS], orient="row"
                     ).with_columns(
                         time_series_id=pl.lit(series_id).cast(pl.Int32),
                         power_fcst_init_time=pl.lit(ordered["power_fcst_init_time"][0]),

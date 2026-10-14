@@ -414,6 +414,7 @@ def load_series_arrays(*, series: pl.DataFrame, config: str) -> dict[str, Series
                 ),
                 on="valid_time",
                 how="left",
+                validate="1:1",
             )
             .join(
                 observed.filter(pl.col("time_series_id") == row["time_series_id"]).select(
@@ -421,6 +422,7 @@ def load_series_arrays(*, series: pl.DataFrame, config: str) -> dict[str, Series
                 ),
                 on="valid_time",
                 how="left",
+                validate="1:1",
             )
             .sort("valid_time")
         )

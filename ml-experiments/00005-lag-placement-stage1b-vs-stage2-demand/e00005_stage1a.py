@@ -81,6 +81,9 @@ def fit_series(*, config: str, seed: int, site: str, arrays: common.SeriesArrays
         )
         model = common.fit_booster(features=features[rows], target=power[rows], seed=seed)
         prediction[first:last] = common.predict(model=model, features=features[first:last])
+    prediction[cutoff:validation] = common.predict(
+        model=final, features=features[cutoff:validation]
+    )
     if settings.calibrators:
         for tag, quarter_start in enumerate(common.CHAIN_STARTS):
             stop = int(common.grid_index(times=quarter_start - common.PURGE))

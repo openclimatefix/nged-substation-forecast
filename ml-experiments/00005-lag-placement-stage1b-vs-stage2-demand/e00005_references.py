@@ -93,7 +93,7 @@ def r1_quantiles() -> pl.DataFrame:
                 quantiles = np.quantile(forecast, common.LEVELS, axis=1).T.astype(np.float32)
                 pieces.append(
                     keys.with_columns(
-                        pl.DataFrame(quantiles, schema=list(common.LEVEL_COLUMNS)),
+                        pl.DataFrame(quantiles, schema=list(common.LEVEL_COLUMNS), orient="row"),
                         seed=pl.lit(seed).cast(pl.Int8),
                     )
                 )

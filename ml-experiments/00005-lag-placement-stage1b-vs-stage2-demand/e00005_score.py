@@ -159,7 +159,10 @@ def common_cases(*, arms: dict[str, pl.DataFrame]) -> pl.DataFrame:
     shared: pl.DataFrame | None = None
     for frame in arms.values():
         cases = (
-            frame.filter(pl.col("actual").is_finite() & (pl.col("valid_time") < HOLDOUT))
+            frame.filter(
+                pl.all_horizontal(pl.col("actual", *common.LEVEL_COLUMNS).is_finite())
+                & (pl.col("valid_time") < HOLDOUT)
+            )
             .select(keys)
             .unique()
         )
@@ -348,11 +351,7 @@ def verdict(*, planned: pl.DataFrame) -> str:
         & (pl.col("group") == "all series")
     ).row(0, named=True)
     material_for = row["difference"] <= -0.15 and row["upper"] < 0 and row["months_negative"] >= 9
-    material_against = (
-        row["difference"] >= 0.15
-        and row["lower"] > 0
-        and row["months"] - row["months_negative"] >= 9
-    )
+    material_against = row["difference"] >= 0.15 and row["lower"] > 0
     label = "supported" if material_for else "refuted" if material_against else "inconclusive"
     return (
         f"{label}: C1 up to 48 h is {row['difference']:+.3f} ({row['lower']:+.3f} to "

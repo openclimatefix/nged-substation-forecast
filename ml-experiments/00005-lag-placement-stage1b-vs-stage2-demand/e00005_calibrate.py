@@ -133,7 +133,9 @@ def main() -> None:
                             "time_series_id", "power_fcst_init_time", "valid_time", "seed"
                         ).with_columns(
                             pl.DataFrame(
-                                quantiles.astype(np.float32), schema=list(common.LEVEL_COLUMNS)
+                                quantiles.astype(np.float32),
+                                schema=list(common.LEVEL_COLUMNS),
+                                orient="row",
                             ),
                             actual=pl.Series(test_actual),
                         )
