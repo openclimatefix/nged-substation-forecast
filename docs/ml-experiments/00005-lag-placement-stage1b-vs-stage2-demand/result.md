@@ -83,8 +83,11 @@ the same information, so a difference between them comes from where the informat
 columns `shortwave`, `longwave`, `temperature_2m`, `dew_point_temperature_2m`,
 `pressure_surface`, `precipitation`, `wind_speed_10m`, `solar_zenith`, and `solar_azimuth` (the sun
 position at the midpoint of the half-hour); the local `hour_local` and `day_of_week_local`;
-`covid_indicator` (1 from 2020-03-23 to 2021-07-19, otherwise 0); and `days_to_nearest_holiday`
-(signed, clipped to plus and minus 7 days, using the `holidays` package's England calendar).
+`covid_indicator` (1 from 2020-03-23 to 2021-07-19, otherwise 0, so 0 throughout validation); and
+`days_to_christmas` (signed days to 25 December, clipped to plus and minus 14 days). Experiment
+00006 chose this list for Primary substations on its selection year (2024-07 to 2025-06) and
+confirmed it once on 2025-07 to 2026-06. It suggests different lists for BSP and GSP; this
+experiment uses one list for all 20 series, and reports BSP and GSP separately as descriptive.
 ERA5 supplies the weather columns at the series' nearest cell in training, and the ENS member
 supplies them in forecasting. Experiment 00006 also found that weighting recent years more
 improves its selection-fold error. This experiment keeps equal weights, and treats a
@@ -130,7 +133,7 @@ Residuals at valid times from 2025-07-01 come from the final stage 1a.
 - **L3:** lag-free stage 1a, then the stage 2 calibrator with the recent-origin inputs.
 - **L2+L3:** L2's member forecasts, then the stage 2 calibrator with the recent-origin inputs.
 - **No-calendar control:** R0 and L2 are repeated without `hour_local`, `day_of_week_local`, and
-  `days_to_nearest_holiday` (window from 2023-09), to show how much of any gain is the calendar
+  `days_to_christmas` (window from 2023-09), to show how much of any gain is the calendar
   position. The sun position and the lockdown indicator stay.
 
 **Stage 2 calibrator.** One multi-quantile XGBoost model per series (`reg:quantileerror` at the 9
