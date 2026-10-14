@@ -168,5 +168,5 @@ with status `planned`. The overnight session:
 diff touches only `ml-experiments/`, `docs/ml-experiments/`, and the experiment's line in
 `mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged, and
 the research log is updated; and the checks pass (`ci` green, no closing keyword in the PR body or
-commit messages, no `data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). A change to
-`packages/studies/` stops at a reviewed PR, as `implement-issue` does.
+commit messages, no `data/` or `.env` file, the branch contains `main`, a merge commit and not a
+squash). A change to `packages/studies/` stops at a reviewed PR, as `implement-issue` does.
