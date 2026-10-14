@@ -107,9 +107,9 @@ A gain of that size is at the edge of what the rows can resolve.
 
 ## Design
 
-**No stage 1a model is refitted.** The ERA5-trained and CAMS-trained boosters of 00009 (20 series, three
-seeds) are loaded as they are. Only the input they read at validation changes, so C2 differs from
-00009's CAMS-trained arm in one input: the ENS shortwave column.
+**No stage 1a model is refitted.** The ERA5-trained and CAMS-trained boosters of 00009 (20 series,
+three seeds) are loaded as they are. Only the input they read at validation changes, so C2 differs
+from 00009's CAMS-trained arm in one input: the ENS shortwave column.
 
 **Stage 0 is an empirical quantile mapping from ENS shortwave to CAMS irradiance.** The mapping is
 fitted on the training times before 2025-06-17 (14 days before the first validation run), from the
@@ -159,11 +159,11 @@ The training table holds one member per run, assumed exchangeable with the other
 
 **The verdict is inconclusive by the pre-registered rule, although C2 itself beats the planned
 size.** Stage 0 lowers the Primary quantile score of the CAMS-trained arm by 0.067 points of
-capacity (C2, 97.5% interval -0.094 to -0.039, half-width 0.028), more than the -0.03 the plan required, and in 12 of
-12 months and 14 of 16 series. The rule also required that the corrected ENS shortwave stay within
-5% of CAMS in every month, and the bias check failed. C1 reproduces experiment 00009's -0.035 (-0.070 to +0.001)
-exactly, and the repeated raw-input quantiles differ from 00009's by 0.000 in every level over
-3,074,760 rows each.
+capacity (C2, 97.5% interval -0.094 to -0.039, half-width 0.028), more than the -0.03 the plan
+required, and in 12 of 12 months and 14 of 16 series. The rule also required that the corrected ENS
+shortwave stay within 5% of CAMS in every month, and the bias check failed. C1 reproduces experiment
+00009's -0.035 (-0.070 to +0.001) exactly, and the repeated raw-input quantiles differ from 00009's
+by 0.000 in every level over 3,074,760 rows each.
 
 | Arm | Primary quantile score | BSP | GSP | Primary error of the median |
 | --- | --- | --- | --- | --- |
@@ -196,27 +196,27 @@ experiment 00009 reported.
 
 ![Stage 0's contrasts by scope](figure_2.svg)
 
-**The gain is in daylight and at every lead from 1 day on.** In daylight the contrast is -0.168 (95% interval
--0.229 to -0.114) and at night it is 0.000. By lead band it is -0.038 up to 1 day (-0.085 to
-+0.002), -0.084 for 1 to 2 days, -0.061 for 3 to 6 days, -0.068 for 7 to 10 days, and -0.075 for 11
-to 15 days, so the gain does not fade at long leads as 00009's did. The interval for the first day reaches
-+0.002, so a gain there is probable and not resolved. Over the 4 bulk and grid supply
+**The gain is in daylight and at every lead from 1 day on.** In daylight the contrast is -0.168 (95%
+interval -0.229 to -0.114) and at night it is 0.000. By lead band it is -0.038 up to 1 day (-0.085
+to +0.002), -0.084 for 1 to 2 days, -0.061 for 3 to 6 days, -0.068 for 7 to 10 days, and -0.075 for
+11 to 15 days, so the gain does not fade at long leads as 00009's did. The interval for the first
+day reaches +0.002, so a gain there is probable and not resolved. Over the 4 bulk and grid supply
 point series together it is -0.042 (-0.086 to -0.001), too few series to say more. Stage 0 also
 helps the ERA5-trained arm (X1, -0.025, -0.038 to -0.012), so part of the gain is a general
-correction of the ENS shortwave, and the CAMS-trained arm gains 0.077 more than the ERA5-trained
-arm after both have stage 0 (X2, -0.111 to -0.040).
+correction of the ENS shortwave, and the CAMS-trained arm gains 0.077 more than the ERA5-trained arm
+after both have stage 0 (X2, -0.111 to -0.040).
 
 **Post hoc, a monthly mapping did no better.** Fitting one mapping per calendar month from the
 single training year of pairs gives X3 -0.049 (-0.089 to -0.007) against raw ENS and X4 +0.019
 (-0.015 to +0.053) against the all-year stage 0, and the monthly ratios to CAMS stay between 0.82
 and 1.12 (figure 1).
 
-**Stage 0 hurts one Primary series and rests on one training member and one year.** Series P6 scores worse with stage 0 (+0.053, 0.037 to 0.073), and series P9,
-with 8 months of data, gains the most (-0.354). The training table held one ensemble member per
-run, the control member, so the mapping assumes the 50 perturbed members share its distribution.
-CAMS is held hourly while ENS shortwave is interpolated to half-hours, which the mapping ignores.
-The 14 months of pairs give April to June two years and the other months one. Validation is one
-year (2025-07 to 2026-06).
+**Stage 0 hurts one Primary series and rests on one training member and one year.** Series P6 scores
+worse with stage 0 (+0.053, 0.037 to 0.073), and series P9, with 8 months of data, gains the most
+(-0.354). The training table held one ensemble member per run, the control member, so the mapping
+assumes the 50 perturbed members share its distribution. CAMS is held hourly while ENS shortwave is
+interpolated to half-hours, which the mapping ignores. The 14 months of pairs give April to June two
+years and the other months one. Validation is one year (2025-07 to 2026-06).
 
 Scripts: `ml-experiments/00014-cams-trained-stage1-with-stage0-ens-correction-demand/`
 (`e00014_fit.py`, `e00014_post_hoc.py`, `e00014_score.py`, `e00014_charts.py`).
