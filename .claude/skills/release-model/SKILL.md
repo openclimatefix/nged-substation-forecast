@@ -100,12 +100,12 @@ is that decision, recorded in the tracking issue.
 
 ## Step 6: release
 
-**One PR records the release, and the maintainer then deploys it.** The PR adds the row to the log in
-`docs/live_service/model-releases.md`, with the rollback pairing, sets `production_status: adopted`
-and `adopted_in: N` in each incorporated experiment's `result.md`, and moves those experiments in
-the research log. The same PR updates the flag of each winner that step 1 dropped. After that PR merges, the maintainer promotes the champion fold run, deploys it,
-and tags the commit `model-N`, in the order the release-log page gives. The output is the deployed
-release.
+**One PR records the release, and the maintainer then deploys it.** The PR adds the row to the log
+in `docs/live_service/model-releases.md`, with the rollback pairing, sets `production_status:
+adopted` and `adopted_in: N` in each incorporated experiment's `result.md`, and moves those
+experiments in the research log. The same PR updates the flag of each winner that step 1 dropped.
+After that PR merges, the maintainer promotes the champion fold run, deploys it, and tags the commit
+`model-N`, in the order the release-log page gives. The output is the deployed release.
 
 ## Step 7: watch the first runs
 
