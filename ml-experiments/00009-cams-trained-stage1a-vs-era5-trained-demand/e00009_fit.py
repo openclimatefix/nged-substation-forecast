@@ -157,7 +157,7 @@ def training_rows(*, data: SeriesData) -> np.ndarray:
     return index[keep]
 
 
-def fit_models(*, series: pl.DataFrame, data: dict[str, SeriesData]) -> None:
+def fit_models(*, data: dict[str, SeriesData]) -> None:
     """Fit and save every arm's, seed's, and series' booster, skipping those that exist."""
     for arm in common.ARMS:
         for seed in common.SEEDS:
@@ -171,7 +171,8 @@ def fit_models(*, series: pl.DataFrame, data: dict[str, SeriesData]) -> None:
                     features=arrays.features(arm=arm)[rows], target=arrays.power[rows], seed=seed
                 )
                 path.parent.mkdir(parents=True, exist_ok=True)
-                model.save_model(path)
+                model.save_model(path.with_suffix(".tmp"))
+                path.with_suffix(".tmp").rename(path)
             print(f"fit {arm} seed {seed}: {time.monotonic() - started:.0f} s", flush=True)
 
 
@@ -311,7 +312,7 @@ def main() -> None:
     args = parser.parse_args()
     series = common.series_table()
     data = load_series_data(series=series)
-    fit_models(series=series, data=data)
+    fit_models(data=data)
     models = load_models(series=series)
     write_observed_weather(series=series, data=data, models=models)
     apply_to_ens(series=series, data=data, models=models, limit_runs=args.limit_runs)

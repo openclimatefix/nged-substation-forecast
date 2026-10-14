@@ -330,6 +330,7 @@ def exploratory_contrasts(*, arms: dict[str, pl.DataFrame], labels: list[str]) -
     rows = []
 
     def add(
+        *,
         label: str,
         treatment: str,
         reference: str,
@@ -356,18 +357,23 @@ def exploratory_contrasts(*, arms: dict[str, pl.DataFrame], labels: list[str]) -
         )
 
     for band, _, _ in LEAD_BANDS[1:]:
-        add(f"C1 by lead band: {band}", TREATMENT, REFERENCE, band=band)
-    add("C1, daylight valid times", TREATMENT, REFERENCE, daylight=True)
-    add("C1, night valid times", TREATMENT, REFERENCE, daylight=False)
+        add(label=f"C1 by lead band: {band}", treatment=TREATMENT, reference=REFERENCE, band=band)
+    add(label="C1, daylight valid times", treatment=TREATMENT, reference=REFERENCE, daylight=True)
+    add(label="C1, night valid times", treatment=TREATMENT, reference=REFERENCE, daylight=False)
     for group in ("BSP", "GSP"):
-        add(f"C1, {group}", TREATMENT, REFERENCE, group=group)
+        add(label=f"C1, {group}", treatment=TREATMENT, reference=REFERENCE, group=group)
     for label in labels:
-        add(f"C1, {label} only", TREATMENT, REFERENCE, only_label=label)
-        add(f"C1 without {label}", TREATMENT, REFERENCE, exclude_label=label)
-    add("X1: era5-hourly minus era5-trained", CONTROL, REFERENCE)
-    add("X2: cams-trained minus era5-hourly", TREATMENT, CONTROL)
-    add("era5-trained minus climatology", REFERENCE, "climatology")
-    add("cams-trained minus climatology", TREATMENT, "climatology")
+        add(label=f"C1, {label} only", treatment=TREATMENT, reference=REFERENCE, only_label=label)
+        add(
+            label=f"C1 without {label}",
+            treatment=TREATMENT,
+            reference=REFERENCE,
+            exclude_label=label,
+        )
+    add(label="X1: era5-hourly minus era5-trained", treatment=CONTROL, reference=REFERENCE)
+    add(label="X2: cams-trained minus era5-hourly", treatment=TREATMENT, reference=CONTROL)
+    add(label="era5-trained minus climatology", treatment=REFERENCE, reference="climatology")
+    add(label="cams-trained minus climatology", treatment=TREATMENT, reference="climatology")
     return pl.DataFrame(rows)
 
 
@@ -469,15 +475,16 @@ def shortwave_by_month(*, series: pl.DataFrame) -> pl.DataFrame:
             keep = rows[arrays.era5_features[rows, zenith_at] < common.MAX_ZENITH_DEGREES]
             times = arrays.valid_time.gather(keep.tolist())
             for source, matrix in (("ERA5", arrays.era5_features), ("CAMS", arrays.cams_features)):
+                values = matrix[keep, shortwave_at].astype(np.float64)
                 pieces.append(
                     pl.DataFrame(
                         {
                             "period": period,
                             "source": source,
                             "month": times.dt.month(),
-                            "value": matrix[keep, shortwave_at].astype(np.float64),
+                            "value": values,
                         }
-                    )
+                    ).filter(pl.col("value").is_finite())
                 )
         ens = pl.concat(
             [
