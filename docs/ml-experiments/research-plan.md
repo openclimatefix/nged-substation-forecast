@@ -41,6 +41,10 @@ model.** Each keeps its section below, and a result may promote it.
 
 ## Proposals in detail
 
+**Resolution limits.** The sections below flag the experiments whose planned contrasts the available
+sample cannot resolve. The sample is 16 Primary substations, 9 generator series, and one validation
+year with 12 months, and it resolves gains of roughly 0.3 points of capacity or more.
+
 ### P2: embedded-solar capacity from lagged residuals
 
 **The embedded-solar proposal rests on one follow-up check of experiment 00006's residuals, which
@@ -140,6 +144,10 @@ second stage would not be worth running. A candidate decision rule: the CAMS-tra
 quantile score at Primary substations by at least 0.2 points of capacity, with a month-block
 bootstrap interval that excludes zero. The threshold is a proposal for the planning step to confirm.
 
+**Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
+substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
+statistics need more substations or a continuous measure of capacity.
+
 ### P3: historical electricity prices as lagged inputs
 
 **The price proposal asks a different question from price forecasting.** Future electricity prices
@@ -188,6 +196,10 @@ capacity](../studies/unmetered-battery-capacity.md). A candidate rule: the gain 
 the listed substations and is less than half as large at the others, because an equal gain at both
 groups would refute the battery-response mechanism even if accuracy improves.
 
+**Resolution limit.** Only one or two of the 16 Primary substations are known to have batteries, so
+the contrast between listed and other substations cannot be tested. A cheaper first step is to
+correlate the stage 1a residual with the price at those few substations before building any model.
+
 ### P4: return-to-work and school-term columns for the holiday periods
 
 **Experiment 00006 found that the windowed days to Christmas lowers the Primary error in the weeks
@@ -207,6 +219,11 @@ Easter, and half-term windows over all three folds, with a day-count control and
 as in the Christmas control of 00006. School-term dates have to be collected and checked by hand,
 which is the data step the 00006 screen left out. The experiment stays out of 00006 because a column
 designed after seeing early-January errors cannot be pre-registered there.
+
+**Resolution limit.** All 20 series are in Lincolnshire, so the school-term column takes the same
+value for every series and carries no variation across series. The Easter and half-term effects each
+rest on three instances. The experiment can resolve the Christmas effect only, and it cannot
+separate a school effect from a calendar effect.
 
 ### P6: Primary substation demand against the stored baselines
 
@@ -249,6 +266,11 @@ design for demand, and stage 2 stays only for the multi-product work.
 windows of 6, 12, and 18 months, recency half-lives, and a monthly retrain against a frozen model,
 scored rolling-origin on the winner of P6 or P7.
 
+**Resolution limit.** One confirmation year cannot rank windows of 6, 12, and 18 months, because the
+ranking would rest on one year of drift. A cheaper design scores stage 1a on ERA5 with rolling
+origins over 2021 to 2026, as experiment 00006 did, which needs no ENS data and gives several years
+of drift.
+
 ### P9: the demand weather ceiling
 
 **The experiment sizes how much skill demand gains from better weather.** It gives N1 ERA5 in place
@@ -272,11 +294,18 @@ planned contrast is coverage and CRPS of the best arm against no correction, dem
 
 The demand part of the calibration question moved into P7.
 
+**Resolution limit.** Nine generator series in two weather regions cannot resolve coverage
+differences of a few percentage points, so the result should be read per technology and as
+descriptive.
+
 ### P13: perfect-prognosis and ceiling checks
 
 **Experiment 00001 found no gain from ERA5 training beyond day 6.** The arms are the ERA5-trained
 stage 1, a stage 1 trained on ENS early leads, and ceiling inputs (ERA5, CAMS, both, and each
 product's short-lead fields).
+
+**Resolution limit.** Nine generator series cannot resolve gains smaller than about 0.3 points of
+capacity, and few solar farms share a weather cell.
 
 ### P14: coupling
 
@@ -294,6 +323,10 @@ the per-product-columns control; a fixed equal-weight mixture; and a learning cu
 and 12 months of the second product's history, rotated across seasons. The planned contrast is ENS
 plus the second product against ENS alone, with a safe-entry check at 1 and 2 months (the interval
 lies inside plus or minus 0.15 points).
+
+**Resolution limit.** With 9 generator series, a safe-entry interval of plus or minus 0.15 points is
+not reachable at 1 or 2 months of history. The experiment compares ENS alone with ENS plus one
+product, and does not run the learning curve.
 
 ### P16: a longer ENS history
 
@@ -321,6 +354,9 @@ years than demand does, so a longer training window may help them where it hurt 
 are a start in 2019-09, a start in 2023-09, and the ENS-era months only, scored with the same
 contrast on 9 generator series.
 
+**Resolution limit.** Six solar farms in one weather region and 3 wind farms cannot resolve gains
+under about 0.3 points of capacity, so the claim rests on those farms.
+
 ### P18: lagged power and summaries of recent power for solar and wind
 
 **Generators depend on weather more than demand does, so lags may help less.** The experiment
@@ -330,6 +366,9 @@ calibrator, and lag anomalies built from the sources serving has (P7). It also r
 and of the latest day on the same weekday) for demand: raw lags against summaries against both.
 Lagged power can also carry curtailment and capacity that the weather does not explain. The planned
 contrast is the lagged calibrator against the lag-free calibrated stage 1, per technology.
+
+**Resolution limit.** With 9 generator series, a lag effect smaller than about 0.3 points of
+capacity will not be resolved, so the result should be read per technology.
 
 ### P19: a point model trained on absolute error
 
