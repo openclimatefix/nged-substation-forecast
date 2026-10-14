@@ -110,13 +110,13 @@ removed.
 ## 4. The candidate design
 
 **The best-guess design has three learned stages with fixed roles, and the studies test simpler
-challengers against it.** Stage 1 is the weather-to-power function, trained on the long ERA5 and
-CAMS history. Stage 2 calibrates each product's stage 1 power with one shared calibrator and blends
-the products. Coupling turns the result back into coherent ensemble members. Every stage always
-runs, and each has one job. The main challenger is a single-stage quantile XGBoost model on ENS
-statistics with a small correction per additional product. It has one stage fewer, and it is the
-baseline that stage 2 must beat or tie. A learned weather-correction stage ("stage 0") is not in the
-first design; see the alternatives.
+challengers against it.** Stage 1 is the weather-to-power function, trained on ERA5 and CAMS. Stage
+2 calibrates each product's stage 1 power with one shared calibrator and blends the products.
+Coupling turns the result back into coherent ensemble members. Every stage always runs, and each has
+one job. The main challenger is a single-stage quantile XGBoost model on ENS statistics with a small
+correction per additional product. It has one stage fewer, and it is the baseline that stage 2 must
+beat or tie. A learned weather-correction stage ("stage 0") is not in the first design; see the
+alternatives.
 
 ```text
 NWP n, member m ─▶ adapter ─▶ canonical weather ─▶ Stage 1 (1a, 1b) ─▶ power(n,m,s,t)
@@ -144,20 +144,22 @@ Notation: n is the NWP product, m the ensemble member, s the series, t the valid
 | Stage 2b, blend (learned) | The calibrated quantiles of the products that are present, lead | Calibrated quantiles of power per series and valid time | Combines the products | No | Yes |
 | ECC (code) | Calibrated quantiles, stage 1 member medians | 51 coherent members (the ENS member count) | No | Output | No |
 
-**Study 2a has run on fold A and supports a stage 1 trained on ERA5, with caveats.** On the 9
-generator series (6 solar and 3 wind), stage 1a trained on ERA5 and applied to the 51 ENS members
-and averaged had a lower mean absolute error than the ENS-trained control, by 0.9 to 1.5 points of
-capacity for solar at 0 to 6 days and by 2.4 to 5.8 points for wind at every lead band ([PR #1184
-(Study: stage 1 pilot, an ERA5-trained weather-to-power model against the ENS-trained
-control)](https://github.com/openclimatefix/nged-substation-forecast/pull/1184)). A review then
-found that the control appears to memorise calendar position: its long-lead wind forecasts correlate
-0.45 to 0.56 with the previous year's power and score worse than a month-by-hour climatology. The
-gain over the control is therefore provisional until a climatology arm and a de-memorised
-ENS-trained control are scored. Adding stage 1a's prediction to the ENS-trained model as one extra
-column changed nothing (solar -0.005, wind -0.025 points), and the cause is not established. Stage
-1a trained on only the 15 ENS months was worse than the control, so the gain comes from the long
-ERA5 history. The pilot scored the ensemble-mean point forecast, not quantiles, and it did not test
-stage 2.
+**Study 2a has run on fold A and supports a stage 1 trained on ERA5 for the first six days, not
+beyond.** The first run compared stage 1a with a production-recipe control that appeared to memorise
+calendar position, and a review caught that: removing the hour and day-of-year columns lowered the
+ENS-trained error by 1.13 points of capacity for solar and 3.40 for wind. The revised study uses one
+feature list for every arm, with no calendar column and no power lag. On the 9 generator series (6
+solar and 3 wind), stage 1a trained on ERA5 and applied to the 51 ENS members and averaged beat the
+same columns trained on ENS control-member weather by 0.32 to 0.83 points of mean absolute error for
+solar and 1.08 to 2.33 for wind up to day 6 ([PR #1184 (Study: stage 1 pilot, an ERA5-trained
+weather-to-power model against the ENS-trained
+control)](https://github.com/openclimatefix/nged-substation-forecast/pull/1184)). Beyond day 6 the
+gain is not material, and stage 1a is within about 1 point of a month-by-half-hour climatology. The
+gain follows the training weather (ERA5 against ENS) and not the training length: stage 1a trained
+on only the ENS months gives the same errors. Adding stage 1a's prediction to the ENS-trained model
+as one extra column is not material anywhere. The pilot scored the ensemble-mean point forecast, not
+quantiles, and it did not test stage 2. The argument for seven years of history therefore rests, for
+generators, on the lag-aware stage 1b and on the demand series, which the pilot did not cover.
 
 **The adapter handles known facts as code.** Each NWP has a table of step width, accumulation or
 instantaneous convention, and the date each convention applies from. The adapter resamples every NWP
