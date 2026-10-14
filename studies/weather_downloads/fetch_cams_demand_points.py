@@ -90,6 +90,9 @@ COLUMN_NAMES: Final[tuple[str, ...]] = (
 """The 11 columns the service writes, in order, under its commented header."""
 COORDINATE_HEADER_PREFIXES: Final[tuple[str, ...]] = ("# Latitude", "# Longitude", "# Altitude")
 """Header lines the service writes that name where the request was made."""
+DECIMAL_TOKEN: Final[re.Pattern[str]] = re.compile(r"(?<![\d.])-?\d+\.\d{2,}(?!\d)")
+"""A number with at least two decimals; version strings such as 4.6 and 1.6 have one."""
+LOCATION_TOLERANCE_DEGREES: Final[float] = 0.01
 VALUE_COLUMNS: Final[tuple[str, ...]] = ("ghi_w_m2", "clear_sky_ghi_w_m2", "reliability")
 
 
@@ -168,12 +171,19 @@ def assert_no_coordinates(*, path: Path, job: SiteYear) -> None:
     Raises:
         RuntimeError: If any `#` line holds the latitude or longitude.
     """
-    needles = {f"{abs(v):.1f}" for v in (job.latitude, job.longitude)} | {
-        str(job.latitude),
-        str(job.longitude),
-    }
     lines = path.read_text().splitlines()
-    if any(n in line for line in lines if line.startswith("#") for n in needles):
+    named = [
+        float(token)
+        for line in lines
+        if line.startswith("#")
+        for token in DECIMAL_TOKEN.findall(line)
+    ]
+    if any(
+        abs(value) - abs(v) < LOCATION_TOLERANCE_DEGREES
+        and abs(value) - abs(v) > -LOCATION_TOLERANCE_DEGREES
+        for value in named
+        for v in (job.latitude, job.longitude)
+    ):
         path.unlink()
         msg = "a header line still names the requested location"
         raise RuntimeError(msg)
