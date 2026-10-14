@@ -39,11 +39,14 @@ ERA5_RAW: Final[str] = "era5-trained"
 CAMS_RAW: Final[str] = "cams-trained"
 CAMS_STAGE0: Final[str] = "cams-stage0"
 ERA5_STAGE0: Final[str] = "era5-stage0"
+MONTH_STAGE0: Final[str] = "cams-stage0-month"
+"""The post hoc variant of `e00014_post_hoc.py`; exploratory only."""
 STAGE_ARMS: Final[dict[str, str]] = {
     "era5-raw": ERA5_RAW,
     "cams-raw": CAMS_RAW,
     "cams-stage0": CAMS_STAGE0,
     "era5-stage0": ERA5_STAGE0,
+    "cams-stage0-month": MONTH_STAGE0,
 }
 HEADLINE_GROUP: Final[str] = "Primary"
 PLANNED_LEVEL: Final[float] = 97.5
@@ -81,6 +84,11 @@ ARM_COLUMNS: Final[tuple[str, ...]] = (
 )
 
 
+def post_hoc_dir() -> Path:
+    """Return where `e00014_post_hoc.py` writes its quantiles."""
+    return common.WORK_DIR / "stats_post_hoc"
+
+
 def _stats() -> pl.DataFrame:
     """Return every ENS run's quantiles of every arm and input from `e00014_fit.py`.
 
@@ -91,7 +99,11 @@ def _stats() -> pl.DataFrame:
     if len(paths) != N_RUNS:
         msg = f"expected {N_RUNS} runs in {fit.STATS_DIR}, found {len(paths)}"
         raise FileNotFoundError(msg)
-    return pl.concat([pl.read_parquet(path) for path in paths])
+    post_hoc = sorted(post_hoc_dir().glob("init=*.parquet"))
+    if len(post_hoc) != N_RUNS:
+        msg = f"expected {N_RUNS} post hoc runs in {post_hoc_dir()}, found {len(post_hoc)}"
+        raise FileNotFoundError(msg)
+    return pl.concat([pl.read_parquet(path) for path in [*paths, *post_hoc]])
 
 
 def noise_check(*, ours: pl.DataFrame) -> pl.DataFrame:
@@ -380,6 +392,9 @@ def exploratory_contrasts(*, arms: dict[str, pl.DataFrame], labels: list[str]) -
     add("C2, BSP", CAMS_STAGE0, CAMS_RAW, group="BSP")
     add("C2, GSP", CAMS_STAGE0, CAMS_RAW, group="GSP")
     add("C1, BSP and GSP together", CAMS_RAW, ERA5_RAW, group=("BSP", "GSP"))
+    add("X3 (post hoc): cams-stage0-month minus cams-trained, Primary", MONTH_STAGE0, CAMS_RAW)
+    add("X4 (post hoc): cams-stage0-month minus cams-stage0, Primary", MONTH_STAGE0, CAMS_STAGE0)
+    add("X3, daylight valid times", MONTH_STAGE0, CAMS_RAW, daylight=True)
     add("X1: era5-stage0 minus era5-trained, Primary", ERA5_STAGE0, ERA5_RAW)
     add("X2: cams-stage0 minus era5-stage0, Primary", CAMS_STAGE0, ERA5_STAGE0)
     add("cams-stage0 minus era5-trained, Primary", CAMS_STAGE0, ERA5_RAW)
@@ -392,7 +407,7 @@ def exploratory_contrasts(*, arms: dict[str, pl.DataFrame], labels: list[str]) -
 def absolute_table(*, arms: dict[str, pl.DataFrame]) -> pl.DataFrame:
     """Return every scored arm's mean quantile score and median error, with 95% intervals."""
     rows = []
-    for name in (ERA5_RAW, CAMS_RAW, CAMS_STAGE0, ERA5_STAGE0, "climatology"):
+    for name in (ERA5_RAW, CAMS_RAW, CAMS_STAGE0, ERA5_STAGE0, MONTH_STAGE0, "climatology"):
         for group in GROUPS:
             for band, _, _ in LEAD_BANDS:
                 part = experiment_store.losses_for_bootstrap(
@@ -415,7 +430,9 @@ def mismatch_table(*, series: pl.DataFrame) -> pl.DataFrame:
     """
     primary = series.filter(pl.col("substation_type") == HEADLINE_GROUP)["time_series_id"]
     sums = pl.concat([pl.read_parquet(p) for p in sorted(fit.SHORTWAVE_DIR.glob("init=*.parquet"))])
-    sums = sums.filter(pl.col("time_series_id").is_in(primary) & (pl.col("month") < HOLDOUT_MONTH))
+    sums = sums.filter(
+        pl.col("time_series_id").is_in(primary.implode()) & (pl.col("month") < HOLDOUT_MONTH)
+    )
     if not sums.select(pl.all_horizontal(pl.exclude("month").is_finite())).to_series().all():
         msg = "the shortwave sums hold a NaN or infinite value"
         raise ValueError(msg)
@@ -449,6 +466,30 @@ def mismatch_table(*, series: pl.DataFrame) -> pl.DataFrame:
     by_month = finish(sums.group_by("month").agg(aggregates).sort("month"))
     overall = finish(sums.select(aggregates).with_columns(month=pl.lit("all")))
     return pl.concat([by_month, overall])
+
+
+def post_hoc_mismatch(*, series: pl.DataFrame) -> pl.DataFrame:
+    """Return the post hoc variant's ratio to CAMS and spread ratio by month, Primary series."""
+    primary = series.filter(pl.col("substation_type") == HEADLINE_GROUP)["time_series_id"]
+    directory = common.WORK_DIR / "shortwave_post_hoc"
+    sums = pl.concat([pl.read_parquet(p) for p in sorted(directory.glob("init=*.parquet"))])
+    sums = sums.filter(
+        pl.col("time_series_id").is_in(primary.implode()) & (pl.col("month") < HOLDOUT_MONTH)
+    )
+    raw = pl.concat(
+        [pl.read_parquet(p) for p in sorted(fit.SHORTWAVE_DIR.glob("init=*.parquet"))]
+    ).filter(pl.col("time_series_id").is_in(primary.implode()) & (pl.col("month") < HOLDOUT_MONTH))
+    return (
+        sums.group_by("month")
+        .agg(pl.col("to_cams").sum(), pl.col("cams").sum(), pl.col("to_cams_spread").sum())
+        .join(raw.group_by("month").agg(pl.col("raw_spread").sum()), on="month", validate="1:1")
+        .sort("month")
+        .select(
+            "month",
+            monthly_stage0_to_cams_ratio=pl.col("to_cams") / pl.col("cams"),
+            spread_ratio_cams=pl.col("to_cams_spread") / pl.col("raw_spread"),
+        )
+    )
 
 
 def verdict(*, planned: pl.DataFrame, mismatch: pl.DataFrame) -> str:
@@ -516,11 +557,13 @@ def main() -> None:
     exploratory = exploratory_contrasts(arms=arms, labels=primary_labels)
     absolute = absolute_table(arms=arms)
     mismatch = mismatch_table(series=series)
+    post_hoc = post_hoc_mismatch(series=series)
     for name, frame in (
         ("planned", planned),
         ("exploratory", exploratory),
         ("absolute", absolute),
         ("mismatch", mismatch),
+        ("post_hoc_mismatch", post_hoc),
         ("noise_check", check),
     ):
         frame.write_parquet(RESULTS_DIR / f"{name}.parquet")
@@ -560,6 +603,9 @@ def main() -> None:
         "",
         "## Daylight shortwave mismatch, 16 Primary series, validation year",
         *_table(frame=mismatch, columns=list(mismatch.columns)),
+        "",
+        "## Post hoc monthly mapping: ratio to CAMS and member-spread ratio, by month",
+        *_table(frame=post_hoc, columns=list(post_hoc.columns)),
     ]
     (RESULTS_DIR / "report.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
