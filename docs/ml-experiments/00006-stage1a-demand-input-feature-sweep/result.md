@@ -154,3 +154,13 @@ model per series, one seed for the sweep, three for the planned contrasts.
 - **Planned contrasts P1 to P7 on the selection fold** (Bonferroni-widened 99.4% intervals): P1
   -0.51 (-0.66 to -0.37), P2 +0.14 (-0.56 to +0.81), P3 -0.10 (-0.21 to -0.01), P4 +0.05 (-0.03 to
   +0.12), P5 -0.003 (-0.024 to +0.013), P6 -0.40 (-0.60 to -0.19), P7 -0.46 (-0.63 to -0.24).
+
+### Revision before any confirmation-fold scoring: select on the Primary series
+
+**The planning session asked for the list to serve the Primary substations.** Greedy selection was
+repeated on the 13 Primary series alone, on the same selection fold. It adds the COVID indicator
+(-0.25 points) and then the signed days to 25 December (-0.14 points), and stops when the next
+addition (the holiday flags) gains 0.05 points. The all-series selection chose the COVID indicator
+and the signed days to the nearest holiday. **The frozen set is now W plus `hour_local`,
+`day_of_week_local`, `covid_indicator`, and `days_to_christmas`.** Nothing has been scored on
+2025-07-01 or later. The earlier frozen set is kept as an exploratory arm.
