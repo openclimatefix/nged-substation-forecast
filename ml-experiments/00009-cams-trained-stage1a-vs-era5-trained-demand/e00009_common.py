@@ -22,8 +22,9 @@ EXPERIMENT_ID: Final[int] = 9
 SLUG: Final[str] = "cams-trained-stage1a-vs-era5-trained-demand"
 ROW_SET_ID: Final[str] = "fold_a_every5d_v1"
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
-ArmType = Literal["era5", "cams"]
-ARMS: Final[tuple[ArmType, ...]] = ("era5", "cams")
+ArmType = Literal["era5", "cams", "era5-hourly"]
+ARMS: Final[tuple[ArmType, ...]] = ("era5", "cams", "era5-hourly")
+"""`era5-hourly` is the control: hourly-mean ERA5 shortwave held across both half-hours."""
 
 EXPERIMENT_00005_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00005-lag-placement-stage1b-vs-stage2-demand"

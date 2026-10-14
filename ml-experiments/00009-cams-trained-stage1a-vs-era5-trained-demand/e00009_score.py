@@ -7,12 +7,13 @@ points of capacity (percent of effective capacity). Intervals resample whole val
 the three fitting seeds. The two planned contrasts are read at 97.5% (Bonferroni across two) with
 10,000 resamples; every other contrast is exploratory and read at 95%.
 
-Arms: `era5-trained` and `cams-trained` (this experiment), `climatology` (experiment 00005's `r2`),
-and `r0-from2023` (experiment 00005's ERA5-trained stage 1a, read only to check that the refit
-reproduces it and never scored).
+Arms: `era5-trained`, `cams-trained`, and the control `era5-hourly` (this experiment),
+`climatology` (experiment 00005's `r2`). Experiment 00005's `r0_from2023` is read only to check
+that the refit reproduces it, and is never scored.
 
 Output: `work/arms/<arm>.parquet`, the prediction sets under
-`data/ml-experiments/00009-.../predictions/`, `work/results/*.parquet`, and `work/results/report.md`.
+`data/ml-experiments/00009-.../predictions/`, `work/results/*.parquet`, and
+`work/results/report.md`.
 
     uv run python ml-experiments/00009-cams-trained-stage1a-vs-era5-trained-demand/e00009_score.py
 """
@@ -34,6 +35,7 @@ N_RUNS: Final[int] = 73
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time"]
 TREATMENT: Final[str] = "cams-trained"
 REFERENCE: Final[str] = "era5-trained"
+CONTROL: Final[str] = "era5-hourly"
 HEADLINE_GROUP: Final[str] = "Primary"
 DOMINANT_LABEL: Final[str] = "P2"
 """The Primary substation that sets experiment 00007's pooled figure."""
@@ -114,7 +116,7 @@ def reproduction_check(*, ours: pl.DataFrame, theirs: pl.DataFrame) -> pl.DataFr
 
 
 def _daylight(*, frame: pl.DataFrame, series: pl.DataFrame) -> pl.DataFrame:
-    """Return `time_series_id`, `valid_time`, and whether the sun is up at the half-hour's midpoint."""
+    """Return each series' valid times with whether the sun is up at the half-hour's midpoint."""
     pieces = []
     for row in series.iter_rows(named=True):
         times = (
@@ -187,8 +189,8 @@ def prepare(*, arms: dict[str, pl.DataFrame], series: pl.DataFrame) -> dict[str,
 
 
 def save_predictions(*, arms: dict[str, pl.DataFrame]) -> None:
-    """Write this experiment's two arms as immutable prediction sets, skipping existing sets."""
-    for name in (REFERENCE, TREATMENT):
+    """Write this experiment's three arms as immutable prediction sets, skipping existing sets."""
+    for name in (REFERENCE, TREATMENT, CONTROL):
         try:
             experiment_store.write_predictions(
                 experiment_id=common.EXPERIMENT_ID,
@@ -230,7 +232,11 @@ def contrast(
     reference: str,
     level: float = 95.0,
     n_resamples: int = DEFAULT_RESAMPLES,
-    **scope: object,
+    band: str = "all leads",
+    group: str = HEADLINE_GROUP,
+    exclude_label: str | None = None,
+    only_label: str | None = None,
+    daylight: bool | None = None,
 ) -> dict[str, float | int]:
     """Return one paired contrast's estimate, interval, and month and series agreement.
 
@@ -240,12 +246,23 @@ def contrast(
         reference: The arm it is compared against.
         level: The interval's coverage in percent.
         n_resamples: How many resamples to draw.
-        **scope: Arguments of `_scope`: `band`, `group`, `exclude_label`, `only_label`, `daylight`.
+        band: A lead band of `LEAD_BANDS`.
+        group: A substation type.
+        exclude_label: A series label to leave out.
+        only_label: A series label to keep alone.
+        daylight: Keep only daylight (True) or night (False) valid times.
 
     Returns:
         The mean paired difference in quantile score, the interval bounds, the months and the
         series with a negative difference, and the row count.
     """
+    scope = {
+        "band": band,
+        "group": group,
+        "exclude_label": exclude_label,
+        "only_label": only_label,
+        "daylight": daylight,
+    }
     losses = experiment_store.losses_for_bootstrap(
         arm_losses={
             treatment: _scope(frame=arms[treatment], **scope),
@@ -274,7 +291,7 @@ def contrast(
     by_month = paired.group_by("month").agg(pl.col("difference").mean())
     by_series = paired.group_by("site").agg(pl.col("difference").mean())
     return {
-        "difference": float(paired["difference"].mean()),
+        "difference": paired.select(pl.col("difference").mean()).item(),
         "lower": lower,
         "upper": upper,
         "months_negative": int((by_month["difference"] < 0).sum()),
@@ -288,9 +305,9 @@ def contrast(
 def planned_contrasts(*, arms: dict[str, pl.DataFrame]) -> pl.DataFrame:
     """Return the two planned contrasts, C1 and C2, at 97.5% with 10,000 resamples."""
     rows = []
-    for label, scope in (
-        ("C1: cams-trained minus era5-trained, Primary", {}),
-        (f"C2: C1 without {DOMINANT_LABEL}", {"exclude_label": DOMINANT_LABEL}),
+    for label, excluded in (
+        ("C1: cams-trained minus era5-trained, Primary", None),
+        (f"C2: C1 without {DOMINANT_LABEL}", DOMINANT_LABEL),
     ):
         rows.append(
             {
@@ -301,7 +318,7 @@ def planned_contrasts(*, arms: dict[str, pl.DataFrame]) -> pl.DataFrame:
                     reference=REFERENCE,
                     level=PLANNED_LEVEL,
                     n_resamples=PLANNED_RESAMPLES,
-                    **scope,
+                    exclude_label=excluded,
                 ),
             }
         )
@@ -312,11 +329,29 @@ def exploratory_contrasts(*, arms: dict[str, pl.DataFrame], labels: list[str]) -
     """Return the exploratory contrasts, read at 95%."""
     rows = []
 
-    def add(label: str, treatment: str, reference: str, **scope: object) -> None:
+    def add(
+        label: str,
+        treatment: str,
+        reference: str,
+        band: str = "all leads",
+        group: str = HEADLINE_GROUP,
+        exclude_label: str | None = None,
+        only_label: str | None = None,
+        daylight: bool | None = None,
+    ) -> None:
         rows.append(
             {
                 "label": label,
-                **contrast(arms=arms, treatment=treatment, reference=reference, **scope),
+                **contrast(
+                    arms=arms,
+                    treatment=treatment,
+                    reference=reference,
+                    band=band,
+                    group=group,
+                    exclude_label=exclude_label,
+                    only_label=only_label,
+                    daylight=daylight,
+                ),
             }
         )
 
@@ -329,6 +364,8 @@ def exploratory_contrasts(*, arms: dict[str, pl.DataFrame], labels: list[str]) -
     for label in labels:
         add(f"C1, {label} only", TREATMENT, REFERENCE, only_label=label)
         add(f"C1 without {label}", TREATMENT, REFERENCE, exclude_label=label)
+    add("X1: era5-hourly minus era5-trained", CONTROL, REFERENCE)
+    add("X2: cams-trained minus era5-hourly", TREATMENT, CONTROL)
     add("era5-trained minus climatology", REFERENCE, "climatology")
     add("cams-trained minus climatology", TREATMENT, "climatology")
     return pl.DataFrame(rows)
@@ -337,7 +374,7 @@ def exploratory_contrasts(*, arms: dict[str, pl.DataFrame], labels: list[str]) -
 def absolute_table(*, arms: dict[str, pl.DataFrame]) -> pl.DataFrame:
     """Return every scored arm's mean quantile score and median error, with 95% intervals."""
     rows = []
-    for name in (REFERENCE, TREATMENT, "climatology"):
+    for name in (REFERENCE, TREATMENT, CONTROL, "climatology"):
         for group in GROUPS:
             for band, _, _ in LEAD_BANDS:
                 part = experiment_store.losses_for_bootstrap(
@@ -369,7 +406,7 @@ def observed_weather_diagnostic(*, series: pl.DataFrame) -> pl.DataFrame:
         .filter(pl.col("actual").is_finite())
         .group_by("time_series_id", "valid_time")
         .agg(pl.col("prediction").mean(), pl.col("actual").first())
-        for arm in common.ARMS
+        for arm in ("era5", "cams")
     }
     joined = frames["era5"].join(
         frames["cams"], on=["time_series_id", "valid_time"], suffix="_cams", validate="1:1"
@@ -396,12 +433,80 @@ def observed_weather_diagnostic(*, series: pl.DataFrame) -> pl.DataFrame:
         out.append(
             {
                 "group": group,
-                "era5_mae": float(part["era5_error"].mean()),
-                "cams_mae": float(part["cams_error"].mean()),
+                "era5_mae": part.select(pl.col("era5_error").mean()).item(),
+                "cams_mae": part.select(pl.col("cams_error").mean()).item(),
                 **interval,
             }
         )
     return pl.DataFrame(out)
+
+
+def shortwave_by_month(*, series: pl.DataFrame) -> pl.DataFrame:
+    """Return the mean daylight shortwave of CAMS, ERA5, and the ENS members, by period and month.
+
+    The training period is 2023-09 to before 2025-06-17 and compares CAMS with ERA5. The validation
+    period is 2025-07 to 2026-06 and adds the mean of the ENS members over the 73 runs, all leads.
+    Means are over the 16 Primary series.
+
+    Args:
+        series: `common.series_table()`.
+
+    Returns:
+        One row per period, source, and calendar month with the mean in W/m2.
+    """
+    primary = series.filter(pl.col("substation_type") == HEADLINE_GROUP)
+    data = fit.load_series_data(series=primary)
+    columns = common.feature_columns()
+    shortwave_at, zenith_at = columns.index("shortwave"), columns.index("solar_zenith")
+    first = int(common.grid_index(times=common.VALIDATION_START))
+    stop = int(common.grid_index(times=common.HOLDOUT))
+    pieces = []
+    for row in primary.iter_rows(named=True):
+        arrays = data[row["site"]]
+        training = fit.training_rows(data=arrays)
+        validation = np.arange(first, stop)
+        for period, rows in (("training", training), ("validation", validation)):
+            keep = rows[arrays.era5_features[rows, zenith_at] < common.MAX_ZENITH_DEGREES]
+            times = arrays.valid_time.gather(keep.tolist())
+            for source, matrix in (("ERA5", arrays.era5_features), ("CAMS", arrays.cams_features)):
+                pieces.append(
+                    pl.DataFrame(
+                        {
+                            "period": period,
+                            "source": source,
+                            "month": times.dt.month(),
+                            "value": matrix[keep, shortwave_at].astype(np.float64),
+                        }
+                    )
+                )
+        ens = pl.concat(
+            [
+                pl.read_parquet(path, columns=["time_series_id", "valid_time", "shortwave"]).filter(
+                    pl.col("time_series_id") == row["time_series_id"]
+                )
+                for path in sorted(common.VALIDATION_DIR.glob("init=*.parquet"))
+            ]
+        ).filter(pl.col("valid_time") < common.HOLDOUT)
+        sun = _daylight(
+            frame=ens, series=series.filter(pl.col("time_series_id") == row["time_series_id"])
+        )
+        ens = ens.join(sun, on=["time_series_id", "valid_time"], validate="m:1").filter(
+            pl.col("daylight")
+        )
+        pieces.append(
+            ens.select(
+                period=pl.lit("validation"),
+                source=pl.lit("ENS members"),
+                month=pl.col("valid_time").dt.month(),
+                value=pl.col("shortwave").cast(pl.Float64),
+            )
+        )
+    return (
+        pl.concat(pieces)
+        .group_by("period", "source", "month")
+        .agg(pl.col("value").mean())
+        .sort("period", "source", "month")
+    )
 
 
 def verdict(*, planned: pl.DataFrame) -> str:
@@ -447,7 +552,7 @@ def main() -> None:
     actual = stats.select(*KEYS, "actual").unique()
     ours = {
         name: stats.filter(pl.col("arm") == arm).drop("arm")
-        for name, arm in ((REFERENCE, "era5"), (TREATMENT, "cams"))
+        for name, arm in ((REFERENCE, "era5"), (TREATMENT, "cams"), (CONTROL, "era5-hourly"))
     }
     check = reproduction_check(
         ours=ours[REFERENCE],
@@ -469,11 +574,13 @@ def main() -> None:
     exploratory = exploratory_contrasts(arms=arms, labels=primary_labels)
     absolute = absolute_table(arms=arms)
     observed = observed_weather_diagnostic(series=series)
+    shortwave = shortwave_by_month(series=series)
     for name, frame in (
         ("planned", planned),
         ("exploratory", exploratory),
         ("absolute", absolute),
         ("observed_weather", observed),
+        ("shortwave_by_month", shortwave),
         ("reproduction", check),
     ):
         frame.write_parquet(RESULTS_DIR / f"{name}.parquet")
@@ -529,7 +636,7 @@ def main() -> None:
             columns=["arm", "group", "scope", "value", "lower_95", "upper_95"],
         ),
         "",
-        "## Observed-weather diagnostic: daylight half-hours of the validation year, mean absolute error",
+        "## Observed-weather diagnostic: daylight half-hours, validation year, mean absolute error",
         *_table(
             frame=observed,
             columns=[

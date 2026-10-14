@@ -1,12 +1,13 @@
 """Fit experiment 00009's ERA5-trained and CAMS-trained stage 1a models and apply them to ENS.
 
-For each arm (`era5` or `cams`), seed, and series this fits one XGBoost model on the half-hourly
-valid times from 2023-09-01 to before 2025-06-17. The arms differ in one column: `era5` reads ERA5
-shortwave at the series' H3 cell, `cams` reads CAMS irradiance at the series' own location. Rows
-are the half-hours with an observed power and both irradiance values, so the arms train on the
-same rows.
+For each arm (`era5`, `cams`, or `era5-hourly`), seed, and series this fits one XGBoost model on
+the half-hourly valid times from 2023-09-01 to before 2025-06-17. The arms differ in the
+shortwave column: `era5` reads ERA5 shortwave at the series' H3 cell, `cams` reads CAMS irradiance
+at the series' own location. Rows are the half-hours with an observed power and all three
+irradiance values, so the arms train on the same rows.
 
-Two outputs, both under `data/ml-experiments/00009-.../work/`:
+The `era5-hourly` arm is a control (ERA5 shortwave averaged over each hour and held across its two
+half-hours). Two outputs, both under `data/ml-experiments/00009-.../work/`:
 
 - `observed/<arm>.parquet`: each model's prediction at the observed weather (ERA5 or CAMS, as the
   arm was trained) for the validation year, a deterministic diagnostic.
@@ -42,18 +43,24 @@ class SeriesData:
     Attributes:
         era5_features: Stage 1a's inputs with ERA5 shortwave, float32, one row per grid half-hour.
         cams_features: The same with CAMS irradiance in the shortwave column.
+        era5_hourly_features: The same with ERA5 shortwave averaged over each hour.
         power: Observed power over effective capacity, NaN where unobserved.
         valid_time: The grid's UTC timestamps.
     """
 
     era5_features: np.ndarray
     cams_features: np.ndarray
+    era5_hourly_features: np.ndarray
     power: np.ndarray
     valid_time: pl.Series
 
     def features(self, *, arm: common.ArmType) -> np.ndarray:
         """Return the arm's feature matrix."""
-        return self.era5_features if arm == "era5" else self.cams_features
+        return {
+            "era5": self.era5_features,
+            "cams": self.cams_features,
+            "era5-hourly": self.era5_hourly_features,
+        }[arm]
 
 
 def load_series_data(*, series: pl.DataFrame) -> dict[str, SeriesData]:
@@ -103,7 +110,12 @@ def load_series_data(*, series: pl.DataFrame) -> dict[str, SeriesData]:
             latitude=row["latitude"],
             longitude=row["longitude"],
         )
-        base = joined.select(weather, "cams").with_columns(derived.select(common.DERIVED))
+        hourly = joined.select(
+            hourly_shortwave=pl.col("shortwave")
+            .mean()
+            .over((pl.col("valid_time") - pl.duration(microseconds=1)).dt.truncate("1h"))
+        )
+        base = joined.select(weather, "cams").with_columns(hourly, derived.select(common.DERIVED))
         era5_matrix = base.select(columns).to_numpy().astype(np.float32)
         cams_matrix = (
             base.with_columns(shortwave=pl.col("cams"))
@@ -111,9 +123,16 @@ def load_series_data(*, series: pl.DataFrame) -> dict[str, SeriesData]:
             .to_numpy()
             .astype(np.float32)
         )
+        hourly_matrix = (
+            base.with_columns(shortwave=pl.col("hourly_shortwave"))
+            .select(columns)
+            .to_numpy()
+            .astype(np.float32)
+        )
         out[row["site"]] = SeriesData(
             era5_features=era5_matrix,
             cams_features=cams_matrix,
+            era5_hourly_features=hourly_matrix,
             power=joined["power"].to_numpy().astype(np.float32),
             valid_time=joined["valid_time"],
         )
@@ -130,6 +149,7 @@ def training_rows(*, data: SeriesData) -> np.ndarray:
         np.isfinite(data.power[first:stop])
         & np.isfinite(data.era5_features[first:stop, shortwave_at])
         & np.isfinite(data.cams_features[first:stop, shortwave_at])
+        & np.isfinite(data.era5_hourly_features[first:stop, shortwave_at])
     )
     return index[keep]
 
@@ -204,7 +224,9 @@ def write_observed_weather(
 def run_statistics(
     *,
     run: pl.DataFrame,
-    row: dict[str, object],
+    site: str,
+    latitude: float,
+    longitude: float,
     arrays: SeriesData,
     models: dict[tuple[str, int, str], xgb.Booster],
 ) -> pl.DataFrame:
@@ -212,16 +234,18 @@ def run_statistics(
 
     Args:
         run: The run's rows for this series, every member.
-        row: The series' row of `common.series_table()`.
+        site: The series' D label.
+        latitude: Degrees north; the coordinates never leave this process.
+        longitude: Degrees east.
         arrays: The series' `SeriesData`.
         models: Every booster.
 
     Returns:
         One row per case, arm, and seed with the 9 quantiles and `actual`.
     """
-    ordered = common.with_derived(
-        frame=run, latitude=row["latitude"], longitude=row["longitude"]
-    ).sort("valid_time", "ensemble_member")
+    ordered = common.with_derived(frame=run, latitude=latitude, longitude=longitude).sort(
+        "valid_time", "ensemble_member"
+    )
     members = ordered["ensemble_member"].n_unique()
     matrix = ordered.select(common.feature_columns()).to_numpy().astype(np.float32)
     keys = ordered.select(*KEY_COLUMNS).unique(maintain_order=True)
@@ -230,9 +254,7 @@ def run_statistics(
     pieces = []
     for arm in common.ARMS:
         for seed in common.SEEDS:
-            forecast = (
-                models[arm, seed, row["site"]].predict(xgb.DMatrix(matrix)).reshape(-1, members)
-            )
+            forecast = models[arm, seed, site].predict(xgb.DMatrix(matrix)).reshape(-1, members)
             quantiles = np.quantile(forecast, common.LEVELS, axis=1).T.astype(np.float32)
             pieces.append(
                 keys.with_columns(
@@ -264,8 +286,10 @@ def apply_to_ens(
         pieces = [
             run_statistics(
                 run=frame.filter(pl.col("time_series_id") == series_id),
-                row=row,
-                arrays=data[row["site"]],
+                site=str(row["site"]),
+                latitude=float(row["latitude"]),
+                longitude=float(row["longitude"]),
+                arrays=data[str(row["site"])],
                 models=models,
             )
             for series_id, row in rows.items()
