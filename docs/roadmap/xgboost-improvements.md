@@ -67,6 +67,10 @@ item](#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)). Scat
 corruption mostly never becomes a null, because ingest renormalises each H3 cell over the grid
 points that arrived.
 
+**See also [A staged probabilistic forecast](staged-probabilistic-forecast.md)**, which owns the
+architecture for ensemble statistics, several NWP sources, and the PV ratio target as parts of one
+staged design.
+
 ## Before anything else — fix how the NWP variables are interpreted
 
 Issues: [#525](https://github.com/openclimatefix/nged-substation-forecast/issues/525) (storage),

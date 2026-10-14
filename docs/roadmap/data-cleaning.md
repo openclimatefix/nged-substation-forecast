@@ -13,6 +13,9 @@ forecast from telemetry that is uncleaned apart from the timestamp repair below 
 rule that drops a substation's zero readings, so every other finding here is currently absorbed by
 the models rather than removed.
 
+**See also [A staged probabilistic forecast](staged-probabilistic-forecast.md)**, which proposes
+large residuals against stage 1 as a layer after the rule-based cleaning.
+
 ## Cleaning rules go in one function, and flag rows rather than delete them
 
 **Every cleaning rule is one more branch in `nged_data.cleaning.flag_nged_power`.** The

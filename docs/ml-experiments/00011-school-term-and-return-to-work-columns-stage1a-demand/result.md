@@ -1,7 +1,7 @@
 ---
 id: "00011"
 slug: school-term-and-return-to-work-columns-stage1a-demand
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the ERA5-trained stage 1a XGBoost demand model at Primary substations in Lincolnshire,
@@ -32,16 +32,169 @@ benchmark: >-
 row_set_id: era5_val_3folds_2023_07_to_2026_06_v1
 metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
+verdict: refuted
+best_arm: >-
+  None. No arm beat the base arm (weather block, hour, weekday, and the Christmas column set within
+  14 days of 25 December, trained from 2021-09-01) in any planned window. The return and term
+  columns together scored 7.15 points on the whole year against the base arm's 7.18, for Primary
+  substations.
+headline: >-
+  Return and term columns against the base arm, Primary substations: +0.06 points from 2 to 20
+  January (99.2% interval -0.17 to +0.30), +0.20 over the Easter window (-0.19 to +0.59), and -0.29
+  over the half-term holidays (-0.68 to +0.07). Over the whole year the change is -0.02 (-0.11 to
+  +0.07).
+lessons: >-
+  The Christmas column of experiment 6 already carries what a return-to-work column could add
+  (+0.02, -0.20 to +0.23 for the return column alone). The half-term gain of the term columns
+  (-0.28) has an interval that includes zero, and a smooth time-of-year curve does as well
+  (-0.46). A training start of 2021-09 scored 0.26 points lower on the whole year than the full
+  history (99.2% interval 0.12 to 0.43).
+advice:
+  - >-
+    Leave the return-to-work column out of the stage 1a demand model, because it changes the
+    Primary error from 2 to 20 January by +0.02 points (-0.20 to +0.23) (C1, return column only).
+  - >-
+    Do not add school-term columns to the stage 1a demand model for Easter, because the change is
+    +0.20 points (-0.19 to +0.59), which is positive in two of three years and zero in the third
+    (C2).
+  - >-
+    Test a half-term effect with more than three occurrences per window, for example by adding
+    other counties' term calendars, because -0.29 points (-0.68 to +0.07) cannot be told from zero
+    or from a one-harmonic time-of-year column at -0.46 (C3).
+  - >-
+    Train the stage 1a demand model from 2021-09-01 and not from the full history for Primary
+    substations, because it scored 0.26 points lower on the whole year (99.2% interval 0.12 to
+    0.43) (Both against Reference, whole-year table).
+  - >-
+    Add a placebo calendar shifted by a fixed number of days, in both directions, to any new
+    calendar-column test, because a shifted calendar raised the GSP error by 1.29 points (0.19 to
+    2.43) (Placebo A against base).
+production_status: not-for-production
+adopted_in: none
+code: ml-experiments/00011-school-term-and-return-to-work-columns-stage1a-demand/
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1214
 ---
 
 # Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?
 
-**Status: planned.** This page is the plan. It fixes the arms, the windows, and the contrasts before
-any fit. It continues experiment 00006, which found that a windowed days-to-Christmas column lowers
-the Primary error by 1.8 points from 15 December to 7 January, and which left Easter and the school
-holidays without a column.
+**Verdict: refuted, by the decision rule as pre-registered.** For the Primary substations, the
+return-to-work and school-term columns did not lower the error in the weeks after Christmas or at
+Easter, and the half-term gain of -0.29 points has an interval that includes zero. The rule's
+refutation clause is looser than intended. It required the upper bounds of C1, C2, and C3 to exceed
+-0.25, -0.15, and -0.15, which every interval with a point estimate near zero satisfies, and also an
+interval such as -1.4 to +0.2. Read as intended, with the lower bounds above those values, the
+data rule out a gain of 0.25 points in the January window (lower bound -0.17) and do not rule out
+a gain of 0.15 points at Easter (-0.19) or over the half terms (-0.68). The verdict field keeps the
+rule as written. All 20 series sit in Lincolnshire, so the term calendar is Lincolnshire County
+Council's recommended calendar. Primary substations are the headline (13, 13, and 14 series in the
+three validation years), and every score is the mean absolute error of the median in points of
+capacity.
 
-## Size
+![Change in error by window and column set, Primary substations](figure_1.svg)
+
+## Planned contrasts
+
+**None of C1 to C3 is a gain, and C6 fails.** The table gives the change for the return and term
+columns together (Both) against the base arm, for Primary substations, with each year's change.
+The level is 99.2%, and each interval resamples 7-day blocks of days after averaging the three
+fitting seeds. The intervals understate the uncertainty, because neighbouring days share weather
+and each window has three occurrences.
+
+| Contrast | Change | Interval | 2023-24 | 2024-25 | 2025-26 | Base error | Result |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| C1: 2 to 20 January | +0.06 | -0.17 to +0.30 | +0.14 | +0.06 | -0.03 | 8.44 | Not a gain |
+| C2: Easter | +0.20 | -0.19 to +0.59 | +0.37 | +0.22 | -0.01 | 7.17 | Not a gain |
+| C3: half-term holidays | -0.29 | -0.68 to +0.07 | -0.25 | -0.12 | -0.49 | 7.73 | Not a gain (interval includes zero) |
+| C4: summer holiday (descriptive) | -0.02 | -0.25 to +0.21 | -0.40 | +0.09 | +0.24 | 6.51 | No harm |
+| C5: whole year | -0.02 | -0.11 to +0.07 | | | | 7.18 | Holds (inside -0.1 to +0.1) |
+| C6: against Placebo A, three windows | -0.03 | -0.25 to +0.19 | +0.11 | -0.05 | -0.13 | 7.73 | Fails |
+| C6: against Placebo B, three windows | -0.04 | -0.19 to +0.11 | +0.12 | -0.05 | -0.18 | 7.74 | Fails |
+
+**Both is no better than a calendar shifted by 17 days.** The shifted calendars score the same as
+the base arm (Placebo A +0.00, -0.13 to +0.12, and Placebo B +0.01, -0.18 to +0.20, pooled over
+the three windows), so for Primary substations the extra columns neither help nor hurt.
+
+![Change for the return and term columns, by validation year](figure_2.svg)
+
+## Which columns, and what else was measured
+
+**The return column does nothing, and the term columns' half-term effect cannot be separated from
+a smooth seasonal curve.** The descriptive contrasts against the base arm, for Primary substations,
+are in the table. None was part of the decision.
+
+| Arm | 2 to 20 January | Easter | Half-term holidays |
+| --- | --- | --- | --- |
+| Return column only | +0.02 (-0.20 to +0.23) | +0.01 (-0.00 to +0.02) | -0.00 (-0.03 to +0.04) |
+| Term columns only | +0.04 (-0.25 to +0.25) | +0.20 (-0.18 to +0.56) | -0.28 (-0.66 to +0.06) |
+| One harmonic of time of year | -0.05 (-0.32 to +0.15) | +0.16 (-0.28 to +0.51) | -0.46 (-1.02 to +0.05) |
+
+![Primary error around Christmas and New Year](figure_3.svg)
+
+**Primary error is highest in the weeks after Christmas, and none of the arms changes the daily
+shape.** The base arm's error rises from 6 to 8 points just before Christmas to 9 to 10 in the
+second and third weeks of January. The return and term columns track the base arm through those
+weeks, as the one harmonic of time of year does.
+
+**A training start of 2021-09-01 scored lower on the whole year than the full history.** The
+Reference arm (the base columns plus the COVID indicator, trained from 2019-09-01) scores 7.44 for
+Primary substations against 7.18 for the base arm: +0.26 (99.2% interval +0.12 to +0.43). Over the
+three windows pooled, Both scores -0.21 (-0.50 to +0.04) against the Reference arm. This agrees with
+the 2023-09 start of experiment 6, and the arm was planned as a descriptive reference, so it does
+not belong to the decision.
+
+| Arm | Primary | BSP | GSP |
+| --- | --- | --- | --- |
+| Climatology (month, half-hour, weekend) | 8.55 | 12.48 | 35.79 |
+| Reference (full history, COVID indicator) | 7.44 | 9.06 | 27.82 |
+| Base | 7.18 | 8.89 | 28.30 |
+| Return column | 7.18 | 8.91 | 28.37 |
+| Term columns | 7.16 | 9.11 | 28.96 |
+| Return and term columns | 7.15 | 9.11 | 28.94 |
+| Placebo A (calendar from 17 days earlier) | 7.22 | 9.12 | 28.87 |
+| Placebo B (calendar from 17 days later) | 7.16 | 8.97 | 28.75 |
+| One harmonic of time of year | 7.19 | 8.96 | 28.99 |
+
+**The columns do not help BSP and GSP either, and a shifted calendar raises the GSP error.** The
+table gives whole-year error over the three validation years. Over the three windows, Both is
++0.35 (-0.50 to +1.48) for BSP in January and +1.30 (-0.99 to +3.84) for GSP, and in the summer
+holiday it raises the BSP error by 1.31 (+0.47 to +2.80). Placebo A raises the GSP error over the
+three windows by 1.29 (+0.19 to +2.43), from two series. The BSP and GSP groups have two series
+each, so none of their intervals is decisive.
+
+## Limits
+
+- **Three occurrences per window.** The January, Easter, and summer windows have one occurrence per
+  year, and the half-term window has three short holidays per year. A real effect of 0.3 points
+  would need an interval narrower than these give.
+- **Midnight half-hours.** `hour_local` and `day_of_week_local` describe the day that starts at
+  `valid_time`, and the term and return columns describe the day the period ends in. The two differ
+  only for the half-hour ending at 00:00.
+- **Series set.** A series needs a year of observed half-hours after 2021-09-01, so the three
+  validation years score 13, 13, and 14 Primary series, and a Primary series that experiment 6
+  scored can be absent.
+- **ERA5 weather.** The stage 1a model is fitted and scored on ERA5, so a gain here need not carry
+  over to forecast weather. The term and return columns are known in advance.
+- **Post hoc work.** None. Every number above is from the pre-registered arms and windows, and
+  `e00011_report.py` prints each of them.
+
+## Lessons for later experiments
+
+- **The return and term columns do not lower the post-Christmas error.** The Christmas column of
+  experiment 6 covers 25 December, and the 2 to 20 January error stays at 8 to 10 points with or
+  without the new columns.
+- **A half-term effect needs more occurrences to test.** Three occurrences per window gave
+  intervals of about 0.7 points.
+- **Shorter training histories deserve their own test.** The 2021-09 start beat the full history
+  on the whole year by 0.26 points.
+
+## Pre-registered plan
+
+**This part of the page is the plan as committed before any fit.** It fixes the arms, the windows,
+and the contrasts. It continues experiment 00006, which found that a windowed days-to-Christmas
+column lowers the Primary error by 1.8 points from 15 December to 7 January, and which left Easter
+and the school holidays without a column.
+
+### Size
 
 **The size is complex, because the experiment adds data and admits more than one defensible
 design.**
@@ -55,7 +208,7 @@ design.**
 - **Code whose callers cannot be named without searching:** no. The fitting code is a copy of
   experiment 00006's, with new column groups.
 
-## Which earlier advice this plan follows
+### Which earlier advice this plan follows
 
 - **Followed:** window the day counts and leave them missing elsewhere (00006, Christmas control);
   score a new calendar column on special-day windows as well as the whole year; add a control before
@@ -66,7 +219,7 @@ design.**
   academic year are not collected. The indicator is then constant at zero and is dropped. One
   reference arm keeps the full history, to show what the shorter history costs.
 
-## Data: Lincolnshire County Council's term dates
+### Data: Lincolnshire County Council's term dates
 
 **All 20 series lie in a box that is essentially Lincolnshire, so one calendar covers them.** The
 `latitude` and `longitude` columns of the metadata place every Primary, BSP, and GSP series between
@@ -93,7 +246,7 @@ starting on 22 April and term 6 on 3 June 2025. The file holds the amended dates
 made before the amendment would have seen the older ones. The difference is one day at each of two
 boundaries, so it is noted and not modelled.
 
-## Columns
+### Columns
 
 **Every column is computed from the local date alone and is known months ahead.** The council
 publishes the current and the next school year, so each column exists at forecast time. The
@@ -108,7 +261,7 @@ experiment uses no lagged weather or power.
 | `placebo_a_*` | The same four columns read from the real calendar 17 days earlier |
 | `placebo_b_*` | The same four columns read from the real calendar 17 days later |
 
-## Arms
+### Arms
 
 **All arms train from 2021-09-01 except the reference arm, use three fitting seeds, and use
 `reg:absoluteerror` with the settings of experiment 00006.** Folds are the three validation years of
@@ -135,7 +288,7 @@ against Base are reported next to C6, and a placebo that is worse than Base weak
 The one-harmonic arm adds two columns, not four, so its comparison with Both is reported without a
 decision. It tests whether a smooth seasonal curve already explains a gain.
 
-## Windows
+### Windows
 
 **Windows are fixed by local date, and each has three occurrences, one per fold.**
 
@@ -147,7 +300,7 @@ decision. It tests whether a smooth seasonal curve already explains a gain.
 - **Summer holiday:** from the day after term 6 ends to 2 September.
 - **Whole year:** every day of the validation year.
 
-## Planned contrasts
+### Planned contrasts
 
 **There are six planned contrasts, all for Primary substations, against the Base arm unless
 stated.** The level is 99.2% (a Bonferroni correction of 95% across six). Each window interval first
@@ -171,7 +324,7 @@ scores for every arm, with the climatology row repeated once per seed. Return an
 collinear in the training years, because the first working day of the year and the first day of
 term 3 differ by 0 or 1 day until 2024, so their separate contrasts cannot be told apart in fold 1.
 
-## Known limits
+### Known limits
 
 - **Fold 1 trains on 1.8 years, and one of its Januaries is unusual.** It trains on 2021-09 to
   2023-06, which holds two Januaries. January 2022 falls under the England Plan B guidance to work
@@ -188,7 +341,7 @@ term 3 differ by 0 or 1 day until 2024, so their separate contrasts cannot be to
 - **The row set is new.** `era5_val_3folds_2023_07_to_2026_06_v1` covers three years of valid times
   and does not match the row set of 00006's pilot (`era5_val_2024_07_to_2025_06_v1`).
 
-## Resources and reporting
+### Resources and reporting
 
 **The fits use the 10 cores of the experiment manager's slot B on the CPU.** `e00011_fit.py` copies
 the structure of `e00006_fit.py`. Reading experiment 00006's private feature table is allowed, and

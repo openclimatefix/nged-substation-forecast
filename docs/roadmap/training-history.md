@@ -21,6 +21,11 @@ Almost all the cost is in the data layer. Once the estimates of past weather and
 statistics exist, moving between the variants below is mostly configuration — so they are
 leaderboard arms, not decisions to make up front.
 
+**See also [A staged probabilistic forecast](staged-probabilistic-forecast.md)** for the full chain
+that uses this training history: a stage 1 trained on estimates of past weather and a stage 2 that
+calibrates and blends the weather products. This page keeps its own study, evaluation, and era
+covariates.
+
 ## Scope the ingest to include the 2024+ overlap
 
 **Fetch the estimates of past weather across the 2024+ ENS overlap as well as the 2020–2023 gap.**
