@@ -115,7 +115,7 @@ committed, and the tentative id then disappears.
 | 00006 | Which input features are best for the demand weather-to-power model (stage 1a), trained on ERA5, for Primary, BSP, and GSP substations? | Running. Runs first, and its chosen columns feed 00005 |
 | P1 | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Waits for 00005, and for the 00006 residual analysis to be published |
-| [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Needs a source of historical prices |
+| [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Source chosen (Elexon Market Index Data); needs a plan |
 
 ### P2: embedded-solar capacity from lagged residuals
 
@@ -203,6 +203,33 @@ generation and storage to the recent past, for example a battery that charges wh
 The plan has to name the price. GB day-ahead auction prices for a day are published the day before,
 so for leads inside that window the known price, not a lagged one, is the relevant input. The system
 price, the intraday price, and a retail time-of-use tariff are other candidates.
+
+**The recommended price is Elexon's Market Index Data, with the N2EX day-ahead price as the
+fallback.** The intraday price that batteries trade against is mostly behind a paywall: the EPEX
+continuous intraday and 30-minute auction prices are sold through the [EEX
+webshop](https://webshop.eex-group.com/eex-public-market-data) from €665 a month, which is over the
+£30 spending limit and needs the maintainer's approval. The nearest free series is the [Market Index
+Data](https://www.elexon.co.uk/bsc/glossary/market-index-data/) that EPEX SPOT and Nord Pool supply
+to Elexon: a half-hourly volume and price for the short-term wholesale markets, served without a key
+by the [Elexon Insights API](https://www.elexon.co.uk/bsc/data/kinnect-insight-solution/) at
+`/balancing/pricing/market-index`. It is known soon after each half-hour, so lagging it matches
+what a forecast could use. The [N2EX day-ahead price](https://www.neso.energy/data-portal/day-ahead-power-exchange-prices-nordpool)
+is free from NESO, hourly, and known at about 10:00 the day before ([GB price
+page](../background/gb-price-data-and-ancillary-markets.md)).
+
+**Three facts about the recommended series are unchecked, and the plan has to settle them before
+any run.** Elexon's pages do not say which products the Market Index covers (day-ahead, within-day,
+or both) or when its history starts, so the plan should pull 2019 to 2026 and confirm the coverage,
+the product mix, and the periods in which one provider reported zero volume. The system price is
+not a candidate input, because the [Elexon pricing page](https://www.elexon.co.uk/settlement/imbalance-pricing/)
+describes it as set by balancing actions and a battery earns little from imbalance
+([how GB batteries schedule
+themselves](../background/gb-battery-scheduling.md)). The claim that batteries respond to the
+intraday price rests on [Modo Energy's
+description](https://modoenergy.com/research/en/gb-research-roundup-january-2025-battery-energy-storage-great-britain-revenues-markets-wholesale-capacity-market-balancing-mechanism)
+of its own dispatch model, which re-optimises every 2 hours, so it is a modelling assumption rather
+than a measurement. Retail time-of-use tariffs were not researched because grid-scale batteries do
+not trade against them.
 
 **The main risk is confounding, so a gain would not by itself show a battery response.** Price
 follows national demand and wind and correlates with the clock, so any gain may come from those
