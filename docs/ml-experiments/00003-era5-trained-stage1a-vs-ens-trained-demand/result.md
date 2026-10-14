@@ -1,7 +1,7 @@
 ---
 id: "00003"
 slug: era5-trained-stage1a-vs-ens-trained-demand
-status: planned
+status: done
 size: complex
 hypothesis: >-
   A weather-to-power XGBoost model trained on ERA5 (2019-09 onward) and applied to the 51 ENS
@@ -19,16 +19,20 @@ benchmark: >-
   climatology rows as references.
 row_set_id: fold_a_every5d_v1
 metric: mean absolute error of the ensemble-mean forecast, points of capacity
-verdict: pending
-best_arm: pending
-headline: pending
+verdict: not supported
+best_arm: s1_short (V2)
+headline: >-
+  D1, s1_memberavg minus ens_trained, weather only, all leads: +1.37 (+0.68 to +2.17), 22 series;
+  with calendar +1.38; with calendar and lags +0.10 (-0.26 to +0.50). Not supported.
 code: studies/stage1_pilot/
 pull_request: pending
 ---
 
 # Does an ERA5-trained weather-to-power model beat the same model trained on ENS, for demand?
 
-**Status: planned. This section was written before the first fit.** The experiment repeats
+**Verdict: not supported.** The ERA5-trained model has a larger error than the ENS-trained
+model for these 22 series, both with weather only and with the calendar added. The plan below was
+written before the first scored fit. The experiment repeats
 experiment 00001 for the 22 series of the fold A frames that are not wind or solar farms. The
 write-up below the plan is filled in after the run.
 
@@ -104,16 +108,111 @@ the label is shifted. The weather columns of ENS member 0 at short lead are comp
 the same valid time, as in 00001.
 
 **To be added.** A CAMS arm: stage 1a with CAMS shortwave irradiance in place of ERA5's in
-training only, as in 00001, at the 22 locations. It needs a CAMS download at those locations and
-is scoped separately.
+training only, as in 00001, at the 22 locations. The CAMS download is running; the arm is
+reported when it finishes.
 
 **Not tested here.** Where lagged power should enter a two-stage forecast, several weather
 models, quantile forecasts, and a second fold.
 
 ## Input columns
 
-Filled in with the results.
+Every arm gets the same columns within a variant. The columns are not production's.
 
-## Results
+- **Weather, 10 columns (V0):** `temperature_2m` (°C), `dew_point_temperature_2m` (°C), `shortwave`
+  (W/m², mean over the half-hour), `longwave` (W/m²), `pressure_surface` (Pa), `pressure_msl` (Pa),
+  `precipitation` (kg m⁻² s⁻¹), `wind_speed_10m` (m/s), `wind_speed_100m` (m/s), and
+  `precipitation_type` (an integer code). ERA5 gives each from its nearest cell of the stage 1
+  box, with `ssrd` and `strd` divided by 3600, `tp` converted to a rate, and the wind speed taken
+  from the components. ENS gives each directly, or from its wind components.
+- **Calendar, 2 columns added in V1:** `hour_local` (fractional local hour of day) and
+  `day_of_week_local` (Monday is 1).
+- **Power lags, 4 columns added in V2:** `power_lag_24h`, `power_lag_48h`, `power_lag_168h`, and
+  `power_lag_336h` in MW, null where the lag is no longer than the lead.
+- **Not used:** the 500 hPa geopotential height, windchill, rolling weather means, sine and cosine
+  time columns, the UTC offset, wind direction, the lead, and spread across the ensemble members.
 
-Filled in after the run.
+## Checks before the fits
+
+- **ERA5 `ssrd` label:** its correlation with the top-of-atmosphere cosine of the zenith is 0.899
+  for the unshifted hour-ending label and 0.860 and 0.869 for labels one hour earlier and later.
+  The label is not shifted.
+- **ENS against ERA5 at the same valid time (member 0, lead under 36 h):** the continuous weather
+  columns correlate 0.93 to 0.999. Precipitation correlates 0.67 and the precipitation-type code
+  0.35. ENS also carries a code 12 that ERA5 never shows.
+- **Row set `fold_a_every5d_v1`:** every lead band has 14% of its cases on each weekday of the
+  valid time. In the Tuesday-only set of the fold A frames, 0 to 24 h has 60% Tuesday and 40%
+  Wednesday. The new extraction reproduces the fold A frame's weather and lag columns exactly for
+  the run of 2025-07-01.
+
+## Absolute scores, all leads
+
+Mean absolute error in points of capacity, over the 22 series, with 95% intervals that resample
+whole validation months.
+
+| arm | weather only (V0) | with calendar (V1) | with calendar and lags (V2) |
+| --- | --- | --- | --- |
+| `ens_trained` | 13.67 (12.36 to 14.80) | 11.62 (10.70 to 12.43) | 11.19 (10.38 to 11.89) |
+| `ens_trained_dedup` | | 11.33 (10.34 to 12.20) | 15.44 (14.83 to 16.02) |
+| `s1_memberavg` | 15.04 (13.91 to 15.95) | 13.00 (12.09 to 13.80) | 11.29 (10.36 to 12.06) |
+| `s1_short` | 13.96 (12.56 to 15.15) | 11.71 (10.64 to 12.59) | 10.91 (9.94 to 11.66) |
+| `climatology` | 13.92 (13.05 to 14.70) | | |
+| `climatology_dow` | 13.76 (12.91 to 14.52) | | |
+
+![Mean absolute error by lead band](figure_1.svg)
+
+## Planned contrasts
+
+![Contrasts by lead band](figure_2.svg)
+
+- **D1 (ERA5-trained minus ENS-trained, weather only) is not material, and the sign is
+  against the hypothesis.** All leads +1.37 (+0.68 to +2.17), 1 of 12 months better. Every lead
+  band is positive.
+- **D2 (ERA5-trained minus the one-row-per-valid-time ENS-trained arm, with calendar) is not
+  material, and also positive:** +1.67 (+1.11 to +2.29).
+- **D3 reads as material, and the reading is wrong.** The reference arm is the one-row-per-valid-time
+  ENS-trained arm with lags, which scores 15.44 against 11.19 for the ENS-trained arm on all rows
+  (+4.25, +3.58 to +4.99). Keeping only the shortest lead of each valid time leaves the lags
+  present in nearly every training row, so the model fails at leads where the lags are null. The
+  fairer comparison, against the all-rows ENS-trained arm, is +0.10 (-0.26 to +0.50): no
+  difference. The decision rule was written before the run, so D3 stays as planned, and the
+  planned contrast is not evidence for ERA5 training.
+
+## What else the study found
+
+All rows below are exploratory.
+
+- **The long ERA5 history is associated with the larger error.** Training on ERA5 from 2024-04
+  only lowers the error by 1.07 (V0), 1.30 (V1), and 0.38 (V2) points against 2019 onward. Weights
+  that halve every 2 years lower it by 0.50 and 0.53 (V0, V1), and dropping 2020-03 to 2021-07 by
+  0.18 and 0.23. The short-history model is within 0.3 points of the ENS-trained model in V0 and
+  V1, and 0.28 points better with lags.
+- **Weather alone has little skill for demand.** Weather-only models score 13.7 to 15.0, the
+  climatology by weekday type 13.8. Adding the calendar lowers the ERA5-trained error by 2.04
+  points and adding lags lowers it by a further 1.71.
+- **The ENS-trained arm with calendar columns is slightly better with one row per valid time**
+  (-0.29, -0.46 to -0.12), so the repeated valid times did not make it worse here.
+- **The ERA5-trained model gains on the largest values of primary demand.** In the cases where
+  observed primary-substation demand exceeds the series' 90th percentile, the weather-only
+  ERA5-trained error is 2.74 points lower (-3.56 to -2.22; 12 of 12 months). Across all 22 series
+  the top-decile contrast is not distinguishable from zero (-0.33, -0.93 to +0.22).
+- **The loss is larger for the grid flows.** D1 is +0.82 for the 16 primary-substation series and
+  +2.56 for the 4 bulk and grid supply flows, and +3.35 for the battery and biofuel series.
+
+## Failures and limits
+
+- One held-out year, one fold, 73 runs. The 22 series include 6 that are not demand (4 flows, a
+  battery, and a biofuel generator), which the groups report separately.
+- D3's reference arm fails by construction. The three-variant design should have given the
+  one-row-per-valid-time guard only to V1.
+- The climatology falls back to the series' mean by time of day, then to its overall mean, for a
+  month a short series has no training data in.
+- The ERA5 history includes 2020-03 to 2021-07, and the study does not separate the effects of the
+  pandemic, growth in embedded generation, and changes of network topology on the long history.
+- A first fit on the Tuesday runs of the fold A frames was run before the row set was chosen and
+  has not been scored.
+
+## Lessons for later experiments
+
+- Give a guard arm the variant it guards, and check that the guard arm's own error is sensible.
+- Train an ERA5-based model for demand on recent years, or weight the recent years.
+- Report the weekday-by-lead balance of any row set whose runs share a weekday.

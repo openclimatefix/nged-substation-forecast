@@ -118,6 +118,10 @@ def _climate_key(*, daytype: bool) -> list[pl.Expr]:
     return keys
 
 
+def _key_names(*, daytype: bool) -> list[str]:
+    return [e.meta.output_name() for e in _climate_key(daytype=daytype)]
+
+
 def training_power(*, series: pl.DataFrame) -> pl.DataFrame:
     """Return cleaned power over effective capacity from 2019-09 to before the stage 1a cutoff."""
     return (
@@ -150,6 +154,15 @@ def scored_cases(*, series: pl.DataFrame) -> pl.DataFrame:
             .group_by("time_series_id", *keys)
             .agg(**{name: pl.col("target").mean()})
         )
+    fallbacks = {
+        name: (
+            observed.with_columns(*_climate_key(daytype=daytype))
+            .group_by("time_series_id", *[k for k in _key_names(daytype=daytype) if k != "month"])
+            .agg(**{f"{name}_coarse": pl.col("target").mean()})
+        )
+        for name, daytype in (("climatology", False), ("climatology_dow", True))
+    }
+    series_mean = observed.group_by("time_series_id").agg(series_mean=pl.col("target").mean())
     pieces = []
     for seed in inputs.SEEDS:
         files = sorted((fit.PRED_DIR / f"seed{seed}").glob("init=*.parquet"))
@@ -164,12 +177,19 @@ def scored_cases(*, series: pl.DataFrame) -> pl.DataFrame:
         )
         for name, daytype in (("climatology", False), ("climatology_dow", True)):
             keys = [e.meta.output_name() for e in _climate_key(daytype=daytype)]
-            frame = frame.with_columns(*_climate_key(daytype=daytype)).join(
-                climates[name], on=["time_series_id", *keys], how="left", validate="m:1"
+            coarse = [k for k in keys if k != "month"]
+            frame = (
+                frame.with_columns(*_climate_key(daytype=daytype))
+                .join(climates[name], on=["time_series_id", *keys], how="left", validate="m:1")
+                .join(fallbacks[name], on=["time_series_id", *coarse], how="left", validate="m:1")
+                .join(series_mean, on="time_series_id", how="left", validate="m:1")
             )
             frame = frame.with_columns(
-                (pl.col(name) * pl.col("effective_capacity_mw")).alias(name)
-            ).drop(*keys)
+                (
+                    pl.coalesce(name, f"{name}_coarse", "series_mean")
+                    * pl.col("effective_capacity_mw")
+                ).alias(name)
+            ).drop(*keys, f"{name}_coarse", "series_mean")
         frame = frame.with_columns(
             *[
                 (
