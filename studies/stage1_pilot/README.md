@@ -230,7 +230,7 @@ lead band is named, with 95% intervals in brackets.
 **Figure 1 (mean absolute error by lead band):** drawn to `charts/figure_1.svg` by
 `stage1_charts.py`.
 
-- **P1 (revised) is material for wind to day 6 and for solar to day 6.** `s1_memberavg` minus
+- **P1 (revised) is material for both technologies up to day 6.** `s1_memberavg` minus
   `ens_trained` is -1.70 for wind over all leads (-2.33 to -1.08) and -0.57 for solar (-0.83 to
   -0.32). By band, the wind difference is -3.18, -4.04 and -2.37 at 0 to 24 h, 1 to 2 days, and
   3 to 6 days, and the solar difference is -1.23, -1.41 and -0.73. At 7 to 10 and 11 to 15 days
@@ -256,11 +256,14 @@ lead band is named, with 95% intervals in brackets.
   `s1_memberavg` minus `s1_control` is -0.70 for solar and -2.23 for wind over all leads (wind
   -4.28 at 11 to 15 days). `ens_trained` minus `ens_trained_control` (the ENS-trained model on the
   control member alone) is -0.15 for solar (-0.30 to -0.05) and -0.22 for wind (-0.41 to -0.05).
-- **With the control member alone, ERA5 training helps only at short leads.** `s1_control` minus
-  `ens_trained_control` is -1.07 (solar) and -2.75 (wind) at 0 to 24 h, -1.06 and -3.56 at 1 to 2
-  days, and +0.55 and +2.09 at 7 to 10 days, and +0.64 and +2.94 at 11 to 15 days. Over all leads it
-  is -0.02 (-0.30 to +0.32) for solar and +0.31 (-0.49 to +1.06) for wind. Both are exploratory.
-  The P1 gain therefore needs both ERA5 training and averaging the members.
+- **With the control member alone, ERA5 training is associated with lower error at short leads.**
+  `s1_control` minus `ens_trained_control` is -1.07 (solar) and -2.75 (wind) at 0 to 24 h, -1.06 and
+  -3.56 at 1 to 2 days, +0.55 and +2.09 at 7 to 10 days, and +0.64 and +2.94 at 11 to 15 days. Over
+  all leads it is -0.02 (-0.30 to +0.32) for solar and +0.31 (-0.49 to +1.06) for wind. Both are
+  exploratory. Over all leads and all cases, the P1 gain is associated with the combination of ERA5
+  training and member averaging. At 0 to 24 h, ERA5 training alone is associated with most of the
+  gain, and on the wind top decile the control-member contrast (-6.95) is as large as the
+  member-averaged one (-6.14).
 
 **Figure 2 (the planned contrasts):** drawn to `charts/figure_2.svg` by `stage1_charts.py`.
 
@@ -304,8 +307,8 @@ so every arm's slope is well below 1 and only the paired differences are compara
   months), against -1.70 on all cases, and -16.54 at 0 to 24 h and -17.56 at 1 to 2 days. With the
   control member alone, `s1_control` minus `ens_trained_control` is -6.95 (-8.39 to -5.23). At 7 to
   10 days it is -1.22 (-2.46 to -0.08) and at 11 to 15 days +0.12 (-1.17 to +1.56). Top-decile wind
-  errors are large for every arm except `era5_ceiling` (13 points), which shows the weather input,
-  not the model, limits the tail forecast.
+  errors are large for every arm except `era5_ceiling` (13 points), so the weather input is
+  associated with most of the top-decile error.
 - **For solar, the tail gain is larger in size but not in certainty.** `s1_memberavg` minus
   `ens_trained` is -1.05 over all leads (-3.93 to +1.25, 7 of 11 months with a top-decile case), -3.52
   at 1 to 2 days (-6.24 to -0.89), and near zero at 7 to 15 days.
