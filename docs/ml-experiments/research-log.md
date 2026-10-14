@@ -36,6 +36,7 @@ the maintainer to confirm.
 | [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | 2026-10-14 |
 | [00011](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written (inconclusive as intended): no gain in any window | Not for production | 2026-10-14 |
 | [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
+| [00013](00013-primary-demand-against-stored-baselines/result.md) | Where does Primary substation demand stand: does an upgraded ENS-trained quantile model (N1) beat `manual_heuristic`, and why does the production recipe lose to it? | Inconclusive: N1 is level with `manual_heuristic`; the production recipe trails it by 1.69 points | Not for production | 2026-10-14 |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | Not yet merged |
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
 
@@ -242,6 +243,30 @@ interval was far narrower than the plan guessed (0.035 points either side, not 0
 shortwave?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213).
 
 ![Contrast of the CAMS-trained arm by scope](00009-cams-trained-stage1a-vs-era5-trained-demand/figure_1.svg)
+
+### 00013: Primary substation demand against the stored baselines
+
+**The upgraded single-stage model N1 did not beat `manual_heuristic`, and the production recipe trails
+`manual_heuristic` by 1.69 points of capacity at every lead.** The experiment scored `manual_heuristic`,
+`climatology`, the production recipe, a stage 1 trained on ERA5, and N1 (an XGBoost quantile model
+trained on the ENS control member, with lagged power measured from the forecast origin) on the 16
+Primary substations and the 73 runs of `fold_a_every5d_v1`.
+
+- **Headline result:** N1 minus `manual_heuristic` was +0.22 points of capacity over all leads (99%
+  interval -0.54 to +0.97) and -0.57 up to 48 hours (-1.33 to +0.27) in the mean absolute error of the
+  median. The production recipe minus `manual_heuristic` was +1.69 (+0.98 to +2.59).
+- **Absolute scores (all leads):** `manual_heuristic` 8.23, N1 8.45, production 9.92, `climatology`
+  10.33 points of capacity.
+- **Why the production recipe loses:** about 0.6 points is a level offset (every arm forecast the
+  validation year 2 to 3 points too low, `manual_heuristic` by 1.3), and the rest matches the lack of
+  recent power, which lagged power from the origin recovers (1.15 points, C4).
+- **Finding for later experiments:** compare Primary arms against `manual_heuristic`, and test a
+  drift correction in P8.
+- **Write-up and pull request:** [result](00013-primary-demand-against-stored-baselines/result.md),
+  [PR #1218 (Experiment 13: Primary substation demand against the stored
+  baselines)](https://github.com/openclimatefix/nged-substation-forecast/pull/1218).
+
+![The five planned contrasts](00013-primary-demand-against-stored-baselines/figure_2.svg)
 
 ### 00014: a stage 0 for the CAMS-trained demand model
 

@@ -18,23 +18,22 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [P6](#p6-primary-substation-demand-against-the-stored-baselines) | Where does Primary substation demand stand: how do `manual_heuristic`, `climatology`, the production recipe, an upgraded single-stage model (N1: a quantile model trained on ENS with the 00006 columns, recency weights, a 2023-09 start, and lags measured from the forecast origin), and stage 1 without lags score on one row set? | 1 | Nothing | Proposed; the three baselines are already stored |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | P6 | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
-| [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
+| [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | Nothing | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
+| [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | Nothing | Proposed |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the intra-day price at time t, with the weather at time t, help a stage 1 demand model explain power at time t on all 20 series, so that a later experiment can estimate the expected past power and measure how unusual the lagged power was? | 3 | Nothing; the Elexon price data is on disk | Proposed; follows experiment 00010, which was inconclusive |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 | Proposed |
 
 ## Deferred until the first results are in
 
-**These proposals wait for the answer to P6 and P7, or for a decision on the shape of the production
+**These proposals wait for the answer to P7, or for a decision on the shape of the production
 model.** Each keeps its section below, and a result may promote it.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 5 | Knowing what the production model will look like | Deferred; its size depends on the shape of the model |
 | [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | P7 | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, so revisit it only if N1 wins P7 |
-| [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | P6 | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
+| [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | Nothing | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 | [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | P7 | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand depends less on weather than generation does |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
@@ -140,57 +139,29 @@ observed prices to estimate the power that should have been metered in the past,
 unusual the actual lagged power was. The follow-up keeps the shuffled-price control and adds the
 climatology row that 00010 lacked.
 
-### P6: Primary substation demand against the stored baselines
-
-**The leaderboard already holds the baselines.** The `forecast_metrics` Delta table has scores for
-`manual_heuristic`, `climatology`, and the production recipe on the 16 Disaggregated Demand series
-(the Primary substations) for the fold `mid_2025_to_mid_2026`. The mean normalised MAE over all
-horizons is 0.086 for `manual_heuristic`, 0.108 for the production recipe, and 0.113 for
-`climatology`, so the production recipe is about 2 points of capacity worse than `manual_heuristic`
-in every horizon slice. The stored forecasts in `power_forecasts` allow re-scoring on the row set of
-the experiments, `fold_a_every5d_v1`. The arms are the three baselines re-scored; N1, a quantile
-model trained on ENS with the 00006 columns, recency weights, a 2023-09 start, and lags measured
-from the forecast origin (the latest observed value at this half-hour before the origin, and the
-same weekday in the latest week, allowing for NGED's real telemetry delay); and stage 1 pooled over
-members without lags. The planned contrast is the best arm against `manual_heuristic`, in MAE and
-CRPS by lead band. P6 tells the project roughly how well it forecasts substation demand, and it sets
-the bar that every later experiment has to beat.
-
-P6 also diagnoses why the production recipe loses to `manual_heuristic` by about 2 points of
-capacity in every horizon slice, because that gap could be the largest mean absolute error gain
-available.
-
-**The quick-wins study already answered several questions that N1 should inherit and not repeat.**
-The [quick-wins study](../studies/forecasts/quick-wins.md) found these results. Quantile loss at 9
-levels lowered CRPS by 2.39 points against production, and the absolute-error objective lowered it
-by 0.42 points, so N1 uses quantile loss and takes its median as the point forecast. Early stopping
-lowered CRPS by 0.38 points. One model per type with a site identifier was the best quick-wins arm,
-and experiment 00006 later found one model per Primary substation slightly better (7.11 against 7.34
-points of capacity), by a small unpaired margin whose intervals overlap. Cutting the training window
-from 15 to 12 months raised CRPS by only 0.07 points. The study left a climatology column (built so
-that a row's own value never enters its own mean), training on CRPS, and features from the ensemble
-itself as ideas for future work.
-
 ### P7: the staged chain against the upgraded single-stage model
 
 **P7 is the go or no-go for the staged design on demand.** It compares the chain (stage 1 plus the
-stage 2 calibrator) with N1 from P6, by lead band. Every lagged arm of experiment 00005 is a
-ceiling, because the lag anomaly (observed power at a lag time minus stage 1's expectation at that
-time) used ERA5 weather at past times. P7 builds the lag anomalies from the sources serving has:
-ERA5T and CAMS at their serving latency, and the analysis proxy (the early leads of the latest ENS
-run), and it allows for NGED's real telemetry delay at the forecast origin, which 00005 assumed
-away. The arms are lag anomalies from ERA5, from the serving sources, from the analysis proxy, and
-none (raw lagged power only). P7 also adds a spread-factor arm, because the 5% to 95% band of the
-Primary substations covers only 83% to 85%. The planned contrasts are the chain with serving-latency
-lag anomalies against the lag-free calibrated stage 1 (the 1.80-point contrast of 00005, measured
-again), and against N1. A chain that does not beat N1 on Primary substations leaves the staged
-design for demand, and stage 2 stays only for the multi-product work.
+stage 2 calibrator) with N1 and with `manual_heuristic` (N1 did not beat it in [experiment
+13](00013-primary-demand-against-stored-baselines/result.md)), by lead band. Every lagged arm of
+experiment 00005 is a ceiling, because the lag anomaly (observed power at a lag time minus stage 1's
+expectation at that time) used ERA5 weather at past times. P7 builds the lag anomalies from the
+sources serving has: ERA5T and CAMS at their serving latency, and the analysis proxy (the early
+leads of the latest ENS run), and it allows for NGED's real telemetry delay at the forecast origin,
+which 00005 assumed away. The arms are lag anomalies from ERA5, from the serving sources, from the
+analysis proxy, and none (raw lagged power only). P7 also adds a spread-factor arm, because the 5%
+to 95% band of the Primary substations covers only 83% to 85%. The planned contrasts are the chain
+with serving-latency lag anomalies against the lag-free calibrated stage 1 (the 1.80-point contrast
+of 00005, measured again), and against N1. A chain that does not beat N1 on Primary substations
+leaves the staged design for demand, and stage 2 stays only for the multi-product work.
 
 ### P8: training window and drift
 
-**Experiments 00003 and 00006 both point at drift as the largest lever.** The arms are sliding
-windows of 6, 12, and 18 months, recency half-lives, and a monthly retrain against a frozen model,
-scored rolling-origin on the winner of P6 or P7.
+**Experiments 00003, 00006, and 13 all point at drift as the largest lever.** In experiment 13 every
+arm forecast the validation year 1.3 to 3.1 points of capacity too low, so a correction from the
+last 14 days of observed error is one of the arms. The arms are sliding windows of 6, 12, and 18
+months, recency half-lives, and a monthly retrain against a frozen model, scored rolling-origin on
+the winner of P7.
 
 **Resolution limit.** One confirmation year cannot rank windows of 6, 12, and 18 months, because the
 ranking would rest on one year of drift. A cheaper design scores stage 1a on ERA5 with rolling
