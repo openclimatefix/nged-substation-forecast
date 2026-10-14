@@ -239,8 +239,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             "Points of effective capacity (smaller is better); 95% intervals resample whole "
             "validation "
             "months and one fitting seed. `era5_ceiling` and `cams_ceiling` apply stage 1a to ERA5 "
-            "or CAMS at the valid time, so they do not depend on lead; they are the floor for any "
-            "ENS-driven stage 1a."
+            "or CAMS at the valid time, so they do not depend on lead; they are not a bound on "
+            "ENS-driven versions, because ERA5 and CAMS are themselves estimates."
         ),
         "",
     ]
