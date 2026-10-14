@@ -126,6 +126,9 @@ def coverage_table(*, rows: dict[str, pl.DataFrame], corrected: pl.DataFrame) ->
         rows: Each arm's per-case frame.
         corrected: Columns `technology`, `band`, `month`: the months in which the per-band fit
             existed, so that the corrected-months scope is the same for every arm.
+
+    Returns:
+        One row per arm, technology, lead band, and month scope, with the coverage and its interval.
     """
     out = []
     for arm, frame in rows.items():
@@ -268,6 +271,12 @@ def verdicts(*, coverage: pl.DataFrame, contrasts: pl.DataFrame) -> dict[Technol
 
 def reproduction(*, absolute: pl.DataFrame) -> list[str]:
     """Check `none` against experiment 00002's mean CRPS and return a table of both.
+
+    Args:
+        absolute: `absolute_table(...)`.
+
+    Returns:
+        Markdown lines of a table of the two scores per technology.
 
     Raises:
         ValueError: If a technology differs by more than `REPRODUCTION_TOLERANCE`.

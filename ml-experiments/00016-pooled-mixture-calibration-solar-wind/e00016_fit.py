@@ -54,6 +54,13 @@ from studies import experiment_store
 def mixture_for_seed(*, seed: int, cases: pl.DataFrame) -> np.ndarray:
     """Return the 9 pooled-mixture quantiles of every case, in `cases` order (cached on disk).
 
+    Args:
+        seed: The fitting seed of the stored member quantiles.
+        cases: `validation_cases()`.
+
+    Returns:
+        Array of shape (cases, 9) of mixture quantiles, a fraction of capacity.
+
     Raises:
         ValueError: If a case lacks a member, or the case count differs from `cases`.
     """
@@ -182,6 +189,9 @@ def correct(
 
 def _check_reproduction(*, none: pl.DataFrame) -> None:
     """Raise unless `none` reproduces experiment 00002's mean CRPS per technology.
+
+    Args:
+        none: The uncorrected arm's predictions over all seeds.
 
     Raises:
         ValueError: If a technology's mean CRPS differs by more than 0.05 points of capacity from
