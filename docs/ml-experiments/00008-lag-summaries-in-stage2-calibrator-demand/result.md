@@ -73,8 +73,8 @@ to two decimals (5.31 up to 48 h, 6.36 over all leads), so the pipeline reproduc
 intervals are at 98.75%.
 
 - **C1 (primary), S1 minus L3:** -0.02 up to 48 h (-0.14 to +0.13), 7 of 12 months and 8 of 16
-  series negative. Over all leads -0.06 (-0.18 to +0.06). The difference is slightly negative from 1 to 2
-  days onward (-0.04 to -0.08), and no band excludes zero.
+  series negative. Over all leads -0.06 (-0.18 to +0.06). The difference is slightly negative from 1
+  to 2 days onward (-0.04 to -0.08), and no band excludes zero.
 - **C2, S2 minus L3:** +0.29 up to 48 h (+0.11 to +0.51), 0 of 12 months negative. Replacing the raw
   power lags with summaries is worse at short leads, and the loss shrinks to +0.04 at 7 to 10 days.
 - **C3, S3 minus L3:** +0.35 up to 48 h (+0.15 to +0.58), 0 of 12 months negative.
