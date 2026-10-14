@@ -51,12 +51,15 @@ code: ml-experiments/00020-solar-wind-stack-cams-stage0-spread-margin/
 
 # Do the candidate changes for solar and wind add up to a better pooled mixture?
 
-**Status: planned.** ENS is the European Centre for Medium-Range Weather Forecasts ensemble, ERA5 its reanalysis of past weather, CAMS the Copernicus Atmosphere Monitoring Service's satellite irradiance estimate, and CRPS the continuous ranked probability score. This is proposal P22 of the [research plan](../research-plan.md). This experiment combines
-the changes that [experiment 00012](../00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md),
-[experiment 00014](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md), and
-[experiment 00016](../00016-pooled-mixture-calibration-solar-wind/result.md) flagged as candidates or
-small gains, and drops each in turn. Gains of this size may not add, because the CAMS-trained model
-and the stage 0 mapping act on the same ENS irradiance bias.
+**Status: planned.** ENS is the European Centre for Medium-Range Weather Forecasts ensemble, ERA5
+its reanalysis of past weather, CAMS the Copernicus Atmosphere Monitoring Service's satellite
+irradiance estimate, and CRPS the continuous ranked probability score. This is proposal P22 of the
+[research plan](../research-plan.md). This experiment combines the changes that [experiment
+00012](../00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md), [experiment
+00014](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md), and [experiment
+00016](../00016-pooled-mixture-calibration-solar-wind/result.md) flagged as candidates or small
+gains, and drops each in turn. Gains of this size may not add, because the CAMS-trained model and
+the stage 0 mapping act on the same ENS irradiance bias.
 
 ## Size
 
