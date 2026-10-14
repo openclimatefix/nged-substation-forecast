@@ -20,8 +20,6 @@ sooner.
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing for the second stage; the slope statistics wait for the second stage | Its cheap first test, experiment 00007, was inconclusive. The second stage is planned as experiment 00009, in [PR #1213 (Plan experiment 9: CAMS-trained stage 1a against ERA5-trained, for demand)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213), with no fits yet |
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain with serving-latency lag anomalies beat N1, by lead band? | 2 | P5 and P6 | Proposed; the go or no-go for the staged design on demand |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
-| [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 2 | P6 | Proposed |
-| [P10](#p10-one-pooled-model-against-one-model-per-series) | Does one model pooled across series, with capacity-normalised targets and series columns, match one model per series? | 2 | P6 | Proposed |
 | [P17](#p17-input-features-for-solar-and-wind) | Which input features and which training start are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Planned as experiment 00011, in [PR #1214 (Plan experiment 11: school-term and return-to-work columns for the stage 1a demand model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214), with no fits yet |
 | [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 3 | P6 | Proposed |
@@ -30,8 +28,9 @@ sooner.
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | 4 | A plan; the price source is chosen | The Elexon Market Index Data pull is under way, and a plan follows it |
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 4 | P6 | Proposed; mostly a generator question |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 4 | The scoring harness and P12 | Proposed |
-| [P15](#p15-a-second-weather-product-already-on-disk) | Does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining, and how many months of its history does it need? | 4 | P7 and P9 | Proposed |
+| [P15](#p15-a-second-weather-product-already-on-disk) | Does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining, and how many months of its history does it need? | 4 | P7 | Proposed |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 4 | Approval against the £30 egress cap | Proposed; a study, not an experiment |
+| [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 5 | Knowing what the production model will look like | Deferred until the shape of the model is known |
 
 ## Proposals in detail
 
@@ -247,12 +246,6 @@ scored rolling-origin on the winner of P6 or P7.
 **The experiment sizes how much skill demand gains from better weather.** It gives N1 ERA5 in place
 of ENS weather at serving time, by lead. A small gap means weather-source work (P15, P16) has low
 priority for demand.
-
-### P10: one pooled model against one model per series
-
-**Pooling matters at 2,500 series and for new sites.** The arms are one model across series with
-capacity-normalised targets and series columns, against one model per series, on the Primary
-substations.
 
 ### P11: ensemble statistics as inputs
 

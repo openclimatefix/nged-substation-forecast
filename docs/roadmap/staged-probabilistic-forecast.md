@@ -253,6 +253,13 @@ variogram score and include the Schaake shuffle there. The output is always the 
 Other NWPs enter stage 2 as pooled rows and a blend component and do not add members, which removes
 the question of how to pool members of different NWPs.
 
+**Models are specific to each site for substations and pooled for solar and wind.** Experiment 00006
+found that one model per Primary substation scored better than one model per substation type with a
+series identifier (7.11 against 7.34 points of capacity in mean absolute error). The same
+site-specific choice holds for bulk supply points and grid supply points. Solar and wind farms share
+a model, because their output follows the weather and a farm has too little history to carry a model
+of its own. The pooled choice for solar and wind is a decision and not an experimental result.
+
 **Targets for solar and wind power.** Stage 1 could predict a ratio for solar: power divided by
 clear-sky PV power, multiplied back by the known half-hourly clear-sky curve, so the output stays in
 megawatts ([roadmap
