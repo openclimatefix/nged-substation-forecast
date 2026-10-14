@@ -145,6 +145,7 @@ nav:
       - "Does a stage 2 calibrator beat the pooled stage 1a mixture?": ml-experiments/00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md
       - "Does an ERA5-trained model beat the same model trained on ENS, for demand series?": ml-experiments/00003-era5-trained-stage1a-vs-ens-trained-demand/result.md
       - "Where should lagged power enter a two-stage demand forecast?": ml-experiments/00005-lag-placement-stage1b-vs-stage2-demand/result.md
+      - "Which inputs work best for the ERA5-trained demand model?": ml-experiments/00006-stage1a-demand-input-feature-sweep/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
