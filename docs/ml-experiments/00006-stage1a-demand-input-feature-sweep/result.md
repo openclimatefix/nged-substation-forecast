@@ -325,20 +325,21 @@ to 1 January, against 7.52 on the other days.
 | One harmonic of time of year | -3.43 (-4.33 to -2.50) | -1.74 (-2.25 to -1.25) | +0.04 (-0.02 to +0.10) |
 | Half-year flag | -0.37 (-0.60 to -0.15) | -0.08 (-0.24 to +0.06) | -0.06 (-0.10 to -0.02) |
 
-![Observed power and forecasts over Christmas 2025 for several input configurations](figure_13.svg)
+![Observed power and forecasts over Christmas 2025, with and without the windowed Christmas column](figure_13.svg)
 
-**Over Christmas 2025 the columns that know about Christmas follow a substation whose power drops
-there, and the base set does not.** The figure shows 20 December 2025 to 3 January 2026 in the
-confirmation fold, for P12 (the median-error series), for P10 (the series the windowed column helps
-most, chosen after the fact from the outcome), and for the mean over the 14 Primary series. Over the
-window, the mean absolute error of the base (weather block, clock, COVID indicator) is 3.96 points
-of capacity for P12 and 22.23 for P10, and adding the days to Christmas gives 3.92 and 4.43, the
-windowed column 3.95 and 4.13, the holiday flags 3.87 and 18.40, and the half-year flag 4.01 and
-21.13. P12 is almost unaffected, so the Christmas gain comes from a subset of series. The error of
-the 14-series mean is 5.15 for the base, 2.84 with the days to Christmas, 2.62 with the windowed
-column, 3.70 with the holiday flags, and 5.01 with the half-year flag. The holiday flags capture
-only the bank-holiday days, so they miss the days either side of them, which the days to Christmas
-covers.
+**Over Christmas 2025 the windowed Christmas column follows a substation whose power drops there,
+and the base set does not.** The figure shows 20 December 2025 to 3 January 2026 in the confirmation
+fold, for P12 (the median-error series), for P10 (the series the windowed column helps most, chosen
+after the fact from the outcome), and for the mean over the 14 Primary series. It draws the observed
+power, the base (weather block, clock, COVID indicator), and the base plus the windowed column; the
+errors of the other configurations are given here and not drawn. Over the window, the mean absolute
+error of the base is 3.96 points of capacity for P12 and 22.23 for P10, and adding the days to
+Christmas gives 3.92 and 4.43, the windowed column 3.95 and 4.13, the holiday flags 3.87 and 18.40,
+and the half-year flag 4.01 and 21.13. P12 is almost unaffected, so the Christmas gain comes from a
+subset of series. The error of the 14-series mean is 5.15 for the base, 2.84 with the days to
+Christmas, 2.62 with the windowed column, 3.70 with the holiday flags, and 5.01 with the half-year
+flag. The holiday flags capture only the bank-holiday days, so they miss the days either side of
+them, which the days to Christmas covers.
 
 **The gain is a Christmas effect, because the half-year flag does not reproduce it.** The half-year
 flag lowers the error by 0.08 over 15 December to 7 January, and the days to Christmas by 1.62. The

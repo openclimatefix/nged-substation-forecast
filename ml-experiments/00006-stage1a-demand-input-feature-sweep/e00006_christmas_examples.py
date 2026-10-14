@@ -35,6 +35,10 @@ SERIES: Final[dict[str, tuple[str, str]]] = {
 }
 
 
+PLOTTED: Final[tuple[str, ...]] = ("target", BASE, f"{BASE}+xmas_window")
+"""The lines drawn. The other configurations are scored in the printed errors only."""
+
+
 def christmas_frame() -> pl.DataFrame:
     """Return per-series half-hourly rows over the window with each configuration's forecast."""
     rows = report.read_seeds(stage="christmas_check", fold_name=FOLD)
@@ -51,7 +55,7 @@ def long_format(*, frame: pl.DataFrame) -> pl.DataFrame:
     local = pl.col("valid_time").dt.convert_time_zone("Europe/London").dt.replace_time_zone(None)
     return (
         frame.unpivot(
-            on=list(SERIES), index="valid_time", variable_name="series", value_name="power"
+            on=list(PLOTTED), index="valid_time", variable_name="series", value_name="power"
         )
         .with_columns(
             time=local,
@@ -66,18 +70,18 @@ def panel(*, data: pl.DataFrame, title: str, show_legend: bool) -> alt.LayerChar
     """Draw one panel of lines."""
     chart = (
         alt.Chart(data)
-        .mark_line(strokeWidth=1.5)
+        .mark_line(strokeWidth=1.5, opacity=0.7)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "time:T",
                 title="Local date (midnight at each tick)",
                 axis=alt.Axis(format="%d %b", values=_ticks(), labelAngle=-45),
             ),
-            y=alt.Y("power:Q", title="Power (% of capacity)", scale=alt.Scale(domain=[20, 100])),
+            y=alt.Y("power:Q", title="Power (% of capacity)", scale=alt.Scale(zero=False)),
             color=alt.Color(
                 "series:N",
                 scale=alt.Scale(
-                    domain=[v[0] for v in SERIES.values()], range=[v[1] for v in SERIES.values()]
+                    domain=[SERIES[a][0] for a in PLOTTED], range=[SERIES[a][1] for a in PLOTTED]
                 ),
                 legend=alt.Legend(title=None, orient="top", columns=2, labelLimit=320)
                 if show_legend
@@ -147,16 +151,16 @@ def main() -> None:
     ).properties(
         title=charts._title(
             text=(
-                "Only the columns that know about Christmas follow the substation "
+                "A column that knows about Christmas follows the substation "
                 "that drops over Christmas"
             ),
             lines=[
                 (
                     "Observed power and forecasts for 20 December 2025 to 3 January 2026, as a "
                     "percentage of capacity, from one XGBoost model per substation trained on "
-                    "ERA5 weather, with each configuration adding columns to the base. Mean of "
-                    "three fitting seeds. The lowest panel averages the forecasts and the "
-                    "observed power over the 14 series."
+                    "ERA5 weather. Mean of three fitting seeds. The lowest panel averages the "
+                    "forecasts and the observed power over the 14 series. Lines are slightly "
+                    "transparent, so overlaps show darker."
                 )
             ],
         )
