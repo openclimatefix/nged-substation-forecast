@@ -105,15 +105,19 @@ experiment repeated 00001 on 22 series that are not wind or solar farms, on a ne
 ## Planned experiments
 
 Each planned experiment has a `result.md` with status `planned`, committed before any code runs. An
-idea that has no folder yet is marked "proposed".
+idea that has no folder yet is marked "proposed" and carries a tentative id, P1, P2, and so on,
+which the sections below use as headings. A proposal receives its numeric id when its plan is
+committed, and the tentative id then disappears.
 
 | Id | Question | State |
 |---|---|---|
 | 00005 | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Planned, in [PR #1195 (Experiment 00005 (planned): where lagged power enters a two-stage demand forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195) |
 | 00006 | Which input features are best for the demand weather-to-power model (stage 1a), trained on ERA5, for Primary, BSP, and GSP substations? | Running. Runs first, and its chosen columns feed 00005 |
-| Proposed | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |
-| Proposed | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Waits for 00005, and for the 00006 residual analysis to be published |
-| Proposed | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Needs a source of historical prices |
+| P1 | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |
+| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Waits for 00005, and for the 00006 residual analysis to be published |
+| [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Needs a source of historical prices |
+
+### P2: embedded-solar capacity from lagged residuals
 
 **The embedded-solar proposal rests on one follow-up check of experiment 00006's residuals, which
 motivates two different questions and tests neither.** The check was run by the 00006 session on
@@ -189,6 +193,8 @@ excludes zero, and it is absent in the night-time residuals. A second candidate:
 arm lowers the confirmation-year daylight quantile score at Primary substations by at least 0.2
 points of capacity, with a month-block bootstrap interval that excludes zero. Otherwise the
 hypothesis is refuted. The thresholds are proposals for the planning step to confirm.
+
+### P3: historical electricity prices as lagged inputs
 
 **The price proposal asks a different question from price forecasting.** Future electricity prices
 are hard to predict, so a price forecast is not the input. The proposal is to use prices that have
