@@ -14,6 +14,7 @@ The SVGs are afterwards optimised with `npx svgo@4 --multipass --precision=1 --f
     uv run python ml-experiments/00005-lag-placement-stage1b-vs-stage2-demand/e00005_charts.py
 """
 
+import textwrap
 from pathlib import Path
 from typing import Final
 
@@ -25,7 +26,10 @@ import polars as pl
 RESULTS_DIR: Final[Path] = common.WORK_DIR / "results"
 ARMS_DIR: Final[Path] = common.WORK_DIR / "arms"
 CHART_DIR: Final[Path] = common.WORK_DIR / "charts"
-WIDTH: Final[int] = 640
+PLOT_WIDTH: Final[int] = 540
+"""The plot area's width in pixels; every title and subtitle line is wrapped to it."""
+WRAP_CHARACTERS: Final[int] = 92
+"""How many characters of 11-pixel subtitle text fit across `PLOT_WIDTH`."""
 HEADLINE: Final[str] = "Primary"
 BANDS: Final[tuple[str, ...]] = tuple(name for name, _, _ in common.LEAD_BANDS)
 EXAMPLE_HOURS: Final[float] = 72.0
@@ -73,8 +77,10 @@ SCOPE: Final[str] = (
 
 
 def _title(*, text: str, lines: list[str]) -> alt.TitleParams:
+    """Return a title whose subtitle paragraphs are wrapped to the plot area's width."""
+    wrapped = [row for line in lines for row in textwrap.wrap(line, WRAP_CHARACTERS)]
     return alt.TitleParams(
-        text=text, subtitle=lines, anchor="start", fontSize=14, subtitleFontSize=11
+        text=text, subtitle=wrapped, anchor="start", fontSize=14, subtitleFontSize=11
     )
 
 
@@ -105,7 +111,7 @@ def figure_1() -> alt.TopLevelMixin:
     )
     bars = base.mark_rule().encode(x="lower_95:Q", x2="upper_95:Q")  # ty: ignore[unresolved-attribute]
     return alt.layer(bars, points).properties(
-        width=WIDTH - 200,
+        width=PLOT_WIDTH,
         height=300,
         title=_title(
             text="Quantile score by lead band for the Primary substations",
@@ -163,7 +169,7 @@ def figure_2() -> alt.TopLevelMixin:
     bars = base.mark_rule().encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#333333").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     return alt.layer(zero, bars, points).properties(
-        width=WIDTH - 200,
+        width=PLOT_WIDTH,
         height=320,
         title=_title(
             text="Planned contrasts for the Primary substations, by lead",
@@ -277,7 +283,7 @@ def _example_figure(*, worst: bool) -> alt.TopLevelMixin:
             )
             panels.append(
                 alt.layer(outer, inner, median, observed).properties(
-                    width=(WIDTH - 90) // 3,
+                    width=(PLOT_WIDTH - 60) // 3,
                     height=120,
                     title=alt.TitleParams(
                         arm.split("(")[-1].rstrip(")") + f", {site}", anchor="start", fontSize=12
