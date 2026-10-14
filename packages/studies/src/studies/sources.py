@@ -369,9 +369,7 @@ The folder sits beside `STUDIES_DATA_DIR`, not under it, because the `ml-experim
 ML_EXPERIMENTS_DOCS_DIR: Final[Path] = _main_checkout(PROJECT_ROOT) / "docs" / "ml-experiments"
 """The main checkout's `docs/ml-experiments/`, where every ml-experiment's `result.md` lives.
 
-An experiment id is never reused, so `reserve_experiment` reads this folder as well as the data
-folder. The main checkout's copy is the one that holds every merged experiment, even from a linked
-worktree.
+`reserve_experiment` reads it so that an id is never reused, even after `data/` is lost.
 """
 
 DOWNLOADS_DIR: Final[Path] = STUDIES_DATA_DIR / "downloads"

@@ -216,11 +216,10 @@ plan sets, Claude may add experiments that combine the night's winners, and each
 did not name is labelled post hoc. The next day's discussion decides which ideas to keep. The ideas
 worth keeping are re-implemented in production in reviewed pull requests.
 
-**Each ml-experiment tests one hypothesis and ends in a verdict.** The hypothesis, a prediction that
-could fail, and a decision rule are written before the run. The experiment's `result.md` holds the
-hypothesis, the verdict, the best arm, and the lessons learned, and it has the same fields that
-phase 2's hypothesis store records for an idea, so the research lead can read phase 1's experiments
-directly. A study, which is a long report that answers several questions, uses the `study` skill.
+**Each ml-experiment tests one hypothesis and ends in a verdict.** The experiment's `result.md`
+holds the hypothesis, the verdict, the best arm, and the lessons learned, and it has the same fields
+that phase 2's hypothesis store records for an idea, so the research lead can read phase 1's
+experiments directly.
 
 **A study or an experiment whose output fits the leaderboard scorer may post its scores as a
 `study/` experiment.** Posting is optional, because an experiment may use its own metric or its own

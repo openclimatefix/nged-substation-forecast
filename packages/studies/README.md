@@ -5,10 +5,10 @@ themselves are not.** `studies/README.md` says which code moves here, and why.
 
 **A study script under `studies/`, and an experiment script under `ml-experiments/`, may import from
 its own folder, from `studies.*` (this package), and from the other reviewed packages in
-`packages/*`.** `src/` and every package under `packages/`
-except this one must never import `studies` or a study script, because humans review that code and
-the study code is fast-moving and agent-written. `tests/test_study_boundaries.py` enforces both
-halves, and no module here imports a script by its bare name.
+`packages/*`.** `src/` and every package under `packages/` except this one must never import
+`studies` or a study script, because humans review that code and the study code is fast-moving
+and agent-written. `tests/test_study_boundaries.py` enforces both halves, and no module here
+imports a script by its bare name.
 
 ## What this package owns, and what it does not
 

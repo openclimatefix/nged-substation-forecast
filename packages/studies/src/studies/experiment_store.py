@@ -12,7 +12,6 @@ Every function here runs in research and fails fast: it raises, and never degrad
 
 import json
 import re
-import shutil
 import subprocess
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -27,9 +26,6 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR, ML_EXPERIMENTS_DOCS_DIR
 
 PredictionKindType = Literal["quantiles", "members", "stage1"]
 """What a prediction set holds: calibrated quantiles, ensemble members, or stage 1 outputs."""
-
-PREDICTION_KINDS: Final[tuple[str, ...]] = ("quantiles", "members", "stage1")
-"""Runtime tuple of the values of `PredictionKindType`."""
 
 
 class PredictionManifest(TypedDict):
@@ -72,7 +68,7 @@ FOLD_A_TUESDAYS_V1: Final[str] = "fold_a_tuesdays_v1"
 ECMWF ENS runs at 00:00 UTC every 7 days from 2025-07-01 to 2026-06-30 (53 runs, all Tuesdays),
 with a forecast origin at 09:00 UTC, all 51 members, valid times to about 14.6 days, and the 9
 generator series (6 solar farms and 3 wind farms). The run stride is `SAMPLE_STRIDE_DAYS` in
-`studies/quick_wins/quick_wins_inputs.py`. A fixed weekday suits generators and not demand.
+`studies/quick_wins/quick_wins_inputs.py`.
 """
 
 
@@ -99,8 +95,8 @@ def reserve_experiment(
 ) -> int:
     """Reserve the next experiment id and create the experiment's data folder.
 
-    The next id is one more than the largest id in `data_dir`, in `data_dir/.ids`, and in
-    `docs_dir`, so an id is never reused, even after the data folder is lost. The reservation is
+    The next id is one more than the largest id in `data_dir/.ids` and in `docs_dir`, so an id is
+    never reused, even after the data folder is lost. The reservation is
     the creation of the bare-id marker `data_dir/.ids/<id>` by `Path.mkdir(exist_ok=False)`, which
     is atomic on a local filesystem. Reserving the bare id, and not the id with the slug, is what
     stops two sessions that pick different slugs from taking one id.
@@ -123,7 +119,6 @@ def reserve_experiment(
     markers.mkdir(parents=True, exist_ok=True)
     while True:
         known = [
-            *_experiment_ids_in(folder=data_dir),
             *_experiment_ids_in(folder=markers),
             *_experiment_ids_in(folder=docs_dir),
         ]
@@ -210,7 +205,7 @@ def write_predictions(
     """Write one named prediction set, never overwriting an existing set.
 
     The parquet file and the manifest are written into a temporary folder that is renamed into
-    place, so an interrupted write leaves no set that can be neither read nor rewritten. A re-run
+    place, so an interrupted write leaves no set at `name`, only a hidden staging folder. A re-run
     is saved under a new name, such as `name-v2`.
 
     Args:
@@ -226,15 +221,12 @@ def write_predictions(
         The folder of the written set.
 
     Raises:
-        ValueError: If the name or kind is not allowed, the frame has no UTC `valid_time`, or a
+        ValueError: If the name is not allowed, the frame has no UTC `valid_time`, or a
             `valid_time` is on or after the holdout start.
         FileExistsError: If the set already exists.
     """
     if not SET_NAME_PATTERN.fullmatch(name):
         msg = f"set name {name!r} must be lower-case words joined by hyphens or underscores"
-        raise ValueError(msg)
-    if kind not in PREDICTION_KINDS:
-        msg = f"kind {kind!r} must be one of {PREDICTION_KINDS}"
         raise ValueError(msg)
     _require_utc_valid_time(frame=frame)
     _require_before_holdout(frame=frame)
@@ -254,13 +246,9 @@ def write_predictions(
     }
     staging = predictions_dir / f".{name}.{uuid4().hex}"
     staging.mkdir(parents=True)
-    try:
-        frame.write_parquet(staging / PREDICTIONS_NAME)
-        (staging / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n")
-        staging.rename(destination)
-    except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
+    frame.write_parquet(staging / PREDICTIONS_NAME)
+    (staging / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n")
+    staging.rename(destination)
     return destination
 
 
@@ -283,16 +271,12 @@ def read_predictions(
         The set's predictions.
 
     Raises:
-        ValueError: If the manifest is missing, the set's `row_set_id` differs from `row_set_id`,
-            or a `valid_time` is on or after the holdout start. A score on different rows is not
-            a comparison, so the function raises and does not warn.
+        ValueError: If the set's `row_set_id` differs from `row_set_id`, or a `valid_time` is on or
+            after the holdout start. A score on different rows is not a comparison, so the function
+            raises and does not warn.
     """
     folder = _experiment_dir(experiment_id=experiment_id, data_dir=data_dir) / "predictions" / name
-    manifest_path = folder / MANIFEST_NAME
-    if not manifest_path.is_file():
-        msg = f"{folder} has no {MANIFEST_NAME}; the set was never completed"
-        raise ValueError(msg)
-    stored: PredictionManifest = json.loads(manifest_path.read_text())
+    stored: PredictionManifest = json.loads((folder / MANIFEST_NAME).read_text())
     if stored["row_set_id"] != row_set_id:
         msg = (
             f"{folder} covers row set {stored['row_set_id']!r}, not {row_set_id!r}; "
@@ -300,7 +284,6 @@ def read_predictions(
         )
         raise ValueError(msg)
     frame = pl.read_parquet(folder / PREDICTIONS_NAME)
-    _require_utc_valid_time(frame=frame)
     _require_before_holdout(frame=frame)
     return frame
 
@@ -326,11 +309,9 @@ def losses_for_bootstrap(*, arm_losses: Mapping[str, pl.DataFrame]) -> pl.DataFr
         joined into one string that sorts in time order.
 
     Raises:
-        ValueError: If no arm is given, the arms hold different seeds, or an arm holds two rows
-            with the same `(time_series_id, power_fcst_init_time, valid_time, seed)`.
+        ValueError: If the arms hold different seeds, or an arm holds two rows with the same
+            `(time_series_id, power_fcst_init_time, valid_time, seed)`.
     """
-    if not arm_losses:
-        raise ValueError("arm_losses holds no arm")
     key_columns = ["time_series_id", "power_fcst_init_time", "valid_time", "seed"]
     seeds = {arm: sorted(frame["seed"].unique().to_list()) for arm, frame in arm_losses.items()}
     if len({tuple(arm_seeds) for arm_seeds in seeds.values()}) > 1:

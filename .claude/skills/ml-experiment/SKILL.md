@@ -2,14 +2,11 @@
 name: ml-experiment
 description: >-
   How to run a small, focused ML experiment that tests one hypothesis about improving the
-  Flexpectation production forecast, and keep its result where a later experiment can find it: state
-  the hypothesis, prediction and decision rule first; size the experiment and run the reviews that
-  size calls for; store the predictions as an immutable set with a manifest so another experiment
-  can use them as the benchmark to beat; write a one-screen `result.md` that ends in a verdict; and
-  run a night's agreed experiments unattended. Load before planning, running, or writing up an
-  experiment under `ml-experiments/`, and before an overnight session. A question that needs a long
-  report, several scientific questions, or a new dataset as its main subject is a study; use the
-  `study` skill for it.
+  Flexpectation production forecast, and keep its result where a later experiment can find it, as a
+  one-screen `result.md` and an immutable set of predictions. Load before planning, running, or
+  writing up an experiment under `ml-experiments/`, and before an overnight session. A question that
+  needs a long report, several scientific questions, or a new dataset as its main subject is a
+  study; use the `study` skill for it.
 ---
 
 # Running an ml-experiment
@@ -18,9 +15,9 @@ An ml-experiment tests **one hypothesis**, such as "adding ERA5 pre-training low
 forecast's CRPS", and ends in a verdict: supported, refuted, or inconclusive. The write-up is about
 a screen long. An experiment is free to use its own metric or its own probabilistic output, so it
 often cannot post to the leaderboard. A **study** is the other kind of work: a long report that
-answers several scientific questions, often on a new dataset, run with the `study` skill. The
-`ml-experiment` and `study` skills do not share a store. `docs/ml_experimentation/` describes
-running the production pipeline's cross-validation, which is neither.
+answers several scientific questions, often on a new dataset, run with the `study` skill.
+`docs/ml_experimentation/` describes running the production pipeline's cross-validation, which is
+neither.
 
 **Work autonomously by default.** Plan, run, review, and write up without waiting for the
 maintainer. When the maintainer asks to review the plan first, push the plan, say so, and wait for
@@ -42,25 +39,22 @@ whose callers you could not name without searching.
 - **Simple** is a permutation of settings the pipeline already has (input-feature sets, a
   hyperparameter, a loss), with no new data and no new method. Write the plan section, implement,
   run, and write up. One Sonnet reviewer reads the code for leakage and for the fit stopping at the
-  fold's `train_end` (the reviewer reads and never runs it), and one Sonnet reviewer checks the
-  write-up against the printed report.
+  fold's `train_end`, and one Sonnet reviewer checks the write-up against the printed report.
 - **Anything else** gets the full process: Sonnet writes the plan, Opus reviews the plan, the
   maintainer reviews the plan only if asked, Sonnet implements, Opus reviews the code, Sonnet runs
   the code and writes up, Sonnet reviews the write-up.
 
 Reuse `implement-issue` by reference for the mechanics: the worktree, the green-before-push set, one
 commit per review, and the triage rule (verify each finding, record each rejected one with its
-reason). Do not use it as a whole, because it ends in a ready PR and a stop for human review, and an
-experiment merges on its own under "Merging", below.
+reason). An experiment merges on its own under "Merging", below, so it does not stop for human
+review as `implement-issue` does.
 
-**A download follows the `data-download` and `data-validation` skills.** An experiment normally
-downloads at most one new dataset.
+**A download follows the `data-download` and `data-validation` skills.**
 
 ## Where the pieces live
 
 - **The id and the slug.** Call `studies.experiment_store.reserve_experiment(slug=...)`. It returns
-  the next five-digit id and creates `data/ml-experiments/<id>-<slug>/`. The slug is descriptive,
-  such as `era5-pretraining-for-pv`. An id is never reused.
+  the next five-digit id and creates `data/ml-experiments/<id>-<slug>/`. Make the slug descriptive.
 - **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
@@ -94,10 +88,7 @@ front matter, so a later session finds results with `grep` over `docs/ml-experim
   contrast through `studies.bootstrap.bootstrap_difference_at_level`, at the level a Bonferroni
   correction sets across the experiment's planned contrasts, with `n_resamples` raised so that each
   tail holds enough draws. A contrast counts as a gain by the `study` skill's rule: the interval
-  over repeated seeds excludes zero. The thresholds belong to the experiment and are stated in its
-  plan.
-- **Absolute scores.** Report each arm's absolute score beside every contrast, and a failures
-  section.
+  over repeated seeds excludes zero.
 - **A climatology row.** Include a month-by-half-hour climatology from
   `baseline_forecasters.climatology.ClimatologyForecaster`, trained on the fold's training window.
 - **No calendar memorisation.** A model must not be able to memorise the calendar position. The
@@ -107,7 +98,7 @@ front matter, so a later session finds results with `grep` over `docs/ml-experim
   of one valid time would otherwise sit on both sides of the split.
 - **The leaderboard.** An experiment whose output has `PowerForecast`'s columns and covers the
   reference experiment's row keys may post through `score_study.py`, as the `study` skill
-  describes. Posting is optional.
+  describes.
 
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
@@ -117,14 +108,13 @@ front matter, so a later session finds results with `grep` over `docs/ml-experim
 **Keep `result.md` to about a screen:** the verdict in one sentence, the winner with its interval,
 each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and the lessons
 learned. **A published page never names a generator, gives its identifier, or shows its time series
-beside either.** Use the anonymised labels the `study` skill describes. A table or figure that
-carries a number the report script did not print is wrong: print every number the page quotes from a
-committed script.
+beside either.** Use the anonymised labels the `study` skill describes. Print every number the page
+quotes from a committed script, as the `study` skill requires.
 
 ## Running a night's experiments
 
-The maintainer and Claude agree the next night's experiments by day. Each is a planned `result.md`,
-already committed. The overnight session:
+The maintainer and Claude agree the next night's experiments by day, each as a committed `result.md`
+with status `planned`. The overnight session:
 
 - **Runs the planned experiments in order.** It may add unplanned experiments up to the budget the
   agreed plan sets (for example, one that combines the night's winners), and labels each post hoc.
@@ -133,8 +123,7 @@ already committed. The overnight session:
 - **Stops between experiments, never mid-fit,** when the night's budget (hours or experiments) is
   spent.
 - **Ends with a morning report as its final message:** one line per experiment with its verdict and
-  link, what failed, and the hypotheses it proposes for the next plan. Each `result.md` is the
-  durable record.
+  link, what failed, and the hypotheses it proposes for the next plan.
 
 ## Merging
 
