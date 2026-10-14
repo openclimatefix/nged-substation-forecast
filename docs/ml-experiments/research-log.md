@@ -116,16 +116,21 @@ idea that has no folder yet is marked "proposed".
 | Proposed | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Needs a source of historical prices |
 
 **The embedded-solar proposal rests on one follow-up check of experiment 00006's residuals.** The
-check is by the 00006 session, its script is not committed, and its result is not in [PR #1202
-(Experiment 00006: which input features work best for the ERA5-trained demand
-model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202), which defines Primary
-substation 12 as the median-error Primary substation. The residual of the chosen-feature stage 1a
-XGBoost model at that substation was -5 to -6 points of capacity from 08:00 to 17:00 in June to
-August 2025, and about -1 point at night. In July 2025 the hourly residual correlated -0.44 with
-satellite irradiance from the Copernicus Atmosphere Monitoring Service (CAMS) and -0.23 with ERA5
-shortwave. CAMS alone explained 19% of the residual's variance, ERA5 alone 5%, and both together
-25%. The evidence is one substation, one month, and a CAMS site 10.3 km away, so it is indicative
-only. The sign of the residual fits embedded solar generation that ERA5's 31 km grid cells
+check was run by the 00006 session on CAMS irradiance at each demand series' own location, and its
+figures and script are in the write-up of [PR #1202 (Experiment 00006: which input features work
+best for the ERA5-trained demand
+model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202). At Primary substation
+12 (P12), the median-error Primary substation, the residual of the chosen-feature stage 1a XGBoost
+model was -5.3 points of capacity from 08:00 to 17:00 in June to August 2025, against -1.0 at night.
+In July 2025, a linear fit on the daylight hours explained 25.5% of the hourly residual's variance
+with irradiance from the Copernicus Atmosphere Monitoring Service (CAMS), 3.8% with ERA5 shortwave,
+and 43.3% with both. Across the 14 Primary series that have CAMS values, CAMS alone explained more
+than ERA5 alone in all 14: a median of 23.7% against 2.9%, and 39.8% with both. Two series differ
+from the pattern. One has a level shift in its error that irradiance does not explain, and in the
+other the residual correlates positively with CAMS irradiance, so the sign is not the same
+everywhere. The evidence is one month, an in-sample linear fit to neighbouring hours, and CAMS
+irradiance observed after the fact, so it shows that the gap exists and not that a forecast-time
+feature closes it. The negative sign fits embedded solar generation that ERA5's 31 km grid cells
 under-represent.
 
 **The three candidate statistics each compare what stage 1a predicted with what the substation
@@ -146,14 +151,12 @@ features and cannot extrapolate beyond its training range, and embedded solar ca
 steadily. The proposal is to give stage 2 the product of the slope and the forecast shortwave at
 each lead, which is the expected adjustment in points of capacity. A linear correction in stage 1b
 would extrapolate correctly where trees cannot. The experiment could compute each statistic twice,
-from ERA5 shortwave alone and from CAMS and ERA5 together, and use CAMS irradiance downloaded at
-each substation's own coordinates, which [PR #1201 (Download and validate CAMS irradiance at the
-demand series' locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201)
-provides for the 22 demand series of experiment 00003 and which may not cover every substation of
-00006. The P12 check used a CAMS site 10.3 km away because that was the nearest data on disk. CAMS
-has no forecast, so it can feed the statistics only at lag times. A cheap diagnostic comes first:
-plot each substation's trailing slope against time, and proceed only if the slope trends at the
-substations with the most solar.
+from ERA5 shortwave alone and from CAMS and ERA5 together. The CAMS irradiance at each demand
+series' own location comes from [PR #1201 (Download and validate CAMS irradiance at the demand
+series' locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201), which
+covers the 22 demand series of experiment 00003. CAMS has no forecast, so it can feed the statistics
+only at lag times. A cheap diagnostic comes first: plot each substation's trailing slope against
+time, and proceed only if the slope trends at the substations with the most solar.
 
 **The price proposal asks a different question from price forecasting.** Future electricity prices
 are hard to predict, so a price forecast is not the input. The proposal is to use the prices that
