@@ -153,7 +153,8 @@ exist until the release is cut. A later experiment that overturns an adopted res
 each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and the lessons
 learned. **A published page never names a generator, gives its identifier, or shows its time series
 beside either.** Use the anonymised labels the `study` skill describes. Print every number the page
-quotes from a committed script, as the `study` skill requires.
+quotes from a committed script, as the `study` skill requires. An experiment that plots feature
+importance follows the recipe in the `study` skill's "Design rules that keep a comparison fair".
 
 ## Running a night's experiments
 
