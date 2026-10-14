@@ -17,7 +17,7 @@ decision_rule: >-
   Supported if C1 (PRICE − BASE) and C2 (PRICE − SHUFFLED), pooled over fitted series, each have a
   point estimate of at most −0.1 points and a 97.5% month-resampled interval (95% familywise,
   Bonferroni across C1 and C2, deliberately conservative) that excludes zero in the selection year,
-and in the confirmation
+  and in the confirmation
   year, scored once, both intervals also exclude zero with the same sign. Refuted if the C1
   interval lies wholly above −0.1 points in both years. Otherwise inconclusive. C3, C4, and the
   residual breakdowns are descriptive and do not enter the rule.
