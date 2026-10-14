@@ -155,17 +155,18 @@ def block_cells(*, series: pl.DataFrame) -> pl.DataFrame:
     for row in nearest.iter_rows(named=True):
         lat_index = int(np.argmin(np.abs(latitudes - row["cell_latitude"])))
         lon_index = int(np.argmin(np.abs(longitudes - row["cell_longitude"])))
-        for i in range(-BLOCK_RADIUS_CELLS, BLOCK_RADIUS_CELLS + 1):
-            for j in range(-BLOCK_RADIUS_CELLS, BLOCK_RADIUS_CELLS + 1):
-                if 0 <= lat_index + i < len(latitudes) and 0 <= lon_index + j < len(longitudes):
-                    rows.append(
-                        {
-                            "time_series_id": row["time_series_id"],
-                            "latitude": float(latitudes[lat_index + i]),
-                            "longitude": float(longitudes[lon_index + j]),
-                            "is_nearest": i == 0 and j == 0,
-                        }
-                    )
+        offsets = range(-BLOCK_RADIUS_CELLS, BLOCK_RADIUS_CELLS + 1)
+        rows.extend(
+            {
+                "time_series_id": row["time_series_id"],
+                "latitude": float(latitudes[lat_index + i]),
+                "longitude": float(longitudes[lon_index + j]),
+                "is_nearest": i == 0 and j == 0,
+            }
+            for i in offsets
+            for j in offsets
+            if 0 <= lat_index + i < len(latitudes) and 0 <= lon_index + j < len(longitudes)
+        )
     return pl.DataFrame(rows).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
 
@@ -293,9 +294,9 @@ def cell_weather(*, cell_hourly: pl.DataFrame, latitude: float, longitude: float
         latitude=latitude,
         longitude=longitude,
     )
-    return grid.with_columns(wind_speed_10m=(pl.col("u10") ** 2 + pl.col("v10") ** 2).sqrt()).select(
-        "valid_time", *BLOCK_SOURCE
-    )
+    return grid.with_columns(
+        wind_speed_10m=(pl.col("u10") ** 2 + pl.col("v10") ** 2).sqrt()
+    ).select("valid_time", *BLOCK_SOURCE)
 
 
 def holiday_tables() -> tuple[pl.DataFrame, list[str]]:
@@ -311,8 +312,8 @@ def holiday_tables() -> tuple[pl.DataFrame, list[str]]:
     names = {d: str(n).removesuffix(" (observed)") for d, n in calendar.items()}
     name_list = sorted(set(names.values()))
     dates = pl.date_range(
-        datetime(HOLIDAY_YEARS.start, 1, 1).date(),
-        datetime(HOLIDAY_YEARS.stop - 1, 12, 31).date(),
+        datetime(HOLIDAY_YEARS.start, 1, 1, tzinfo=UTC).date(),
+        datetime(HOLIDAY_YEARS.stop - 1, 12, 31, tzinfo=UTC).date(),
         eager=True,
     )
     frame = pl.DataFrame({"date": dates}).with_columns(
@@ -370,9 +371,9 @@ def sun_columns(*, valid_time: pl.Series, latitude: float, longitude: float) -> 
     declination = np.radians(23.44) * np.sin(2.0 * np.pi * (284.0 + day) / 365.0)
     cos_hour_angle = np.clip(-np.tan(np.radians(latitude)) * np.tan(declination), -1.0, 1.0)
     length = 24.0 / np.pi * np.arccos(cos_hour_angle)
-    utc_hours = (
-        midpoint.dt.hour().to_numpy() + midpoint.dt.minute().to_numpy() / 60.0
-    ).astype(np.float64)
+    utc_hours = (midpoint.dt.hour().to_numpy() + midpoint.dt.minute().to_numpy() / 60.0).astype(
+        np.float64
+    )
     solar_time = (utc_hours + longitude / 15.0) % 24.0
     return pl.DataFrame(
         {
@@ -424,7 +425,9 @@ def _trailing_columns() -> list[pl.Expr]:
         for label, size in half_hours.items()
     ]
     columns += [
-        pl.col("temperature_2m").ewm_mean(half_life=hours * 2.0, adjust=False).alias(f"ewm_t_{name}")
+        pl.col("temperature_2m")
+        .ewm_mean(half_life=hours * 2.0, adjust=False)
+        .alias(f"ewm_t_{name}")
         for name, hours in {"12h": 12, "72h": 72, "7d": 168}.items()
     ]
     columns += [
@@ -505,7 +508,9 @@ def build_series_features(*, series: pl.DataFrame) -> pl.DataFrame:
             pl.col("time_series_id").is_in(series["time_series_id"].to_list()),
             pl.col("time") >= TRAIN_START,
         )
-        .select("time_series_id", pl.col("time").alias("valid_time"), pl.col("power").alias("power_mw"))
+        .select(
+            "time_series_id", pl.col("time").alias("valid_time"), pl.col("power").alias("power_mw")
+        )
         .collect()
         .filter(pl.col("power_mw").is_finite())
     )
@@ -541,7 +546,9 @@ def build_series_features(*, series: pl.DataFrame) -> pl.DataFrame:
             validate="1:1",
         )
         .join(
-            series.select("time_series_id", "effective_capacity_mw"), on="time_series_id", how="left"
+            series.select("time_series_id", "effective_capacity_mw"),
+            on="time_series_id",
+            how="left",
         )
         .with_columns(target=pl.col("power_mw") / pl.col("effective_capacity_mw"))
         .sort("time_series_id", "valid_time")

@@ -8,7 +8,8 @@ Stages (each writes predictions under `fits/<stage>/<fold>/`):
 - `drop_one`: the chosen set with each group removed.
 - `confirm`: the frozen set, run only on the confirmation fold, after `selection.json` exists.
 
-    uv run python ml-experiments/00006-stage1a-demand-input-feature-sweep/e00006_sweep.py add_one_in select_2024
+    uv run python ml-experiments/00006-stage1a-demand-input-feature-sweep/e00006_sweep.py \
+        add_one_in select_2024
 """
 
 import json
@@ -25,13 +26,15 @@ MIN_GAIN_POINTS: Final[float] = 0.1
 MAX_GREEDY_STEPS: Final[int] = 6
 SELECTION_PATH: Final[Path] = inputs.EXPERIMENT_DIR / "selection_Primary.json"
 FEATURE_GROUPS: Final[tuple[str, ...]] = tuple(
-    g for g in fit.GROUP_COLUMNS if g not in ("month_cat", "covid_graded")
+    g for g in fit.GROUP_COLUMNS if g not in ("month_cat", "covid_graded", "windchill_unguarded")
 )
 """The groups the add-one-in and greedy stages consider. The month categorical and the graded
 lockdown indicator are tested in their own stages."""
 
 
-def read_stage(*, stage: str, fold_name: str, config: str = "series", seed: int = 0) -> pl.DataFrame:
+def read_stage(
+    *, stage: str, fold_name: str, config: str = "series", seed: int = 0
+) -> pl.DataFrame:
     """Concatenate a stage's unit files for one fold."""
     folder = fit.FOLDS_DIR / stage / fold_name / config / f"seed{seed}"
     files = sorted(f for f in folder.glob("*.parquet") if not f.stem.endswith("_importance"))
@@ -50,7 +53,7 @@ def mae_points(*, frame: pl.DataFrame) -> dict[str, float]:
     per_series = frame.group_by("time_series_id").agg(
         [(pl.col(a) - pl.col("target")).abs().mean().alias(a) for a in arms]
     )
-    return {a: float(per_series[a].mean()) * 100.0 for a in arms}  # ty: ignore[unsupported-operator]
+    return {a: float(per_series[a].to_numpy().mean()) * 100.0 for a in arms}
 
 
 def add_one_in(*, fold_name: str) -> None:
@@ -61,7 +64,11 @@ def add_one_in(*, fold_name: str) -> None:
     for base in ((), ("clock",)):
         names += [fit.Arm(groups=base, treatments=(t,)).name for t in fit.TREATMENTS]
     fit.run_stage(
-        stage="add_one_in", fold_name=fold_name, config="series", arm_names=list(dict.fromkeys(names)), seeds=[0]
+        stage="add_one_in",
+        fold_name=fold_name,
+        config="series",
+        arm_names=list(dict.fromkeys(names)),
+        seeds=[0],
     )
 
 
@@ -85,7 +92,8 @@ def greedy(*, fold_name: str, substation_type: str | None = None) -> None:
     chosen: list[str] = ["clock"]
     scores = mae_points(
         frame=_only_type(
-            frame=read_stage(stage="add_one_in", fold_name=fold_name), substation_type=substation_type
+            frame=read_stage(stage="add_one_in", fold_name=fold_name),
+            substation_type=substation_type,
         )
     )
     current = scores[fit.Arm(groups=tuple(chosen)).name]
@@ -121,7 +129,9 @@ def drop_one(*, fold_name: str) -> None:
     selected = tuple(json.loads(SELECTION_PATH.read_text())["path"][-1]["set"])
     names = [fit.Arm(groups=selected).name]
     names += [fit.Arm(groups=tuple(g for g in selected if g != drop)).name for drop in selected]
-    fit.run_stage(stage="drop_one", fold_name=fold_name, config="series", arm_names=names, seeds=[0])
+    fit.run_stage(
+        stage="drop_one", fold_name=fold_name, config="series", arm_names=names, seeds=[0]
+    )
 
 
 def selected_groups() -> tuple[str, ...]:
@@ -143,7 +153,9 @@ def candidates(*, fold_name: str) -> None:
         fit.Arm(groups=chosen, train_start="2024-04").name,
         fit.Arm(groups=chosen, treatments=("recency",), train_start="2023-09").name,
     ]
-    fit.run_stage(stage="candidates", fold_name=fold_name, config="series", arm_names=names, seeds=[0])
+    fit.run_stage(
+        stage="candidates", fold_name=fold_name, config="series", arm_names=names, seeds=[0]
+    )
 
 
 def planned(*, fold_name: str) -> None:
@@ -158,7 +170,9 @@ def planned(*, fold_name: str) -> None:
         fit.Arm(groups=("clock", "covid_flag")).name,
         fit.Arm(groups=("clock",), treatments=("recency",)).name,
     ]
-    fit.run_stage(stage="planned", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+    fit.run_stage(
+        stage="planned", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2]
+    )
 
 
 def masking(*, fold_name: str) -> None:
@@ -174,11 +188,14 @@ def masking(*, fold_name: str) -> None:
             "dew_point_temperature_2m",
         ),
     }
-    names = []
-    for dropped in removals.values():
-        for extra in ((), ("doy1",), ("doy2",), ("month_cat",)):
-            names.append(fit.Arm(groups=("clock", *extra), dropped=dropped).name)
-    fit.run_stage(stage="masking", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+    names = [
+        fit.Arm(groups=("clock", *extra), dropped=dropped).name
+        for dropped in removals.values()
+        for extra in ((), ("doy1",), ("doy2",), ("month_cat",))
+    ]
+    fit.run_stage(
+        stage="masking", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2]
+    )
 
 
 def graded_covid(*, fold_name: str) -> None:
@@ -190,7 +207,26 @@ def graded_covid(*, fold_name: str) -> None:
         fit.Arm(groups=(*base, "covid_graded")).name,
         fit.Arm(groups=(*base, "covid_flag", "covid_graded")).name,
     ]
-    fit.run_stage(stage="graded_covid", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+    fit.run_stage(
+        stage="graded_covid", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2]
+    )
+
+
+def production_windchill(*, fold_name: str) -> None:
+    """Fit production's unguarded windchill expression, which the guarded arms do not test."""
+    names = [
+        fit.Arm(groups=()).name,
+        fit.Arm(groups=("windchill_unguarded",)).name,
+        fit.Arm(groups=("clock",)).name,
+        fit.Arm(groups=("clock", "windchill_unguarded")).name,
+    ]
+    fit.run_stage(
+        stage="production_windchill",
+        fold_name=fold_name,
+        config="series",
+        arm_names=names,
+        seeds=[0, 1, 2],
+    )
 
 
 def finals(*, fold_name: str) -> None:
@@ -206,7 +242,9 @@ def finals(*, fold_name: str) -> None:
         fit.Arm(groups=chosen, treatments=("recency",), train_start="2023-09"),
     ]
     names = [a.name for a in (*reference, *frozen, *recent)]
-    fit.run_stage(stage="finals", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+    fit.run_stage(
+        stage="finals", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2]
+    )
     median_arms = [a.name for a in (*reference, *frozen)]
     fit.run_stage(
         stage="finals_importance",
@@ -232,7 +270,12 @@ def finals(*, fold_name: str) -> None:
             f"{arm.name}|idcat",
         ]
     fit.run_stage(
-        stage="pooled", fold_name=fold_name, config="type", arm_names=pooled, seeds=[0], importance=True
+        stage="pooled",
+        fold_name=fold_name,
+        config="type",
+        arm_names=pooled,
+        seeds=[0],
+        importance=True,
     )
 
 
@@ -246,7 +289,9 @@ def type_sets(*, fold_name: str) -> None:
             fit.Arm(groups=groups).name,
             fit.Arm(groups=groups, treatments=("recency",)).name,
         ]
-    fit.run_stage(stage="type_sets", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+    fit.run_stage(
+        stage="type_sets", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2]
+    )
 
 
 def main() -> None:
@@ -255,7 +300,18 @@ def main() -> None:
     if stage.startswith("greedy_"):
         greedy(fold_name=fold_name, substation_type=stage.removeprefix("greedy_"))
         return
-    {"add_one_in": add_one_in, "greedy": greedy, "drop_one": drop_one, "candidates": candidates, "finals": finals, "type_sets": type_sets, "graded_covid": graded_covid, "masking": masking, "planned": planned}[stage](fold_name=fold_name)
+    {
+        "add_one_in": add_one_in,
+        "greedy": greedy,
+        "drop_one": drop_one,
+        "candidates": candidates,
+        "finals": finals,
+        "production_windchill": production_windchill,
+        "type_sets": type_sets,
+        "graded_covid": graded_covid,
+        "masking": masking,
+        "planned": planned,
+    }[stage](fold_name=fold_name)
 
 
 if __name__ == "__main__":

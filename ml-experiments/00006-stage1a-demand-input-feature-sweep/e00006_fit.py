@@ -12,6 +12,8 @@ arm, and is skipped if the file exists, so a crash costs one unit.
     uv run python ml-experiments/00006-stage1a-demand-input-feature-sweep/e00006_fit.py --help
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import multiprocessing
@@ -20,7 +22,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
 import e00006_inputs as inputs
 import numpy as np
@@ -91,6 +93,7 @@ GROUP_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "covid_flag": ("covid_indicator",),
     "covid_graded": ("covid_graded",),
     "month_cat": ("month_local",),
+    "windchill_unguarded": ("windchill_unguarded_c",),
 }
 """The column groups an arm can add to `W`, each computable at forecast time."""
 
@@ -137,11 +140,12 @@ class Arm:
         return frozenset(
             c
             for c in self.columns
-            if c in ("holiday_name_code", "month_local") or (c == "series_code" and self.series_code == "cat")
+            if c in ("holiday_name_code", "month_local")
+            or (c == "series_code" and self.series_code == "cat")
         )
 
     @classmethod
-    def from_name(cls, name: str) -> "Arm":
+    def from_name(cls, name: str) -> Arm:
         """Parse a name written by `name`."""
         head, *extras = name.split("|")
         groups = tuple(head.split("+")[1:])
@@ -153,8 +157,16 @@ class Arm:
             raise ValueError(msg)
         treatments = tuple(e for e in extras if e in TREATMENTS)
         start = next((e.removeprefix("from") for e in extras if e.startswith("from")), None)
-        code = next((e.removeprefix("id") for e in extras if e in ("idint", "idcat")), "none")
-        return cls(groups=groups, dropped=dropped, treatments=treatments, train_start=start, series_code=code)  # ty: ignore[invalid-argument-type]
+        code: Literal["none", "int", "cat"] = (
+            "int" if "idint" in extras else "cat" if "idcat" in extras else "none"
+        )
+        return cls(
+            groups=groups,
+            dropped=dropped,
+            treatments=treatments,
+            train_start=start,
+            series_code=code,
+        )
 
 
 def arm_names_with(*, base: Sequence[str], extra: Sequence[str]) -> list[str]:
@@ -183,7 +195,9 @@ def _train_matrix(*, rows: pl.DataFrame, arm: Arm, weights: np.ndarray | None) -
     return matrix
 
 
-def _train_rows(*, arm: Arm, fold: Fold, frame: pl.DataFrame) -> tuple[pl.DataFrame, np.ndarray | None]:
+def _train_rows(
+    *, arm: Arm, fold: Fold, frame: pl.DataFrame
+) -> tuple[pl.DataFrame, np.ndarray | None]:
     rows = frame.filter(
         pl.col("target").is_not_null(),
         pl.col("valid_time") >= _train_start(arm=arm, fold=fold),
@@ -243,18 +257,20 @@ def importance_rows(
     column is shuffled across the validation rows. Gain favours columns with many distinct values,
     so the two are reported side by side.
     """
-    gain = booster.get_score(importance_type="gain")
+    gain = cast("dict[str, float]", booster.get_score(importance_type="gain"))
     total = sum(gain.values()) or 1.0
     names = {f"f{i}": c for i, c in enumerate(arm.columns)}
     baseline_matrix = _matrix(frame=valid, arm=arm)
     target = valid["target"].to_numpy()
     baseline = float(np.abs(booster.predict(baseline_matrix) - target).mean()) * 100.0
     rng = np.random.default_rng(seed)
-    rows = []
+    rows: list[dict[str, object]] = []
     for column in arm.columns:
         increases = []
         for _ in range(PERMUTATION_REPEATS):
-            shuffled = valid.with_columns(pl.Series(column, rng.permutation(valid[column].to_numpy())))
+            shuffled = valid.with_columns(
+                pl.Series(column, rng.permutation(valid[column].to_numpy()))
+            )
             error = np.abs(booster.predict(_matrix(frame=shuffled, arm=arm)) - target).mean()
             increases.append(float(error) * 100.0 - baseline)
         rows.append(
@@ -263,7 +279,8 @@ def importance_rows(
                 "unit": unit,
                 "seed": seed,
                 "column": column,
-                "gain_share": gain.get(next(k for k, v in names.items() if v == column), 0.0) / total,
+                "gain_share": gain.get(next(k for k, v in names.items() if v == column), 0.0)
+                / total,
                 "permutation_points": float(np.mean(increases)),
             }
         )
@@ -275,8 +292,19 @@ def unit_path(*, stage: str, fold_name: str, config: str, unit: str, seed: int) 
     return FOLDS_DIR / stage / fold_name / config / f"seed{seed}" / f"{unit}.parquet"
 
 
+def _production_windchill() -> pl.Expr:
+    """Return production's windchill expression, which has no guard on its valid range."""
+    factor = (pl.col("wind_speed_10m") * 3.6) ** 0.16
+    return (
+        13.12
+        + 0.6215 * pl.col("temperature_2m")
+        - 11.37 * factor
+        + 0.3965 * pl.col("temperature_2m") * factor
+    )
+
+
 def _load(*, unit: str, config: str, fold: Fold) -> pl.DataFrame | None:
-    """Load a unit's rows (one series, or every series of one type), or None if it cannot be fitted."""
+    """Load a unit's rows (a series, or every series of a type), or None if it cannot be fitted."""
     series = pl.read_parquet(inputs.INPUTS_DIR / "series.parquet")
     wanted = (
         series.filter(pl.col("time_series_id") == int(unit))
@@ -301,6 +329,7 @@ def _load(*, unit: str, config: str, fold: Fold) -> pl.DataFrame | None:
     return frame.with_columns(
         series_code=pl.col("time_series_id").replace_strict(codes, return_dtype=pl.Int32),
         month_local=pl.col("valid_time").dt.convert_time_zone("Europe/London").dt.month(),
+        windchill_unguarded_c=_production_windchill(),
     )
 
 
@@ -375,7 +404,9 @@ def run_stage(
     )
     nthread = 1 if config == "series" else max(1, workers // len(units))
     context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(max_workers=min(workers, len(units) * len(seeds)), mp_context=context) as pool:
+    with ProcessPoolExecutor(
+        max_workers=min(workers, len(units) * len(seeds)), mp_context=context
+    ) as pool:
         futures = [
             pool.submit(
                 run_unit,
