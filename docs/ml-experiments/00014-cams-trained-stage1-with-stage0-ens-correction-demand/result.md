@@ -70,7 +70,7 @@ advice:
   - >-
     Fit a stage 0 on the whole ENS ensemble, not on the control member alone, when the pairs exist:
     the training table held member 0 only, which this experiment could not test (Known limits).
-production_status: not-for-production
+production_status: candidate
 adopted_in: none
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1219
 code: ml-experiments/00014-cams-trained-stage1-with-stage0-ens-correction-demand/
@@ -161,9 +161,10 @@ The training table holds one member per run, assumed exchangeable with the other
 size.** Stage 0 lowers the Primary quantile score of the CAMS-trained arm by 0.067 points of
 capacity (C2, 97.5% interval -0.094 to -0.039, half-width 0.028), more than the -0.03 the plan
 required, and in 12 of 12 months and 14 of 16 series. The rule also required that the corrected ENS
-shortwave stay within 5% of CAMS in every month, and the bias check failed. C1 reproduces experiment
-00009's -0.035 (-0.070 to +0.001) exactly, and the repeated raw-input quantiles differ from 00009's
-by 0.000 in every level over 3,074,760 rows each.
+shortwave stay within 5% of CAMS in every month, and the bias check failed. C2 is not a small gain:
+its interval lies wholly beyond the planned threshold, and only the bias check prevents a verdict of
+supported. C1 reproduces experiment 00009's -0.035 (-0.070 to +0.001) exactly, and the repeated
+raw-input quantiles differ from 00009's by 0.000 in every level over 3,074,760 rows each.
 
 | Arm | Primary quantile score | BSP | GSP | Primary error of the median |
 | --- | --- | --- | --- | --- |
