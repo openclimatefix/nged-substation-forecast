@@ -173,6 +173,7 @@ nav:
       - "Live service: what's left to build": roadmap/live-service.md
       - Metrics and leaderboard: roadmap/metrics-and-leaderboard.md
       - Net-demand disaggregation: roadmap/disaggregation.md
+      - Staged probabilistic forecast: roadmap/staged-probabilistic-forecast.md
       - Switching events: roadmap/switching-events.md
       - Extending the training history: roadmap/training-history.md
       - XGBoost improvements: roadmap/xgboost-improvements.md

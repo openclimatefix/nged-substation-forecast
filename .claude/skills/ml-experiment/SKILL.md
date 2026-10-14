@@ -68,8 +68,8 @@ review as `implement-issue` does.
   conflict on rebase; keep both.
 - **The research log and plan:** `docs/ml-experiments/research-log.md` lists every finished
   experiment in the order it was started, with its question, headline result, date, and links.
-  `docs/ml-experiments/research-plan.md` lists the planned and proposed experiments in the order
-  they should run. Keep both current in the same PR that changes an experiment's state, as the next
+  `docs/ml-experiments/research-plan.md` lists the planned and proposed experiments, sorted by
+  priority. Keep both current in the same PR that changes an experiment's state, as the next
   section says.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
