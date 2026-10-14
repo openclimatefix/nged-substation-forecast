@@ -187,9 +187,9 @@ def run_statistics(
         powers: For each configuration, this series' observed power on the grid.
         predictions: For each configuration and seed, this series' ERA5 predictions on the grid.
         models: The booster cache.
-        coordinates: The series' latitude and longitude, which never leave this process.
         chained: Whether to use each valid time's forward-chain model (calibration) instead of
             the final model (validation).
+        coordinates: The series' latitude and longitude, which never leave this process.
 
     Returns:
         One row per case, configuration, seed, and kind with `mean`, `std`, and the 9 quantiles.
