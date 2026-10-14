@@ -27,6 +27,20 @@ headline: >-
   D1, s1_memberavg minus ens_trained, weather only, all leads: +1.37 (+0.68 to +2.17), 22 series;
   with calendar +1.38 (D2, against the one-row-per-valid-time arm: +1.67); with calendar and
   lags +0.10 (-0.26 to +0.50). Not supported.
+advice:
+  - >-
+    Train the demand stage 1a on ERA5 from 2023-09 rather than 2019-09: the error fell by 1.32
+    points (weather only) and 1.49 points (with calendar), and a 2024-04 start was not better
+    than 2023-09. The study does not isolate whether embedded generation, changes in the
+    electricity network, or the pandemic years cause the difference (history section).
+  - >-
+    Give a guard arm the variant it guards, and check that the guard arm's own error is sensible
+    (lessons).
+  - >-
+    Report the weekday-by-lead balance of any row set whose runs share a weekday (lessons).
+  - >-
+    Test ERA5 training on recent years, or recency weights, with the short-history effect
+    separated from demand drift (lessons).
 code: studies/stage1_pilot/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1192
 ---
