@@ -275,16 +275,17 @@ Primary substations and the 73 runs of `fold_a_every5d_v1`.
 ### 00018: the staged chain against the single-stage model for Primary demand
 
 **The staged chain, built only from weather that serving has and with NGED's real telemetry delay,
-scored the same as N1 and behind `manual_heuristic` on the quantile score.** The experiment gave the
-stage 2 calibrator lag anomalies from ERA5T, CAMS, and the ENS control member's early leads, with
-the newest usable power 7 hours before the 09:00 UTC origin.
+had a quantile score not distinguishable from N1's and a point estimate above
+`manual_heuristic`'s.** The experiment gave the stage 2 calibrator lag anomalies from ERA5T, CAMS,
+and the ENS control member's early leads, with the newest usable power 7 hours before the 09:00 UTC
+origin.
 
 - **Headline result:** the chain minus N1 was +0.08 points of capacity over all leads (99.17%
   interval -0.11 to +0.25), -0.27 up to 48 hours (-0.62 to +0.03). The chain minus
   `manual_heuristic` was +0.52 (-0.25 to +1.25).
 - **Absolute scores (all leads):** `manual_heuristic` 5.89, N1 6.33, chain 6.41.
 - **What the serving sources cost:** 0.13 points against final ERA5, and 3.5 more hours of telemetry
-  delay cost another 0.13. Lag anomalies added 0.04 to raw lagged power.
+  delay cost another 0.13. Lag anomalies lowered the score by 0.04 against raw lagged power.
 - **Finding for later experiments:** a spread factor of 1.15 lifts the 5% to 95% coverage from 86%
   to 90%, and every arm under-forecast the validation year by 1.3 to 3.5 points.
 - **Write-up and pull request:** [result](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md),
