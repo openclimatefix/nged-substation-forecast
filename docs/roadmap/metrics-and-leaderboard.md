@@ -22,6 +22,9 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 
 ---
 
+**See also [A staged probabilistic forecast](staged-probabilistic-forecast.md)**, which proposes how
+calibrated quantiles and coherent ensemble members would be produced.
+
 ## The leaderboard concept 🚧
 
 Issue: [#4](https://github.com/openclimatefix/nged-substation-forecast/issues/4)

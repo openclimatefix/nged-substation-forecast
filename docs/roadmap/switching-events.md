@@ -28,6 +28,9 @@ nearest-term piece is the **two-stage
 
 ---
 
+**See also [A staged probabilistic forecast](staged-probabilistic-forecast.md)**, which reuses the
+stage 1 weather-to-power baseline for switching detection.
+
 ## The approaches
 
 The work is organised as a set of **named approaches**, tried in the order set out just below. The
@@ -1151,7 +1154,6 @@ is convex: [Convex Optimisation](../techniques/convex-optimisation.md).
 import cvxpy as cp
 import numpy as np
 
-
 def fit_edge_flows(R, B, lam_fused, lam_sparse, lam_anomaly, weights=None):
     """Joint convex estimator for switching events (untested sketch).
 
@@ -1195,7 +1197,6 @@ def fit_edge_flows(R, B, lam_fused, lam_sparse, lam_anomaly, weights=None):
     )
     prob.solve(solver=cp.CLARABEL)  # or ECOS / SCS
     return e.value, u.value
-
 
 def extract_events(edge_flows, edge_list, times, tol=1e-4):
     """Turn fitted flows into event records: maximal nonzero runs per edge.
