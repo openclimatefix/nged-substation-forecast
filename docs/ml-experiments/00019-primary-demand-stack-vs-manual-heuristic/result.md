@@ -31,8 +31,8 @@ decision_rule: >-
   A component earns a place in the release when its drop contrast (C4 to C6) has an interval wholly
   above zero and a point estimate of at least the threshold: 0 for the half-life and the spread
   factor (they change a number in the fit or the output) and 0.10 points for the correction (a new
-  pipeline step). C3 and C7 to C9 decide no verdict but count in the Bonferroni family. The mean absolute error of the median is reported beside the quantile score and
-  decides nothing.
+  pipeline step). C3 and C7 to C9 decide no verdict but count in the Bonferroni family. The mean absolute error of the median is reported beside the
+  quantile score and decides nothing.
 benchmark: >-
   `manual_heuristic`, `climatology`, and the production recipe (stored, 00013), and N1 (00013).
 row_set_id: fold_a_every5d_v1
