@@ -81,8 +81,8 @@ the code runs, so the commit order proves the hypothesis came first. Its front m
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
 the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
 `failed`), the best arm with its headline number, and the lessons learned. A finished experiment
-whose winner is ported into production also has an `informs` field, naming the production setting
-it decided (a configuration key or a code path). Every result has the same front matter, so a later
+also has `production_status` (`candidate`, `adopted`, `superseded`, or `not-for-production`) and
+`adopted_in` (the model release number, or `none`). Every result has the same front matter, so a later
 session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 ## How to score
@@ -132,13 +132,17 @@ folder yet goes in the planned table marked "Proposed". An experiment that ends 
 
 ## When a winner reaches production
 
-**The pull request that ports an experiment's winner into the production pipeline records why.** In
-the same change, set `informs` in the experiment's `result.md` to the setting the experiment
-decided, and add a row to the table in `docs/architecture/design-evidence.md`: the production
-setting, what production now does, a link to the experiment, and its verdict. A `supported` or
-`refuted` verdict earns a row, and an `inconclusive` or `invalid` one does not. The first row
-replaces the "None yet" placeholder. An experiment that later overturns a row changes the row in
-place, and a row whose setting production drops is deleted.
+**Flag each finished experiment for the next model release.** Set `production_status` in
+`result.md` to `candidate` when the verdict is `supported` or `partly supported` and the result is
+worth considering for the next model release, and to `not-for-production` for a diagnostic, a
+refuted idea, or a stage that failed its test. The log's "Candidates for the next release" section
+is the agenda for the maintainer's release review.
+
+**The pull request that ports a winner into the production pipeline records why.** In the same
+change, set `production_status` to `adopted` and `adopted_in` to the model release number in the
+experiment's `result.md`, move its row in the research log, and add the experiment to the release
+log's row for that release. A later experiment that overturns an adopted result sets
+`production_status` to `superseded` on the old experiment and names the new one in the log.
 
 ## The write-up
 

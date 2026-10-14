@@ -18,6 +18,8 @@ benchmark: >-
 row_set_id: fold_a_tuesdays_v1
 metric: CRPS estimated from 9 quantile levels, points of capacity
 verdict: partly supported
+production_status: candidate
+adopted_in: none
 best_arm: b_mixture_full
 headline: >-
   Q3, b_mixture_full minus a_ens_quantile, all leads: wind -0.62 (-0.99 to -0.26), solar -0.24

@@ -97,7 +97,6 @@ nav:
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - Code style: architecture/code-style.md
       - Testing: architecture/testing.md
-      - The experiments behind the production design: architecture/design-evidence.md
   - Studies:
       - Overview: studies/index.md
       - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md

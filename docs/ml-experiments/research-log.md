@@ -1,18 +1,29 @@
 # Research log of the ML experiments
 
-**This page lists every ml-experiment in the order it was started, what it set out to find, and
-what it found.** A reader who wants the headline of each experiment, or wants to know what is
-planned next, starts here and follows the link to the experiment's `result.md` for the numbers. The
-[experiments behind the production design](../architecture/design-evidence.md) is a shorter page: it
-lists only the experiments whose winners production now uses.
+**This page lists every ml-experiment in the order it was started, what it set out to find, and what
+it found.** A reader who wants the headline of each experiment, or wants to know what is planned
+next, starts here and follows the link to the experiment's `result.md` for the numbers. Each
+experiment carries a production status. The maintainer reviews the candidates every one to two weeks
+and ports the best into a new model release; the release log records which experiments each release
+adopted.
+
+## Candidates for the next release
+
+**These experiments are flagged `candidate` and are not yet adopted.** The flags are proposals for
+the maintainer to confirm.
+
+| Id | What would change in production | Note |
+|---|---|---|
+| [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Train the weather-to-power model on ERA5 and apply it to ENS members | Needs the staged design, and helps only up to day 6 |
+| [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
 
 ## The experiments so far
 
-| Id | Question | Verdict | Merged |
-|---|---|---|---|
-| [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | 2026-10-14 |
-| [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | 2026-10-14 |
-| [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | 2026-10-14 |
+| Id | Question | Verdict | Production status | Merged |
+|---|---|---|---|---|
+| [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
+| [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
+| [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 

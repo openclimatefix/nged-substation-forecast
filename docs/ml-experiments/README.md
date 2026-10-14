@@ -5,9 +5,8 @@ forecast, named `<id>-<slug>`. The id is a five-digit integer that orders the ex
 order in which they were started. The folder holds `result.md` and its figures, and the front matter
 of `result.md` states the hypothesis, the prediction, the decision rule, and the verdict.
 
-When an experiment's winner is ported into production, its `result.md` also gets an `informs` field
-naming the production setting it decided, and [the experiments behind the production
-design](../architecture/design-evidence.md) gains a row.
+The front matter of `result.md` also says whether the result is a candidate for the next model
+release (`production_status`) and, once ported, which release adopted it (`adopted_in`).
 
 The [research log](research-log.md) lists every experiment in the order it was started, with its
 question, headline result, and link, and it lists the experiments that are planned.
