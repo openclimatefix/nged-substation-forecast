@@ -125,6 +125,9 @@ def series_table(*, full: bool = False) -> pl.DataFrame:
 
     A smoke test returns two series unless `full` is set.
 
+    Args:
+        full: Return all 20 series even in a smoke test.
+
     Returns:
         One row per series with `time_series_id`, `site` (D1 to D22), `substation_type`, and
         `effective_capacity_mw`, sorted by the site's number.
