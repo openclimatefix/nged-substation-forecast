@@ -59,7 +59,7 @@ advice:
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00015-same-time-price-stage1-demand/
-pull_request: null
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1220
 ---
 
 # Does the same-time electricity price help a stage 1 demand model explain power?
