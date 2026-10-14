@@ -19,7 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P6](#p6-primary-substation-demand-against-the-stored-baselines) | Where does Primary substation demand stand: how do `manual_heuristic`, `climatology`, the production recipe, an upgraded single-stage model (N1: a quantile model trained on ENS with the 00006 columns, recency weights, a 2023-09 start, and lags measured from the forecast origin), and stage 1 without lags score on one row set? | 1 | Nothing | Proposed; the three baselines are already stored |
-| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing for the second stage; the slope statistics wait for the second stage | Its cheap first test, experiment 00007, was inconclusive. The second stage is planned as experiment 00009, in [PR #1213 (Plan experiment 9: CAMS-trained stage 1a against ERA5-trained, for demand)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213), with no fits yet |
+| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | P6 | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
 | [P17](#p17-input-features-for-solar-and-wind) | Which input features and which training start are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
@@ -125,27 +125,6 @@ excludes zero, and it is absent in the night-time residuals. A second candidate:
 arm lowers the confirmation-year daylight quantile score at Primary substations by at least 0.2
 points of capacity, with a month-block bootstrap interval that excludes zero. Otherwise the
 hypothesis is refuted. The thresholds are proposals for the planning step to confirm.
-
-#### Second stage: CAMS irradiance in place of ERA5 for stage 1a training
-
-**A second stage of P2 could train stage 1a on CAMS irradiance, where the first test uses CAMS only
-to read the residuals.** The stage 1a XGBoost model would train with CAMS shortwave in place of
-ERA5's and be applied to ENS weather members, with the other weather columns staying ERA5. CAMS has
-no forecast, so it can be an input in training only. This departs from the requirement above that
-training use the source available at forecast time, and it creates a mismatch: the stage 1a XGBoost
-model trains on satellite-derived irradiance and is applied to forecast irradiance. The comparison
-shows what the departure costs or gains. The arms would be the ERA5-trained stage 1a XGBoost model
-and the same model with CAMS in place of ERA5 shortwave, on the 20 series of experiment 00005 (16
-Primary, 2 bulk-supply point, and 2 grid-supply point series), using experiment 00005's folds and
-quantile score.
-
-**Experiment 00009, the CAMS-trained stage 1a, tests the irradiance explanation directly, because
-00007 was inconclusive.** If training on CAMS removes the residual at the source, the slope
-statistics of this section are not needed. If the residual remains, or the cause is a change in
-solar capacity, the slope statistics become the next test. A candidate decision rule for 00009: the
-CAMS-trained arm lowers the quantile score at Primary substations by at least 0.2 points of
-capacity, with a month-block bootstrap interval that excludes zero. The threshold is a proposal for
-the experiment's plan to confirm.
 
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope

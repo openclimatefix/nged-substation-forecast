@@ -30,6 +30,7 @@ the maintainer to confirm.
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
 | [00007](00007-cams-static-correction-stage1a-residual/result.md) | Does a static CAMS correction fitted on one year remove most of the next year's daytime stage 1a residual? | Inconclusive | Not for production | Not yet merged |
 | [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | Not yet merged |
+| [00009](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, when both are applied to ENS members? | Refuted: a gain of 0.035 points, not 0.2 | Not for production | Not yet merged |
 | [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -192,6 +193,23 @@ stage 1 statistics on the same 73 runs, and every arm with ERA5 residuals is a c
   calibrator)](https://github.com/openclimatefix/nged-substation-forecast/pull/1209).
 
 ![Summaries alone clearly beat no recent power](00008-lag-summaries-in-stage2-calibrator-demand/figure_2.svg)
+
+### 00009: a stage 1a trained on CAMS irradiance, for demand
+
+**Training stage 1a on CAMS irradiance in place of ERA5 shortwave lowered the Primary quantile score
+by 0.035 points of capacity, a sixth of the 0.2 points the plan required.** The contrast over all
+leads at the 16 Primary substations is -0.035 (97.5% interval -0.070 to +0.001), and -0.043 (-0.081
+to -0.004) without the substation that set experiment 00007's pooled figure. The score falls by 0.07
+to 0.08 points in the first 2 days, no gain is resolved from day 7, and the gain appears in daylight
+only. At the observed weather, where the CAMS-trained arm also reads CAMS, the daylight error of the
+median falls by 0.88 points, so the smaller gain at ENS is probably a mismatch at application: the
+ENS members' shortwave averages 7% above ERA5's, which this experiment did not test. The paired
+interval was far narrower than the plan guessed (0.035 points either side, not 0.2). See
+[`result.md`](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) and [PR #1213 (Experiment
+9: does a stage 1a trained on CAMS irradiance beat one trained on ERA5
+shortwave?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213).
+
+![Contrast of the CAMS-trained arm by scope](00009-cams-trained-stage1a-vs-era5-trained-demand/figure_1.svg)
 
 ### 00010: the lagged electricity price in the stage 1a demand model
 
