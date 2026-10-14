@@ -12,16 +12,17 @@ prediction: >-
   the median at the listed substation (B2) by at least 0.5 points of capacity, and by less than 0.1
   points at the unlisted series.
 decision_rule: >-
-  Supported if C1 and C2 are both material at B2. A contrast is material if its 98.3%
-  month-resampled interval (95% familywise, Bonferroni across the three verdict contrasts C1 to
-  C3) excludes zero and its point estimate is at least 0.1 points in the direction stated.
-  Refuted if the C1 interval at B2 excludes a gain of 0.3 points. Otherwise inconclusive. The
-  selection year decides; the confirmation year is scored once, and if its C1 interval at B2
-  excludes the selection year's point estimate the verdict is inconclusive. Before any fit, the
-  half-width of B2's interval is computed from experiment 00006's per-month losses; if it exceeds
-  0.3 points the refuted branch is dropped and the best possible verdict is supported or
-  inconclusive. C4, the listed against unlisted comparison, rests on two listed series and is
-  reported but cannot change the verdict.
+  Supported only if C1, C2, and C4 are all material. A contrast is material if its 98.3%
+  month-resampled interval (95% familywise, Bonferroni across the three verdict contrasts C1, C2,
+  and C4) excludes zero and its point estimate is at least 0.1 points in the direction stated, and
+  for C4 at least 0.2 points: the gain at the two listed series (B2 and P4) must exceed the gain at
+  the other 18 series by that margin, the pattern a battery response predicts. C1 and C2 are read at
+  the listed series pooled, and at B2 alone. Otherwise the verdict is inconclusive, or refuted if
+  the C1 interval at the listed series pooled excludes a gain of 0.3 points. The selection year
+  decides; the confirmation year is scored once, and if its C1 interval excludes the selection
+  year's point estimate the verdict is inconclusive. C3 is a check on the price columns' calendar
+  structure and does not enter the rule. The power check below shows the refuted branch is
+  probably unreachable, so with two listed series the likely verdict is inconclusive.
 benchmark: >-
   The experiment 00006 Primary input set with recency weights (arm BASE), and a month-by-half-hour
   climatology row.
@@ -90,7 +91,7 @@ subsampling), seeds, and the 7-day purge are those of 00006.
 | BASE | nothing |
 | PRICE | `price_lag7d` (price at the same half-hour 7 days earlier), `price_min_lag7d` and `price_max_lag7d` (the minimum and maximum over the 48 half-hours ending at the valid time minus 7 days, so nothing post-dates the valid time minus 7 days) |
 | CONTROL | three columns with no price in them, matching PRICE's count: GB national demand outturn (Elexon `INDO`) at the same half-hour 7 days earlier, wind generation (Elexon `FUELHH`) at the same half-hour 7 days earlier, and the range of demand minus wind over the 48 half-hours ending 7 days earlier |
-| SHUFFLED | the three PRICE columns, all taken from one other week of the same weekday and half-hour, drawn with a fixed seed from within 4 weeks of the true week (a negative control) |
+| SHUFFLED | the three PRICE columns, all taken from one other week of the same weekday and half-hour, drawn with a fixed seed from 1 to 4 weeks further back than the true lag (a negative control) |
 
 **Weather and timing caveat.** The weather block is ERA5 read at the valid time, as in 00006, so
 every score is a ceiling for the same reason 00005's was: ERA5 arrives about 5 days late. The
@@ -105,12 +106,13 @@ price's information, and it is the control for that.
 
 All are differences in mean absolute error of the median, in points of capacity, over the
 selection year (2024-07 to 2025-06) and then, once, the confirmation year (2025-07 to 2026-06),
-with a month-resampled interval at the level a Bonferroni correction over four contrasts sets.
+with a month-resampled interval at the 98.3% level that the decision rule sets.
 
 - **C1:** PRICE − BASE.
 - **C2:** PRICE − CONTROL (what the price adds beyond national demand and wind).
 - **C3:** PRICE − SHUFFLED (what the price adds beyond the calendar structure of the price columns).
-- **C4:** the gain PRICE − BASE at the listed series minus the gain at the unlisted series.
+- **C4:** the gain PRICE − BASE at the two listed series minus the gain at the other 18, with the
+  months resampled (a verdict contrast, as the decision rule says).
 
 ## The listed substations, chosen before any fit
 
@@ -136,8 +138,11 @@ result for the 20 series 00006 scored:
 
 **The listed group has two members, one of them with a 0.37 MW battery, so the mechanism cannot be
 tested well with this series set.** C4 compares two listed series with the rest. The verdict
-therefore rests on C1 and C2 at B2, the only series with a battery that is large against the
-series. P4 is reported beside B2. The advice for a later experiment is to repeat the test on a
+therefore needs C4, and the register in the embedded-battery and unmetered-battery studies adds no
+further series: the unmetered-battery study's screen found no battery at any of its eight primaries,
+including the two the register lists with connected storage, so no other series can be named from
+data independent of the outcome. P4's battery is 0.37 MW. The advice for a later experiment is to
+repeat the test on a
 series set with more battery sites. No series is added after seeing results.
 
 ## Power check, run before any fit

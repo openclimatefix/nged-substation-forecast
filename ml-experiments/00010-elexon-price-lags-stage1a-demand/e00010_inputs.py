@@ -9,7 +9,7 @@ Three column sets are added, each of three columns:
 
 - `price_lag7d`, `price_min_lag7d`, `price_max_lag7d`: the price at the half-hour, and the minimum
   and maximum of the 48 half-hours ending there.
-- `shuffled_*`: the same three, taken from one other week within 4 weeks, drawn with a fixed seed.
+- `shuffled_*`: the same three, taken from one earlier week, 1 to 4 weeks further back, drawn with a fixed seed.
 - `demand_lag7d`, `wind_lag7d`, `residual_range_lag7d`: national demand (INDO) and wind (FUELHH
   `WIND`) at the half-hour, and the range of demand minus wind over the 48 half-hours ending there.
 
@@ -34,7 +34,7 @@ LAG: Final[timedelta] = timedelta(days=7)
 HALF_HOUR: Final[timedelta] = timedelta(minutes=30)
 WINDOW: Final[int] = 48
 MIN_WINDOW_SAMPLES: Final[int] = 40
-SHUFFLE_WEEKS: Final[tuple[int, ...]] = (-4, -3, -2, -1, 1, 2, 3, 4)
+SHUFFLE_WEEKS: Final[tuple[int, ...]] = (1, 2, 3, 4)
 SHUFFLE_SEED: Final[int] = 10010
 PRICE_COLUMNS: Final[tuple[str, ...]] = ("price_lag7d", "price_min_lag7d", "price_max_lag7d")
 SHUFFLED_COLUMNS: Final[tuple[str, ...]] = (
@@ -105,7 +105,7 @@ def control_table() -> pl.DataFrame:
 
 
 def shuffle_weeks(*, n_weeks: int) -> np.ndarray:
-    """Return, for each week index, a nonzero week offset within 4 weeks, from a fixed seed."""
+    """Return, for each week index, an extra lag of 1 to 4 weeks, from a fixed seed."""
     rng = np.random.default_rng(SHUFFLE_SEED)
     return rng.choice(np.array(SHUFFLE_WEEKS), size=n_weeks)
 
