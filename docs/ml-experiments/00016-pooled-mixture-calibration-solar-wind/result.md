@@ -60,7 +60,7 @@ pull_request: pending
 - **Departs from:** nothing. No arm uses lagged power, so the advice on lagged power does not
   apply.
 - **Not tested:** the PV ratio target and the wind `base_margin` that the research plan lists for
-  P12. Experiment 00012 found them within 0.05 points of its benchmark (C3, C4), and they change
+  this proposal. Experiment 00012 found them within 0.05 points of its benchmark (C3, C4), and they change
   stage 1a and not its calibration.
 
 ## Setup
