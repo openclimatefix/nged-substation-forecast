@@ -7,6 +7,8 @@ of `result.md` states the hypothesis, the prediction, the decision rule, and the
 
 The front matter of `result.md` also says whether the result is a candidate for the next model
 release (`production_status`) and, once ported, which release adopted it (`adopted_in`).
+Its `advice` field lists one-line imperatives for the next experiment's plan, each pointing to
+its evidence, and a plan begins by reading `advice` across every `result.md`.
 
 The [research log](research-log.md) lists every experiment in the order it was started, with its
 question, headline result, and link, and it lists the experiments that are planned.
