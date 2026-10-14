@@ -35,6 +35,29 @@ and averaged has a smaller error than the same columns trained on ENS weather, f
 planned contrasts were revised after two scientific reviews, so they are not pre-registered. The
 full write-up is the study README in `studies/stage1_pilot/README.md`.
 
+## Input columns
+
+Every arm except `c0` gets the same columns, and none is a calendar column or a power lag. Solar
+zenith and azimuth carry the time of day and the time of year.
+
+- **Solar farms (9 columns):** `shortwave`, `longwave`, `temperature_2m`,
+  `dew_point_temperature_2m`, `pressure_surface`, `precipitation`, `wind_speed_10m`,
+  `solar_zenith`, `solar_azimuth`.
+- **Wind farms (6 columns):** `wind_speed_10m`, `wind_speed_100m`, `wind_dir_sin_10m`,
+  `wind_dir_cos_10m`, `wind_dir_sin_100m`, `wind_dir_cos_100m`. The wind farms' ERA5 cells have no
+  temperature or pressure on disk.
+- **`ens_trained_plus_s1`** adds one column, `stage1a_prediction`.
+- **The `*_calendar` arms** (the first run) add `hour_sin`, `hour_cos`, `doy_sin`, and `doy_cos`
+  (solar 13 columns, wind 10).
+- **`c0`, the production control, has 24 columns:** `categorical_precipitation_type_surface`,
+  `dew_point_temperature_2m`, `downward_short_wave_radiation_flux_surface`,
+  `geopotential_height_500hpa`, `local_day_of_week`, `local_day_of_week_cos`,
+  `local_day_of_week_sin`, `local_time_of_day_cos`, `local_time_of_day_sin`,
+  `local_time_of_year_cos`, `local_time_of_year_sin`, `local_utc_offset_minutes`,
+  `power_lag_24h`, `power_lag_48h`, `power_lag_168h`, `power_lag_336h`,
+  `pressure_reduced_to_mean_sea_level`, `pressure_surface`, `temperature_2m`, `windchill`,
+  `wind_direction_10m`, `wind_direction_100m`, `wind_speed_10m`, `wind_speed_100m`.
+
 ## Absolute scores, all leads
 
 Mean absolute error, points of capacity, with 95% intervals that resample whole validation months.
