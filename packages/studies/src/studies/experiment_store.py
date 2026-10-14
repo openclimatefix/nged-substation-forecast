@@ -49,6 +49,9 @@ SLUG_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 SET_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9]+([-_][a-z0-9]+)*$")
 """A prediction set's name, such as `era5-pretrained` or `era5-pretrained-v2`."""
 
+RESERVED_LOSS_COLUMNS: Final[frozenset[str]] = frozenset({"arm", "site", "time", "month"})
+"""The columns `losses_for_bootstrap` builds, which a caller's frame may not already carry."""
+
 MANIFEST_NAME: Final[str] = "manifest.json"
 """The manifest's file name inside a prediction set's folder."""
 
@@ -66,7 +69,8 @@ FOLD_A_TUESDAYS_V1: Final[str] = "fold_a_tuesdays_v1"
 """The id of the first shared benchmark row set, the one the stage 1 pilot scores.
 
 ECMWF ENS runs at 00:00 UTC every 7 days from 2025-07-01 to 2026-06-30 (53 runs, all Tuesdays),
-with a forecast origin at 09:00 UTC, all 51 members, valid times to about 14.6 days, and the 9
+with a forecast origin at 09:00 UTC, all 51 members, valid times to about 14.6 days (the last runs
+are clipped at the end of 2026-06-30), and the 9
 generator series (6 solar farms and 3 wind farms). The run stride is `SAMPLE_STRIDE_DAYS` in
 `studies/quick_wins/quick_wins_inputs.py`.
 """
@@ -95,8 +99,8 @@ def reserve_experiment(
 ) -> int:
     """Reserve the next experiment id and create the experiment's data folder.
 
-    The next id is one more than the largest id in `data_dir/.ids` and in `docs_dir`, so an id is
-    never reused, even after the data folder is lost. The reservation is
+    The next id is one more than the largest id in `data_dir`, in `data_dir/.ids`, and in
+    `docs_dir`, so an id is never reused, even after the data folder is lost. The reservation is
     the creation of the bare-id marker `data_dir/.ids/<id>` by `Path.mkdir(exist_ok=False)`, which
     is atomic on a local filesystem. Reserving the bare id, and not the id with the slug, is what
     stops two sessions that pick different slugs from taking one id.
@@ -119,6 +123,7 @@ def reserve_experiment(
     markers.mkdir(parents=True, exist_ok=True)
     while True:
         known = [
+            *_experiment_ids_in(folder=data_dir),
             *_experiment_ids_in(folder=markers),
             *_experiment_ids_in(folder=docs_dir),
         ]
@@ -309,10 +314,15 @@ def losses_for_bootstrap(*, arm_losses: Mapping[str, pl.DataFrame]) -> pl.DataFr
         joined into one string that sorts in time order.
 
     Raises:
-        ValueError: If the arms hold different seeds, or an arm holds two rows with the same
-            `(time_series_id, power_fcst_init_time, valid_time, seed)`.
+        ValueError: If a frame already has an `arm`, `site`, `time`, or `month` column, the arms
+            hold different seeds, the arms do not hold the same keys, or an arm holds two rows
+            with the same `(time_series_id, power_fcst_init_time, valid_time, seed)`.
     """
     key_columns = ["time_series_id", "power_fcst_init_time", "valid_time", "seed"]
+    for arm, frame in arm_losses.items():
+        if clashing := RESERVED_LOSS_COLUMNS & set(frame.columns):
+            msg = f"arm {arm!r} already has the column(s) {sorted(clashing)}, which this builds"
+            raise ValueError(msg)
     seeds = {arm: sorted(frame["seed"].unique().to_list()) for arm, frame in arm_losses.items()}
     if len({tuple(arm_seeds) for arm_seeds in seeds.values()}) > 1:
         msg = f"every arm needs the same seeds, found {seeds}"
@@ -320,6 +330,16 @@ def losses_for_bootstrap(*, arm_losses: Mapping[str, pl.DataFrame]) -> pl.DataFr
     for arm, frame in arm_losses.items():
         if frame.select(key_columns).is_duplicated().any():
             msg = f"arm {arm!r} holds two rows with the same run, valid time, series, and seed"
+            raise ValueError(msg)
+    # The bootstrap pairs arms with an inner join, which drops an unmatched row without a word.
+    first_arm, *other_arms = arm_losses
+    first_keys = arm_losses[first_arm].select(key_columns)
+    for arm in other_arms:
+        other_keys = arm_losses[arm].select(key_columns)
+        only_in_first = first_keys.join(other_keys, on=key_columns, how="anti")
+        only_in_other = other_keys.join(first_keys, on=key_columns, how="anti")
+        if not (only_in_first.is_empty() and only_in_other.is_empty()):
+            msg = f"arms {first_arm!r} and {arm!r} do not hold the same rows"
             raise ValueError(msg)
     return pl.concat(
         [

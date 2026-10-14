@@ -5,7 +5,8 @@
 package under `packages/` except `packages/studies` must never import `studies` or a study script,
 because humans review that code and the study code is fast-moving and agent-written.
 
-**What the tests check, over every script under `studies/` except those in `era_fold_design`:**
+**What the tests check, over every script under `studies/` (except those in `era_fold_design`) and
+under `ml-experiments/`:**
 
 - no import of a module that lives in a different `studies/` folder;
 - no use of `sys.path`, `site.addsitedir`, `spec_from_file_location`, `SourceFileLoader`,

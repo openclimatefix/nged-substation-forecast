@@ -54,7 +54,8 @@ review as `implement-issue` does.
 ## Where the pieces live
 
 - **The id and the slug.** Call `studies.experiment_store.reserve_experiment(slug=...)`. It returns
-  the next five-digit id and creates `data/ml-experiments/<id>-<slug>/`. Make the slug descriptive.
+  the next id, written as five digits, and creates `data/ml-experiments/<id>-<slug>/`. Make the slug
+  descriptive.
 - **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
@@ -90,7 +91,9 @@ front matter, so a later session finds results with `grep` over `docs/ml-experim
   tail holds enough draws. A contrast counts as a gain by the `study` skill's rule: the interval
   over repeated seeds excludes zero.
 - **A climatology row.** Include a month-by-half-hour climatology from
-  `baseline_forecasters.climatology.ClimatologyForecaster`, trained on the fold's training window.
+  `baseline_forecasters.climatology.ClimatologyForecaster` (local month, half-hour, and weekend flag,
+  smoothed over neighbouring cells), trained on the fold's training window. The climatology has no
+  seed, so repeat its rows once per seed of the arms it is compared with.
 - **No calendar memorisation.** A model must not be able to memorise the calendar position. The
   stage 1 pilot found a control whose error changed by 1.1 to 3.4 points when its hour and
   day-of-year columns were removed. Use no calendar columns, or include a control without them. Group

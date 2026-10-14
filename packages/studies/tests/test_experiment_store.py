@@ -16,6 +16,7 @@ from studies.experiment_store import (
 from studies import experiment_store
 
 COMMIT = "0123456789abcdef"
+_real_code_state = experiment_store._code_state
 
 
 @pytest.fixture(autouse=True)
@@ -63,12 +64,13 @@ def test_a_marker_taken_between_listing_and_creation_moves_the_id_on(
     (tmp_path / "data" / ".ids" / "00001").mkdir(parents=True)
     (tmp_path / "data" / "00001-someone-elses-slug").mkdir()
     real_listing = experiment_store._experiment_ids_in
-    stale_listings = iter([[], []])
-    monkeypatch.setattr(
-        experiment_store,
-        "_experiment_ids_in",
-        lambda *, folder: next(stale_listings, None) or real_listing(folder=folder),
-    )
+    stale_listings = iter([[], [], []])
+
+    def listing(*, folder: Path) -> list[int]:
+        stale = next(stale_listings, None)
+        return real_listing(folder=folder) if stale is None else stale
+
+    monkeypatch.setattr(experiment_store, "_experiment_ids_in", listing)
 
     assert _reserve(tmp_path=tmp_path) == 2
 
@@ -252,3 +254,23 @@ def test_an_arm_with_two_rows_for_one_key_is_refused():
 
     with pytest.raises(ValueError, match="same run"):
         losses_for_bootstrap(arm_losses={"a": duplicated})
+
+
+def test_arms_that_do_not_hold_the_same_rows_are_refused():
+    short = _arm(loss=1.0).head(5)
+
+    with pytest.raises(ValueError, match="same rows"):
+        losses_for_bootstrap(arm_losses={"a": _arm(loss=1.0), "b": short})
+
+
+@pytest.mark.parametrize("column", ["arm", "site", "time", "month"])
+def test_a_frame_that_already_has_a_built_column_is_refused(column: str):
+    with pytest.raises(ValueError, match=column):
+        losses_for_bootstrap(arm_losses={"a": _arm(loss=1.0).with_columns(**{column: pl.lit("x")})})
+
+
+def test_the_code_state_is_a_full_commit_hash_and_a_flag():
+    commit, dirty = _real_code_state()
+
+    assert len(commit) == 40
+    assert isinstance(dirty, bool)
