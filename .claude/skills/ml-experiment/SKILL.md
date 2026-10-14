@@ -66,9 +66,10 @@ review as `implement-issue` does.
   to the navigation in `mkdocs.yml`, under "ML experiments" and titled with the hypothesis, in the
   commit that first adds the page. When two experiments finish together, the two navigation lines
   conflict on rebase; keep both.
-- **The research log:** `docs/ml-experiments/research-log.md` lists every experiment in the order it
-  was started, with its question, headline result, date, and links, and it lists the planned
-  experiments. Keep it current in the same PR that changes an experiment's state, as the next
+- **The research log and plan:** `docs/ml-experiments/research-log.md` lists every finished
+  experiment in the order it was started, with its question, headline result, date, and links.
+  `docs/ml-experiments/research-plan.md` lists the planned and proposed experiments in the order
+  they should run. Keep both current in the same PR that changes an experiment's state, as the next
   section says.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
@@ -83,10 +84,26 @@ review as `implement-issue` does.
 the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
 the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
-`failed`), the best arm with its headline number, and the lessons learned. A finished experiment
-also has `production_status` (`candidate`, `adopted`, `superseded`, or `not-for-production`) and
-`adopted_in` (the model release number, or `none`). Every result has the same front matter, so a later
-session finds results with `grep` over `docs/ml-experiments/*/result.md`.
+`failed`), the best arm with its headline number, the lessons learned, and `advice` (below). A
+finished experiment also has `production_status` (`candidate`, `adopted`, `superseded`, or
+`not-for-production`) and `adopted_in` (the model release number, or `none`). Every result has the
+same front matter, so a later session finds results with `grep` over
+`docs/ml-experiments/*/result.md`.
+
+**`advice` is a YAML list of one-line imperatives for future experiments, and a result is not
+finished without it.** Each item says what to do and where it applies, and ends with a pointer to the
+evidence, such as a planned contrast (C1) or a section of the write-up. For example: "Put recent
+power in the stage 2 calibrator, not in stage 1b, for Primary substations (C1)." Write each item as
+a folded YAML scalar (`- >-`), wrapped at 100 characters, so that it makes sense without the page
+around it. Write the items from the write-up's lessons and headline contrasts, and drop any item
+that no number or statement in the write-up supports. The field is separate from the `lessons`
+summary and the page's lessons section, which explain the reasoning, and from `production_status`,
+which says whether the winner is ready for production. Before planning a new experiment, read the
+earlier advice with
+`awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f' docs/ml-experiments/*/result.md`,
+which prints a whole list however long it is, and say in the plan which items the plan follows and
+which it departs from. The research log's "What the experiments taught us so far" section is the
+curated roll-up of the `advice` lists.
 
 ## How to score
 
@@ -123,15 +140,17 @@ session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 ## Keep the research log current
 
-**Update `docs/ml-experiments/research-log.md` in the PR that commits the `planned` `result.md`,
-and again in the PR that adds the finished write-up.** The first PR adds a row under "Planned
-experiments" with the id, the question in one line, and the state. The finished PR moves that row
-into the table at the top and adds a short entry: the question, the verdict in one sentence, the
+**Update `docs/ml-experiments/research-plan.md` in the PR that commits the `planned` `result.md`,
+and `docs/ml-experiments/research-log.md` in the PR that adds the finished write-up.** The first PR
+updates the experiment's row in the table of `research-plan.md` with its id, the question in one
+line, the priority, what it waits for, and the state. The finished PR deletes that row and its
+section from `research-plan.md`, adds the experiment to the table at the top of `research-log.md`,
+and adds a short entry: the question, the verdict in one sentence, the
 headline number with its interval, any finding that changes how later experiments are run, links
 to `result.md` and the PR, and one figure. An idea the maintainer has agreed to run but that has no
-folder yet goes in the planned table marked "Proposed". An experiment that ends `invalid` or
-`failed` keeps its entry, and the entry says why. Write the entry for a reader who has not opened
-`result.md`.
+folder yet goes in the table of `research-plan.md` marked "Proposed". An experiment that ends
+`invalid` or `failed` keeps its entry, and the entry says why. Write the entry for a reader who has
+not opened `result.md`.
 
 ## When a winner reaches production
 
@@ -154,10 +173,11 @@ exist until the release is cut. A later experiment that overturns an adopted res
 
 **Keep `result.md` to about a screen:** the verdict in one sentence, the winner with its interval,
 each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and the lessons
-learned. **A published page never names a generator, gives its identifier, or shows its time series
-beside either.** Use the anonymised labels the `study` skill describes. Print every number the page
-quotes from a committed script, as the `study` skill requires. An experiment that plots feature
-importance follows the recipe in the `study` skill's "Design rules that keep a comparison fair".
+for later experiments, which also become `advice`. **A published page never names a generator, gives
+its identifier, or shows its time series beside either.** Use the anonymised labels the `study`
+skill describes. Print every number the page quotes from a committed script, as the `study` skill
+requires. An experiment that plots feature importance follows the recipe in the `study` skill's
+"Design rules that keep a comparison fair".
 
 ## Running a night's experiments
 
