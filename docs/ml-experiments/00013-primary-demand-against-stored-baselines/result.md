@@ -43,26 +43,27 @@ headline: >-
   recipe loses to manual_heuristic at every lead, and N1 does not beat it with an interval that
   excludes zero.
 lessons: >-
-  Every arm trained on April 2024 to June 2025 forecasts the next year 2 to 3 points of capacity
-  too low, which explains about 0.6 of the 1.69 points by which the production recipe trails
-  manual_heuristic. Lagged power from the forecast origin is worth 1.15 points (C4), and the
-  quantile loss, the 00006 columns, and the recency weights are worth no more than 0.32 points of
-  error of the median.
+  Every N1 arm, trained on April 2024 to June 2025, forecast the next year 2 to 3 points of capacity
+  too low, and the other arms were 1.3 to 3.1 points too low. In a post hoc oracle, removing each
+  arm's per-series mean offset lowers the production recipe's gap to manual_heuristic from 1.69 to
+  1.08 points. Lagged power from the forecast origin lowered N1's error of the median by 1.15
+  points (C4), and the quantile loss, the 00006 columns, and the recency weights lowered it by an
+  amount not distinguishable from zero (E7).
 advice:
   - >-
     Compare every later Primary substation arm against manual_heuristic (8.23 points of capacity over
     all leads), not only against the production recipe, because N1 did not beat it (C1).
   - >-
     Add lagged power measured from the forecast origin to any ENS-trained demand model, because it
-    lowered the error of the median by 1.15 points (C4), and expect no gain from the quantile loss
-    and the 00006 columns on that error without it (E7).
+    lowered the error of the median by 1.15 points (C4), and do not expect the quantile loss and the
+    00006 columns to lower that error without it (E7: -0.32, interval -0.76 to +0.27).
   - >-
-    Test a drift correction before comparing training windows, because every arm forecast the
-    validation year 1.3 to 3.1 points too low, and a per-series level offset removed 0.4 to 1.6 points
-    of error (bias table, level-correction table).
+    Test a drift correction in P8, because every arm forecast the validation year 1.3 to 3.1 points
+    too low, and an in-sample per-series level offset lowered each arm's error by 0.4 to 1.6 points
+    (bias table, level-correction table).
   - >-
     Score a deployable recent-bias correction (for example the mean error of the last 14 days) on
-    these rows in P8, because the oracle offset puts N1 0.7 points below manual_heuristic.
+    these rows in P8, because with both arms offset-corrected in-sample, N1 scores 0.7 points below manual_heuristic.
   - >-
     Report the interval over the validation months for every Primary contrast, because 12
     months and 16 series leave a 0.5-point effect inside a 99% interval of about plus or minus 0.8
@@ -75,15 +76,18 @@ code: ml-experiments/00013-primary-demand-against-stored-baselines/
 
 # Where does Primary substation demand stand against the stored baselines?
 
-**Verdict: inconclusive.** The upgraded single-stage model N1 does not beat `manual_heuristic` with
-an interval that excludes zero. For the 16 Primary substations, N1's mean absolute error of the median
-is 8.45 points of capacity over all leads against 8.23 for `manual_heuristic`: C1 is +0.22 (99%
-interval -0.54 to +0.97). Up to 48 hours N1 scores 7.38 against 7.95, which meets the planned 0.5-point
-size (-0.57) but not the interval (-1.33 to +0.27). The part of the hypothesis about the production
-recipe holds: it loses to `manual_heuristic` by +1.69 points (C3, +0.98 to +2.59), at every lead and
-in 12 of 16 series. **The gate for P7 and P8 is not passed, so P7 compares the staged chain with
-`manual_heuristic` as well as with N1.** A point is 1% of the series' effective capacity. The
-substations are not named.
+**Verdict: inconclusive.** The upgraded XGBoost quantile model N1 does not beat `manual_heuristic`
+with an interval that excludes zero. For the 16 Primary substations, N1's mean absolute error of the
+median is 8.45 points of capacity over all leads against 8.23 for `manual_heuristic`: C1 is +0.22
+(99% interval -0.54 to +0.97). Up to 48 hours N1 scores 7.38 against 7.95, which meets the planned
+0.5-point size (-0.57) but not the interval (-1.33 to +0.27), and beyond 3 days N1 is level or worse
+(+0.40, -0.39 to +1.19). The production recipe does lose to `manual_heuristic`, by +1.69 points
+(C3, +0.98 to +2.59), at every lead and in 12 of 16 series. The hypothesis named a mechanism for
+that loss, no usable power persistence at short leads, and the equal gap at every lead contradicts
+it. **The decision rule has no branch for this outcome, so the verdict and the gate action below
+are the fall-through reading of the rule and were not pre-registered.** The gate for P7 and P8 is
+not passed, so P7 compares the staged chain with `manual_heuristic` as well as with N1. A point is
+1% of the series' effective capacity. The substations are not named.
 
 ![Error of the median by lead band and arm](figure_1.svg)
 
@@ -104,36 +108,40 @@ seeds; the stored baselines have no seed, so each is repeated three times.
 | Production recipe | 9.92 | 9.65 | 10.02 |
 | `climatology` | 10.33 | 10.19 | 10.36 |
 
-The quantile score (an estimate of the continuous ranked probability score) tells the same story:
-`manual_heuristic` 5.89, N1 6.33, the production recipe 9.52, and `climatology` 7.46. For the two
-bulk supply points N1 scores 11.3 against 12.3 for `manual_heuristic`, and for the two grid supply
-points 27.4 against 29.8, on the error of the median; two series per type resolve no interval.
+**N1 is no better than `manual_heuristic` on the quantile score.** The quantile score (an estimate of
+the continuous ranked probability score) is 5.89 for `manual_heuristic`, 6.33 for N1 (C1 +0.44, -0.27
+to +1.08), 9.52 for the production recipe, and 7.46 for `climatology`. For the two bulk supply points
+N1 scores 11.3 against 12.3 for `manual_heuristic`, and for the two grid supply points 27.4 against
+29.8, on the error of the median; two series per type resolve no interval.
 
 ## Why the production recipe loses to `manual_heuristic`
 
 **The gap is the same size at every lead, so it does not come from missing persistence at short
 leads.** C3 is between +1.60 and +1.79 in every lead band, and the production recipe is worse in
-all 12 months. Two causes account for it.
+all 12 months. Two hypotheses are consistent with the numbers; the experiment did not isolate either.
 
 - **A level offset.** Every arm forecasts the validation year too low (figure 3). The mean error of
-  the median is -2.3 points for the production recipe and -1.3 for `manual_heuristic`, because
-  `manual_heuristic` copies the last weeks of observed power and the other arms learned from April
-  2024 to June 2025. Post hoc, subtracting each arm's own per-series mean error (an oracle, since it
-  uses the validation year) lowers the production recipe's error to 8.95 and `manual_heuristic`'s to
-  7.87, so the offset explains about 0.6 of the 1.69 points.
-- **No recent power.** The remaining 1.1 points match the information that `manual_heuristic` uses
-  and the production recipe lacks. N1 without lagged power scores 9.60, 0.32 better than the
-  production recipe (E7, 95% interval -0.76 to +0.27), so the quantile loss, the 00006 columns, and
-  the recency weights recover no detectable error. Lagged power recovers 1.15 (C4, -2.16 to -0.58).
+  the median is -2.3 points for the production recipe and -1.3 for `manual_heuristic`. The N1 arms
+  trained on April 2024 to June 2025, and `manual_heuristic` may track the drift because it copies
+  the last weeks of observed power. Post hoc, subtracting each arm's own per-series mean error (an
+  oracle, since it uses the validation year) lowers the production recipe's error to 8.95 and
+  `manual_heuristic`'s to 7.87, so the offset accounts for 0.6 of the 1.69 points. The offset is not
+  specific to the production recipe: `climatology` (-2.9) and S1 (-3.1) are lower still.
+- **No recent power.** The remaining 1.1 points are of the size that lagged power recovers in N1
+  (C4, 1.15, -2.16 to -0.58), but C4 compares two N1 arms and not the production recipe. N1 without
+  lagged power scores 9.60, 0.32 below the production recipe (E7, 95% interval -0.76 to +0.27), so
+  the quantile loss, the 00006 columns, the recency weights, and training on ENS pooled over members
+  lowered the error by an amount not distinguishable from zero.
 
 ![Mean signed error by lead band](figure_3.svg)
 
 ## Other findings
 
-- **N1 without lagged power does no better than S1** (C5 +0.12, -0.41 to +0.61), so training on ENS
-  instead of ERA5 changes the error of the median by less than the interval can show. The planned
-  clause that N1 without lags recovers half the production gap beyond 3 days fails: C5 is +0.13
-  against C3's +1.71.
+- **N1 without lagged power does no better than S1 on the error of the median** (C5 +0.12, -0.41
+  to +0.61), so training on ENS instead of ERA5 changes that error by less than the interval can
+  show. On the quantile score N1 without lagged power is better (C5 -0.73, -1.14 to -0.31, 11 of 12
+  months). The planned clause that N1 without lags recovers half the production gap beyond 3 days
+  fails: C5 is +0.13 against C3's +1.71.
 - **Pooling the 51 members helps slightly.** N1 beats the control member alone by 0.05 points
   (E3, 95% interval -0.08 to -0.03).
 - **The calendar columns matter little.** Removing hour, weekday, and days to Christmas raises
@@ -143,16 +151,17 @@ all 12 months. Two causes account for it.
 
 ## Post hoc
 
-**The level-offset diagnostic above is post hoc.** It was added after the verdict, uses the
-validation year to estimate the offset, and changes no pre-registered contrast. A deployable version,
-a correction from the last 14 days of observed error, is a candidate for P8.
+**The oracle level correction is post hoc.** The plan pre-registered a decomposition of the production
+gap by bias; the oracle correction was added after the verdict, uses the validation year to estimate
+the offset, and changes no pre-registered contrast. A deployable version, a correction from the last
+14 days of observed error, is a candidate for P8.
 
 ## Limits
 
 - **The telemetry delay is assumed.** Every N1 result is conditional on the newest usable value
   being 3.5 hours before the origin.
 - **N1 trained on 15 months, not from 2023-09,** because the stored ENS archive starts on
-  2024-04-01. C5 mixes ENS against ERA5 training with the shorter window.
+  2024-04-01. C5 mixes ENS against ERA5 training with the shorter window, and S1 trains on 2023-09 onward.
 - **16 series and 12 months** leave 99% intervals of about plus or minus 0.8 points, wider than the
   planned 0.5-point effect.
 
