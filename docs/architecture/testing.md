@@ -308,7 +308,7 @@ Three GitHub workflows in `.github/workflows/` run the checks described on this 
   GitHub repository ruleset, not in the workflow file).
 - **`studies_tests.yml` — the studies tests.** Runs `pytest -n auto --run-studies packages/studies`
   on every push to `main`, and on a pull request only when the pull request changes
-  `packages/studies/`, `studies/`, or `docs/studies/`.
+  `packages/studies/`, `studies/`, `docs/studies/`, `ml-experiments/`, or `docs/ml-experiments/`.
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated tests
   (`uv run pytest --run-network -m network`) on a daily schedule, plus `workflow_dispatch` for
   on-demand runs. This is the only CI that touches the real Dynamical.org catalog, and it needs no

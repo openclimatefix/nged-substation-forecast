@@ -5,7 +5,8 @@
 package under `packages/` except `packages/studies` must never import `studies` or a study script,
 because humans review that code and the study code is fast-moving and agent-written.
 
-**What the tests check, over every script under `studies/` except those in `era_fold_design`:**
+**What the tests check, over every script under `studies/` (except those in `era_fold_design`) and
+under `ml-experiments/`:**
 
 - no import of a module that lives in a different `studies/` folder;
 - no use of `sys.path`, `site.addsitedir`, `spec_from_file_location`, `SourceFileLoader`,
@@ -22,21 +23,48 @@ in `.claude/skills/study/SKILL.md` ("Where a study's pieces live").
 
 import ast
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
+EXPERIMENTS_FOLDER: Final[str] = "ml-experiments"
+"""The second script tree, beside `studies/`, that every rule below also covers."""
+EXPERIMENT_TREES: Final[tuple[Path, ...]] = (REPO_ROOT / EXPERIMENTS_FOLDER,)
 FROZEN_FOLDER: Final[str] = "era_fold_design"
 """The one folder the rules skip: its scripts are a record of how a report was made."""
 
 
-def _scripts_by_folder(*, studies_dir: Path) -> dict[str, list[Path]]:
-    """Return each study folder's scripts, nested folders included, skipping the frozen folder."""
-    return {
+def _scripts_by_folder(
+    *, studies_dir: Path, extra_dirs: Sequence[Path] = ()
+) -> dict[str, list[Path]]:
+    """Return each study folder's scripts, nested folders included, skipping the frozen folder.
+
+    A folder of an `extra_dirs` tree, such as `ml-experiments/`, is keyed `<tree>/<folder>`, so two
+    trees that hold a folder of one name cannot hide a crossing import between them. A tree that
+    does not exist holds no scripts.
+    """
+    folders = {
         folder.name: sorted(folder.rglob("*.py"))
         for folder in sorted(studies_dir.iterdir())
         if folder.is_dir() and folder.name != FROZEN_FOLDER
     }
+    for extra_dir in extra_dirs:
+        if extra_dir.is_dir():
+            folders |= {
+                f"{extra_dir.name}/{folder.name}": sorted(folder.rglob("*.py"))
+                for folder in sorted(extra_dir.iterdir())
+                if folder.is_dir()
+            }
+    return folders
+
+
+def _reported_name(*, path: Path, studies_dir: Path, extra_dirs: Sequence[Path]) -> str:
+    """Return a script's path relative to `studies_dir`, or to the parent of its extra tree."""
+    for extra_dir in extra_dirs:
+        if path.is_relative_to(extra_dir):
+            return path.relative_to(extra_dir.parent).as_posix()
+    return path.relative_to(studies_dir).as_posix()
 
 
 def _imported_modules(*, source_path: Path) -> set[str]:
@@ -114,9 +142,9 @@ def _path_mutations(*, source_path: Path) -> list[str]:
     return found
 
 
-def crossing_imports(*, studies_dir: Path) -> dict[str, list[str]]:
+def crossing_imports(*, studies_dir: Path, extra_dirs: Sequence[Path] = ()) -> dict[str, list[str]]:
     """Return, for each script, the modules it imports from a different study folder."""
-    scripts = _scripts_by_folder(studies_dir=studies_dir)
+    scripts = _scripts_by_folder(studies_dir=studies_dir, extra_dirs=extra_dirs)
     folder_of = {path.stem: folder for folder, paths in scripts.items() for path in paths}
     crossings: dict[str, list[str]] = {}
     for folder, paths in scripts.items():
@@ -127,39 +155,49 @@ def crossing_imports(*, studies_dir: Path) -> dict[str, list[str]]:
                 if module in folder_of and folder_of[module] != folder
             )
             if foreign:
-                crossings[path.relative_to(studies_dir).as_posix()] = foreign
+                name = _reported_name(path=path, studies_dir=studies_dir, extra_dirs=extra_dirs)
+                crossings[name] = foreign
     return crossings
 
 
-def path_mutations(*, studies_dir: Path) -> dict[str, list[str]]:
+def path_mutations(*, studies_dir: Path, extra_dirs: Sequence[Path] = ()) -> dict[str, list[str]]:
     """Return, for each script, its uses of `sys.path`, `site.addsitedir` and path loaders."""
     return {
-        path.relative_to(studies_dir).as_posix(): found
-        for folder, paths in _scripts_by_folder(studies_dir=studies_dir).items()
+        _reported_name(path=path, studies_dir=studies_dir, extra_dirs=extra_dirs): found
+        for folder, paths in _scripts_by_folder(
+            studies_dir=studies_dir, extra_dirs=extra_dirs
+        ).items()
         for path in paths
         if (found := _path_mutations(source_path=path))
     }
 
 
-def loose_scripts(*, studies_dir: Path) -> list[str]:
-    """Return the Python files that sit directly under `studies/`, which no folder check scans."""
-    return sorted(path.name for path in studies_dir.glob("*.py"))
+def loose_scripts(*, studies_dir: Path, extra_dirs: Sequence[Path] = ()) -> list[str]:
+    """Return the Python files that sit directly under a script tree; no folder check scans them."""
+    trees = [studies_dir, *(extra_dir for extra_dir in extra_dirs if extra_dir.is_dir())]
+    return sorted(
+        _reported_name(path=path, studies_dir=studies_dir, extra_dirs=extra_dirs)
+        for tree in trees
+        for path in tree.glob("*.py")
+    )
 
 
-def shared_basenames(*, studies_dir: Path) -> dict[str, list[str]]:
+def shared_basenames(*, studies_dir: Path, extra_dirs: Sequence[Path] = ()) -> dict[str, list[str]]:
     """Return each script basename that two scripts share, with the folders holding it."""
     folders_by_stem: dict[str, list[str]] = {}
-    for folder, paths in _scripts_by_folder(studies_dir=studies_dir).items():
+    for folder, paths in _scripts_by_folder(studies_dir=studies_dir, extra_dirs=extra_dirs).items():
         for path in paths:
             folders_by_stem.setdefault(path.stem, []).append(folder)
     return {stem: folders for stem, folders in folders_by_stem.items() if len(folders) > 1}
 
 
-def package_imports_of_scripts(*, studies_dir: Path, package_src_dir: Path) -> dict[str, list[str]]:
+def package_imports_of_scripts(
+    *, studies_dir: Path, package_src_dir: Path, extra_dirs: Sequence[Path] = ()
+) -> dict[str, list[str]]:
     """Return, for each package module, the script basenames it imports."""
     basenames = {
         path.stem
-        for paths in _scripts_by_folder(studies_dir=studies_dir).values()
+        for paths in _scripts_by_folder(studies_dir=studies_dir, extra_dirs=extra_dirs).values()
         for path in paths
     }
     return {
@@ -173,7 +211,9 @@ def production_imports_of_studies(*, repo_root: Path) -> dict[str, list[str]]:
     """Return, for each production file, the `studies` or script modules it imports."""
     forbidden = {"studies"} | {
         path.stem
-        for paths in _scripts_by_folder(studies_dir=repo_root / "studies").values()
+        for paths in _scripts_by_folder(
+            studies_dir=repo_root / "studies", extra_dirs=[repo_root / EXPERIMENTS_FOLDER]
+        ).values()
         for path in paths
     }
     packages = repo_root / "packages"
@@ -197,25 +237,26 @@ def _write(*, root: Path, files: dict[str, str]) -> None:
 
 
 def test_no_study_script_imports_a_script_of_another_folder():
-    assert crossing_imports(studies_dir=REPO_ROOT / "studies") == {}
+    assert crossing_imports(studies_dir=REPO_ROOT / "studies", extra_dirs=EXPERIMENT_TREES) == {}
 
 
 def test_no_study_script_touches_sys_path_or_loads_a_script_by_path():
-    assert path_mutations(studies_dir=REPO_ROOT / "studies") == {}
+    assert path_mutations(studies_dir=REPO_ROOT / "studies", extra_dirs=EXPERIMENT_TREES) == {}
 
 
 def test_no_python_file_sits_directly_under_studies():
-    assert loose_scripts(studies_dir=REPO_ROOT / "studies") == []
+    assert loose_scripts(studies_dir=REPO_ROOT / "studies", extra_dirs=EXPERIMENT_TREES) == []
 
 
 def test_no_two_study_scripts_share_a_basename():
-    assert shared_basenames(studies_dir=REPO_ROOT / "studies") == {}
+    assert shared_basenames(studies_dir=REPO_ROOT / "studies", extra_dirs=EXPERIMENT_TREES) == {}
 
 
 def test_no_package_module_imports_a_study_script_by_its_bare_name():
     result = package_imports_of_scripts(
         studies_dir=REPO_ROOT / "studies",
         package_src_dir=REPO_ROOT / "packages" / "studies" / "src",
+        extra_dirs=EXPERIMENT_TREES,
     )
 
     assert result == {}
@@ -360,19 +401,118 @@ def test_production_code_importing_studies_or_a_script_is_reported(tmp_path: Pat
     }
 
 
+def test_an_experiment_script_importing_a_study_script_by_bare_name_is_a_crossing(tmp_path: Path):
+    studies = tmp_path / "studies"
+    experiments = tmp_path / "ml-experiments"
+    _write(root=studies, files={"quick_wins/inputs.py": "", "quick_wins/other.py": ""})
+    _write(
+        root=experiments,
+        files={
+            "e00001-demo/e00001_fit.py": "import inputs\nimport e00001_report\n",
+            "e00001-demo/e00001_report.py": "",
+        },
+    )
+
+    assert crossing_imports(studies_dir=studies, extra_dirs=[experiments]) == {
+        "ml-experiments/e00001-demo/e00001_fit.py": ["inputs"]
+    }
+
+
+def test_a_basename_shared_between_the_two_trees_is_reported(tmp_path: Path):
+    studies = tmp_path / "studies"
+    experiments = tmp_path / "ml-experiments"
+    _write(root=studies, files={"alpha/fit.py": ""})
+    _write(root=experiments, files={"e00001-demo/fit.py": ""})
+
+    assert shared_basenames(studies_dir=studies, extra_dirs=[experiments]) == {
+        "fit": ["alpha", "ml-experiments/e00001-demo"]
+    }
+
+
+def test_a_loose_file_or_a_path_mutation_in_the_experiments_tree_is_reported(tmp_path: Path):
+    studies = tmp_path / "studies"
+    experiments = tmp_path / "ml-experiments"
+    _write(root=studies, files={"alpha/one.py": ""})
+    _write(
+        root=experiments,
+        files={"loose.py": "", "e00001-demo/e00001_fit.py": "import sys\nsys.path.append('.')\n"},
+    )
+
+    assert loose_scripts(studies_dir=studies, extra_dirs=[experiments]) == [
+        "ml-experiments/loose.py"
+    ]
+    assert path_mutations(studies_dir=studies, extra_dirs=[experiments]) == {
+        "ml-experiments/e00001-demo/e00001_fit.py": ["sys.path"]
+    }
+
+
+def test_a_package_module_importing_an_experiment_script_is_reported(tmp_path: Path):
+    studies = tmp_path / "studies"
+    experiments = tmp_path / "ml-experiments"
+    _write(root=studies, files={"alpha/one.py": ""})
+    _write(root=experiments, files={"e00001-demo/e00001_fit.py": ""})
+    _write(root=tmp_path / "src", files={"studies/bad.py": "import e00001_fit\n"})
+
+    assert package_imports_of_scripts(
+        studies_dir=studies, package_src_dir=tmp_path / "src", extra_dirs=[experiments]
+    ) == {"studies/bad.py": ["e00001_fit"]}
+
+
+def test_production_code_importing_an_experiment_script_is_reported(tmp_path: Path):
+    _write(root=tmp_path / "studies", files={"alpha/one.py": ""})
+    _write(root=tmp_path / "ml-experiments", files={"e00001-demo/e00001_fit.py": ""})
+    _write(root=tmp_path / "packages" / "studies", files={"src/studies/x.py": ""})
+    _write(root=tmp_path / "packages" / "other", files={"src/other/a.py": "import e00001_fit\n"})
+
+    assert production_imports_of_studies(repo_root=tmp_path) == {
+        "packages/other/src/other/a.py": ["e00001_fit"]
+    }
+
+
 RAW_POWER_TABLE_NAME: Final[re.Pattern[str]] = re.compile(r"(?<!\w)power_time_series(?!=)")
 """Any name or path beginning `power_time_series`, which the raw table's folder name and its
 `Settings` attribute both do."""
 
 
+def raw_power_table_offenders(*, repo_root: Path) -> list[str]:
+    """Return each study, experiment, or `studies` package script that names the raw power table."""
+    scripts = [
+        *(repo_root / "packages" / "studies" / "src").rglob("*.py"),
+        *(repo_root / "studies").rglob("*.py"),
+        *(repo_root / EXPERIMENTS_FOLDER).rglob("*.py"),
+    ]
+    return sorted(
+        script.relative_to(repo_root).as_posix()
+        for script in scripts
+        if RAW_POWER_TABLE_NAME.search(script.read_text())
+    )
+
+
 def test_no_study_names_the_raw_power_table():
     # `studies.power.scan_power` is the one reader of observed power. A study that names the raw
     # table instead reads rows the leaderboard scorer never sees.
-    studies_package = REPO_ROOT / "packages" / "studies" / "src"
-    scripts = [*studies_package.rglob("*.py"), *(REPO_ROOT / "studies").rglob("*.py")]
-    offenders = [
-        script.relative_to(REPO_ROOT).as_posix()
-        for script in scripts
-        if RAW_POWER_TABLE_NAME.search(script.read_text())
+    assert raw_power_table_offenders(repo_root=REPO_ROOT) == []
+
+
+def test_the_raw_power_table_is_found_in_each_of_the_three_places_scripts_live(tmp_path: Path):
+    offender = "table = 'power_time_series'\n"
+    _write(root=tmp_path / "packages" / "studies" / "src", files={"studies/a.py": offender})
+    _write(root=tmp_path / "studies", files={"alpha/b.py": offender})
+    _write(root=tmp_path / "ml-experiments", files={"e00001-demo/e00001_c.py": offender})
+
+    assert raw_power_table_offenders(repo_root=tmp_path) == [
+        "ml-experiments/e00001-demo/e00001_c.py",
+        "packages/studies/src/studies/a.py",
+        "studies/alpha/b.py",
     ]
-    assert offenders == []
+
+
+def test_a_script_nested_in_an_experiment_folder_is_scanned(tmp_path: Path):
+    studies = tmp_path / "studies"
+    experiments = tmp_path / "ml-experiments"
+    _write(root=studies, files={"alpha/one.py": ""})
+    _write(root=experiments, files={"e00001-demo/deep/e00001_x.py": "import one\n"})
+
+    assert crossing_imports(studies_dir=studies, extra_dirs=[experiments]) == {
+        "ml-experiments/e00001-demo/deep/e00001_x.py": ["one"]
+    }
