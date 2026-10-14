@@ -114,7 +114,10 @@ def figure_1() -> alt.TopLevelMixin:
         width=PLOT_WIDTH,
         height=300,
         title=_title(
-            text="Quantile score by lead band for the Primary substations",
+            text=(
+                "Lagged power in the calibrator scores as low as any arm at every lead "
+                "for the Primary substations"
+            ),
             lines=[
                 (
                     "Quantile score of the 9-quantile forecast, an estimate of the continuous "
@@ -172,7 +175,7 @@ def figure_2() -> alt.TopLevelMixin:
         width=PLOT_WIDTH,
         height=320,
         title=_title(
-            text="Planned contrasts for the Primary substations, by lead",
+            text="Lagged power in the calibrator beats lagged power in stage 1b at every lead",
             lines=[
                 (
                     "Change in the quantile score between two arms (points of the substation's "
@@ -293,9 +296,11 @@ def _example_figure(*, worst: bool) -> alt.TopLevelMixin:
         rows.append(alt.hconcat(*panels).resolve_scale(y="shared"))
     kind = "worst" if worst else "typical"
     headline = (
-        "Example forecasts: the worst run of each of three Primary substations"
+        "In the worst runs, all three arms miss the level by the same amount"
         if worst
-        else "Example forecasts: the median run of each of three Primary substations"
+        else (
+            "In the typical runs, lagged power in the calibrator follows the first day more closely"
+        )
     )
     return alt.vconcat(*rows).properties(
         title=_title(

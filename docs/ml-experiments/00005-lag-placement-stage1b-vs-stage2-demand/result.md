@@ -1,7 +1,7 @@
 ---
 id: "00005"
 slug: lag-placement-stage1b-vs-stage2-demand
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For substation demand series, recent observed power improves a two-stage probabilistic forecast
@@ -28,18 +28,107 @@ metric: >-
   Quantile score: twice the mass-weighted mean pinball loss over 9 quantile levels, an estimate
   of the continuous ranked probability score (CRPS), in points of capacity; and the mean absolute
   error of the median, in points of capacity
-verdict: pending
+verdict: refuted
+production_status: not-for-production
+adopted_in: none
+best_arm: L3 (lagged power in the stage 2 calibrator; L2+L3 is equal within error)
+headline: >-
+  Primary substations, leads up to 48 h, C1 (L2c minus L3): +0.84 (+0.28 to +1.50 at 99%), 3 of 12
+  months negative; L3 scores 5.31 against 6.14 for L2c and 7.11 for R0c. Refuted: lagged power
+  helps more in the stage 2 calibrator than in stage 1b.
 code: ml-experiments/00005-lag-placement-stage1b-vs-stage2-demand/
-pull_request: pending
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1195
 ---
 
 # Where should lagged power enter a two-stage demand forecast?
 
-**Status: planned.** This page was committed before any fit. Stage 1a's input columns come from
-the separate input-feature sweep (experiment 00006), which chose them on its selection fold
-(2024-07 to 2025-06) before it scored any 2025-07 data, so this experiment's validation year has
-not influenced them. The sweep's pooled-model result may still refine the list, and this page
-records the list that was used.
+**Verdict: refuted.** For the 16 Primary substations, lagged power improved the forecast more when
+it entered the stage 2 calibrator (L3) than when it entered stage 1b (L2c). The planned primary
+contrast, L2c minus L3 for leads up to 48 hours, was +0.84 points of capacity (99% interval +0.28 to
++1.50), and only 3 of the 12 validation months favoured stage 1b. The decision rule needed at least
+9 months to agree on the opposite sign. Stage 1a's input columns come from the separate
+input-feature sweep ([experiment
+00006](https://github.com/openclimatefix/nged-substation-forecast/pull/1202)), which chose them on
+its selection fold before it scored any 2025-07 data. The plan below was committed before any fit,
+and the results above it were written after the run.
+
+## Results
+
+**Lagged power in the calibrator scored lowest, or level with the lowest, at every lead for the
+Primary substations.** Up to 48 hours ahead, the quantile score (twice the mass-weighted pinball
+loss, an estimate of the continuous ranked probability score, in points of capacity; smaller is
+better) was 5.31 for L3 and 5.25 for L2+L3, against 6.14 for L2c, 7.11 for the lag-free calibrated
+arm R0c, and 8.12 for stage 1a alone (R0). Over all leads the scores were 6.36, 6.34, 6.95, 7.47,
+and 7.88. The advantage of L3 over R0c shrinks from 2.0 points in the first 24 hours to 0.8 points
+at 11 to 15 days, and stays below zero.
+
+![Quantile score by lead band for the Primary substations](figure_1.svg)
+
+**All five planned contrasts were computed for the Primary substations.** Negative means the first
+arm is better, and the intervals are at 99%.
+
+- **C1 (primary), L2c minus L3:** +0.84 up to 48 h (+0.28 to +1.50), and +0.59 over all leads (+0.22
+  to +1.06). The interval is above zero in every lead band, but L2c is better in 8 of the 16 series
+  up to 48 h, so the advantage of L3 is an average over mixed series. - **C2, L3 minus R0c:** -1.80
+  up to 48 h (-2.72 to -1.00), negative in 12 of 12 months and 16 of 16 series. - **C3, L2c minus
+  R0c:** -0.97 up to 48 h (-1.25 to -0.66), negative in 12 of 12 months and 16 of 16 series. - **C4,
+  L2+L3 minus L2c:** -0.90 up to 48 h (-1.55 to -0.32). - **C5, L2+L3 minus L3:** -0.06 up to 48 h
+  (-0.15 to +0.03), so using both placements adds nothing detectable to L3.
+
+![Planned contrasts for the Primary substations](figure_2.svg)
+
+**The BSP and GSP results are descriptive, from two series each, and do not decide anything.** Up to
+48 h, L3 scored 6.48 for the two bulk supply points and 15.21 for the two grid supply points,
+against 6.32 and 15.50 for L2c. C1 was -0.17 (-0.54 to +0.20) for the bulk supply points and +0.29
+(-0.42 to +0.82) for the grid supply points, so neither placement is better there. The grid supply
+points' error is dominated by drift: stage 1a alone scored 21.1 over all leads from the 2023-09
+window and 26.4 from the 2019-09 window.
+
+**Calibration helps in every arm, and the calendar adds nothing detectable.** In the exploratory
+contrasts (95% intervals, Primary), the lag-free calibrator lowered stage 1a's score by 1.02 up to
+48 h (E4), and the calibrator lowered stage 1b's by 0.52 (E3). Stage 1a alone scored 8.12 up to 48 h
+and day-type climatology 8.14, so stage 1a without a calibrator is no better than climatology on
+this score. Dropping the calendar columns changed stage 1a's score by +0.07 (-0.23 to +0.34) up to
+48 h (E12) and stage 1b's by -0.02 (-0.34 to +0.25) (E13). The 2023-09 training window beat the
+2019-09 window for stage 1a by 0.95 (E10), and the contrast C1 keeps its sign from the 2019-09
+window (+1.11, E7). The ENS-trained reference R1 scored 7.69 up to 48 h and L3 beat it by 2.38
+(E14).
+
+**Examples show the forecast level following the first day more closely with lagged power in the
+calibrator.** In the typical runs of these three substations, L3 starts nearer the observed level than R0c does. In the
+worst runs, all three arms miss the level by about the same amount, so recent power does not repair
+a persistent offset between the weather-driven forecast and the substation.
+
+![Typical example forecasts](figure_3.svg)
+
+![Worst example forecasts](figure_4.svg)
+
+## Caveats
+
+- **The lagged arms are a ceiling.** The residuals at lag times use ERA5 weather at the lag time,
+  which production does not have in time. L2, L2c, L3, and L2+L3 are an upper bound on what
+  production can do. - **The calendar column `days_to_christmas` was used as experiment 00006 listed
+  it when the fits started.** Experiment 00006 later weakened the evidence for it. Its confirmed set
+  is the weather block, the clock columns, and `covid_indicator`, and the holiday flags were the
+  most consistently supported calendar columns. The no-calendar control (E12, E13) shows the
+  calendar columns do not change the result here. - **The 2023-09 start of the primary window was
+  chosen after seeing results.** It comes from experiment 00003 and from the confirmation year of
+  experiment 00006, not from a selection year. The 2019-09 window gives the same sign for C1. -
+  **One column list was used for all 20 series.** Experiment 00006 suggests different lists for the
+  BSP and GSP series, so their results may understate what a tuned list gives. - **The reviews used
+  Sonnet, not Opus, for the code.** The `ml-experiment` skill calls for Opus on the code of a
+  complex experiment, and the maintainer asked for Opus only where vital.
+
+## Lessons learned
+
+- **Put recent power in the calibrator first.** For Primary substations, the stage 2 calibrator with
+  the recent-origin inputs matches the calibrator plus stage 1b and costs one fit fewer. -
+  **Calibrate stage 1a before judging lags.** The lag-free calibrator is worth about 1 point of
+  capacity at short leads, so a comparison against uncalibrated stage 1a overstates what lags add. -
+  **Check drift before comparing series groups.** The grid supply points' error falls by a fifth between the
+  full history and the 2023-09 window, so a mean over series types would mostly measure drift. -
+  **Report the number of series that agree with each mean.** C1 favours L3 on average, and L2c is
+  better in half of the series.
 
 ## Plan
 
