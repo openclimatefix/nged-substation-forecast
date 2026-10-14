@@ -94,6 +94,37 @@ year. The script checks which rows the file holds, not how the forecast was
 made. The study itself must therefore fit only on observations up to the fold's `train_end`, and use
 observations after `train_end` only as lags earlier than each forecast's initialisation time.
 
+**A study posts its arms to the leaderboard only when the output fits `score_study.py`.** Posting
+is optional, and a study that cannot post reports its own scores on the page and says why. The rules
+for a study that does post:
+
+- **Post the study's control arm and each arm the page reports.** Call the study's own baseline the
+  control arm, because the scorer's "reference" is the cross-validation (CV) config's
+  `reference_experiment_name` experiment.
+- **Post each arm as its own submission,** because the script stores one experiment per call. Name
+  the submission `<page-slug>--<arm>`: the page's file name without `.md`, two hyphens, and the arm
+  name, lower-cased, with each `.` changed to `_`, in at most 64 characters of `[a-z0-9_-]` (the
+  pattern `validate_study_name` checks). The experiment is then `study/<page-slug>--<arm>`, so the
+  page names the experiment and the experiment's name names the page. Post the arm's seed 0 fit, and
+  say so on the page, because the page's intervals average over three seeds and the leaderboard row
+  holds one.
+- **Write exactly the `PowerForecast` columns the script accepts, and no others:** `valid_time`,
+  `time_series_id`, `ensemble_member` (Int8), `power_fcst_init_time`, `power_fcst` (Float32),
+  `power_fcst_model_name`, and `power_fcst_model_version`. The script adds `experiment_name` and
+  `fold_id`, and refuses a file with any other column.
+- **Post nothing when the output cannot match the reference's row keys.** The file must hold one row
+  per series, initialisation time, lead, and ensemble member of the reference, so a study that
+  forecasts one run in 7 days, or fewer series, cannot post. A study whose native output is not a
+  `PowerForecast` (for example, a quantile arm whose `ensemble_member` codes exceed the Int8 range)
+  cannot post either, and collapsing it to the reference's 51 members would change the forecast
+  being scored.
+- **Post nothing from a fit made on data past the fold's `train_end`.** Month-block folds match the
+  row keys and are still in sample, so such a study refits on data up to `train_end` first.
+- **Resubmit an arm with `--replace` only after a reviewer-requested re-run, or after a failure
+  that came once the rows were written** (the script stores the rows before it scores them, so a
+  failure in scoring leaves them stored). Never resubmit to improve a score. Any new attempt, a new
+  name included, raises `study_submission_number`.
+
 **A study script is not unit-tested as a whole, so its check is its own output.** Every table the
 page quotes is printed by a committed script into a `report.md`, never transcribed by hand, and
 every number on the page is checked against that report. A number from a diagnostic run during
@@ -118,7 +149,10 @@ review goes on the page only after a committed script prints it into the report.
 5. **Draft the page and its charts, then run the second Opus scientific-validity review** with a
    fresh reviewer, judging the revised study and the draft page as an outside expert would before
    publication. Triage, fix, and re-run. Keep reviewing until a reviewer finds nothing that must be
-   fixed.
+   fixed. Then post the arms the page reports, if the output fits `score_study.py` (see "A study
+   posts its arms to the leaderboard only when the output fits"), so that no
+   reviewer-requested re-run forces a resubmission and the evidence reviewer has already checked
+   that the fit stopped at the fold's `train_end`.
 6. **Finish the charts and the page** (sections below).
 7. **Diff review**, with steps 5 to 8 of the `implement-issue` skill, using that skill's models:
    Sonnet for the cut-down review, Opus for the correctness review. Step 8 below replaces that
@@ -554,7 +588,9 @@ Every study page follows the structure of an academic paper, in this order:
     says nothing about.
 12. **Data and code availability.** Which inputs are public and where they come from, which are
     private and why, the commit of the code, and the XGBoost version and settings. No generator's
-    name, identifier, or coordinates appears in this section.
+    name, identifier, or coordinates appears in this section. A page that posted arms lists each
+    `study/<page-slug>--<arm>` experiment name, and states that `study/` rows on the leaderboard fold
+    are biased low, because the study chose its arms on that fold.
 13. **Reproducing the figures.** The commands, in order.
 
 **Put a new study page where its question belongs.** A study of how well a weather product describes
