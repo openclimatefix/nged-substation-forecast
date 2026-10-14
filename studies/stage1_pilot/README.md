@@ -302,16 +302,17 @@ observed power exceeds the series' 90th percentile of cleaned power in the stage
 (20,020 solar and 9,747 wind cases per seed). Selecting on the observed value truncates the outcome,
 so every arm's slope is well below 1 and only the paired differences are comparable.
 
-- **For wind, the gain from ERA5 training is much larger in the tail.** `s1_memberavg` minus
-  `ens_trained` on the top-decile cases is -6.14 points over all leads (-7.66 to -4.33, 12 of 12
-  months), against -1.70 on all cases, and -16.54 at 0 to 24 h and -17.56 at 1 to 2 days. With the
-  control member alone, `s1_control` minus `ens_trained_control` is -6.95 (-8.39 to -5.23). At 7 to
-  10 days it is -1.22 (-2.46 to -0.08) and at 11 to 15 days +0.12 (-1.17 to +1.56). Top-decile wind
-  errors are large for every arm except `era5_ceiling` (13 points), so the weather input is
-  associated with most of the top-decile error.
-- **For solar, the tail gain is larger in size but not in certainty.** `s1_memberavg` minus
-  `ens_trained` is -1.05 over all leads (-3.93 to +1.25, 7 of 11 months with a top-decile case), -3.52
-  at 1 to 2 days (-6.24 to -0.89), and near zero at 7 to 15 days.
+- **For wind, the gain from ERA5 training is much larger in the tail, in points.** It is about 12%
+  of the top-decile error against 10% of the all-case error. `s1_memberavg` minus `ens_trained` on
+  the top-decile cases is -6.14 points over all leads (-7.66 to -4.33, 12 of 12 months), against
+  -1.70 on all cases, and -16.54 at 0 to 24 h and -17.56 at 1 to 2 days. With the control member
+  alone, `s1_control` minus `ens_trained_control` is -6.95 (-8.39 to -5.23). At 7 to 10 days it is
+  -1.22 (-2.46 to -0.08) and at 11 to 15 days +0.12 (-1.17 to +1.56). Top-decile wind errors are
+  large for every arm except `era5_ceiling` (13 points), so the weather input is associated with
+  most of the top-decile error. - **For solar, the tail gain is larger in points but not in
+  certainty, and smaller in relative terms (4% against 7%).** `s1_memberavg` minus `ens_trained` is
+  -1.05 over all leads (-3.93 to +1.25, 7 of 11 months with a top-decile case), -3.52 at 1 to 2 days
+  (-6.24 to -0.89), and near zero at 7 to 15 days.
 
 **Other results.**
 
