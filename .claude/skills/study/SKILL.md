@@ -248,26 +248,34 @@ effect must exist) shows the instrument can detect an effect at all. Before a nu
 "an effect as large as 0.08 points is not excluded".
 
 **When a study fits XGBoost models, plot each column's feature importance, but never read importance
-as evidence that an input helps.** Take the gains from the point model's booster, not the quantile
-model's, whose `get_score` pools every quantile level. Read
+as evidence that an input helps.** Take the gains from the point model's booster. The quantile
+model's `get_score` pools every quantile level, so its gains mix the levels. Read
 `Booster.get_score(importance_type="total_gain")`, map its positional keys (`f0`, `f1`, ...) back to
-the column names unless the `DMatrix` was given `feature_names`, and fill every column the booster
-never split on with 0. Scale the shares to sum to 1 within each XGBoost model, then average them
-over folds and seeds. Plot each column's mean share with its range across folds and seeds, and call
-that range the variability across refits, because the fold models share most of their training
-months. Sum the shares by feature group where the study adds columns in groups.
+the column names unless the `DMatrix` was given `feature_names`, and pass the result to
+`studies.era5_ladder.gain_shares`, which fills every column the booster never split on with 0 and
+scales the shares to sum to 1 within each XGBoost model. Average the shares over folds and seeds.
+Plot each column's mean share with its minimum-to-maximum range across folds and seeds, and call the
+range the variability across refits, because the fold models share most of their training months.
+Sum the shares by feature group where the study adds columns in groups. Draw the chart on the
+logarithmic axis that the "Charts" section describes for shares spanning orders of magnitude, and
+put it after the leaderboard figure. A study of a model family other than XGBoost reports
+permutation importance only.
 
-**Gain is measured on the training data and splits credit between correlated columns according to
-which the greedy split search picks first, so importance is descriptive.** A group's total is more
-stable than any one column's share. Where the study can afford a refit, add a separate
-importance-only fit with shuffled copies of real columns, which keep each column's distribution and
-so set the share that noise earns. Never score that fit in a planned contrast, because the extra
-columns change the trees and break the equal-column-count rule. A held-out permutation importance,
-which scores the test fold with one column permuted at a time through `fit_one_fold_scoring_many`,
-measures the increase in the study's own loss on unseen months, and stays descriptive for the same
-reason. The planned contrasts are the evidence on whether an input helps. Where importance disagrees
-with them, the page says so. `fit_one_fold` does not return its booster, so a study that reports
-importance refits the arms it plots and saves each booster's gains.
+**Gain is measured on the training data, so importance is descriptive.** The planned contrasts are
+the evidence on whether an input helps. Where importance disagrees with them, the page says so.
+
+**Gain splits credit between correlated columns according to which the greedy split search picks
+first.** A group's total is more stable than any one column's share. Prefer a held-out permutation
+importance where the study can afford it: it scores the test fold with one column permuted at a time
+through `fit_one_fold_scoring_many`, and measures the increase in the study's own loss on unseen
+months. Permutation importance is still descriptive, for the same reason as gain.
+
+Where the study can afford a refit, add a separate importance-only fit with shuffled copies of real
+columns. The copies keep each column's distribution, so the share they receive is the share a column
+of pure noise receives. Never score that fit in a planned contrast, because the extra columns change
+the trees and break the equal-column-count rule. `fit_one_fold` does not return its booster, so a
+study that reports importance refits the arms it plots and saves each booster's gains. An
+ml-experiment that reports feature importance follows the same recipe.
 
 **Clean the target, not the inputs, and never correct NGED's timestamps twice.**
 `PowerTimeSeries.correct_late_timestamps` already moves NGED's readings to the right half-hour at
