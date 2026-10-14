@@ -84,9 +84,10 @@ the code runs, so the commit order proves the hypothesis came first. Its front m
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
 the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
 `failed`), the best arm with its headline number, the lessons learned, and `advice` (below). A
-finished experiment also has `production_status` (`candidate`, `adopted`, `superseded`, or `not-for-production`) and
-`adopted_in` (the model release number, or `none`). Every result has the same front matter, so a later
-session finds results with `grep` over `docs/ml-experiments/*/result.md`.
+finished experiment also has `production_status` (`candidate`, `adopted`, `superseded`, or
+`not-for-production`) and `adopted_in` (the model release number, or `none`). Every result has the
+same front matter, so a later session finds results with `grep` over
+`docs/ml-experiments/*/result.md`.
 
 **`advice` is a YAML list of one-line imperatives for future experiments, and a result is not
 finished without it.** Each item says what to do and where it applies, and ends with a pointer to the
