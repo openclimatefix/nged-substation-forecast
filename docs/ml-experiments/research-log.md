@@ -183,7 +183,8 @@ stage 1 statistics on the same 73 runs, and every arm with ERA5 residuals is a c
   hours (98.75% interval -0.14 to +0.13). Replacing the raw power lags with summaries was worse
   (+0.29).
 - **Finding for later experiments:** summaries alone, without ERA5 residuals, scored 1.18 points
-  better than no recent power up to 48 hours, so they are a forecast-time input.
+  better than no recent power up to 48 hours. They are available at forecast time, but the stage 1
+  statistics beneath them come from an ERA5-trained stage 1a.
 - **Write-up and pull request:** [result](00008-lag-summaries-in-stage2-calibrator-demand/result.md),
   [PR #1209 (Plan experiment 00008: summaries of recent power in the stage 2
   calibrator)](https://github.com/openclimatefix/nged-substation-forecast/pull/1209).

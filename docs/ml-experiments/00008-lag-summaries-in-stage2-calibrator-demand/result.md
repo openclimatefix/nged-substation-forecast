@@ -40,7 +40,8 @@ advice:
   - >-
     Daily minimum, mean, and maximum power carry most of the benefit of lagged power without
     ERA5 residuals: summaries alone scored 1.18 points better than no recent power up to 48 h
-    (C4), against 1.80 for L3. A production calibrator can take them at forecast time.
+    (C4), against 1.80 for L3. The summaries are available at forecast time, but the stage 1
+    statistics beneath them come from an ERA5-trained stage 1a.
   - >-
     A gain of 0.15 points is below what 16 Primary substations and 12 months can resolve here: the
     C1 interval is 0.27 points wide up to 48 h.
@@ -72,8 +73,8 @@ to two decimals (5.31 up to 48 h, 6.36 over all leads), so the pipeline reproduc
 intervals are at 98.75%.
 
 - **C1 (primary), S1 minus L3:** -0.02 up to 48 h (-0.14 to +0.13), 7 of 12 months and 8 of 16
-  series negative. Over all leads -0.06 (-0.18 to +0.06). The gain grows with lead, reaching -0.08
-  at 7 to 10 days (-0.22 to +0.02), and no band excludes zero.
+  series negative. Over all leads -0.06 (-0.18 to +0.06). The difference is slightly negative from 1 to 2
+  days onward (-0.04 to -0.08), and no band excludes zero.
 - **C2, S2 minus L3:** +0.29 up to 48 h (+0.11 to +0.51), 0 of 12 months negative. Replacing the raw
   power lags with summaries is worse at short leads, and the loss shrinks to +0.04 at 7 to 10 days.
 - **C3, S3 minus L3:** +0.35 up to 48 h (+0.15 to +0.58), 0 of 12 months negative.
@@ -92,7 +93,7 @@ for C1.** C1 was -0.04 (-0.16 to +0.07) at 3 to 6 days, -0.08 (-0.22 to +0.02) a
 **The BSP and GSP results are descriptive, from two series each.** Up to 48 h, C1 was +0.10 (-0.08
 to +0.31) for the two bulk supply points and -0.25 (-0.69 to +0.23) for the two grid supply points.
 C4 was -0.04 (-0.23 to +0.15) for the bulk supply points and -1.57 (-3.09 to -0.62) for the grid
-supply points, where drift dominates the error.
+supply points.
 
 ## Caveats
 
@@ -115,8 +116,9 @@ supply points, where drift dominates the error.
 ## Lessons learned
 
 - **Keep the raw power lags.** Replacing them with summaries cost 0.29 points up to 48 h.
-- **Summaries are a cheap forecast-time substitute for lagged residuals.** Daily minimum, mean, and
-  maximum power alone beat no recent power by 1.18 points up to 48 h.
+- **Summaries alone recover about two thirds of L3's gain over no recent power.** Daily minimum,
+  mean, and maximum power beat no recent power by 1.18 points up to 48 h, and score 0.62 worse than
+  L3 (E2).
 - **An effect of 0.15 points is near this design's resolution.** The C1 interval is 0.27 points
   wide, so a larger fold or more series would be needed to resolve it.
 
