@@ -1154,6 +1154,7 @@ is convex: [Convex Optimisation](../techniques/convex-optimisation.md).
 import cvxpy as cp
 import numpy as np
 
+
 def fit_edge_flows(R, B, lam_fused, lam_sparse, lam_anomaly, weights=None):
     """Joint convex estimator for switching events (untested sketch).
 
@@ -1197,6 +1198,7 @@ def fit_edge_flows(R, B, lam_fused, lam_sparse, lam_anomaly, weights=None):
     )
     prob.solve(solver=cp.CLARABEL)  # or ECOS / SCS
     return e.value, u.value
+
 
 def extract_events(edge_flows, edge_list, times, tol=1e-4):
     """Turn fitted flows into event records: maximal nonzero runs per edge.

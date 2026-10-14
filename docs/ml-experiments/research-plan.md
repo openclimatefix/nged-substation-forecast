@@ -1,6 +1,6 @@
 # Research plan of the ML experiments
 
-**This page lists the ml-experiments that are planned or proposed, in the order they should run.**
+**This page lists the ml-experiments that are planned or proposed, sorted by priority.**
 The [research log](research-log.md) holds the finished experiments, their verdicts, and the lessons
 so far. The maintainer adds proposals to this page, and the ML experiment manager orders them,
 merges proposals that test the same hypothesis, and discards the ones an earlier result has
@@ -15,23 +15,23 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | P1 | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | 1 | Nothing | Running as experiment 00008, in [PR #1209 (Plan experiment 00008: summaries of recent power in the stage 2 calibrator)](https://github.com/openclimatefix/nged-substation-forecast/pull/1209) |
+| [P5](#p5-lag-anomalies-from-the-sources-serving-will-have) | How much of the 1.80-point gain of lagged power in the stage 2 calibrator (00005) survives when the lag anomalies use only the sources serving has? | 1 | Nothing | Proposed |
+| [P6](#p6-primary-substation-demand-against-the-stored-baselines) | Where does Primary substation demand stand: how do `manual_heuristic`, `climatology`, the production recipe, an upgraded single-stage model (N1), and stage 1 without lags score on one row set? | 1 | Nothing | Proposed; the three baselines are already stored |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing for the second stage; the slope statistics wait for its result | Its cheap first test, experiment 00007, was inconclusive; the slope statistics wait for a CAMS-trained stage 1a |
+| [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain with serving-latency lag anomalies beat N1, by lead band? | 2 | P5 and P6 | Proposed; the go or no-go for the staged design on demand |
+| [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
+| [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 2 | P6 | Proposed |
+| [P10](#p10-one-pooled-model-against-one-model-per-series) | Does one model pooled across series, with capacity-normalised targets and series columns, match one model per series? | 2 | P6 | Proposed |
+| [P17](#p17-input-features-for-solar-and-wind) | Which input features are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Needs school-term dates, and follows 00006 |
+| [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 3 | P6 | Proposed |
+| [P12](#p12-calibration-of-the-pooled-mixture) | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage, demand first, then wind and solar? | 3 | P6 | Proposed |
+| [P18](#p18-lagged-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, with lag anomalies from the sources serving has, help solar and wind farms, as it helps Primary substations in 00005? | 3 | P5 and P17 | Proposed |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | 4 | A plan; the price source is chosen | Source chosen (Elexon Market Index Data); needs a plan |
-| P5 | How much of the 1.80-point gain of lagged power in the stage 2 calibrator (00005) survives when the lag anomalies use only the sources serving has? | 1 | Nothing | Proposed |
-| P6 | Where does Primary substation demand stand: how do `manual_heuristic`, `climatology`, the production recipe, an upgraded single-stage model (N1), and stage 1 without lags score on one row set? | 1 | Nothing | Proposed; the three baselines are already stored |
-| P7 | Does the staged chain with serving-latency lag anomalies beat N1, by lead band? | 2 | P5 and P6 | Proposed; the go or no-go for the staged design on demand |
-| P8 | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
-| P9 | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 2 | P6 | Proposed |
-| P10 | Does one model pooled across series, with capacity-normalised targets and series columns, match one model per series? | 2 | P6 | Proposed |
-| P11 | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 3 | P6 | Proposed |
-| P12 | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage, demand first, then wind and solar? | 3 | P6 | Proposed |
-| P13 | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 4 | P6 | Proposed; mostly a generator question |
-| P14 | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 4 | The scoring harness and P12 | Proposed |
-| P15 | Does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining, and how many months of its history does it need? | 4 | P7 and P9 | Proposed |
-| P16 | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 4 | Approval against the £30 egress cap | Proposed; a study, not an experiment |
-| P17 | Which input features are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
-| P18 | Does lagged power in the stage 2 calibrator, with lag anomalies from the sources serving has, help solar and wind farms, as it helps Primary substations in 00005? | 3 | P5 and P17 | Proposed |
+| [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 4 | P6 | Proposed; mostly a generator question |
+| [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 4 | The scoring harness and P12 | Proposed |
+| [P15](#p15-a-second-weather-product-already-on-disk) | Does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining, and how many months of its history does it need? | 4 | P7 and P9 | Proposed |
+| [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 4 | Approval against the £30 egress cap | Proposed; a study, not an experiment |
 
 ## Proposals in detail
 
@@ -152,18 +152,19 @@ webshop](https://webshop.eex-group.com/eex-public-market-data) from €665 a mon
 Data](https://www.elexon.co.uk/bsc/glossary/market-index-data/) that EPEX SPOT and Nord Pool supply
 to Elexon: a half-hourly volume and price for the short-term wholesale markets, served without a key
 by the [Elexon Insights API](https://www.elexon.co.uk/bsc/data/kinnect-insight-solution/) at
-`/balancing/pricing/market-index`. It is known soon after each half-hour, so lagging it matches
-what a forecast could use. The [N2EX day-ahead price](https://www.neso.energy/data-portal/day-ahead-power-exchange-prices-nordpool)
-is free from NESO, hourly, and known at about 10:00 the day before ([GB price
+`/balancing/pricing/market-index`. It is known soon after each half-hour, so lagging it matches what
+a forecast could use. The [N2EX day-ahead
+price](https://www.neso.energy/data-portal/day-ahead-power-exchange-prices-nordpool) is free from
+NESO, hourly, and known at about 10:00 the day before ([GB price
 page](../background/gb-price-data-and-ancillary-markets.md)).
 
-**Three facts about the recommended series are unchecked, and the plan has to settle them before
-any run.** Elexon's pages do not say which products the Market Index covers (day-ahead, within-day,
-or both) or when its history starts, so the plan should pull 2019 to 2026 and confirm the coverage,
-the product mix, and the periods in which one provider reported zero volume. The system price is
-not a candidate input, because the [Elexon pricing page](https://www.elexon.co.uk/settlement/imbalance-pricing/)
-describes it as set by balancing actions and a battery earns little from imbalance
-([how GB batteries schedule
+**Three facts about the recommended series are unchecked, and the plan has to settle them before any
+run.** Elexon's pages do not say which products the Market Index covers (day-ahead, within-day, or
+both) or when its history starts, so the plan should pull 2019 to 2026 and confirm the coverage, the
+product mix, and the periods in which one provider reported zero volume. The system price is not a
+candidate input, because the [Elexon pricing
+page](https://www.elexon.co.uk/settlement/imbalance-pricing/) describes it as set by balancing
+actions and a battery earns little from imbalance ([how GB batteries schedule
 themselves](../background/gb-battery-scheduling.md)). The claim that batteries respond to the
 intraday price rests on [Modo Energy's
 description](https://modoenergy.com/research/en/gb-research-roundup-january-2025-battery-energy-storage-great-britain-revenues-markets-wholesale-capacity-market-balancing-mechanism)
@@ -243,9 +244,9 @@ scored rolling-origin on the winner of P6 or P7.
 
 ### P9: the demand weather ceiling
 
-**The experiment sizes how much better weather could help demand.** It gives N1 ERA5 in place of ENS
-weather at serving time, by lead. A small gap means weather-source work (P15, P16) has low priority
-for demand.
+**The experiment sizes how much skill demand gains from better weather.** It gives N1 ERA5 in place
+of ENS weather at serving time, by lead. A small gap means weather-source work (P15, P16) has low
+priority for demand.
 
 ### P10: one pooled model against one model per series
 
@@ -262,11 +263,11 @@ control-member arm.
 ### P12: calibration of the pooled mixture
 
 **Calibration is open for every technology.** Experiment 00006 found the 5% to 95% band of the
-Primary substations covering about 82% to 85%, and the closed Codex study found pooled wind
-quantiles under-covering and solar 80% bands covering above their label. The arms are no correction,
-a scalar spread factor per technology, a location-and-scale calibrator, a free quantile calibrator,
-and, for solar and wind, the PV ratio target and the wind `base_margin`. The planned contrast is
-coverage and CRPS of the best arm against no correction, demand first.
+Primary substations covering about 83% to 85%, and the closed study of pipeline fixes (PR #1175)
+found pooled wind quantiles under-covering and solar 80% bands covering above their label. The arms
+are no correction, a scalar spread factor per technology, a location-and-scale calibrator, a free
+quantile calibrator, and, for solar and wind, the PV ratio target and the wind `base_margin`. The
+planned contrast is coverage and CRPS of the best arm against no correction, demand first.
 
 ### P13: perfect-prognosis and ceiling checks
 
@@ -296,7 +297,8 @@ lies inside plus or minus 0.15 points).
 **The ENS backfill from Source Cooperative (2021-03 to 2024-03) could give an earlier validation
 fold.** Every experiment since 00003 scores the same year on the same 16 series, so choices tuned
 there overfit it. For demand, a longer training history has hurt so far, so the backfill is valuable
-first as validation data. Check whether issue 959 already covers it.
+first as validation data. Check whether [issue #959 (Extend ECMWF ENS training
+history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959) already covers it.
 
 ### P17: input features for solar and wind
 
@@ -305,9 +307,9 @@ list of 9 columns for the 6 solar farms and 6 columns for the 3 wind farms, with
 and no power lag. The screen follows 00006: select on 2024-07 to 2025-06 only and confirm once on
 2025-07 to 2026-06, with the windchill-style columns in the production recipe tested for use, the
 clear-sky ratio target for solar (power divided by clear-sky power, weighted by clear-sky power),
-and a `base_margin` from a power curve of wind speed for wind. Nine series in one weather region
-cannot resolve gains under about 0.3 points of capacity, so the experiment reports every score per
-technology and flags the claim as resting on 6 solar farms and 3 wind farms.
+and a `base_margin` from a power curve of wind speed for wind. Nine generator series in two weather
+regions cannot resolve gains under about 0.3 points of capacity, so the experiment reports every
+score per technology and flags the claim as resting on 6 solar farms and 3 wind farms.
 
 ### P18: lagged power for solar and wind
 
