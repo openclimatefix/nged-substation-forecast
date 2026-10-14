@@ -154,6 +154,14 @@ statistics need more substations or a continuous measure of capacity.
 
 ### P3: historical electricity prices as lagged inputs
 
+**Experiment 00010 ran a first version and was inconclusive; a follow-up on all series is proposed.**
+Experiment 00010 added the price from exactly 7 days earlier to the stage 1a demand model and judged
+it at the two series known to host batteries, of which only one had training history. The follow-up
+the maintainer asked for on 2026-10-14 tests the price on all 20 series, to explain unmetered
+price-sensitive generators, with the pooled effect as the headline. It would try several lags and the
+known day-ahead price for the nearest leads, and keep the shuffled-price control and a climatology
+row that 00010 lacked.
+
 **The price proposal asks a different question from price forecasting.** Future electricity prices
 are hard to predict, so a price forecast is not the input. The proposal is to use prices that have
 already been published, at lag times, as inputs that carry the response of price-dependent
@@ -368,6 +376,12 @@ scorer-protection work in issue 958. Every experiment since 00003 scores the sam
 longer training history has hurt so far, so the backfill is valuable first as validation data.
 
 ### P17: input features for solar and wind
+
+**An arm for the 6 solar farms trains stage 1 on CAMS irradiance in place of ERA5 shortwave.** The
+maintainer asked for it on 2026-10-14, after experiment 00009 found no gain from a CAMS-trained stage
+1a for demand (-0.035 points). The arm applies the CAMS-trained model to ENS irradiance, and a
+variant adds a small stage 0 model that calibrates ENS irradiance to CAMS first. The two contrasts
+are kept separate: CAMS-trained against ERA5-trained, then stage 0 against plain CAMS-trained.
 
 **No experiment has screened inputs for solar or wind.** Experiments 00001 and 00002 used one fixed
 list of 9 columns for the 6 solar farms and 6 columns for the 3 wind farms, with no calendar column
