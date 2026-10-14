@@ -42,6 +42,7 @@ from e00020_common import (
     VARIANTS,
     WIND_FEATURES,
     WORK_DIR,
+    TechnologyType,
     VariantType,
     mixture_quantiles,
     observed_training_power,
@@ -153,7 +154,7 @@ def stage0_mappings(
         .with_columns(cos_zenith=pl.col("solar_zenith").radians().cos())
         .filter(pl.all_horizontal(pl.col("ens", "shortwave", "shortwave_cams").is_finite()))
     )
-    if pairs["valid_time"].max() >= TRAIN_END:
+    if pairs.select(pl.col("valid_time").max()).item() >= TRAIN_END:
         msg = "a stage 0 pair is at or after the end of training"
         raise ValueError(msg)
     mappings = {}
@@ -313,16 +314,10 @@ def fit_seed(
     limit_runs: int | None,
 ) -> None:
     """Fit every variant for one seed and write its mixtures."""
-    targets = {
+    targets: dict[tuple[TechnologyType, VariantType], Path] = {
         (technology, variant): MIXTURE_DIR / f"{variant}_{technology}_seed{seed}.parquet"
         for technology, variants in VARIANTS.items()
         for variant in variants
-        if variant not in STAGE0_VARIANT_TARGET
-    } | {
-        (technology, variant): MIXTURE_DIR / f"{variant}_{technology}_seed{seed}.parquet"
-        for technology, variants in VARIANTS.items()
-        for variant in variants
-        if variant in STAGE0_VARIANT_TARGET
     }
     if limit_runs is None and all(p.exists() for p in targets.values()):
         return
@@ -350,7 +345,9 @@ def fit_seed(
         "base_s0": "base",
         "margin": "margin",
     }
-    pieces: dict[tuple[str, str], list[pl.DataFrame]] = {key: [] for key in targets}
+    pieces: dict[tuple[TechnologyType, VariantType], list[pl.DataFrame]] = {
+        key: [] for key in targets
+    }
     files = sorted(ENS_VALIDATION_DIR.glob("init=*.parquet"))[:limit_runs]
     technology_of = dict(zip(sites["time_series_id"], sites["technology"], strict=True))
     for path in files:

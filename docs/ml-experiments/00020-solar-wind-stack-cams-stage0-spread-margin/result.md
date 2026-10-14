@@ -1,7 +1,7 @@
 ---
 id: "00020"
 slug: solar-wind-stack-cams-stage0-spread-margin
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 6 solar farms and 3 wind farms, stacking the candidate changes of experiments 00012, 00014,
@@ -42,16 +42,54 @@ row_set_id: fold_a_tuesdays_v1
 metric: >-
   CRPS estimated from 9 quantile levels, points of capacity (power over effective capacity, times
   100); coverage of the 5% to 95% band, percent, by lead band
-verdict: null
-advice: []
-production_status: not-for-production
+verdict: partly supported
+best_arm: >-
+  `full` for wind (power-curve base margin plus spread factor), 11.04 points of capacity against
+  11.11 for the production recipe; for solar no arm beats the recipe's 5.03 by an interval that
+  excludes zero
+headline: >-
+  W1, wind full stack minus the recipe: -0.071 (99.58% interval -0.133 to -0.014), a gain. S1, solar
+  full stack minus the recipe: +0.035 (-0.075 to +0.116), inconclusive.
+lessons: >-
+  For wind, the power-curve base margin carries the gain and the spread factor adds nothing
+  detectable on top of it. For solar, none of the CAMS-trained stage 1a model (-0.009), stage 0
+  (+0.036), or spread factor (+0.006) lowered the CRPS of the pooled mixture, and the full stack was
+  0.035 worse.
+advice:
+  - >-
+    Add the power-curve base margin to the wind stage 1a quantile model: it lowers the pooled-mixture
+    CRPS by 0.055 (99.58% interval -0.110 to -0.007), and dropping it from the stack raises the CRPS
+    by 0.050 (W2, W4).
+  - >-
+    Treat the wind spread factor as a coverage fix and not a score gain once the base margin is in:
+    on top of the margin it changes the CRPS by -0.016 (-0.036 to +0.004), and alone by -0.021 (W5,
+    W3).
+  - >-
+    Leave stage 0 out of the solar stage 1a: a quantile mapping of ENS shortwave onto CAMS raised the
+    CRPS by 0.036 (-0.093 to +0.208) and widened the member spread by 25%, with monthly ratios to
+    CAMS from 0.83 to 1.10 (S3, stage 0 check).
+  - >-
+    Do not expect a point-forecast gain for CAMS-trained solar stage 1a to show in the pooled
+    mixture's CRPS: it was -0.009 (-0.127 to +0.072), against -0.14 in the mean absolute error of
+    the member average in experiment 00012 (S2).
+  - >-
+    Use the solar spread factor only to bring the 5% to 95% band to about 90% coverage, since it
+    leaves the CRPS unchanged (+0.006; S4, coverage table).
+  - >-
+    Test solar changes on more than 6 farms: the paired intervals for the solar full stack and
+    stage 0 are 0.19 and 0.30 points wide, too wide to resolve a 0.05-point gain (S1, S3).
+production_status: candidate
 adopted_in: none
 code: ml-experiments/00020-solar-wind-stack-cams-stage0-spread-margin/
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1226
 ---
 
 # Do the candidate changes for solar and wind add up to a better pooled mixture?
 
-**Status: planned.** ENS is the European Centre for Medium-Range Weather Forecasts ensemble, ERA5
+**Verdict: partly supported.** For wind, the full stack (a power-curve base margin and a spread
+factor) lowers the CRPS by 0.071 points of capacity, and the base margin carries the gain. For
+solar, no component helped and the full stack was 0.035 points worse, with an interval that does not
+rule out a gain of 0.075. ENS is the European Centre for Medium-Range Weather Forecasts ensemble, ERA5
 its reanalysis of past weather, CAMS the Copernicus Atmosphere Monitoring Service's satellite
 irradiance estimate, and CRPS the continuous ranked probability score. This is proposal P22 of the
 [research plan](../research-plan.md). This experiment combines the changes that [experiment
@@ -81,7 +119,7 @@ project's current review budget reserves Opus for vital cases).
 - **Followed:** keep the training start at 2019-09 and leave out the clear-sky-ratio target (00012);
   pair a CAMS-trained stage 1a with a stage 0 mapping onto the same irradiance and check the member
   spread afterwards (00014); scale the solar mixture's quantiles by one factor, and the wind
-  mixture's on two lead groups (0 to 2 days, 3 to 15 days), refitted monthly on earlier cases
+  mixture's on two lead groups (under 72 h, and 72 h or more), refitted monthly on earlier cases
   (00016); report absolute scores and the climatology beside every contrast (00001).
 - **Departs from:** 00012's stage 0 was a regression on the control member, which gave no gain on
   the member average. This plan uses 00014's empirical quantile mapping, which kept the member
@@ -129,7 +167,7 @@ spread before and after, as experiment 00014 did.
 | CAMS-trained | solar | The shortwave column of training rows is CAMS irradiance at the farm, not ERA5 shortwave |
 | Stage 0 | solar | An empirical quantile mapping per lead band and zenith bin (00014's design) maps each ENS member's shortwave onto the irradiance the stage 1a trained on, CAMS for a CAMS-trained arm and ERA5 for an ERA5-trained arm. The mapping is fitted on the control member's pairs with valid times before 2025-06-17, pooled over the 6 farms (the run asserts the latest valid time) |
 | Base margin | wind | The 100 m wind-speed power curve (binned mean power, running maximum) is the booster's base margin for all 9 quantiles |
-| Spread factor | both | The quantiles are scaled about the median by the factor nearest 90% coverage of the 5% to 95% band, fitted for each scored month on non-trivial cases with valid times before the first run of that month. Solar uses one factor, wind one for 0 to 2 days and one for 3 to 15 days |
+| Spread factor | both | The quantiles are scaled about the median by the factor nearest 90% coverage of the 5% to 95% band, fitted for each scored month on non-trivial cases with valid times before the first run of that month. Solar uses one factor, wind one for leads under 72 h (the first two lead bands) and one for longer leads |
 
 **Arms.**
 
@@ -164,7 +202,59 @@ the base margin from the wind stack gives `base_spread`.
 The write-up also reports each arm's absolute CRPS and its 5% to 95% coverage by lead band, with the
 climatology row of experiment 00002.
 
-## Post hoc tweaks
+## Results
 
-Tweaks made after the planned results are seen are labelled post hoc in the write-up and do not
-change the planned contrasts or the verdict.
+![Planned contrasts](figure_1.svg)
+
+![Mean CRPS of each arm](figure_2.svg)
+
+- **Absolute CRPS, all leads (points of capacity).** Solar: recipe 5.03, `cams` 5.02, `cams_s0` 5.05,
+  `base_spread` 5.03, `full` 5.06, `full_no_cams` 5.05, `full_no_s0` 5.02, climatology 5.63. Wind:
+  recipe 11.11, `margin` 11.05, `base_spread` 11.09, `full` 11.04, climatology 13.03. The seed
+  spread is 0.001. The recipe reproduces experiment 00002 (solar 5.03 against 5.05, wind 11.11
+  against 11.11).
+- **Wind.** W1, full minus recipe: -0.071 (-0.133 to -0.014), a gain (at most -0.05, interval below
+  zero). W2, base margin alone: -0.055 (-0.110 to -0.007). W3, spread factor alone: -0.021 (-0.043
+  to -0.002). Dropping the margin from the stack raises the CRPS by 0.050 (W4, +0.005 to +0.098), so
+  the margin stays. Dropping the spread factor raises it by 0.016 (W5, -0.004 to +0.036), so the
+  spread factor does not stay by the rule.
+- **Solar.** S1, full minus recipe: +0.035 (-0.075 to +0.116), inconclusive. S2, CAMS-trained: -0.009
+  (-0.127 to +0.072). S3, stage 0 on top of CAMS-trained: +0.036 (-0.093 to +0.208). S4, spread
+  factor: +0.006 (-0.004 to +0.025). Dropping CAMS (S5), stage 0 (S6), or the spread factor (S7)
+  changes the CRPS by -0.010, -0.044, and -0.008, so no component stays.
+- **Coverage.** The spread factor brings the 5% to 95% band to 87.9% to 92.5% in every lead band
+  for both technologies, against 94.3% to 95.3% for the solar recipe and 89.5% to 95.3% for the wind
+  recipe.
+
+![Coverage by lead band](figure_3.svg)
+
+- **Stage 0 check.** Over the validation year, the mapped ENS daylight shortwave is 0.988 of CAMS
+  (raw ENS: 1.045), but the monthly ratio ranges from 0.83 (November) to 1.10 (July), and the mean
+  member spread is 25% wider than before the mapping.
+- **Prediction against result.** The solar prediction (-0.10, plausible range +0.02 to -0.20) was
+  wrong in sign for the full stack. The wind prediction (-0.04, reaching only a small gain) was
+  too cautious: the stack reached the gain threshold. The solar spread factor was predicted to be
+  dropped, and was.
+
+## Failures and limits
+
+- **The claims rest on 6 solar farms and 3 wind farms in one validation year.** The solar paired
+  intervals are 0.19 to 0.30 points wide, so a gain under 0.1 points is not resolved for solar.
+- **Stage 0 was fitted on the ENS control member's pairs only,** pooled over the 6 farms, and
+  corrects the year's mean but not individual months.
+- **The wind spread-factor groups** (under 72 h, and 72 h or more) were chosen after experiment
+  00016's results and are validated here on the same year. The first month, and the short wind
+  groups for most of the year, have too few earlier cases for a fit and stay uncorrected.
+- **Coverage uses the recipe's non-trivial cases for every arm,** while each arm's spread factor
+  is fitted on the arm's own earlier non-trivial cases.
+- **No post hoc tweak was run.** A stage 0 that keeps the member spread would need a refit of the
+  CAMS-trained stage 1a models, which were not saved.
+
+## Lessons
+
+- **A change that helps the mean absolute error of the member average need not help the pooled
+  mixture's CRPS.** CAMS-trained solar moved the first by -0.14 in experiment 00012 and the second
+  by -0.009 here.
+- **Stage 0 helped Primary demand in experiment 00014 and did not help solar farms.** The mapping
+  widens the spread of the 51 members by about a quarter, which the pooled mixture reads as more
+  uncertainty.
