@@ -65,9 +65,9 @@ advice:
     on top of the margin it adds nothing detectable (-0.016, -0.036 to +0.004), and alone it is a
     small gain (-0.021, -0.043 to -0.002; W5, W3).
   - >-
-    Leave stage 0 out of the solar stage 1a: a quantile mapping of ENS shortwave onto CAMS did not lower the
-    CRPS (+0.036, -0.093 to +0.208) and widened the daylight member spread by 25%, with monthly
-    ratios to CAMS from 0.83 to 1.10 (S3, stage 0 check).
+    Leave stage 0 out of the solar stage 1a: a quantile mapping of ENS shortwave onto CAMS did not
+    lower the CRPS (+0.036, -0.093 to +0.208) and widened the daylight member spread by 25%, with
+    monthly ratios to CAMS from 0.83 to 1.10 (S3, stage 0 check).
   - >-
     Do not expect a point-forecast gain for CAMS-trained solar stage 1a to show in the pooled
     mixture's CRPS: it was -0.009 (-0.127 to +0.072), against -0.14 in the mean absolute error of
