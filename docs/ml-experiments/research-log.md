@@ -248,7 +248,8 @@ the 16 Primary substations is -0.067 (97.5% interval -0.094 to -0.039), in 12 of
 entirely in daylight, so the CAMS-trained arm with stage 0 is 0.102 points better than the
 ERA5-trained arm. The pre-registered rule also required the corrected shortwave to stay within 5%
 of CAMS in every month, and it was up to 18.6% off in December although the year's mean matched
-(ratio 1.000). The mapping widened the member spread by 27%, and a post hoc monthly mapping did no
+(ratio 1.000). The gain is smallest in the first day, whose interval reaches zero. The mapping
+widened the member spread by 27%, against a predicted 10%, and a post hoc monthly mapping did no
 better. See [`result.md`](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) and
 [PR #1219 (Experiment 14: does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained
 demand

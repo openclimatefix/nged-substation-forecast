@@ -159,9 +159,9 @@ The training table holds one member per run, assumed exchangeable with the other
 
 **The verdict is inconclusive by the pre-registered rule, although C2 itself beats the planned
 size.** Stage 0 lowers the Primary quantile score of the CAMS-trained arm by 0.067 points of
-capacity (C2, 97.5% interval -0.094 to -0.039), more than the -0.03 the plan required, and in 12 of
+capacity (C2, 97.5% interval -0.094 to -0.039, half-width 0.028), more than the -0.03 the plan required, and in 12 of
 12 months and 14 of 16 series. The rule also required that the corrected ENS shortwave stay within
-5% of CAMS in every month, and it failed. C1 reproduces experiment 00009's -0.035 (-0.070 to +0.001)
+5% of CAMS in every month, and the bias check failed. C1 reproduces experiment 00009's -0.035 (-0.070 to +0.001)
 exactly, and the repeated raw-input quantiles differ from 00009's by 0.000 in every level over
 3,074,760 rows each.
 
@@ -178,32 +178,40 @@ All scores are in points of capacity, over all leads, with 95% month-and-seed in
 Primary quantile score. The CAMS-trained arm with stage 0 is 0.102 points better than the
 ERA5-trained arm (-0.143 to -0.059), three times 00009's gain.
 
-![Stage 0's contrasts by scope](figure_2.svg)
-
-**The gain is in daylight and at every lead.** In daylight the contrast is -0.168 (95% interval
--0.229 to -0.114) and at night it is 0.000. By lead band it is -0.038 up to 1 day (-0.085 to
-+0.002), -0.084 for 1 to 2 days, -0.061 for 3 to 6 days, -0.068 for 7 to 10 days, and -0.075 for 11
-to 15 days, so the gain does not fade at long leads as 00009's did. Over the 4 bulk and grid supply
-point series together it is -0.042 (-0.086 to -0.001), too few series to say more. Stage 0 also
-helps the ERA5-trained arm (X1, -0.025, -0.038 to -0.012), so part of the gain is a general
-correction of the ENS shortwave, and the CAMS-trained arm gains 0.077 more than the ERA5-trained
-arm after both have stage 0 (X2, -0.111 to -0.040).
-
 **Stage 0 fixes the year's mean mismatch but not each month's.** Over the validation year, the
 mean daylight ENS shortwave is 6.2% above CAMS as published and 0.0% above after stage 0 (320.9 and
 302.1 against 302.1 W/m²). By month, the published ratio runs from 0.92 to 1.26, and after stage 0
 from 0.81 (December) to 1.13 (July), so the 5% monthly bound failed. The member spread of the
-shortwave after stage 0 is 1.27 times its published value (1.12 to 1.31 by month), outside the 10%
+shortwave after stage 0 is 1.27 times its published value (1.13 to 1.31 by month), outside the 10%
 the plan expected.
 
 ![Ratio of ENS daylight shortwave to CAMS, by month](figure_1.svg)
+
+**The prediction was right on the size of the gain and wrong on its lead times and on the member
+spread.** C2 fell inside the predicted 0.03 to 0.10 band, and the year's mean daylight ratio to CAMS
+reached 1.000. The predicted concentration in the first 6 days did not appear: the first day has
+the smallest gain (-0.038), and 7 to 15 days gain as much as 3 to 6 days. The member spread changed
+by 27% against a predicted 10%. The offset before correction was 6.2%, a little under the 7% that
+experiment 00009 reported.
+
+![Stage 0's contrasts by scope](figure_2.svg)
+
+**The gain is in daylight and at every lead from 1 day on.** In daylight the contrast is -0.168 (95% interval
+-0.229 to -0.114) and at night it is 0.000. By lead band it is -0.038 up to 1 day (-0.085 to
++0.002), -0.084 for 1 to 2 days, -0.061 for 3 to 6 days, -0.068 for 7 to 10 days, and -0.075 for 11
+to 15 days, so the gain does not fade at long leads as 00009's did. The interval for the first day reaches
++0.002, so a gain there is probable and not resolved. Over the 4 bulk and grid supply
+point series together it is -0.042 (-0.086 to -0.001), too few series to say more. Stage 0 also
+helps the ERA5-trained arm (X1, -0.025, -0.038 to -0.012), so part of the gain is a general
+correction of the ENS shortwave, and the CAMS-trained arm gains 0.077 more than the ERA5-trained
+arm after both have stage 0 (X2, -0.111 to -0.040).
 
 **Post hoc, a monthly mapping did no better.** Fitting one mapping per calendar month from the
 single training year of pairs gives X3 -0.049 (-0.089 to -0.007) against raw ENS and X4 +0.019
 (-0.015 to +0.053) against the all-year stage 0, and the monthly ratios to CAMS stay between 0.82
 and 1.12 (figure 1).
 
-**Failures and limits.** Series P6 scores worse with stage 0 (+0.053, 0.037 to 0.073), and series P9,
+**Stage 0 hurts one Primary series and rests on one training member and one year.** Series P6 scores worse with stage 0 (+0.053, 0.037 to 0.073), and series P9,
 with 8 months of data, gains the most (-0.354). The training table held one ensemble member per
 run, the control member, so the mapping assumes the 50 perturbed members share its distribution.
 CAMS is held hourly while ENS shortwave is interpolated to half-hours, which the mapping ignores.
