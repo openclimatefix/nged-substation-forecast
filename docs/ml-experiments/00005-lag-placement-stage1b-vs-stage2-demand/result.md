@@ -94,6 +94,14 @@ improves its selection-fold error. This experiment keeps equal weights, and trea
 recency-weighted run as an exploratory extra, to be added only if the primary results leave a
 question it could answer.
 
+**Caveats on the column list and the window, added while the fits ran.** This experiment used
+`days_to_christmas` as experiment 00006 listed it when the fits started. Experiment 00006 later
+weakened the evidence for that column: its confirmed set is the weather block, the clock columns,
+and `covid_indicator`, because `days_to_christmas` changes sign every late June and its gain is
+small and uncertain. The 2023-09 start of the primary window comes from experiment 00003 and from
+the confirmation year of experiment 00006 only, so it was chosen after seeing results and is not a
+selection-year result. The fits do not change.
+
 **Training windows.** Each ERA5-trained arm uses the training window starting at 2023-09
 (primary) or at 2019-09 (exploratory). The 2023-09 start was chosen after seeing 00003, which found
 that error falls as the start moves later, and the write-up says so wherever it is used. R0 is also
