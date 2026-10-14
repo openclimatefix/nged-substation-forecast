@@ -133,8 +133,8 @@ Quantile score, Primary substations, 99.17% intervals; negative means the first 
   shortwave differ by +0.01 over all leads (E1, 0.00 to +0.01) and by +0.01 up to 48 h (+0.01 to
   +0.03), so the swap is a tiny worsening. The proxy alone against the serving mix differs by 0.00
   (E2).
-- **Telemetry delay matters up to 48 hours.** The chain with final ERA5 and the 7-hour delay scores 0.05 better
-  than with a 0.5-hour delay over all leads (E3, -0.17 to +0.05), but 0.11 worse up to 48 h. With
+- **Telemetry delay matters up to 48 hours.** The chain with final ERA5 and the 7-hour delay scores 0.05
+  better than with a 0.5-hour delay over all leads (E3, -0.17 to +0.05), but 0.11 worse up to 48 h. With
   3.5 hours of delay, as N1 had, the chain beats N1 up to 48 h by 0.43 (-0.72 to -0.15, E5) and is
   level with it over all leads (-0.04, -0.18 to +0.07). The extra 3.5 hours cost 0.13 (E7).
 - **The production recipe is far behind.** The chain beats it by 3.11 (E4).
