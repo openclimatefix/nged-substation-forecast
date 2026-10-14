@@ -39,6 +39,6 @@ pairing.
 
 ## The log
 
-| Release | Date | Git tag | MLflow run id (promoted fold run) | Image tag | Software release | Experiments incorporated |
-|---|---|---|---|---|---|---|
-| None yet | | | | | | |
+| Release | Date | Git tag | MLflow run id (promoted fold run) | Image tag | Software release | Experiments incorporated | Holdout months read |
+|---|---|---|---|---|---|---|---|
+| None yet | | | | | | | |
