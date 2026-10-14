@@ -21,6 +21,10 @@ study code line by line, so **the adversarial reviews in this skill are the main
 number a study publishes.** The priority, above speed and above tidiness, is a result that is
 scientifically valid and says no more than its evidence supports.
 
+**A study is a long report that answers several scientific questions, often on a new dataset.** An
+experiment that tests one hypothesis about improving the production forecast, with a short
+write-up, uses the `ml-experiment` skill instead.
+
 **Work autonomously: the maintainer has asked for studies to run with as little waiting on a human
 as possible.** Plan, run, review, re-run, chart, and write up without stopping to ask, and post short
 progress updates while working and a full report at the end. So a study does not stop for human
