@@ -13,7 +13,8 @@ prediction: >-
   points at the unlisted series.
 decision_rule: >-
   Supported if C1 and C2 are both material at B2: the 98.3% month-resampled interval (95% familywise,
-  Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point estimate is at least 0.1 points in the
+  Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point estimate is at least 0.1
+  points in the
   direction stated. Refuted if the C1 interval at B2 excludes a gain of 0.3 points. Otherwise
   inconclusive. The selection year decides; the confirmation year is scored once, and if its
   C1 interval at B2 excludes the selection year's point estimate the verdict is inconclusive.
@@ -119,7 +120,8 @@ The 5% threshold is a round number chosen before the sums were run; P4 passed it
 which is why the plan reports it only beside B2. The register has no commissioning dates, so a
 listed battery may have been absent for part of the training years or of the selection year, and
 batteries also earn from balancing and frequency response, not only the index price. A gain at B2
-is therefore weak evidence of a battery response. The register names the primary, bulk supply point, and grid supply point each row connects to. The
+is therefore weak evidence of a battery response. The register names the primary, bulk supply point, and grid supply point
+each row connects to. The
 result for the 20 series 00006 scored:
 
 - **Listed: B2, a bulk supply point,** with 9.5 MW of connected storage against 47.6 MW of effective
