@@ -27,7 +27,7 @@ import stage1_stats as stats
 from stage1_fit_stage1a import observed_training_power
 
 SCORE_DIR: Final[Path] = inputs.OUTPUT_ROOT / "scores"
-RESULT_DIR: Final[Path] = inputs.OUTPUT_ROOT / "results"
+RESULT_DIR: Final[Path] = inputs.RESULTS_DIR
 BANDS: Final[tuple[str, ...]] = ("all", *(name for name, _, _ in inputs.LEAD_BANDS))
 ARMS: Final[tuple[str, ...]] = (
     "c0",

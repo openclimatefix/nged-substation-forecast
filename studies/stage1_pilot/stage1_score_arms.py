@@ -69,6 +69,9 @@ def fair_crps(*, members: np.ndarray, actual: np.ndarray) -> np.ndarray:
     Args:
         members: Shape (rows, m) member forecasts.
         actual: Shape (rows,) observations.
+
+    Returns:
+        The fair CRPS of each row, in the units of the forecasts.
     """
     m = members.shape[1]
     sorted_members = np.sort(members.astype(np.float64), axis=1)

@@ -22,7 +22,7 @@ import polars as pl
 import stage1_inputs as inputs
 from studies.solar import cos_zenith_hour_mean
 
-INPUT_DIR: Final[Path] = inputs.OUTPUT_ROOT / "inputs"
+INPUT_DIR: Final[Path] = inputs.INPUTS_DIR
 
 WIND_SPEED_LIMIT: Final[float] = 60.0
 """A wind speed above this, in m s-1, is a decoding fault."""

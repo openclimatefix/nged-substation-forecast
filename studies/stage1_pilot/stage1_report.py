@@ -18,7 +18,7 @@ from stage1_score_arms import ARMS as NEW_ARMS
 from stage1_score_arms import MEMBER_ARMS as NEW_MEMBER_ARMS
 from stage1_score_arms import SCORE_DIR
 
-RESULT_DIR: Final[Path] = inputs.OUTPUT_ROOT / "results"
+RESULT_DIR: Final[Path] = inputs.RESULTS_DIR
 
 PRIOR_SCORE_DIR: Final[Path] = (
     inputs.OUTPUT_ROOT / "superseded" / "with_calendar_and_production_columns" / "scores"

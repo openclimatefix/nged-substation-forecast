@@ -67,6 +67,9 @@ def monthly(*, rows: pl.DataFrame, value: str) -> Monthly:
         rows: One arm's rows within one scope, with `seed`, `time_series_id`, `valid_time`.
         value: The column to sum.
 
+    Returns:
+        The totals by seed, series, and month, the row counts, and the labels.
+
     Raises:
         ValueError: If the seeds do not hold the same rows.
     """
@@ -186,6 +189,9 @@ def slope_interval(*, rows: pl.DataFrame) -> Interval:
     Args:
         rows: One arm's rows within one scope with `seed`, `valid_time`, `point_norm`,
             `actual_norm`.
+
+    Returns:
+        The pooled slope with its 95% month-resampled interval.
     """
     grouped = (
         rows.with_columns(month=pl.col("valid_time").dt.strftime("%Y-%m"))

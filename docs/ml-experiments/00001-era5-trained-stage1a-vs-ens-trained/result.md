@@ -69,6 +69,8 @@ the series' 90th percentile of cleaned power in stage 1a's training window (20,0
 wind cases per seed). The table gives `s1_memberavg` minus `ens_trained` in points of capacity, with
 95% month-resampled intervals, against the same contrast on all cases.
 
+![The ERA5-trained gain on the top decile of observed power against all cases](figure_6.svg)
+
 | lead band | wind, top decile | wind, all cases | solar, top decile | solar, all cases |
 | --- | --- | --- | --- | --- |
 | 0 to 24 h | -16.54 (-18.82 to -12.81) | -3.18 | -2.99 (-7.73 to +0.23) | -1.23 |
