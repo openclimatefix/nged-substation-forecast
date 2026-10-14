@@ -1,7 +1,7 @@
 ---
 id: "00007"
 slug: cams-static-correction-stage1a-residual
-status: planned
+status: done
 size: medium
 hypothesis: >-
   Most of the daytime residual of the stage 1a demand model at Primary substations is a fixed
@@ -12,8 +12,9 @@ prediction: >-
   Fitted on the 2024-07 to 2025-06 residuals and scored on the 2025-07 to 2026-06 residuals,
   ERA5 shortwave plus CAMS irradiance removes at least 50% of the daylight mean squared residual
   of the median forecast at the Primary substations that have CAMS values, and CAMS adds at least
-  20% on top of ERA5 shortwave alone (partial R squared). The stability ratio, the out-of-sample share removed over the share removed when the same
-  correction is fitted on the scored year itself, is at least 0.8.
+  20% on top of ERA5 shortwave alone (partial R squared). The stability ratio, the out-of-sample
+  share removed over the share removed when the same correction is fitted on the scored year
+  itself, is at least 0.8.
 decision_rule: >-
   Share removed is one minus the sum of squared daylight residuals after the correction over the
   sum before it (uncentred, pooled over the 14 substations), so a fixed bias counts as error. The
@@ -34,7 +35,27 @@ row_set_id: era5_val_2025_07_to_2026_06_v1
 metric: >-
   Share of the daylight mean squared residual removed (points of capacity squared), and the mean
   absolute error of the median, points of capacity (power over effective capacity, times 100)
-verdict: null
+verdict: inconclusive
+best_arm: >-
+  ERA5 shortwave plus CAMS irradiance, fitted per substation on 2024-07 to 2025-06 and scored on
+  2025-07 to 2026-06: 46.6% of the daylight squared residual removed (98.33% month-block interval
+  38.4% to 53.1%), against 39.1% for a fixed daylight shift alone
+headline: >-
+  The static correction removes 46.6% of the next year's daylight squared residual, just below
+  the planned 50%, and a fixed bias alone removes 39.1%. CAMS given ERA5 adds a partial R squared
+  of 0.110 (0.084 to 0.130) and lowers the daylight MAE of the median by 0.73 points of capacity
+  against the shift (0.62 to 0.84), from 8.78 uncorrected to 6.80. The stability ratio is 0.84.
+lessons: >-
+  Most of the removable residual is a fixed bias, and the pooled share depends on one substation
+  (P2): without it the share falls from 46.6% to 18.2%. CAMS helps at most substations, but the gate
+  does not open on a pooled rule.
+advice:
+  - >-
+    Treat the gate as open for a CAMS-trained stage 1a only as a candidate for a separate test,
+    not as a result, because the pooled share is below the 50% planned and rests on one substation.
+  - >-
+    Report a pooled share of variance removed with and without the substation that has the largest
+    residual, because one level-shifted series can set the headline.
 production_status: not-for-production
 adopted_in: none
 ---
@@ -50,14 +71,12 @@ cannot follow. The page is a plan now and becomes the write-up after the run.
 ## Size
 
 - **What gets stored:** residual tables and figures only, under this experiment's private folder.
-  Nothing enters a Delta table.
-- **Production serving path:** not touched.
-- **Degradation rule:** not touched.
-- **Designs that would test the hypothesis defensibly:** two. A linear correction of the residuals
-  answers the question cheaply and is the planned design. Retraining the XGBoost model with CAMS as
-  a feature is the later P4.
-- **Callers that need searching for:** none, because the scripts read 00006's stored predictions and CAMS parquet and nothing imports them. The scripts read 00006's stored predictions and the
-  CAMS download from [PR #1201 (Download and validate CAMS irradiance at the demand series'
+  Nothing enters a Delta table. - **Production serving path:** not touched. - **Degradation rule:**
+  not touched. - **Designs that would test the hypothesis defensibly:** two. A linear correction of
+  the residuals answers the question cheaply and is the planned design. Retraining the XGBoost model
+  with CAMS as a feature is the later P4. - **Callers that need searching for:** none, because the
+  script reads 00006's stored predictions and the CAMS download from [PR #1201 (Download and
+  validate CAMS irradiance at the demand series'
   locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201).
 
 The experiment is medium: it uses a new data source and a new method, but touches nothing stored
@@ -136,4 +155,48 @@ capacity drift in this test.
 
 ## Results
 
-To be written after the run.
+**The gate does not open for P4, and does not close for P2: the outcome is inconclusive.** The
+planned share removed was 50% or more. The result is 46.6%, with a 98.33% month-block interval of
+38.4% to 53.1% that straddles 50%. The stability ratio is 0.84, so the relation held across the two
+years, which a growing capacity would not do. Share removed in the 20% to 50% band with a ratio of
+0.5 or more is "inconclusive" in the plan's table. Three conditions held: the partial R squared is
+above zero, the MAE gain against the shift is at least 0.3 points (0.73), and the stability ratio
+is at least 0.8. The lower bound of the share's interval is above 25% (38.4%). One condition
+failed: the share removed is below 50%.
+
+| Arm | Share of daylight squared residual removed | Daylight MAE of the median (points of capacity) |
+|---|---|---|
+| Uncorrected | 0% | 8.78 |
+| Fixed daylight shift | 39.1% | 7.52 |
+| ERA5 shortwave | 40.0% | 7.41 |
+| CAMS | 42.7% | 7.11 |
+| ERA5 and CAMS | 46.6% | 6.80 |
+| CAMS minus ERA5 (one coefficient) | not scored | 7.00 |
+
+The out-of-sample figures use 13 Primary substations, not the 14 planned. One substation has no
+2024-07 to 2025-06 residual, so it has nothing to fit on. Fitting each correction on the scored
+year gives 55.8%, from which the stability ratio of 0.84 follows.
+
+![Share of the next year's daylight squared residual removed, by substation](figure_1.svg)
+
+**Most of what the correction removes is a fixed daytime bias, and one substation sets the pooled
+figure.** The shift arm alone removes 39.1%, so CAMS adds 7.5 percentage points of share on top.
+Substation P2 has a mean absolute error of 34.1 points before correction, against a median of 5.8 at
+the other substations, and its shift alone removes 64.5%. Without P2 the pooled share is 18.2%,
+which would sit in the plan's P2-capacity branch. The median substation's share is 34.4%. The
+correction makes the next year worse at 2 of the 13 substations (P13 and P15), removes almost
+nothing at P16 (1.2%), and has its largest partial R squared at P3 (0.41).
+
+**What this means for the follow-up work.** CAMS carries information that ERA5 shortwave lacks at
+most substations, so a CAMS-trained stage 1a (P4) is worth a test of its own, with the substation
+that sets the pooled figure treated separately. The result does not show that the residual is an
+irradiance error and not a change in capacity. A growing capacity and a fixed ERA5 cloud error both
+give a stable relation, and the model behind year B was trained on year A, so it may have absorbed
+part of the error. The slope statistics of P2 should wait for that follow-up.
+
+**Caveats.** The 98.33% interval resamples 12 months, so its tails are coarse. The MAE is of the
+hourly mean residual in daylight hours, not of half-hours. Year B is 00006's confirmation fold, and
+the earlier July 2025 exploration had already looked at part of it. CAMS has no forecast and its
+latency at forecast time was not checked.
+
+Script: `ml-experiments/00007-cams-static-correction-stage1a-residual/e00007_correction.py`.

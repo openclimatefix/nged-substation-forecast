@@ -27,6 +27,7 @@ the maintainer to confirm.
 | [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
 | [00005](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | Not yet merged |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
+| [00007](00007-cams-static-correction-stage1a-residual/result.md) | Does a static CAMS correction fitted on one year remove most of the next year's daytime stage 1a residual? | Inconclusive | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -156,6 +157,21 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
   substations, the calibrator with recent-origin inputs beat a stage 1b correction, and a lag-free
   calibrator is worth about 1 point of capacity at short leads (00005).
 
+### 00007: does a static CAMS correction remove the stage 1a daytime residual?
+
+**The cheap first test for P2 and P4 was inconclusive.** A correction with fixed coefficients on
+ERA5 shortwave and CAMS irradiance, fitted per substation on 2024-07 to 2025-06 and scored on
+2025-07 to 2026-06, removed 46.6% of the daylight squared residual at 13 Primary substations
+(98.33% interval 38.4% to 53.1%), just under the planned 50%. A fixed daytime shift alone removed
+39.1%, CAMS given ERA5 added a partial R squared of 0.11 (0.08 to 0.13), and the stability ratio was
+0.84. One substation sets the pooled figure: without it the share is 18.2%. A CAMS-trained stage 1a
+(P4) is worth its own test, and the slope statistics of P2 wait for it. See
+[`result.md`](00007-cams-static-correction-stage1a-residual/result.md) and [PR #1210 (Experiment 7:
+does a static CAMS correction remove the stage 1a daytime
+residual?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1210).
+
+![Share removed by substation](00007-cams-static-correction-stage1a-residual/figure_1.svg)
+
 ## Planned experiments
 
 Each planned experiment has a `result.md` with status `planned`, committed before any code runs. An
@@ -166,8 +182,7 @@ committed, and the tentative id then disappears.
 | Id | Question | State |
 |---|---|---|
 | P1 | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |
-| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Its cheap first test is experiment 00007; the slope statistics wait for that result |
-| [00007](00007-cams-static-correction-stage1a-residual/result.md) | Does a correction with fixed coefficients on CAMS irradiance, fitted on one year of out-of-fold residuals, remove most of the next year's daytime stage 1a residual? | Planned |
+| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Its cheap first test, experiment 00007, was inconclusive; the slope statistics wait for a CAMS-trained stage 1a |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Source chosen (Elexon Market Index Data); needs a plan |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | Needs school-term dates, and follows 00006 |
 
