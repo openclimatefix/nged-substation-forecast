@@ -71,8 +71,9 @@ the right release landed. The maintainer builds the image, tags it as today, and
 row to the release log (`docs/live_service/model-releases.md`): the release number, the date, the
 git tag `model-12`, the run's `experiment_name`, the MLflow run id of the promoted fold run (the
 rollback target), the software release (`v0.2.2`) that first shipped it, and the ml-experiments it
-incorporated, each linked. The same pull request adds the `design-evidence.md` rows and `informs`
-fields for those ml-experiments, as the `ml-experiment` skill already requires.
+incorporated, each linked. The same pull request sets `production_status` to `adopted` and
+`adopted_in` to the release number in each incorporated experiment's `result.md`, and updates the
+research log, as the `ml-experiment` skill requires after PR #1196 merges.
 
 #### The main branches off the happy path
 
@@ -143,8 +144,6 @@ fields for those ml-experiments, as the `ml-experiment` skill already requires.
       `packages/contracts/README.md`, and the stale `MODEL_VERSION = 1` line in
       `docs/roadmap/metrics-and-leaderboard.md` (a planned persistence forecaster): replace the
       "`MODEL_VERSION` is a class constant" account.
-    - `.claude/skills/ml-experiment/SKILL.md`: one sentence in "When a winner reaches production"
-      saying that the release log gets a row too.
     - `mkdocs.yml`: nav entry for the new page.
 - **Tests.** The `PowerForecast` fixtures that hard-code `power_fcst_model_version: 1` stay as they
   are, because the field's dtype and range are unchanged.
@@ -190,8 +189,8 @@ Each new test asserts what fails on `main` today.
 ## Docs to update
 
 The files listed above, each written for the present. This issue does not complete a roadmap item,
-so there is no ship-time triage. The release log starts empty ("None yet"), as the evidence page
-does, because no release has been numbered.
+so there is no ship-time triage. The release log starts empty ("None yet"), because no release has
+been numbered.
 
 ## Verification commands
 
@@ -235,3 +234,7 @@ uv run pre-commit run --all-files
   growing table in a runbook rots, and the page costs one nav line.
 - **Fill stored-config defaults in `_config_differences`** (the review's optional free fix): not
   adopted. Risk 1 stays as the maintainer's accepted cost of a retrain.
+- **`design-evidence.md` was deleted in PR #1196**, which replaces the `informs` field with
+  `production_status` and `adopted_in` in each `result.md` and rewrites the skill's "When a winner
+  reaches production" section to say the release log gets a row too. This plan therefore makes no
+  edit to that skill section. The merge order is #1196, then #1194.
