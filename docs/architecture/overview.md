@@ -10,20 +10,20 @@ The architecture prioritises developer velocity, idempotent re-runs, and strict 
 symmetry** — [one execution path from research to
 production](../design-philosophy/design-principles.md#3-one-execution-path-from-research-to-production),
 so [nothing gets rewritten on the way to
-production](../ml_experimentation/index.md#nothing-gets-rewritten-on-the-way-to-production). The
+production](../cross-validation/index.md#nothing-gets-rewritten-on-the-way-to-production). The
 primary aim is to develop novel, ambitious, state-of-the-art machine-learning (ML) approaches to
 forecasting. We are simultaneously building a "test-harness" production service so that ML research
 runs in a production-like environment from day one.
 
 The aim is to manage the *entire* data pipeline in Dagster: download data, validate data, train ML
-models, run inference, perform backtests. MLflow tracks every experiment. Re-running a backtest
+models, run inference, perform backtests. MLflow tracks every CV run. Re-running a backtest
 should be as easy as clicking a button in Dagster. Swapping a new model into production should
 require minimal friction.
 
 The system is designed as a modular monorepo using [uv
 workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/), with
 [Dagster](https://dagster.io/) orchestrating the data pipeline and [MLflow](https://mlflow.org/)
-tracking experiments. The measured performance engineering behind these choices — storage formats,
+tracking CV runs. The measured performance engineering behind these choices — storage formats,
 lazy evaluation, memory bounds, and Polars' row-index ceiling — lives on [Performance and
 Scale](performance.md).
 
@@ -68,7 +68,7 @@ Scale](performance.md).
   `config_overrides` on top and constructs that class's `CONFIG_CLASS`, so pydantic validates every
   hyperparameter at registration time — its name as well as its value. The resolved config is logged
   to MLflow.
-* **Experiment Tracking**: **MLflow**.
+* **CV run tracking**: **MLflow**.
 * **Visualisation**: Altair for plotting, Marimo for interactive data exploration and web apps.
 
 ## The Universal Model Interface

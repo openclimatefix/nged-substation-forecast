@@ -37,7 +37,7 @@ interval-aware handling. The remaining changes are [part of the data-handling wo
 baselines](metrics-and-leaderboard.md#baseline-forecasters) (without them "improved" is unanchored)
 and [horizon-sliced metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
 (several wins below are horizon-specific and invisible in the `"all"` aggregate) first. Each win is
-one registered experiment (`register_experiment_job`) scored against the current champion on the
+one registered CV run (`register_experiment_job`) scored against the current champion on the
 leaderboard fold; headline metric NMAE, sliced by horizon and `time_series_type`, with the 3–10 day
 band as the headline horizon slice. Several items interact (e.g. init-time-anchored features overlap
 short lags at short horizons), so land winners into `conf/model/xgboost.yaml` one at a time to keep
@@ -83,7 +83,7 @@ how to tell what each change achieved.
 nothing on the leaderboard to invalidate. That is precisely the argument for doing this now rather
 than later: these fixes change the distribution of the model's weather inputs, so every experiment
 run before them has to be re-run afterwards to stay comparable under [principle
-8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically). The effort
+8](../design-philosophy/design-principles.md#8-every-cv-run-is-scored-identically). The effort
 of that grows with every experiment added, and it is currently zero.
 
 ### Fix the NWP resample to honour the variable conventions
@@ -179,7 +179,7 @@ reference has to be measured on the same machinery the arms below use, rather th
 anything scored earlier — and by the time it is measured, "today's pipeline" is a commit rather than
 the working tree.
 
-Then each fix lands as its own leaderboard experiment, in this order, each scored against the arm
+Then each fix lands as its own leaderboard CV run, in this order, each scored against the arm
 before it — so the work ends with an attribution per change rather than one number for a bundle:
 
 1. **u/v storage**, with the resample interpolating components. Subsumes defect (a).
@@ -486,16 +486,16 @@ power a network instruction allowed.
 **The export cap is a mask on the target, never a feature.** The cap in force at a future valid
 time is not known when the forecast is made, so giving the cap to the model is exactly the fault
 the [lookahead-bias
-guardrails](../ml_experimentation/model-configuration.md#lookahead-bias-guardrails) exist to
+guardrails](../cross-validation/model-configuration.md#lookahead-bias-guardrails) exist to
 prevent. Holding an already-delivered forecast down to a cap the operator has since set is a
 different question, and one for the serving path rather than the training loop.
 
 **Clamping a prediction to the export cap is fair when the cap is already on the record, and
 lookahead bias when the cap is still in the future.** The [beam/diffuse
-experiment](../studies/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
-under active network management. That experiment reads reanalysis and satellite irradiance for
+study](../studies/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
+under active network management. That study reads reanalysis and satellite irradiance for
 hours that have already happened, so the cap the operator set is as much a historical record as the
-weather is. Every arm in that experiment gets the same clamp, so the clamp cannot favour the arm
+weather is. Every arm in that study gets the same clamp, so the clamp cannot favour the arm
 under test. A forecast issued at 06:00 for 14:00 holds no such record, because the operator sets the
 14:00 cap during the day. A live service that clamped to that cap would be scored on megawatts the
 service could not have published, which is the same fault as handing the cap to the model as a
@@ -517,7 +517,7 @@ months while the generator exports normally — the hour counts and the yields a
 network management caps what a generator may
 export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
 Masking on the raw feed would drop most of that site's early record as curtailed. The
-[beam/diffuse experiment](../studies/beam-diffuse-split.md) honours the cap only from the first
+[beam/diffuse study](../studies/beam-diffuse-split.md) honours the cap only from the first
 half-hour at which it reaches the connection limit, which is a marker taken from the cap alone.
 
 ### Drop a generator's commissioning ramp from the training target
@@ -946,7 +946,7 @@ differentiable-physics treatment.
 **Why this sits behind the instantaneous z-scores, and what the leaderboard will actually tell
 you.** The obstacle is not the feature, it is the effective sample size *on the training side*. A
 90-day accumulator moves slowly, so the [leaderboard
-fold](../ml_experimentation/cross-validation-folds.md#current-state-a-single-fold)'s training window
+fold](../cross-validation/cross-validation-folds.md#current-state-a-single-fold)'s training window
 — 2024-04-01 to 2025-06-30, bounded below by the start of the ENS archive — contains a *handful* of
 independent observations of it per series: one summer and one winter, not a distribution. A
 per-series booster will still happily split on it, and what it fits will largely be that particular
@@ -967,8 +967,8 @@ an out-of-band check of whether the model still behaves sensibly when the accumu
 the values the training window held — the same "sane extrapolation in weather regimes the training
 year never saw" criterion the [monotone
 constraints](#monotone-constraints-for-the-generation-models) item is judged on. Note that this does
-not trade away [principle 8 ("*every experiment is scored
-identically*")](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically):
+not trade away [principle 8 ("*every CV run is scored
+identically*")](../design-philosophy/design-principles.md#8-every-cv-run-is-scored-identically):
 the leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
 *additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
 measurable only once [pre-training](training-history.md) extends the training history from one
@@ -1276,10 +1276,10 @@ informative. Calibration and attribution are genuinely different goods here.
   the same fork, so decide them together rather than in sequence.
 - **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics, and
   the leaderboard. [Principle
-  8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically) means it
+  8](../design-philosophy/design-principles.md#8-every-cv-run-is-scored-identically) means it
   must be scored against the existing board by a controlled comparison, not swapped in.
 
-**How to evaluate.** One registered experiment against the member-by-member champion on the same
+**How to evaluate.** One registered CV run against the member-by-member champion on the same
 folds and population, with four arms: quantile features, representative-member subsampling,
 control-member only (today), and all-member training. Running the subsampling arm alongside the
 collapse is what separates "the resource saving was the win" from "the member axis was carrying
@@ -1496,10 +1496,10 @@ exact zeros at night.)
 
 ## How each win is evaluated
 
-Each win lands as its own experiment on the leaderboard: register → `full_cv` → `metrics`
+Each win lands as its own CV run on the leaderboard: register → `full_cv` → `metrics`
 (leaderboard scope) → compare NMAE (overall + per-type + per-horizon-slice once horizon slicing is
 in, with the 3–10 day band as the headline slice) against the current champion and the
-[baselines](metrics-and-leaderboard.md#baseline-forecasters). Keep losing experiments in MLflow
+[baselines](metrics-and-leaderboard.md#baseline-forecasters). Keep losing CV runs in MLflow
 (negative results are results); promote winners' settings into `conf/model/xgboost.yaml` one at a
 time so attribution stays clean.
 

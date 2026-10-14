@@ -240,7 +240,7 @@ IDs they need.
 When a PR lands a roadmap item, that PR (or an immediate follow-up) must also:
 
 1. Promote surviving design decisions to their permanent home (`docs/architecture/`,
-   `docs/ml_experimentation/`, …).
+   `docs/cross-validation/`, …).
 2. Delete the item's "Implementation details" section (and any `plans/` file), pasting it (or a
    summary) into the PR body. When a roadmap page's last 🚧 item ships, delete the page (nav entry,
    inbound doc links).

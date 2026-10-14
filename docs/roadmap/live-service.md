@@ -79,7 +79,7 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
   the always-on control-plane box once it exists — see the [note below](#aws-architecture).
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
   windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire stale
-  experiment partitions.
+  CV run partitions.
 - For more plans for post-v0.1, please see [the milestones (v0.2 onwards)](index.md#milestones).
 
 ## The `live_forecasts` asset
@@ -275,7 +275,7 @@ until live forecasts exist.*
 
 The `metrics` asset implements the `leaderboard` and `ad_hoc` scopes; `production_monitoring` is
 declared in `EVALUATION_SCOPES` but unimplemented (`EvalScopeType` in `contracts/ml_schemas.py`
-deliberately omits it). And with thousands of experiments planned, the `cv_experiment_folds` dynamic
+deliberately omits it). And with thousands of CV runs planned, the `cv_experiment_folds` dynamic
 partition set grows without bound — partition keys need a retirement path that cannot lose results.
 
 ### The `production_monitoring` evaluation scope
@@ -366,7 +366,7 @@ A **manually triggered** job (deliberate and auditable — never automatic) with
 1. **Verify before deleting**: the MLflow parent run exists and carries aggregate metrics, **and**
    `power_forecasts` Delta contains rows for this `experiment_name`. If either check fails, raise
    and delete nothing.
-2. Delete the experiment's dynamic partition keys via
+2. Delete the CV run's dynamic partition keys via
    `context.instance.delete_dynamic_partition("cv_experiment_folds", key)` for each
    `f"{experiment_name}__{fold_id}"`.
 3. Log the deleted keys as output metadata.
@@ -387,8 +387,8 @@ coupling needed; the ordering is flexible.
 Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851), under the v0.9
 epic [#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)
 
-> **Status: 🚧 Planned (v0.9).** Nothing below is built. The first step is [an
-> experiment](#the-experiment-how-fast-a-model-recovers-after-an-upgrade), whose result sets how
+> **Status: 🚧 Planned (v0.9).** Nothing below is built. The first step is [a
+> study](#the-study-how-fast-a-model-recovers-after-an-upgrade), whose result sets how
 > long the uncertainty bands stay wide after an upgrade.
 
 **An upgrade to a weather model changes what the forecast's NWP inputs mean without making them
@@ -428,7 +428,7 @@ good the model already promoted is on the day the new version arrives.
 ### Why the model is not told the NWP version
 
 **For now, XGBoost is not given the NWP model version as a feature, for two reasons.** The
-[experiment](#the-experiment-how-fast-a-model-recovers-after-an-upgrade) includes a post-upgrade
+[study](#the-study-how-fast-a-model-recovers-after-an-upgrade) includes a post-upgrade
 flag as one of its setups, so the decision can be revisited on evidence.
 
 **On the day of an upgrade, no training row carries the new version, so a version feature cannot
@@ -492,7 +492,7 @@ hours](../design-philosophy/inherent-stability.md#the-rules). The training run r
 weeks of each cycle it saw, so serving compares the row's cycle with a number in the model's saved
 config, a table lookup that keeps the [complexity
 offline](../design-philosophy/inherent-stability.md#where-complexity-should-live). How many weeks
-count as enough is what the experiment measures. Widening the bands needs quantile output
+count as enough is what the study measures. Widening the bands needs quantile output
 ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) and
 [regime-conditional
 calibration](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal) first;
@@ -502,13 +502,13 @@ until both exist, the cycle column is the only signal the plan commits to.
 [A retraining cadence and
 trigger](../design-philosophy/design-principles.md#a-retraining-cadence-and-trigger) says the
 project lacks. A retrain can only use post-upgrade rows whose power has been observed, so the
-earliest useful retrain is set by how fast those rows build up, and the experiment says how many
+earliest useful retrain is set by how fast those rows build up, and the study says how many
 weeks are worth waiting for. A per-series correction of the forecast, refitted on the last few
 weeks of observed power, might bridge the gap sooner. That correction is untested.
 
-### The experiment: how fast a model recovers after an upgrade
+### The study: how fast a model recovers after an upgrade
 
-**The experiment measures how the error on post-upgrade rows falls as training gains post-upgrade
+**The study measures how the error on post-upgrade rows falls as training gains post-upgrade
 data, around the Met Office's UKV upgrade of 2026-01-21.** That upgrade is the one with metered
 power on both sides of it in the studies' data. The recovery curve says how long the bands must stay
 wide after an upgrade, and whether a post-upgrade flag or recency weighting shortens that time.
@@ -641,14 +641,14 @@ Tests:
 
 Verification: trigger a power update (or the sensor manually), see trailing-24h/7d metrics appear in
 the `production_monitoring` MLflow experiment and `forecast_metrics`; run `retire_experiment_job` on
-a throwaway experiment and watch its partitions disappear from the Dagster UI while its MLflow runs
+a throwaway CV run and watch its partitions disappear from the Dagster UI while its MLflow runs
 and Delta rows remain.
 
 ### NWP model upgrades — order of work
 
 Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)
 
-1. **Run [the experiment](#the-experiment-how-fast-a-model-recovers-after-an-upgrade)** under
+1. **Run [the study](#the-study-how-fast-a-model-recovers-after-an-upgrade)** under
    `studies/`, on the fold and bootstrap machinery in `packages/studies/`. The recovery curve sets
    how many weeks of post-upgrade training count as enough, and the decision rules say whether the
    post-upgrade flag or recency weighting goes into the production model.

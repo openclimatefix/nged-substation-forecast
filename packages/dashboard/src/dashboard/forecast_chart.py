@@ -149,7 +149,7 @@ LAG_OPTIONS: Final[dict[str, timedelta]] = {
 """The lagged-power lines the dashboard offers, as UI-label → lag.
 
 Hardcoded, illustrative model inputs: the dashboard cannot see which lag features a given
-experiment's model actually used, because that config lives in MLflow. We therefore offer the
+CV run's model actually used, because that config lives in MLflow. We therefore offer the
 common defaults rather than pretending to read the real lags from the model.
 """
 
@@ -375,14 +375,14 @@ def build_view_forecast_chart(
             sets the vertical rule.
         units: ``"MW"`` or ``"MVA"``, from this series' ``TimeSeriesMetadata``.
         title: Chart title (the series name / type / id line).
-        subtitle: Chart subtitle (the init time / experiment line).
+        subtitle: Chart subtitle (the init time / CV run line).
         shade_weekends: Whether to draw a faint background band behind each weekend.
         show_forecast: Whether to draw the grey forecast-ensemble lines.
         show_actuals: Whether to draw the thick blue observed-power line.
         lags: Power lags to plot as coloured lines (observed power shifted forward by each lag,
             using only pre-init observations — see ``_lagged_power_frame``). Empty for none.
-        comparison_forecasts: Optional second experiment for the same series, fold, and init time.
-        comparison_label: Legend label identifying the second experiment's orange ensemble.
+        comparison_forecasts: Optional second CV run for the same series, fold, and init time.
+        comparison_label: Legend label identifying the second CV run's orange ensemble.
 
     Returns:
         A layered, zoomable Altair chart in Europe/London wall time.

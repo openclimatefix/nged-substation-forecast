@@ -10,19 +10,20 @@ description: >-
   timestamp conventions, grid cells, steps in served data); how to chart a study so the charts tell
   the story alone; how to write the page without overclaiming; and anonymisation. Load before
   planning, running, re-running, charting, writing up, or reviewing any study under `studies/`,
-  before changing `packages/studies/`, and before any experiment whose numbers will reach `docs/`.
+  before changing `packages/studies/`, and before any ml-experiment or study whose numbers will
+  reach `docs/`.
 ---
 
 # Running a study
 
-A study answers one question with an experiment, such as "which weather product best describes past
+A study answers one question by measurement, such as "which weather product best describes past
 sunshine?", and publishes the answer as a page under `docs/studies/`. The maintainer does not review
 study code line by line, so **the adversarial reviews in this skill are the main defence of every
 number a study publishes.** The priority, above speed and above tidiness, is a result that is
 scientifically valid and says no more than its evidence supports.
 
 **A study is a long report that answers several scientific questions, often on a new dataset.** An
-experiment that tests one hypothesis about improving the production forecast, with a short
+ml-experiment that tests one hypothesis about improving the production forecast, with a short
 write-up, uses the `ml-experiment` skill instead.
 
 **Work autonomously: the maintainer has asked for studies to run with as little waiting on a human
@@ -81,7 +82,7 @@ is on pytest's path. `packages/studies/tests/test_study_boundaries.py` enforces 
 
 **A study's leaderboard number comes only from `scripts/forecasting/score_study.py`.** Run the
 script on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number
-from the `forecast_metrics` row that the `metrics` asset writes under the experiment name
+from the `forecast_metrics` row that the `metrics` asset writes under the `experiment_name`
 `study/<study name>`. Never quote a leaderboard skill number computed by the study's own scoring
 code. The script logs every attempt, refused ones included. Do not retry a submission to find a
 lucky score, because each attempt raises the `study_submission_number` that the next scored fold run
@@ -90,7 +91,7 @@ the reference from the `vs_reference__` metrics on the study's MLflow fold run, 
 asset computes in the same run as the reference's own scores. Never edit the scorer files in a
 study: `packages/ml_core/src/ml_core/metrics.py`, `packages/ml_core/src/ml_core/cv_helpers.py`,
 `src/nged_substation_forecast/defs/cv_assets.py`, `scripts/forecasting/score_study.py`, and
-`conf/cv/`. The script refuses a file whose row keys differ from the reference experiment's for the
+`conf/cv/`. The script refuses a file whose row keys differ from the reference CV run's for the
 fold, so the file must hold exactly the reference's series, initialisation times, valid times, and
 ensemble members, with none missing and none extra. Read observed power through
 `studies.power.scan_power`, which serves every cleaned reading, including the whole validation
@@ -102,16 +103,17 @@ observations after `train_end` only as lags earlier than each forecast's initial
 is optional, and a study that cannot post reports its own scores on the page and says why. The rules
 for a study that does post:
 
-- **Call the study's own baseline the control arm.** The scorer uses "reference" for the experiment
+- **Call the study's own baseline the control arm.** The scorer uses "reference" for the CV run
   named by `reference_experiment_name` in the cross-validation (CV) config, which is a different
   forecast. Post the control arm and each arm the page reports.
-- **Post each arm as its own submission,** because the script stores one experiment per call. Name
-  the submission `<page-slug>--<arm>`: the page's file name without `.md`, two hyphens, and the arm
-  name, lower-cased, with each character outside `[a-z0-9_-]` (a `.` or a space, for example)
+- **Post each arm as its own submission,** because the script stores one `experiment_name` per call.
+  Name the submission `<page-slug>--<arm>`: the page's file name without `.md`, two hyphens, and the
+  arm name, lower-cased, with each character outside `[a-z0-9_-]` (a `.` or a space, for example)
   changed to `_`, in at most 64 characters (the pattern `validate_study_name` checks). The
-  experiment is then `study/<page-slug>--<arm>`. The page lists each experiment name, and each
-  experiment name contains the page's file name. Post each arm's seed 0 fit, and say so on the page,
-  because the page's intervals average over several seeds and the leaderboard row holds one.
+  `experiment_name` is then `study/<page-slug>--<arm>`. The page lists each `experiment_name`, and
+  each `experiment_name` contains the page's file name. Post each arm's seed 0 fit, and say so on
+  the page, because the page's intervals average over several seeds and the leaderboard row holds
+  one.
 - **Write the seven required `PowerForecast` columns, and no column from outside `PowerForecast`:**
   `valid_time`, `time_series_id`, `ensemble_member` (Int8), `power_fcst_init_time`, `power_fcst`
   (Float32), `power_fcst_model_name`, and `power_fcst_model_version` (Int16). The script adds
@@ -594,9 +596,9 @@ Every study page follows the structure of an academic paper, in this order:
 12. **Data and code availability.** Which inputs are public and where they come from, which are
     private and why, the commit of the code, and the XGBoost version and settings. No generator's
     name, identifier, or coordinates appears in this section. A page that posted arms lists each
-    `study/<page-slug>--<arm>` experiment name. The page also states that the errors of the arms the
-    study chose after seeing the leaderboard fold are biased low, because the study chose those arms
-    on that fold.
+    `study/<page-slug>--<arm>` `experiment_name`. The page also states that the errors of the arms
+    the study chose after seeing the leaderboard fold are biased low, because the study chose those
+    arms on that fold.
 13. **Reproducing the figures.** The commands, in order.
 
 **Put a new study page where its question belongs.** A study of how well a weather product describes

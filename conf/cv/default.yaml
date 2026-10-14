@@ -13,7 +13,7 @@
 #
 # Once Dynamical.org has backfilled ECMWF ENS to earlier years, we will move to the target
 # multiple-yearly-fold protocol (expanding training window, one validation year per fold) via a new
-# leaderboard epoch.  See docs/ml_experimentation/cross-validation-folds.md.
+# leaderboard epoch.  See docs/cross-validation/cross-validation-folds.md.
 
 folds:
   - fold_id: "mid_2025_to_mid_2026"

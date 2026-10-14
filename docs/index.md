@@ -42,7 +42,7 @@ NGED](roadmap/handover.md) design page.
 A large part of this project is building a production forecasting system and researching novel
 forecasting methods. But NGED's interest goes beyond the forecasts themselves: they also want
 **information** — to learn which forecasting approaches actually work well on their data (a major
-reason we invest in a rigorous [leaderboard](ml_experimentation/index.md)), and to understand the
+reason we invest in a rigorous [leaderboard](cross-validation/index.md)), and to understand the
 underlying issues involved in forecasting their electricity network.
 
 This interest in information means a negative result can be just as valuable as a positive result.
@@ -75,8 +75,8 @@ industries we borrow practice from and what we declined.
 - [Code Style](architecture/code-style.md) — code conventions
 - [Testing](architecture/testing.md) — how the test suite is wired, the house style, and the notable
   test suites
-- [ML Experimentation](ml_experimentation/index.md) — methodology for our implemented ML
-  experimentation: cross-validation folds, the leaderboard, and how we evaluate models
+- [Cross-validation](cross-validation/index.md) — methodology for our implemented
+  cross-validation runs: cross-validation folds, the leaderboard, and how we evaluate models
 - [Live Service](live_service/index.md) — operating the live, 6-hourly production service: promoting
   a champion model and backfilling missed runs
 - [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery
@@ -103,4 +103,4 @@ rather hear about the disagreement than have it stand.
 > New to this repo? See the [Documentation Guide](documentation-guide.md) for how these sections
 > relate to each other and to GitHub issues — including the rule that `roadmap/` holds **only
 > not-yet-implemented** design, moving out to a permanent home (`architecture/` for design
-> rationale, `ml_experimentation/`/`live_service/` for step-by-step how-to) once a feature ships.
+> rationale, `cross-validation/`/`live_service/` for step-by-step how-to) once a feature ships.

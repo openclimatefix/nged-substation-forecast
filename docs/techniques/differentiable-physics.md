@@ -443,7 +443,7 @@ many site-level sawtooths, which makes $\delta$ easier to identify than $r_{\tex
 
 ## What a fitted five-parameter PV model measured on six solar farms
 
-**A throw-away experiment fitted this page's single-site physics on six metered solar farms without
+**A throw-away study fitted this page's single-site physics on six metered solar farms without
 using any gradients, and three of its findings bear on the design sketched above.** Panel tilt,
 panel azimuth, capacity, an inverter clipping limit, and a temperature coefficient were fitted per
 site by a Powell optimiser. The write-up is [Does a weather product's
@@ -452,7 +452,7 @@ sites inside one 25 km by 23 km box in Lincolnshire over 2019 to 2026 — a meas
 rather than a general result about fitting PV models. The by-products that bear on estimating
 capacity rather than on this method, among them a half-hour timestamp error absorbed into the fitted
 azimuth, are on the [capacity-estimation
-page](../roadmap/capacity-estimation.md#what-the-beamdiffuse-experiment-measured-on-this-fleet).
+page](../roadmap/capacity-estimation.md#what-the-beamdiffuse-study-measured-on-this-fleet).
 
 **A single site's five parameters are recoverable without gradients, so the case for differentiable
 physics cannot rest on that fit being hard.** The objective is not convex. Refitting all 30
@@ -481,7 +481,7 @@ satellite source, an interval spanning zero. The deficit is therefore not a mis-
 rescaling the physical model's own output could repair.
 
 **The term that hurts is the transposition, and the sketch above carries no guard on it.** The
-experiment compared a weather product's published direct-beam field against a beam estimated from
+study compared a weather product's published direct-beam field against a beam estimated from
 the total irradiance by a separation model, and the fitted physical model and the tree disagree
 about which of the two beam fields is better. The physical model divides the horizontal beam by the
 cosine of the solar zenith angle to recover the direct normal irradiance, which magnifies a beam

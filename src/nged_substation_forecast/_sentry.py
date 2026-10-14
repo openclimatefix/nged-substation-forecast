@@ -17,7 +17,8 @@ Sentry configuration:
   process (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed telemetry
   error), swamping Sentry with events the design never intended to send. The hook is attached to the
   *scheduled* asset jobs only, so it covers the unattended production workload;
-  manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
+  manual, backfill, and `register_experiment_job` runs are watched by the operator at the Dagster
+  UI, not Sentry.
   `report_asset_retry` is the early warning for an asset that is about to retry: it sends the caught
   exception at *warning* level on the first failed attempt, so the operator learns of the fault
   hours before the last retry fails. It is called from inside the asset, so it also fires in a

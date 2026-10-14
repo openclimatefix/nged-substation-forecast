@@ -41,10 +41,10 @@ memory](https://openclimatefix.github.io/nged-substation-forecast/architecture/p
 `XGBoostConfig` extends `BaseForecasterConfig` with XGBoost hyperparameters (`n_estimators`,
 `learning_rate`, `max_depth`, etc.). `BaseForecasterConfig` contributes `selected_features`,
 `random_seed` (threaded into XGBoost's own `seed` parameter for deterministic training), the
-experiment-identity fields `experiment_name` and `ml_flow_experiment_id`, and the leaderboard tag
+CV-run identity fields `experiment_name` and `ml_flow_experiment_id`, and the leaderboard tag
 fields `weather_source` and `training_strategy`, which label a run so the leaderboard can compare
 like with like. Model-family identity — `MODEL_NAME` ("xgboost") and `MODEL_VERSION` —
-lives on the `XGBoostForecaster` class itself, not in the config; both a config's experiment
+lives on the `XGBoostForecaster` class itself, not in the config; both a config's CV run
 identity and the class's model-family identity are stamped onto every row of the `PowerForecast`
 output, so the Delta Lake table is self-describing. `XGBoostConfig` inherits `extra="forbid"` from
 `BaseForecasterConfig`, so a key that names neither an `XGBoostConfig` field nor an inherited

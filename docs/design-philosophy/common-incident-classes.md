@@ -122,7 +122,7 @@ system, so the shape may not earn a dedicated mechanism until the architecture g
 A single malformed or missing record inside a larger batch — one site, one time series, one
 partition — takes down the entire job, rather than being isolated to the piece it actually affects.
 
-Per-`(experiment, fold)` partitioning and Patito's own null-tolerance policy — reject a structurally
+Per-`(CV run, fold)` partitioning and Patito's own null-tolerance policy — reject a structurally
 empty column outright, but absorb a locally corrupt value the model can tolerate — both push in the
 right direction by construction. One case is now settled rather than assumed: NWP rows duplicated
 for a single H3 cell fan the feature join out, `PowerForecast.validate` rejects the duplicated

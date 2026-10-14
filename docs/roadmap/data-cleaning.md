@@ -62,7 +62,7 @@ earliest date in that bracket keeps the most rows, and every later date would re
 cleaning step that hard-codes the cut-off should say which bracket it came from, so that a later
 re-measurement can move it without anyone having to rediscover why it was there.
 
-**The beam/diffuse experiment removes those rows rather than masking them out of training alone,
+**The beam/diffuse study removes those rows rather than masking them out of training alone,
 and the same reasoning applies here.** A curtailed hour can be kept and scored against the cap the
 operator set. Nothing in the record says what fraction of an array was energised on a given day, so
 a commissioning hour has no ceiling to compare a prediction against.
