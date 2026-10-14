@@ -195,8 +195,8 @@ the one-time fix (`docker run --privileged --rm tonistiigi/binfmt --install arm6
 "/app/data/NWP" does not exist or you don't have access!`. That halt is correct behaviour.
 
 The script builds the image tagged with the promoted model's run id and the git commit, runs it
-offline, and prints the container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded, arbitrary
-partition key — the offline run fails at the NWP lookup long before the slot's validity could
+offline, and prints the container log with a pass/fail summary. (The smoke test's one-shot run
+uses a hard-coded, arbitrary partition key — the offline run fails at the NWP lookup long before the slot's validity could
 matter, so there is no key worth choosing.) It hard-fails only if the runtime touches MLflow — the
 hermeticity guarantee worth automating — and otherwise asks you to confirm by eye that the run
 loaded the model and failed *only* on missing NWP data (expected: no data tables are mounted for

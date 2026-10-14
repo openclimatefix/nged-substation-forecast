@@ -503,3 +503,10 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_mo
 def test_model_release_outside_the_int16_range_is_rejected(model_release: int) -> None:
     with pytest.raises(ValueError, match="model_release"):
         BaseForecasterConfig(selected_features=set(), model_release=model_release)
+
+
+@pytest.mark.parametrize("model_release", [0, 32767])
+def test_model_release_at_the_int16_bounds_is_accepted(model_release: int) -> None:
+    config = BaseForecasterConfig(selected_features=set(), model_release=model_release)
+
+    assert config.model_release == model_release
