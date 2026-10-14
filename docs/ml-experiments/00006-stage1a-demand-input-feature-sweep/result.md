@@ -23,21 +23,24 @@ benchmark: >-
   The weather block W alone, and a month-by-half-hour climatology row.
 row_set_id: era5_val_2024_07_to_2025_06_v1
 metric: mean absolute error of the median, points of capacity (power over effective capacity, times 100)
-verdict: supported
+verdict: partly supported
 best_arm: >-
-  Post hoc, by confirmation-year score: the Primary set (weather block, hour, weekday, COVID
-  indicator, days to Christmas) trained from 2023-09, with and without recency weights (6.68 and
-  6.71 points on the Primary substations; the two are tied)
+  Chosen on the selection years only: the Primary set (weather block, hour, weekday, COVID
+  indicator, days to Christmas) with recency weights over the full history (6.93 points on the
+  selection year and 7.11 on the confirmation year, Primary substations). A 2023-09 start scored
+  lowest on the confirmation year (6.71) and did not help on the selection year, so it is not the
+  best arm
 headline: >-
   P1, hour and weekday against the weather block alone, Primary substations: -0.55 (99.4%
   interval -0.71 to -0.41) on the selection year and -0.46 (-0.61 to -0.30) on the confirmation
-  year. It is the largest single input, at about a third of the predicted size. Against the
-  Primary set, a 2023 start (-0.86, confirmation year only) is larger, and recency weights (-0.22
-  on the selection year, -0.46 on the confirmation year) are smaller on the selection year and
-  equal to the clock on the confirmation year.
+  year, the largest single input but about a third of the predicted size. For comparison, P7
+  (recency weights, against W plus clock) is -0.32, and the COVID indicator (P6) is -0.26. For GSP
+  the COVID indicator beats the clock. The Primary set's step over the clock (P8) is -0.29 on the
+  confirmation year (99.4% -0.58 to +0.02), which fails the planned level.
 lessons: >-
-  The weather block already carries the season, so time-of-year columns add nothing; windchill
-  changes nothing; the choice of training window matters as much as any added column.
+  The weather block already carries the season, so time-of-year columns show no detectable gain;
+  windchill changes nothing; the choice of training window and lockdown handling matters about as
+  much as any added column.
 production_status: candidate
 adopted_in: none
 code: ml-experiments/00006-stage1a-demand-input-feature-sweep/
@@ -46,12 +49,17 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Which inputs work best for the ERA5-trained demand model (stage 1a)?
 
-**Verdict: supported on the decision rule, with the predicted size wrong.** For the Primary
-substations, the clock (hour of day and day of week) is the largest single input against the
-weather block alone, and no other single input beats it. The clock lowers the error by 0.55 points
-of capacity on the selection year and 0.46 on the confirmation year, a third of the 1.5 points the
-hypothesis predicted. Every other non-lag input lowers the error by less than the clock does, and
-windchill changes it by less than 0.05 points, as predicted.
+**Verdict: partly supported.** For the Primary substations, the clock (hour of day and day of week)
+is the largest single input against the weather block alone (-0.55 points of capacity on the
+selection year and -0.46 on the confirmation year), a third of the 1.5 points the hypothesis
+predicted. Restricting the verdict to Primary was decided after the plan, at the planning session's
+request and before the confirmation year was scored; the plan's contrasts were not split by type.
+Across all series the clock leads on point estimates only (-0.51 against -0.45 for recency weights
+and -0.40 for the COVID indicator, each against W on the selection year), with no paired interval
+between them. For the two grid supply points (GSP) the hypothesis fails: the COVID indicator beats
+the clock, and the clock is not material. Windchill changes the error by less than 0.05 points, as
+predicted. The hypothesis lists columns, so this page counts recency weights as a training choice
+and not as an input.
 
 **Primary substations are the headline, because NGED cares most about them.** Every score below
 is split by substation type, and no mean over all types is quoted as a result, because the two grid
@@ -80,16 +88,18 @@ series each:
 changes the error by -0.46 for Primary (99.4% interval -0.61 to -0.30), -0.30 for BSP (-0.41 to
 -0.17), and -0.08 for GSP (-0.43 to +0.27, against W).
 
-**The Primary set was frozen before anything was scored on 2025-07 to 2026-06.** The first
-selection, over all series, chose the days to the nearest holiday where the Primary-only selection
-chose the days to Christmas, and the Primary-only set replaced it before the confirmation year was
-scored. The discarded set scores slightly lower on the confirmation year (7.53 against 7.57 for
-Primary, and 7.04 against 7.11 with recency weights), a difference inside the noise. The Primary
-set's columns are `hour_local`, `day_of_week_local`, `covid_indicator` (1 from 2020-03-23 to
-2021-07-19, and 0 in all later data, so it reads 0 at forecast time), and `days_to_christmas` (days
-to 25 December, negative after it, clipped to 14 days either way). Only `days_to_christmas` is
-outside the set of derived columns the stage 1 pilot already had. Each column is computable at
-forecast time from the calendar alone.
+**Only the Primary set was written into this page before anything was scored on 2025-07 to
+2026-06.** The BSP and GSP sets were selected before the confirmation fits but were not written into
+the page until after scoring, so their confirmation rows are not pre-committed. The first selection,
+over all series, chose the days to the nearest holiday where the Primary-only selection chose the
+days to Christmas, and the Primary-only set replaced it before the confirmation year was scored. The
+discarded set scores slightly lower on the confirmation year (7.53 against 7.57 for Primary, and
+7.04 against 7.11 with recency weights), a difference inside the noise. The Primary set's columns
+are `hour_local`, `day_of_week_local`, `covid_indicator` (1 from 2020-03-23 to 2021-07-19, and 0 in
+all later data, so it reads 0 at forecast time), and `days_to_christmas` (days to 25 December,
+negative after it, clipped to 14 days either way). Only `days_to_christmas` is outside the set of
+derived columns the stage 1 pilot already had. Each column is computable at forecast time from the
+calendar alone.
 
 **Dropping one group at a time from the Primary set shows the clock and the COVID indicator
 matter most.** On the selection year, removing the clock raised the Primary error by 0.59 points
@@ -138,7 +148,7 @@ better, with three fitting seeds.
 | P1: clock against W | selection | -0.55 | -0.71 to -0.41 (99.4%) | yes |
 | P1: clock against W | confirmation | -0.46 | -0.61 to -0.30 (99.4%) | yes |
 | P2: one harmonic of time of year, against W plus clock | selection | +0.04 | -0.40 to +0.37 (99.4%) | no |
-| P3: holiday flags, against W plus clock | selection | -0.11 | -0.21 to -0.02 (99.4%) | yes, marginal: 0.106 against the 0.1 floor |
+| P3: holiday flags, against W plus clock | selection | -0.11 | -0.21 to -0.02 (99.4%) | marginal (0.106 against the 0.1 floor), and not material on the second selection year |
 | P4: previous-24-hour mean temperature | selection | +0.04 | -0.01 to +0.08 (99.4%) | no (slightly worse) |
 | P5: guarded windchill, against W | selection | +0.003 | -0.011 to +0.016 (99.4%) | no effect |
 | P6: COVID indicator | selection | -0.26 | -0.40 to -0.10 (99.4%) | yes |
@@ -148,23 +158,37 @@ better, with three fitting seeds.
 | P9: trained from 2023-09, against the full history | selection | -0.05 | -0.60 to +0.59 (99.4%) | no |
 | P9: trained from 2023-09, against the full history | confirmation | -0.86 | -1.19 to -0.48 (99.4%) | yes |
 
+**The selection and confirmation years score different series.** The confirmation year scores 14
+Primary series and each selection year 13, and two of the 16 Primary series in the metadata are
+never scored, so a comparison of the 0.55 and 0.46 figures mixes a change of series with a change of
+year.
+
 **P8, the step from the clock to the Primary set, is supported at 95% but not at the planned
 99.4% level on the confirmation year.** The COVID and Christmas columns together lower the
 confirmation-year error by 0.29 points, and the planned-level interval touches zero.
 
 **The 2023-09 start helps on the confirmation year and not on the selection year, for Primary
-substations.** On the selection year the start trains on only ten months (2023-09 to 2024-06), and
-adding it to the recency-weighted set changes the error by +0.17 (95% interval -0.18 to +0.57). On
-the confirmation year it has 22 months and lowers the error by 0.86. For BSP the contrast is -1.48
-(-2.75 to -0.30, 99.4%) on the selection year and -0.42 (-1.09 to +0.15) on the confirmation year.
-For GSP it is -5.37 (-11.63 to -0.19) and -4.74 (-9.36 to -1.58). The explanation that the
-long history carries drift is plausible and was not tested.
+substations, and the two years differ in season coverage as well as length.** On the selection year
+the start trains on only ten months (2023-09 to 2024-06), which contain no July or August, so two
+validation months lie outside the season it saw. Adding it to the recency-weighted set changes the
+error by +0.17 (95% interval -0.18 to +0.57). On the confirmation year it has 22 months, including
+one summer, and lowers the error by 0.86. The 2023-09 start also makes `covid_indicator` constant at
+zero in training, so "Primary set from 2023-09" is in effect the weather block, the clock, and the
+days to Christmas, and the contrast measures "drop the lockdown handling and keep only recent data".
+For BSP the contrast is -1.48 (-2.75 to -0.30, 99.4%) on the selection year and -0.42 (-1.09 to
++0.15) on the confirmation year. For GSP it is -5.37 (-11.63 to -0.19) and -4.74 (-9.36 to -1.58).
+The explanation that the long history carries drift is plausible and was not tested. The
+confirmation year influenced no choice of the selected set, and the 2023-09 start needs a fresh year
+before anyone adopts it.
 
-**P2, P4, and P5 predicted correctly that these columns do nothing.** P5 stays within 0.01 points
-of zero, and P2 and P4 move the error up by 0.04 points. A second selection year (2023-07 to
-2024-06, 13 Primary series) repeats P1 -0.50 (-0.66 to -0.34), P2 +0.07 (-0.44 to +0.47), P5 -0.005
-(-0.021 to +0.013), and P7 -0.42 (-0.61 to -0.24) at 99.4%. P4 changes sign (-0.04, -0.12 to
-+0.03), and P3 (-0.07, -0.26 to +0.03) and P6 (-0.11, -0.27 to +0.06) are no longer material.
+**P2, P4, and P5 show no detectable gain from these columns, within the intervals.** P5 stays within
+0.01 points of zero. P2 is +0.04 with a 99.4% interval of -0.40 to +0.37, which allows a gain nearly
+as large as the clock's, and P4 is +0.04 (-0.01 to +0.08), which is not material. A second selection
+year (2023-07 to 2024-06, 13 Primary series) repeats P1 -0.50 (-0.66 to -0.34), P2 +0.07 (-0.44 to
++0.47), and P7 -0.42 (-0.61 to -0.24) at 99.4%. P4 and P5 change sign (-0.04, -0.12 to +0.03, and
+-0.005, -0.021 to +0.013), and P3 (-0.07, -0.26 to +0.03) and P6 (-0.11, -0.27 to +0.06) are no
+longer material. P3, marginal at 0.106 against the 0.1 floor on the selection year, is therefore
+treated as not material.
 
 **The BSP and GSP selection-year contrasts mostly share the Primary signs, with wider intervals
 from two series each.** P1 is -0.37 (-0.59 to -0.16) for BSP and -0.35 (-0.68 to +0.03) for GSP.
@@ -207,9 +231,9 @@ wind-driven heat loss +0.01. The mean of the 3 by 3 block of cells around the ne
 place of the nearest cell, changes the error by -0.01 points. Sun azimuth as sine and cosine
 lowers it by 0.04 points (-0.08 to -0.02), too small to matter.
 
-**Time of year adds nothing in the full weather block.** One harmonic of the day of the year adds
-+0.04 points (-0.28 to +0.29), two harmonics +0.10, and the month as a categorical +0.09 against
-the weather block plus clock.
+**Time of year shows no detectable gain in the full weather block.** One harmonic of the day of the
+year adds +0.04 points (-0.28 to +0.29), two harmonics +0.10, and the month as a categorical +0.09
+against the weather block plus clock. The intervals allow a gain of up to about 0.3 points.
 
 ![Time of year added to weather blocks with columns removed](figure_4.svg)
 
@@ -250,11 +274,14 @@ intervals and three fitting seeds:
 | One harmonic of time of year | -0.06 (-0.33 to +0.18) | +0.01 (-0.36 to +0.36) | -0.15 (-0.42 to +0.14) |
 | Holiday flags | -0.10 (-0.17 to -0.04) | -0.06 (-0.17 to +0.02) | -0.07 (-0.14 to -0.02) |
 
-**Most of the gain is from Christmas itself, and the gain is small and uncertain.** The windowed
-column keeps three quarters of the gain of the column as built, and the half-year flag alone gains
-under 0.1 on every fold. Only the holiday flags have intervals that exclude zero on two of the
-three folds. The days to the nearest holiday (clipped at 7 days) has a milder version of the same
-half-year step, because England has no bank holiday between late May and late August.
+**The data cannot separate a Christmas effect from the half-year step.** The windowed column keeps
+three quarters of the point-estimate gain of the column as built, and the half-year flag alone gains
+under 0.1 on every fold, but no paired test between these point estimates was run, and every
+interval of the Christmas column includes zero except the windowed column on the selection year.
+Only the holiday flags have intervals that exclude zero on two of the three folds. The days to the
+nearest holiday (clipped at 7 days) has a milder version of the same half-year step, because England
+has no bank holiday between late May and late August. The Christmas column is therefore unproven,
+and the confirmed set is in effect the weather block, the clock, and the COVID indicator.
 
 ## Windchill changes nothing, so its production code can go
 
@@ -335,12 +362,14 @@ Calibration is the job of stage 2, not of this experiment.
   directly comparable.
 - **P8 fails at the planned level on the confirmation year.** The COVID and Christmas columns
   together are supported at 95% only.
-- **The `best_arm` is a winner's-curse pick.** It is chosen by confirmation-year score, so it is
-  post hoc, and the two 2023-09 arms are tied.
-- **BSP and GSP rest on two series each**, so their selected sets, and the BSP and GSP intervals,
-  are noisy. The bootstrap resamples months and fitting seeds, not series, so these intervals are
-  optimistic. The GSP error is dominated by drift, so a GSP set tuned on one year may not carry
-  over.
+- **The `best_arm` is chosen on the selection years only,** because the plan bars the confirmation
+  year from influencing choices that feed experiment 00005. The 2023-09 start, which scored lowest
+  on the confirmation year, is reported as confirmation-only evidence.
+- **The intervals describe these series in these months.** The bootstrap resamples whole months and
+  the fitting seed with the series fixed, so no interval generalises to other substations, and a
+  percentile bootstrap over 12 months undercovers at 99.4%. BSP and GSP rest on two series each, so
+  their selected sets are noisy, and the GSP error is dominated by drift, so a GSP set tuned on one
+  year may not carry over.
 - **The Bonferroni family is nine contrasts per substation type**, which is 27 tests across the
   three types.
 - **The sweep used one fitting seed and 12 validation months**; the add-one-in intervals do not
@@ -389,16 +418,11 @@ recency weights, since recency weights beat the 0/1 indicator on Primary here.
 
 ## Lessons for later experiments
 
-- **Choose the training window before adding columns.** Recency weights and a COVID indicator
-  lower the Primary error by about half as much as the clock on the selection year, and a 2023
-  start lowers it more than the clock on the confirmation year.
-- **Use per-substation sets, and report each type separately.** The best set differs between
-  Primary, BSP, and GSP, and the GSP error would swamp a mean over all types.
-- **Add time-of-year columns only to a weather block that cannot already carry the season.**
-- **Check that a calendar encoding does not also encode the season.** A signed distance to the
-  nearest holiday clipped at a few days is a half-year flag outside the window.
-- **Report a Bonferroni-widened interval for each pre-registered contrast.** The P8 contrast reads
-  as supported at 95% and not at the planned level.
+- **Choose the training window and lockdown handling before adding columns, and do not add their
+  gains together.** Recency weights and the COVID indicator lower the Primary error by about half as
+  much as the clock on the selection year, and both act on the same lockdown months. A 2023 start
+  lowers it more than the clock on the confirmation year only, and also removes the COVID
+  indicator's training rows.
 
 ## Plan
 
@@ -509,9 +533,11 @@ row. Absolute scores are reported for every arm.
 **The plan below is as committed before the first fit, with these changes made afterwards.**
 
 - **Selection and confirmation folds.** Selection used the validation years 2024-07 to 2025-06 and,
-  for a replication, 2023-07 to 2024-06; the confirmation year (2025-07 to 2026-06) was scored once
-  after the Primary set was written into this page. The plan's original wording scored the main
-  fold first.
+  for a replication, 2023-07 to 2024-06. The Primary set was written into this page before the
+  confirmation year (2025-07 to 2026-06) was scored, and the planned set was scored once. The BSP
+  and GSP sets, the discarded all-series set, the pooled models, the Christmas control, and the
+  importance fits were also scored on the confirmation year and are post hoc. The plan's original
+  wording scored the main fold first.
 - **The set was selected on the Primary series.** The first all-series selection was replaced
   before the confirmation year was scored.
 - **Added arms:** the BSP and GSP sets, a graded lockdown indicator, a masking ablation of the time

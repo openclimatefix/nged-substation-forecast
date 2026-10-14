@@ -16,7 +16,7 @@ the maintainer to confirm.
 |---|---|---|
 | [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Train the weather-to-power model on ERA5 and apply it to ENS members | Needs the staged design, and helps only up to day 6 |
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
-| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and days to Christmas as the stage 1a demand inputs, trained from a recent start or with recency weights | The COVID and Christmas step is supported at 95% only; windchill can go |
+| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs | Days to Christmas is unproven, a 2023 start needs a fresh year, and windchill can go |
 
 ## The experiments so far
 
@@ -25,7 +25,7 @@ the maintainer to confirm.
 | [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
 | [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
-| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Supported, with the predicted size wrong | Candidate | Pending |
+| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -103,10 +103,11 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
   -0.71 to -0.41) on the selection year and 0.46 (-0.61 to -0.30) on the confirmation year, against
   1.5 predicted. The chosen Primary set adds a COVID indicator and the days to Christmas, which
   lowers the error by a further 0.29 on the confirmation year, supported at 95% and not at the
-  planned level.
-- **Training history matters as much as any column:** recency weights lower the confirmation-year
-  error by 0.46 more, and a 2023-09 start by 0.86 more, though the 2023 start did not help on the
-  selection year.
+  planned level, and the Christmas column on its own is unproven. For grid supply points the COVID
+  indicator beats the clock.
+- **Training history and lockdown handling matter about as much as any column:** recency weights
+  lower the confirmation-year error by 0.46 more. A 2023-09 start lowers it by 0.86 more, but it
+  did not help on the selection year and needs a fresh year before anyone adopts it.
 - **Time of year adds nothing, because the weather block already carries the season.** Windchill
   changes the error by less than 0.01 points, and trailing temperature means do not help.
 - **Different substation types need different sets:** bulk supply points gain from holiday flags,
