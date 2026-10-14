@@ -34,6 +34,7 @@ the maintainer to confirm.
 | [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | 2026-10-14 |
 | [00011](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written (inconclusive as intended): no gain in any window | Not for production | 2026-10-14 |
 | [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
+| [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -238,6 +239,22 @@ interval was far narrower than the plan guessed (0.035 points either side, not 0
 shortwave?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213).
 
 ![Contrast of the CAMS-trained arm by scope](00009-cams-trained-stage1a-vs-era5-trained-demand/figure_1.svg)
+
+### 00014: a stage 0 for the CAMS-trained demand model
+
+**Mapping the ENS shortwave onto CAMS lowered the Primary quantile score of the CAMS-trained stage
+1a by 0.067 points of capacity, but the verdict is inconclusive.** The contrast over all leads at
+the 16 Primary substations is -0.067 (97.5% interval -0.094 to -0.039), in 12 of 12 months and
+entirely in daylight, so the CAMS-trained arm with stage 0 is 0.102 points better than the
+ERA5-trained arm. The pre-registered rule also required the corrected shortwave to stay within 5%
+of CAMS in every month, and it was up to 18.6% off in December although the year's mean matched
+(ratio 1.000). The mapping widened the member spread by 27%, and a post hoc monthly mapping did no
+better. See [`result.md`](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) and
+[PR #1219 (Experiment 14: does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained
+demand
+model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1219).
+
+![Ratio of ENS daylight shortwave to CAMS](00014-cams-trained-stage1-with-stage0-ens-correction-demand/figure_1.svg)
 
 ### 00010: the lagged electricity price in the stage 1a demand model
 
