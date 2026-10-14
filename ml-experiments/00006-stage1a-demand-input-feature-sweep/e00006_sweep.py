@@ -26,7 +26,9 @@ MIN_GAIN_POINTS: Final[float] = 0.1
 MAX_GREEDY_STEPS: Final[int] = 6
 SELECTION_PATH: Final[Path] = inputs.EXPERIMENT_DIR / "selection_Primary.json"
 FEATURE_GROUPS: Final[tuple[str, ...]] = tuple(
-    g for g in fit.GROUP_COLUMNS if g not in ("month_cat", "covid_graded", "windchill_unguarded")
+    g
+    for g in fit.GROUP_COLUMNS
+    if g not in ("month_cat", "covid_graded", "windchill_unguarded", "xmas_window", "season_half")
 )
 """The groups the add-one-in and greedy stages consider. The month categorical and the graded
 lockdown indicator are tested in their own stages."""
@@ -229,6 +231,26 @@ def production_windchill(*, fold_name: str) -> None:
     )
 
 
+def christmas_check(*, fold_name: str) -> None:
+    """Test whether `days_to_christmas` helps through Christmas or through its half-year step."""
+    base = ("clock", "covid_flag")
+    names = [
+        fit.Arm(groups=base).name,
+        fit.Arm(groups=(*base, "xmas")).name,
+        fit.Arm(groups=(*base, "xmas_window")).name,
+        fit.Arm(groups=(*base, "season_half")).name,
+        fit.Arm(groups=(*base, "doy1")).name,
+        fit.Arm(groups=(*base, "hol_flags")).name,
+    ]
+    fit.run_stage(
+        stage="christmas_check",
+        fold_name=fold_name,
+        config="series",
+        arm_names=names,
+        seeds=[0, 1, 2],
+    )
+
+
 def finals(*, fold_name: str) -> None:
     """Fit the frozen set and its reference arms: three seeds, quantiles, pooled, importance."""
     chosen = selected_groups()
@@ -306,6 +328,7 @@ def main() -> None:
         "drop_one": drop_one,
         "candidates": candidates,
         "finals": finals,
+        "christmas_check": christmas_check,
         "production_windchill": production_windchill,
         "type_sets": type_sets,
         "graded_covid": graded_covid,

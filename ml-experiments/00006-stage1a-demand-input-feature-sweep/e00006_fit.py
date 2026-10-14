@@ -32,6 +32,7 @@ import xgboost as xgb
 FOLDS_DIR: Final[Path] = inputs.EXPERIMENT_DIR / "fits"
 N_ROUNDS: Final[int] = 500
 PERMUTATION_REPEATS: Final[int] = 3
+CHRISTMAS_WINDOW_DAYS: Final[int] = 14
 PURGE: Final[timedelta] = timedelta(days=7)
 MIN_TRAIN_ROWS: Final[int] = 17_520
 """A series needs a year of observed half-hours before a fold's purge to be fitted in that fold."""
@@ -94,6 +95,8 @@ GROUP_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "covid_graded": ("covid_graded",),
     "month_cat": ("month_local",),
     "windchill_unguarded": ("windchill_unguarded_c",),
+    "xmas_window": ("days_to_christmas_window",),
+    "season_half": ("season_half",),
 }
 """The column groups an arm can add to `W`, each computable at forecast time."""
 
@@ -303,6 +306,33 @@ def _production_windchill() -> pl.Expr:
     )
 
 
+def _christmas_window_columns() -> dict[str, pl.Expr]:
+    """Return the Christmas-window and half-year columns used to test `days_to_christmas`.
+
+    `days_to_christmas` is the signed distance to the nearest 25 December clipped at 14 days, so
+    it also flips sign once a year in late June and separates January to June from July to
+    December. `days_to_christmas_window` is null outside the 14-day window, and `season_half`
+    isolates the half-year step.
+    """
+    local = pl.col("valid_time").dt.convert_time_zone("Europe/London").dt.date()
+    year = local.dt.year()
+    offsets = [(pl.date(year + shift, 12, 25) - local).dt.total_days() for shift in (-1, 0, 1)]
+    nearest = pl.min_horizontal([o.abs() for o in offsets])
+    signed = (
+        pl.when(offsets[0].abs() == nearest)
+        .then(offsets[0])
+        .when(offsets[1].abs() == nearest)
+        .then(offsets[1])
+        .otherwise(offsets[2])
+    )
+    return {
+        "days_to_christmas_window": pl.when(nearest <= CHRISTMAS_WINDOW_DAYS)
+        .then(signed)
+        .otherwise(None),
+        "season_half": (signed > 0).cast(pl.Float64),
+    }
+
+
 def _load(*, unit: str, config: str, fold: Fold) -> pl.DataFrame | None:
     """Load a unit's rows (a series, or every series of a type), or None if it cannot be fitted."""
     series = pl.read_parquet(inputs.INPUTS_DIR / "series.parquet")
@@ -330,6 +360,7 @@ def _load(*, unit: str, config: str, fold: Fold) -> pl.DataFrame | None:
         series_code=pl.col("time_series_id").replace_strict(codes, return_dtype=pl.Int32),
         month_local=pl.col("valid_time").dt.convert_time_zone("Europe/London").dt.month(),
         windchill_unguarded_c=_production_windchill(),
+        **_christmas_window_columns(),
     )
 
 

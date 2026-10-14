@@ -322,12 +322,17 @@ def finals_levels(*, fold_name: str) -> None:
     write(table=pl.concat(levels), name=f"finals_levels_{fold_name}")
     frozen = "W+clock+covid_flag+xmas"
     planned = [
+        ("P1 clock", "W+clock", "W"),
         ("P8 frozen vs clock", frozen, "W+clock"),
         ("P9 from 2023-09", f"{frozen}|from2023-09", frozen),
     ]
     other = [
         ("P1 clock", "W+clock", "W"),
+        ("P8 frozen vs clock", frozen, "W+clock"),
+        ("P9 from 2023-09", f"{frozen}|from2023-09", frozen),
         ("frozen vs W", frozen, "W"),
+        ("W vs climatology", "W", CLIMATOLOGY),
+        ("W+clock vs climatology", "W+clock", CLIMATOLOGY),
         ("recency", f"{frozen}|recency", frozen),
         ("recency+from 2023-09", f"{frozen}|recency|from2023-09", f"{frozen}|recency"),
         ("frozen vs climatology", frozen, CLIMATOLOGY),
@@ -338,6 +343,73 @@ def finals_levels(*, fold_name: str) -> None:
         contrasts.append(contrast_table(rows=sub, pairs=planned, label=t, level=PLANNED_LEVEL))
         contrasts.append(contrast_table(rows=sub, pairs=other, label=t))
     write(table=pl.concat(contrasts), name=f"finals_contrasts_{fold_name}")
+
+
+def extra_selection_tables() -> None:
+    """Tables behind the write-up's drop-one-out, replication, and windchill numbers."""
+    drop = read_seeds(stage="drop_one", fold_name="select_2024")
+    reference = "W+clock+covid_flag+xmas"
+    drop_pairs = [(a, a, reference) for a in arm_columns(rows=drop) if a != reference]
+    write(
+        table=pl.concat(
+            [
+                contrast_table(
+                    rows=of_type(rows=drop, substation_type=t), pairs=drop_pairs, label=t
+                )
+                for t in TYPES
+            ]
+        ),
+        name="drop_one_selection_fold",
+    )
+    planned_pairs = [
+        ("P1", "W+clock", "W"),
+        ("P2", "W+clock+doy1", "W+clock"),
+        ("P3", "W+clock+hol_flags", "W+clock"),
+        ("P4", "W+clock+t24", "W+clock"),
+        ("P5", "W+windchill", "W"),
+        ("P6", "W+clock+covid_flag", "W+clock"),
+        ("P7", "W+clock|recency", "W+clock"),
+    ]
+    second = read_seeds(stage="planned", fold_name="select_2023")
+    write(
+        table=contrast_table(
+            rows=of_type(rows=second, substation_type="Primary"),
+            pairs=planned_pairs,
+            label="Primary",
+            level=PLANNED_LEVEL,
+        ),
+        name="planned_second_selection_fold",
+    )
+    windchill = read_seeds(stage="production_windchill", fold_name="select_2024")
+    pairs = [
+        ("unguarded vs W", "W+windchill_unguarded", "W"),
+        ("unguarded vs W+clock", "W+clock+windchill_unguarded", "W+clock"),
+    ]
+    write(
+        table=pl.concat(
+            [
+                contrast_table(
+                    rows=of_type(rows=windchill, substation_type=t), pairs=pairs, label=t
+                )
+                for t in TYPES
+            ]
+        ),
+        name="production_windchill",
+    )
+    counts = []
+    for fold_name in ("select_2023", "select_2024", "confirm_2025"):
+        fitted = read_seeds(
+            stage="planned" if fold_name != "confirm_2025" else "finals", fold_name=fold_name
+        )
+        types = series_types()
+        ids = fitted["time_series_id"].unique()
+        counts.append(
+            types.filter(pl.col("time_series_id").is_in(ids.implode()))
+            .group_by("substation_type")
+            .len()
+            .with_columns(fold=pl.lit(fold_name))
+        )
+    write(table=pl.concat(counts), name="series_counts")
 
 
 def pinball_table(*, fold_name: str) -> None:
