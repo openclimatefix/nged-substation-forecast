@@ -155,6 +155,7 @@ nav:
       - "Where does Primary substation demand stand against the stored baselines?": ml-experiments/00013-primary-demand-against-stored-baselines/result.md
       - "Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?": ml-experiments/00011-school-term-and-return-to-work-columns-stage1a-demand/result.md
       - "Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model?": ml-experiments/00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md
+      - "Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error?": ml-experiments/00017-training-window-and-retraining-rule-drift-demand/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
