@@ -36,7 +36,7 @@ pull_request: pending
 # Where should lagged power enter a two-stage demand forecast?
 
 **Status: planned.** This page was committed before any fit. The fits wait for the separate
-input-feature sweep (experiment 00004) to choose the input columns of stage 1a. The sweep must
+input-feature sweep (experiment 00006) to choose the input columns of stage 1a. The sweep must
 choose those columns on data before 2025-07-01, so that this experiment's validation year has not
 influenced the columns it uses.
 
