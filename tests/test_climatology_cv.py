@@ -160,7 +160,7 @@ def test_climatology_emits_pooled_quantiles_as_members_and_crps_flows(
     assert forecasts["fold_id"].unique().to_list() == [FOLD_ID]
     assert forecasts["experiment_name"].unique().to_list() == [EXPERIMENT_NAME]
     assert forecasts["power_fcst_model_name"].unique().to_list() == ["climatology"]
-    # Five Friday valid times times 51 members: the three NWP members are not repeated, and the
+    # Six Friday valid times times 51 members: the three NWP members are not repeated, and the
     # Saturday run, whose weekend cells have no training sample nearby, is dropped.
     valid_times = half_hours(_VAL_FRIDAY).to_list()
     assert forecasts.height == len(valid_times) * _MEMBER_COUNT

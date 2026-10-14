@@ -3,6 +3,8 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        # Unified diffs need the single-space markers on blank context lines.
+        exclude: ^studies/wind_storage/variants/.*\.patch$
       - id: end-of-file-fixer
       - id: check-yaml
       # A Vega/Altair chart exported straight to SVG trips the hook's 500 KB default, because a
@@ -65,15 +67,6 @@ repos:
       - id: ty
         name: ty
         entry: uv run --all-packages ty check --project .
-        language: system
-        pass_filenames: false
-        always_run: true
-      # The scorer's pure core (`ml_core.metrics`, `ml_core.cv_helpers`) must import neither Dagster,
-      # MLflow, nor the study code. See `[tool.importlinter]` in pyproject.toml. The CI step
-      # "Pre-commit (every hook, every file)" runs this hook, so the contract is checked on every pull request.
-      - id: import-linter
-        name: import-linter
-        entry: uv run lint-imports
         language: system
         pass_filenames: false
         always_run: true

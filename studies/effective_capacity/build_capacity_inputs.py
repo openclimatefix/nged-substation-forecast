@@ -52,7 +52,6 @@ from capacity_paths import (
     sha256_of,
     write_json_atomic,
 )
-from contracts.config_schemas import load_cv_config
 from studies.baselines import hourly_clear_sky
 from studies.capacity_estimators import CapacityRecord
 from studies.capacity_recovery import (
@@ -65,7 +64,6 @@ from studies.capacity_recovery import (
 from studies.commissioning import SETTLED_OUTPUT_FROM, drop_commissioning_ramp
 from studies.export_cap import with_export_cap
 from studies.guards import refuse_to_overwrite
-from studies.power import CV_CONFIG_PATH
 from studies.pv_dataset import (
     MIN_CAMS_RELIABILITY,
     drop_outages_and_spikes,
@@ -85,17 +83,20 @@ FIRST_DAY: Final[date] = date(2019, 9, 1)
 ORIENTATION_END: Final[datetime] = datetime(2024, 12, 1, tzinfo=UTC)
 """Each plant's orientation is fitted on data before this."""
 
+FINAL_TEST_CUTOFF: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
+"""The study reads no power at or after this instant."""
+
 UNCLIPPED_AC_MW: Final[float] = 1.0e9
 """An alternating-current limit so high that the unit-capacity output is never clipped."""
 
 
 def final_test_cutoff() -> datetime:
-    """Return midnight UTC at the start of `final_test_start`, which no study may read.
+    """Return midnight UTC on 2026-07-01, the end of the readings this study uses.
 
     Returns:
         The cut-off.
     """
-    return datetime.combine(load_cv_config(CV_CONFIG_PATH).final_test_start, time.min, tzinfo=UTC)
+    return FINAL_TEST_CUTOFF
 
 
 def hourly_grid_ends(*, days: int) -> pl.Series:

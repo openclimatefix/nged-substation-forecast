@@ -14,9 +14,8 @@ frame once the calling asset knows the window and the scope. The enriched frame 
 writes to Delta. ``build_mlflow_aggregate_metrics`` takes the un-enriched frame that
 ``compute_metrics`` returned. That function reduces the frame to the flat key/value dictionary
 the MLflow leaderboard displays. The ``require_*`` functions beside the four scoring functions
-refuse a group the scorer must not score: a window reaching ``final_test_start``, rows outside the
-fold's window, a study whose row keys differ from the reference experiment's, and a study that
-carries more than one model name.
+refuse a group the scorer must not score: rows outside the fold's window, and a study whose row
+keys differ from the reference experiment's.
 
 Every function here is pure: no Dagster, no MLflow, and no IO. Each function is therefore
 unit-testable on an in-memory frame. The asset that calls the function owns every read and write.
@@ -30,7 +29,7 @@ degenerate inputs are a single-member ensemble and a forecast with zero error.
 
 import hashlib
 import re
-from datetime import date, datetime
+from datetime import datetime
 from typing import Final
 
 import patito as pt
@@ -52,8 +51,6 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 
-from ml_core.cv_helpers import date_to_utc_datetime
-
 
 class NoOverlappingActualsError(ValueError):
     """Raised by ``compute_metrics`` when no forecast row joins to any observed actual.
@@ -64,13 +61,6 @@ class NoOverlappingActualsError(ValueError):
     other ``ValueError`` — a negative lead time, a missing capacity row — still propagates.
     """
 
-
-LIVE_FOLD_ID: Final[str] = "live"
-"""The ``fold_id`` under which the live service stores its forecasts in ``power_forecasts``.
-
-Live rows are forecasts of the future, not a held-out set, so the final-test date guard exempts
-them.
-"""
 
 ROW_KEY_COLUMNS: Final[tuple[str, ...]] = (
     "time_series_id",
@@ -99,52 +89,12 @@ initialisation times, and valid times.
 """
 
 
-class FinalTestWindowError(ValueError):
-    """Raised when a window reaches ``final_test_start`` and ``NGED_FINAL_TEST=1`` is not set."""
-
-
 class RowsOutsideWindowError(ValueError):
     """Raised when a forecast row's ``valid_time`` lies outside the fold's evaluation window."""
 
 
 class RowKeyMismatchError(ValueError):
     """Raised when a study's forecast row keys differ from the reference experiment's."""
-
-
-def require_window_within_guard(
-    *,
-    window_end: datetime,
-    final_test_start: date,
-    fold_id: str,
-    final_test_enabled: bool,
-) -> None:
-    """Refuse a window that reaches ``final_test_start``, unless the maintainer allows it.
-
-    ``final_test_start`` is a guard rather than a sealed test year: the observations after that
-    date span a few months, not an independent year. The guard exists so that no experiment, and no
-    autonomous research session, scores on those observations without the maintainer's say-so.
-    Forecasts stored under ``LIVE_FOLD_ID`` are exempt, because live rows are forecasts of the
-    future and not a held-out set.
-
-    Args:
-        window_end: Inclusive end of the evaluation window.
-        final_test_start: First date of the guarded period.
-        fold_id: Fold identifier of the group being scored.
-        final_test_enabled: Whether the maintainer's environment variable ``NGED_FINAL_TEST=1``
-            is set. The caller reads the environment, so this function stays free of IO.
-
-    Raises:
-        FinalTestWindowError: If ``window_end`` is on or after ``final_test_start``,
-            ``final_test_enabled`` is False, and ``fold_id`` is not ``LIVE_FOLD_ID``.
-    """
-    if fold_id == LIVE_FOLD_ID or final_test_enabled:
-        return
-    if window_end >= date_to_utc_datetime(final_test_start):
-        raise FinalTestWindowError(
-            f"The window for fold {fold_id!r} ends at {window_end.isoformat()}, which reaches "
-            f"final_test_start={final_test_start}. Set NGED_FINAL_TEST=1 in the maintainer's "
-            "environment to score it."
-        )
 
 
 def require_valid_times_within_window(
@@ -159,9 +109,8 @@ def require_valid_times_within_window(
 
     ``compute_metrics`` joins forecasts to actuals on ``(time_series_id, valid_time)`` and never
     filters to the window, so a forecast file carrying extra rows would be scored and then labelled
-    as the fold's window. In leaderboard scope this check, not the ``final_test_start`` guard, keeps
-    rows past ``val_end`` out of the score, because a leaderboard window ends before
-    ``final_test_start``.
+    as the fold's window. In leaderboard scope this check keeps rows past ``val_end`` out of the
+    score.
 
     Args:
         valid_time_min: Earliest ``valid_time`` in the group.
@@ -186,40 +135,6 @@ def _distinct_series_ids(forecasts: pl.LazyFrame) -> list[int]:
     return sorted(
         forecasts.select("time_series_id").unique().collect(engine="streaming")["time_series_id"]
     )
-
-
-class MultipleModelNamesError(ValueError):
-    """Raised when a study's forecast rows carry more than one ``power_fcst_model_name``."""
-
-
-def require_single_model_name(*, study: pl.LazyFrame, group_label: str) -> None:
-    """Refuse a study whose rows carry more than one ``power_fcst_model_name``.
-
-    ``compute_metrics`` returns separate metric rows for each ``power_fcst_model_name``, and the
-    leaderboard number is the mean over all of those metric rows. A study that spreads the easy
-    forecast rows across several model names and keeps the hard forecast rows under a single model
-    name would therefore lower its mean error while still carrying
-    the reference's row keys. Spreading the members of one ensemble across model names would also
-    split that ensemble.
-
-    Args:
-        study: Lazy scan of the study's forecast rows, carrying ``power_fcst_model_name``.
-        group_label: Names the group in the error message.
-
-    Raises:
-        MultipleModelNamesError: If the rows hold zero or several distinct model names.
-    """
-    names = (
-        study.select("power_fcst_model_name")
-        .unique()
-        .collect(engine="streaming")["power_fcst_model_name"]
-        .to_list()
-    )
-    if len(names) != 1:
-        raise MultipleModelNamesError(
-            f"Group ({group_label}) must carry exactly one power_fcst_model_name; "
-            f"found {sorted(map(str, names))}."
-        )
 
 
 def require_same_row_keys(

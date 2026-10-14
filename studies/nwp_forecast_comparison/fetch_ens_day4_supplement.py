@@ -16,31 +16,34 @@ writing, the script re-reads the leads that the extract and the table share, and
 every row and every field agrees. That check is what shows the supplement means the same as the
 extract: same table, same units, same anonymous site labels.
 
-Run it with `uv run python studies/nwp_forecast_comparison/fetch_ens_day4_supplement.py`.
+Run with `uv run python studies/nwp_forecast_comparison/fetch_ens_day4_supplement.py`
+followed by `--source COMPONENT_TABLE --source-version VERSION --output-directory NEW_DIRECTORY`.
+The main extract and supplement must use the same pinned source snapshot and output directory.
+Existing polar caches remain frozen and cannot be paired with newly derived values.
 """
 
+import argparse
+import json
 import logging
 import sys
+from pathlib import Path
 from typing import Final
 
 import ens_forecast_horizons as efh
 import polars as pl
-from fetch_ens_forecast_horizons import MARGIN_HOURS, NWP_TABLE, OUTPUT_PATH, _cells, _members
+from fetch_ens_forecast_horizons import MARGIN_HOURS, _cells, _members, source_metadata
 from studies.ens_members import ENSEMBLE_SIZE
 from studies.guards import refuse_to_overwrite
 from studies.pv_dataset import pv_sites, wind_sites
 from studies.sources import ENS_PRODUCT_DIR
 
+SUPPLEMENT_PATH: Final[Path] = ENS_PRODUCT_DIR / "ens_members_day4.parquet"
+"""Frozen supplement used by existing analyses; the extraction CLI writes an explicit directory."""
+
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_ens_day4_supplement")
 
 DAY: Final[int] = 4
 """The band the extract lacks."""
-
-SUPPLEMENT_DIR: Final = ENS_PRODUCT_DIR
-"""The folder holding the supplement, beside the extract."""
-
-SUPPLEMENT_PATH: Final = SUPPLEMENT_DIR / "ens_members_day4.parquet"
-"""The supplement: the extract's columns, for the leads the extract lacks at day 4."""
 
 MISSING_LEADS: Final[tuple[int, ...]] = (105, 108, 111)
 """The 3-hourly leads inside the day-4 band that the extract lacks."""
@@ -113,8 +116,13 @@ def log_surviving_runs(*, extract_band: pl.DataFrame, supplement: pl.DataFrame) 
         )
 
 
-def main() -> int:
+def main(*, source: Path, source_version: int, output_directory: Path) -> int:
     """Write the supplement after checking it against the extract.
+
+    Args:
+        source: Component-wind Delta archive shared with the main extract.
+        source_version: The main extract's pinned snapshot.
+        output_directory: Directory holding the matching extract and its source metadata.
 
     Returns:
         The process exit status.
@@ -126,8 +134,14 @@ def main() -> int:
             lacks any of `MISSING_LEADS` for any (site, run) the extract holds.
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    refuse_to_overwrite(paths=[SUPPLEMENT_PATH])
-    for path in (OUTPUT_PATH, NWP_TABLE):
+    extract_path = output_directory / "ens_members.parquet"
+    supplement_path = output_directory / "ens_members_day4.parquet"
+    metadata_path = output_directory / "ens_members_day4.source.json"
+    refuse_to_overwrite(paths=[supplement_path, metadata_path])
+    expected = source_metadata(source=source, source_version=source_version)
+    if json.loads((output_directory / "ens_members.source.json").read_text()) != expected:
+        raise ValueError("Extract and supplement must share the same component source snapshot")
+    for path in (extract_path, source):
         if not path.exists():
             msg = f"{path} is missing"
             raise FileNotFoundError(msg)
@@ -139,12 +153,18 @@ def main() -> int:
         ]
     )
     lookup = _cells(sites=sites)
-    extract = pl.scan_parquet(OUTPUT_PATH)
+    extract = pl.scan_parquet(extract_path)
     held = set(extract.select("lead_hours").unique().collect()["lead_hours"].to_list())
     runs = extract.select("init_time").unique().collect()["init_time"]
     table = (
         lookup.join(
-            _members(cells=lookup["h3_index"].unique().to_list(), leads=band_leads()), on="h3_index"
+            _members(
+                source=source,
+                source_version=source_version,
+                cells=lookup["h3_index"].unique().to_list(),
+                leads=band_leads(),
+            ),
+            on="h3_index",
         )
         .drop("h3_index")
         .filter(pl.col("init_time").is_in(runs.implode()))
@@ -182,18 +202,31 @@ def main() -> int:
     )
     log_surviving_runs(extract_band=extract_band, supplement=supplement)
 
-    SUPPLEMENT_DIR.mkdir(parents=True, exist_ok=True)
-    supplement.select(theirs.columns).write_parquet(SUPPLEMENT_PATH)
+    temporary = supplement_path.with_suffix(".parquet.partial")
+    supplement.select(theirs.columns).write_parquet(temporary)
+    metadata_path.write_text(json.dumps(expected, indent=2) + "\n")
+    temporary.replace(supplement_path)
     _LOG.info(
         "wrote %d rows at leads %s for %d generators and %d runs to %s",
         supplement.height,
         sorted(supplement["lead_hours"].unique().to_list()),
         supplement["site"].n_unique(),
         supplement["init_time"].n_unique(),
-        SUPPLEMENT_PATH,
+        supplement_path,
     )
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--source-version", type=int, required=True)
+    parser.add_argument("--output-directory", type=Path, required=True)
+    args = parser.parse_args()
+    sys.exit(
+        main(
+            source=args.source,
+            source_version=args.source_version,
+            output_directory=args.output_directory,
+        )
+    )

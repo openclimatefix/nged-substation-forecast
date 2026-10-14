@@ -218,61 +218,56 @@ class Nwp(pt.Model):
         le=100,
     )
 
-    wind_speed_10m: float = pt.Field(
+    # The ±200 m/s component bounds are corrupt-feed guards, not meteorological limits.
+    # Independent bounds permit a vector magnitude above 200 m/s; there is no magnitude constraint.
+    # The highest non-tornadic surface wind gust ever recorded is 113.2 m/s. That gust was
+    # measured on Barrow Island during Tropical Cyclone Olivia on 10 April 1996. The World
+    # Meteorological Organisation (WMO) ratified the record in its World Weather and Climate
+    # Extremes Archive: <https://wmo.int/asu-map?map=Wind_028>. That record is a 3-second gust at a
+    # single anemometer.
+    # u is eastward and v is northward, and their signs must survive storage and interpolation.
+    wind_u_10m: float = pt.Field(
         dtype=pl.Float32,
         description=(
-            "Wind speed at 10 m. Unit: metres per second. This is the magnitude of the cell's"
-            " *vector* mean wind, not the mean of its grid points' scalar speeds. See"
-            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
+            "Area-weighted eastward wind at 10 m. Unit: metres per second."
+            " Signed components are interpolated before deriving speed and bearing. See"
+            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
         ),
-        ge=0,
-        # The 200 m/s ceiling is a corrupt-feed guard, not a meteorological limit. The highest
-        # non-tornadic surface wind gust ever recorded is 113.2 m/s. That gust was measured on
-        # Barrow Island during Tropical Cyclone Olivia on 10 April 1996. The World Meteorological
-        # Organisation (WMO) ratified the record in its World Weather and Climate Extremes
-        # Archive: <https://wmo.int/asu-map?map=Wind_028>. That record is a 3-second gust at a
-        # single anemometer. This column holds an instantaneous wind averaged as a vector over a
-        # whole H3 cell. A cell-mean vector wind is lower again than a 3-second gust at a point.
-        # Only a unit error or a corrupt value can reach 200.
+        ge=-200,
         le=200,
     )
 
-    wind_direction_10m: float = pt.Field(
+    wind_v_10m: float = pt.Field(
         dtype=pl.Float32,
         description=(
-            "Wind direction at 10 m. The angle where the wind is coming from. Degrees."
-            " 0° is North; 90° is East. This is a *circular* quantity: 359° and 1° are two degrees"
-            " apart, so interpolating, averaging, differencing or taking a quantile of it as if it"
-            " were an ordinary number is wrong wherever the values straddle North. Convert to"
-            " components first. See"
+            "Area-weighted northward wind at 10 m. Unit: metres per second."
+            " Signed components are interpolated before deriving speed and bearing. See"
             " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
         ),
-        ge=0,
-        le=360,
+        ge=-200,
+        le=200,
     )
 
-    wind_speed_100m: float = pt.Field(
+    wind_u_100m: float = pt.Field(
         dtype=pl.Float32,
         description=(
-            "Wind speed at 100 m. Unit: metres per second. The stored value is a vector mean,"
-            " with the same caveat as `wind_speed_10m`: a turbine power curve responds to the"
-            " scalar speed at each grid point, not to the cell's vector mean. A height of 100 m"
-            " matters most for wind generation, being near a modern turbine's hub. See"
-            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
+            "Area-weighted eastward wind at 100 m. Unit: metres per second."
+            " Signed components are interpolated before deriving speed and bearing. See"
+            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
         ),
-        ge=0,
-        le=200,  # The same corrupt-feed ceiling as `wind_speed_10m`; see the comment there.
+        ge=-200,
+        le=200,
     )
 
-    wind_direction_100m: float = pt.Field(
+    wind_v_100m: float = pt.Field(
         dtype=pl.Float32,
         description=(
-            "Wind direction at 100 m. The angle where the wind is coming from. Degrees. 0° is "
-            "North; 90° is East. This is circular, with the same handling requirement as "
-            "`wind_direction_10m`."
+            "Area-weighted northward wind at 100 m. Unit: metres per second."
+            " Signed components are interpolated before deriving speed and bearing. See"
+            " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
         ),
-        ge=0,
-        le=360,
+        ge=-200,
+        le=200,
     )
 
     pressure_surface: float = pt.Field(
@@ -353,6 +348,14 @@ class Nwp(pt.Model):
         {"categorical_precipitation_type_surface"}
     )
 
+    radiation_var_names: ClassVar[frozenset[str]] = frozenset(
+        {
+            "downward_short_wave_radiation_flux_surface",
+            "downward_long_wave_radiation_flux_surface",
+        }
+    )
+    """Radiation flux fields, also included in `continuous_var_names` for rounding and plotting."""
+
     deaccumulated_var_names: ClassVar[frozenset[str]] = frozenset(
         {
             "precipitation_surface",
@@ -382,7 +385,7 @@ class Nwp(pt.Model):
 
     @classmethod
     def continuous_var_names(cls) -> frozenset[str]:
-        """Meteorological variable field names suitable for linear interpolation."""
+        """Numeric meteorological field names, including period-ending radiation and rates."""
         return cls.all_weather_var_names() - cls.categorical_var_names
 
     @classmethod

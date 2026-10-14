@@ -12,7 +12,7 @@ from baseline_forecasters import ManualHeuristicForecaster
 from baseline_forecasters.nwp_run_rows import NwpRunRowsWithoutWeatherFeatureEngineer
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import Nwp
+from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, Nwp
 from ml_core.base_forecaster import BaseForecasterConfig
 from ml_core.features import TabularFeatureEngineer
 from polars.testing import assert_frame_equal
@@ -49,6 +49,8 @@ def _metadata(cells: dict[int, int]) -> pt.DataFrame[TimeSeriesMetadata]:
         {
             "time_series_id": pl.Series(list(cells), dtype=pl.Int32),
             "h3_res_5": pl.Series(list(cells.values()), dtype=pl.UInt64),
+            "latitude": [53.0] * len(cells),
+            "longitude": [-0.5] * len(cells),
         }
     )
     return pt.DataFrame(frame).set_model(TimeSeriesMetadata)
@@ -57,13 +59,13 @@ def _metadata(cells: dict[int, int]) -> pt.DataFrame[TimeSeriesMetadata]:
 def _nwp(
     runs: list[tuple[datetime, tuple[int, ...], timedelta]], cells: list[int]
 ) -> pt.LazyFrame[Nwp]:
-    """ECMWF-shaped NWP: 3-hourly valid times from each run's first valid offset to 360 h."""
+    """ECMWF native steps from each run's first valid offset through lead 360."""
     records = []
     for init_time, members, first_valid_offset in runs:
         valid_times = [
-            init_time + timedelta(hours=3 * step)
-            for step in range(121)
-            if timedelta(hours=3 * step) >= first_valid_offset
+            init_time + timedelta(hours=lead)
+            for lead in ECMWF_ENS_LEAD_TIME_HOURS
+            if timedelta(hours=lead) >= first_valid_offset
         ]
         for cell in cells:
             records += nwp_records(cell, init_time, members, valid_times=valid_times)

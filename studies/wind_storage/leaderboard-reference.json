@@ -1,0 +1,17 @@
+{
+  "pre_change_commit": "5ac2e16a7088d13f2f7103f0385a58f54388bfba",
+  "polar_source": "/mnt/data/nged-substation-forecast/data/NWP",
+  "polar_delta_version": 1830,
+  "experiment_name": "wind_components_after_interpolation",
+  "base_model_config": "conf/model/xgboost.yaml",
+  "model_config_sha256": "5b9bd6078453ed578b3f69da3fc08acda529c251a19fb71e2aa0934c89fd4178",
+  "cv_config_sha256": "7fa4dfc33d23fb74e8390ae3bb873bb33bce94c96588eadd3b83abb48b584170",
+  "config_overrides": {},
+  "comparison": "component interpolation versus polar interpolation with unchanged model features, recipe, folds, seeds, scenario settings and matched evaluation keys",
+  "required_slices": [
+    "3-10 days",
+    "forecast horizon",
+    "time-series type"
+  ],
+  "status": "registered in isolated local MLflow/Dagster stores; scoring pending complete component archive and matched baseline predictions; serving cutover not performed"
+}

@@ -631,8 +631,8 @@ def cleaning_lines() -> list[str]:
             ),
         ],
         [
-            "read cut-off (`studies.power.scan_power`)",
-            "all rows from `final_test_start` (2026-07-01)",
+            "read cut-off",
+            "all rows from 2026-07-01",
             "a fixed date",
             "no row from that date is read at all.",
         ],

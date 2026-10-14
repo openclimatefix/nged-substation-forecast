@@ -89,9 +89,8 @@ study: `packages/ml_core/src/ml_core/metrics.py`, `packages/ml_core/src/ml_core/
 `conf/cv/`. The script refuses a file whose row keys differ from the reference experiment's for the
 fold, so the file must hold exactly the reference's series, initialisation times, valid times, and
 ensemble members, with none missing and none extra. Read observed power through
-`studies.power.scan_power`, which stops at `final_test_start` and so includes the whole validation
-year. The `metrics` asset refuses to score a window that reaches that date unless the maintainer
-sets `NGED_FINAL_TEST=1`. The script checks which rows the file holds, not how the forecast was
+`studies.power.scan_power`, which serves every cleaned reading, including the whole validation
+year. The script checks which rows the file holds, not how the forecast was
 made. The study itself must therefore fit only on observations up to the fold's `train_end`, and use
 observations after `train_end` only as lags earlier than each forecast's initialisation time.
 

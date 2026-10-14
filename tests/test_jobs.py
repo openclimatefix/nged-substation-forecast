@@ -166,7 +166,6 @@ def _mixed_fold_config() -> CvConfig:
     )
     return CvConfig(
         folds=[*leaderboard_folds, dev_fold],
-        final_test_start=date(2030, 1, 1),
         reference_experiment_name="reference",
     )
 

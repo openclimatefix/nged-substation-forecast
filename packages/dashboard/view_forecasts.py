@@ -20,7 +20,7 @@ with app.setup:
     )
     from deltalake import DeltaTable
     from nged_data.storage import scan_cleaned_power
-    from weather_utils import select_analysis_proxy
+    from weather_utils import select_analysis_proxy, wind_feature_expressions
 
 
 @app.cell
@@ -476,6 +476,10 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
                 pl.col("init_time") == nwp_init_time,
                 pl.col("h3_index") == _series_h3,
             )
+            .with_columns(
+                *wind_feature_expressions(height="10m"),
+                *wind_feature_expressions(height="100m"),
+            )
             .drop("nwp_model_id", "init_time", "h3_index")
             .collect()
         )
@@ -494,11 +498,16 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
                 pl.scan_delta(
                     settings.nwp_data_path,
                     storage_options=typeddict_to_dict(settings.storage_options),
-                ).filter(
+                )
+                .filter(
                     pl.col("init_time").is_between(
                         init_time - PLOT_HISTORY - NWP_ANALYSIS_LEAD, init_time + PLOT_HORIZON
                     ),
                     pl.col("h3_index") == _series_h3,
+                )
+                .with_columns(
+                    *wind_feature_expressions(height="10m"),
+                    *wind_feature_expressions(height="100m"),
                 ),
                 group_key="h3_index",
                 max_lead=NWP_ANALYSIS_LEAD,
