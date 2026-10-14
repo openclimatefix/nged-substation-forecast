@@ -83,23 +83,24 @@ series each:
 | Primary | COVID indicator, then days to 25 December (-0.25, then -0.14 points) | 13 |
 | BSP | holiday flags: the day, the day before, and the day after (-0.16 points) | 2 |
 | GSP | COVID indicator, days to the nearest holiday, heating degree-hours (-1.67, -0.24, -0.14 points) | 2 |
-| One set for all three types (recommended if a single set is required) | COVID indicator | 18 |
+| One set for all three types (recommended if a single set is required) | COVID indicator, days to Christmas inside a 14-day window | 18 |
 
-**If one set must serve all three types, use the weather block, the clock, and the COVID indicator,
-and weight Primary substations' evidence above that of BSP and GSP.** The choice rests on three
-points. The clock is the largest gain for Primary substations and helps BSP, and its small effect on
-GSP has an interval that includes zero, so it costs GSP nothing measurable. The COVID indicator
-gains -0.26 points for Primary (99.4% interval -0.40 to -0.10) and -1.74 for GSP (-2.76 to -0.69) on
-the selection year, and is neutral for BSP (-0.02). The days to Christmas is left out because the
-Christmas control above could not separate it from a half-year step, and the holiday flags are left
-out because only BSP selected them and the Primary gain is not replicated for Primary on the second
-selection year. On the confirmation year this set scores 7.70 for Primary, 9.43 for BSP, and 26.73
-for GSP, against 7.57, 9.41, and 26.47 for the Primary set with the days to Christmas added. The BSP
-set scores 9.53 and the GSP set 27.71, so for those two types the single set beats the set chosen
-for the type. The days to Christmas is the only optional extra: it lowers the confirmation-year
-error by 0.13 for Primary (95% interval -0.36 to +0.11), and by 0.02 for BSP and 0.26 for GSP, with
-the BSP and GSP differences resting on two series each. Recency weights are a training choice, not a
-column, and are unaffected by this recommendation.
+**If one set must serve all three types, use the weather block, the clock, the COVID indicator, and
+the days to Christmas inside a 14-day window, and weight Primary substations' evidence above that of
+BSP and GSP.** The clock is the largest gain for Primary substations and helps BSP, and its small
+effect on GSP has an interval that includes zero. The COVID indicator gains -0.26 points for Primary
+(99.4% interval -0.40 to -0.10) and -1.74 for GSP (-2.76 to -0.69) on the selection year, and is
+neutral for BSP (-0.02). The days to Christmas gains little over a year (-0.10 for Primary on the
+confirmation year) and a lot at Christmas: inside 15 December to 7 January it lowers the Primary
+error by 1.78 points, in each of three years (see the special-day windows below). The column is
+windowed, meaning it takes the days to 25 December inside 14 days of it and is missing otherwise,
+because the unwindowed column also marks the half-year, and in the summer school holidays it raises
+the BSP error by 0.43 points and the GSP error by 2.22. The holiday flags are left out because only
+BSP selected them, and they raise the BSP and GSP error at Easter. On the confirmation year this set
+scores 7.61 for Primary, 9.34 for BSP, and 26.65 for GSP, against 7.57, 9.41, and 26.47 for the
+Primary set with the unwindowed days to Christmas. The BSP set scores 9.53 and the GSP set 27.71, so
+for those two types the single set beats the set chosen for the type. Recency weights are a training
+choice, not a column, and are unaffected by this recommendation.
 
 **The clock helps Primary substations and BSP but not GSP.** On the confirmation year the clock
 changes the error by -0.46 for Primary (99.4% interval -0.61 to -0.30), -0.30 for BSP (-0.41 to
@@ -273,7 +274,7 @@ on the selection year is lowest in July to September (about 6.1 to 6.7) and high
 (8.97), December (9.17), and January (8.29). The one-harmonic column lowers December by 1.3 points
 (9.17 to 7.89) and raises July by 0.5 and October by 0.5, without removing the seasonal shape.
 
-## The Christmas column may also be a half-year flag
+## The unwindowed Christmas column also acts as a half-year flag
 
 **`days_to_christmas` as built also flips sign every late June, so it separates January to June
 from July to December.** The signed distance to the nearest 25 December is clipped at 14 days, and
@@ -291,14 +292,66 @@ intervals and three fitting seeds:
 | One harmonic of time of year | -0.06 (-0.33 to +0.18) | +0.01 (-0.36 to +0.36) | -0.15 (-0.42 to +0.14) |
 | Holiday flags | -0.10 (-0.17 to -0.04) | -0.06 (-0.17 to +0.02) | -0.07 (-0.14 to -0.02) |
 
-**The data cannot separate a Christmas effect from the half-year step.** The windowed column keeps
-three quarters of the point-estimate gain of the column as built, and the half-year flag alone gains
-under 0.1 on every fold, but no paired test between these point estimates was run, and every
-interval of the Christmas column includes zero except the windowed column on the selection year.
-Only the holiday flags have intervals that exclude zero on two of the three folds. The days to the
-nearest holiday (clipped at 7 days) has a milder version of the same half-year step, because England
-has no bank holiday between late May and late August. The Christmas column is therefore unproven,
-and the confirmed set is in effect the weather block, the clock, and the COVID indicator.
+**Averaged over the year, the data cannot separate a Christmas effect from the half-year step.** The
+windowed column keeps three quarters of the point-estimate gain of the column as built, and the
+half-year flag alone gains under 0.1 on every fold, but no paired test between these point estimates
+was run, and every interval of the Christmas column includes zero except the windowed column on the
+selection year. Only the holiday flags have intervals that exclude zero on two of the three folds.
+The days to the nearest holiday (clipped at 7 days) has a milder version of the same half-year step,
+because England has no bank holiday between late May and late August. The next section scores the
+columns inside the Christmas weeks themselves, where the half-year flag does not reproduce the gain,
+so the gain there is a Christmas effect.
+
+## The Christmas columns cut the error at Christmas, and the Easter and summer windows show little
+
+![Change in error inside each special-day window, Primary substations](figure_12.svg)
+
+**Over 15 December to 7 January the days to Christmas lowers the Primary error by 1.62 points, in
+each of three years, against 0.13 over the whole year.** A column can help on a few hard days and
+hardly move a yearly average, and the NGED forecasts are most needed on such days. This check was
+run after the experiment and none of it was pre-registered. It reads the Christmas-control
+predictions (three folds, three fitting seeds, every substation type) and cuts the valid times into
+calendar windows by local date. Each window has three occurrences, one per fold, and neighbouring
+days are correlated, so the 95% intervals, which resample whole days, describe these three years
+only. Primary substations are harder to forecast at Christmas: the base error (the weather block,
+clock, and COVID indicator) is 9.66 points over 15 December to 7 January and 11.23 over 24 December
+to 1 January, against 7.52 on the other days.
+
+| Primary, change in error against the base | 24 Dec to 1 Jan (27 days) | 15 Dec to 7 Jan (72 days) | Other days (859 days) |
+| --- | --- | --- | --- |
+| Days to Christmas as built | -3.35 (-4.21 to -2.51) | -1.62 (-2.12 to -1.17) | -0.06 (-0.10 to -0.02) |
+| Days to Christmas, 14-day window | -3.64 (-4.55 to -2.73) | -1.78 (-2.30 to -1.26) | 0.00 (-0.01 to +0.02) |
+| Holiday flags | -2.04 (-3.07 to -1.10) | -0.73 (-1.20 to -0.30) | -0.02 (-0.03 to 0.00) |
+| One harmonic of time of year | -3.43 (-4.33 to -2.50) | -1.74 (-2.25 to -1.25) | +0.04 (-0.02 to +0.10) |
+| Half-year flag | -0.37 (-0.60 to -0.15) | -0.08 (-0.24 to +0.06) | -0.06 (-0.10 to -0.02) |
+
+**The gain is a Christmas effect, because the half-year flag does not reproduce it.** The half-year
+flag lowers the error by 0.08 over 15 December to 7 January, and the days to Christmas by 1.62. The
+gain holds in each year: the change over 15 December to 7 January is -2.44, -1.29, and -1.14 for the
+folds that start in 2023, 2024, and 2025 for the column as built, and -2.84, -1.32, and -1.18 for
+the windowed column, against base errors of 9.60, 9.46, and 9.92. For GSP the windowed column lowers
+the error by 2.45 over 15 December to 7 January (-3.73 to -1.21), and by 5.99 over 24 December to 1
+January (-7.80 to -4.24). For BSP it lowers it by 0.35 (-0.85 to +0.11) and by 1.45 (-2.41 to
+-0.48), and the BSP holiday flags lower it by 0.59 (-1.02 to -0.21) over the longer window.
+
+**The windowed column keeps the Christmas gain and removes the summer harm.** The unwindowed column
+raises the error in the summer school holidays (22 July to 31 August) by 0.08 points for Primary
+(0.03 to 0.12), 0.43 for BSP (0.30 to 0.58), and 2.22 for GSP (1.64 to 2.78), because it flips sign
+in late June. The windowed column changes the summer error by -0.01, -0.01, and -0.06. On all other
+days it changes the error by 0.00 for Primary, -0.04 for BSP, and +0.12 for GSP (0.02 to 0.24). The
+one harmonic of time of year matches the Christmas gain but raises the summer error by 0.31 for
+Primary, 2.13 for BSP, and 3.84 for GSP, so it is not a substitute.
+
+**The holiday flags help Primary substations at Easter and hurt BSP and GSP.** Over the Easter long
+weekend (the Thursday to the Tuesday, 18 days) the flags lower the Primary error by 0.76 points
+(-1.14 to -0.37) and raise the BSP error by 0.52 (0.08 to 0.89) and the GSP error by 1.09 (-0.51 to
++2.67). The Christmas columns change the Primary error by under 0.1 at Easter. The effects are small
+for a period that is six days a year, so the single set leaves the flags out.
+
+**School holidays are not tested, because no column encodes them.** The summer window row shows that
+no existing column helps in the summer school holidays: the holiday flags change the Primary error
+by -0.07 (-0.17 to +0.01) and the other columns raise it. A school-term column, by nation or by
+local authority, would need dates collected by hand, and is listed under untested ideas.
 
 ## Windchill changes nothing, so its production code can go
 
@@ -475,13 +528,14 @@ the Christmas control use three fitting seeds; the add-one-in, greedy, and drop-
 
 ## Untested ideas
 
-From an Opus consultation, not tested because each needs outside data or hand-collected dates:
-an embedded-solar proxy built from the clear-sky irradiance times the embedded PV capacity of each
-grid supply point; school-term flags by nation; cooling degree-hours; the temperature change over
-24 hours; a snow flag; relative humidity or apparent temperature; days since the last clock change;
-sporting and broadcast events; and the substation-type and customer-mix fields. A follow-up could
-also test a measured lockdown size (the Oxford stringency index or Google mobility) against the
-recency weights, since recency weights beat the 0/1 indicator on Primary here.
+From an Opus consultation, not tested because each needs outside data or hand-collected dates: an
+embedded-solar proxy built from the clear-sky irradiance times the embedded PV capacity of each grid
+supply point; school-term and half-term flags, which the special-day windows suggest are worth a
+direct test; cooling degree-hours; the temperature change over 24 hours; a snow flag; relative
+humidity or apparent temperature; days since the last clock change; sporting and broadcast events;
+and the substation-type and customer-mix fields. A follow-up could also test a measured lockdown
+size (the Oxford stringency index or Google mobility) against the recency weights, since recency
+weights beat the 0/1 indicator on Primary here.
 
 ## Lessons for later experiments
 
