@@ -103,13 +103,15 @@ def panel(*, data: pl.DataFrame, title: str, show_legend: bool) -> alt.LayerChar
     )
     band = (
         alt.Chart(band_data)
-        .mark_area(opacity=0.25, color=ocf.BRAND_ORANGE)  # ty: ignore[unresolved-attribute]
-        .encode(x=x, y=alt.Y("lower:Q", title="Power (% of capacity)"), y2="upper:Q")
+        .mark_area(opacity=0.25, color=ocf.BRAND_ORANGE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=x, y=alt.Y("lower:Q", title="Power (% of capacity)"), y2="upper:Q"
+        )
     )
     lines = (
         alt.Chart(long)
-        .mark_line(strokeWidth=1.5)  # ty: ignore[unresolved-attribute]
-        .encode(
+        .mark_line(strokeWidth=1.5)
+        .encode(  # ty: ignore[unresolved-attribute]
             x=x,
             y=alt.Y("power:Q", title="Power (% of capacity)"),
             color=alt.Color(
@@ -122,7 +124,9 @@ def panel(*, data: pl.DataFrame, title: str, show_legend: bool) -> alt.LayerChar
         )
     )
     return alt.layer(band, lines).properties(
-        width=charts.WIDTH, height=150, title=alt.TitleParams(title, anchor="start", fontSize=12)
+        width=charts.LINE_WIDTH,
+        height=150,
+        title=alt.TitleParams(title, anchor="start", fontSize=12),
     )
 
 

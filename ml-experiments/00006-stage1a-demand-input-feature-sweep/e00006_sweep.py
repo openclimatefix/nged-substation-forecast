@@ -251,6 +251,32 @@ def christmas_check(*, fold_name: str) -> None:
     )
 
 
+def importance_only(*, fold_name: str) -> None:
+    """Refit the finalists for gain and permutation importance only: per series, and pooled."""
+    chosen = selected_groups()
+    arms = [
+        fit.Arm(groups=("clock",)),
+        fit.Arm(groups=chosen, treatments=("recency",)),
+    ]
+    fit.run_stage(
+        stage="importance_series",
+        fold_name=fold_name,
+        config="series",
+        arm_names=[a.name for a in arms],
+        seeds=[0],
+        importance=True,
+    )
+    pooled = [f"{a.name}|idcat" for a in arms]
+    fit.run_stage(
+        stage="importance_pooled",
+        fold_name=fold_name,
+        config="type",
+        arm_names=pooled,
+        seeds=[0],
+        importance=True,
+    )
+
+
 def finals(*, fold_name: str) -> None:
     """Fit the frozen set and its reference arms: three seeds, quantiles, pooled, importance."""
     chosen = selected_groups()
@@ -328,6 +354,7 @@ def main() -> None:
         "drop_one": drop_one,
         "candidates": candidates,
         "finals": finals,
+        "importance_only": importance_only,
         "christmas_check": christmas_check,
         "production_windchill": production_windchill,
         "type_sets": type_sets,

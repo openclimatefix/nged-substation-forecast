@@ -28,6 +28,7 @@ import e00006_inputs as inputs
 import numpy as np
 import polars as pl
 import xgboost as xgb
+from studies.era5_ladder import gain_shares
 
 FOLDS_DIR: Final[Path] = inputs.EXPERIMENT_DIR / "fits"
 N_ROUNDS: Final[int] = 500
@@ -255,14 +256,17 @@ def importance_rows(
 ) -> list[dict[str, object]]:
     """Return gain and permutation importance of each input column of a median model.
 
-    Gain is the mean loss reduction of the column's splits, as a share of the total. Permutation
+    Gain is the column's share of the model's total gain (`studies.era5_ladder.gain_shares`, with 0
+    for a column the model never split on). Permutation
     importance is the rise in the validation mean absolute error, in points of capacity, when the
     column is shuffled across the validation rows. Gain favours columns with many distinct values,
     so the two are reported side by side.
     """
-    gain = cast("dict[str, float]", booster.get_score(importance_type="gain"))
-    total = sum(gain.values()) or 1.0
     names = {f"f{i}": c for i, c in enumerate(arm.columns)}
+    raw = cast("dict[str, float]", booster.get_score(importance_type="total_gain"))
+    shares = gain_shares(
+        total_gain={names[key]: value for key, value in raw.items()}, features=arm.columns
+    )
     baseline_matrix = _matrix(frame=valid, arm=arm)
     target = valid["target"].to_numpy()
     baseline = float(np.abs(booster.predict(baseline_matrix) - target).mean()) * 100.0
@@ -282,8 +286,7 @@ def importance_rows(
                 "unit": unit,
                 "seed": seed,
                 "column": column,
-                "gain_share": gain.get(next(k for k, v in names.items() if v == column), 0.0)
-                / total,
+                "gain_share": shares[column],
                 "permutation_points": float(np.mean(increases)),
             }
         )

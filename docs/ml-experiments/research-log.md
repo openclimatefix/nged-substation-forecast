@@ -16,6 +16,7 @@ the maintainer to confirm.
 |---|---|---|
 | [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Train the weather-to-power model on ERA5 and apply it to ENS members | Needs the staged design, and helps only up to day 6 |
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
+| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and days to Christmas as the stage 1a demand inputs, trained from a recent start or with recency weights | The COVID and Christmas step is supported at 95% only; windchill can go |
 
 ## The experiments so far
 
@@ -24,6 +25,7 @@ the maintainer to confirm.
 | [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
 | [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
+| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Supported, with the predicted size wrong | Candidate | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -89,6 +91,32 @@ experiment repeated 00001 on 22 series that are not wind or solar farms, on a ne
 
 ![Contrasts by lead band](00003-era5-trained-stage1a-vs-ens-trained-demand/figure_2.svg)
 
+### 00006: which inputs work best for the ERA5-trained demand model (stage 1a)
+
+**The clock is the largest single input for Primary substations, but it lowers the error by only
+about 0.5 points of capacity, and the choice of training window matters as much.** The experiment
+trained one XGBoost model per substation on ERA5 weather and scored held-out ERA5 months (it does not
+forecast), for 14 Primary substations, two bulk supply points, and two grid supply points. It chose
+inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06.
+
+- **Headline result:** hour and weekday lower the Primary error by 0.55 points (99.4% interval
+  -0.71 to -0.41) on the selection year and 0.46 (-0.61 to -0.30) on the confirmation year, against
+  1.5 predicted. The chosen Primary set adds a COVID indicator and the days to Christmas, which
+  lowers the error by a further 0.29 on the confirmation year, supported at 95% and not at the
+  planned level.
+- **Training history matters as much as any column:** recency weights lower the confirmation-year
+  error by 0.46 more, and a 2023-09 start by 0.86 more, though the 2023 start did not help on the
+  selection year.
+- **Time of year adds nothing, because the weather block already carries the season.** Windchill
+  changes the error by less than 0.01 points, and trailing temperature means do not help.
+- **Different substation types need different sets:** bulk supply points gain from holiday flags,
+  and grid supply points gain from the COVID indicator, and have errors about four times larger.
+- **Write-up and pull request:** [result](00006-stage1a-demand-input-feature-sweep/result.md),
+  [PR #1202 (Experiment 00006: which input features work best for the ERA5-trained demand
+  model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202).
+
+![Error on the confirmation year by arm and substation type](00006-stage1a-demand-input-feature-sweep/figure_1.svg)
+
 ### What the experiments taught us so far
 
 - **Check for calendar memorisation.** When the same valid time repeats across many ENS runs, a model
@@ -110,5 +138,4 @@ idea that has no folder yet is marked "proposed".
 | Id | Question | State |
 |---|---|---|
 | 00005 | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Planned, in [PR #1195 (Experiment 00005 (planned): where lagged power enters a two-stage demand forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195) |
-| 00006 | Which input features are best for the demand weather-to-power model (stage 1a), trained on ERA5, for Primary, BSP, and GSP substations? | Running. Runs first, and its chosen columns feed 00005 |
 | Proposed | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |

@@ -7,6 +7,7 @@ coordinate appears on any figure; series are never labelled individually.
     uv run python ml-experiments/00006-stage1a-demand-input-feature-sweep/e00006_charts.py
 """
 
+import textwrap
 from pathlib import Path
 from typing import Final
 
@@ -19,8 +20,16 @@ from contracts.settings import PROJECT_ROOT
 OUT_DIR: Final[Path] = (
     PROJECT_ROOT / "docs" / "ml-experiments" / "00006-stage1a-demand-input-feature-sweep"
 )
-WIDTH: Final[int] = 440
-"""The plot area's width; with the labels, the figure fills the docs text column."""
+CONTENT_PX: Final[int] = 680
+"""The docs text column's width, which every figure fills."""
+LABEL_PX: Final[int] = 310
+"""Room for the row labels of a dot chart."""
+WIDTH: Final[int] = CONTENT_PX - LABEL_PX - 10
+"""The plot area's width in a dot chart, so labels and plot fill the text column."""
+LINE_WIDTH: Final[int] = CONTENT_PX - 70
+"""The plot area's width in a line chart, which has only a y axis beside it."""
+TITLE_CHARACTER_PX: Final[float] = 7.2
+SUBTITLE_CHARACTER_PX: Final[float] = 5.6
 FROZEN: Final[str] = "W+clock+covid_flag+xmas"
 
 ARM_LABELS: Final[dict[str, str]] = {
@@ -87,9 +96,12 @@ SCOPE_SELECTION: Final[str] = (
 )
 
 
-def _title(*, text: str, lines: list[str]) -> alt.TitleParams:
+def _title(*, text: str, lines: list[str], plot_px: int = CONTENT_PX) -> alt.TitleParams:
+    """Return a title whose lines are wrapped to the width of the whole figure."""
+    wrapped = textwrap.wrap(text, width=int(plot_px / TITLE_CHARACTER_PX))
+    subtitle = textwrap.wrap(" ".join(lines), width=int(plot_px / SUBTITLE_CHARACTER_PX))
     return alt.TitleParams(
-        text=text, subtitle=lines, anchor="start", fontSize=14, subtitleFontSize=11
+        text=wrapped, subtitle=subtitle, anchor="start", fontSize=14, subtitleFontSize=11
     )
 
 
@@ -120,7 +132,7 @@ def _dots(
         else alt.value(colour or ocf.DATA_BLUE)
     )
     base = alt.Chart(data).encode(
-        y=alt.Y(f"{y}:N", sort=order, title=None, axis=alt.Axis(labelLimit=330)),
+        y=alt.Y(f"{y}:N", sort=order, title=None, axis=alt.Axis(labelLimit=LABEL_PX)),
         color=colour_encoding,
     )
     rules = base.mark_rule().encode(x=alt.X("lower:Q", title=x_title, scale=x_scale), x2="upper:Q")  # ty: ignore[unresolved-attribute]
@@ -182,9 +194,10 @@ def figure_2() -> alt.TopLevelMixin:
         "recency": "Recent years weighted more, against chosen set",
         "P9 from 2023-09": "Trained from 2023-09, against chosen set",
     }
-    data = contrasts.filter(pl.col("contrast").is_in(list(labels))).with_columns(
-        label=pl.col("contrast").replace_strict(labels), value=pl.col("difference")
-    )
+    data = contrasts.filter(
+        pl.col("contrast").is_in(list(labels)),
+        (pl.col("level") > 99.0) | (pl.col("contrast") == "recency"),
+    ).with_columns(label=pl.col("contrast").replace_strict(labels), value=pl.col("difference"))
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#333333").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     panels = []
     for scope in ("Primary", "BSP", "GSP"):
@@ -325,7 +338,10 @@ def figure_4() -> alt.TopLevelMixin:
     colours = [ocf.DATA_BLUE, ocf.DATA_SKY, ocf.DATA_GREEN]
     base = alt.Chart(data).encode(
         y=alt.Y(
-            "variant:N", sort=list(variants.values()), title=None, axis=alt.Axis(labelLimit=330)
+            "variant:N",
+            sort=list(variants.values()),
+            title=None,
+            axis=alt.Axis(labelLimit=LABEL_PX),
         ),
         yOffset=alt.YOffset("encoding:N", sort=list(encodings.values())),
         color=alt.Color(
@@ -374,15 +390,18 @@ def figure_5() -> alt.TopLevelMixin:
     )
     order = table.sort("permutation_median", descending=True)["column"].to_list()
     base = alt.Chart(table).encode(
-        y=alt.Y("column:N", sort=order, title=None, axis=alt.Axis(labelLimit=220))
+        y=alt.Y("column:N", sort=order, title=None, axis=alt.Axis(labelLimit=LABEL_PX))
     )
 
-    def panel(*, median: str, low: str, high: str, title: str) -> alt.LayerChart | alt.FacetChart:
+    def panel(
+        *, median: str, low: str, high: str, title: str, log: bool = False
+    ) -> alt.LayerChart | alt.FacetChart:
+        scale = alt.Scale(type="log") if log else alt.Scale()
         bars = base.mark_rule(color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X(f"{low}:Q", title=title), x2=f"{high}:Q"
+            x=alt.X(f"{low}:Q", title=title, scale=scale), x2=f"{high}:Q"
         )
         points = base.mark_point(filled=True, color=ocf.DATA_BLUE, size=50).encode(  # ty: ignore[unresolved-attribute]
-            x=f"{median}:Q"
+            x=alt.X(f"{median}:Q", scale=scale)
         )
         return alt.layer(bars, points).properties(width=WIDTH, height=240)
 
@@ -390,7 +409,8 @@ def figure_5() -> alt.TopLevelMixin:
         median="gain_median",
         low="gain_q1",
         high="gain_q3",
-        title="Share of the model's total split gain (larger means used more)",
+        title="Share of the model's total gain, logarithmic axis (larger means used more)",
+        log=True,
     )
     permutation = panel(
         median="permutation_median",
@@ -446,7 +466,7 @@ def figure_6() -> alt.TopLevelMixin:
             ),
         )
         .properties(
-            width=WIDTH,
+            width=LINE_WIDTH,
             height=220,
             title=_title(
                 text="Error peaks in autumn and early winter, with or without time-of-year columns",

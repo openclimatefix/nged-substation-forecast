@@ -412,6 +412,24 @@ def extra_selection_tables() -> None:
     write(table=pl.concat(counts), name="series_counts")
 
 
+def christmas_check_table() -> None:
+    """Contrast each Christmas encoding with the clock plus COVID indicator, on every fold."""
+    base = "W+clock+covid_flag"
+    tables = []
+    for fold_name in ("select_2024", "select_2023", "confirm_2025"):
+        rows = of_type(
+            rows=read_seeds(stage="christmas_check", fold_name=fold_name),
+            substation_type="Primary",
+        )
+        pairs = [(a, a, base) for a in arm_columns(rows=rows) if a != base]
+        tables.append(
+            contrast_table(rows=rows, pairs=pairs, label=fold_name).with_columns(
+                n_series=pl.lit(rows["time_series_id"].n_unique())
+            )
+        )
+    write(table=pl.concat(tables), name="christmas_check")
+
+
 def pinball_table(*, fold_name: str) -> None:
     """Mean pinball loss over the 9 levels, and the coverage of the 5-95 interval."""
     rows = read_seeds(stage="finals_quantiles", fold_name=fold_name)
@@ -451,7 +469,7 @@ def pinball_table(*, fold_name: str) -> None:
 def importance_table(*, fold_name: str) -> None:
     """Aggregate gain and permutation importance across series (median and quartiles)."""
     files = sorted(
-        (fit.FOLDS_DIR / "finals_importance" / fold_name / "series" / "seed0").glob(
+        (fit.FOLDS_DIR / "importance_series" / fold_name / "series" / "seed0").glob(
             "*_importance.parquet"
         )
     )
@@ -475,7 +493,9 @@ def importance_table(*, fold_name: str) -> None:
         name=f"importance_series_{fold_name}",
     )
     pooled_files = sorted(
-        (fit.FOLDS_DIR / "pooled" / fold_name / "type" / "seed0").glob("*_importance.parquet")
+        (fit.FOLDS_DIR / "importance_pooled" / fold_name / "type" / "seed0").glob(
+            "*_importance.parquet"
+        )
     )
     pooled = pl.concat([pl.read_parquet(f) for f in pooled_files]).rename(
         {"unit": "substation_type"}
@@ -520,7 +540,6 @@ def main() -> None:
         finals_levels(fold_name="select_2024")
         pooled_versus_series(fold_name="select_2024")
         pinball_table(fold_name="select_2024")
-        importance_table(fold_name="select_2024")
         month_error(fold_name="select_2024", arms=["W+clock", "W+clock+doy1", "W"], stage="planned")
     elif what == "confirmation":
         fold_name = "confirm_2025"
