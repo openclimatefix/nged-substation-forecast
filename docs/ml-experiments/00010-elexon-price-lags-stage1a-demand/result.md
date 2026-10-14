@@ -16,12 +16,12 @@ decision_rule: >-
   month-resampled interval (95% familywise, Bonferroni across the three verdict contrasts C1, C2,
   and C4) excludes zero and its point estimate is at least 0.1 points in the direction stated, and
   for C4 at least 0.2 points: the gain at the two listed series (B2 and P4) must exceed the gain at
-  the other 18 series by that margin, the pattern a battery response predicts. C1 and C2 are read at
-  the listed series pooled, and at B2 alone. Otherwise the verdict is inconclusive, or refuted if
-  the C1 interval at the listed series pooled excludes a gain of 0.3 points. The selection year
-  decides; the confirmation year is scored once, and if its C1 interval excludes the selection
-  year's point estimate the verdict is inconclusive. C3 is a check on the price columns' calendar
-  structure and does not enter the rule. The power check below shows the refuted branch is
+  the other fitted series by that margin, the pattern a battery response predicts. C1 and C2 are
+  read at the listed series pooled, and at B2 alone. Otherwise the verdict is inconclusive, or
+  refuted if the C1 interval at the listed series pooled excludes a gain of 0.3 points. The
+  selection year decides; the confirmation year is scored once, and if its C1 interval excludes the
+  selection year's point estimate the verdict is inconclusive. C3 is a check on the price columns'
+  calendar structure and does not enter the rule. The power check below shows the refuted branch is
   probably unreachable, so with two listed series the likely verdict is inconclusive.
 benchmark: >-
   The experiment 00006 Primary input set with recency weights (arm BASE), and a month-by-half-hour
@@ -39,19 +39,19 @@ headline: >-
   gain at the others: -0.55 (-1.43 to +0.20) in the selection year and +0.47 (+0.06 to +0.91) in
   the confirmation year, the wrong sign.
 lessons: >-
-  The apparent selection-year gain at B2 is mostly a calendar-structure effect, not a price signal,
-  because the shuffled price (from an earlier week) gives most of it. The gain disappears in the
-  confirmation year. With one listed series that has training history, the test cannot separate a
-  battery response from noise.
+  The selection-year gain at B2 is not evidence of a price effect: its interval includes zero, the
+  shuffled price from an earlier week reproduced most of it, and it disappeared in the confirmation
+  year. With one listed series that has training history, the test cannot separate a battery
+  response from noise.
 advice:
   - >-
     Do not add lagged price columns to the stage 1a demand model on this evidence, because the
     selection-year gain at B2 did not survive the confirmation year and the shuffled price matched
     most of it (C3, C1).
   - >-
-    Test a battery mechanism on series with known, large, long-lived batteries, because only B2
-    had enough battery capacity and history here, and P4 had too little training history to be
-    fitted in the selection year (section "The listed substations").
+    Test a battery mechanism on series with known, large, long-lived batteries, because B2 had far
+    more battery capacity (20% of its capacity) than P4 (5.1%), and P4 had too little training
+    history to be fitted in the selection year (section "The listed substations").
   - >-
     Keep a shuffled-price control in any experiment that adds lagged price columns, because the
     unshuffled gain at B2 was mostly reproduced by price columns from another week (C3).
@@ -72,8 +72,7 @@ excludes zero, and the gain seen in the selection year disappeared in the confir
 pre-registered mechanism test (C4) failed in the selection year and pointed the wrong way in the
 confirmation year, so the experiment cannot support a price response by batteries.
 
-**Absolute scores** (mean absolute error of the median, points of capacity, 3 seeds; 95% intervals
-are in the results tables):
+**Absolute scores** (mean absolute error of the median, points of capacity, 3 seeds):
 
 | Scope and year | BASE | PRICE | CONTROL | SHUFFLED |
 | --- | --- | --- | --- | --- |
@@ -95,9 +94,17 @@ are in the results tables):
   (the interval includes zero). In the confirmation year -0.06 (-0.38 to +0.23).
 - **C2, price against demand and wind, B2:** -0.86 (-2.10 to +0.21) in the selection year, so not
   material, and +0.18 (-0.08 to +0.41) in the confirmation year.
-- **C3, price against shuffled price, B2:** -0.16 (-0.53 to +0.17). The shuffled price gives about
-  five sixths of the gain, so most of the selection-year gain does not depend on the price's value
-  at the right time.
+- **C3, price against shuffled price, B2:** -0.16 (-0.53 to +0.17). The shuffled price reproduced
+  about five sixths (0.77 of 0.92 points) of the selection-year gain at B2, and C1's own interval
+  includes zero, so the gain is not evidence of a price effect. The CONTROL arm, with the same lag
+  and column count, gained only 0.07 points at B2, so the experiment does not show why the shuffled
+  price matched the real price.
+- **Confirmation year, listed series pooled (B2 and P4):** C1 is +0.53 (+0.14 to +1.27), C2 is
+  +0.67 (+0.20 to +1.49), and C3 is +0.44 (-0.04 to +1.33). The pooled C1 interval excludes the
+  selection-year estimate of -0.92, so the decision rule's confirmation clause makes the verdict
+  inconclusive.
+- **The prediction's second clause failed.** The price lowered the selection-year error at the
+  other series by 0.38 points (-0.77 to +0.07), against a predicted gain below 0.1.
 - **C4, gain at the listed series minus gain at the others:** -0.55 (-1.43 to +0.20) in the
   selection year, and +0.47 (+0.06 to +0.91) in the confirmation year, where the listed series got
   worse by more than the others.
@@ -114,26 +121,26 @@ are in the results tables):
   series were fitted in the selection year and 18 in the confirmation year, not 20.
 - **No month-by-half-hour climatology row was scored,** which the `ml-experiment` skill asks for.
 - **The refuted branch of the decision rule was unreachable,** as the power check predicted.
-- **No Opus review was run;** a Sonnet review of the plan and one of the code ran, as the
-  manager's brief asked. The code review found that the shuffled arm read prices from later weeks;
+- **No Opus review was run.** Sonnet reviewed the plan, the code, and this write-up, as the brief
+  asked. The code review found that the shuffled arm read prices from later weeks;
   that was fixed before any fit.
 
 ## Lessons
 
-**The selection-year gain at B2 came mostly from a calendar-structure effect, not the price
-signal.** Price columns taken from a week earlier gave most of the gain. The experiment did not
-test why, so the gain may come from the price level, the weekly rhythm, or the extra columns alone. The advice list
-in the front matter carries the actions.
+**A price taken from another week matched most of the selection-year gain at B2, and the gain
+did not repeat.** The gain at B2 and the larger gains at G1 and P2 in the selection year are not
+evidence of a price effect, because intervals include zero and the confirmation year reversed G1.
+The advice list in the front matter carries the actions.
 
 ## Why the price, and why only a lag
 
 **Future prices are hard to predict, so the inputs are prices already published.** A battery that
 charges when the price is low and discharges when it is high moves a substation's demand by an
-amount the weather and the clock do not explain. The model sees this only if it is given the price.
-The price at the same half-hour 7 days earlier is published well before any forecast issue time,
-so it exists at forecast time for every lead up to 7 days.
+amount the weather and the clock do not explain. The stage 1a demand model sees this only if it is
+given the price. The price at the same half-hour 7 days earlier is published well before any
+forecast issue time, so it exists at forecast time for every lead up to 7 days.
 
-## Price source (step 1, done)
+## Price source
 
 **The price is the `APXMIDP` provider's price in Elexon's Market Index Data.** The data pull is in
 `data/ml-experiments/00010-elexon-price-lags-stage1a-demand/prices/` and its `README.md` is the
@@ -155,7 +162,7 @@ lineage note. Findings, all from `e00010_fetch_prices.py`:
 
 **The CONTROL columns need a second pull.** The demand outturn and fuel-mix downloads already in
 `data/studies/downloads/market/` cover only 2025-09 to 2026-09, so the same free Insights API
-pull is repeated for 2019 to 2026 before any fit, with the same validation.
+pull was repeated for 2019 to 2026 with the same validation.
 
 **Training years with missing prices are not dropped.** XGBoost handles a missing value natively.
 `price_lag7d` is missing when its half-hour is missing or has zero volume. The minimum and maximum
@@ -195,8 +202,8 @@ with a month-resampled interval at the 98.3% level that the decision rule sets.
 - **C1:** PRICE − BASE.
 - **C2:** PRICE − CONTROL (what the price adds beyond national demand and wind).
 - **C3:** PRICE − SHUFFLED (what the price adds beyond the calendar structure of the price columns).
-- **C4:** the gain PRICE − BASE at the two listed series minus the gain at the other 18, with the
-  months resampled (a verdict contrast, as the decision rule says).
+- **C4:** the gain PRICE − BASE at the two listed series minus the gain at the other fitted series
+  (16 in each year), with the months resampled (a verdict contrast, as the decision rule says).
 
 ## The listed substations, chosen before any fit
 
@@ -235,7 +242,7 @@ series set with more battery sites. No series is added after seeing results.
 cannot be reached.** The check resampled the 12 validation months of one seed of two close arms from
 experiment 00006's stored fits at B2 (the clock-only arm against the clock, COVID indicator, and
 days-to-Christmas arm), a difference of typical size. The half-width was 0.40 points, and 0.30 for
-a larger difference. The decision rule's rule therefore applies: the refuted branch is dropped, and
+a larger difference. The decision rule therefore applies: the refuted branch is dropped, and
 the verdict is `supported` or `inconclusive`. A gain at B2 needs to be about 0.4 points or more to
 be material.
 
@@ -247,8 +254,9 @@ production port would need one (price missing means the columns go missing, whic
 More than one defensible design: yes (which price, which lags), so the plan fixes them here.
 Code whose callers could not be named without searching: no. This is medium.
 
-**Slot C:** 8 cores, GPU share of 8 GB, one fit at a time. The fits are the 00006 per-series fits
-for four arms on two folds. Reviews: Sonnet reviews the plan, the code, and the write-up.
+**Resources.** The fits ran on 8 CPU cores, one thread per fit, with no GPU: the 00006 per-series
+fits for four arms on two folds and three seeds. Sonnet reviewed the plan, the code, and the
+write-up.
 
 **Earlier advice.** Follows the experiment 00006 advice to use its Primary set and recency weights.
 Departs from none of it.

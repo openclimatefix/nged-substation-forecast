@@ -195,8 +195,9 @@ stage 1 statistics on the same 73 runs, and every arm with ERA5 residuals is a c
 
 ### 00010: the lagged electricity price in the stage 1a demand model
 
-**Adding the Elexon price from 7 days earlier to the ERA5-trained demand model did not help at the
-substation hosting the largest battery, and the experiment could not test a battery response.** The
+**Adding the Elexon price from 7 days earlier to the ERA5-trained demand model did not reliably
+help at the substation hosting the largest battery, and the experiment could not test a battery
+response.** The
 price is Elexon's Market Index Data (the `APXMIDP` half-hourly index, free, 98.5% of half-hours
 covered from 2019). The comparison arms were demand and wind at the same lag, and a price taken from
 an earlier week.
