@@ -389,16 +389,16 @@ def _panel(rows: pl.DataFrame, title: str, domain: tuple[float, float]) -> chart
             legend=legend,
         ),
     )
-    zero = (
-        alt.Chart(pl.DataFrame({"zero": [0.0]}))
-        .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3])
-        .encode(x=alt.X("zero:Q", scale=scale))
-    )
-    note = (
-        alt.Chart(pl.DataFrame({"zero": [0.0], "text": [ZERO_LABEL]}))
-        .mark_text(align="left", dx=4, dy=-4, color=ocf.BLACK_1)
-        .encode(x=alt.X("zero:Q", scale=scale), y=alt.value(0), text="text:N")
-    )
+    zero = cast(
+        alt.Chart,
+        alt.Chart(pl.DataFrame({"zero": [0.0]})).mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3]),
+    ).encode(x=alt.X("zero:Q", scale=scale))
+    note = cast(
+        alt.Chart,
+        alt.Chart(pl.DataFrame({"zero": [0.0], "text": [ZERO_LABEL]})).mark_text(
+            align="left", dx=4, dy=-4, color=ocf.BLACK_1
+        ),
+    ).encode(x=alt.X("zero:Q", scale=scale), y=alt.value(0), text="text:N")
     return alt.layer(zero, rules, points, note).properties(
         width=charts.PLOT_WIDTH_PX,
         height=alt.Step(38),
@@ -475,8 +475,16 @@ def main() -> None:
     _write(path=output / "selected-aggregates.md", content=_table(rows=rows).encode())
     names = ["figure-text.md", "selected-aggregates.md"]
     if not args.text_only:
-        low = min(0.0, float(rows["lower95"].min()), float(rows["difference"].min()))
-        high = max(0.0, float(rows["upper95"].max()), float(rows["difference"].max()))
+        low = min(
+            0.0,
+            float(cast(float, rows["lower95"].min())),
+            float(cast(float, rows["difference"].min())),
+        )
+        high = max(
+            0.0,
+            float(cast(float, rows["upper95"].max())),
+            float(cast(float, rows["difference"].max())),
+        )
         margin = max((high - low) * 0.12, 0.02)
         domain = (low - margin, high + margin)
         figure = charts.figure(

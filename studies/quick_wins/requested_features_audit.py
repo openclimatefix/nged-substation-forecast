@@ -16,7 +16,7 @@ import re
 import sys
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 THREADS: Final[tuple[str, ...]] = (
     "POLARS_MAX_THREADS",
@@ -598,7 +598,7 @@ def _verify_model_parameters(
     rounds = fit.fit_arms.N_TREES
     if manifest["setting"] == "sensitivity":
         extra = dict(fit.SENSITIVITY_HYPER_PARAMETERS)
-        rounds = int(extra.pop("num_boost_round"))
+        rounds = int(cast(int, extra.pop("num_boost_round")))
         expected.update(extra)
         expected["eta"] = expected.pop("learning_rate")
     aliases = {"reg_lambda": "lambda"}
@@ -616,7 +616,7 @@ def _verify_model_parameters(
             if name not in {"device", "objective", "seed"}:
                 _require(
                     np.float32(tree[aliases.get(name, name)]).tobytes()
-                    == np.float32(value).tobytes()
+                    == np.float32(cast(int | float, value)).tobytes()
                 )
 
 
@@ -711,7 +711,11 @@ def _compare_selected(
 
 
 def _validation_prepared(
-    context: FrameContext, name: str, recipe: Any, registry: RecipeRegistry, padding: str
+    context: FrameContext,
+    name: str,
+    recipe: Any,
+    registry: RecipeRegistry,
+    padding: fit.PaddingType,
 ) -> tuple[pl.DataFrame, FeatureColumns]:
     """Prepare one immutable validation run under the selected recipe and padding."""
     frame = pl.read_parquet(context[0] / name).join(

@@ -16,7 +16,7 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import numpy as np
 import polars as pl
@@ -71,7 +71,7 @@ WIND_BEARING_TOLERANCE_DEGREES: Final[float] = 0.0001
 ERA_BOUNDARY: Final[datetime] = datetime(2024, 11, 13, tzinfo=UTC)
 
 
-def _require(condition: bool, message: str) -> None:
+def _require(condition: bool | np.bool_, message: str) -> None:
     """Reject an invalid invariant without exposing private values."""
     if not condition:
         raise ValueError(message)
@@ -613,8 +613,8 @@ def _frame_details(path: Path) -> dict[str, Any]:
         "rows": key_frame.height,
         "key_sha256": hashlib.sha256(buffer.getvalue()).hexdigest(),
         "key_hash_semantics": "Polars IPC of original five ordered key columns, rechunked",
-        "valid_start": key_frame["valid_time"].min().isoformat(),
-        "valid_end": key_frame["valid_time"].max().isoformat(),
+        "valid_start": cast(datetime, key_frame["valid_time"].min()).isoformat(),
+        "valid_end": cast(datetime, key_frame["valid_time"].max()).isoformat(),
         "features": [name for name in schema.names() if name not in NONFEATURES],
         "schema": {name: str(dtype) for name, dtype in schema.items()},
     }
@@ -677,7 +677,7 @@ def _augment(
     wind_counts = {}
     try:
         for batch in pq.ParquetFile(source).iter_batches(batch_size=BATCH_ROWS):
-            original = pl.from_arrow(batch)
+            original = cast(pl.DataFrame, pl.from_arrow(batch))
             _require(
                 condition=original.schema == original_schema,
                 message=("Arrow conversion changed original schema"),
@@ -719,8 +719,8 @@ def _augment(
     output_batches = pq.ParquetFile(destination).iter_batches(batch_size=BATCH_ROWS)
     for old, new in zip(source_batches, output_batches, strict=True):
         _assert_arrow_original_bits(original=old, restored=new)
-        original = pl.from_arrow(old)
-        reread = pl.from_arrow(new)
+        original = cast(pl.DataFrame, pl.from_arrow(old))
+        reread = cast(pl.DataFrame, pl.from_arrow(new))
         _assert_original_equal(original=original, restored=reread.select(original_schema.names()))
         expected = original.join(
             lookup,
@@ -762,7 +762,7 @@ def _precipitation_contract_bounds(path: Path) -> dict[str, dict[str, float]]:
             )
             found[node.target.id] = {
                 keyword.arg: float(ast.literal_eval(keyword.value))
-                for keyword in node.value.keywords
+                for keyword in cast(ast.Call, node.value).keywords
                 if keyword.arg in {"ge", "le"}
             }
     _require(
@@ -1149,7 +1149,7 @@ def _frozen_frame_semantics(
         )
         for batch in pq.ParquetFile(path).iter_batches(batch_size=BATCH_ROWS):
             _frame_batch_semantics(
-                frame=pl.from_arrow(batch),
+                frame=cast(pl.DataFrame, pl.from_arrow(batch)),
                 power=power,
                 population=population,
                 start=start,

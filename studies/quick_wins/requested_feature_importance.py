@@ -12,7 +12,7 @@ import json
 import math
 import os
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import fixed_pipeline_fit as fitter
 import numpy as np
@@ -118,7 +118,7 @@ PUBLIC_COLUMNS: Final[frozenset[str]] = frozenset(
 )
 
 
-def _require(condition: bool, message: str) -> None:
+def _require(condition: bool | np.bool_, message: str) -> None:
     """Reject invalid aggregate/source invariants without exposing private values."""
     if not condition:
         raise ValueError(message)
@@ -221,7 +221,7 @@ def _gain_vector(raw: dict[str, float], shown: list[str]) -> np.ndarray:
 
 def _frame_inventory(root: Path, manifest: dict[str, Any], fingerprints: dict[Path, str]) -> None:
     """Verify context bytes and both historical and augmented inventory conventions."""
-    context = _json(path=root / "context.json", fingerprints=fingerprints)
+    context = cast(dict[str, Any], _json(path=root / "context.json", fingerprints=fingerprints))
     _require(condition=context == manifest["context"], message="Frame context differs")
     _complete_inventory(
         root=root,
@@ -254,7 +254,9 @@ def _frame_lineage(
         expected=binding["context_sha256"],
         fingerprints=fingerprints,
     )
-    parent = _json(path=original_root / "manifest.json", fingerprints=fingerprints)
+    parent = cast(
+        dict[str, Any], _json(path=original_root / "manifest.json", fingerprints=fingerprints)
+    )
     _require(
         condition=parent["complete"] is True
         and parent["context"]["pipeline_tag"] == "combined"
@@ -349,7 +351,9 @@ def _model_shares(
         message="Saved booster structure/objective differs",
     )
     recorded = _gain_vector(raw=model["total_gain"], shown=shown)
-    regenerated = _gain_vector(raw=saved.get_score(importance_type="total_gain"), shown=shown)
+    regenerated = _gain_vector(
+        raw=cast(dict[str, float], saved.get_score(importance_type="total_gain")), shown=shown
+    )
     _require(
         condition=np.array_equal(recorded, regenerated),
         message="Recorded gains differ from fingerprinted saved booster",
@@ -475,9 +479,11 @@ def _read_fit(
         expected=run["frame_manifest_sha256"],
         fingerprints=fingerprints,
     )
-    manifest = _json(path=root / "manifest.json", fingerprints=fingerprints)
-    completion = _json(path=root / "complete.json", fingerprints=fingerprints)
-    frame_manifest = _json(path=frames / "manifest.json", fingerprints=fingerprints)
+    manifest = cast(dict[str, Any], _json(path=root / "manifest.json", fingerprints=fingerprints))
+    completion = cast(dict[str, Any], _json(path=root / "complete.json", fingerprints=fingerprints))
+    frame_manifest = cast(
+        dict[str, Any], _json(path=frames / "manifest.json", fingerprints=fingerprints)
+    )
     _require(
         condition=all(manifest[name] == run[name] for name in ("recipe", "setting", "seed"))
         and manifest["padding"] == "equal"
@@ -526,8 +532,8 @@ def _read_fit(
     kind, requested = RECIPES[recipe]
     real = sorted(requested)
     _verify_registry(registry=registry, recipe=recipe, kind=kind, real=real)
-    features = _json(path=root / "features.json", fingerprints=fingerprints)
-    models = _json(path=root / "models.json", fingerprints=fingerprints)
+    features = cast(dict[str, Any], _json(path=root / "features.json", fingerprints=fingerprints))
+    models = cast(list[dict[str, Any]], _json(path=root / "models.json", fingerprints=fingerprints))
     model_ids = [model["time_series_id"] for model in models]
     _require(
         condition=len(model_ids) == 31
@@ -652,7 +658,9 @@ def _recheck_inventories(spec: dict[str, Any], fingerprints: dict[Path, str]) ->
         ):
             if directory in seen:
                 continue
-            manifest = _json(path=directory / manifest_name, fingerprints=fingerprints)
+            manifest = cast(
+                dict[str, Any], _json(path=directory / manifest_name, fingerprints=fingerprints)
+            )
             _complete_inventory(
                 root=directory, listed=manifest["files"], extras=extras, fingerprints=fingerprints
             )
@@ -660,7 +668,9 @@ def _recheck_inventories(spec: dict[str, Any], fingerprints: dict[Path, str]) ->
     for binding in spec["original_frames"].values():
         root = _plain(path=binding["path"])
         if root not in seen:
-            manifest = _json(path=root / "manifest.json", fingerprints=fingerprints)
+            manifest = cast(
+                dict[str, Any], _json(path=root / "manifest.json", fingerprints=fingerprints)
+            )
             _frame_inventory(root=root, manifest=manifest, fingerprints=fingerprints)
             seen.add(root)
 
@@ -675,7 +685,7 @@ def main() -> None:
     script = Path(__file__).resolve()
     _pin(path=script, expected=_sha(path=script), fingerprints=fingerprints)
     spec_path, output = _plain(path=args.spec), _plain(path=args.output)
-    spec = _json(path=spec_path, fingerprints=fingerprints)
+    spec = cast(dict[str, Any], _json(path=spec_path, fingerprints=fingerprints))
     _keys(
         value=spec,
         names={

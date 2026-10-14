@@ -246,7 +246,7 @@ def _read_table(root: Path, recipe: str) -> pl.DataFrame:
                 | (pl.col("min_series_per_refit") != expected_count)
                 | (pl.col("max_series_per_refit") != expected_count)
             ).is_empty()
-            and abs(selected["mean_share"].sum() - 1.0) < 1e-12,
+            and abs(cast(float, selected["mean_share"].sum()) - 1.0) < 1e-12,
             message="Gain feature coverage, ranges or support differs",
         )
     _require(condition=rows.height == 2 * len(real), message="Unexpected setting rows")
