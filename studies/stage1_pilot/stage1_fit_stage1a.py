@@ -7,6 +7,8 @@ lead input. Three kinds of model are fitted, each for seeds 0, 1, and 2:
 - `pre`: trained on valid times before 2025-06-17 (14 days before the first validation run), used
   on every validation row. For the solar farms a second `pre` model is trained with CAMS irradiance
   in place of ERA5's.
+- `short`: the same, trained only on valid times from 2024-04, the months the ENS-trained arms
+  train on, so that it separates the training weather from the training length.
 - `month`: for each month from 2024-04 to 2025-06, trained on valid times up to 14 days before the
   month starts, used on that month's rows of the ENS training frame. These are the forward-chained
   out-of-fold values the control with the extra column trains on.
@@ -164,6 +166,8 @@ def training_rows(
     )
     if arm == "cams":
         rows = rows.with_columns(shortwave=pl.col("shortwave_cams")).drop_nulls("shortwave")
+    if arm == "short":
+        rows = rows.filter(pl.col("valid_time") >= OOF_MONTHS[0])
     return rows.filter(pl.col("valid_time") < before)
 
 
@@ -290,7 +294,7 @@ def fit_all(  # noqa: PLR0912
         started = time.monotonic()
         pre: dict[tuple[int, str], xgb.Booster] = {}
         for series in columns:
-            for arm in ("era5", "cams"):
+            for arm in ("era5", "cams", "short"):
                 if arm == "cams" and technology[series] != "solar":
                     continue
                 rows = training_rows(
@@ -320,12 +324,15 @@ def fit_all(  # noqa: PLR0912
                         if (sid, "cams") in pre
                         else np.full(part.height, np.nan, dtype=np.float32)
                     ),
+                    s1_short=pl.Series(
+                        predict(booster=pre[sid, "short"], frame=part, columns=columns[sid])
+                    ),
                 )
                 pieces.append(result)
             target.parent.mkdir(parents=True, exist_ok=True)
-            pl.concat(pieces).cast({"s1_era5": pl.Float32, "s1_cams": pl.Float32}).write_parquet(
-                target.with_suffix(".tmp")
-            )
+            pl.concat(pieces).cast(
+                {"s1_era5": pl.Float32, "s1_cams": pl.Float32, "s1_short": pl.Float32}
+            ).write_parquet(target.with_suffix(".tmp"))
             target.with_suffix(".tmp").rename(target)
 
         ceiling_path = STAGE_DIR / "ceiling" / f"seed{seed}.parquet"

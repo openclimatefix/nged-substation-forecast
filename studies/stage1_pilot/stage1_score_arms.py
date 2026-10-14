@@ -8,13 +8,15 @@ cases the stored control was scored on.
 
 Arms (see the README):
 
-- `c0`: the stored fixed-pipeline control (`production_cleaned`), seeds 0, 1, 2.
-- `c0_refit`, `c0_plus_s1`: the controls refitted here (`stage1_fit_enstrained.py`).
+- `c0`: the stored fixed-pipeline control (`production_cleaned`, 24 production columns), seeds 0,
+  1, 2. A reference row only: it is the only arm with other columns.
+- `ens_trained`, `ens_trained_plus_s1`: stage 1a's columns trained on the ENS control-member
+  weather (`stage1_fit_enstrained.py`), without and with stage 1a's prediction as a column.
+- `s1_short`: `s1_memberavg` with stage 1a trained on ERA5 from 2024-04 only.
 - `s1_control`: stage 1a on ENS member 0's weather.
 - `s1_memberavg`: stage 1a on each of the 51 members' weather, predictions averaged.
 - `s1_cams` (solar farms): `s1_memberavg` with stage 1a trained on CAMS irradiance.
-- `s1_recipe_on_ens`: stage 1a's columns and fitting loop trained on the ENS control-member
-  training rows instead of ERA5 (applied to all 51 members, predictions averaged).
+- `climatology`: mean power by local month and half-hour of day, 2019-09 to 2025-06.
 - `era5_ceiling`, `cams_ceiling`: stage 1a on ERA5 (or CAMS) weather at the valid time.
 
 Output: `data/studies/per_study/stage1_pilot/scores/rows_seed<s>.parquet`.
@@ -28,6 +30,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 import stage1_inputs as inputs
+from stage1_fit_stage1a import observed_training_power
 
 SCORE_DIR: Final[Path] = inputs.OUTPUT_ROOT / "scores"
 STAGE_DIR: Final[Path] = inputs.OUTPUT_ROOT / "stage1a"
@@ -37,17 +40,18 @@ MEMBERS: Final[int] = 51
 
 MEMBER_ARMS: Final[tuple[str, ...]] = (
     "c0",
-    "c0_refit",
-    "c0_plus_s1",
+    "ens_trained",
+    "ens_trained_plus_s1",
     "s1_memberavg",
+    "s1_short",
     "s1_cams",
-    "s1_recipe_on_ens",
 )
 """Arms that predict all 51 members, and so have a CRPS."""
 
 ARMS: Final[tuple[str, ...]] = (
     *MEMBER_ARMS,
     "s1_control",
+    "climatology",
     "era5_ceiling",
     "cams_ceiling",
 )
@@ -115,12 +119,52 @@ def _score_rows(
     )
 
 
+def _climate_key(*, column: str) -> list[pl.Expr]:
+    local = pl.col(column).dt.convert_time_zone("Europe/London")
+    return [
+        local.dt.month().alias("month"),
+        (local.dt.hour() * 2 + local.dt.minute() // 30).alias("slot"),
+    ]
+
+
+def month_hour_climatology(*, sites: pl.DataFrame) -> pl.DataFrame:
+    """Return each series' mean power (MW) by local month and half-hour slot of day.
+
+    Built from the cleaned observations from 2019-09 to the validation start, with the same
+    settling cut as stage 1a's training rows, so it uses no observation from the validation year.
+    """
+    observed = observed_training_power(sites=sites)
+    return (
+        observed.with_columns(*_climate_key(column="valid_time"))
+        .group_by("time_series_id", "month", "slot")
+        .agg(mean_target=pl.col("target").mean())
+        .join(sites.select("time_series_id", "effective_capacity_mw"), on="time_series_id")
+        .select(
+            "time_series_id",
+            "month",
+            "slot",
+            climatology=pl.col("mean_target") * pl.col("effective_capacity_mw"),
+        )
+    )
+
+
+def climatology_forecast(*, cases: pl.DataFrame, climatology: pl.DataFrame) -> pl.DataFrame:
+    """Return the climatology as the point forecast of each case."""
+    return (
+        cases.select("time_series_id", "power_fcst_init_time", "valid_time")
+        .with_columns(*_climate_key(column="valid_time"))
+        .join(climatology, on=["time_series_id", "month", "slot"], how="left", validate="m:1")
+        .select("time_series_id", "power_fcst_init_time", "valid_time", point=pl.col("climatology"))
+    )
+
+
 def score_seed(*, seed: int, sites: pl.DataFrame) -> pl.DataFrame:
     """Score every arm for one seed over all 53 validation runs."""
     ids = sites["time_series_id"].to_list()
     capacity = sites.select("time_series_id", "effective_capacity_mw")
     ceiling = pl.read_parquet(STAGE_DIR / "ceiling" / f"seed{seed}.parquet")
     pieces: list[pl.DataFrame] = []
+    climatology = month_hour_climatology(sites=sites)
     for path in sorted((inputs.FRAMES_DIR / "val").glob("init=*.parquet")):
         frame = pl.read_parquet(path).filter(pl.col("time_series_id").is_in(ids))
         cases = (
@@ -141,29 +185,24 @@ def score_seed(*, seed: int, sites: pl.DataFrame) -> pl.DataFrame:
         stage1 = stage1.join(capacity, on="time_series_id").with_columns(
             era5_power=pl.col("s1_era5") * pl.col("effective_capacity_mw"),
             cams_power=pl.col("s1_cams") * pl.col("effective_capacity_mw"),
+            short_power=pl.col("s1_short") * pl.col("effective_capacity_mw"),
         )
         stored = pl.read_parquet(
             inputs.CONTROL_FITS_DIR / f"cuda_seed{seed}_none" / "forecasts" / path.name
         ).filter(pl.col("time_series_id").is_in(ids))
         arms: dict[str, pl.DataFrame] = {
             "c0": _member_matrix(frame=stored, column="power_fcst"),
-            "c0_refit": _member_matrix(
-                frame=pl.read_parquet(ENS_TRAINED_DIR / "c0_refit" / f"seed{seed}" / path.name),
-                column="power_fcst",
-            ),
-            "c0_plus_s1": _member_matrix(
-                frame=pl.read_parquet(ENS_TRAINED_DIR / "c0_plus_s1" / f"seed{seed}" / path.name),
-                column="power_fcst",
-            ),
+            **{
+                arm: _member_matrix(
+                    frame=pl.read_parquet(ENS_TRAINED_DIR / arm / f"seed{seed}" / path.name),
+                    column="power_fcst",
+                )
+                for arm in ("ens_trained", "ens_trained_plus_s1")
+            },
             "s1_memberavg": _member_matrix(frame=stage1, column="era5_power"),
+            "s1_short": _member_matrix(frame=stage1, column="short_power"),
             "s1_cams": _member_matrix(
                 frame=stage1.filter(pl.col("s1_cams").is_not_nan()), column="cams_power"
-            ),
-            "s1_recipe_on_ens": _member_matrix(
-                frame=pl.read_parquet(
-                    ENS_TRAINED_DIR / "s1_recipe_on_ens" / f"seed{seed}" / path.name
-                ),
-                column="power_fcst",
             ),
         }
         for arm, members_by_case in arms.items():
@@ -185,6 +224,14 @@ def score_seed(*, seed: int, sites: pl.DataFrame) -> pl.DataFrame:
             pl.col("era5_power").alias("point"),
         )
         pieces.append(_point_rows(cases=cases, point=control, arm="s1_control", seed=seed))
+        pieces.append(
+            _point_rows(
+                cases=cases,
+                point=climatology_forecast(cases=cases, climatology=climatology),
+                arm="climatology",
+                seed=seed,
+            )
+        )
         for arm, column in (("era5_ceiling", "s1_era5"), ("cams_ceiling", "s1_cams")):
             scoped = (
                 cases

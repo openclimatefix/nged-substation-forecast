@@ -4,18 +4,34 @@ This is study 2a of the staged probabilistic forecast plan ([PR #1183 (Plan: doc
 probabilistic forecast, and schedule the studies that test it)](https://github.com/openclimatefix/nged-substation-forecast/pull/1183)).
 It runs on the nine metered generator series only (6 solar farms, 3 wind farms), because ERA5 and
 CAMS are on disk only for them. It is exploratory and autonomous: it changes no production code and
-imports only from this folder, `studies.*`, and the reviewed packages in `packages/*`. This README
-was written before the first fit. Everything not listed under "Planned contrasts" is exploratory.
+imports only from this folder, `studies.*`, and the reviewed packages in `packages/*`.
 
-## Status: the headline is provisional
+## What changed after the first run
 
-An outside-expert review found that the ENS-trained control (`c0`) may memorise calendar position instead of mapping weather to power, and that it scores worse than a month-by-hour climatology at long leads on wind. The contrast P1 (stage 1a minus `c0`) and the null in P2 are therefore provisional until a climatology arm and a de-memorised ENS-trained control are scored.
+**The first run's planned contrasts were revised after two scientific reviews, so the revised
+contrasts are not pre-registered.** The first run compared stage 1a with the production control
+`c0`, which has 24 production columns, including hour, day-of-year, day-of-week, and four power
+lags. Two reviewers found that the control looks like it memorises calendar position: its training
+rows repeat each valid time about 15 times (one per forecast lead), and the calendar columns
+identify the valid time. The maintainer then asked for one feature list in every arm. This
+README describes the second run:
+
+- **One feature list in every arm** (see "Columns"), with no calendar column and no power lag. The
+  ENS-trained control `ens_trained` now has the same columns as stage 1a, so the only difference
+  between them is the training weather and the training length.
+- **The planned contrasts keep their names but change their reference**: P1 and P2 are now measured
+  against `ens_trained` and are labelled "(revised)". The first run's version of P1 (stage 1a with
+  calendar columns minus `c0`) is kept as the exploratory contrast F6, and the production control
+  `c0` stays in the tables as a reference row.
+- **The first run's scores are kept** (`superseded/with_calendar_and_production_columns/`) and
+  enter the report as the `*_calendar` arms, so the effect of the feature lists is measured on
+  the same cases (contrasts F1 to F6).
 
 ## Question
 
 **Does a weather-to-power XGBoost model trained on ERA5 and CAMS (a "perfect prognosis" model,
 2019-09 onward), applied to ECMWF ENS weather, improve the ENS-era point forecast compared with the
-XGBoost model trained on ENS alone?** If it adds nothing, stage 1 leaves the forecast chain.
+same model trained on ENS alone?** If it adds nothing, stage 1 leaves the forecast chain.
 
 ## Rows and folds
 
@@ -24,49 +40,56 @@ XGBoost model trained on ENS alone?** If it adds nothing, stage 1 leaves the for
   every 7 days from 2025-07-01, all 51 members, for valid times to 2026-06-30.
 - **Scored rows are the half-hours with an observed power**, the rows the stored control was scored
   on. Each error is divided by the series' effective capacity from the fold A frames.
-- **Fold B is not run.** It is the follow-up if fold A finishes with time to spare.
+- **Fold B is not run.**
 
 ## Arms
 
-All arms are scored on the same cases. The control `c0` is the fixed-pipeline production arm of
-[PR #1159 (Study: production feature faults and forecast effects)](https://github.com/openclimatefix/nged-substation-forecast/pull/1159),
-recipe `production_cleaned` (24 production columns, `colsample_bytree` 1.0, the quick-wins
-`new_meter_settling` cleaning), read from
-`quick_wins_fixed_pipeline_1156/fits/combined/fold_a/production_cleaned/main/cuda_seed<s>_none`.
-The fixed-pipeline fits were run with padding `equal` and `none`; the recipe is in the set that is
-never padded, so both runs have the same 24 columns, and this study reads the `none` run.
+All arms are scored on the same cases. Every arm except `c0` and `climatology` uses the columns
+under "Columns". The ENS-trained arms train on the 15 ENS months, in which each valid time
+appears about 15 times, once per forecast lead, with the same target and different forecast
+weather.
 
 | Arm | What it is |
 | --- | --- |
-| `c0` | The stored ENS-trained control, seeds 0, 1, 2. |
-| `c0_refit` | The same model refitted here from the same frames with this study's loop. It checks the loop against the stored fits and is the paired control for `c0_plus_s1`. |
+| `ens_trained` | Stage 1a's columns trained on the ENS control member's weather, 2024-04 to 2025-06. Applied to each of the 51 members and averaged. The paired control for every stage 1a arm. |
+| `s1_memberavg` | Stage 1a (ERA5-trained, 2019-09 to 2025-06-16) applied to each of the 51 members' weather, predictions averaged. |
 | `s1_control` | Stage 1a applied to ENS member 0's weather. |
-| `s1_memberavg` | Stage 1a applied to each of the 51 members' weather, predictions averaged. |
-| `s1_cams` | Solar farms only. As `s1_memberavg`, with stage 1a trained on CAMS global irradiance in place of ERA5's. |
-| `c0_plus_s1` | `c0_refit` with stage 1a's prediction as a 25th column. Training rows carry a forward-chained out-of-fold value (one model per month, trained on ERA5 up to 14 days before the month starts); validation rows carry the pre-validation model's prediction for the row's own member. |
-| `era5_ceiling`, `cams_ceiling` | Stage 1a applied to ERA5 (or CAMS) weather at the valid time: the floor for any ENS-driven stage 1a. Not a forecast; independent of lead. |
+| `s1_short` | `s1_memberavg` with stage 1a trained on ERA5 from 2024-04 only, the months `ens_trained` trains on. Separates the training weather from the training length. |
+| `s1_cams` | Solar farms only. As `s1_memberavg`, with stage 1a trained on CAMS irradiance. |
+| `ens_trained_plus_s1` | `ens_trained` with stage 1a's prediction as an extra column. Training rows carry a forward-chained out-of-fold value (one model per month, trained on ERA5 up to 14 days before the month starts); validation rows carry the pre-validation model's prediction for the row's own member. |
+| `climatology` | Mean power by local month and half-hour of day over 2019-09 to 2025-06-16 (cleaned, same settling cut as stage 1a). No weather input. |
+| `era5_ceiling`, `cams_ceiling` | Stage 1a applied to ERA5 (or CAMS) weather at the valid time. Not a forecast, and not a bound on ENS-driven versions: ERA5 is itself an estimate with error. |
+| `c0` | The stored fixed-pipeline production control of [PR #1159 (Study: production feature faults and forecast effects)](https://github.com/openclimatefix/nged-substation-forecast/pull/1159), recipe `production_cleaned`, seeds 0, 1, 2. A reference row: it is the only arm with the production columns. |
+| `*_calendar` | The first run's `s1_memberavg`, `s1_control`, `s1_cams`, `era5_ceiling`, and the ENS-trained stage 1a recipe (`ens_trained_calendar`), with hour and day-of-year sine and cosine added. |
 
-`c0_refit` and `c0_plus_s1` both use `colsample_bytree` 1.0, so the extra column gives no gain from
-column subsampling. The stored `c0` was fitted at 1.0 too.
+`ens_trained` and `ens_trained_plus_s1` both use `colsample_bytree` 1.0, so the extra column gives no
+gain from column subsampling.
+
+## Columns
+
+Every arm except `c0` uses these columns, listed per technology (the report prints them too).
+
+- **Solar farm (9):** shortwave radiation, long-wave radiation, 2 m temperature, 2 m dew point,
+  surface pressure, precipitation, 10 m wind speed, solar zenith, solar azimuth. Solar zenith and
+  azimuth together carry the time of day and the time of year.
+- **Wind farm (6):** 10 m and 100 m wind speed, sine and cosine of the 10 m bearing, sine and cosine
+  of the 100 m bearing. ERA5 temperature and pressure are not on disk at the wind farms' cells.
+- **`ens_trained_plus_s1`** adds `stage1a_prediction`.
+- **`c0`** has the 24 production columns, including hour, day-of-year, and day-of-week features,
+  four power lags, and a precipitation-type column (see `stage1_fit_enstrained.py` and the stored
+  fit's `features.json`).
+- **`*_calendar` arms** add hour and day-of-year sine and cosine (solar 13 columns, wind 10).
 
 ## Stage 1a
 
 - **One XGBoost model per series**, squared error, production hyperparameters (learning rate 0.05,
   depth 6, minimum child weight 1, row subsample 0.8, 500 rounds) with every column offered to each
   tree, on the GPU, seeds 0, 1, 2. The target is power divided by effective capacity.
-- **No power lag and no lead input.** Calendar columns are the sine and cosine of the UTC hour and
-  of the day of year.
+- **No power lag, no lead input, no calendar column.**
 - **Training window.** Valid times from 2019-09-01 to before 2025-06-17, 14 days before the first
   validation run (the embargo of the wind interpolation study). Rows before each series' settling
   cutoff (the quick-wins `new_meter_settling` rule, applied to the whole ERA5 era with the effective
   capacity as its level) are dropped.
-- **Solar farm columns (13):** shortwave radiation, long-wave radiation, 2 m temperature, 2 m dew
-  point, surface pressure, precipitation, 10 m wind speed, solar zenith, solar azimuth, hour and day
-  of year sine and cosine. These are variables the ENS table serves, plus solar geometry.
-- **Wind farm columns (10):** 10 m and 100 m wind speed, sine and cosine of the 10 m and 100 m
-  bearing, hour and day of year sine and cosine. ERA5 temperature and pressure are not on disk at
-  the wind farms' cells. No cloud cover is used, because ENS did not serve it over the training
-  window.
 - **Wind** is interpolated as eastward and northward components; speed and bearing are derived
   afterwards. The ENS side takes the speed and bearing columns of the fixed-pipeline frames, which
   are derived the same way.
@@ -91,10 +114,12 @@ column subsampling. The stored `c0` was fitted at 1.0 too.
 ## Planned contrasts
 
 Each is computed per lead band and per technology, in points of capacity, on the mean absolute error
-of the ensemble-mean point forecast.
+of the ensemble-mean point forecast. Both are revised (see "What changed after the first run").
 
-- **P1 = `s1_memberavg` minus `c0`.** Does stage 1a on ENS weather beat the ENS-trained model?
-- **P2 = `c0_plus_s1` minus `c0`.** Does adding stage 1a's prediction to the ENS-trained model help?
+- **P1 (revised) = `s1_memberavg` minus `ens_trained`.** Does stage 1a on ENS weather beat the
+  same columns trained on ENS?
+- **P2 (revised) = `ens_trained_plus_s1` minus `ens_trained`.** Does adding stage 1a's prediction to
+  the ENS-trained model help?
 
 **A planned contrast is material** if the mean paired difference is at most -0.15 points, its 95%
 month-resampled interval lies wholly below zero, and at least 9 of 12 months agree (a negative
@@ -106,50 +131,52 @@ slope, and CRPS figure is exploratory.
 - **Mean absolute error** of the ensemble-mean forecast, in points of effective capacity, by
   technology and lead band. Lead is the valid time minus `power_fcst_init_time`. Lead bands: 0 to
   24 h, 1 to 2 days (24 to 72 h), 3 to 6 days (72 to 168 h), 7 to 10 days (168 to 264 h), 11 to 15
-  days (264 h and over). The mean is the mean over series of each series' mean.
+  days (264 h and over). The mean is the mean over series of each series' mean. A level at one
+  lead band mixes lead with which cases fall in the band, so compare arms only through paired
+  contrasts.
 - **Intervals** resample whole validation months with replacement and one of the three fitting seeds,
   the same draw for every arm so contrasts stay paired (`stage1_stats.py`, 2,000 resamples,
   stream seed `20261013`).
-- **Hedging diagnostic.** For `s1_memberavg` and `c0` (and, as exploratory extras, `s1_control`,
-  `c0_plus_s1`, `s1_cams`), the slope of an ordinary least squares regression of observed power on
-  the ensemble-mean forecast, by lead band and technology. A slope below 1 at long leads is the
-  signature of a perfect-prognosis model over-reacting to forecast weather.
-- **ERA5-input ceiling.** The mean absolute error of stage 1a applied to ERA5 at the validation
-  valid times.
+- **Over-reaction diagnostic.** The slope of an ordinary least squares regression of observed power
+  on the ensemble-mean forecast, by lead band and technology. The slope equals the correlation times
+  the spread of observed power over the spread of the forecast. Below 1: the forecast's swings are
+  larger than the swings that come true. At 1: on average, observed power equals the forecast at
+  every forecast level. Read each slope against `era5_ceiling`, because any noisy forecast has a
+  slope below 1.
 - **Fair CRPS** of the 51 member point predictions (the sorted-member form of
-  `ml_core.metrics._fair_crps_expr`) for `c0`, `c0_refit`, `c0_plus_s1`, `s1_memberavg`, and
-  `s1_cams`, normalised by capacity. These are squared-error point models, so this is not a
-  calibrated distribution. It stays outside P1 and P2.
-- **GPU repeatability.** One solar farm's `c0_refit` fitted twice with seed 0 on the GPU
+  `ml_core.metrics._fair_crps_expr`), normalised by capacity. These are squared-error point models,
+  so this is not a calibrated distribution. It stays outside P1 and P2.
+- **GPU repeatability.** One solar farm's `ens_trained` fitted twice with seed 0 on the GPU
   (`noise_floor.md`).
 
 ## Random seeds
 
 XGBoost seeds 0, 1, 2 (stage 1a and the ENS-trained models; seed `s` of the ENS-trained model uses
 seed `s` of stage 1a for its extra column). The month bootstrap uses stream seed `20261013`. The
-anonymous site labels A to F and W1 to W3 come from `studies.anonymise`.
+random example days in the charts use seed `20261013`. The anonymous site labels A to F and W1 to W3
+come from `studies.anonymise`.
 
 ## Anonymisation
 
 No generator name, `time_series_id`, or coordinate appears in any script output, table, or chart.
-Series appear as A to F (solar) and W1 to W3 (wind).
+Series appear as A to F (solar) and W1 to W3 (wind), and no chart carries a calendar date.
 
 ## Files
 
 | Script | What it does |
 | --- | --- |
-| `stage1_inputs.py` | Paths, series, lead bands, ERA5 and CAMS readers, the half-hourly conversion. |
+| `stage1_inputs.py` | Paths, series, lead bands, feature lists, ERA5 and CAMS readers, the half-hourly conversion. |
 | `stage1_build_weather.py` | Builds stage 1a's inputs from ERA5, CAMS, and the ENS rows; writes `inputs/checks.md`. |
-| `stage1_fit_stage1a.py` | Fits stage 1a (`--stage sanity` first, then `--stage all`). |
-| `stage1_fit_enstrained.py` | Refits `c0_refit` and `c0_plus_s1`; `--stage noise` measures GPU repeatability. |
-| `stage1_score_arms.py` | Scores every arm on the same cases; saves per-row losses. |
+| `stage1_fit_stage1a.py` | Fits stage 1a, its CAMS and short-training variants, and the out-of-fold column (`--stage sanity` first, then `--stage all`). |
+| `stage1_fit_enstrained.py` | Fits `ens_trained` and `ens_trained_plus_s1`; `--stage noise` measures GPU repeatability. |
+| `stage1_score_arms.py` | Scores every arm, and the climatology, on the same cases; saves per-row losses. |
 | `stage1_stats.py` | Month-resampled intervals for levels, contrasts, and slopes. |
 | `stage1_report.py` | Prints `results/report.md` and saves the tables the charts read. |
 | `stage1_charts.py` | Draws the charts. |
 
 Outputs are under `data/studies/per_study/stage1_pilot/`: `inputs/`, `stage1a/` (predictions),
-`ens_trained/` (forecasts of the refitted arms), `scores/` (per-row losses), `results/` (tables),
-and `charts/`.
+`ens_trained/` (forecasts of the ENS-trained arms), `scores/` (per-row losses), `results/` (tables),
+`charts/`, and `superseded/` (the first run).
 
 ## Reproduce
 
@@ -164,54 +191,94 @@ uv run python studies/stage1_pilot/stage1_report.py
 uv run python studies/stage1_pilot/stage1_charts.py
 ```
 
-Every script skips outputs that exist, so a crashed run resumes where it stopped.
+Every script skips outputs that exist, so a crashed run resumes where it stopped. The report reads
+the first run's scores from `superseded/with_calendar_and_production_columns/scores/`, which a fresh
+reproduction would have to recreate with the first run's feature lists.
 
 ## Limitations
 
 - Nine series in two weather regions: six solar farms share two ERA5 cells, so the effective sample
-  is weather episodes (months), not series-hours.
-- The held-out year is one year. A forward fold only; fold B (the reversed fold) is not run.
+  is weather episodes (months), not series-hours. Every conclusion holds for one held-out year at
+  nine generators in two weather regions.
+- A percentile interval over 12 resampled months is somewhat narrow: a reviewer's check put it 15%
+  to 20% narrower than a t interval. The 24 planned-contrast decisions (2 contrasts, 2
+  technologies, 6 lead bands) are not corrected for multiple comparisons.
+- Fold A only. Fold B (the reversed fold) is not run.
+- The revised P1 and P2 and the feature list were chosen after seeing the first run's results.
+- The ENS-trained rows repeat each valid time about 15 times with different forecast weather. A
+  de-duplicated training set (one lead per valid time) is not tested.
+- ENS is biased against ERA5 at the same valid time: 10 m wind is 13% to 15% slower, 100 m wind 9%
+  slower, shortwave 7% brighter (`inputs/checks.md`), a bias stage 1a was not trained on. Mapping
+  each ENS variable's quantiles onto ERA5's before applying stage 1a is not tried.
 - The ERA5 irradiance and 2 m temperature come from the Open-Meteo mirror at whole W/m².
 - Wind farms have no temperature or pressure input.
-- The ENS-trained models run on the fixed-pipeline frames, whose weather columns were built with the
-  interval-aware radiation resampler and component wind interpolation. Stage 1a is trained on ERA5
-  put onto the same convention by this study's own, simpler code, not the production resampler.
+- Stage 1a is trained on ERA5 put onto the ENS convention by this study's own, simpler code, not the
+  production resampler.
+- The `sanity` stage of the stage 1a script prints validation-year errors; nothing in stage 1a's
+  recipe was changed in response, but its feature list was changed for the second run.
 
 ## Results
 
 Every number below is printed by `stage1_report.py` into `results/report.md`. Mean absolute error
-is in points of capacity, fold A, three fitting seeds, 12 validation months.
+is in points of capacity, fold A, three fitting seeds, 12 validation months, all leads unless a
+lead band is named, with 95% intervals in brackets.
 
-- **P1 is material for wind at every lead band and for solar to day 6.** `s1_memberavg` minus `c0`
-  is -3.72 points for wind over all leads (95% interval -4.82 to -2.67) and -0.84 for solar
-  (-1.24 to -0.43). For solar, 7 to 10 days is -0.64 (-1.18 to -0.11) with 8 of 12 months
-  negative, so it fails the month rule, and 11 to 15 days is -0.56 (-1.14 to +0.03).
-- **P2 is not material anywhere.** `c0_plus_s1` minus `c0` is -0.005 for solar (-0.04 to +0.05)
-  and -0.025 for wind (-0.11 to +0.06) over all leads. Why the extra column helps nowhere is
-  not established by this study; a quick check on one wind farm (not in a committed script, so not
-  quoted) suggested the ENS-trained model fits its training months far more closely than the
-  validation year, which would leave little for an extra input to add.
-- **The ERA5-input ceiling** (stage 1a given ERA5 weather) is 6.18 points for solar (CAMS-trained,
-  given CAMS: 4.42) and 7.81 for wind, against 7.90 (`s1_memberavg`) and 15.36 for the ENS-driven
-  versions. Forecast weather costs wind about 7.5 points over all leads and solar 1.7.
-- **Training weather and training length matter more than the recipe.** `s1_recipe_on_ens`
-  (stage 1a's columns trained on 15 months of ENS) is worse than `c0` (solar +0.64, wind +1.41),
-  and `s1_memberavg` is 1.48 (solar) and 5.13 (wind) better than it. The two contrasts
-  change the training weather and the training length together, so this study does not separate
-  them.
-- **Averaging 51 members helps.** `s1_memberavg` is better than `s1_control` by 0.68 (solar) and
-  2.17 (wind) over all leads, and by more at long leads.
-- **Slopes.** A slope below 1 means the forecast varies more than the observed power. The slope of
-  observed on predicted power for `s1_memberavg` is 1.04 to 0.97 for solar and 1.04 to 0.83 for
-  wind from the first to the last lead band (0.81 at 7 to 10 days, interval 0.50 to 1.08), against
-  0.86 to 1.01 (solar) and 0.05 to 1.07 (wind) for `c0`; the ceiling's slope is 0.94 to 1.01. Mild
-  over-reaction at long leads cannot be ruled out for wind, and `c0` shows much more.
+**Figure 1 (mean absolute error by lead band):** drawn to `charts/figure_1.svg` by `stage1_charts.py`.
+
+- **P1 (revised) is material for wind to day 6 and for solar to day 6.** `s1_memberavg` minus
+  `ens_trained` is -1.70 for wind over all leads (-2.33 to -1.08) and -0.57 for solar (-0.83 to
+  -0.32). By band, the wind difference is -3.18, -4.04 and -2.37 at 0 to 24 h, 1 to 2 days, and
+  3 to 6 days, and the solar difference is -1.23, -1.41 and -0.73. At 7 to 10 and 11 to 15 days neither
+  technology passes: wind is -0.45 (-1.30 to +0.30) and -0.61 (-1.19 to -0.13, 8 of 12 months),
+  solar -0.30 and -0.12.
+- **Beyond day 6 the ERA5-trained model is close to climatology.** At 7 to 10 days `s1_memberavg`
+  is better than climatology by 0.51 for solar (-0.96 to -0.09) and 0.59 for wind (-1.98 to +0.73);
+  at 11 to 15 days by 0.10 for solar (-0.41 to +0.24) and 1.03 for wind (-1.81 to -0.39). The
+  ENS-trained control is no better than climatology beyond day 6 (+0.02 solar and -0.42 wind at
+  11 to 15 days, both intervals spanning zero).
+- **The gain comes from the training weather, not the training length.** `s1_short` (ERA5 from
+  2024-04 only) minus `ens_trained` is -0.60 for solar (-0.90 to -0.35) and -1.70 for wind (-2.28
+  to -1.13). `s1_memberavg` minus `s1_short` is +0.02 and -0.01. Both are exploratory contrasts.
+- **P2 (revised) is not material anywhere.** `ens_trained_plus_s1` minus `ens_trained` is -0.06 for
+  solar (-0.12 to -0.01, 9 of 12 months) and +0.02 for wind (+0.01 to +0.03). The largest solar
+  gain is -0.10 at 0 to 24 h, above the -0.15 threshold. On the same columns, adding the
+  prediction as an input adds nearly nothing.
+- **Averaging 51 members helps.** `s1_memberavg` minus `s1_control` is -0.70 for solar and -2.23 for
+  wind over all leads, and the gain is larger at long leads (wind -4.28 at 11 to 15 days).
+
+**Figure 2 (the planned contrasts):** drawn to `charts/figure_2.svg` by `stage1_charts.py`.
+
+- **Absolute levels, all leads.** Solar: `ens_trained` 8.25, `s1_memberavg` 7.67 (`s1_cams` 7.54),
+  climatology 8.62, the production control `c0` 8.74, `era5_ceiling` 5.98. Wind: `ens_trained` 17.09,
+  `s1_memberavg` 15.39, climatology 19.16, `c0` 19.08, `era5_ceiling` 7.90. With ENS in place of
+  ERA5 as stage 1a's input, error is 1.70 points higher for solar and 7.49 higher for wind. At 0 to
+  24 h for solar, `s1_memberavg` (5.57) is not worse than `era5_ceiling` (5.63), so the ceiling is
+  not a bound.
+- **Feature lists (post hoc, F1 to F6 and E12 to E14).** Removing hour and day-of-year columns
+  lowers the ENS-trained model's error by 1.13 points for solar (-1.71 to -0.65) and 3.40 for wind
+  (-4.81 to -1.97), and the ERA5-trained model's by 0.23 for solar (-0.47 to -0.08) and not at all
+  for wind (+0.03). Replacing the production control's 24 columns by the common columns lowers the
+  ENS-trained error by 0.49 (solar) and 1.99 (wind). The production control is worse than
+  climatology at 7 to 10 and 11 to 15 days (solar +0.38 and +0.65, wind +1.73 and +2.29), and
+  `s1_memberavg` is 1.07 (solar) and 3.69 (wind) better than it, against 0.84 and 3.72 in the first
+  run.
+
+**Figure 4 (the effect of the feature lists):** drawn to `charts/figure_4.svg` by `stage1_charts.py`.
+
+- **Slopes.** The slope of observed on predicted power for `s1_memberavg` is 1.03 to 0.99 for solar
+  and 1.06 to 0.91 for wind from the first to the last band (0.83 at 7 to 10 days, interval 0.48 to
+  1.08), against 0.99 to 1.00 (solar) and 0.95 to 0.97 (wind) for `era5_ceiling`. `s1_control` falls
+  to 0.82 (solar) and 0.11 (wind) at 11 to 15 days. A single member's weather therefore produces
+  the over-reaction expected of a perfect-prognosis model, and averaging the members removes most
+  of it. Mild over-reaction cannot be ruled out for wind at 7 to 10 days. The `ens_trained` wind
+  slope is 1.5 to 2.1, so its forecast varies less than the outcomes.
+
+**Figure 3 (slope by lead band):** drawn to `charts/figure_3.svg` by `stage1_charts.py`.
+
+- **CRPS** (exploratory, 51 member point predictions): 5.60 for `s1_memberavg` and 7.11 for
+  `ens_trained` for solar, 11.04 and 13.66 for wind.
 - **GPU repeatability.** The same GPU fit repeated gave identical predictions (difference 0.0000).
-  `c0_refit` reproduces the stored `c0` exactly.
 
-Caveats: the control `c0` is weak for wind (19 points over all leads), and the P1 gain is the
-gain over that control, not over a best-possible ENS-trained model. ENS 10 m wind is 13% to 15%
-slower than ERA5, ENS 100 m wind 9% slower, and ENS shortwave 7% brighter, at the same valid time
-(`inputs/checks.md`), a bias stage 1a was not trained on. Twenty-four decisions (2 contrasts, 2
-technologies, 6 lead bands) are read against the materiality rule without correction for multiple
-comparisons.
+**Figure 5 (example days):** drawn to `charts/figure_5.svg` by `stage1_charts.py`.
+
+The first run's headline (P1 against the production control `c0`) is F6 and E12 here.

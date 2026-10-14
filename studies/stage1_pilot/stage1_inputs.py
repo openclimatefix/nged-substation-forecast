@@ -78,12 +78,8 @@ SOLAR_FEATURES: Final[tuple[str, ...]] = (
     "wind_speed_10m",
     "solar_zenith",
     "solar_azimuth",
-    "hour_sin",
-    "hour_cos",
-    "doy_sin",
-    "doy_cos",
 )
-"""Stage 1a's columns for a solar farm. Each is a variable the ENS table serves, or derived."""
+"""Every arm's columns for a solar farm. Solar zenith and azimuth carry the time of day and year."""
 
 WIND_FEATURES: Final[tuple[str, ...]] = (
     "wind_speed_10m",
@@ -92,13 +88,9 @@ WIND_FEATURES: Final[tuple[str, ...]] = (
     "wind_dir_cos_10m",
     "wind_dir_sin_100m",
     "wind_dir_cos_100m",
-    "hour_sin",
-    "hour_cos",
-    "doy_sin",
-    "doy_cos",
 )
-"""Stage 1a's columns for a wind farm. ERA5 temperature and pressure are not on disk at the wind
-farms' cells, so only the wind components and the calendar are used."""
+"""Every arm's columns for a wind farm. ERA5 temperature and pressure are not on disk at the wind
+farms' cells, so only the wind speeds and bearings are used."""
 
 FEATURES: Final[dict[str, tuple[str, ...]]] = {"solar": SOLAR_FEATURES, "wind": WIND_FEATURES}
 """Stage 1a's feature columns by technology."""
