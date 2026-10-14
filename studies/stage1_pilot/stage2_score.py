@@ -24,6 +24,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 import stage1_inputs as inputs
+from scipy.stats import beta as beta_distribution
 from stage1_fit_stage1a import observed_training_power
 from stage2_common import (
     BLEND_GRID,
@@ -85,8 +86,8 @@ def member_fine_quantiles(*, directory: Path, seed: int, cases: pl.DataFrame) ->
 
 def tuned_blend(
     *, fine: np.ndarray, actual: np.ndarray, cases: pl.DataFrame
-) -> tuple[np.ndarray, pl.DataFrame]:
-    """Return the blended 9 quantiles of every case and the chosen parameters.
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, pl.DataFrame]:
+    """Return the blended 9 quantiles of every case, each case's two parameters, and the table.
 
     Args:
         fine: Shape (cases, 199) mixture quantile functions.
@@ -95,6 +96,8 @@ def tuned_blend(
     """
     generator = np.random.default_rng(BLEND_SEED)
     out = np.empty((fine.shape[0], LEVELS.size), dtype=np.float32)
+    alphas = np.ones(fine.shape[0])
+    betas = np.ones(fine.shape[0])
     chosen = []
     valid = cases["valid_time"].to_numpy()
     technology = cases["technology"].to_numpy()
@@ -123,6 +126,8 @@ def tuned_blend(
                             if score < best:
                                 best, alpha, beta = score, a, b
                 out[group] = blended_levels(fine=fine[group], alpha=alpha, beta=beta)
+                alphas[group] = alpha
+                betas[group] = beta
                 chosen.append(
                     {
                         "month": month_label,
@@ -133,11 +138,75 @@ def tuned_blend(
                         "fit_cases": int(fit_index.size),
                     }
                 )
-    return out, pl.DataFrame(chosen)
+    return out, alphas, betas, pl.DataFrame(chosen)
+
+
+def exceedance_probability(
+    *, fine: np.ndarray, threshold: np.ndarray, alpha: np.ndarray, beta: np.ndarray
+) -> np.ndarray:
+    """Return P(power > threshold) per case from the mixture quantile function and the blend.
+
+    The mixture's cumulative probability at the threshold is the share of the 199 grid levels whose
+    quantile is at or below it; the beta transform then maps it to the blended cumulative
+    probability. Resolution is 1/199, and probabilities beyond 0.995 or below 0.005 are not
+    resolved (the tail rule).
+    """
+    cumulative = (fine <= threshold[:, None]).mean(axis=1)
+    return 1.0 - beta_distribution.cdf(cumulative, alpha, beta)
+
+
+def pinball(*, quantile: np.ndarray, level: float, actual: np.ndarray) -> np.ndarray:
+    """Return the pinball loss of one quantile forecast per case."""
+    difference = actual - quantile
+    return np.where(difference >= 0, level * difference, (level - 1) * difference)
+
+
+def exceedance_columns(
+    *,
+    fine: np.ndarray,
+    thresholds: dict[str, np.ndarray],
+    actual: np.ndarray,
+    alpha: np.ndarray,
+    beta: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Return the exceedance probability and outcome (0 or 1) for each threshold."""
+    columns = {}
+    for name, threshold in thresholds.items():
+        columns[f"p_{name}"] = exceedance_probability(
+            fine=fine, threshold=threshold, alpha=alpha, beta=beta
+        )
+        columns[f"o_{name}"] = (actual > threshold).astype(np.float64)
+    return columns
+
+
+def exceedance_thresholds(*, cases: pl.DataFrame, sites: pl.DataFrame) -> dict[str, np.ndarray]:
+    """Return each case's series' 90th and 95th percentile of cleaned power in the training period.
+
+    The percentiles are of power over effective capacity, from 2019-09 to before 2025-06-17.
+    """
+    table = (
+        observed_training_power(sites=sites)
+        .group_by("time_series_id")
+        .agg(
+            exceed_90=pl.col("target").quantile(0.9),
+            exceed_95=pl.col("target").quantile(0.95),
+        )
+    )
+    joined = cases.join(table, on="time_series_id", how="left", validate="m:1")
+    return {
+        "exceed_90": joined["exceed_90"].to_numpy(),
+        "exceed_95": joined["exceed_95"].to_numpy(),
+    }
 
 
 def score_rows(
-    *, arm: str, seed: int, cases: pl.DataFrame, quantiles: np.ndarray, actual: np.ndarray
+    *,
+    arm: str,
+    seed: int,
+    cases: pl.DataFrame,
+    quantiles: np.ndarray,
+    actual: np.ndarray,
+    exceedance: dict[str, np.ndarray],
 ) -> pl.DataFrame:
     """Return one scored row per case (errors in points of capacity, coverage 0 or 100)."""
     median = quantiles[:, MEDIAN_INDEX]
@@ -159,6 +228,13 @@ def score_rows(
         cover_90=pl.Series(
             100.0 * ((actual >= quantiles[:, 0]) & (actual <= quantiles[:, 8])), dtype=pl.Float64
         ),
+        pinball_90=pl.Series(
+            100.0 * pinball(quantile=quantiles[:, 7], level=0.9, actual=actual), dtype=pl.Float64
+        ),
+        pinball_95=pl.Series(
+            100.0 * pinball(quantile=quantiles[:, 8], level=0.95, actual=actual), dtype=pl.Float64
+        ),
+        **{name: pl.Series(values, dtype=pl.Float64) for name, values in exceedance.items()},
     )
 
 
@@ -202,26 +278,45 @@ def main() -> None:
             month=pl.col("valid_time").dt.strftime("%Y-%m"),
         )
         actual = cases["actual_norm"].to_numpy().astype(np.float64)
+        thresholds = exceedance_thresholds(cases=cases, sites=sites)
+        ones = np.ones(cases.height)
         pieces = []
         for arm, directory in ARM_DIRS.items():
             fine = member_fine_quantiles(directory=directory, seed=seed, cases=cases)
-            raw = read_levels(fine=fine, levels=LEVELS)
-            blended, params = tuned_blend(fine=fine, actual=actual, cases=cases)
-            pieces.append(score_rows(arm=arm, seed=seed, cases=cases, quantiles=raw, actual=actual))
-            pieces.append(
-                score_rows(
-                    arm=f"{arm}_blp", seed=seed, cases=cases, quantiles=blended, actual=actual
+            blended, alphas, betas, params = tuned_blend(fine=fine, actual=actual, cases=cases)
+            for name, quantiles, alpha, beta in (
+                (arm, read_levels(fine=fine, levels=LEVELS), ones, ones),
+                (f"{arm}_blp", blended, alphas, betas),
+            ):
+                pieces.append(
+                    score_rows(
+                        arm=name,
+                        seed=seed,
+                        cases=cases,
+                        quantiles=quantiles,
+                        actual=actual,
+                        exceedance=exceedance_columns(
+                            fine=fine, thresholds=thresholds, actual=actual, alpha=alpha, beta=beta
+                        ),
+                    )
                 )
-            )
             all_params.append(params.with_columns(arm=pl.lit(arm), seed=pl.lit(seed)))
             print(f"seed {seed}: {arm} scored", flush=True)
+        climate = np.sort(climatology_quantiles(cases=cases, sites=sites), axis=1)
         pieces.append(
             score_rows(
                 arm="climatology_q",
                 seed=seed,
                 cases=cases,
-                quantiles=np.sort(climatology_quantiles(cases=cases, sites=sites), axis=1),
+                quantiles=climate,
                 actual=actual,
+                exceedance=exceedance_columns(
+                    fine=mixture_quantiles(member_quantiles=climate[:, None, :].astype(np.float32)),
+                    thresholds=thresholds,
+                    actual=actual,
+                    alpha=ones,
+                    beta=ones,
+                ),
             )
         )
         pl.concat(pieces).write_parquet(target.with_suffix(".tmp"))

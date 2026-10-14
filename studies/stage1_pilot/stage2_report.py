@@ -25,7 +25,22 @@ METRICS: Final[dict[str, str]] = {
     "abs_error": "Mean absolute error of the median (points of capacity; smaller is better)",
     "cover_80": "Coverage of the 10 to 90 interval (% of cases; nominal 80)",
     "cover_90": "Coverage of the 5 to 95 interval (% of cases; nominal 90)",
+    "pinball_90": "Pinball loss at level 0.9 (points of capacity; smaller is better; exploratory)",
+    "pinball_95": "Pinball loss at level 0.95 (points of capacity; smaller is better; exploratory)",
+    "brier_90": (
+        "Brier score of exceeding the series' training-period 90th percentile of power "
+        "(100 times the squared error of the probability; smaller is better; exploratory)"
+    ),
+    "brier_95": (
+        "Brier score of exceeding the series' training-period 95th percentile of power "
+        "(100 times the squared error of the probability; smaller is better; exploratory)"
+    ),
 }
+TAIL_METRICS: Final[tuple[str, ...]] = ("pinball_90", "pinball_95", "brier_90", "brier_95")
+TAIL_CONTRASTS: Final[tuple[str, ...]] = ("Q1", "Q2", "Q3", "X5", "X6", "X7", "X11")
+"""Contrasts also computed on the tail metrics; the others are read on CRPS and MAE only."""
+RELIABILITY_ARMS: Final[tuple[str, ...]] = ("a_ens_quantile", "b_mixture_full", "c_stage2_full_blp")
+RELIABILITY_BINS: Final[tuple[float, ...]] = (0.0, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0001)
 BASE_ARMS: Final[tuple[str, ...]] = (
     "a_ens_quantile",
     "b_mixture_full",
@@ -89,7 +104,11 @@ def load_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
         )
     return rows.join(
         sites.select("time_series_id", "technology"), on="time_series_id"
-    ).with_columns(band=band)
+    ).with_columns(
+        band=band,
+        brier_90=100.0 * (pl.col("p_exceed_90") - pl.col("o_exceed_90")) ** 2,
+        brier_95=100.0 * (pl.col("p_exceed_95") - pl.col("o_exceed_95")) ** 2,
+    )
 
 
 def scope(*, rows: pl.DataFrame, arm: str, technology: str, band: str) -> pl.DataFrame:
@@ -106,6 +125,53 @@ def table(*, header: list[str], body: list[list[str]]) -> list[str]:
         *["| " + " | ".join(row) + " |" for row in body],
         "",
     ]
+
+
+def reliability(*, rows: pl.DataFrame) -> list[str]:
+    """Return reliability tables: forecast exceedance probability against observed frequency."""
+    out = [
+        "## Reliability of the exceedance probabilities (exploratory)",
+        "",
+        (
+            "Each cell is the mean forecast probability, the observed frequency, and the number of "
+            "cases (pooled over the three seeds and the series of the technology), by forecast "
+            "probability bin. A reliable forecast has the first two numbers equal."
+        ),
+        "",
+    ]
+    saved = []
+    for threshold in ("90", "95"):
+        for technology in TECHNOLOGIES:
+            for band in BANDS:
+                body = []
+                for low, high in zip(RELIABILITY_BINS[:-1], RELIABILITY_BINS[1:], strict=True):
+                    cells = [f"[{low:.2f}, {min(high, 1.0):.2f})"]
+                    for arm in RELIABILITY_ARMS:
+                        part = scope(rows=rows, arm=arm, technology=technology, band=band).filter(
+                            (pl.col(f"p_exceed_{threshold}") >= low)
+                            & (pl.col(f"p_exceed_{threshold}") < high)
+                        )
+                        n = part.height
+                        forecast = part[f"p_exceed_{threshold}"].mean() if n else float("nan")
+                        observed = part[f"o_exceed_{threshold}"].mean() if n else float("nan")
+                        saved.append(
+                            {
+                                "threshold": threshold,
+                                "technology": technology,
+                                "band": band,
+                                "arm": arm,
+                                "bin_low": low,
+                                "forecast": forecast,
+                                "observed": observed,
+                                "cases": n,
+                            }
+                        )
+                        cells.append(f"{forecast:.3f} / {observed:.3f} ({n:,})" if n else "-")
+                    body.append(cells)
+                out += [f"### exceeding the {threshold}th percentile, {technology}, {band}", ""]
+                out += table(header=["forecast probability bin", *RELIABILITY_ARMS], body=body)
+    pl.DataFrame(saved).write_parquet(RESULT_DIR / "reliability.parquet")
+    return out
 
 
 def main() -> None:
@@ -174,11 +240,13 @@ def main() -> None:
         ),
         "",
     ]
-    for metric in ("crps", "abs_error"):
+    for metric in ("crps", "abs_error", *TAIL_METRICS):
         for technology in TECHNOLOGIES:
             report += [f"### {metric}, {technology}", ""]
             body = []
             for name, (treatment, reference) in {**PLANNED, **EXPLORATORY}.items():
+                if metric in TAIL_METRICS and name.split(":")[0] not in TAIL_CONTRASTS:
+                    continue
                 for band in BANDS:
                     a = scope(rows=rows, arm=treatment, technology=technology, band=band)
                     b = scope(rows=rows, arm=reference, technology=technology, band=band)
@@ -224,6 +292,7 @@ def main() -> None:
             )
     pl.DataFrame(contrast_rows).write_parquet(RESULT_DIR / "contrasts.parquet")
 
+    report += reliability(rows=rows)
     params_path = SCORE_DIR / "blend_params.parquet"
     if params_path.exists():
         params = (
