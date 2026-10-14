@@ -26,6 +26,7 @@ LABELS: Final[dict[str, str]] = {
     **original.LABELS,
     "downward_short_wave_radiation_flux_surface": "Short-wave GHI",
     "downward_long_wave_radiation_flux_surface": "Downward long-wave radiation",
+    "precipitation_surface": "Precipitation rate",
     "sun_east": "Sun: east component",
     "sun_north": "Sun: north component",
     "sun_up": "Sun: up component",
@@ -45,15 +46,19 @@ SETTING_STYLE: Final[dict[str, tuple[str, str, str]]] = {
 }
 COMMON_TEXT: Final[tuple[str, ...]] = (
     (
-        "Post hoc training gain from per-meter XGBoost squared-error models in "
-        "NGED's trial area in Lincolnshire, with corrected wind and radiation inputs."
+        "Training gain is the reduction in fitting loss credited to an input when trees split "
+        "the training data. These descriptive comparisons were added after the original results. "
+        "The descriptive comparisons use per-meter XGBoost squared-error models in "
+        "National Grid Electricity Distribution's trial area in Lincolnshire, "
+        "with corrected wind and radiation inputs."
     ),
     (
         "Main: 500 trees, depth 6, learning rate 0.05, minimum child weight 1, L2 1. "
         "Sensitivity: 1200 trees, depth 4, learning rate 0.03, minimum child weight 50, L2 5."
     ),
     (
-        "Both sample 80% of rows and allow all columns. Retained inputs are duplicated "
+        "Main and sensitivity fits sample 80% of rows and allow all columns. "
+        "Retained inputs are duplicated "
         "to width 24; duplicate gain returns to its source before each booster's "
         "shares are normalized to one."
     ),
@@ -123,8 +128,8 @@ def _definitions(recipe: str) -> list[str]:
                 ),
                 (
                     "Clear-sky GHI is the Haurwitz model's global horizontal irradiance "
-                    "averaged over that half-hour at 30 one-minute midpoints. It is an "
-                    "approximation, not measured or tilted-panel irradiance."
+                    "averaged over that half-hour at 30 one-minute midpoints. "
+                    "Clear-sky GHI is an approximation, not measured or tilted-panel irradiance."
                 ),
                 (
                     "Solar geometry and clear sky use valid time and private coordinates, "
@@ -142,14 +147,15 @@ def _definitions(recipe: str) -> list[str]:
         lines.append(
             "u/v are reconstructed eastward/northward components in m/s: u = −speed "
             "sin(bearing), v = −speed cos(bearing), from corrected "
-            "post-interpolation polar inputs at 10 and 100 m. They are not native "
-            "upstream components and add no weather information."
+            "post-interpolation polar inputs at 10 and 100 m. The reconstructed u/v components "
+            "are not native upstream components and add no weather information."
         )
     if "wind_direction_10m_sin" in real:
         lines.append(
             "Dimensionless direction sine/cosine encode the same corrected "
-            "post-interpolation meteorological bearings at 10 and 100 m. They "
-            "replace raw angles, contain no u/v inputs and add no weather "
+            "post-interpolation meteorological bearings at 10 and 100 m. "
+            "The direction sine/cosine inputs replace raw angles, contain no u/v inputs, "
+            "and add no weather "
             "information."
         )
     return lines

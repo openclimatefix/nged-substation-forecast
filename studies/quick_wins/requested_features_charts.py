@@ -54,18 +54,25 @@ ZERO_LABEL: Final[str] = "Zero: equal loss"
 LEGEND: Final[tuple[str, ...]] = ("Main: blue circle", "Sensitivity: orange diamond")
 CAPTION: Final[tuple[str, ...]] = (
     (
-        "Post hoc paired fair-CRPS comparisons at six solar and three wind farms in NGED's "
-        "Lincolnshire trial area. Each forecast has 51 weather-driven point predictions."
+        "Power forecasts at six solar and three wind farms in National Grid Electricity "
+        "Distribution's Lincolnshire trial area "
+        "each contain 51 weather-driven predictions. Fair continuous ranked probability score "
+        "(fair CRPS) measures their distributional error against observed power; lower is better. "
+        "The comparisons match the same forecast cases and were added after the original results."
     ),
     (
         "Each row is the first recipe minus the second; negative means lower loss for the first. "
-        "Loss is divided by full-history effective capacity for scoring only; "
-        "one point is 1% of capacity."
+        "Each farm's effective capacity is the 99th percentile of absolute observed power over "
+        "its available history, including readings after validation, not a connection rating. "
+        "Loss is divided by that fixed scale for scoring only; one point is 1% of capacity."
     ),
     (
-        "Numbers name real inputs: PV 2 uses temperature and short-wave radiation; PV 11 adds "
-        "weather and solar geometry. Wind 5 uses temperature, speeds and bearings at 10/100 m; "
-        "Wind 9 adds reconstructed u/v; Wind 7 replaces bearings with sine/cosine."
+        "PV means photovoltaic. Numbers name real inputs: PV 2 uses temperature and short-wave "
+        "radiation; PV 11 adds weather and solar geometry. "
+        "Wind 5 uses temperature, speeds, and directions at 10/100 m. "
+        "Direction is the angle the wind comes from, measured clockwise from north. "
+        "Wind 9 adds eastward/northward velocity components (u/v) in m/s at both heights; "
+        "Wind 7 replaces each direction angle with its sine and cosine."
     ),
     (
         "Full 24 is the cleaned full-input control; old lean Wind retains 16 inputs. Corrected "
@@ -80,19 +87,21 @@ CAPTION: Final[tuple[str, ...]] = (
     (
         "Main: 500 trees, depth 6, learning rate 0.05, minimum child weight 1, L2 1. "
         "Sensitivity: 1200 trees, depth 4, learning rate 0.03, minimum child weight 50, L2 5. "
-        "Both sample 80% of rows and allow all columns; each uses three fitting seeds."
+        "Main and sensitivity fits sample 80% of rows and allow all columns; "
+        "each setting uses three fitting seeds."
     ),
     (
         "Points: reported paired mean differences, with equal meter weight. Lines: unadjusted "
         "95% bootstrap bounds from 2,000 whole-calendar-month draws and one common seed per draw. "
-        "They are not intervals for a seed-averaged estimator or transfer to new meters. "
+        "The bootstrap bounds do not describe a seed-averaged estimator or uncertainty "
+        "when forecasting new meters. "
         "A draw omits a meter if none of its supported months was drawn; "
         "support is in the appendix."
     ),
     (
         "All seven families were chosen post hoc; comparisons share months and are subject to "
         "multiplicity. Differences do not isolate causal effects of individual inputs. "
-        "Absolute losses, support and the separate equal-month t-intervals are in the appendix."
+        "Absolute losses, support, and the separate equal-month t-intervals are in the appendix."
     ),
 )
 
@@ -351,7 +360,7 @@ def _panel(rows: pl.DataFrame, title: str, domain: tuple[float, float]) -> chart
     )
     colours = alt.Scale(domain=list(LEGEND), range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE])
     scale = alt.Scale(domain=list(domain), nice=False, zero=False)
-    legend = alt.Legend(title=None, orient="top", direction="horizontal")
+    legend = alt.Legend(title=None, orient="top", direction="horizontal", labelLimit=300)
     base = alt.Chart(shown).encode(
         y=alt.Y(
             "label:N",

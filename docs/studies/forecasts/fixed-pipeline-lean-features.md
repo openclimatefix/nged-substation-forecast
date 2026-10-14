@@ -2,7 +2,7 @@
 
 > **Draft study.** Original pipeline, lean-feature and robustness comparisons are complete.
 > The requested minimal-feature fits, prediction audits and reports are complete.
-> Figures and final scientific reviews remain pending.
+> The requested comparison and feature-importance figures are complete; final reviews remain pending.
 > Results evaluate frozen PR revisions. The final merged radiation revision has not been scored;
 > its performance remains an open part of the latest-PR question.
 
@@ -1068,6 +1068,8 @@ and 19-level pinball loss are secondary diagnostics. Loss differences below are 
 reference in capacity percentage points. Bootstrap intervals describe the equal-series estimate; the
 separate equal-month estimate and t interval address a different estimand.
 
+![Figure 8: requested solar and wind feature comparisons in both folds and settings.](../assets/fixed-pipeline-lean-features/requested_features_figure_8.svg)
+
 **Temperature and short-wave radiation alone reduce solar fair CRPS in all four comparisons.**
 Against the full-input `production_cleaned` point control, the two-input solar set gives differences
 of −1.800 in Fold A main, −2.147 in Fold B main and −1.625 in Fold A sensitivity; Fold B sensitivity
@@ -1153,10 +1155,34 @@ source; the existing frozen fits do not need automatic rerunning. The many post 
 and lead comparisons do not provide multiplicity-adjusted family-wide significance. The two
 main-setting robustness reports are complete. The [authoritative generated
 tables](fixed-pipeline-feature-results-tables.md#requested-minimal-feature-comparisons) include the
-completed robustness and lead-specific comparisons. Figure 8, the descriptive gain figures and final
-scientific and prose reviews remain pending. The gain producer has completed, but its figures are
-not yet rendered or reviewed; gain importance describes fitted-model use rather than establishes a
-held-out feature benefit. No deployment or feature adoption recommendation follows yet.
+completed robustness and lead-specific comparisons. Final scientific and prose reviews remain
+pending. Gain importance describes fitted-model use rather than establishes a held-out feature
+benefit. No deployment or feature adoption recommendation follows yet.
+
+### Training gain for each requested feature set
+
+Figures 9 to 13 show every real input in each requested set; the [ordered feature
+lists](#requested-minimal-feature-extension) identify their exact implementation columns.
+Main and sensitivity settings appear separately. Dots show mean training-gain shares and lines
+show the range across six fold-and-seed refits. These ranges are descriptive variability, not
+confidence intervals. Duplicate padding columns return their gain to the original input before
+normalisation.
+
+Short-wave radiation dominates the two-input solar fit. Clear-sky irradiance and the vertical sun
+component receive much of the expanded solar fit's gain, although that bundle has worse held-out
+fair CRPS than the two-input set. Both wind speeds receive the largest gain shares in all three
+requested wind representations. A large gain share therefore does not establish that adding an
+input improves forecasting.
+
+![Figure 9: training-gain shares for the two-input solar set, PV2.](../assets/fixed-pipeline-lean-features/requested_feature_importance_9.svg)
+
+![Figure 10: training-gain shares for the eleven-input solar set, PV11.](../assets/fixed-pipeline-lean-features/requested_feature_importance_10.svg)
+
+![Figure 11: training-gain shares for the five-input wind set, Wind5.](../assets/fixed-pipeline-lean-features/requested_feature_importance_11.svg)
+
+![Figure 12: training-gain shares for the nine-input wind set with reconstructed u/v, Wind9.](../assets/fixed-pipeline-lean-features/requested_feature_importance_12.svg)
+
+![Figure 13: training-gain shares for the seven-input wind set with circular directions, Wind7.](../assets/fixed-pipeline-lean-features/requested_feature_importance_13.svg)
 
 ## Discussion: what to use
 
