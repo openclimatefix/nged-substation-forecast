@@ -298,8 +298,8 @@ def write_stage1_readme(*, tables: dict[str, pl.DataFrame], report: dict[str, ob
             + ", ".join(f"`{n}`" for n in solar_exact)
             + " match the held `solar_variables/` tables bit for bit, but those tables were also "
             "read from ARCO, so this checks the cell selection only. `tcc`, the one CDS table "
-            "there, differs by at most 8e-6. `t2m`, `ssrd`, `fdir` and the four wind components differ "
-            "from the held "
+            "there, differs by at most 8e-6. `t2m`, `ssrd`, `fdir` and the four wind "
+            "components differ from the held "
             "`beam_diffuse/` archives and `ERA5-WIND-2019-2023/` by at most about 6e-5 of the "
             "variable's maximum, in no pattern by cell, consistent with 16-bit packing in those "
             "netCDF files. Details are in `validation.json`.",
