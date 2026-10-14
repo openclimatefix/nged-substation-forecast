@@ -29,9 +29,9 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/11
 # Does a stage 2 calibrator beat the pooled stage 1a mixture?
 
 **Verdict: the pooled ERA5-trained mixture beats the ENS-trained quantile model, and the stage 2
-calibrator and learned blend did not improve on it, and were worse for solar.** Study 2b ran in one held-out year (fold A,
-53 weekly runs) for 6 solar farms and 3 wind farms. The full write-up is the `Results` section of
-`studies/stage1_pilot/README_stage2.md`.
+calibrator and learned blend did not improve on it, and were worse for solar.** Study 2b ran in one
+held-out year (fold A, 53 weekly runs) for 6 solar farms and 3 wind farms. The full write-up is the
+`Results` section of `studies/stage1_pilot/README_stage2.md`.
 
 ## Input columns
 
@@ -87,6 +87,7 @@ CRPS in points of capacity.
 
 ## Lessons for later experiments
 
-- Report the pooled mixture beside any stage 2 arm, because the mixture is the reference stage 2 has to beat.
+- Report the pooled mixture beside any stage 2 arm, because the mixture is the reference stage 2
+  has to beat.
 - Predictions are under `data/studies/per_study/stage2_pilot/` and are not yet in
   `data/ml-experiments/` with a manifest.
