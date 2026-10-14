@@ -52,6 +52,10 @@ PLANNED_RESAMPLES: Final[int] = 10_000
 DEFAULT_RESAMPLES: Final[int] = 2_000
 SUPPORT_THRESHOLD: Final[float] = -0.03
 """C2 must be at most this many points of capacity, with its interval below zero, for support."""
+HOLDOUT_MONTH: Final[str] = "2026-07"
+"""Valid times from this month on are never scored, so the mismatch table leaves them out."""
+C1_IN_00009: Final[float] = -0.035
+C1_NOISE: Final[float] = 0.005
 BIAS_YEAR_LIMIT: Final[float] = 0.02
 BIAS_MONTH_LIMIT: Final[float] = 0.05
 GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
@@ -411,7 +415,10 @@ def mismatch_table(*, series: pl.DataFrame) -> pl.DataFrame:
     """
     primary = series.filter(pl.col("substation_type") == HEADLINE_GROUP)["time_series_id"]
     sums = pl.concat([pl.read_parquet(p) for p in sorted(fit.SHORTWAVE_DIR.glob("init=*.parquet"))])
-    sums = sums.filter(pl.col("time_series_id").is_in(primary))
+    sums = sums.filter(pl.col("time_series_id").is_in(primary) & (pl.col("month") < HOLDOUT_MONTH))
+    if not sums.select(pl.all_horizontal(pl.exclude("month").is_finite())).to_series().all():
+        msg = "the shortwave sums hold a NaN or infinite value"
+        raise ValueError(msg)
     value_columns = ["raw", "to_cams", "to_era5", "cams", "era5"]
 
     def finish(frame: pl.DataFrame) -> pl.DataFrame:
@@ -468,7 +475,8 @@ def verdict(*, planned: pl.DataFrame, mismatch: pl.DataFrame) -> str:
         label = "inconclusive"
     return (
         f"{label}: C2 is {c2['difference']:+.3f} ({c2['lower']:+.3f} to {c2['upper']:+.3f} at "
-        f"97.5%), C1 is {c1['difference']:+.3f} ({c1['lower']:+.3f} to {c1['upper']:+.3f}); "
+        f"97.5%), C1 is {c1['difference']:+.3f} ({c1['lower']:+.3f} to {c1['upper']:+.3f}; "
+        f"00009 found {C1_IN_00009:+.3f}, noise floor {C1_NOISE:.3f}); "
         f"bias check {'passed' if bias_ok else 'failed'} (year ratio "
         f"{overall['stage0_to_cams_ratio']:.3f}, worst month deviation "
         f"{float(np.abs(months['stage0_to_cams_ratio'].to_numpy() - 1).max()):.3f})"
