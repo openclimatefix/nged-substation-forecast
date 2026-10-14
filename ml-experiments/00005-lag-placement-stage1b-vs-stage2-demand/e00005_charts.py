@@ -299,7 +299,8 @@ def _example_figure(*, worst: bool) -> alt.TopLevelMixin:
         "In the worst runs, all three arms miss the level by the same amount"
         if worst
         else (
-            "In the typical runs, lagged power in the calibrator follows the first day more closely"
+            "In typical runs, the three arms follow the daily shape "
+            "and differ mainly in the first day's level"
         )
     )
     return alt.vconcat(*rows).properties(
@@ -307,7 +308,8 @@ def _example_figure(*, worst: bool) -> alt.TopLevelMixin:
             text=headline,
             lines=[
                 "The three Primary substations with the lowest labels, one forecast run each.",
-                f"Each run is picked by rule: the {kind} run by L3's quantile score over 72 hours.",
+                f"Each run is picked by rule: the {kind} run by L3's quantile score over 72 hours."
+                + (" The rule is unfavourable to L3." if worst else ""),
                 "Dashed line: observed demand. Solid line: median forecast.",
                 "Dark band: 25th to 75th percentile. Light band: 5th to 95th percentile.",
                 "R0c: no lagged power. L3: lagged power in the calibrator. L2c: in stage 1b.",

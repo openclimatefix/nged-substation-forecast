@@ -98,17 +98,17 @@ the 73 runs of the validation year. Every lagged arm is a ceiling, because the r
 ERA5 weather at past times.
 
 - **Headline result:** the primary contrast, stage 1b with a calibrator minus the calibrator with
-  lags, was +0.84 points of capacity for leads up to 48 hours (99% interval +0.28 to +1.50, 3 of 12
-  months negative). Lagged power in the calibrator scored 5.31 against 6.14 for stage 1b and 7.11
-  for no lags. Using both placements added nothing detectable (-0.06, -0.15 to +0.03). - **Finding
-  for later experiments:** a lag-free calibrator is worth about 1 point of capacity at short leads,
-  and stage 1a alone scored no better than day-type climatology. The grid supply points' error is
-  dominated by drift. - **Write-up and pull request:**
-  [result](00005-lag-placement-stage1b-vs-stage2-demand/result.md), [PR #1195 (Experiment 00005
-  (planned): where lagged power enters a two-stage demand
+  lags, was +0.84 points of capacity for leads up to 48 hours (99% interval +0.28 to +1.50, 9 of 12
+  months favouring the calibrator). Lagged power in the calibrator scored 5.31 against 6.14 for
+  stage 1b and 7.11 for no lags. Using both placements added at most 0.12 points.
+- **Finding for later experiments:** a lag-free calibrator lowered the quantile score by about 1
+  point of capacity at short leads and raised the median's error. Stage 1a alone scored no better
+  than day-type climatology. The grid supply points' error is dominated by drift.
+- **Write-up and pull request:** [result](00005-lag-placement-stage1b-vs-stage2-demand/result.md),
+  [PR #1195 (Experiment 5: where lagged power enters a two-stage demand
   forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195).
 
-![Planned contrasts for the Primary substations](00005-lag-placement-stage1b-vs-stage2-demand/figure_2.svg)
+![Lagged power in the calibrator beats lagged power in stage 1b at every lead](00005-lag-placement-stage1b-vs-stage2-demand/figure_2.svg)
 
 ### What the experiments taught us so far
 
