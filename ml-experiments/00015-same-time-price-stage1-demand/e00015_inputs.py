@@ -71,7 +71,10 @@ def build() -> pl.DataFrame:
     features = pl.read_parquet(EXPERIMENT_00006_DIR / "features.parquet")
     series = half_hourly_series()
     origin = features["valid_time"].min()
-    n_weeks = (features["valid_time"].max() - origin).days // 7 + 2
+    n_days = features.select(
+        (pl.col("valid_time").max() - pl.col("valid_time").min()).dt.total_days()
+    ).item()
+    n_weeks = int(n_days) // 7 + 2
     offsets = np.random.default_rng(SHUFFLE_SEED).choice(np.array(SHUFFLE_WEEKS), size=n_weeks)
     frame = features.with_columns(
         start=pl.col("valid_time") - HALF_HOUR,
