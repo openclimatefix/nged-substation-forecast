@@ -115,18 +115,22 @@ idea that has no folder yet is marked "proposed".
 | Proposed | Can summaries of the stage 1a residuals over recent days show that a substation's embedded solar capacity has changed since the stage 1a XGBoost model was trained? | Waits for 00005, and for the 00006 residual analysis to be published |
 | Proposed | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Needs a source of historical prices |
 
-**The embedded-solar proposal rests on one follow-up check of experiment 00006's residuals.** The check is by the 00006 session, its script is not committed, and its result is not in [PR #1202
+**The embedded-solar proposal rests on one follow-up check of experiment 00006's residuals.** The
+check is by the 00006 session, its script is not committed, and its result is not in [PR #1202
 (Experiment 00006: which input features work best for the ERA5-trained demand
-model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202), which defines Primary substation 12 as the median-error Primary substation. The residual of the chosen-feature stage 1a XGBoost model at that substation was -5 to -6 points of capacity from 08:00 to 17:00 in June to August 2025, and about -1 point at night. In July
-2025 the hourly residual correlated -0.44 with satellite irradiance from the Copernicus Atmosphere
-Monitoring Service (CAMS) and -0.23 with ERA5 shortwave. CAMS alone explained 19% of the residual's
-variance, ERA5 alone 5%, and both together 25%. The evidence is one substation, one month, and a CAMS
-site 10.3 km away, so it is indicative only. The sign of the residual fits embedded solar generation that ERA5's
-31 km grid cells under-represent.
+model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202), which defines Primary
+substation 12 as the median-error Primary substation. The residual of the chosen-feature stage 1a
+XGBoost model at that substation was -5 to -6 points of capacity from 08:00 to 17:00 in June to
+August 2025, and about -1 point at night. In July 2025 the hourly residual correlated -0.44 with
+satellite irradiance from the Copernicus Atmosphere Monitoring Service (CAMS) and -0.23 with ERA5
+shortwave. CAMS alone explained 19% of the residual's variance, ERA5 alone 5%, and both together
+25%. The evidence is one substation, one month, and a CAMS site 10.3 km away, so it is indicative
+only. The sign of the residual fits embedded solar generation that ERA5's 31 km grid cells
+under-represent.
 
 **The three candidate statistics each compare what stage 1a predicted with what the substation
-metered.** Each uses the residual, the metered power over capacity minus stage 1a's prediction at the
-observed weather.
+metered.** Each uses the residual, the metered power over capacity minus stage 1a's prediction at
+the observed weather.
 
 - **The solar slope:** regress the residual on irradiance over the trailing 14 to 28 days, in
   daylight hours only. A more negative slope means more embedded solar than stage 1a learned.
@@ -138,20 +142,22 @@ observed weather.
   trained on.
 
 **Pass the correction to stage 2 in power units, not as a raw slope.** XGBoost cannot multiply two
-features and cannot extrapolate beyond its training range, and embedded solar capacity grows steadily.
-The proposal is to give stage 2 the product of the slope and the forecast shortwave at each lead,
-which is the expected adjustment in points of capacity. A linear correction in stage 1b would
-extrapolate correctly where trees cannot. The experiment could compute each statistic twice, from
-ERA5 shortwave alone and from CAMS and ERA5 together, and use CAMS irradiance downloaded at each
-substation's own coordinates, which [PR #1201 (Download and validate CAMS irradiance at the demand series'
-locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201) provides for the 22 demand series of experiment 00003 and which may not cover every substation of 00006. The P12 check used a CAMS site 10.3 km away because that was the nearest data on disk. CAMS has no
-forecast, so it can feed the statistics only at lag times. A cheap diagnostic comes first: plot each
-substation's trailing slope against time, and proceed only if the slope trends at the substations with the
-most solar.
+features and cannot extrapolate beyond its training range, and embedded solar capacity grows
+steadily. The proposal is to give stage 2 the product of the slope and the forecast shortwave at
+each lead, which is the expected adjustment in points of capacity. A linear correction in stage 1b
+would extrapolate correctly where trees cannot. The experiment could compute each statistic twice,
+from ERA5 shortwave alone and from CAMS and ERA5 together, and use CAMS irradiance downloaded at
+each substation's own coordinates, which [PR #1201 (Download and validate CAMS irradiance at the
+demand series' locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201)
+provides for the 22 demand series of experiment 00003 and which may not cover every substation of
+00006. The P12 check used a CAMS site 10.3 km away because that was the nearest data on disk. CAMS
+has no forecast, so it can feed the statistics only at lag times. A cheap diagnostic comes first:
+plot each substation's trailing slope against time, and proceed only if the slope trends at the
+substations with the most solar.
 
 **The price proposal asks a different question from price forecasting.** Future electricity prices
 are hard to predict, so a price forecast is not the input. The proposal is to use the prices that
 have already been published, at lag times, as inputs that carry the response of price-dependent
-generation and storage to the recent past, for example a battery that charges when prices are low.
-A first step would be to find a source of historical half-hourly prices and to check that the response
+generation and storage to the recent past, for example a battery that charges when prices are low. A
+first step would be to find a source of historical half-hourly prices and to check that the response
 shows up in the stage 1a residuals of substations that host batteries or flexible generation.
