@@ -48,7 +48,9 @@ ARM_COLOURS: Final[dict[str, str]] = {
 CONTRAST_LABELS: Final[dict[str, str]] = {
     "D1": "ERA5-trained minus ENS-trained, weather only",
     "E1: ERA5-trained minus ENS-trained, V1": "ERA5-trained minus ENS-trained, with calendar",
-    "E2: ERA5-trained minus ENS-trained, V2": "ERA5-trained minus ENS-trained, with calendar and lags",
+    "E2: ERA5-trained minus ENS-trained, V2": (
+        "ERA5-trained minus ENS-trained, with calendar and lags"
+    ),
     "E6: short ERA5 history minus long, V1": "Short ERA5 history minus long, with calendar",
 }
 CONTRAST_COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.DATA_PURPLE, ocf.DATA_SKY, ocf.DATA_GREEN]
