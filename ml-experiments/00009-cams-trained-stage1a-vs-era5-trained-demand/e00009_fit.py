@@ -115,7 +115,10 @@ def load_series_data(*, series: pl.DataFrame) -> dict[str, SeriesData]:
             .mean()
             .over((pl.col("valid_time") - pl.duration(microseconds=1)).dt.truncate("1h"))
         )
-        base = joined.select(weather, "cams").with_columns(hourly, derived.select(common.DERIVED))
+        base = pl.concat(
+            [joined.select(*weather, "cams"), hourly, derived.select(common.DERIVED)],
+            how="horizontal",
+        )
         era5_matrix = base.select(columns).to_numpy().astype(np.float32)
         cams_matrix = (
             base.with_columns(shortwave=pl.col("cams"))
@@ -257,8 +260,9 @@ def run_statistics(
             forecast = models[arm, seed, site].predict(xgb.DMatrix(matrix)).reshape(-1, members)
             quantiles = np.quantile(forecast, common.LEVELS, axis=1).T.astype(np.float32)
             pieces.append(
-                keys.with_columns(
-                    pl.DataFrame(quantiles, schema=list(common.LEVEL_COLUMNS), orient="row"),
+                keys.hstack(
+                    pl.DataFrame(quantiles, schema=list(common.LEVEL_COLUMNS), orient="row")
+                ).with_columns(
                     actual,
                     arm=pl.lit(arm),
                     seed=pl.lit(seed).cast(pl.Int8),
