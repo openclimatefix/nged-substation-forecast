@@ -19,14 +19,14 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P6](#p6-primary-substation-demand-against-the-stored-baselines) | Where does Primary substation demand stand: how do `manual_heuristic`, `climatology`, the production recipe, an upgraded single-stage model (N1: a quantile model trained on ENS with the 00006 columns, recency weights, a 2023-09 start, and lags measured from the forecast origin), and stage 1 without lags score on one row set? | 1 | Nothing | Proposed; the three baselines are already stored |
-| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing for the second stage; the slope statistics wait for the second stage | Its cheap first test, experiment 00007, was inconclusive. The second stage is planned as experiment 00009, in [PR #1213 (Plan experiment 9: CAMS-trained stage 1a against ERA5-trained, for demand)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213), with no fits yet |
+| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | P6 | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
 | [P17](#p17-input-features-for-solar-and-wind) | Which input features and which training start are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
 | [P20](#p20-a-cams-trained-stage-1-with-a-stage-0-for-demand) | For Primary, BSP, and GSP demand series, does a stage 1 model trained on CAMS irradiance and fed ENS irradiance for all 51 members beat the ERA5-trained stage 1, and does a stage 0 model that maps ENS irradiance to CAMS irradiance help further? | 2 | Nothing; CAMS values must exist at the BSP and GSP series | Proposed; the follow-up to experiment 00009, which tested Primary substations only, without stage 0 |
+| [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the intra-day price at time t, with the weather at time t, help a stage 1 demand model explain power at time t on all 20 series, so that a later experiment can estimate the expected past power and measure how unusual the lagged power was? | 3 | Nothing; the Elexon price data is on disk | Proposed; follows experiment 00010, which was inconclusive |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Planned as experiment 00011, in [PR #1214 (Plan experiment 11: school-term and return-to-work columns for the stage 1a demand model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214), with no fits yet |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 and P17 | Proposed |
-| [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | 4 | A plan; the price source is chosen | The Elexon Market Index Data pull is under way, and a plan follows it |
 | [P12](#p12-calibration-of-the-pooled-mixture-for-solar-and-wind) | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage for wind and solar, wind first? | 4 | P17 | Proposed; the demand part is in P7 |
 
 ## Deferred until the first results are in
@@ -128,27 +128,6 @@ arm lowers the confirmation-year daylight quantile score at Primary substations 
 points of capacity, with a month-block bootstrap interval that excludes zero. Otherwise the
 hypothesis is refuted. The thresholds are proposals for the planning step to confirm.
 
-#### Second stage: CAMS irradiance in place of ERA5 for stage 1a training
-
-**A second stage of P2 could train stage 1a on CAMS irradiance, where the first test uses CAMS only
-to read the residuals.** The stage 1a XGBoost model would train with CAMS shortwave in place of
-ERA5's and be applied to ENS weather members, with the other weather columns staying ERA5. CAMS has
-no forecast, so it can be an input in training only. This departs from the requirement above that
-training use the source available at forecast time, and it creates a mismatch: the stage 1a XGBoost
-model trains on satellite-derived irradiance and is applied to forecast irradiance. The comparison
-shows what the departure costs or gains. The arms would be the ERA5-trained stage 1a XGBoost model
-and the same model with CAMS in place of ERA5 shortwave, on the 20 series of experiment 00005 (16
-Primary, 2 bulk-supply point, and 2 grid-supply point series), using experiment 00005's folds and
-quantile score.
-
-**Experiment 00009, the CAMS-trained stage 1a, tests the irradiance explanation directly, because
-00007 was inconclusive.** If training on CAMS removes the residual at the source, the slope
-statistics of this section are not needed. If the residual remains, or the cause is a change in
-solar capacity, the slope statistics become the next test. A candidate decision rule for 00009: the
-CAMS-trained arm lowers the quantile score at Primary substations by at least 0.2 points of
-capacity, with a month-block bootstrap interval that excludes zero. The threshold is a proposal for
-the experiment's plan to confirm.
-
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
@@ -164,56 +143,6 @@ model that maps the intra-day price at time t, with the weather at time t, to po
 observed prices to estimate the power that should have been metered in the past, and so measure how
 unusual the actual lagged power was. The follow-up keeps the shuffled-price control and adds the
 climatology row that 00010 lacked.
-
-**The price proposal asks a different question from price forecasting.** Future electricity prices
-are hard to predict, so a price forecast is not the input. The proposal is to use prices that have
-already been published, at lag times, as inputs that carry the response of price-dependent
-generation and storage to the recent past, for example a battery that charges when prices are low.
-The plan has to name the price. GB day-ahead auction prices for a day are published the day before,
-so for leads inside that window the known price, not a lagged one, is the relevant input. The system
-price, the intraday price, and a retail time-of-use tariff are other candidates.
-
-**The recommended price is Elexon's Market Index Data, with the N2EX day-ahead price as the
-fallback.** The intraday price that batteries trade against is mostly behind a paywall: the EPEX
-continuous intraday and 30-minute auction prices are sold through the [EEX
-webshop](https://webshop.eex-group.com/eex-public-market-data) from €665 a month, which is over the
-£30 spending limit and needs the maintainer's approval. The nearest free series is the [Market Index
-Data](https://www.elexon.co.uk/bsc/glossary/market-index-data/) that EPEX SPOT and Nord Pool supply
-to Elexon: a half-hourly volume and price for the short-term wholesale markets, served without a key
-by the [Elexon Insights API](https://www.elexon.co.uk/bsc/data/kinnect-insight-solution/) at
-`/balancing/pricing/market-index`. It is known soon after each half-hour, so lagging it matches what
-a forecast could use. The [N2EX day-ahead
-price](https://www.neso.energy/data-portal/day-ahead-power-exchange-prices-nordpool) is free from
-NESO, hourly, and known at about 10:00 the day before ([GB price
-page](../background/gb-price-data-and-ancillary-markets.md)).
-
-**Three facts about the recommended series are unchecked, and the experiment's plan has to settle
-them before any run.** Elexon's pages do not say which products the Market Index covers (day-ahead,
-within-day, or both) or when its history starts, so the experiment's plan should pull 2019 to 2026
-and confirm the coverage, the product mix, and the periods in which one provider reported zero
-volume. The system price is not a candidate input, because the [Elexon pricing
-page](https://www.elexon.co.uk/settlement/imbalance-pricing/) describes it as set by balancing
-actions and a battery earns little from imbalance ([how GB batteries schedule
-themselves](../background/gb-battery-scheduling.md)). The claim that batteries respond to the
-intraday price rests on [Modo Energy's
-description](https://modoenergy.com/research/en/gb-research-roundup-january-2025-battery-energy-storage-great-britain-revenues-markets-wholesale-capacity-market-balancing-mechanism)
-of its own dispatch model, which re-optimises every 2 hours, so it is a modelling assumption rather
-than a measurement. Retail time-of-use tariffs were not researched because grid-scale batteries do
-not trade against them.
-
-**The main risk is confounding, so a gain would not by itself show a battery response.** Price
-follows national demand and wind and correlates with the clock, so any gain may come from those
-proxies. The comparison arm is the chosen stage 1a feature set with clock and weather columns and no
-price. The substations with price-responsive generation and storage have to be listed in advance
-from data independent of the outcome, such as the lists behind [embedded battery
-forecast](../studies/embedded-battery-forecast.md) and [unmetered battery
-capacity](../studies/unmetered-battery-capacity.md). A candidate rule: the gain is concentrated at
-the listed substations and is less than half as large at the others, because an equal gain at both
-groups would refute the battery-response mechanism even if accuracy improves.
-
-**Resolution limit.** Only one or two of the 16 Primary substations are known to have batteries, so
-the contrast between listed and other substations cannot be tested. A cheaper first step is to
-correlate the stage 1a residual with the price at those few substations before building any model.
 
 ### P4: return-to-work and school-term columns for the holiday periods
 
@@ -411,9 +340,9 @@ under about 0.3 points of capacity, so the claim rests on those farms.
 this follow-up adds a stage 0 model and the other substation types.** The maintainer asked for it on
 2026-10-14. Stage 1 trains on CAMS irradiance and is fed ENS irradiance for each of the 51 members at
 inference. Stage 0 is a small model that maps ENS irradiance to CAMS irradiance, trained on the period
-when both exist, and its output feeds stage 1. The arms are ERA5-trained stage 1, CAMS-trained stage 1
-without stage 0, and CAMS-trained stage 1 with stage 0, on Primary, BSP, and GSP series, scored by
-type. Two contrasts, kept separate: CAMS-trained against ERA5-trained, then stage 0 against plain
+when both exist, and its output feeds stage 1. The arms are ERA5-trained stage 1, CAMS-trained
+stage 1 without stage 0, and CAMS-trained stage 1 with stage 0, on Primary, BSP, and GSP series,
+scored by type. Two contrasts, kept separate: CAMS-trained against ERA5-trained, then stage 0 against plain
 CAMS-trained. The plan has to check first that CAMS values exist at the BSP and GSP series
 ([PR #1201](https://github.com/openclimatefix/nged-substation-forecast/pull/1201) covers the 22
 series of 00003), and has to reuse the code of 00009.
