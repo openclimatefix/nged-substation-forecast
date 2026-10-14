@@ -3,8 +3,8 @@
 These tables support the [wind, radiation and lean-input study](fixed-pipeline-lean-features.md).
 This appendix gathers existing aggregate publication selections without recalculating statistics.
 The main page retains the deciding comparisons; the tables here retain their printed precision,
-fold and training-setting labels. Reconciliation of private run specifications with the planned
-public execution configurations remains pending.
+fold and training-setting labels. The [main report's public inventory](fixed-pipeline-lean-features.md#data-and-code-availability)
+links the published execution specifications and reproduction records.
 
 Losses are divided by each meter's frozen effective capacity before aggregation. Estimates give
 equal weight to meters and fitting seeds; `all`, `PV` and `Wind` denote all series, solar farms and

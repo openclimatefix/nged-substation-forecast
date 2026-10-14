@@ -1,7 +1,7 @@
 # Supplementary calibration diagnostic tables
 
-> **Draft evidence.** These ten tables are copied verbatim from the completed aggregate publication
-> extract. Scientific reviews are complete; final prose and publication checks remain pending.
+> **Supporting evidence.** These ten tables are copied verbatim from the completed aggregate
+> publication extract. Scientific and prose reviews are complete; reproduction records are published.
 > Human review has not been completed.
 
 Further Part 2 implementation and experiments are on hold while the maintainer revises the plan.
@@ -40,13 +40,13 @@ the table's scope and does not guarantee complete month support for every series
 
 **Lead and era summaries remain descriptive.** Lead bands are below 72 hours, 72 to below
 264 hours and 264 hours onward. November source eras use weather initialisation time around
-13 November 2024 at 00:00 UTC, the verified archive precipitation-availability boundary; differing
+13 November 2024 at 00:00 UTC, the verified archive categorical-precipitation-type availability boundary; differing
 seasons, target support and training exposure confound era comparisons. The archive grouping
 does not evaluate the operational upgrade cycle at 12 November 2024 at 06:00 UTC. That exact
 operational-cycle comparison has not been evaluated, and the separate comparison around
 12 May 2026 at 06:00 UTC remains pending. No table identifies a causal upgrade effect, supplies coherent
-joint scenarios or evaluates a calibrator. Exact public selection configurations and the final
-sanitised hash inventory remain pending publication; no configuration links are available yet.
+joint scenarios or evaluates a calibrator. The [main report's public inventory](calibration-diagnostics-1156.md#data-and-code-availability)
+links the published selection configurations and reproduction records.
 
 ## Fold A, main: delivered empirical-CDF bin shares (% of cases)
 
@@ -1009,3 +1009,64 @@ sanitised hash inventory remain pending publication; no configuration links are 
 | r2_e1_c1_a3w_d3 | Wind | before November 2024 boundary | width80 | 41.130 | 0.049 | 3 | 3 | 8 | 69464 |
 | r2_e1_c1_a3w_d3 | Wind | before November 2024 boundary | width90 | 49.603 | 0.047 | 3 | 3 | 8 | 69464 |
 | r2_e1_c1_a3w_d3 | Wind | before November 2024 boundary | spread | 15.752 | 0.011 | 3 | 3 | 8 | 69464 |
+
+## Reproducing the figures
+
+**The commands below rescore all four completed fold/settings from their six saved fits.** Run
+from the repository root with the recorded environment. Set `STUDY_DATA_ROOT` to the private
+`data/studies/per_study` directory and choose a new `STUDY_REPRO_ROOT`; each output directory must
+be absent. The recipe and seed loops name the exact completed fit-directory layout. These are
+portable reproduction commands, not a claim that new runs have been executed. They omit the
+untriggered best-point refit. The [supplementary tables](calibration-diagnostics-1156-tables.md)
+copy the completed selector output. Reproducing that selection also requires a separately labelled
+copy of the corresponding public table specification, with its input paths and required report
+hashes updated to match the reproduced reports. Preserve the archived specification unchanged.
+
+```bash
+set -euo pipefail
+STUDY_DATA_ROOT="/path/to/data/studies/per_study"
+STUDY_REPRO_ROOT="/path/to/new/calibration-reproduction"
+STUDY_PARENT_ROOT="$STUDY_DATA_ROOT/quick_wins_fixed_pipeline_1156"
+export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+export MLFLOW_DISABLE_AGENT_HINT=1
+
+for STUDY_RUN in fold_a_main fold_a_sensitivity fold_b_main fold_b_sensitivity; do
+  STUDY_FOLD="${STUDY_RUN%_*}"
+  STUDY_SETTING="${STUDY_RUN##*_}"
+  STUDY_FITS=()
+  for STUDY_RECIPE in production r2_e1_c1_a3w_d3; do
+    for STUDY_SEED in 0 1 2; do
+      STUDY_FITS+=("$STUDY_PARENT_ROOT/fits/combined/$STUDY_FOLD/$STUDY_RECIPE/$STUDY_SETTING/cuda_seed${STUDY_SEED}_none")
+    done
+  done
+  .venv/bin/python studies/forecast_calibration/calibration_diagnostics.py \
+    --frames "$STUDY_PARENT_ROOT/frames/combined/$STUDY_FOLD" \
+    --fit "${STUDY_FITS[@]}" \
+    --output "$STUDY_REPRO_ROOT/reports/$STUDY_RUN"
+done
+```
+
+**Figure text must be reviewed before rendering.** The coverage script verifies a completed
+report's output hashes and exports the text with `--text-only`. The first-reader and prose reviews
+must clear that exact text before a separate render command uses `--reviewed-text`. Use distinct,
+new output directories for text export and rendering, and inspect the rendered labels and layout.
+The following commands reproduce the Fold A main coverage figure from the rescored report above.
+
+```bash
+.venv/bin/python studies/forecast_calibration/calibration_coverage_charts.py \
+  --report "$STUDY_REPRO_ROOT/reports/fold_a_main" \
+  --output "$STUDY_REPRO_ROOT/coverage-fold-a-text" \
+  --text-only
+```
+
+After the exported `figure-text.md` has passed the required text reviews:
+
+```bash
+.venv/bin/python studies/forecast_calibration/calibration_coverage_charts.py \
+  --report "$STUDY_REPRO_ROOT/reports/fold_a_main" \
+  --output "$STUDY_REPRO_ROOT/coverage-fold-a-render" \
+  --reviewed-text "$STUDY_REPRO_ROOT/coverage-fold-a-text/figure-text.md"
+```
+
+**The reproduction records describe the completed diagnostics.** The scorer's immutable report,
+aggregate tables and manifest preserve their evidence. Further Part 2 implementation remains on hold.

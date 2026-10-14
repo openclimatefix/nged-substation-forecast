@@ -8,8 +8,8 @@ they deliver in two training/test splits and two sets of model hyperparameters.
 **The quantile recipe has lower distribution loss than the production refit in all four comparisons.**
 The marginal diagnostics leave calibration questions open: coverage changes accompany substantial
 width changes, and pooling's small nine-level loss effect differs between folds. This separate
-Part 2 draft of issue 1156 supports no calibration or production recommendation. Scientific
-and first-reader reviews are complete; final prose and publication-inventory checks remain pending.
+Part 2 diagnostic study of issue 1156 supports no calibration or production recommendation.
+Scientific, first-reader and prose reviews are complete; the public reproduction inventory is published.
 
 **Part 2 implementation is on hold while the maintainer revises its plan.** The write-up records
 only the completed diagnostics: two folds, two hyperparameter settings, and three fitting
@@ -22,7 +22,8 @@ experiments are deferred pending the revised plan.
 > **How this page was made.** The research question came from a human. OpenAI Codex wrote the new
 > study code, analysis and text, reusing recipes and fitting helpers from the Claude-authored
 > [quick-wins study](quick-wins.md). Two independent AI scientific reviews checked the results
-> and draft page; final prose and publication checks remain pending. Human review is pending.
+> and draft page. Prose reviews are complete and reproduction records are published.
+> Human review has not been completed.
 
 ## Key findings
 
@@ -571,8 +572,8 @@ establishing that pooling improves calibration.
 **The completed diagnostics justify neither a calibrator choice nor a coherence claim.** No
 calibrator was fitted, the conditional best-point refit was not triggered, and marginal scores
 cannot establish joint scenarios across sites or forecast times. The supplementary CDF, lead
-and era tables are descriptive. Final prose review and the public reproduction inventory remain
-pending. The completed diagnostics support no calibration or production recommendation.
+and era tables are descriptive. The completed diagnostics support no calibration or production
+recommendation.
 
 ## Proposed follow-up study
 
@@ -599,7 +600,7 @@ earlier data. Shared weather episodes, frozen capacities, missing targets and sp
 support limit interpretation beyond the observed period and population.
 
 Source-era summaries use recorded weather initialisation times before or from
-13 November 2024 at 00:00 UTC, the verified archive precipitation-availability boundary. This
+13 November 2024 at 00:00 UTC, the verified archive categorical-precipitation-type availability boundary. This
 grouping differs from the operational upgrade cycle at 12 November 2024 at 06:00 UTC and does
 not evaluate that cycle's effect. Different seasons and training exposure prevent a causal
 upgrade interpretation. The separate comparison around 12 May 2026 at 06:00 UTC remains pending;
@@ -653,9 +654,9 @@ vl-convert-python 1.9.0.post1. Diagnostics use bootstrap seed 20261012 and 2,000
 | Published equivalent integration patch | `fca0456fde5f6009290908c3c9b895bba285b4af7cdfa98972745a0adcc116b3` |
 
 **Public reproduction records cover the existing diagnostics.** The
-[executed-specification index](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/forecast_calibration/diagnostic_specs/index.json)
+[executed-specification index](https://github.com/openclimatefix/nged-substation-forecast/blob/b15a675c8f83b95851f3b02ec6c0e2408e382951/studies/forecast_calibration/diagnostic_specs/index.json)
 contains the four primary publication-table specifications and the supplementary table
-specification. The [derived-record index](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/forecast_calibration/diagnostic_runtime_records/index.json)
+specification. The [derived-record index](https://github.com/openclimatefix/nged-substation-forecast/blob/b15a675c8f83b95851f3b02ec6c0e2408e382951/studies/forecast_calibration/diagnostic_runtime_records/index.json)
 contains the four scoring configurations and separate text and render records for the coverage
 figure. Each index binds file and executed-provenance hashes. Derived records document completed
 configurations; the records are not original execution
@@ -665,62 +666,5 @@ correction or coherence implementation is included.
 
 ## Reproducing the figures
 
-**The commands below rescore all four completed fold/settings from their six saved fits.** Run
-from the repository root with the recorded environment. Set `STUDY_DATA_ROOT` to the private
-`data/studies/per_study` directory and choose a new `STUDY_REPRO_ROOT`; each output directory must
-be absent. The recipe and seed loops name the exact completed fit-directory layout. These are
-portable reproduction commands, not a claim that new runs have been executed. They omit the
-untriggered best-point refit. The [supplementary tables](calibration-diagnostics-1156-tables.md)
-copy the completed selector output. Reproducing that selection also requires a separately labelled
-copy of the corresponding public table specification, with its input paths and required report
-hashes updated to match the reproduced reports. Preserve the archived specification unchanged.
-
-```bash
-set -euo pipefail
-STUDY_DATA_ROOT="/path/to/data/studies/per_study"
-STUDY_REPRO_ROOT="/path/to/new/calibration-reproduction"
-STUDY_PARENT_ROOT="$STUDY_DATA_ROOT/quick_wins_fixed_pipeline_1156"
-export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
-export MLFLOW_DISABLE_AGENT_HINT=1
-
-for STUDY_RUN in fold_a_main fold_a_sensitivity fold_b_main fold_b_sensitivity; do
-  STUDY_FOLD="${STUDY_RUN%_*}"
-  STUDY_SETTING="${STUDY_RUN##*_}"
-  STUDY_FITS=()
-  for STUDY_RECIPE in production r2_e1_c1_a3w_d3; do
-    for STUDY_SEED in 0 1 2; do
-      STUDY_FITS+=("$STUDY_PARENT_ROOT/fits/combined/$STUDY_FOLD/$STUDY_RECIPE/$STUDY_SETTING/cuda_seed${STUDY_SEED}_none")
-    done
-  done
-  .venv/bin/python studies/forecast_calibration/calibration_diagnostics.py \
-    --frames "$STUDY_PARENT_ROOT/frames/combined/$STUDY_FOLD" \
-    --fit "${STUDY_FITS[@]}" \
-    --output "$STUDY_REPRO_ROOT/reports/$STUDY_RUN"
-done
-```
-
-**Figure text must be reviewed before rendering.** The coverage script verifies a completed
-report's output hashes and exports the text with `--text-only`. The first-reader and prose reviews
-must clear that exact text before a separate render command uses `--reviewed-text`. Use distinct,
-new output directories for text export and rendering, and inspect the rendered labels and layout.
-The following commands reproduce the Fold A main coverage figure from the rescored report above.
-
-```bash
-.venv/bin/python studies/forecast_calibration/calibration_coverage_charts.py \
-  --report "$STUDY_REPRO_ROOT/reports/fold_a_main" \
-  --output "$STUDY_REPRO_ROOT/coverage-fold-a-text" \
-  --text-only
-```
-
-After the exported `figure-text.md` has passed the required text reviews:
-
-```bash
-.venv/bin/python studies/forecast_calibration/calibration_coverage_charts.py \
-  --report "$STUDY_REPRO_ROOT/reports/fold_a_main" \
-  --output "$STUDY_REPRO_ROOT/coverage-fold-a-render" \
-  --reviewed-text "$STUDY_REPRO_ROOT/coverage-fold-a-text/figure-text.md"
-```
-
-**Scientific reviews are complete; final reading and publication checks remain pending.** The
-scorer's immutable report, aggregate tables and manifest preserve their evidence; the reproduction
-commands do not replace those checks.
+The [calibration appendix](calibration-diagnostics-1156-tables.md#reproducing-the-figures)
+contains the recorded commands for reproducing the coverage figure from completed diagnostics.

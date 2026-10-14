@@ -87,3 +87,240 @@ No data were read and no model was fitted. Empty added/removed cells mean none.
 | wind_minimal_uv_requested | Wind | 9 | categorical_precipitation_type_surface, dew_point_temperature_2m, downward_short_wave_radiation_flux_surface, geopotential_height_500hpa, local_day_of_week, local_day_of_week_cos, local_day_of_week_sin, local_time_of_day_cos, local_time_of_day_sin, local_time_of_year_cos, local_time_of_year_sin, local_utc_offset_minutes, power_lag_168h, power_lag_24h, power_lag_336h, power_lag_48h, pressure_reduced_to_mean_sea_level, pressure_surface, windchill | wind_u_100m, wind_u_10m, wind_v_100m, wind_v_10m | temperature_2m, wind_direction_100m, wind_direction_10m, wind_speed_100m, wind_speed_10m, wind_u_100m, wind_u_10m, wind_v_100m, wind_v_10m | 24 | 15 | False | 24 | temperature_2m, wind_direction_100m, wind_direction_10m, wind_speed_100m, wind_speed_10m, wind_u_100m, wind_u_10m, wind_v_100m, wind_v_10m, padding_Wind_00, padding_Wind_01, padding_Wind_02, padding_Wind_03, padding_Wind_04, padding_Wind_05, padding_Wind_06, padding_Wind_07, padding_Wind_08, padding_Wind_09, padding_Wind_10, padding_Wind_11, padding_Wind_12, padding_Wind_13, padding_Wind_14 | False | False |
 | wind_minimal_circular_requested | PV | 24 |  |  | categorical_precipitation_type_surface, dew_point_temperature_2m, downward_short_wave_radiation_flux_surface, geopotential_height_500hpa, local_day_of_week, local_day_of_week_cos, local_day_of_week_sin, local_time_of_day_cos, local_time_of_day_sin, local_time_of_year_cos, local_time_of_year_sin, local_utc_offset_minutes, power_lag_168h, power_lag_24h, power_lag_336h, power_lag_48h, pressure_reduced_to_mean_sea_level, pressure_surface, temperature_2m, wind_direction_100m, wind_direction_10m, wind_speed_100m, wind_speed_10m, windchill | 24 | 0 | False | 24 | categorical_precipitation_type_surface, dew_point_temperature_2m, downward_short_wave_radiation_flux_surface, geopotential_height_500hpa, local_day_of_week, local_day_of_week_cos, local_day_of_week_sin, local_time_of_day_cos, local_time_of_day_sin, local_time_of_year_cos, local_time_of_year_sin, local_utc_offset_minutes, power_lag_168h, power_lag_24h, power_lag_336h, power_lag_48h, pressure_reduced_to_mean_sea_level, pressure_surface, temperature_2m, wind_direction_100m, wind_direction_10m, wind_speed_100m, wind_speed_10m, windchill | False | True |
 | wind_minimal_circular_requested | Wind | 7 | categorical_precipitation_type_surface, dew_point_temperature_2m, downward_short_wave_radiation_flux_surface, geopotential_height_500hpa, local_day_of_week, local_day_of_week_cos, local_day_of_week_sin, local_time_of_day_cos, local_time_of_day_sin, local_time_of_year_cos, local_time_of_year_sin, local_utc_offset_minutes, power_lag_168h, power_lag_24h, power_lag_336h, power_lag_48h, pressure_reduced_to_mean_sea_level, pressure_surface, wind_direction_100m, wind_direction_10m, windchill | wind_direction_100m_cos, wind_direction_100m_sin, wind_direction_10m_cos, wind_direction_10m_sin | temperature_2m, wind_direction_100m_cos, wind_direction_100m_sin, wind_direction_10m_cos, wind_direction_10m_sin, wind_speed_100m, wind_speed_10m | 24 | 17 | False | 24 | temperature_2m, wind_direction_100m_cos, wind_direction_100m_sin, wind_direction_10m_cos, wind_direction_10m_sin, wind_speed_100m, wind_speed_10m, padding_Wind_00, padding_Wind_01, padding_Wind_02, padding_Wind_03, padding_Wind_04, padding_Wind_05, padding_Wind_06, padding_Wind_07, padding_Wind_08, padding_Wind_09, padding_Wind_10, padding_Wind_11, padding_Wind_12, padding_Wind_13, padding_Wind_14, padding_Wind_15, padding_Wind_16 | False | False |
+
+## Reproducing the figures
+
+**Reconstruct the four feature treatments before rebuilding frames.** Run from a repository
+clone containing the three pinned commits, using the recorded dependencies and authorised access
+to the frozen inputs. Follow the commands in
+`studies/quick_wins/fixed_pipeline_runtime/README.md`
+to create the wind, radiation and combined source trees and compare their source hashes with
+`all-source-hashes.json`. In the same shell, add the unchanged treatment:
+
+```bash
+git worktree add --detach "$STUDY_RUNTIME_ROOT/old" \
+  4e820d24c0129c8c95c567ff7355abff8d416144
+```
+
+The component migration must have passed its full readiness checks before either component
+treatment is built. Source reconstruction supplies no weather or power data. Use new output
+directories throughout; these commands describe reproduction and have not themselves been run
+as a new experiment. Set the following paths to your authorised input copies and an absent
+output root. The data roots must expose the registered power, capacity and eligibility snapshots;
+the frame builder checks power version 70 and records the eligibility snapshot it reads, which
+must match snapshot 1. It has no eligibility-version command-line override.
+
+```bash
+set -euo pipefail
+STUDY_REPRO_ROOT="/path/to/new/fixed-pipeline-reproduction"
+STUDY_POLAR_ARCHIVE="/path/to/frozen/polar-archive"
+STUDY_COMPONENT_ARCHIVE="/path/to/frozen/component-archive"
+export DATA_PATH_INTERNAL="/path/to/authorised/internal-data"
+export DATA_PATH_DELIVERY="/path/to/authorised/delivery-data"
+export REPO_DATA_DIR="$DATA_PATH_INTERNAL"
+export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+export MLFLOW_DISABLE_AGENT_HINT=1
+
+for STUDY_PIPELINE in old radiation wind combined; do
+  export PYTHONPATH="$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/contracts/src:$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/ml_core/src"
+  case "$STUDY_PIPELINE" in
+    old)
+      STUDY_ARCHIVE="$STUDY_POLAR_ARCHIVE"; STUDY_ARCHIVE_VERSION=1830
+      STUDY_REVISION="4e820d24c0129c8c95c567ff7355abff8d416144" ;;
+    radiation)
+      STUDY_ARCHIVE="$STUDY_POLAR_ARCHIVE"; STUDY_ARCHIVE_VERSION=1830
+      STUDY_REVISION="0f094c35" ;;
+    wind)
+      STUDY_ARCHIVE="$STUDY_COMPONENT_ARCHIVE"; STUDY_ARCHIVE_VERSION=924
+      STUDY_REVISION="PR1167:38025f4eab457b9605b8c124006609869dbfca0d+base:4e820d24+source1830+destination924" ;;
+    combined)
+      STUDY_ARCHIVE="$STUDY_COMPONENT_ARCHIVE"; STUDY_ARCHIVE_VERSION=924
+      STUDY_REVISION="PR1167:38025f4eab457b9605b8c124006609869dbfca0d+PR1166:0f094c356da82e75c4014664ad7fb33fe1df8b7f+base:4e820d24+source1830+destination924" ;;
+  esac
+  for STUDY_FOLD in fold_a fold_b; do
+    case "$STUDY_FOLD" in
+      fold_a) STUDY_WINDOW=mid_2025_to_mid_2026 ;;
+      fold_b) STUDY_WINDOW=backwards_2025_07_to_2026_06 ;;
+    esac
+    .venv/bin/python studies/quick_wins/fixed_pipeline_frames.py \
+      --output "$STUDY_REPRO_ROOT/frames/$STUDY_PIPELINE/$STUDY_FOLD" \
+      --fold "$STUDY_WINDOW" --pipeline-tag "$STUDY_PIPELINE" \
+      --pipeline-revision "$STUDY_REVISION" --archive "$STUDY_ARCHIVE" \
+      --archive-version "$STUDY_ARCHIVE_VERSION" --power-version 70 --capacity-version 1
+  done
+done
+```
+
+**Refit the report-listed recipes on their matching frames.** The `production` recipe calls the public
+production training and prediction path; `r2_e1_c1_a3w_d3` preserves the exact quick-wins winner's
+historical fitting path. Both use no padding. The Part 1b `production_cleaned`, `lean_pv` and
+`lean_wind` controls, the registered wind add-backs, guarded-windchill arms, negative controls and
+first solar rung use their separately recorded padding and setting. The unpadded controls are
+distinct main-setting checks. Select the completed fits from the exact executed report
+specifications in the public executed-specification index. Each report lists its runs, including fit
+path, frames, label and seed, together with fold, setting and padding. The canonical fit path
+`fits/<treatment>/<fold>/<recipe>/<setting>/<device>_seed<seed>_<padding>` identifies the treatment,
+recipe and device; check these against the fit manifest. The derived runtime index does not
+contain per-fit records. Do not infer a Cartesian product from the recipe registry. For each
+selected run, set these variables from its report specification and checked fit path, then run
+the following command, one CUDA fit at a time:
+
+```bash
+: "${STUDY_PIPELINE:?Select the treatment from the checked fit path}"
+: "${STUDY_FOLD:?Select the report fold}"
+: "${STUDY_RECIPE:?Select the recipe from the checked fit path}"
+: "${STUDY_SETTING:?Select the report setting}"
+: "${STUDY_SEED:?Select the report run seed}"
+: "${STUDY_DEVICE:?Select the device from the checked fit path}"
+: "${STUDY_PADDING:?Select the report padding}"
+export PYTHONPATH="$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/contracts/src:$STUDY_RUNTIME_ROOT/$STUDY_PIPELINE/packages/ml_core/src"
+.venv/bin/python studies/quick_wins/fixed_pipeline_fit.py \
+  --frames "$STUDY_REPRO_ROOT/frames/$STUDY_PIPELINE/$STUDY_FOLD" \
+  --output "$STUDY_REPRO_ROOT/fits/$STUDY_PIPELINE/$STUDY_FOLD" \
+  --recipe "$STUDY_RECIPE" --seed "$STUDY_SEED" --device "$STUDY_DEVICE" \
+  --setting "$STUDY_SETTING" --padding "$STUDY_PADDING"
+```
+
+The combined production and exact-winner refits use seeds 0, 1 and 2 at both main and sensitivity
+settings in both folds. Do not add the conditional G3 best-point refit: its preregistered gate
+failed in both folds, so it was not run. The solar ladder starts with `solar_add_wind10`; report
+that rung and apply the registered stopping rule before considering another. Listing later
+rungs in the registry does not establish their execution or authorise bypassing that rule.
+
+**Regenerate reports and publication artifacts from reviewed specifications.** The executed index
+provides the report, table, original importance, and original chart specifications. The requested
+gain producer and Figures 8 to 13 use derived configuration records; reconstruct their private
+bindings from the saved manifests and the corresponding script's specification schema. Retain
+original executed bytes and their hashes. If input or output paths need to change, make a
+separately labelled reproduction copy bound to the rebuilt artifacts; it is a
+derived configuration, not the original executed specification. Replace each consumed input path
+with its corresponding rebuilt artifact, update the required manifest and file hashes, and keep
+the reproduced configuration separate from the archived original. Derived records document
+parameters and hashes; reconstruct their private path bindings from the saved run manifests.
+The following variables select those reviewed reproduction copies:
+
+```bash
+: "${STUDY_REPORT_SPEC:?Select and rebind the reviewed report specification}"
+: "${STUDY_TABLE_SPEC:?Select and rebind the reviewed publication-table specification}"
+: "${STUDY_CHART_SPEC:?Select and rebind the reviewed figure specification}"
+: "${STUDY_ARTIFACT:?Choose the indexed artifact name for fresh outputs}"
+.venv/bin/python studies/quick_wins/fixed_pipeline_report.py \
+  --spec "$STUDY_REPORT_SPEC" --output "$STUDY_REPRO_ROOT/reports/$STUDY_ARTIFACT"
+.venv/bin/python studies/quick_wins/fixed_pipeline_tables.py \
+  --spec "$STUDY_TABLE_SPEC" --output "$STUDY_REPRO_ROOT/publication/$STUDY_ARTIFACT"
+.venv/bin/python studies/quick_wins/fixed_pipeline_charts.py \
+  --spec "$STUDY_CHART_SPEC" --output "$STUDY_REPRO_ROOT/figure-text/$STUDY_ARTIFACT" \
+  --text-only
+```
+
+Review the exported figure text before rendering the corresponding chart into another new
+directory:
+
+```bash
+.venv/bin/python studies/quick_wins/fixed_pipeline_charts.py \
+  --spec "$STUDY_CHART_SPEC" --output "$STUDY_REPRO_ROOT/figures/$STUDY_ARTIFACT" \
+  --reviewed-text "$STUDY_REPRO_ROOT/figure-text/$STUDY_ARTIFACT/figure-text.md"
+```
+
+The input-audit report has a direct CLI rather than an executed JSON spec. Repeat for each fold,
+with `STUDY_FOLD` set to `fold_a` or `fold_b`:
+
+```bash
+.venv/bin/python studies/quick_wins/fixed_pipeline_input_audit.py \
+  --old "$STUDY_REPRO_ROOT/frames/old/$STUDY_FOLD" \
+  --radiation "$STUDY_REPRO_ROOT/frames/radiation/$STUDY_FOLD" \
+  --wind "$STUDY_REPRO_ROOT/frames/wind/$STUDY_FOLD" \
+  --combined "$STUDY_REPRO_ROOT/frames/combined/$STUDY_FOLD" \
+  --output "$STUDY_REPRO_ROOT/input_audit/$STUDY_FOLD"
+```
+
+**Verify that each feature experiment preserves forecasts for unaffected series types.** After
+the required combined-pipeline fits complete, the verifier compares every saved sample key and
+forecast value exactly for those types. It checks the two lean arms against their full-input
+control, and the first solar addition against lean solar. The unpadded check covers only the
+two registered lean comparisons. It checks input inventories and hashes before and after the
+comparison and writes an aggregate proof without private row keys or predictions. Use new
+proof filenames:
+
+```bash
+for STUDY_FOLD in fold_a fold_b; do
+  for STUDY_SETTING in main sensitivity; do
+    .venv/bin/python studies/quick_wins/fixed_pipeline_unaffected.py \
+      --data-root "$STUDY_REPRO_ROOT" --fold "$STUDY_FOLD" \
+      --setting "$STUDY_SETTING" --padding equal \
+      --output "$STUDY_REPRO_ROOT/unaffected-$STUDY_FOLD-$STUDY_SETTING-equal.json"
+  done
+  .venv/bin/python studies/quick_wins/fixed_pipeline_unaffected.py \
+    --data-root "$STUDY_REPRO_ROOT" --fold "$STUDY_FOLD" \
+    --setting main --padding none \
+    --output "$STUDY_REPRO_ROOT/unaffected-$STUDY_FOLD-main-none.json"
+done
+```
+
+This proof concerns unaffected types within each padding policy. It does not test equality
+between the padded and unpadded forecasts for the affected type.
+
+The importance figure uses its own completed specification and report. After selecting and
+rebinding `STUDY_IMPORTANCE_SPEC` from the public index, regenerate its aggregate report and text:
+
+```bash
+: "${STUDY_IMPORTANCE_SPEC:?Select and rebind the reviewed importance specification}"
+.venv/bin/python studies/quick_wins/fixed_pipeline_importance.py \
+  --spec "$STUDY_IMPORTANCE_SPEC" --output "$STUDY_REPRO_ROOT/importance/report"
+.venv/bin/python studies/quick_wins/fixed_pipeline_importance_charts.py \
+  --report "$STUDY_REPRO_ROOT/importance/report" \
+  --output "$STUDY_REPRO_ROOT/importance/text" --number 6 --text-only
+```
+
+After reviewing that text, render with `fixed_pipeline_importance_charts.py` using the same
+`--report` and `--number 6`, a new `--output` directory and
+`--reviewed-text "$STUDY_REPRO_ROOT/importance/text/figure-text.md"`.
+
+**Figures 8 to 13 use the requested-feature scripts.** Prepare separately labelled specifications
+from their derived records and private manifests before selecting the archived source revision
+`af5201f2`. The gain specification binds all 60 saved equal-padding fits. The paired specification
+binds the four completed fold/setting reports. Each recipe's chart specification binds the gain
+report being reproduced. Set the following variables to those reviewed private copies:
+
+```bash
+: "${REQUESTED_GAIN_SPEC:?Bind the 60 saved fits and original frame manifests}"
+: "${REQUESTED_PAIRED_SPEC:?Bind the four matched equal-padding reports}"
+: "${REQUESTED_CHART_SPEC_DIR:?Select the five rebound chart specifications}"
+export POLARS_MAX_THREADS=8 OMP_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+export MKL_NUM_THREADS=8 NUMEXPR_NUM_THREADS=8 VECLIB_MAXIMUM_THREADS=8 BLIS_NUM_THREADS=8
+mkdir -p "$STUDY_REPRO_ROOT/requested/text" "$STUDY_REPRO_ROOT/requested/figures"
+.venv/bin/python studies/quick_wins/requested_feature_importance.py \
+  --spec "$REQUESTED_GAIN_SPEC" --output "$STUDY_REPRO_ROOT/requested/gain-report"
+```
+
+After the gain report completes, set each chart specification's `report.path` to the reproduced
+gain-report directory and `report.manifest_sha256` to its actual manifest hash. The chart script
+verifies the output hashes recorded in that manifest. Bind the paired specification to the four
+reproduced aggregate reports before exporting the texts:
+
+```bash
+.venv/bin/python studies/quick_wins/requested_features_charts.py \
+  --spec "$REQUESTED_PAIRED_SPEC" --output "$STUDY_REPRO_ROOT/requested/paired-text" --text-only
+for recipe in solar_minimal_requested solar_expanded_requested wind_minimal_requested \
+  wind_minimal_uv_requested wind_minimal_circular_requested; do
+  .venv/bin/python studies/quick_wins/requested_feature_importance_charts.py \
+    --spec "$REQUESTED_CHART_SPEC_DIR/$recipe.json" \
+    --output "$STUDY_REPRO_ROOT/requested/text/$recipe" --text-only
+done
+```
+
+Review the six exported texts before rendering. Each render requires its exact reviewed text and
+a new output directory:
+
+```bash
+.venv/bin/python studies/quick_wins/requested_features_charts.py \
+  --spec "$REQUESTED_PAIRED_SPEC" --output "$STUDY_REPRO_ROOT/requested/paired-figure" \
+  --reviewed-text "$STUDY_REPRO_ROOT/requested/paired-text/figure-text.md"
+for recipe in solar_minimal_requested solar_expanded_requested wind_minimal_requested \
+  wind_minimal_uv_requested wind_minimal_circular_requested; do
+  .venv/bin/python studies/quick_wins/requested_feature_importance_charts.py \
+    --spec "$REQUESTED_CHART_SPEC_DIR/$recipe.json" \
+    --output "$STUDY_REPRO_ROOT/requested/figures/$recipe" \
+    --reviewed-text "$STUDY_REPRO_ROOT/requested/text/$recipe/figure-text.md"
+done
+```
