@@ -8,6 +8,7 @@ output; this report prints none.
     uv run python studies/stage1_pilot/stage2_report.py
 """
 
+import itertools
 from pathlib import Path
 from typing import Final
 
@@ -144,7 +145,7 @@ def reliability(*, rows: pl.DataFrame) -> list[str]:
         for technology in TECHNOLOGIES:
             for band in BANDS:
                 body = []
-                for low, high in zip(RELIABILITY_BINS[:-1], RELIABILITY_BINS[1:], strict=True):
+                for low, high in itertools.pairwise(RELIABILITY_BINS):
                     cells = [f"[{low:.2f}, {min(high, 1.0):.2f})"]
                     for arm in RELIABILITY_ARMS:
                         part = scope(rows=rows, arm=arm, technology=technology, band=band).filter(
