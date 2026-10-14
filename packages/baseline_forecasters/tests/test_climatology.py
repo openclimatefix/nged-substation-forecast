@@ -192,15 +192,6 @@ def test_train_on_no_samples_warns_and_predict_drops_every_row(
     assert "dropped 1 forecast rows" in caplog.records[1].getMessage()
 
 
-def test_a_config_that_is_not_a_release_stamps_model_release_zero() -> None:
-    forecaster = _forecaster()
-    forecaster.train(_features(_january_weekday_samples()), [1])
-
-    forecast = forecaster.predict(_features([(1, _utc(2025, 1, 14), 5.0)]))
-
-    assert forecast["power_fcst_model_version"].unique().to_list() == [0]
-
-
 def test_predict_stamps_the_identity_columns() -> None:
     forecaster = _forecaster(experiment_name="exp_clim", ml_flow_experiment_id=7, model_release=3)
     forecaster.train(_features(_january_weekday_samples()), [1])

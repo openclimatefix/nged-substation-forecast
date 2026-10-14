@@ -26,14 +26,11 @@ keeps the previous model release, and only the software column of the log change
    `model_release` as output metadata, so check the number there.
 4. Tag the commit `model-N`, and add a row to the log below in the same pull request.
 
-A cross-validation run that is not a release leaves `model_release` at its default `0`, and promoting
-such a model is allowed during development. Promote only a numbered model for a deployment.
-Nothing checks that the number in the config matches the run's name, so the log is the record of
-the pairing.
+A cross-validation run that is not a release leaves `model_release` at its default `0`. Nothing
+checks that the number in the config matches the run's name, so the log is the record of the
+pairing.
 
 ## The log
-
-Rollback needs the MLflow run id and the image tag, so each row records both.
 
 | Release | Date | Git tag | MLflow run id (promoted fold run) | Image tag | Software release | Experiments incorporated |
 |---|---|---|---|---|---|---|

@@ -366,7 +366,6 @@ row carries
 [`power_fcst_model_name`](../api/contracts/index.md#contracts.power_schemas.PowerForecast.power_fcst_model_name)
 and
 [`power_fcst_model_version`](../api/contracts/index.md#contracts.power_schemas.PowerForecast.power_fcst_model_version)
-(the production model release number)
 — all four of which survive through to the table delivered to NGED — plus
 [`experiment_name`](../api/contracts/index.md#contracts.power_schemas.PowerForecast.experiment_name),
 [`fold_id`](../api/contracts/index.md#contracts.power_schemas.PowerForecast.fold_id) and

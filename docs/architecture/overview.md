@@ -96,5 +96,5 @@ implementation. Each subclass of `BaseForecaster` is responsible for defining:
 * _Identity_: `MODEL_NAME` is a class-level constant on each `BaseForecaster` subclass, separate
   from `BaseForecasterConfig`. `experiment_name`, `ml_flow_experiment_id`, and `model_release` (the
   number of the production model release, `0` when the run is not a release) travel in the config
-  instead. Both levels are stamped onto every `PowerForecast` row at predict time, so each row is
+  instead. All of them are stamped onto every `PowerForecast` row at predict time, so each row is
   self-describing. The [model release log](../live_service/model-releases.md) records each release.
