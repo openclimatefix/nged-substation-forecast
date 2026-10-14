@@ -73,7 +73,13 @@ def r1_quantiles() -> pl.DataFrame:
     pieces = []
     for row in series.iter_rows(named=True):
         series_id, capacity = row["time_series_id"], row["effective_capacity_mw"]
-        own = train.filter((pl.col("time_series_id") == series_id) & pl.col("power").is_finite())
+        own = common.with_derived(
+            frame=train.filter(
+                (pl.col("time_series_id") == series_id) & pl.col("power").is_finite()
+            ),
+            latitude=row["latitude"],
+            longitude=row["longitude"],
+        )
         features = own.select(columns).to_numpy().astype(np.float32)
         target = (own["power"] / capacity).to_numpy()
         models = {
@@ -81,7 +87,11 @@ def r1_quantiles() -> pl.DataFrame:
             for seed in common.SEEDS
         }
         for path in sorted(common.VALIDATION_DIR.glob("init=*.parquet")):
-            run = pl.read_parquet(path).filter(pl.col("time_series_id") == series_id)
+            run = common.with_derived(
+                frame=pl.read_parquet(path).filter(pl.col("time_series_id") == series_id),
+                latitude=row["latitude"],
+                longitude=row["longitude"],
+            )
             ordered = run.sort("valid_time", "ensemble_member")
             members = ordered["ensemble_member"].n_unique()
             matrix = ordered.select(columns).to_numpy().astype(np.float32)

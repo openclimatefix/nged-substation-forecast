@@ -9,13 +9,15 @@ an index. The newest observation a forecast initialised at `T` may use is the ha
 import json
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
+import holidays  # ty: ignore[unresolved-import]  # `uv run --with holidays`
 import numpy as np
 import polars as pl
 import xgboost as xgb
+from studies.solar import azimuth, zenith
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, study_dir_for
 
 EXPERIMENT_ID: Final[int] = 5
@@ -92,7 +94,29 @@ LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("11-15 d", 240.0, 10_000.0),
 )
 
-CALENDAR: Final[tuple[str, ...]] = ("hour_local", "day_of_week_local")
+DERIVED: Final[tuple[str, ...]] = (
+    "solar_zenith",
+    "solar_azimuth",
+    "hour_local",
+    "day_of_week_local",
+    "covid_indicator",
+    "days_to_nearest_holiday",
+    "days_to_christmas",
+)
+"""Stage 1a columns computed from the timestamp and the location, not read from a weather file."""
+NO_CALENDAR_DROPS: Final[tuple[str, ...]] = (
+    "hour_local",
+    "day_of_week_local",
+    "days_to_nearest_holiday",
+    "days_to_christmas",
+)
+"""The calendar-position columns the no-calendar control removes."""
+LOCKDOWN_START: Final[datetime] = datetime(2020, 3, 23, tzinfo=UTC)
+LOCKDOWN_END: Final[datetime] = datetime(2021, 7, 19, tzinfo=UTC)
+"""The 0/1 lockdown indicator is 1 from the first to the last of these days, inclusive."""
+HOLIDAY_YEARS: Final[range] = range(2018, 2029)
+HOLIDAY_CLIP_DAYS: Final[int] = 7
+CHRISTMAS_CLIP_DAYS: Final[int] = 14
 LAG_STEPS: Final[tuple[int, ...]] = (48, 96, 336, 672)
 LAG_NAMES: Final[tuple[str, ...]] = ("lag_24h", "lag_48h", "lag_168h", "lag_336h")
 RECENT_COLUMNS: Final[tuple[str, ...]] = (
@@ -202,7 +226,7 @@ def feature_columns(*, config: str) -> list[str]:
         raise FileNotFoundError(msg)
     columns: list[str] = json.loads(FEATURE_SET_PATH.read_text())["columns"]
     if CONFIGS[config].drop_calendar:
-        columns = [c for c in columns if c not in CALENDAR]
+        columns = [c for c in columns if c not in NO_CALENDAR_DROPS]
     return columns
 
 
@@ -212,7 +236,8 @@ def series_table() -> pl.DataFrame:
     The coordinates never leave this process.
 
     Returns:
-        One row per series with `time_series_id`, `site` (D1 to D22), `group`, `latitude`,
+        One row per series with `time_series_id`, `site` (D1 to D22), `group`,
+        `substation_type` (Primary, BSP, or GSP), `latitude`,
         `longitude`, `h3_res_5`, and `effective_capacity_mw`.
 
     Raises:
@@ -233,11 +258,11 @@ def series_table() -> pl.DataFrame:
         .with_columns(pl.col("substation_type").cast(pl.String))
     )
     if SMOKE:
-        return kept.head(2).sort(pl.col("site").str.slice(1).cast(pl.Int32)).drop("substation_type")
+        return kept.head(2).sort(pl.col("site").str.slice(1).cast(pl.Int32))
     if kept.height != 20 or not set(kept["substation_type"].to_list()) <= SUBSTATION_TYPES:
         msg = "expected the 20 Primary, BSP, and GSP series"
         raise ValueError(msg)
-    return kept.drop("substation_type").sort(pl.col("site").str.slice(1).cast(pl.Int32))
+    return kept.sort(pl.col("site").str.slice(1).cast(pl.Int32))
 
 
 def grid_times() -> pl.Series:
@@ -324,20 +349,95 @@ def recent_origin_inputs(
     return np.stack(columns, axis=1).astype(np.float32)
 
 
-def calendar_values(*, valid_time: pl.Series) -> np.ndarray:
-    """Return the local hour of day (fractional) and local day of week (Monday is 1).
-
-    Args:
-        valid_time: UTC timestamps.
+def holiday_gaps() -> pl.DataFrame:
+    """Return, for each calendar date, the signed days to the nearest holiday and to Christmas.
 
     Returns:
-        A float32 array of shape (rows, 2), columns in `CALENDAR` order.
+        A frame with `date`, `days_to_nearest_holiday` (positive before the holiday, negative after
+        it, clipped at 7 days either way, from the `holidays` package's England calendar), and
+        `days_to_christmas` (the same sign, to 25 December, clipped at 14 days either way).
     """
+    calendar = holidays.country_holidays("GB", subdiv="ENG", years=HOLIDAY_YEARS)
+    holiday_dates = np.array(sorted(calendar), dtype="datetime64[D]")
+    days = pl.date_range(
+        date(HOLIDAY_YEARS.start, 1, 1),
+        date(HOLIDAY_YEARS.stop - 1, 12, 31),
+        eager=True,
+    )
+    gaps = (holiday_dates[None, :] - days.to_numpy()[:, None]).astype("timedelta64[D]").astype(int)
+    nearest = gaps[np.arange(days.len()), np.abs(gaps).argmin(axis=1)]
+    christmas = np.array(
+        [np.datetime64(f"{year}-12-25") for year in HOLIDAY_YEARS], dtype="datetime64[D]"
+    )
+    to_christmas = (
+        (christmas[None, :] - days.to_numpy()[:, None]).astype("timedelta64[D]").astype(int)
+    )
+    nearest_christmas = to_christmas[np.arange(days.len()), np.abs(to_christmas).argmin(axis=1)]
+    return pl.DataFrame(
+        {
+            "date": days,
+            "days_to_nearest_holiday": np.clip(nearest, -HOLIDAY_CLIP_DAYS, HOLIDAY_CLIP_DAYS),
+            "days_to_christmas": np.clip(
+                nearest_christmas, -CHRISTMAS_CLIP_DAYS, CHRISTMAS_CLIP_DAYS
+            ),
+        }
+    )
+
+
+def derived_columns(*, valid_time: pl.Series, latitude: float, longitude: float) -> pl.DataFrame:
+    """Return the timestamp-and-location columns of stage 1a for period-ending UTC stamps.
+
+    The sun position is at the midpoint of the half-hour ending at each stamp. The local hour,
+    weekday, and holiday distance use the stamp in Europe/London time.
+
+    Args:
+        valid_time: Period-ending UTC stamps.
+        latitude: Degrees north.
+        longitude: Degrees east.
+
+    Returns:
+        One row per stamp with the `DERIVED` columns, float32 (the holiday distance in whole days).
+    """
+    midpoint = valid_time.dt.offset_by("-15m")
     local = valid_time.dt.convert_time_zone("Europe/London")
-    hour = local.dt.hour().cast(pl.Float64) + local.dt.minute().cast(pl.Float64) / 60.0
-    return np.stack(
-        [hour.to_numpy(), local.dt.weekday().cast(pl.Float64).to_numpy()], axis=1
-    ).astype(np.float32)
+    frame = pl.DataFrame(
+        {
+            "solar_zenith": zenith(stamps=midpoint, latitude=latitude, longitude=longitude),
+            "solar_azimuth": azimuth(stamps=midpoint, latitude=latitude, longitude=longitude),
+            "hour_local": local.dt.hour().cast(pl.Float64)
+            + local.dt.minute().cast(pl.Float64) / 60.0,
+            "day_of_week_local": local.dt.weekday().cast(pl.Float64),
+            "covid_indicator": (
+                (valid_time >= LOCKDOWN_START) & (valid_time < LOCKDOWN_END + timedelta(days=1))
+            ).cast(pl.Float64),
+            "date": local.dt.date(),
+        }
+    )
+    return (
+        frame.join(holiday_gaps(), on="date", how="left", validate="m:1")
+        .select(DERIVED)
+        .cast(dict.fromkeys(DERIVED, pl.Float32))
+    )
+
+
+def with_derived(*, frame: pl.DataFrame, latitude: float, longitude: float) -> pl.DataFrame:
+    """Add the `DERIVED` columns to a frame with a `valid_time` column, replacing any it has.
+
+    Args:
+        frame: Rows with a UTC `valid_time`.
+        latitude: Degrees north.
+        longitude: Degrees east.
+
+    Returns:
+        The frame with the `DERIVED` columns, computed once per distinct valid time.
+    """
+    times = frame["valid_time"].unique().sort()
+    table = derived_columns(valid_time=times, latitude=latitude, longitude=longitude).with_columns(
+        valid_time=times
+    )
+    return frame.drop(DERIVED, strict=False).join(
+        table, on="valid_time", how="left", validate="m:1"
+    )
 
 
 def fit_booster(
@@ -401,7 +501,7 @@ def load_series_arrays(*, series: pl.DataFrame, config: str) -> dict[str, Series
         Each site label's `SeriesArrays`.
     """
     columns = feature_columns(config=config)
-    weather = [c for c in columns if c not in CALENDAR]
+    weather = [c for c in columns if c not in DERIVED]
     grid = pl.DataFrame({"valid_time": grid_times()})
     era5 = pl.read_parquet(ERA5_PATH)
     observed = pl.read_parquet(OBSERVED_PATH, columns=["time_series_id", "valid_time", "power"])
@@ -426,13 +526,18 @@ def load_series_arrays(*, series: pl.DataFrame, config: str) -> dict[str, Series
             )
             .sort("valid_time")
         )
-        matrix = joined.select(weather).to_numpy().astype(np.float32)
-        if any(c in CALENDAR for c in columns):
-            matrix = np.concatenate(
-                [matrix, calendar_values(valid_time=joined["valid_time"])], axis=1
-            )
-            ordered = [*weather, *CALENDAR]
-            matrix = matrix[:, [ordered.index(c) for c in columns]]
+        derived = with_derived(
+            frame=joined.select("valid_time"),
+            latitude=row["latitude"],
+            longitude=row["longitude"],
+        )
+        matrix = (
+            joined.select(weather)
+            .with_columns(derived.select(DERIVED))
+            .select(columns)
+            .to_numpy()
+            .astype(np.float32)
+        )
         out[row["site"]] = SeriesArrays(
             features=matrix,
             power=joined["power"].to_numpy().astype(np.float32),

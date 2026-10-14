@@ -35,10 +35,11 @@ pull_request: pending
 
 # Where should lagged power enter a two-stage demand forecast?
 
-**Status: planned.** This page was committed before any fit. The fits wait for the separate
-input-feature sweep (experiment 00006) to choose the input columns of stage 1a. The sweep must
-choose those columns on data before 2025-07-01, so that this experiment's validation year has not
-influenced the columns it uses.
+**Status: planned.** This page was committed before any fit. Stage 1a's input columns come from
+the separate input-feature sweep (experiment 00006), which chose them on its selection fold
+(2024-07 to 2025-06) before it scored any 2025-07 data, so this experiment's validation year has
+not influenced them. The sweep's pooled-model result may still refine the list, and this page
+records the list that was used.
 
 ## Plan
 
@@ -52,8 +53,11 @@ probabilistic forecast, and does using both placements together add anything?
 primary substations, 2 bulk supply points, and 2 grid supply points, labelled D1 to D22 as in 00003.
 The battery and the biofuel generator of 00003 (D7 and D20, both of substation type EHV Customer)
 are dropped, because the maintainer asked for substation series only. The inference is to these 20
-series, which the bootstrap treats as fixed. The write-up reports the number of series on which each
-contrast has the sign of its mean, and reports primary substations and grid-flow series separately.
+series, which the bootstrap treats as fixed. NGED cares most about Primary substations, so the
+**16 Primary substations are the headline of every score and contrast**. The 2 BSP and 2 GSP series
+are reported separately, as descriptive results from two series each, and no mean over all three
+types is a headline. The write-up reports the number of series on which each contrast has the sign
+of its mean.
 
 **Row set and folds.** The validation year is the 73 runs of `fold_a_every5d_v1`: European Centre
 for Medium-Range Weather Forecasts (ECMWF) ensemble (ENS) runs at 00:00 UTC every fifth day from
@@ -75,6 +79,18 @@ forecast at that time), each null where the lag is no longer than the lead. Stag
 calibrator also receive the lead. Neither receives a calendar column. This gives the two placements
 the same information, so a difference between them comes from where the information enters.
 
+**Stage 1a input columns (from experiment 00006).** The 13 columns are: the nine weather
+columns `shortwave`, `longwave`, `temperature_2m`, `dew_point_temperature_2m`,
+`pressure_surface`, `precipitation`, `wind_speed_10m`, `solar_zenith`, and `solar_azimuth` (the sun
+position at the midpoint of the half-hour); the local `hour_local` and `day_of_week_local`;
+`covid_indicator` (1 from 2020-03-23 to 2021-07-19, otherwise 0); and `days_to_nearest_holiday`
+(signed, clipped to plus and minus 7 days, using the `holidays` package's England calendar).
+ERA5 supplies the weather columns at the series' nearest cell in training, and the ENS member
+supplies them in forecasting. Experiment 00006 also found that weighting recent years more
+improves its selection-fold error. This experiment keeps equal weights, and treats a
+recency-weighted run as an exploratory extra, to be added only if the primary results leave a
+question it could answer.
+
 **Training windows.** Each ERA5-trained arm uses the training window starting at 2023-09
 (primary) or at 2019-09 (exploratory). The 2023-09 start was chosen after seeing 00003, which found
 that error falls as the start moves later, and the write-up says so wherever it is used. R0 is also
@@ -95,8 +111,8 @@ Residuals at valid times from 2025-07-01 come from the final stage 1a.
   Windows 2019-09, 2023-09, and 2024-04.
 - **R0c:** stage 1a, then the lag-free stage 2 calibrator.
 - **R1 (reference):** one XGBoost model on ENS weather, trained on the control member of every
-  daily run from 2024-04-01 to 2025-06-30, with the 00003 V2 columns (weather, calendar, and the
-  four power lags nulled by lead). Training uses every lead of every run. Quantiles are the 9
+  daily run from 2024-04-01 to 2025-06-30, with stage 1a's 13 columns and the four power lags
+  nulled by lead. Training uses every lead of every run. Quantiles are the 9
   empirical quantiles of the 51 member forecasts. R1 repeats valid times across leads and has
   calendar columns, so it can memorise the calendar position (00001), and it is a reference only.
 - **R2 (reference):** climatology by local month, half-hour of the day, and weekday or weekend, with
@@ -113,8 +129,9 @@ Residuals at valid times from 2025-07-01 come from the final stage 1a.
   calibrator that sees no lags.
 - **L3:** lag-free stage 1a, then the stage 2 calibrator with the recent-origin inputs.
 - **L2+L3:** L2's member forecasts, then the stage 2 calibrator with the recent-origin inputs.
-- **No-calendar control:** R0 and L2 are repeated with stage 1a's calendar columns removed (window
-  from 2023-09), to show how much of any gain is the calendar position.
+- **No-calendar control:** R0 and L2 are repeated without `hour_local`, `day_of_week_local`, and
+  `days_to_nearest_holiday` (window from 2023-09), to show how much of any gain is the calendar
+  position. The sun position and the lockdown indicator stay.
 
 **Stage 2 calibrator.** One multi-quantile XGBoost model per series (`reg:quantileerror` at the 9
 levels; depth 4, eta 0.05, 300 rounds, no early stopping, power over effective capacity). Its inputs
@@ -126,7 +143,9 @@ from 2024-04, stage 1a and stage 1b are fitted on ERA5 targets that end 15 days 
 starts. No calendar column enters the calibrator. Output quantiles are sorted to remove crossings.
 
 **Planned contrasts** (quantile score over all leads and by lead band, points of capacity; training
-window from 2023-09; each read at 99% because five are planned):
+window from 2023-09; each read at 99% because five are planned). The five are defined on the 16
+Primary substations. The same five are also computed for the BSP series and for the GSP series and
+reported separately, with no decision attached and the multiplicity unchanged:
 
 - **C1 (primary):** L2c minus L3. This is placement: both are calibrated and both receive the same
   inputs. The decision rule applies to cases of leads up to 48 hours.

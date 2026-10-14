@@ -104,7 +104,7 @@ def archive_run(*, run: datetime, series: pl.DataFrame) -> pl.DataFrame:
     coordinates = series.lazy().select("time_series_id", "latitude", "longitude")
     half_hourly = _upsample_nwp_to_half_hourly(native, solar_coordinates=coordinates).collect()
     init = run + timedelta(hours=PUBLICATION_DELAY_HOURS)
-    rows = (
+    return (
         half_hourly.with_columns(
             wind_speed_10m=(pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2).sqrt(),
             wind_speed_100m=(pl.col("wind_u_100m") ** 2 + pl.col("wind_v_100m") ** 2).sqrt(),
@@ -118,10 +118,6 @@ def archive_run(*, run: datetime, series: pl.DataFrame) -> pl.DataFrame:
             )
         )
         .rename({source: name for name, source in ENS_COLUMNS.items()})
-    )
-    calendar = common.calendar_values(valid_time=rows["valid_time"])
-    return rows.with_columns(
-        hour_local=pl.Series(calendar[:, 0]), day_of_week_local=pl.Series(calendar[:, 1])
     )
 
 
@@ -180,6 +176,7 @@ def run_statistics(
     predictions: dict[str, dict[int, np.ndarray]],
     models: Models,
     chained: bool,
+    coordinates: tuple[float, float],
 ) -> pl.DataFrame:
     """Return the stage 1 statistics of one series in one run, for every configuration and seed.
 
@@ -190,6 +187,7 @@ def run_statistics(
         powers: For each configuration, this series' observed power on the grid.
         predictions: For each configuration and seed, this series' ERA5 predictions on the grid.
         models: The booster cache.
+        coordinates: The series' latitude and longitude, which never leave this process.
         chained: Whether to use each valid time's forward-chain model (calibration) instead of
             the final model (validation).
 
@@ -197,7 +195,9 @@ def run_statistics(
         One row per case, configuration, seed, and kind with `mean`, `std`, and the 9 quantiles.
     """
     members = sorted(frame["ensemble_member"].unique().to_list())
-    ordered = frame.sort("valid_time", "ensemble_member")
+    ordered = common.with_derived(
+        frame=frame, latitude=coordinates[0], longitude=coordinates[1]
+    ).sort("valid_time", "ensemble_member")
     steps = ordered["valid_time"].unique(maintain_order=True)
     count = steps.len()
     target = np.asarray(common.grid_index(times=steps))
@@ -267,6 +267,9 @@ def main() -> None:
         for config in common.CONFIGS
     }
     ids = dict(zip(series["site"], series["time_series_id"], strict=True))
+    coords = {
+        row["site"]: (row["latitude"], row["longitude"]) for row in series.iter_rows(named=True)
+    }
     era5 = {
         config: {
             seed: common.read_era5_pred(config=config, seed=seed, sites=list(ids))
@@ -310,6 +313,7 @@ def main() -> None:
                 },
                 models=models,
                 chained=split == "calibration",
+                coordinates=coords[site],
             )
             for site, series_id in ids.items()
         ]

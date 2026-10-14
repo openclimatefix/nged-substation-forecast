@@ -14,6 +14,7 @@ contrasts.parquet}`.
     uv run python ml-experiments/00005-lag-placement-stage1b-vs-stage2-demand/e00005_score.py
 """
 
+import itertools
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -56,7 +57,9 @@ SCOPES: Final[tuple[str, ...]] = (
     "7-10 d",
     "11-15 d",
 )
-GROUPS: Final[tuple[str, ...]] = ("all series", "primary", "grid flow")
+GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
+HEADLINE_GROUP: Final[str] = "Primary"
+"""The 16 Primary substations are the headline; BSP and GSP have 2 series each."""
 RAW_ARMS: Final[dict[str, tuple[str, str]]] = {
     **{f"r0_{config}": (config, "a") for config in common.CONFIGS},
     **{f"l2_{config}": (config, "ab") for config, s in common.CONFIGS.items() if s.stage1b},
@@ -183,10 +186,7 @@ def prepare(*, arms: dict[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
     keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
     shared = common_cases(arms=arms)
     groups = common.series_table().select(
-        "time_series_id",
-        group=pl.when(pl.col("group") == "primary demand")
-        .then(pl.lit("primary"))
-        .otherwise(pl.lit("grid flow")),
+        "time_series_id", group=pl.col("substation_type").cast(pl.String)
     )
     out = {}
     for name, frame in arms.items():
@@ -234,9 +234,14 @@ def save_predictions(*, arms: dict[str, pl.DataFrame]) -> None:
             continue
 
 
+def present_groups(*, arms: dict[str, pl.DataFrame]) -> tuple[str, ...]:
+    """Return the substation types that have cases (all three in the full run)."""
+    first = next(iter(arms.values()))
+    return tuple(g for g in GROUPS if g in set(first["group"].unique().to_list()))
+
+
 def _scope(*, frame: pl.DataFrame, scope: str, group: str) -> pl.DataFrame:
-    if group != "all series":
-        frame = frame.filter(pl.col("group") == group)
+    frame = frame.filter(pl.col("group") == group)
     if scope == "all leads":
         return frame
     if scope == "up to 48 h":
@@ -282,7 +287,7 @@ def contrast(
         metric="quantile_score",
         level=level,
         n_resamples=N_RESAMPLES
-        if level == PLANNED_LEVEL and scope in DECISION_SCOPES and group == "all series"
+        if level == PLANNED_LEVEL and scope in DECISION_SCOPES and group == HEADLINE_GROUP
         else DEFAULT_RESAMPLES,
     )
     paired = (
@@ -325,13 +330,16 @@ def absolute_table(*, arms: dict[str, pl.DataFrame]) -> pl.DataFrame:
     """
     rows = []
     for name, frame in arms.items():
-        for scope in SCOPES:
-            part = experiment_store.losses_for_bootstrap(
-                arm_losses={name: _scope(frame=frame, scope=scope, group="all series")}
-            )
-            for metric in ("quantile_score", "median_error"):
-                interval = bootstrap.bootstrap_absolute(losses=part, arm=name, metric=metric)
-                rows.append({"arm": name, "scope": scope, "metric": metric, **interval})
+        for group in present_groups(arms=arms):
+            for scope in SCOPES:
+                part = experiment_store.losses_for_bootstrap(
+                    arm_losses={name: _scope(frame=frame, scope=scope, group=group)}
+                )
+                for metric in ("quantile_score", "median_error"):
+                    interval = bootstrap.bootstrap_absolute(losses=part, arm=name, metric=metric)
+                    rows.append(
+                        {"arm": name, "group": group, "scope": scope, "metric": metric, **interval}
+                    )
     return pl.DataFrame(rows)
 
 
@@ -348,7 +356,7 @@ def verdict(*, planned: pl.DataFrame) -> str:
         pl.col("treatment").eq("l2c_from2023")
         & pl.col("reference").eq("l3_from2023")
         & (pl.col("scope") == "up to 48 h")
-        & (pl.col("group") == "all series")
+        & (pl.col("group") == HEADLINE_GROUP)
     ).row(0, named=True)
     material_for = row["difference"] <= -0.15 and row["upper"] < 0 and row["months_negative"] >= 9
     material_against = row["difference"] >= 0.15 and row["lower"] > 0
@@ -378,7 +386,7 @@ def main() -> None:
             }
             for label, (t, r) in PLANNED.items()
             for s in SCOPES
-            for g in GROUPS
+            for g in present_groups(arms=arms)
         ]
     )
     exploratory = pl.DataFrame(
@@ -386,7 +394,7 @@ def main() -> None:
             {
                 "label": label,
                 **contrast(
-                    arms=arms, treatment=t, reference=r, scope=s, group="all series", level=95.0
+                    arms=arms, treatment=t, reference=r, scope=s, group=HEADLINE_GROUP, level=95.0
                 ),
             }
             for label, (t, r) in EXPLORATORY.items()
@@ -404,24 +412,28 @@ def main() -> None:
         "",
     ]
     lines += ["## Absolute scores (points of capacity; 95% month-and-seed intervals)", ""]
-    lines += ["| arm | scope | quantile score | median error |", "| --- | --- | --- | --- |"]
-    for name in arms:
-        for scope in SCOPES:
-            q = absolute.filter(
-                (pl.col("arm") == name)
-                & (pl.col("scope") == scope)
-                & (pl.col("metric") == "quantile_score")
-            ).row(0, named=True)
-            m = absolute.filter(
-                (pl.col("arm") == name)
-                & (pl.col("scope") == scope)
-                & (pl.col("metric") == "median_error")
-            ).row(0, named=True)
-            lines.append(
-                f"| {name} | {scope} | {q['value']:.2f} "
-                f"({q['lower_95']:.2f} to {q['upper_95']:.2f})"
-                f" | {m['value']:.2f} ({m['lower_95']:.2f} to {m['upper_95']:.2f}) |"
-            )
+    lines += [
+        "| arm | group | scope | quantile score | median error |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for name, group, scope in itertools.product(arms, present_groups(arms=arms), SCOPES):
+        q = absolute.filter(
+            (pl.col("arm") == name)
+            & (pl.col("group") == group)
+            & (pl.col("scope") == scope)
+            & (pl.col("metric") == "quantile_score")
+        ).row(0, named=True)
+        m = absolute.filter(
+            (pl.col("arm") == name)
+            & (pl.col("group") == group)
+            & (pl.col("scope") == scope)
+            & (pl.col("metric") == "median_error")
+        ).row(0, named=True)
+        lines.append(
+            f"| {name} | {group} | {scope} | {q['value']:.2f} "
+            f"({q['lower_95']:.2f} to {q['upper_95']:.2f})"
+            f" | {m['value']:.2f} ({m['lower_95']:.2f} to {m['upper_95']:.2f}) |"
+        )
     lines += ["", "## Planned contrasts (99% intervals; negative favours the first arm)", ""]
     lines += [
         "| contrast | scope | group | difference | interval | months negative | series negative |",
@@ -434,7 +446,7 @@ def main() -> None:
             f"{row['months_negative']} of {row['months']} | "
             f"{row['series_negative']} of {row['series']} |"
         )
-    lines += ["", "## Exploratory contrasts (95% intervals)", ""]
+    lines += ["", "## Exploratory contrasts, Primary substations (95% intervals)", ""]
     lines += [
         "| contrast | scope | difference | interval | months negative |",
         "| --- | --- | --- | --- | --- |",
