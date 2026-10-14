@@ -1,7 +1,8 @@
 # Do wind and radiation fixes improve XGBoost forecasts, and which lean inputs help?
 
 > **Draft study.** Original pipeline, lean-feature and robustness comparisons are complete.
-> The requested minimal-feature extension and final scientific reviews remain pending.
+> The requested minimal-feature fits, prediction audits and reports are complete.
+> Figures and final scientific reviews remain pending.
 > Results evaluate frozen PR revisions. The final merged radiation revision has not been scored;
 > its performance remains an open part of the latest-PR question.
 
@@ -24,7 +25,9 @@ cannot be credited to the processing fixes. Lower loss also does not establish a
 coverage; the separate [Part 2 study](calibration-diagnostics-1156.md) examines that question.
 These are weekly-initialisation diagnostics for a fixed population, with a retrospective capacity
 denominator. The original lean-wind improvement persists across the completed settings and
-controls; the requested smaller feature sets and final reviews remain pending.
+controls. The requested two-input solar set improves on the full-input point control in both
+folds and settings. The requested five-input wind set improves on that control, but does not
+establish an improvement on the original 16-input lean-wind set. Final reviews remain pending.
 
 ![Input fixes and recipe comparison on the executed frozen revisions.](../assets/fixed-pipeline-lean-features/headline-fold-a.svg)
 
@@ -57,7 +60,7 @@ The figure evaluates the frozen implementations; it does not score the final mer
 - **The conditional best-point refit was not run.** Neither fold passes G3's preregistered
   0.15-capacity-point magnitude gate on main-setting production fair CRPS. Statistical
   significance alone does not pass that gate. The original lean-feature checks are complete;
-  the requested minimal-feature extension remains pending.
+  the requested minimal-feature fits and robustness reports are also complete.
 
 ## Introduction
 
@@ -226,13 +229,34 @@ targeted sets includes power lags, calendar fields, a site identifier, or windch
 [generated inventory](fixed-pipeline-feature-inventory.md#requested-post-hoc-feature-sets)
 prints their exact ordered real and trained columns.
 
-| Requested set | Target | Real inputs | Representation |
+| Result label / saved recipe | Target | Real input count | Exact real input columns, in fitted order |
 |---|---|---|---|
-| Minimal solar | Solar | 2 | Temperature and downward short-wave radiation |
-| Expanded solar | Solar | 11 | Seven weather fields, three sun-position components, and clear-sky irradiance |
-| Minimal wind | Wind | 5 | Temperature, speed and raw bearing at 10 m and 100 m |
-| Minimal wind plus u/v | Wind | 9 | The same five inputs plus four reconstructed components |
-| Circular minimal wind | Wind | 7 | Temperature and both speeds; sine/cosine pairs replace both raw bearings |
+| PV2 / `solar_minimal_requested` | Solar | 2 | `downward_short_wave_radiation_flux_surface`, `temperature_2m` |
+| PV11 / `solar_expanded_requested` | Solar | 11 | `categorical_precipitation_type_surface`, `clear_sky_irradiance`, `dew_point_temperature_2m`, `downward_long_wave_radiation_flux_surface`, `downward_short_wave_radiation_flux_surface`, `precipitation_surface`, `sun_east`, `sun_north`, `sun_up`, `temperature_2m`, `wind_speed_10m` |
+| Wind5 / `wind_minimal_requested` | Wind | 5 | `temperature_2m`, `wind_direction_100m`, `wind_direction_10m`, `wind_speed_100m`, `wind_speed_10m` |
+| Wind9 u/v / `wind_minimal_uv_requested` | Wind | 9 | `temperature_2m`, `wind_direction_100m`, `wind_direction_10m`, `wind_speed_100m`, `wind_speed_10m`, `wind_u_100m`, `wind_u_10m`, `wind_v_100m`, `wind_v_10m` |
+| Wind7 circular / `wind_minimal_circular_requested` | Wind | 7 | `temperature_2m`, `wind_direction_100m_cos`, `wind_direction_100m_sin`, `wind_direction_10m_cos`, `wind_direction_10m_sin`, `wind_speed_100m`, `wind_speed_10m` |
+
+**The result labels identify real information, while padding identifies the trained width.**
+PV2, PV11, Wind5, Wind9 u/v and Wind7 circular name exactly the columns in this table in every
+requested-feature result and importance plot. The primary comparisons and both hyperparameter
+settings append deterministic duplicates of each set's own columns to reach 24 trained columns;
+the duplicates add no new measurements. The main-setting unpadded checks use exactly 2, 11, 5,
+9 and 7 trained columns respectively. The generated inventory prints the padding names and
+complete trained order. These five targeted sets contain no unlisted lags, calendar fields,
+windchill or series identifiers.
+
+**Full 24 and original lean Wind16 identify separate reference input sets.** Full 24 is
+`production_cleaned`, the Part 1b point control defined above, rather than the production
+configuration or the pooled quick-wins winner. Original lean Wind16 is `lean_wind`: it retains
+`geopotential_height_500hpa`, `local_time_of_day_cos`, `local_time_of_day_sin`,
+`local_utc_offset_minutes`, `power_lag_168h`, `power_lag_24h`, `power_lag_336h`, `power_lag_48h`,
+`pressure_reduced_to_mean_sea_level`, `pressure_surface`, `temperature_2m`,
+`wind_direction_100m`, `wind_direction_10m`, `wind_speed_100m`, `wind_speed_10m` and `windchill`,
+in that order, followed by eight duplicate columns in equal-width comparisons. The
+[complete reference inventory](fixed-pipeline-feature-inventory.md) also prints Full 24's exact
+columns and the production and pooled-winner recipes. A guarded-reference label changes
+windchill's domain handling, rather than removing the column or adding it to a requested set.
 
 Expanded solar's seven weather fields are temperature, dewpoint, 10 m wind speed, downward
 long-wave and short-wave radiation, precipitation rate, and precipitation type. Sun position
@@ -952,8 +976,8 @@ guarded and negative controls reported above.
 
 **The original lean-wind benefit survives the completed robustness checks.** Both folds and
 training settings support lower loss, including direct guarded lean/full comparisons. The
-main unpadded checks retain the reported scores. Final scientific review and the requested
-smaller-feature experiments remain pending. These weekly-initialisation scores do not
+main unpadded checks retain the reported scores. The requested smaller-feature results follow
+below; final scientific review remains pending. These weekly-initialisation scores do not
 establish an official leaderboard result, adequate calibration or joint scenario coherence.
 
 ![Original lean-wind loss improvements across training settings, windchill guards and padding checks.](../assets/fixed-pipeline-lean-features/lean-wind-controls.svg)
@@ -1027,6 +1051,112 @@ saved corrected-pipeline predictions. It does not fit a calibrator or establish 
 coherence. This study changes no production code or forecast contract.
 
 <!-- PROVENANCE_AND_DECISIONS -->
+
+### Requested smaller solar sets improve loss; wind's advantage depends on the reference
+
+**The two-input solar and five-input wind sets improve on the full-input point control, but the
+comparison with original lean wind changes the wind conclusion.** These post hoc results cover both
+main and sensitivity settings in the forward Fold A and retrospective Fold B. All four equal-padding
+reports and both main-setting unpadded robustness reports are complete; final scientific review
+remains pending. The labels PV2, PV11, Wind5, Wind9 u/v and Wind7 circular refer to the [exact input
+sets](#requested-minimal-feature-extension), with their own inputs duplicated to width 24 for the
+primary comparisons. Full input means the 24-input Part 1b point control; original lean wind means
+the 16-input `lean_wind` recipe, not the production configuration or pooled quick-wins winner.
+
+**Fair CRPS is the deciding loss for the matched 51-point delivered ensembles;** mean absolute error
+and 19-level pinball loss are secondary diagnostics. Loss differences below are candidate minus
+reference in capacity percentage points. Bootstrap intervals describe the equal-series estimate; the
+separate equal-month estimate and t interval address a different estimand.
+
+**Temperature and short-wave radiation alone reduce solar fair CRPS in all four comparisons.**
+Against the full-input `production_cleaned` point control, the two-input solar set gives differences
+of −1.800 in Fold A main, −2.147 in Fold B main and −1.625 in Fold A sensitivity; Fold B sensitivity
+also improves. Both interval methods support lower loss at the unadjusted 5% level in each
+comparison. For example, Fold B main has a paired bootstrap interval of [−2.769, −1.538], while its
+equal-month estimate is −2.142 with a t interval of [−2.849, −1.435]. These are comparisons of
+bundled feature policies under the fixed fitting procedure; they do not identify the individual
+contribution of each omitted input.
+
+**The expanded solar bundle performs worse than the two-input set in both folds and settings.** Its
+fair-CRPS differences against the minimal set are +1.241 in Fold A main, +1.642 in Fold B main and
++1.316 in Fold B sensitivity; Fold A sensitivity also deteriorates. Both interval methods support
+deterioration at the unadjusted 5% level in all four comparisons. Against the full-input control,
+the expanded set improves loss in both Fold A settings and Fold B sensitivity, but Fold B main
+remains unresolved: the equal-series difference is −0.505 with bootstrap interval [−1.006, +0.016],
+and the equal-month difference is −0.476 with a t interval that also includes zero. The added
+weather and solar-geometry fields therefore do not establish an advantage over the minimal set in
+these examined comparisons.
+
+**Wind5 improves on the full-input control but does not establish an improvement on the original
+lean-wind model.** The five-input set retains temperature, both wind speeds and both raw directions.
+Against the full-input point control, fair-CRPS differences are −3.579 in Fold A main, −3.201 in
+Fold B main, −3.177 in Fold A sensitivity and −3.115 in Fold B sensitivity; both interval methods
+support lower loss. Against original lean wind, both Fold A settings remain unresolved, while both
+Fold B settings deteriorate. Fold B main gives +0.543, with bootstrap interval [+0.304, +0.805] and
+equal-month estimate +0.543 with t interval [+0.263, +0.823]; Fold B sensitivity gives +0.517, with
+both intervals above zero. The all-lead result also hides a lead reversal: in Fold A main, Wind5
+minus original lean wind is +2.033 on days 0 to 2 and −1.817 from day 11 onward, with both interval
+methods supporting those opposite directions. An all-lead gain against the full control is therefore
+insufficient grounds to replace original lean wind.
+
+**Wind representation changes show no fair-CRPS advantage here.** Adding u/v to Wind5 increases fair
+CRPS by +0.052 in Fold A main, +0.030 in Fold B main and +0.044 in Fold A sensitivity; both interval
+methods support deterioration at the unadjusted 5% level. Fold B sensitivity remains unresolved:
++0.018 with bootstrap interval [−0.002, +0.037], and equal-month estimate +0.018 with t interval
+[−0.003, +0.040]. Replacing raw directions with their sine/cosine pairs remains unresolved in both
+main folds but deteriorates in both sensitivity settings. Fold A sensitivity gives +0.037 with
+bootstrap interval [+0.013, +0.064]; Fold B sensitivity gives +0.031 with [+0.010, +0.055], and both
+equal-month t intervals are above zero. Both representations derive from the same corrected
+processed wind values and add no upstream weather information. These results do not isolate
+windchill or establish a general benefit from changing direction representation.
+
+**Main-setting padding checks retain the requested-feature conclusions.** In both folds, all five
+direct padded-minus-unpadded fair-CRPS differences and both interval methods' bounds are zero in
+the saved aggregate reports. The unpadded comparisons retain the main-setting conclusions.
+This aggregate agreement does not establish bit-identical affected forecasts. The
+[padding tables](fixed-pipeline-feature-results-tables.md#requested-minimal-feature-comparisons)
+identify each padded reference explicitly; sensitivity-setting fits retain equal padding.
+
+**Mean absolute error gives a less favourable view of Wind5 than fair CRPS against Wind16.**
+In Fold A main, the Wind5-minus-original-lean mean-absolute-error difference is +0.277 capacity
+points, with bootstrap interval [-0.045, +0.555], while fair CRPS is -0.249 [-0.554, +0.026].
+Both are unresolved, with opposite central signs. In Fold A sensitivity, mean absolute error
+increases by +0.391 [+0.114, +0.650], supported by both interval methods, while fair CRPS remains
+unresolved at -0.185 [-0.467, +0.089]. The five-input set therefore does not establish an
+across-metric advantage over the original 16-input set.
+
+**Secondary loss and coverage diagnostics qualify the deciding result.** Minimal solar and Wind5
+also reduce mean absolute error and pinball loss against the full-input control in the completed
+reports, but the representation comparisons are less uniform. For expanded versus minimal solar in
+Fold A main, the mean-absolute-error bootstrap interval excludes zero while the equal-month t
+interval includes it; for circular versus raw-direction Wind5 in Fold A sensitivity, the same
+interval disagreement occurs for mean absolute error. Lower fair CRPS does not establish calibrated
+uncertainty: in Fold B main, minimal solar's nominal 80% and 90% intervals cover 57.274% and 65.290%
+of cases, and Wind5's cover 24.507% and 32.750%. These descriptive coverage values are well below
+their nominal levels; they are not evidence of calibrated forecasts or a calibration improvement.
+
+**Lead-specific and precipitation support constrain interpretation of the expanded solar bundle.**
+In both completed Fold A settings, solar comparisons on days 0 to 2 and from day 11 onward have one
+series supported in only 11 of the 12 validation months; the saved three-seed provisional flag does
+not certify complete monthly support. Interval choice can also matter within a lead band: expanded
+solar versus full input on days 0 to 2 in Fold A main has a bootstrap interval below zero but an
+equal-month t interval that includes zero. Categorical precipitation type is absent in the early
+archive before 13 November 2024 at 00:00 UTC; precipitation amount/rate has separate lead-zero and
+corruption limitations and must not be described as wholly absent in that era. The availability and
+support limitations of these fields are distinct. Neither the bundle comparison nor an
+availability-era slice isolates precipitation information or an operational upgrade effect.
+
+**These results support a bounded frozen-source finding, not an adoption decision.** They use
+radiation revision `0f094c3`, not the final merged `01ddf53` implementation. A matched input and
+preparation audit is required before carrying a processing or feature conclusion to that merged
+source; the existing frozen fits do not need automatic rerunning. The many post hoc feature, metric
+and lead comparisons do not provide multiplicity-adjusted family-wide significance. The two
+main-setting robustness reports are complete. The [authoritative generated
+tables](fixed-pipeline-feature-results-tables.md#requested-minimal-feature-comparisons) include the
+completed robustness and lead-specific comparisons. Figure 8, the descriptive gain figures and final
+scientific and prose reviews remain pending. The gain producer has completed, but its figures are
+not yet rendered or reviewed; gain importance describes fitted-model use rather than establishes a
+held-out feature benefit. No deployment or feature adoption recommendation follows yet.
 
 ## Discussion: what to use
 
