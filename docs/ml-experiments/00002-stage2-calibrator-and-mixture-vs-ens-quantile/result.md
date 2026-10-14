@@ -24,6 +24,17 @@ best_arm: b_mixture_full
 headline: >-
   Q3, b_mixture_full minus a_ens_quantile, all leads: wind -0.62 (-0.99 to -0.26), solar -0.24
   (-0.36 to -0.06). Q1, stage 2 minus the mixture: solar +0.40, wind +0.26, not material.
+advice:
+  - >-
+    Pool the ERA5-trained quantiles over the ENS members before adding a stage 2 calibrator. For
+    solar and wind with no power lag and no calendar column, stage 2 itself did not beat the
+    pooled mixture.
+  - >-
+    Report the pooled mixture beside any stage 2 arm, because the mixture is the reference that
+    stage 2 has to beat.
+  - >-
+    Test lagged power in a stage 2 calibrator before concluding that stage 2 does not help.
+    Experiment 00005 found that it helps for demand series.
 code: studies/stage1_pilot/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1189
 ---

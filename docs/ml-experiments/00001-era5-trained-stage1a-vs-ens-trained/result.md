@@ -24,6 +24,15 @@ best_arm: s1_memberavg
 headline: >-
   P1 (revised), s1_memberavg minus ens_trained, all leads: wind -1.70 (-2.33 to -1.08), solar
   -0.57 (-0.83 to -0.32); material up to day 6, not beyond.
+advice:
+  - >-
+    Train the solar and wind stage 1a on ERA5 and apply it to the ENS members. The gain is material
+    up to day 6 and not beyond.
+  - >-
+    Give every arm the same feature columns, and add a control without calendar columns whenever
+    the training rows repeat a valid time.
+  - >-
+    Report the benchmark's absolute score and a climatology row beside every contrast.
 code: studies/stage1_pilot/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1184
 ---

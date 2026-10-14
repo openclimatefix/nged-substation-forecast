@@ -217,7 +217,7 @@ did not name is labelled post hoc. The next day's discussion decides which ideas
 worth keeping are re-implemented in production in reviewed pull requests.
 
 **Each ml-experiment tests one hypothesis and ends in a verdict.** The experiment's `result.md`
-holds the hypothesis, the verdict, the best arm, and the lessons learned, and it has the same fields
+holds the hypothesis, the verdict, the best arm, and the advice for future experiments, and it has the same fields
 that phase 2's hypothesis store records for an idea, so the research lead can read phase 1's
 experiments directly.
 
