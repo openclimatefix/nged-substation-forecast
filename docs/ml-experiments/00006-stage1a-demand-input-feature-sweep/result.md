@@ -31,8 +31,10 @@ best_arm: >-
 headline: >-
   P1, hour and weekday against the weather block alone, Primary substations: -0.55 (99.4%
   interval -0.71 to -0.41) on the selection year and -0.46 (-0.61 to -0.30) on the confirmation
-  year. It is the largest single input, at about a third of the predicted size. A 2023 start (-0.86
-  on the confirmation year only) and recency weights (-0.22 and -0.46) are as large or larger.
+  year. It is the largest single input, at about a third of the predicted size. Against the
+  Primary set, a 2023 start (-0.86, confirmation year only) is larger, and recency weights (-0.22
+  on the selection year, -0.46 on the confirmation year) are smaller on the selection year and
+  equal to the clock on the confirmation year.
 lessons: >-
   The weather block already carries the season, so time-of-year columns add nothing; windchill
   changes nothing; the choice of training window matters as much as any added column.
@@ -160,9 +162,9 @@ long history carries drift is plausible and was not tested.
 
 **P2, P4, and P5 predicted correctly that these columns do nothing.** P5 stays within 0.01 points
 of zero, and P2 and P4 move the error up by 0.04 points. A second selection year (2023-07 to
-2024-06, 13 Primary series) gives the same signs at 99.4%: P1 -0.50 (-0.66 to -0.34), P2 +0.07
-(-0.44 to +0.47), P3 -0.07 (-0.26 to +0.03), P4 -0.04 (-0.12 to +0.03), P5 -0.005 (-0.021 to
-+0.013), P6 -0.11 (-0.27 to +0.06), and P7 -0.42 (-0.61 to -0.24).
+2024-06, 13 Primary series) repeats P1 -0.50 (-0.66 to -0.34), P2 +0.07 (-0.44 to +0.47), P5 -0.005
+(-0.021 to +0.013), and P7 -0.42 (-0.61 to -0.24) at 99.4%. P4 changes sign (-0.04, -0.12 to
++0.03), and P3 (-0.07, -0.26 to +0.03) and P6 (-0.11, -0.27 to +0.06) are no longer material.
 
 **The BSP and GSP selection-year contrasts mostly share the Primary signs, with wider intervals
 from two series each.** P1 is -0.37 (-0.59 to -0.16) for BSP and -0.35 (-0.68 to +0.03) for GSP.
@@ -175,9 +177,9 @@ so the holiday flags and the COVID indicator do not carry across every type. P6 
 ![Change in error from adding one set of columns, Primary substations, selection year](figure_3.svg)
 
 **No single input beats the clock against the weather block alone.** The add-one-in contrasts
-against W on the selection year, for Primary substations, are -0.56 for the clock, -0.29 for
-recency weights, -0.22 for the COVID indicator, -0.19 for dropping the lockdown months, and -0.11
-or smaller for every other column.
+against W on the selection year, for Primary substations, are -0.56 for the clock, -0.29 for recency
+weights, -0.22 for the COVID indicator, -0.19 for dropping the lockdown months, and every other
+column lowers it by 0.11 or less (some raise it).
 
 **The training-history choices are as large as the best added column.** For Primary substations on
 the selection year, against W plus clock, weighting recent years more (half-life 2 years) lowers
@@ -224,11 +226,11 @@ the sun position and the temperature is large (see below).
 
 ![Error by month of the year, with and without time of year](figure_6.svg)
 
-**The error is highest in November, December, and January, with or without a time-of-year
-column.** Without one, the Primary error on the selection year is lowest in July to September
-(about 6.1 to 6.7) and highest in November (8.97), December (9.17), and January (8.29). The
-one-harmonic column lowers December by 1.3 points (9.17 to 7.89) and raises July by 0.5 and
-October by 0.5, without removing the seasonal shape.
+**Without a time-of-year column the error is highest in November, December, and January, and the
+one-harmonic column removes December from the worst months.** Without the column, the Primary error
+on the selection year is lowest in July to September (about 6.1 to 6.7) and highest in November
+(8.97), December (9.17), and January (8.29). The one-harmonic column lowers December by 1.3 points
+(9.17 to 7.89) and raises July by 0.5 and October by 0.5, without removing the seasonal shape.
 
 ## The Christmas column may also be a half-year flag
 
@@ -273,12 +275,15 @@ substations, by a small and unpaired margin.** A pooled model needs the series i
 input. Without it, the pooled Primary model scores 11.79 on the confirmation year against 7.57 for
 the per-series model, both with the Primary set, because the series have different levels of power
 over capacity. With a categorical identifier and the same columns plus recency weights, the pooled
-model scores 7.34 against 7.11 for the per-series model, and the 95% intervals overlap (7.08 to
-7.65 and 6.84 to 7.40). A categorical identifier scores 0.23 points lower than an integer code
-for Primary (7.34 against 7.57, with recency weights), and the two are identical for BSP and GSP,
-which have two series each. The selection-year comparison points the same way (7.11 pooled
-against 6.92 per series). No paired interval was computed, so the margin is not established, and
-the feature sets were chosen with per-series models only.
+model scores 7.34 against 7.11 for the per-series model, and the 95% intervals overlap (7.08 to 7.65
+and 6.84 to 7.40). A categorical identifier scores 0.23 points lower than an integer code for
+Primary (7.34 against 7.57, with recency weights), and the two are identical for BSP and GSP, which
+have two series each. The selection-year comparison points the same way (7.11 pooled against 6.92
+per series). For BSP and GSP, two series each, the pooled model with an identifier and recency
+weights scores slightly lower than the per-series model (BSP 8.93 against 9.06, GSP 23.91 against
+23.97 on the confirmation year), so the margin is specific to Primary. No paired interval was
+computed, so the margin is not established, and the feature sets were chosen with per-series models
+only.
 
 ## What the model uses
 
