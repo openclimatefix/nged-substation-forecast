@@ -18,8 +18,8 @@ keeps the previous model release, and only the software column of the log change
 
 The [`release-model`
 skill](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/release-model/SKILL.md)
-covers the work that leads to step 1: choosing the experiments, testing them together, and planning
-the port.
+covers the work before and including the port in step 1 below: choosing the experiments, testing
+them together, and planning the port.
 
 1. Port the supported ml-experiments' winners into the production pipeline, in pull requests that
    do not bump the release number.
