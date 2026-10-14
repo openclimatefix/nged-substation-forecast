@@ -158,6 +158,7 @@ nav:
       - "Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model?": ml-experiments/00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md
       - "Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error?": ml-experiments/00017-training-window-and-retraining-rule-drift-demand/result.md
       - "Does the same-time electricity price help a stage 1 demand model explain power?": ml-experiments/00015-same-time-price-stage1-demand/result.md
+      - "Does the staged chain beat the single-stage model for Primary substation demand?": ml-experiments/00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md

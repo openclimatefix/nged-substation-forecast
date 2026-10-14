@@ -19,21 +19,20 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | Nothing | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
-| [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 | Proposed |
+| [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | Nothing | Proposed; experiment 00018 found lag anomalies add little to raw lagged power for demand |
 
 ## Deferred until the first results are in
 
-**These proposals wait for the answer to P7, or for a decision on the shape of the production
+**These proposals wait for a decision on the shape of the production
 model.** Each keeps its section below, and a result may promote it.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 5 | Knowing what the production model will look like | Deferred; its size depends on the shape of the model |
-| [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | P7 | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, so revisit it only if N1 wins P7 |
+| [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | Nothing | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, and experiment 00018 found the staged chain level with N1 for demand |
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | Nothing | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
-| [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | P7 | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand depends less on weather than generation does |
+| [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | A decision on the shape of the production model | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand depends less on weather than generation does |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
 
 ## Proposals in detail
@@ -125,22 +124,6 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
 
-### P7: the staged chain against the upgraded single-stage model
-
-**P7 is the go or no-go for the staged design on demand.** It compares the chain (stage 1 plus the
-stage 2 calibrator) with N1 and with `manual_heuristic` (N1 did not beat it in [experiment
-13](00013-primary-demand-against-stored-baselines/result.md)), by lead band. Every lagged arm of
-experiment 00005 is a ceiling, because the lag anomaly (observed power at a lag time minus stage 1's
-expectation at that time) used ERA5 weather at past times. P7 builds the lag anomalies from the
-sources serving has: ERA5T and CAMS at their serving latency, and the analysis proxy (the early
-leads of the latest ENS run), and it allows for NGED's real telemetry delay at the forecast origin,
-which 00005 assumed away. The arms are lag anomalies from ERA5, from the serving sources, from the
-analysis proxy, and none (raw lagged power only). P7 also adds a spread-factor arm, because the 5%
-to 95% band of the Primary substations covers only 83% to 85%. The planned contrasts are the chain
-with serving-latency lag anomalies against the lag-free calibrated stage 1 (the 1.80-point contrast
-of 00005, measured again), and against N1. A chain that does not beat N1 on Primary substations
-leaves the staged design for demand, and stage 2 stays only for the multi-product work.
-
 ### P9: the demand weather ceiling
 
 **The experiment sizes how much skill demand gains from better weather.** The experiment gives N1
@@ -200,11 +183,12 @@ longer training history has hurt so far, so the backfill is valuable first as va
 
 **Generators depend on weather more than demand does, so lags may help less.** The experiment
 repeats the 00005 comparison for solar and wind farms: no lags, lagged power in the stage 2
-calibrator, and lag anomalies built from the sources serving has (P7). It also repeats experiment
-00008, which tested summaries of recent power (the minimum, mean, and maximum of the latest 24 hours
-and of the latest day on the same weekday) for demand: raw lags against summaries against both.
-Lagged power can also carry curtailment and capacity that the weather does not explain. The planned
-contrast is the lagged calibrator against the lag-free calibrated stage 1, per technology.
+calibrator, and lag anomalies built from the sources serving has (as experiment 00018 did for
+demand). It also repeats experiment 00008, which tested summaries of recent power (the minimum,
+mean, and maximum of the latest 24 hours and of the latest day on the same weekday) for demand: raw
+lags against summaries against both. Lagged power can also carry curtailment and capacity that the
+weather does not explain. The planned contrast is the lagged calibrator against the lag-free
+calibrated stage 1, per technology.
 
 **Resolution limit.** With 9 generator series, a lag effect smaller than about 0.3 points of
 capacity will not be resolved, so the result should be read per technology.
