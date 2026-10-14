@@ -10,16 +10,21 @@ description: >-
   timestamp conventions, grid cells, steps in served data); how to chart a study so the charts tell
   the story alone; how to write the page without overclaiming; and anonymisation. Load before
   planning, running, re-running, charting, writing up, or reviewing any study under `studies/`,
-  before changing `packages/studies/`, and before any experiment whose numbers will reach `docs/`.
+  before changing `packages/studies/`, and before any ml-experiment or study whose numbers will
+  reach `docs/`.
 ---
 
 # Running a study
 
-A study answers one question with an experiment, such as "which weather product best describes past
+A study answers one question by measurement, such as "which weather product best describes past
 sunshine?", and publishes the answer as a page under `docs/studies/`. The maintainer does not review
 study code line by line, so **the adversarial reviews in this skill are the main defence of every
 number a study publishes.** The priority, above speed and above tidiness, is a result that is
 scientifically valid and says no more than its evidence supports.
+
+**A study is a long report that answers several scientific questions, often on a new dataset.** An
+ml-experiment that tests one hypothesis about improving the production forecast, with a short
+write-up, uses the `ml-experiment` skill instead.
 
 **Work autonomously: the maintainer has asked for studies to run with as little waiting on a human
 as possible.** Plan, run, review, re-run, chart, and write up without stopping to ask, and post short
@@ -77,7 +82,7 @@ is on pytest's path. `packages/studies/tests/test_study_boundaries.py` enforces 
 
 **A study's leaderboard number comes only from `scripts/forecasting/score_study.py`.** Run the
 script on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number
-from the `forecast_metrics` row that the `metrics` asset writes under the experiment name
+from the `forecast_metrics` row that the `metrics` asset writes under the `experiment_name`
 `study/<study name>`. Never quote a leaderboard skill number computed by the study's own scoring
 code. The script logs every attempt, refused ones included. Do not retry a submission to find a
 lucky score, because each attempt raises the `study_submission_number` that the next scored fold run
@@ -86,13 +91,46 @@ the reference from the `vs_reference__` metrics on the study's MLflow fold run, 
 asset computes in the same run as the reference's own scores. Never edit the scorer files in a
 study: `packages/ml_core/src/ml_core/metrics.py`, `packages/ml_core/src/ml_core/cv_helpers.py`,
 `src/nged_substation_forecast/defs/cv_assets.py`, `scripts/forecasting/score_study.py`, and
-`conf/cv/`. The script refuses a file whose row keys differ from the reference experiment's for the
+`conf/cv/`. The script refuses a file whose row keys differ from the reference CV run's for the
 fold, so the file must hold exactly the reference's series, initialisation times, valid times, and
 ensemble members, with none missing and none extra. Read observed power through
 `studies.power.scan_power`, which serves every cleaned reading, including the whole validation
 year. The script checks which rows the file holds, not how the forecast was
 made. The study itself must therefore fit only on observations up to the fold's `train_end`, and use
 observations after `train_end` only as lags earlier than each forecast's initialisation time.
+
+**A study posts its arms to the leaderboard only when the output fits `score_study.py`.** Posting
+is optional, and a study that cannot post reports its own scores on the page and says why. The rules
+for a study that does post:
+
+- **Call the study's own baseline the control arm.** The scorer uses "reference" for the CV run
+  named by `reference_experiment_name` in the cross-validation (CV) config, which is a different
+  forecast. Post the control arm and each arm the page reports.
+- **Post each arm as its own submission,** because the script stores one `experiment_name` per call.
+  Name the submission `<page-slug>--<arm>`: the page's file name without `.md`, two hyphens, and the
+  arm name, lower-cased, with each character outside `[a-z0-9_-]` (a `.` or a space, for example)
+  changed to `_`, in at most 64 characters (the pattern `validate_study_name` checks). The
+  `experiment_name` is then `study/<page-slug>--<arm>`. The page lists each `experiment_name`, and
+  each `experiment_name` contains the page's file name. Post each arm's seed 0 fit, and say so on
+  the page, because the page's intervals average over several seeds and the leaderboard row holds
+  one.
+- **Write the seven required `PowerForecast` columns, and no column from outside `PowerForecast`:**
+  `valid_time`, `time_series_id`, `ensemble_member` (Int8), `power_fcst_init_time`, `power_fcst`
+  (Float32), `power_fcst_model_name`, and `power_fcst_model_version` (Int16). The script adds
+  `experiment_name` and `fold_id`, and `PowerForecast.validate` refuses any column that the schema
+  does not declare.
+- **Post nothing when the output cannot match the reference's row keys.** The file must hold one row
+  per series, initialisation time, lead, and ensemble member of the reference. A study that
+  forecasts one run in 7 days, or forecasts fewer series than the reference, therefore cannot post.
+  A quantile arm whose `ensemble_member` codes exceed the Int8 range cannot post either, and
+  collapsing the arm's output to the reference's 51 members would change the forecast being scored.
+- **Post nothing from a fit made on data past the fold's `train_end`.** Month-block folds can match
+  the row keys while training on data after `train_end`, so such a study refits on data up to
+  `train_end` first.
+- **Resubmit an arm with `--replace` only after a reviewer-requested re-run, or after a scoring
+  failure.** The script stores the rows before it scores them, so a failure in scoring leaves the
+  rows stored. Never resubmit to improve a score. Every further call of the script, including one
+  under a new name and one that the script refuses, raises `study_submission_number`.
 
 **A study script is not unit-tested as a whole, so its check is its own output.** Every table the
 page quotes is printed by a committed script into a `report.md`, never transcribed by hand, and
@@ -118,7 +156,10 @@ review goes on the page only after a committed script prints it into the report.
 5. **Draft the page and its charts, then run the second Opus scientific-validity review** with a
    fresh reviewer, judging the revised study and the draft page as an outside expert would before
    publication. Triage, fix, and re-run. Keep reviewing until a reviewer finds nothing that must be
-   fixed.
+   fixed. Then post the arms the page reports, if the output fits `score_study.py` (see "A study
+   posts its arms to the leaderboard only when the output fits"). Posting after the reviews means
+   that no reviewer-requested re-run forces a resubmission. It also means that the second Opus
+   reviewer has already checked that the fit stopped at the fold's `train_end`.
 6. **Finish the charts and the page** (sections below).
 7. **Diff review**, with steps 5 to 8 of the `implement-issue` skill, using that skill's models:
    Sonnet for the cut-down review, Opus for the correctness review. Step 8 below replaces that
@@ -207,26 +248,34 @@ effect must exist) shows the instrument can detect an effect at all. Before a nu
 "an effect as large as 0.08 points is not excluded".
 
 **When a study fits XGBoost models, plot each column's feature importance, but never read importance
-as evidence that an input helps.** Take the gains from the point model's booster, not the quantile
-model's, whose `get_score` pools every quantile level. Read
+as evidence that an input helps.** Take the gains from the point model's booster. The quantile
+model's `get_score` pools every quantile level, so its gains mix the levels. Read
 `Booster.get_score(importance_type="total_gain")`, map its positional keys (`f0`, `f1`, ...) back to
-the column names unless the `DMatrix` was given `feature_names`, and fill every column the booster
-never split on with 0. Scale the shares to sum to 1 within each XGBoost model, then average them
-over folds and seeds. Plot each column's mean share with its range across folds and seeds, and call
-that range the variability across refits, because the fold models share most of their training
-months. Sum the shares by feature group where the study adds columns in groups.
+the column names unless the `DMatrix` was given `feature_names`, and pass the result to
+`studies.era5_ladder.gain_shares`, which fills every column the booster never split on with 0 and
+scales the shares to sum to 1 within each XGBoost model. Average the shares over folds and seeds.
+Plot each column's mean share with its minimum-to-maximum range across folds and seeds, and call the
+range the variability across refits, because the fold models share most of their training months.
+Sum the shares by feature group where the study adds columns in groups. Draw the chart on the
+logarithmic axis that the "Charts" section describes for shares spanning orders of magnitude, and
+put it after the leaderboard figure. A study of a model family other than XGBoost reports
+permutation importance only.
 
-**Gain is measured on the training data and splits credit between correlated columns according to
-which the greedy split search picks first, so importance is descriptive.** A group's total is more
-stable than any one column's share. Where the study can afford a refit, add a separate
-importance-only fit with shuffled copies of real columns, which keep each column's distribution and
-so set the share that noise earns. Never score that fit in a planned contrast, because the extra
-columns change the trees and break the equal-column-count rule. A held-out permutation importance,
-which scores the test fold with one column permuted at a time through `fit_one_fold_scoring_many`,
-measures the increase in the study's own loss on unseen months, and stays descriptive for the same
-reason. The planned contrasts are the evidence on whether an input helps. Where importance disagrees
-with them, the page says so. `fit_one_fold` does not return its booster, so a study that reports
-importance refits the arms it plots and saves each booster's gains.
+**Gain is measured on the training data, so importance is descriptive.** The planned contrasts are
+the evidence on whether an input helps. Where importance disagrees with them, the page says so.
+
+**Gain splits credit between correlated columns according to which the greedy split search picks
+first.** A group's total is more stable than any one column's share. Prefer a held-out permutation
+importance where the study can afford it: it scores the test fold with one column permuted at a time
+through `fit_one_fold_scoring_many`, and measures the increase in the study's own loss on unseen
+months. Permutation importance is still descriptive, for the same reason as gain.
+
+Where the study can afford a refit, add a separate importance-only fit with shuffled copies of real
+columns. The copies keep each column's distribution, so the share they receive is the share a column
+of pure noise receives. Never score that fit in a planned contrast, because the extra columns change
+the trees and break the equal-column-count rule. `fit_one_fold` does not return its booster, so a
+study that reports importance refits the arms it plots and saves each booster's gains. An
+ml-experiment that reports feature importance follows the same recipe.
 
 **Clean the target, not the inputs, and never correct NGED's timestamps twice.**
 `PowerTimeSeries.correct_late_timestamps` already moves NGED's readings to the right half-hour at
@@ -554,7 +603,10 @@ Every study page follows the structure of an academic paper, in this order:
     says nothing about.
 12. **Data and code availability.** Which inputs are public and where they come from, which are
     private and why, the commit of the code, and the XGBoost version and settings. No generator's
-    name, identifier, or coordinates appears in this section.
+    name, identifier, or coordinates appears in this section. A page that posted arms lists each
+    `study/<page-slug>--<arm>` `experiment_name`. The page also states that the errors of the arms
+    the study chose after seeing the leaderboard fold are biased low, because the study chose those
+    arms on that fold.
 13. **Reproducing the figures.** The commands, in order.
 
 **Put a new study page where its question belongs.** A study of how well a weather product describes

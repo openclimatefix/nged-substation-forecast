@@ -1,4 +1,4 @@
-"""Export one cross-validation experiment's forecasts to three parquet files for offline analysis.
+"""Export one CV run's forecasts to three parquet files for offline analysis.
 
 Written for issue #179: hand the weather/calendar-only baseline forecasts (the switching-event
 "shared baseline") to a colleague for switching-event detection work. A switching event is a
@@ -68,7 +68,7 @@ def _freshest_forecasts(
     fold_id: str,
     storage_options: dict[str, str] | None,
 ) -> pl.LazyFrame:
-    """Scan ``power_forecasts`` for one experiment/fold, keeping only the freshest run per timestep.
+    """Scan ``power_forecasts`` for one CV run/fold, keeping only the freshest run per timestep.
 
     ``experiment_name`` / ``fold_id`` are ``String`` partition columns, so both filters push down
     into the Delta scan (partition pruning). For each ``(time_series_id, valid_time)`` the run
@@ -78,7 +78,7 @@ def _freshest_forecasts(
 
     Args:
         power_forecasts_path: URI of the ``power_forecasts`` Delta table.
-        experiment_name: Experiment whose forecasts to export.
+        experiment_name: CV run whose forecasts to export.
         fold_id: CV fold whose forecasts to export.
         storage_options: Object-store options for ``pl.scan_delta``.
 
@@ -151,10 +151,10 @@ def _with_observed(forecasts: pl.LazyFrame, observed: pl.LazyFrame) -> pl.LazyFr
 
 
 def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> dict[str, Path]:
-    """Write the three parquet files for one experiment/fold and return their paths.
+    """Write the three parquet files for one CV run/fold and return their paths.
 
     Args:
-        experiment_name: Experiment whose forecasts to export.
+        experiment_name: CV run whose forecasts to export.
         fold_id: CV fold whose forecasts to export.
         output_dir: Directory to write the parquet files into (created if absent).
 

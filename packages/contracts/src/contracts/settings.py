@@ -301,8 +301,8 @@ class Settings(BaseSettings):
         description=(
             "Delta table of the canonical per-fold eligible time_series_id population, written"
             " by the eligible_time_series asset (partitioned by fold_id) and read by"
-            " trained_cv_model, so every experiment trains a fold on the identical,"
-            " experiment-independent population. cv_power_forecasts inherits that same population"
+            " trained_cv_model, so every CV run trains a fold on the identical population."
+            " cv_power_forecasts inherits that same population"
             " from the trained model's trained_time_series_ids rather than reading this table."
         ),
     )

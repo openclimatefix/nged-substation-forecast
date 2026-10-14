@@ -174,7 +174,7 @@ the horizon catches only the case nothing else sees: NWP that is fresh but trunc
 
 **The read is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts`
 replaces one `(experiment_name, fold_id)` partition at a time.** Promoting a champion from a
-different experiment leaves the outgoing experiment's rows for the same slot on disk, and without
+different CV run leaves the outgoing CV run's rows for the same slot on disk, and without
 that filter the check would report faults sourced entirely from dead rows.
 
 The same check carries the **missed daily NWP run count**, because the second way a live slot goes
@@ -262,9 +262,9 @@ configured — so laptops and CI stay silent by default.
   Breadcrumbs — the integration's default `level=INFO` — stay on, so log context still rides along
   with the events the senders below do send. The hook is attached to the three *scheduled* asset
   jobs, so it covers the whole unattended production workload. Because log capture is off, the hook
-  does not report failures in a manual UI materialisation, a replay backfill, or an experiment job,
-  which the operator watches at the Dagster UI. The senders called from inside an asset, such as
-  `report_asset_retry`, still fire in those runs.
+  does not report failures in a manual UI materialisation, a replay backfill, or a
+  `register_experiment_job` run, which the operator watches at the Dagster UI. The senders called
+  from inside an asset, such as `report_asset_retry`, still fire in those runs.
 
     One production fault the hook cannot see is an asset check that caught its own exception instead
     of failing the run — which, by design, is every one of them: the two standalone `@asset_check`s,
@@ -732,10 +732,10 @@ depend on — an MLflow tracking server at all. The model simply freezes until a
 new model reaches production only as a new container image.
 
 Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
-experimentation: training runs log their models, configs, and metrics to it. The champion is
-*chosen* from an MLflow leaderboard (see [ML orchestration: model
+research and development: training runs log their models, configs, and metrics to it. The champion
+is *chosen* from an MLflow leaderboard (see [ML orchestration: model
 artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache) for the
-design, and [ML experimentation](../ml_experimentation/index.md) for the day-to-day workflow). The
+design, and [cross-validation](../cross-validation/index.md) for the day-to-day workflow). The
 boundary this rejection draws is between ML R&D and production: research uses MLflow constantly,
 while production's hot path never touches it. MLflow's job ends at the moment of promotion, when the
 chosen champion is copied out of the tracking store and baked into the image.
@@ -834,7 +834,7 @@ Postgres (£10–12, approximate — the one unverified price), Marimo as its ow
 #### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
 
 £7.50/month base + £0.030/credit (1 credit = 1 materialisation or op execution; May 2026 pricing).
-Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy 50-experiment month adds
+Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy month of 50 CV runs adds
 £7.50–26). Plus a stateless Hybrid agent (~£6.75 tiny Fargate service) and Marimo hosting
 (~£3.75–6), and the same per-run Fargate compute. Hybrid incurs no serverless charge; sensor
 evaluations are free (an hourly freshness *op* would cost +£22/month — on Dagster+ you use sensors,

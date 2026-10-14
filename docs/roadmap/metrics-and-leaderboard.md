@@ -7,7 +7,7 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the [evaluation-metrics
 > reference](../techniques/evaluation-metrics.md)) are ✅ implemented, as are the `manual_heuristic`
 > and `climatology` baseline forecasters. The interactive leaderboard visualisation is 🚧 planned.
-> The implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has
+> The implemented [cross-validation protocol](../cross-validation/cross-validation-folds.md) has
 > moved out of the roadmap. See the [roadmap index](index.md) for status conventions. The 🚧 items
 > are tracked under the v0.3 epic
 > [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6): baseline forecasters
@@ -30,13 +30,13 @@ A key deliverable is a **leaderboard** comparing many forecasting approaches. We
 leaderboard per `time_series_type`**, e.g. primary substations, GSPs, BSPs, solar PV sites, wind
 farms, BESS, etc.
 
-Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **ML experiment**: a
-particular model, trained with a particular set of features, processed a particular way. Entrants
+Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **CV run**: a particular
+forecasting model, trained with a particular set of features, processed a particular way. Entrants
 must be compared apples-to-apples — same test dataset, same metrics, same assumptions.
 
-Per-experiment configuration, trained weights, and metrics are stored in the project's **MLflow**
-database. The leaderboard will be displayed as an interactive table showing multiple metrics at a
-glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.html):
+The configuration, trained weights, and metrics of each CV run are stored in the project's
+**MLflow** database. The leaderboard will be displayed as an interactive table showing multiple
+metrics at a glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.html):
 
 ![WeirdML leaderboard](assets/WeirdML_leaderboard.png)
 
@@ -326,12 +326,12 @@ that only records `trained_time_series_ids` and a `meta.json`-only `save()` need
 engineering effort, and the uniform provenance is exactly what makes re-running routine. Re-running
 cross-validation (CV) for any algo is then a native Dagster operation: select
 **`trained_cv_model++`** in the asset graph (two `+` — `metrics` is two hops downstream, so a single
-`+` would silently stop at `cv_power_forecasts` and skip scoring), choose the experiment's
+`+` would silently stop at `cv_power_forecasts` and skip scoring), choose the CV run's
 partitions, and launch a backfill. The unpartitioned `metrics` asset materialises once afterwards
 with its default config (no filter, `leaderboard` scope). Verify this drill end-to-end on a
 smoke-test fold before documenting it — the Dagster version supports mixed partitioned/unpartitioned
 backfill selections, but confirm the UI behaviour rather than assuming it. To re-score a *single*
-experiment without touching the rest, use the `metrics` asset's `PopulationFilter` config instead.
+CV run without touching the rest, use the `metrics` asset's `PopulationFilter` config instead.
 
 **Data check before interpreting the manual heuristic's results.** For each eligible series, count
 the observations in the cleaned power table that lie at least 49 weeks before `val_start`.
@@ -342,7 +342,7 @@ annual analogue, and its ensemble then holds only the weekly members.
 v0.3 epic.** The metrics collapse can land before or after any baseline. Implements the
 [metric-matched collapse
 decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters emit
-**members only**; every collapse lives in the metrics layer, so there is no per-experiment
+**members only**; every collapse lives in the metrics layer, so there is no per-CV-run
 collapse config and no designated point-forecast columns on `PowerForecast`. In
 `packages/ml_core/src/ml_core/metrics.py`:
 
@@ -370,10 +370,10 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   single-member ensemble (all collapses coincide; CRPS still reduces to MAE); the pinball-p50
   identity. Recompute existing expected values — never relax a test to absorb the shift.
 - **After the metrics collapse lands, run one `trained_cv_model++` backfill over every existing
-  experiment partition** — retrain, re-predict, and re-score everything under the new collapse. The
+  CV run partition** — retrain, re-predict, and re-score everything under the new collapse. The
   backfill is deliberately the exact "re-run everything after a pipeline fix" drill, and it doubles
   as the empirical verification of the backfill mechanics before the recipe is written into
-  `docs/ml_experimentation/dagster-workflow.md`. Treat the change as a leaderboard epoch event,
+  `docs/cross-validation/dagster-workflow.md`. Treat the change as a leaderboard epoch event,
   because the new collapse shifts existing numbers.
 
 **PR B — `PersistenceForecaster` (seasonal-naive).** This PR is deferred to the v0.9 epic and
@@ -382,7 +382,7 @@ tracked in [#1087](https://github.com/openclimatefix/nged-substation-forecast/is
 helper, which the climatology PR extracted into `baseline_forecasters`. No `StatelessForecaster`
 base class until a third stateless model exists.
 
-- `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`. Config default
+- `MODEL_NAME = "persistence"`. Config default
   `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
 - `train()` records the sorted `trained_time_series_ids` (the requested ids present in the data,
   mirroring XGBoost's "no usable rows → not trained" semantics). `predict()` = `pl.coalesce` of the
@@ -424,9 +424,9 @@ forecast](../background/manual-heuristic-forecast.md); the implementation spec:
 [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088), so the two deferred
 items survive #147 closing. (2)
 
-**Re-run recipe:** add a short "Re-running CV for an experiment" subsection to
-`docs/ml_experimentation/dagster-workflow.md` describing the `trained_cv_model++` backfill, written
-only after the drill is verified end-to-end, and mentioning `PopulationFilter` for single-experiment
+**Re-run recipe:** add a short "Re-running a CV run" subsection to
+`docs/cross-validation/dagster-workflow.md` describing the `trained_cv_model++` backfill, written
+only after the drill is verified end-to-end, and mentioning `PopulationFilter` for single-CV-run
 scoring. (3) **MLflow re-logging** on a re-run is idempotent in effect (latest value wins; history
 accumulates harmlessly).
 
@@ -434,8 +434,8 @@ accumulates harmlessly).
 
 ## Cross-fold validation
 
-The cross-validation protocol is **implemented**, so it has moved to its permanent home: [ML
-Experimentation → Cross-validation folds](../ml_experimentation/cross-validation-folds.md). That
+The cross-validation protocol is **implemented**, so it has moved to its permanent home:
+[Cross-validation folds](../cross-validation/cross-validation-folds.md). That
 page covers the expanding-window protocol, the current single fold (and why the available weather
 data constrains us to it), the target multiple-yearly-fold protocol, and the fold-design
 alternatives we considered.
@@ -454,14 +454,14 @@ optimistic bias** — see
 for [Hyndman (2020)](https://doi.org/10.1016/j.ijforecast.2019.03.015)'s M3/M4 warning and
 [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493)'s one-year minimum, both of
 which our own fold already meets in length but not in independence. The winner's reported skill will
-grow more optimistically biased over time, because hundreds of experiments are planned. Each study
-that posts a score to the leaderboard as a `study/` experiment adds to the bias, because the study
-chose its arms on the leaderboard fold. In phase 2 of the search that [Experiments run by an LLM agent](auto-research.md)
-describes, a large language model (LLM) agent screens ideas on folds that end before the leaderboard
-fold's validation window, but each finalist the maintainer scores on the leaderboard fold still adds
-to the bias. Our own fold is small in effective sample size rather than in row count, because
-consecutive half-hours are strongly correlated. The epoch mechanism handles *data* changes but not
-*adaptive selection* on a fixed fold.
+grow more optimistically biased over time, because hundreds of CV runs are planned. Each study
+that posts a score to the leaderboard as a `study/` MLflow experiment adds to the bias, because the
+study chose its arms on the leaderboard fold. In phase 2 of the search that [Experiments run by an
+LLM agent](auto-research.md) describes, a large language model (LLM) agent screens ideas on folds
+that end before the leaderboard fold's validation window, but each finalist the maintainer scores on
+the leaderboard fold still adds to the bias. Our own fold is small in effective sample size rather
+than in row count, because consecutive half-hours are strongly correlated. The epoch mechanism
+handles *data* changes but not *adaptive selection* on a fixed fold.
 
 **Whether to reserve a genuinely untouched final-test year remains a design decision in #960.**
 Jack has questioned whether to reserve that year rather than train on more history and report
@@ -477,7 +477,7 @@ The interim guards below are planned work in #960.
 a margin. The published score is then reported rounded to that margin.** [Blum and Hardt
 (2015)](https://arxiv.org/abs/1502.04585) designed the Ladder for machine-learning competitions that
 publish a leaderboard and accept repeated submissions — the same shape of risk hundreds of
-experiments create when every one of them is adjudicated on one fold. Every query against a held-out
+CV runs create when every one of them is adjudicated on one fold. Every query against a held-out
 set leaks a little information about it back to the experimenter. The margin-plus-rounding rule caps
 how much a single query can leak.
 
@@ -490,7 +490,7 @@ the protein-structure databases behind them keep updating ([Robin et al.
 
 While evaluation data is reused for selection: leaderboard metrics are selection metrics;
 differences smaller than
-fold-level noise should not drive decisions; and the number of experiments per epoch is itself a
+fold-level noise should not drive decisions; and the number of CV runs per epoch is itself a
 relevant statistic (visible as the MLflow experiment count).
 
 **The `mid_2025_to_mid_2026` fold, at its full 12 validation months, is what decides promotion — not
@@ -499,7 +499,7 @@ months, so it has to be judged against a window of history that already exists r
 still arriving. It also cannot be judged on less than a year, because a shorter window cannot show
 whether a model handles both ends of the annual cycle — the one-year minimum Pinheiro et al. set out
 above, and the same minimum the [cross-validation
-protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
+protocol](../cross-validation/cross-validation-folds.md#why-expanding-window-cross-validation)
 already builds the single fold around. The caveats above apply today; the planned Ladder guard
 will constrain publication once implemented.
 
@@ -516,7 +516,7 @@ TS-Arena pattern instead.
 #### Implementation details — final-test window (deleted when it ships)
 
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
-`docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
+`docs/cross-validation/cross-validation-folds.md` restating the paragraphs above.
 
 **2. If adopted in #960, reserve a final-test window once a second, independent year of data exists
 — not by shrinking the fold that decides promotion.** (Jack's note: I'm not convinced we should do
@@ -528,7 +528,7 @@ additional history tracked in #959,
 which is also what turns the single fold into a genuine multi-fold epoch, so the `final_test` fold
 and the further leaderboard folds are founded in one new epoch in `conf/cv/default.yaml` rather than
 over two. The `final_test` fold needs a per-fold flag that keeps it out of every run mode, so no
-experiment trains or scores on it in the normal flow: extend `CvConfig` / the fold schema in
+CV run trains or scores on it in the normal flow: extend `CvConfig` / the fold schema in
 `packages/contracts/src/contracts/config_schemas.py`, and make sure `_fold_ids_for_run_mode` in
 `defs/jobs.py` includes the fold in no run mode at all. Scoring against it is then a deliberate,
 rare act — champion candidates immediately before promotion only — through the `metrics` asset's
@@ -554,7 +554,7 @@ denominator.
 **Verification.** If the full reservation is adopted: `register_experiment_job` must never create a
 partition for the `final_test` fold in any run mode (extend
 `tests/test_register_experiment_job.py`); and once the disjoint year lands, score one existing
-experiment against the reserved window end-to-end and confirm the rows reach
+CV run against the reserved window end-to-end and confirm the rows reach
 `forecast_metrics.delta` with the window label while nothing is logged to the leaderboard MLflow
 runs.
 
@@ -583,8 +583,8 @@ runs.
 > `metric_param` carries, e.g., the quantile for Pinball Loss (`p10`) or the band for PICP
 > (`p10_p90`). The `metrics` Dagster asset computes every ✅ metric above and writes per-series rows
 > to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with per-fold and
-> mean-across-folds aggregates logged to MLflow — see [Running an ML experiment
-> end-to-end](../ml_experimentation/dagster-workflow.md#step-9-materialise-metrics).
+> mean-across-folds aggregates logged to MLflow — see [Running the cross-validation pipeline
+> end-to-end](../cross-validation/dagster-workflow.md#step-9-materialise-metrics).
 
 **Every metric above is also broken out by named population-filter slices**, which appear as extra
 leaderboard columns. Most are legitimate ranking columns, because the filter is fixed by information
@@ -898,7 +898,7 @@ comparisons.
 **How each scenario is scored.** Train once, then predict once per scenario — the cost is N×
 *predict* plus N× metrics, not N× train. The scenario becomes a dimension on the metrics rows (and
 on the `power_forecasts` rows the metrics are computed from) rather than a new evaluation scope, so
-degradation behaviour is a first-class property of every experiment instead of a separate study
+degradation behaviour is a first-class property of every CV run instead of a separate study
 somebody has to remember to run.
 
 **The acceptance criterion is `manual_heuristic`, not a fixed error threshold.** The manual
@@ -917,7 +917,7 @@ training augmentation that makes the weather-blind claim true rather than hopefu
 
 ## Scoring against estimates of past weather — a diagnostic scope 🚧
 
-Once the [estimates of past weather are ingested](training-history.md), scoring an experiment on an
+Once the [estimates of past weather are ingested](training-history.md), scoring a CV run on an
 estimate of past weather rather than ENS separates the two components total error confounds: the
 weather-to-power response, which we can actually improve, and the implicit hedging against forecast
 error, which we cannot (NWP error is exogenous to us). Without the split, a change in the ENS-scored
@@ -927,7 +927,7 @@ Scoring against estimates of past weather lands as a **new `evaluation_scope`** 
 `leaderboard` / `production_monitoring` / `ad_hoc`, never as a fold. The **ENS-scored leaderboard
 stays the promotion criterion**, because total error at real lead times is what NGED receives — and
 keeping estimates of past weather out of the fold set is what preserves both [principle
-8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically) and the
+8](../design-philosophy/design-principles.md#8-every-cv-run-is-scored-identically) and the
 standing [rejection of reanalysis-backed validation
 folds](../architecture/ml-orchestration.md#yearly-folds-backed-by-era5-rejected-for-validation).
 
@@ -1039,7 +1039,7 @@ like — is the durable explainer [Probabilistic forecasting from NWP
 ensembles](../techniques/probabilistic-forecasting.md). This section is the *plan* that applies it.
 
 Fix in four phases, each an independent PR (Phase D is itself several PRs). Phases A and B are pure
-evaluation (no model changes) and should land before any further MAE-driven experimentation.
+evaluation (no model changes) and should land before any further MAE-driven changes.
 
 ### Phase A — horizon-sliced metrics ✅
 
@@ -1100,7 +1100,7 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
    the existing deterministic-ensemble representation.
 2. **Quantile XGBoost model family**
    ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) — `objective:
-   reg:quantileerror` with several `quantile_alpha`s, as a separate experiment/model family emitting
+   reg:quantileerror` with several `quantile_alpha`s, as a separate model family emitting
    Rep 3. Sort each member's quantiles at predict time (monotonic rearrangement fixes quantile
    crossing). The lead-time feature and training on multiple members
    ([xgboost-improvements](xgboost-improvements.md) — the lead-time feature and ensemble-member
@@ -1122,7 +1122,7 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
 
 ## Grouping the results
 
-Each ML experiment is tagged with metadata so we can group experiments and compute average
+Each CV run is tagged with metadata so we can group CV runs and compute average
 performance per group (e.g. "does lagged power *always* help, regardless of model sophistication?",
 or "how robust is each model to weather-forecast uncertainty — estimates of past weather vs.
 operational NWP?"). Example tags:

@@ -80,8 +80,8 @@ above yourself before committing, for faster feedback than waiting on the commit
 - **Run Marimo notebooks**: `uv run marimo edit packages/notebooks/some_notebook.py`
 - **View MLflow experiments**: `uv run mlflow ui --gunicorn-opts "--workers 1"`, then open
   `http://localhost:5000`. The `--gunicorn-opts` flag is required on Python 3.14 — MLflow's default
-  uvicorn+FastAPI server fails to start there; see [the ML experimentation
-  docs](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#viewing-results-in-the-mlflow-ui).
+  uvicorn+FastAPI server fails to start there; see [the cross-validation
+  docs](https://openclimatefix.github.io/nged-substation-forecast/cross-validation/dagster-workflow/#viewing-results-in-the-mlflow-ui).
 
 ### Documentation
 

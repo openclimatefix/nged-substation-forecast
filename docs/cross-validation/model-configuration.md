@@ -1,6 +1,6 @@
 # Model configuration
 
-How to set hyperparameters and choose features for a forecasting experiment.
+How to set hyperparameters and choose features for a forecasting CV run.
 
 ---
 
@@ -158,6 +158,7 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 | `weather_source` | `""` | Leaderboard tag, e.g. `"ecmwf_control"` or `"ecmwf_ens"`. |
 | `training_strategy` | `""` | Leaderboard tag, e.g. `"horizon_as_feature"`. |
 | `random_seed` | `0` | Passed to XGBoost's `seed` param; makes re-training a fold reproduce the same model. |
+| `model_release` | `0` | Number of the production model release, stamped on every forecast row as `power_fcst_model_version`. `0` means the run is not a release. Range 0 to 32767. |
 | `experiment_name` | `""` | Set from the job's own `experiment_name`; cannot be overridden. |
 | `ml_flow_experiment_id` | `None` | Stamped onto every `PowerForecast` row. Nothing sets it automatically. |
 
@@ -176,9 +177,9 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 
 ---
 
-## Tweaking a config for an experiment
+## Tweaking a config for a CV run
 
-You never edit a YAML file per experiment. Instead, pass `config_overrides` to
+You never edit a YAML file per CV run. Instead, pass `config_overrides` to
 `register_experiment_job`. Each override is applied to `model_params` before the config object is
 constructed.
 
@@ -187,12 +188,12 @@ constructed.
 with a `ValidationError` naming the key. This matters more than a typo usually would, because the
 searches planned to drive most registrations will run unattended. The
 [large language model (LLM) agent](../roadmap/auto-research.md) planned for automated
-experimentation will train and score screening runs with nobody in the loop. The
-[variant grid](../roadmap/training-history.md) planned for the training-history experiments will
+ml-experiments will train and score screening runs with nobody in the loop. The
+[variant grid](../roadmap/training-history.md) planned for the training-history CV runs will
 sweep several dimensions at once. A key that was quietly dropped would give you a grid of
 *identical* runs, each scoring plausibly, each landing on the leaderboard, and nothing to
 distinguish that grid from a genuine null result. That is
-[principle 8](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically).
+[principle 8](../design-philosophy/design-principles.md#8-every-cv-run-is-scored-identically).
 
 Two further keys are refused for their own reasons. `_target_` names the forecaster class, and the
 config class follows from it: to use a different one, point `base_model_config` at a different YAML.
@@ -221,4 +222,4 @@ replaces the whole mapping, dropping the base's other keys, so restate every key
 
 The resolved config (the YAML defaults with your overrides applied) is frozen as a JSON tag on the
 MLflow experiment at registration time. That frozen record is what `trained_cv_model` reads back at
-train time — so changing the YAML after registering an experiment has no effect on it.
+train time — so changing the YAML after registering a CV run has no effect on it.

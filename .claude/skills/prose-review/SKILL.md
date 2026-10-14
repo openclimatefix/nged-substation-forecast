@@ -646,7 +646,7 @@ links only, so a link from a docstring or a comment to the published site surviv
 with nothing to catch it. Run `uv run python scripts/lint/check_docs_links.py` after any heading
 change; it reports the file, the line and the closest real anchors on the target page. A heading
 whose text contains an em dash generates a single separator, not two: `## H2 — a hundred
-experiments` becomes `#h2-a-hundred-experiments`.
+CV runs` becomes `#h2-a-hundred-cv-runs`.
 
 **Neither command catches content dropped at render time either.** Python-Markdown treats any line
 starting with `#` as a heading even without the space CommonMark requires, and it silently discards

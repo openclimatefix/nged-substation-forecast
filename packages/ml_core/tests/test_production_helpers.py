@@ -189,6 +189,27 @@ def test_load_forecaster_from_dir_round_trips_xgboost(tmp_path: Path) -> None:
     assert loaded.model_params == config
 
 
+def test_load_forecaster_from_dir_reads_the_model_release_and_defaults_to_zero(
+    tmp_path: Path,
+) -> None:
+    XGBoostForecaster(XGBoostConfig(selected_features={"temperature_2m"}, model_release=5)).save(
+        tmp_path / "released"
+    )
+    XGBoostForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(
+        tmp_path / "saved_before_releases"
+    )
+    meta_path = tmp_path / "saved_before_releases" / "meta.json"
+    meta = json.loads(meta_path.read_text())
+    del meta["model_params"]["model_release"]
+    meta_path.write_text(json.dumps(meta))
+
+    released = load_forecaster_from_dir(tmp_path / "released")
+    old = load_forecaster_from_dir(tmp_path / "saved_before_releases")
+
+    assert released.model_params.model_release == 5
+    assert old.model_params.model_release == 0
+
+
 def test_load_forecaster_from_dir_raises_on_missing_dir(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Materialise"):
         load_forecaster_from_dir(tmp_path / "missing")

@@ -21,7 +21,7 @@ linked from the sections below go deeper.
   the frame against the class. **Delta Lake** is the on-disk table format the pipeline reads and
   writes.
 - **An MLflow run** is one recorded training job, holding parameters, metrics, tags, and stored
-  artifact files under a run id. MLflow is the experiment tracker, and **the leaderboard** is
+  artifact files under a run id. MLflow records CV runs, and **the leaderboard** is
   MLflow's ranked comparison of those runs' scores. **Promoting** a model means choosing one run's
   saved model to be the model the live service forecasts with, and `promotion.json` records that
   choice.
@@ -89,7 +89,7 @@ dual-strategy join in `_apply_weather_lag`.
 the `time_series_id` population it trained on, whatever the eligibility rules would admit today, and
 `BaseForecaster.trained_time_series_ids` is that frozen record. Power coverage changes over time, so
 a series can newly qualify or newly drop out between a training run and a scoring run. Letting the
-scored population drift with the coverage would silently compare two experiments over two different
+scored population drift with the coverage would silently compare two CV runs over two different
 populations. The same invariant stops the live service forecasting a series the promoted model never
 saw.
 
@@ -118,7 +118,7 @@ and [design principle
   supplies a different `FeatureEngineer` rather than editing the shared pipeline. The package
   docstring below lists the sub-modules and says what each sub-module owns.
 - `base_forecaster` — `BaseForecaster`, the abstract interface every model implements, and
-  `BaseForecasterConfig`, the serialisable config carrying a trained model's experiment identity.
+  `BaseForecasterConfig`, the serialisable config carrying a trained model's CV run identity.
   Also holds the MLflow round-trip that both research and production read a saved model through,
   which ships a model as one replaceable archive rather than as a directory of files. The constant
   `_MLFLOW_MODEL_ARTIFACT` documents why that distinction matters.
@@ -135,7 +135,7 @@ and [design principle
 - `cv_helpers` — pure, input-only helpers for the cross-validation assets: fold date arithmetic, the
   eligibility rule, partition-key parsing, and config flattening. Fold design itself is on
   [Cross-validation
-  folds](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/cross-validation-folds/).
+  folds](https://openclimatefix.github.io/nged-substation-forecast/cross-validation/cross-validation-folds/).
 - `mlflow_runs` — idempotent resolution of an MLflow experiment, its parent run, and its per-fold
   child runs, always by tag rather than through a live handle, so separate processes and Dagster
   retries converge on the same run.

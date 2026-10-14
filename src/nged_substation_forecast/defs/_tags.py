@@ -1,6 +1,6 @@
 """The ``layer`` asset tag, which records whether the live service needs an asset.
 
-Splitting the asset graph this way lets whoever operates the live service filter the experiment
+Splitting the asset graph this way lets whoever operates the live service filter the CV run
 assets out of the Dagster UI — see
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/#core-components>.
 """

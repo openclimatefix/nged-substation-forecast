@@ -15,8 +15,9 @@ Planning content lives in five places with deliberately non-overlapping jobs:
 | **[`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md)** | **Our own falsifiable claims** — what we assert the engineering will achieve, the threshold that decides it, and what would falsify it. Not design (that is `roadmap/` or `architecture/`) and not NGED-derived requirement (that is `background/`): a claim we are on the hook for, and a natural Network Innovation Allowance (NIA) deliverable. One page; append tests, never renumber them. |
 | **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list** — including quick tweaks and non-code tasks — plus all discussion. **Fine-grained prioritisation lives only in GitHub.** Epics map 1:1 to the [roadmap milestones](roadmap/index.md#milestones); dependencies are recorded as `blocked by` issue relationships. |
 | **[`docs/roadmap/`](roadmap/index.md)** | Design depth: What we plan to build and *why*. The milestone arc and inter-plan dependencies are recorded here; fine-grained task-level ordering is not. |
-| **`docs/`[techniques](techniques/index.md), [background](background/index.md), [architecture](architecture/overview.md), [ml_experimentation](ml_experimentation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`ml_experimentation/`, `live_service/`) alike. These pages are where content moves to from `docs/roadmap/` after implementation. |
+| **`docs/`[techniques](techniques/index.md), [background](background/index.md), [architecture](architecture/overview.md), [cross-validation](cross-validation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`cross-validation/`, `live_service/`) alike. These pages are where content moves to from `docs/roadmap/` after implementation. |
 | **`studies/`** (not published) | **Throwaway code that answered a question once.** Kept, and held to a lower standard than the rest of the repository: no maintenance, no backwards compatibility, never run in production. A study whose findings are cited in `docs/` has to merge, so a reader who doubts a number can re-run the code that produced it. The machinery a study calls is tested, in `packages/studies/`; the study's own arms, charts and write-up are not. `studies/README.md` states the tier in full. |
+| **`ml-experiments/`** (code, not published) and **`docs/ml-experiments/`** (write-ups, published) | **One small experiment per folder, each testing one hypothesis about improving the production forecast.** `result.md` states the hypothesis, prediction and decision rule before the run and ends in a verdict, and the experiment's predictions sit under `data/ml-experiments/` so a later experiment can use them as the benchmark to beat. The `ml-experiment` skill states the rules, and [the research log](ml-experiments/research-log.md) lists every experiment with its headline result, whether it is a candidate for the next model release, and the planned ones. |
 | **`plans/`** (repo root, not published) | At most **one** file per branch: the implementation plan for the work in flight on that branch, written before any code is touched and deleted when it merges. One worktree per branch is what keeps it to one file. Usually empty on `main`. |
 
 **Relationship between `docs/roadmap/` and GitHub**: Every substantial 🚧 plan in the `docs/roadmap/`
@@ -29,18 +30,18 @@ When a piece of work ships, its design content **moves out** of `roadmap/` to it
 and the roadmap page shrinks; when a page's last 🚧 item ships, the page is deleted. That permanent
 home splits along a **why vs. how** line: `architecture/` holds system design — the decisions and
 rationale, written once and rarely re-read step-by-step — while
-[`ml_experimentation/`](ml_experimentation/index.md) and [`live_service/`](live_service/index.md)
+[`cross-validation/`](cross-validation/index.md) and [`live_service/`](live_service/index.md)
 hold operational how-to — step-by-step recipes for running what's already built, one per area (ML
 backtesting vs. the live production service). Each `architecture/` design page names its how-to
 counterpart (and vice versa) in a "See also" section — e.g. [ML Orchestration
-Design](architecture/ml-orchestration.md) ↔ [ML Experimentation](ml_experimentation/index.md), and
+Design](architecture/ml-orchestration.md) ↔ [Cross-validation](cross-validation/index.md), and
 [Production Deployment — Design](architecture/production-deployment.md) ↔ [Setting up the live
 service on AWS](live_service/aws.md). A page is a candidate for splitting along this line when it
 mixes the two — design rationale followed by a runbook with literal commands. The `docs/roadmap/`
 folder therefore contains **only design for work that is not yet implemented**, and is never a
 mirror of the code. Because roadmap pages are deletable, **code must never link into `roadmap/`** —
 instead, code docstrings link to the durable sections (`design-philosophy/`, `techniques/`,
-`architecture/`, `background/`, `ml_experimentation/`, `live_service/`) instead. The *methods*
+`architecture/`, `background/`, `cross-validation/`, `live_service/`) instead. The *methods*
 behind these plans — differentiable physics, learned encoders, the disaggregation-evaluation
 protocol — live in [Techniques](techniques/index.md) for exactly this reason: they survive the
 roadmap items that apply them.
@@ -102,7 +103,7 @@ across a cross-validation fold, say.
 | Understand *why* an existing system works the way it does | [`docs/architecture/`](architecture/overview.md) — the local rationale, recorded next to each component |
 | State — or check — a measurable claim about the engineering | [`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md). Add a test with a threshold and a resolution point; never renumber an existing one |
 | Record an assessment of work we decided **not** to do | [`docs/architecture/`](architecture/overview.md), with a `Status:` banner saying so — e.g. [Why Dagster, not Airflow?](architecture/why-dagster-not-airflow.md). Not `docs/roadmap/`, which implies intent to build and is deleted on ship. |
-| Learn *how* to run or operate an existing system, step by step | [`docs/ml_experimentation/`](ml_experimentation/index.md), [`docs/live_service/`](live_service/index.md) |
+| Learn *how* to run or operate an existing system, step by step | [`docs/cross-validation/`](cross-validation/index.md), [`docs/live_service/`](live_service/index.md) |
 | File a quick tweak or a non-code task | A GitHub issue only — no markdown needed |
 | Plan how to implement an issue, before writing code | `plans/<branch-name>.md` on that issue's branch (one file per branch, deleted on merge) |
 | Explain what a function guarantees, what a caller must not assume, or why *this* implementation | The symbol's **docstring** — everything that would die with the symbol. Rendered onto the API page by mkdocstrings |
