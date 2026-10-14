@@ -4,7 +4,6 @@ from pathlib import Path
 
 import polars as pl
 import pytest
-from studies import experiment_store
 from studies.bootstrap import bootstrap_difference
 from studies.experiment_store import (
     FOLD_A_TUESDAYS_V1,
@@ -13,6 +12,8 @@ from studies.experiment_store import (
     reserve_experiment,
     write_predictions,
 )
+
+from studies import experiment_store
 
 COMMIT = "0123456789abcdef"
 
@@ -274,7 +275,9 @@ def _arm(*, loss: float, seeds: tuple[int, ...] = (0,)) -> pl.DataFrame:
 
 
 def test_a_valid_time_in_two_runs_gives_two_rows_not_a_many_to_many_blow_up():
-    losses = losses_for_bootstrap(arm_losses={"treatment": _arm(loss=1.0), "control": _arm(loss=2.0)})
+    losses = losses_for_bootstrap(
+        arm_losses={"treatment": _arm(loss=1.0), "control": _arm(loss=2.0)}
+    )
 
     interval = bootstrap_difference(
         losses=losses, treatment="treatment", reference="control", metric="crps"
@@ -282,7 +285,7 @@ def test_a_valid_time_in_two_runs_gives_two_rows_not_a_many_to_many_blow_up():
 
     assert interval["n_rows"] == 12
     assert interval["difference"] == pytest.approx(-1.0)
-    assert losses["time"].n_unique() == 6 * 2 // 2 * 2 // 2 * 2 // 2 or True
+    assert losses.filter(pl.col("arm") == "treatment")["time"].n_unique() == 6
 
 
 def test_the_month_label_comes_from_the_run_and_the_time_from_run_and_valid_time():

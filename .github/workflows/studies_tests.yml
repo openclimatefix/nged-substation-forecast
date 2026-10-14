@@ -12,6 +12,8 @@ on:
       - "packages/studies/**"
       - "studies/**"
       - "docs/studies/**"
+      - "ml-experiments/**"
+      - "docs/ml-experiments/**"
       - ".github/workflows/studies_tests.yml"
   push:
     branches: [main]

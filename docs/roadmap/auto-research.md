@@ -210,16 +210,22 @@ Each study's adversarial reviews look for broken and leaky implementations, as t
 already requires.
 
 **Phase 1 runs on a daily rhythm.** During the day, the maintainer and Claude read the latest
-results and agree the next study plan. Overnight, a Claude session runs the plan with the `study`
-skill, on the current data, as the maintainer's own Unix user. Within a budget the plan sets, Claude
-may add arms that combine the night's winners, and each arm the plan did not name is labelled post
-hoc. The next day's discussion decides which ideas to keep. The ideas worth keeping are
-re-implemented in production in reviewed pull requests.
+results and agree the next night's experiments. Overnight, a Claude session runs them with the
+`ml-experiment` skill, on the current data, as the maintainer's own Unix user. Within a budget the
+plan sets, Claude may add experiments that combine the night's winners, and each experiment the plan
+did not name is labelled post hoc. The next day's discussion decides which ideas to keep. The ideas
+worth keeping are re-implemented in production in reviewed pull requests.
 
-**Each study will post its scores to the leaderboard as a `study/` experiment** ([issue #1168 (Make
-the study skill post scores to the leaderboard and run studies
-overnight)](https://github.com/openclimatefix/nged-substation-forecast/issues/1168)). The `study/`
-prefix labels the rows, and promotion to production never picks a `study/` run.
+**Each ml-experiment tests one hypothesis and ends in a verdict.** The hypothesis, a prediction that
+could fail, and a decision rule are written before the run. The experiment's `result.md` holds the
+hypothesis, the verdict, the best arm, and the lessons learned, and it has the same fields that
+phase 2's hypothesis store records for an idea, so the research lead can read phase 1's experiments
+directly. A study, which is a long report that answers several questions, uses the `study` skill.
+
+**A study or an experiment whose output fits the leaderboard scorer may post its scores as a
+`study/` experiment.** Posting is optional, because an experiment may use its own metric or its own
+probabilistic output. The `study/` prefix labels the rows, and promotion to production never picks a
+`study/` run.
 
 **A `study/` score on the leaderboard fold is biased low, because the study chose its arms on that
 fold.** The bias is likely to be small next to gains as large as the Quick wins study found. Once

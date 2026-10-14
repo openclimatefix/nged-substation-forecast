@@ -1,4 +1,4 @@
-"""The store behind the `ml-experiment` skill: experiment ids, immutable prediction sets, and losses.
+"""The store behind the `ml-experiment` skill: experiment ids, prediction sets, and losses.
 
 Each ml-experiment has an id, a five-digit integer that orders experiments by the order in which
 they were started, and a slug that describes it. The experiment keeps its predictions in
@@ -238,7 +238,9 @@ def write_predictions(
         raise ValueError(msg)
     _require_utc_valid_time(frame=frame)
     _require_before_holdout(frame=frame)
-    predictions_dir = _experiment_dir(experiment_id=experiment_id, data_dir=data_dir) / "predictions"
+    predictions_dir = (
+        _experiment_dir(experiment_id=experiment_id, data_dir=data_dir) / "predictions"
+    )
     destination = predictions_dir / name
     if destination.exists():
         msg = f"{destination} exists; save the new fit under another name, such as {name}-v2"
@@ -330,9 +332,7 @@ def losses_for_bootstrap(*, arm_losses: Mapping[str, pl.DataFrame]) -> pl.DataFr
     if not arm_losses:
         raise ValueError("arm_losses holds no arm")
     key_columns = ["time_series_id", "power_fcst_init_time", "valid_time", "seed"]
-    seeds = {
-        arm: sorted(frame["seed"].unique().to_list()) for arm, frame in arm_losses.items()
-    }
+    seeds = {arm: sorted(frame["seed"].unique().to_list()) for arm, frame in arm_losses.items()}
     if len({tuple(arm_seeds) for arm_seeds in seeds.values()}) > 1:
         msg = f"every arm needs the same seeds, found {seeds}"
         raise ValueError(msg)

@@ -3,8 +3,9 @@
 **The machinery a one-off study calls, held to the repository's normal standard while the studies
 themselves are not.** `studies/README.md` says which code moves here, and why.
 
-**A study script under `studies/` may import from its own folder, from `studies.*` (this package),
-and from the other reviewed packages in `packages/*`.** `src/` and every package under `packages/`
+**A study script under `studies/`, and an experiment script under `ml-experiments/`, may import from
+its own folder, from `studies.*` (this package), and from the other reviewed packages in
+`packages/*`.** `src/` and every package under `packages/`
 except this one must never import `studies` or a study script, because humans review that code and
 the study code is fast-moving and agent-written. `tests/test_study_boundaries.py` enforces both
 halves, and no module here imports a script by its bare name.
@@ -38,6 +39,9 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
   and applied to each member; one model scored on several frames of feature values, which gives a
   transfer penalty with no second fit; and the scoring of a forecast made outside the fit loop. The
   fold schemes are month blocks, and 7-day blocks for a span too short for months.
+- `experiment_store` — the store behind the `ml-experiment` skill: reserving an experiment id,
+  writing and reading immutable prediction sets with a manifest, refusing a set whose row set or
+  holdout rule differs, and building the loss frame that `bootstrap` pairs.
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
   seed, within each calendar year as well as overall, and a t-interval across the folds' own
   differences.
