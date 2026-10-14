@@ -237,8 +237,8 @@ CAMS irradiance at each demand series' own location comes from [PR #1201 (Downlo
 irradiance at the demand series'
 locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201), which covers the
 22 series of experiment 00003 (16 Primary demand series, 4 bulk-supply and grid-supply point flows,
-and 2 others). The experiment could compute each statistic from ERA5 alone and from CAMS and ERA5
-together.
+and 2 non-demand series, a battery and a biofuel generator). The experiment could compute each
+statistic from ERA5 alone and from CAMS and ERA5 together.
 
 **A decision rule could be fixed before any fit.** One candidate: the trend in the monthly change
 from a year earlier is negative at 70% or more of the substations in the top quartile of registered
@@ -250,30 +250,24 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 
 #### Second stage: CAMS irradiance in place of ERA5 for stage 1a training
 
-**A second stage of P2 would change the irradiance that stage 1a trains on, where the first test
-uses irradiance only to read the residuals.** The Copernicus Atmosphere Monitoring Service (CAMS)
-irradiance at each demand series' own location agrees with ERA5 shortwave, with a correlation of
-0.947 pooled over the 22 series and hour-ending labels. The second stage could train the stage 1a
-XGBoost model with CAMS shortwave in place of ERA5's, and apply it to ENS weather members, with the
-other weather columns staying ERA5. CAMS irradiance is satellite-derived and has no forecast, so it
-can be an input in training only. That creates a mismatch: the model trains on satellite-derived
-irradiance and is applied to the ENS forecast irradiance, and the comparison shows whether the
-mismatch costs or gains skill. The arms would be the ERA5-trained stage 1a XGBoost model with the
-column list chosen in experiment 00006 and the same model with CAMS in place of ERA5 shortwave, on
-the 20 series of experiment 00005 (16 Primary, 2 bulk-supply point, and 2 grid-supply point series),
-with its folds and quantile score. The CAMS irradiance comes from [PR #1201 (Download and validate
-CAMS irradiance at the demand series'
-locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201), which covers the
-22 series of experiment 00003 (16 Primary demand series, 4 bulk-supply and grid-supply point flows,
-and 2 others).
+**A second stage of P2 could train stage 1a on CAMS irradiance, where the first test uses CAMS only
+to read the residuals.** The stage 1a XGBoost model would train with CAMS shortwave in place of
+ERA5's and be applied to ENS weather members, with the other weather columns staying ERA5. CAMS has
+no forecast, so it can be an input in training only. This departs from the requirement above that
+training use the source available at forecast time, and it creates a mismatch: the stage 1a XGBoost
+model trains on satellite-derived irradiance and is applied to forecast irradiance. The comparison
+shows what the departure costs or gains. The arms would be the ERA5-trained stage 1a XGBoost model
+and the same model with CAMS in place of ERA5 shortwave, on the 20 series of experiment 00005 (16
+Primary, 2 bulk-supply point, and 2 grid-supply point series), using experiment 00005's folds and
+quantile score.
 
-**The outcome of the first test of P2 is the proposed gate for the second stage.** If that outcome
-shows that irradiance at the substation's own location explains the residual, the second stage asks
-whether training on CAMS removes the residual at the source. If the outcome shows that the residual
-comes from something other than the irradiance input, the second stage would not be worth running. A
-candidate decision rule: the CAMS-trained arm lowers the quantile score at Primary substations by at
-least 0.2 points of capacity, with a month-block bootstrap interval that excludes zero. The
-threshold is a proposal for the planning step to confirm.
+**The outcome of experiment 00007, the first test of P2, is the proposed gate for the second
+stage.** If the outcome finds that a static CAMS correction removes most of the residual, which
+points to an irradiance error, the second stage would ask whether training on CAMS removes the
+residual at the source. If the residual remains, or the cause is a change in solar capacity, the
+second stage would not be worth running. A candidate decision rule: the CAMS-trained arm lowers the
+quantile score at Primary substations by at least 0.2 points of capacity, with a month-block
+bootstrap interval that excludes zero. The threshold is a proposal for the planning step to confirm.
 
 ### P3: historical electricity prices as lagged inputs
 
