@@ -55,6 +55,18 @@ every key above the plot, and keep subtitles short. `studies.charts` draws every
 `docs/`'s text column; match that width for a chart outside `docs/studies/` too, and check that the
 text is legible in the built site, not only in the SVG.
 
+**Make the plot area fill the figure's full width, and wrap the title and subtitle lines to the
+plot area's width.** Vertical space is the scarce resource on a docs page, so every row of the
+figure should go to the plot rather than to text. A figure whose plot area covers only the left
+half of the width, under subtitle lines that run past the plot area's right edge, leaves the right
+half blank and forces the text to take many short lines above the plot. Instead, size the plot area
+to the figure's width (in Altair, `width` for the plot area plus the axis and legend margins equals
+`CONTENT_WIDTH_PX`, not a smaller fixed number), and wrap each title and subtitle line to that same
+width (in Altair, split the text into a list of lines at the character count that fits the plot
+area, rather than one line per sentence). Fewer, longer lines of text give each panel more height
+for its marks. Check the render for two faults: blank space to the right of any plot area, and text
+that is wider or narrower than the plot area beneath.
+
 **Write SVG, then optimise it, and check the render before committing.** `CLAUDE.md`'s "Chart
 images" section has the full rule: run the export through `npx svgo@4 --multipass --precision=1
 --final-newline`, and look at every chart rendered to PNG before committing it.
