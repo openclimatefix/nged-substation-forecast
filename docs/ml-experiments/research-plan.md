@@ -20,7 +20,6 @@ sooner.
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | Nothing | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
-| [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | Nothing | Planned as experiment 00017 (scored on ERA5, rolling origins 2022 to 2026) |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the intra-day price at time t, with the weather at time t, help a stage 1 demand model explain power at time t on all 20 series, so that a later experiment can estimate the expected past power and measure how unusual the lagged power was? | 3 | Nothing; the Elexon price data is on disk | Proposed; follows experiment 00010, which was inconclusive |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 | Proposed |
 | [P12](#p12-calibration-of-the-pooled-mixture-for-solar-and-wind) | Does a spread factor or the stage 2 calibrator bring the 5% to 95% band of the pooled mixture to 90% coverage for wind and solar, wind first? | 4 | Nothing | Proposed; the demand part is in P7 |
@@ -155,26 +154,6 @@ to 95% band of the Primary substations covers only 83% to 85%. The planned contr
 with serving-latency lag anomalies against the lag-free calibrated stage 1 (the 1.80-point contrast
 of 00005, measured again), and against N1. A chain that does not beat N1 on Primary substations
 leaves the staged design for demand, and stage 2 stays only for the multi-product work.
-
-### P8: training window and drift
-
-**Experiments 00003, 00006, and 13 all point at drift as the largest lever.** In experiment 13 every
-arm forecast the validation year 1.3 to 3.1 points of capacity too low, so a correction from the
-last 14 days of observed error is one of the arms. The arms are sliding windows of 6, 12, and 18
-months, recency half-lives, and a monthly retrain against a frozen model, scored rolling-origin on
-the winner of P7.
-
-**Resolution limit.** One confirmation year cannot rank windows of 6, 12, and 18 months, because the
-ranking would rest on one year of drift. A cheaper design scores stage 1a on ERA5 with rolling
-origins over 2021 to 2026, as experiment 00006 did, which needs no ENS data and gives several years
-of drift.
-
-**The recency result differs between the quick-wins study and experiment 00006, so P8 repeats the
-question on purpose.** The [quick-wins study](../studies/forecasts/quick-wins.md) found that recency
-weights with a half-life of 120 days did not help on 15 months of ENS-era data (+0.05 points of
-CRPS), and that cutting the window from 15 to 12 months changed CRPS by only 0.07. Experiment 00006
-found that recency weights with a half-life of 2 years over 7 years of ERA5 helped. The two results
-use different data, so P8 repeats the question on purpose.
 
 ### P9: the demand weather ceiling
 

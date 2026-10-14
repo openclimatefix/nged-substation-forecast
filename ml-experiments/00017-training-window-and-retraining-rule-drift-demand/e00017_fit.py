@@ -1,11 +1,11 @@
-"""Fit experiment 17's arms for one Primary substation at a time and write monthly rolling-origin predictions.
+"""Fit experiment 17's arms and write monthly rolling-origin predictions, one substation at a time.
 
 Each validation month from `FIRST_MONTH` to `LAST_MONTH` is forecast by models trained on rows that
 end `PURGE` before the month starts. The arms differ only in the training window, the row weights,
 and how often the model is refitted (see the experiment's `result.md`). One file is written per
 series, and a series whose file exists is skipped.
 
-    uv run python ml-experiments/00017-training-window-and-retraining-rule-drift-demand/e00017_fit.py
+    uv run python ml-experiments/00017-*/e00017_fit.py
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ COLUMNS: Final[tuple[str, ...]] = (
     "covid_indicator",
     "days_to_christmas_window",
 )
-"""Experiment 6's Primary input set: weather block, clock, COVID indicator, windowed Christmas days."""
+"""Experiment 6's Primary input set: weather block, clock, COVID flag, windowed Christmas days."""
 WINDOW_DAYS: Final[dict[str, int]] = {"W6": 183, "W12": 365, "W18": 548}
 HALF_LIFE_YEARS: Final[dict[str, float]] = {"H0.5": 0.5, "H1": 1.0, "H2": 2.0}
 ARMS: Final[tuple[str, ...]] = ("A", *WINDOW_DAYS, *HALF_LIFE_YEARS, "F", "Y")

@@ -3,10 +3,9 @@
 Reads the fits `e00017_fit.py` wrote, adds the 14-day correction arm K and a climatology refitted
 each month, and writes tables under the experiment's private `results/` folder.
 
-    uv run python ml-experiments/00017-training-window-and-retraining-rule-drift-demand/e00017_report.py
+    uv run python ml-experiments/00017-*/e00017_report.py
 """
 
-from datetime import UTC, datetime
 from typing import Final
 
 import e00017_fit as fit
@@ -31,7 +30,7 @@ LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / len(CONTRASTS))
 N_RESAMPLES: Final[int] = 20_000
 CORRECTION_FIRST_DAY: Final[int] = 15
 CORRECTION_LAST_DAY: Final[int] = 2
-"""The correction for local day d averages the errors of days d - 15 to d - 2 (14 days, 1 day lag)."""
+"""The correction for local day d averages the errors of days d - 15 to d - 2."""
 MIN_CORRECTION_DAYS: Final[int] = 7
 CLIMATOLOGY_MEDIAN: Final[str] = CLIMATOLOGY_QUANTILE_COLUMNS[25]
 
@@ -41,21 +40,23 @@ def read_fits() -> pl.DataFrame:
     return pl.concat([pl.read_parquet(f) for f in sorted(fit.FITS_DIR.glob("*.parquet"))])
 
 
-def add_correction(*, rows: pl.DataFrame) -> pl.DataFrame:
-    """Add arm K: A plus the mean signed error of A over local days d - 15 to d - 2.
+def add_correction(*, rows: pl.DataFrame, arm: str = REFERENCE, name: str = "K") -> pl.DataFrame:
+    """Add arm `name`: `arm` plus the mean signed error of A over local days d - 15 to d - 2.
 
     Only errors of A's own earlier forecasts are used, so nothing from the day being forecast or
     the day before enters. A day with fewer than 7 days of errors gets no correction.
     """
     local_date = pl.col("valid_time").dt.convert_time_zone("Europe/London").dt.date()
-    keyed = rows.with_columns(date=local_date, error=pl.col("target") - pl.col(REFERENCE))
+    keyed = rows.with_columns(date=local_date, error=pl.col("target") - pl.col(arm))
     daily = keyed.group_by("time_series_id", "date").agg(
         error_sum=pl.col("error").sum(), n=pl.len()
     )
     out = []
     for series_id, group in daily.group_by("time_series_id", maintain_order=True):
         dense = (
-            pl.date_range(group["date"].min(), group["date"].max(), "1d", eager=True)
+            pl.date_range(  # ty: ignore[no-matching-overload]
+                group["date"].min(), group["date"].max(), "1d", eager=True
+            )
             .alias("date")
             .to_frame()
             .join(group.drop("time_series_id"), on="date", how="left")
@@ -75,7 +76,7 @@ def add_correction(*, rows: pl.DataFrame) -> pl.DataFrame:
         out.append(dense.select("time_series_id", "date", "correction"))
     return (
         keyed.join(pl.concat(out), on=["time_series_id", "date"], how="left")
-        .with_columns(K=pl.col(REFERENCE) + pl.col("correction").fill_null(0.0))
+        .with_columns((pl.col(arm) + pl.col("correction").fill_null(0.0)).alias(name))
         .drop("date", "error", "correction")
     )
 
@@ -128,7 +129,7 @@ def loss_frame(*, rows: pl.DataFrame, arms: list[str]) -> pl.DataFrame:
                 "power_fcst_init_time",
                 "valid_time",
                 "seed",
-                abs_error=(pl.col(arm) - pl.col("target")).abs() * 100.0,
+                abs_error=((pl.col(arm) - pl.col("target")).abs() * 100.0).cast(pl.Float64),
             ).drop_nulls("abs_error")
             for arm in arms
         }
@@ -150,31 +151,65 @@ def main() -> None:
     contrasts, absolute = [], []
     for arm in arms:
         result = bootstrap_absolute(losses=frame, arm=arm, metric="abs_error")
-        absolute.append({"arm": arm, "mae": result["value"], "lower": result["lower_95"],
-                         "upper": result["upper_95"], "n_months": result["n_months"]})
+        absolute.append(
+            {
+                "arm": arm,
+                "mae": result["value"],
+                "lower": result["lower_95"],
+                "upper": result["upper_95"],
+                "n_months": result["n_months"],
+            }
+        )
     clim = loss_frame(rows=shared, arms=["climatology"])
     result = bootstrap_absolute(losses=clim, arm="climatology", metric="abs_error")
-    absolute.append({"arm": "climatology", "mae": result["value"], "lower": result["lower_95"],
-                     "upper": result["upper_95"], "n_months": result["n_months"]})
+    absolute.append(
+        {
+            "arm": "climatology",
+            "mae": result["value"],
+            "lower": result["lower_95"],
+            "upper": result["upper_95"],
+            "n_months": result["n_months"],
+        }
+    )
     for number, arm in enumerate(CONTRASTS, start=1):
         low, high = bootstrap_difference_at_level(
-            losses=frame, treatment=arm, reference=REFERENCE, metric="abs_error",
-            level=LEVEL, n_resamples=N_RESAMPLES,
+            losses=frame,
+            treatment=arm,
+            reference=REFERENCE,
+            metric="abs_error",
+            level=LEVEL,
+            n_resamples=N_RESAMPLES,
         )
         point = bootstrap_difference(
             losses=frame, treatment=arm, reference=REFERENCE, metric="abs_error"
         )
-        contrasts.append({"contrast": f"C{number}", "arm": arm, "difference": point["difference"],
-                          "lower": low, "upper": high, "level": LEVEL})
+        contrasts.append(
+            {
+                "contrast": f"C{number}",
+                "arm": arm,
+                "difference": point["difference"],
+                "lower": low,
+                "upper": high,
+                "level": LEVEL,
+            }
+        )
     year = pl.col("valid_time").dt.year()
-    by_year = rows.group_by(year.alias("year")).agg(
-        [(pl.col(a) - pl.col("target")).abs().mean().mul(100).alias(f"mae_{a}") for a in arms]
-        + [(pl.col("target") - pl.col(a)).mean().mul(100).alias(f"bias_{a}") for a in arms]
-    ).sort("year")
-    by_month = rows.group_by(pl.col("valid_time").dt.truncate("1mo").alias("month")).agg(
-        [(pl.col(a) - pl.col("target")).abs().mean().mul(100).alias(a) for a in arms]
-        + [(pl.col("target") - pl.col(a)).mean().mul(100).alias(f"bias_{a}") for a in arms]
-    ).sort("month")
+    by_year = (
+        rows.group_by(year.alias("year"))
+        .agg(
+            [(pl.col(a) - pl.col("target")).abs().mean().mul(100).alias(f"mae_{a}") for a in arms]
+            + [(pl.col("target") - pl.col(a)).mean().mul(100).alias(f"bias_{a}") for a in arms]
+        )
+        .sort("year")
+    )
+    by_month = (
+        rows.group_by(pl.col("valid_time").dt.truncate("1mo").alias("month"))
+        .agg(
+            [(pl.col(a) - pl.col("target")).abs().mean().mul(100).alias(a) for a in arms]
+            + [(pl.col("target") - pl.col(a)).mean().mul(100).alias(f"bias_{a}") for a in arms]
+        )
+        .sort("month")
+    )
     tables = {
         "absolute": pl.DataFrame(absolute),
         "contrasts": pl.DataFrame(contrasts),

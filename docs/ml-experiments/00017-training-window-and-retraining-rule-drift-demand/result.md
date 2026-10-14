@@ -1,7 +1,7 @@
 ---
 id: "00017"
 slug: training-window-and-retraining-rule-drift-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For the stage 1a XGBoost demand model trained on ERA5 weather, Primary substation demand drifts
@@ -31,54 +31,75 @@ benchmark: >-
 row_set_id: era5_rolling_monthly_2022_01_to_2026_06_v1
 metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
-verdict: null
+verdict: supported
+best_arm: >-
+  Arm K, the monthly-retrained all-history model plus the mean error of its own forecasts over the
+  14 days ending 2 days before (6.10 points of capacity, against 7.62 for A). Among arms with no
+  access to recent power, the half-life of 0.5 years (6.70)
+headline: >-
+  C9, the 14-day correction against A: -1.52 points (99.44% interval -1.95 to -1.13). C4, a
+  half-life of 0.5 years: -0.92 (-1.22 to -0.64). C2, a 12-month window: -0.84 (-1.19 to -0.53).
+lessons: >-
+  Demand drifted by several points of capacity in both directions over 2022 to 2026, so any rule
+  that follows recent data beats all history, and retraining monthly beats retraining yearly by
+  0.5 points. A frozen model loses 3.8 points.
+advice:
+  - >-
+    Weight training rows with a half-life of 0.5 years, or train on the last 12 months, in the stage
+    1a demand model for Primary substations, in place of the 2-year half-life (C4, C2, C6).
+  - >-
+    Retrain monthly rather than yearly, and never leave a demand model frozen (C7, C8).
+  - >-
+    Test the 14-day error correction on forecast-time weather and a realistic power delay before
+    porting it, because its 1.5-point gain is measured on ERA5 weather (C9).
+  - >-
+    Score a training-window change over several years of rolling origins, because the sign of the
+    bias reverses between 2025 and 2026 (figure 2).
+production_status: candidate
+adopted_in: none
 ---
 
 # Experiment 17: training window, recency, and retraining rule for demand
 
-**Status: planned. No fit has run.**
+**Supported: every rule that follows recent data beat all history, and the 14-day correction beat
+all of them.** Scores are the mean absolute error of the median in points of capacity, on 16
+Primary substations, with monthly forecasts from January 2022 to June 2026 (1.07 million
+half-hours). Weather is ERA5, which arrives about 5 days late, so the scores are a ceiling on what
+forecast-time weather reaches. The fitting code is in `ml-experiments/00017-*/`; the sliding
+windows are 183, 365, and 548 days.
 
-## Design
+![Planned contrasts against arm A](figure_1.svg)
 
-**Setup.** The rows are the 16 Primary substations, scored on ERA5 weather as in experiment 6, with
-each validation month 2022-01 to 2026-06 (54 months) forecast by a model trained on rows ending 7
-days before the month starts. A series enters at the first month with at least 12 months of
-observed history before the purge, so the row set is shared by every arm. Every arm uses experiment
-6's Primary inputs (weather block, hour, weekday, COVID indicator, Christmas-window days),
-`reg:absoluteerror`, 500 rounds, seed 0, one model per series. ERA5 arrives about 5 days late, so
-the scores are a ceiling on what the live service reaches with forecast weather (experiment 6's
-caveat). No calendar columns beyond the clock are used, so no model memorises the day of the year.
+| Arm | Error (95% interval) | Against A (99.44% interval) |
+|---|---|---|
+| A: all history, monthly retrain | 7.62 (7.28 to 7.98) | reference |
+| W6: 6-month window | 7.32 (6.97 to 7.70) | -0.30 (-0.91 to +0.32) |
+| W12: 12-month window | 6.78 (6.48 to 7.11) | -0.84 (-1.19 to -0.53) |
+| W18: 18-month window | 6.82 (6.52 to 7.17) | -0.79 (-1.15 to -0.48) |
+| H0.5: half-life 0.5 years | 6.70 (6.42 to 7.00) | -0.92 (-1.22 to -0.64) |
+| H1: half-life 1 year | 6.91 (6.63 to 7.23) | -0.71 (-0.92 to -0.51) |
+| H2: half-life 2 years | 7.17 (6.86 to 7.50) | -0.45 (-0.57 to -0.34) |
+| F: never retrained | 11.42 (10.86 to 12.02) | +3.80 (+3.12 to +4.47) |
+| Y: retrained yearly | 8.14 (7.76 to 8.54) | +0.52 (+0.30 to +0.81) |
+| K: A plus 14-day correction | 6.10 (5.88 to 6.32) | -1.52 (-1.95 to -1.13) |
+| Month-by-half-hour climatology | 8.44 (8.02 to 8.88) | not paired |
 
-**Arms.**
+**The drift reverses sign, and that is why recent rows win.** A's mean error (observed minus
+forecast) runs from -3.8 points in 2022 and 2023 (forecast too high) to +1.8 in the first half of
+2026 (forecast too low). Shorter memory follows the swing sooner, and the correction removes the
+bias in every year (figure 2).
 
-- **A:** all history, equal weights, retrained monthly (reference).
-- **W6, W12, W18:** the last 6, 12, or 18 months before the purge, retrained monthly (C1 to C3).
-- **H0.5, H1, H2:** all history, weights halving every 0.5, 1, or 2 years, retrained monthly (C4 to
-  C6; H2 repeats experiment 6's recency result on more years).
-- **F:** A fitted once at the series' first origin and never retrained (C7).
-- **Y:** A refitted every 12 months from the first origin (C8).
-- **K:** A plus the mean signed error of A's own earlier out-of-sample forecasts over the 14 days
-  ending 1 day before the valid day, added to the forecast; no correction while fewer than 7 days of
-  errors exist (C9).
-- **Climatology:** month, half-hour, and weekend median over the same training rows as A.
+![Mean signed error by calendar year](figure_2.svg)
 
-**Post hoc, labelled as such in the write-up:** the correction K applied to the best window or
-recency arm, and the loss by calendar year for each arm.
+**Three predictions missed.** The recency and correction gains were 0.5 to 1.5 points, against the
+0.1 to 0.3 predicted. The 6-month window did not raise the error as predicted, but its interval
+straddles zero. The frozen model raised the error by 3.8 points, against at least 0.5 predicted.
 
-**Prior advice followed:** weather block, clock, COVID indicator, and windowed Christmas days
-(experiment 6); recency with a half-life of 2 years (6, P7), now tested against shorter half-lives.
-Departed from: experiment 6 scored one selection and one confirmation year, and this experiment
-scores 54 months so the ranking does not rest on one year of drift.
+**Failures and limits.** No fit failed. The correction needs observed power 2 days old, so it is
+only as good as the live telemetry delay. All scores use ERA5 weather.
 
-## Size
+## Post hoc contrasts
 
-- **Stores:** only the experiment's own predictions under `data/ml-experiments/`; nothing in the
-  pipeline.
-- **Production serving path:** not touched; the result decides a later port.
-- **Degradation rule:** not touched.
-- **Defensible designs:** more than one exists (pooled models, other correction forms), so the
-  correction is kept to its simplest form and labelled so.
-- **Callers:** the scripts copy experiment 6's fitting code; no other caller exists.
-
-Sized medium: one Sonnet review of the code for leakage (fit ends at the origin's `train_end`, the
-correction uses only errors known the day before) and one of the write-up.
+**The correction stacks with shorter memory.** The correction applied to H0.5 scores 5.82 (95%
+interval 5.63 to 6.02), 0.27 points (0.21 to 0.34) below the correction on A. Applied to W12, it
+scores 5.84. These contrasts were not pre-registered.
