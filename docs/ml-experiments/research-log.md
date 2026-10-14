@@ -29,6 +29,7 @@ the maintainer to confirm.
 | [00005](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | Not yet merged |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
 | [00007](00007-cams-static-correction-stage1a-residual/result.md) | Does a static CAMS correction fitted on one year remove most of the next year's daytime stage 1a residual? | Inconclusive | Not for production | Not yet merged |
+| [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -172,3 +173,21 @@ does a static CAMS correction remove the stage 1a daytime
 residual?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1210).
 
 ![Share removed by substation](00007-cams-static-correction-stage1a-residual/figure_1.svg)
+
+### 00008: summaries of recent power in the stage 2 calibrator
+
+**Adding the minimum, mean, and maximum of the last 24 hours and of the same weekday to the
+calibrator with raw lags changed the score by no resolvable amount.** The experiment reused 00005's
+stage 1 statistics on the same 73 runs, and every arm with ERA5 residuals is a ceiling.
+
+- **Headline result:** C1 (summaries added to L3) was -0.02 points of capacity for leads up to 48
+  hours (98.75% interval -0.14 to +0.13). Replacing the raw power lags with summaries was worse
+  (+0.29).
+- **Finding for later experiments:** summaries alone, without ERA5 residuals, scored 1.18 points
+  better than no recent power up to 48 hours. They are available at forecast time, but the stage 1
+  statistics beneath them come from an ERA5-trained stage 1a.
+- **Write-up and pull request:** [result](00008-lag-summaries-in-stage2-calibrator-demand/result.md),
+  [PR #1209 (Plan experiment 00008: summaries of recent power in the stage 2
+  calibrator)](https://github.com/openclimatefix/nged-substation-forecast/pull/1209).
+
+![Summaries alone clearly beat no recent power](00008-lag-summaries-in-stage2-calibrator-demand/figure_2.svg)
