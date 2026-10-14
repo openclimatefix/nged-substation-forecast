@@ -141,6 +141,7 @@ nav:
       - Cross-validation folds: cross-validation/cross-validation-folds.md
   - ML experiments:
       - Overview: ml-experiments/README.md
+      - Research log: ml-experiments/research-log.md
       - "Does an ERA5-trained weather-to-power model beat the same model trained on ENS?": ml-experiments/00001-era5-trained-stage1a-vs-ens-trained/result.md
       - "Does a stage 2 calibrator beat the pooled stage 1a mixture?": ml-experiments/00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md
       - "Does an ERA5-trained model beat the same model trained on ENS, for demand series?": ml-experiments/00003-era5-trained-stage1a-vs-ens-trained-demand/result.md

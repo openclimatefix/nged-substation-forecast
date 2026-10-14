@@ -63,6 +63,10 @@ review as `implement-issue` does.
   to the navigation in `mkdocs.yml`, under "ML experiments" and titled with the hypothesis, in the
   commit that first adds the page. When two experiments finish together, the two navigation lines
   conflict on rebase; keep both.
+- **The research log:** `docs/ml-experiments/research-log.md` lists every experiment in the order it
+  was started, with its question, headline result, date, and links, and it lists the planned
+  experiments. Keep it current in the same PR that changes an experiment's state, as the next
+  section says.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
   `ml-experiments/` may share a basename. A script imports its own folder, `studies.*`, and the
@@ -114,6 +118,18 @@ session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
 
+## Keep the research log current
+
+**Update `docs/ml-experiments/research-log.md` in the PR that commits the `planned` `result.md`,
+and again in the PR that adds the finished write-up.** The first PR adds a row under "Planned
+experiments" with the id, the question in one line, and the state. The finished PR moves that row
+into the table at the top and adds a short entry: the question, the verdict in one sentence, the
+headline number with its interval, any finding that changes how later experiments are run, links
+to `result.md` and the PR, and one figure. An idea the maintainer has agreed to run but that has no
+folder yet goes in the planned table marked "Proposed". An experiment that ends `invalid` or
+`failed` keeps its entry, and the entry says why. Write the entry for a reader who has not opened
+`result.md`.
+
 ## When a winner reaches production
 
 **The pull request that ports an experiment's winner into the production pipeline records why.** In
@@ -150,7 +166,7 @@ with status `planned`. The overnight session:
 
 **An experiment's PR may be merged without waiting for the maintainer when all three hold:** the
 diff touches only `ml-experiments/`, `docs/ml-experiments/`, and the experiment's line in
-`mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged; and
-the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no `data/` or
-`.env` file, the branch contains `main`, a merge commit and not a squash). A change to
+`mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged, and
+the research log is updated; and the checks pass (`ci` green, no closing keyword in the PR body or
+commit messages, no `data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). A change to
 `packages/studies/` stops at a reviewed PR, as `implement-issue` does.

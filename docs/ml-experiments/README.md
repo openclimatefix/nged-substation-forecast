@@ -8,3 +8,6 @@ of `result.md` states the hypothesis, the prediction, the decision rule, and the
 When an experiment's winner is ported into production, its `result.md` also gets an `informs` field
 naming the production setting it decided, and [the experiments behind the production
 design](../architecture/design-evidence.md) gains a row.
+
+The [research log](research-log.md) lists every experiment in the order it was started, with its
+question, headline result, and link, and it lists the experiments that are planned.
