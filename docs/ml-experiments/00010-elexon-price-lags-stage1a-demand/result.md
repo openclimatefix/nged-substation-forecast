@@ -12,8 +12,10 @@ prediction: >-
   the median at the listed substation (B2) by at least 0.5 points of capacity, and by less than 0.1
   points at the unlisted series.
 decision_rule: >-
-  Supported if C1 and C2 are both material at B2: the 98.3% month-resampled interval (95% familywise,
-  Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point estimate is at least 0.1
+  Supported if C1 and C2 are both material at B2: the 98.3% month-resampled interval (95%
+  familywise,
+  Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point estimate is at
+  least 0.1
   points in the
   direction stated. Refuted if the C1 interval at B2 excludes a gain of 0.3 points. Otherwise
   inconclusive. The selection year decides; the confirmation year is scored once, and if its
@@ -26,7 +28,8 @@ benchmark: >-
   The experiment 00006 Primary input set with recency weights (arm BASE), and a month-by-half-hour
   climatology row.
 row_set_id: era5_val_2024_07_to_2025_06_v1
-metric: mean absolute error of the median, points of capacity (power over effective capacity, times 100)
+metric: mean absolute error of the median, points of capacity (power over effective capacity, times
+100)
 verdict: null
 advice: []
 production_status: null
@@ -120,7 +123,8 @@ The 5% threshold is a round number chosen before the sums were run; P4 passed it
 which is why the plan reports it only beside B2. The register has no commissioning dates, so a
 listed battery may have been absent for part of the training years or of the selection year, and
 batteries also earn from balancing and frequency response, not only the index price. A gain at B2
-is therefore weak evidence of a battery response. The register names the primary, bulk supply point, and grid supply point
+is therefore weak evidence of a battery response. The register names the primary, bulk supply point,
+and grid supply point
 each row connects to. The
 result for the 20 series 00006 scored:
 
