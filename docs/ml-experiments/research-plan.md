@@ -338,14 +338,14 @@ under about 0.3 points of capacity, so the claim rests on those farms.
 
 **Experiment 00009 found no gain from training stage 1a on CAMS irradiance for Primary demand, and
 this follow-up adds a stage 0 model and the other substation types.** The maintainer asked for it on
-2026-10-14. Stage 1 trains on CAMS irradiance and is fed ENS irradiance for each of the 51 members at
-inference. Stage 0 is a small model that maps ENS irradiance to CAMS irradiance, trained on the period
-when both exist, and its output feeds stage 1. The arms are ERA5-trained stage 1, CAMS-trained
-stage 1 without stage 0, and CAMS-trained stage 1 with stage 0, on Primary, BSP, and GSP series,
-scored by type. Two contrasts, kept separate: CAMS-trained against ERA5-trained, then stage 0 against plain
-CAMS-trained. The plan has to check first that CAMS values exist at the BSP and GSP series
-([PR #1201](https://github.com/openclimatefix/nged-substation-forecast/pull/1201) covers the 22
-series of 00003), and has to reuse the code of 00009.
+2026-10-14. Stage 1 trains on CAMS irradiance and is fed ENS irradiance for each of the 51 members
+at inference. Stage 0 is a small model that maps ENS irradiance to CAMS irradiance, trained on the
+period when both exist, and its output feeds stage 1. The arms are ERA5-trained stage 1,
+CAMS-trained stage 1 without stage 0, and CAMS-trained stage 1 with stage 0, on Primary, BSP, and
+GSP series, scored by type. Two contrasts, kept separate: CAMS-trained against ERA5-trained, then
+stage 0 against plain CAMS-trained. The plan has to check first that CAMS values exist at the BSP
+and GSP series ([PR #1201](https://github.com/openclimatefix/nged-substation-forecast/pull/1201)
+covers the 22 series of 00003), and has to reuse the code of 00009.
 
 ### P18: lagged power and summaries of recent power for solar and wind
 
