@@ -1,31 +1,37 @@
----
-id: "00018"
-slug: staged-chain-vs-n1-serving-latency-lag-anomalies-demand
-status: planned
-size: complex
-hypothesis: >-
-  For the 16 Primary substation demand series, the staged chain (an ERA5-trained stage 1 and the
-  stage 2 calibrator, with lag anomalies built only from weather that serving has at the forecast
-  origin, and NGED's real telemetry delay) beats the single-stage ENS-trained quantile model N1 and
-  `manual_heuristic` on the quantile score.
-prediction: >-
-  The chain with serving-latency lag anomalies scores 0.3 to 0.8 points of capacity below N1 on the
-  quantile score over all leads, and 0.3 to 0.5 points better than `manual_heuristic` (a lower score is better). It keeps at least
-  half of the 1.80-point gain over the lag-free calibrated stage 1 that experiment 00005 measured
-  with ERA5 weather and no telemetry delay. The 5% to 95% band covers 83% to 87% before a spread
-  factor and 88% to 91% after.
+--- id: "00018" slug: staged-chain-vs-n1-serving-latency-lag-anomalies-demand status: planned size:
+complex hypothesis: >- For the 16 Primary substation demand series, the staged chain (an
+ERA5-trained stage 1 and the stage 2 calibrator, with lag anomalies built only from weather that
+serving has at the forecast origin, and NGED's real telemetry delay) beats the single-stage
+ENS-trained quantile model N1 and `manual_heuristic` on the quantile score. prediction: >- The chain
+with serving-latency lag anomalies scores 0.3 to 0.8 points of capacity below N1 on the quantile
+score over all leads, and 0.3 to 0.5 points better than `manual_heuristic` (a lower score is
+better). It keeps at least half of the 1.80-point gain over the lag-free calibrated stage 1 that
+experiment 00005 measured with ERA5 weather and no telemetry delay. The 5% to 95% band covers 83% to
+87% before a spread factor and 88% to 91% after.
 decision_rule: >-
   Six planned contrasts on the 16 Primary substations, read at 99.17% (Bonferroni across six),
   months and seeds resampled. C1 (primary) is the chain with serving-latency lag anomalies (S)
-  minus N1, and C3 is S minus `manual_heuristic`, both on the quantile score over all leads. The
-  staged design is supported on demand when both C1 and C3 have a point estimate of at most -0.3
-  points and an interval wholly below zero. The threshold of 0.3 points (about 5% of N1's 6.33)
-  is set by the cost of porting: a second model per series, a second weather product at lag times,
-  and a calibrator that must be refitted. The verdict is `small gain` when both intervals are wholly
-  below zero and either point estimate is above -0.3, `refuted` when the C1 interval is wholly above
-  zero or the C3 interval is wholly above zero, and `inconclusive` otherwise. A split outcome, in which
-  one of C1 and C3 is wholly below zero and the other wholly above, is `refuted`. The mean absolute
-  error of the median is reported beside the quantile score and decides nothing.
+--- id: "00018" slug: staged-chain-vs-n1-serving-latency-lag-anomalies-demand status: planned size:
+complex hypothesis: >- For the 16 Primary substation demand series, the staged chain (an
+ERA5-trained stage 1 and the stage 2 calibrator, with lag anomalies built only from weather that
+serving has at the forecast origin, and NGED's real telemetry delay) beats the single-stage
+ENS-trained quantile model N1 and `manual_heuristic` on the quantile score. prediction: >- The chain
+with serving-latency lag anomalies scores 0.3 to 0.8 points of capacity below N1 on the quantile
+score over all leads, and 0.3 to 0.5 points better than `manual_heuristic` (a lower score is
+better). It keeps at least half of the 1.80-point gain over the lag-free calibrated stage 1 that
+experiment 00005 measured with ERA5 weather and no telemetry delay. The 5% to 95% band covers 83% to
+87% before a spread factor and 88% to 91% after. decision_rule: >- Six planned contrasts on the 16
+Primary substations, read at 99.17% (Bonferroni across six), months and seeds resampled. C1
+(primary) is the chain with serving-latency lag anomalies (S) minus N1, and C3 is S minus
+`manual_heuristic`, both on the quantile score over all leads. The staged design is supported on
+demand when both C1 and C3 have a point estimate of at most -0.3 points and an interval wholly below
+zero. The threshold of 0.3 points (about 5% of N1's 6.33) is set by the cost of porting: a second
+model per series, a second weather product at lag times, and a calibrator that must be refitted. The
+verdict is `small gain` when both intervals are wholly below zero and either point estimate is above
+-0.3, `refuted` when the C1 interval is wholly above zero or the C3 interval is wholly above zero,
+and `inconclusive` otherwise. A split outcome, in which one of C1 and C3 is wholly below zero and
+the other wholly above, is `refuted`. The mean absolute error of the median is reported beside the
+quantile score and decides nothing.
 benchmark: >-
   N1 and `manual_heuristic` from experiment 00013 (stored predictions, same row set), plus the
   lag-free calibrated stage 1 R0c of experiment 00005, the production recipe, and `climatology`.
@@ -81,10 +87,9 @@ the chain.
   after the newest usable half-hour (origin minus 7 hours), so the 24-hour lag is unusable at leads
   up to 17 hours.
 - **Which stage 1 models.** Calibration origins use the forward-chain stage 1 model of their
-  quarter, and validation origins use the final model, both from experiment 00005. A chain model stops
-  15 days before its quarter starts, and an origin reads lag times no earlier than 14 days before
-  itself, so every expectation is out of sample. The experiment refits
-  nothing in stage 1.
+  quarter, and validation origins use the final model, both from experiment 00005. A chain model
+  stops 15 days before its quarter starts, and an origin reads lag times no earlier than 14 days
+  before itself, so every expectation is out of sample. The experiment refits nothing in stage 1.
 
 ## Plan: arms
 
@@ -108,11 +113,12 @@ from 2024-04-01 to 2025-06-30). They differ only in the recent-origin inputs. Se
   `manual_heuristic`, so C1 and C3 can be read at equal telemetry freshness. It is exploratory.
 - **CH-E-nodelay (replicates 00005's L3):** final ERA5 and a 0.5-hour delay, as 00005 had.
 - **CH-S-spread:** CH-S quantiles with the spread scaled about the median, `q50 + k (q - q50)`, by
-  one factor `k` for the Primary substations (and one each for the bulk and grid supply points). `k` is chosen from the grid 1.00 to 1.60 in steps of 0.05 on
-  held-out calibration rows: a calibrator fitted on the calibration runs before 2025-01-01 scored on
-  the runs from 2025-01-01 to 2025-06-30 by quantile score. The scored arm uses the full-window
-  calibrator and that `k`. No validation row influences `k`. N1 gets no equivalent tuning, so C6 is descriptive and the
-  verdict never rests on it.
+  one factor `k` for the Primary substations (and one each for the bulk and grid supply points). `k`
+  is chosen from the grid 1.00 to 1.60 in steps of 0.05 on held-out calibration rows: a calibrator
+  fitted on the calibration runs before 2025-01-01 scored on the runs from 2025-01-01 to 2025-06-30
+  by quantile score. The scored arm uses the full-window calibrator and that `k`. No validation row
+  influences `k`. N1 gets no equivalent tuning, so C6 is descriptive and the verdict never rests on
+  it.
 - **References from stored predictions:** N1 (00013), `manual_heuristic`, `climatology`, and the
   production recipe (00013), and R0c, the lag-free calibrated stage 1 (00005), each repeated once
   per seed where unseeded.
@@ -137,7 +143,8 @@ supply points and the two grid supply points, which are descriptive.
 
 Every arm in experiment 00013 under-forecast the validation year by 1.3 to 3.1 points. The page
 reports the mean signed error of the median for every arm and lead band, and the mean absolute error
-after subtracting each arm's per-series mean signed error (an oracle on the validation year, labelled
+after subtracting each arm's per-series mean signed error (an oracle on the validation year,
+labelled
 post hoc), so the drift is not mistaken for a difference between arms.
 
 ## Plan: design confounds
@@ -154,10 +161,10 @@ post hoc), so the drift is not mistaken for a difference between arms.
 ## Plan: leakage and cleanliness
 
 - Nothing is scored on or after 2026-07-01.
-- Lag times, ERA5, CAMS, and proxy rows are all at or before the newest usable half-hour, which is at
-  or before the origin minus 7 hours; a unit check asserts this on every case, and also each source's cutoff: ERA5T times at least
-  5 days before the origin, CAMS times up to 00:00 UTC of the origin day, and proxy values from a
-  run started by the lag time.
+- Lag times, ERA5, CAMS, and proxy rows are all at or before the newest usable half-hour, which is
+  at or before the origin minus 7 hours; a unit check asserts this on every case, and also each
+  source's cutoff: ERA5T times at least 5 days before the origin, CAMS times up to 00:00 UTC of the
+  origin day, and proxy values from a run started by the lag time.
 - Stage 1 models are never refitted. The calibrator trains on valid times up to 2025-06-30 23:30.
 - The spread factor `k` uses calibration runs only.
 - No calendar column enters the calibrator, as in 00005.
