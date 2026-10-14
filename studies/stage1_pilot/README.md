@@ -173,6 +173,7 @@ Series appear as A to F (solar) and W1 to W3 (wind), and no chart carries a cale
 | `stage1_score_arms.py` | Scores every arm, and the climatology, on the same cases; saves per-row losses. |
 | `stage1_stats.py` | Month-resampled intervals for levels, contrasts, and slopes. |
 | `stage1_report.py` | Prints `results/report.md` and saves the tables the charts read. |
+| `stage1_tail.py` | Top-decile comparison (exploratory): MAE, slope, and paired differences on the cases where observed power exceeds the series' training-period 90th percentile; writes `results/tail.md`. |
 | `stage1_charts.py` | Draws the charts. |
 
 Outputs are under `data/studies/per_study/stage1_pilot/`: `inputs/`, `stage1a/` (predictions),
@@ -189,6 +190,7 @@ uv run python studies/stage1_pilot/stage1_fit_enstrained.py --stage noise
 uv run python studies/stage1_pilot/stage1_fit_enstrained.py --stage all
 uv run python studies/stage1_pilot/stage1_score_arms.py
 uv run python studies/stage1_pilot/stage1_report.py
+uv run python studies/stage1_pilot/stage1_tail.py
 uv run python studies/stage1_pilot/stage1_charts.py
 ```
 
@@ -291,6 +293,22 @@ lead band is named, with 95% intervals in brackets.
 
 **Figure 5 (an extreme day and a random day):** drawn to `charts/figure_5.svg` by
 `stage1_charts.py`.
+
+**Top decile of observed power (exploratory, `results/tail.md`).** The cases are those where
+observed power exceeds the series' 90th percentile of cleaned power in the stage 1a training window
+(20,020 solar and 9,747 wind cases per seed). Selecting on the observed value truncates the outcome,
+so every arm's slope is well below 1 and only the paired differences are comparable.
+
+- **For wind, the gain from ERA5 training is much larger in the tail.** `s1_memberavg` minus
+  `ens_trained` on the top-decile cases is -6.14 points over all leads (-7.66 to -4.33, 12 of 12
+  months), against -1.70 on all cases, and -16.54 at 0 to 24 h and -17.56 at 1 to 2 days. With the
+  control member alone, `s1_control` minus `ens_trained_control` is -6.95 (-8.39 to -5.23). At 7 to
+  10 days it is -1.22 (-2.46 to -0.08) and at 11 to 15 days +0.12 (-1.17 to +1.56). Top-decile wind
+  errors are large for every arm except `era5_ceiling` (13 points), which shows the weather input,
+  not the model, limits the tail forecast.
+- **For solar, the tail gain is larger in size but not in certainty.** `s1_memberavg` minus
+  `ens_trained` is -1.05 over all leads (-3.93 to +1.25, 7 of 11 months with a top-decile case), -3.52
+  at 1 to 2 days (-6.24 to -0.89), and near zero at 7 to 15 days.
 
 **Other results.**
 
