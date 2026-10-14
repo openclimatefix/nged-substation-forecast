@@ -156,6 +156,7 @@ nav:
       - "Where does Primary substation demand stand against the stored baselines?": ml-experiments/00013-primary-demand-against-stored-baselines/result.md
       - "Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?": ml-experiments/00011-school-term-and-return-to-work-columns-stage1a-demand/result.md
       - "Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model?": ml-experiments/00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md
+      - "Does the same-time electricity price help a stage 1 demand model explain power?": ml-experiments/00015-same-time-price-stage1-demand/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md

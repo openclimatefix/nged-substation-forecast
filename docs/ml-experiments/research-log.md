@@ -39,6 +39,7 @@ the maintainer to confirm.
 | [00013](00013-primary-demand-against-stored-baselines/result.md) | Where does Primary substation demand stand: does an upgraded ENS-trained quantile model (N1) beat `manual_heuristic`, and why does the production recipe lose to it? | Inconclusive: N1 is level with `manual_heuristic`; the production recipe trails it by 1.69 points | Not for production | 2026-10-14 |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | Not yet merged |
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
+| [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -358,3 +359,24 @@ months, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
   wind)](https://github.com/openclimatefix/nged-substation-forecast/pull/1221).
 
 ![Coverage of the 5% to 95% band by lead band](00016-pooled-mixture-calibration-solar-wind/figure_1.svg)
+
+### 00015: the same-time electricity price in a stage 1 demand model
+
+**The price at the same half-hour as the target lowered the pooled demand error in the selection
+year, but a price from another week did almost as well, and the gain did not repeat in the
+confirmation year.** The stage 1 demand model maps the observed price and ERA5 weather at time t to
+power at time t
+on 17 series (18 in the confirmation year), scored at observed values.
+
+- **Headline result:** price against no price, pooled: -0.52 points of capacity (97.5% interval
+  -0.88 to -0.11) in the selection year and -0.18 (-0.50 to +0.08) in the confirmation year. Price
+  against a price from another week: -0.07 (-0.17 to +0.03) and -0.06 (-0.18 to +0.07).
+- **Finding for later experiments:** national demand and wind at time t did no worse than the price
+  in either year (pooled intervals include zero; 0.43 points lower in the confirmation year), so the
+  price may be a proxy for national conditions. The gain was largest from 12:00 to 20:00 and at the
+  series with the largest errors, and the other-week price reproduced most of it there.
+- **Write-up and pull request:** [result](00015-same-time-price-stage1-demand/result.md), [PR #1220
+  (Experiment 15: same-time price in a stage 1 demand
+  model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1220).
+
+![Pooled contrasts with 97.5% intervals](00015-same-time-price-stage1-demand/figure_1.svg)

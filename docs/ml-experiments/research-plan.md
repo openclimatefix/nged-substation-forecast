@@ -21,7 +21,6 @@ sooner.
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | Nothing | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | Nothing | Proposed |
-| [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the intra-day price at time t, with the weather at time t, help a stage 1 demand model explain power at time t on all 20 series, so that a later experiment can estimate the expected past power and measure how unusual the lagged power was? | 3 | Nothing; the Elexon price data is on disk | Proposed; follows experiment 00010, which was inconclusive |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 | Proposed |
 
 ## Deferred until the first results are in
@@ -126,18 +125,6 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
-
-### P3: historical electricity prices as lagged inputs
-
-**Experiment 00010 ran a first version and was inconclusive; a follow-up on all series is proposed.**
-Experiment 00010 added the price from exactly 7 days earlier to the stage 1a demand model and judged
-it at the two series known to host batteries, of which only one had training history. The follow-up
-the maintainer asked for on 2026-10-14 does not forecast and uses no lags. It trains a stage 1 demand
-model that maps the intra-day price at time t, with the weather at time t, to power at time t, on all
-20 series, with the pooled effect as the headline. A later experiment could feed that model the
-observed prices to estimate the power that should have been metered in the past, and so measure how
-unusual the actual lagged power was. The follow-up keeps the shuffled-price control and adds the
-climatology row that 00010 lacked.
 
 ### P7: the staged chain against the upgraded single-stage model
 
