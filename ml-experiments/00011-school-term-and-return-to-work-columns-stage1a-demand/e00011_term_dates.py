@@ -24,7 +24,8 @@ WINDOW_DAYS: Final[int] = 13
 RETURN_WINDOW_BEFORE: Final[int] = 7
 RETURN_WINDOW_AFTER: Final[int] = 14
 PLACEBO_SHIFT_DAYS: Final[int] = 17
-"""The placebo columns read the real calendar from this many days earlier."""
+"""Placebo A reads the real calendar from this many days earlier, and placebo B from this many
+days later."""
 TERMS_PER_YEAR: Final[int] = 6
 CROSS_CHECK_2025_26: Final[dict[int, tuple[str, str]]] = {
     1: ("2025-09-04", "2025-10-23"),
@@ -67,6 +68,8 @@ def _shape_problems(*, ordered: pl.DataFrame) -> list[str]:
         label = f"{ordered['academic_year'][i]} term {ordered['term'][i]}"
         if a.weekday() >= 5:
             problems.append(f"{label} starts on a weekend")
+        if b.weekday() >= 5:
+            problems.append(f"{label} ends on a weekend")
         if not 4 <= ((b - a).days + 1) / 7 <= 8:
             problems.append(f"{label} lasts {(b - a).days + 1} days")
         if i:
@@ -96,7 +99,7 @@ def validate(*, terms: pl.DataFrame) -> None:
     problems += _shape_problems(ordered=ordered) + _holiday_problems(ordered=ordered)
     for number, (a, b) in CROSS_CHECK_2025_26.items():
         row = terms.filter(pl.col("academic_year") == "2025-26", pl.col("term") == number)
-        if (str(row["first_day"][0]), str(row["last_day"][0])) != (a, b):
+        if row.is_empty() or (str(row["first_day"][0]), str(row["last_day"][0])) != (a, b):
             problems.append(f"2025-26 term {number} differs from the school calendars")
     if ordered["first_day"][0] > FIRST_DATE + timedelta(days=6) or ordered["last_day"][
         -1
@@ -132,8 +135,8 @@ def _signed_nearest(*, local: pl.Expr, anchors: list[date], keep: tuple[int, int
 def calendar_frame(*, terms: pl.DataFrame) -> pl.DataFrame:
     """Return one row per local date from `FIRST_DATE` to `LAST_DATE` with the new columns.
 
-    Columns, each also with a `placebo_` copy that reads the real calendar `PLACEBO_SHIFT_DAYS`
-    earlier:
+    Columns, each also with a `placebo_a_` copy that reads the real calendar `PLACEBO_SHIFT_DAYS`
+    earlier and a `placebo_b_` copy that reads it that many days later:
 
     - `school_term_flag`: 1 on every date from a term's first to its last day (weekends inside a
       term included), otherwise 0.
@@ -145,7 +148,11 @@ def calendar_frame(*, terms: pl.DataFrame) -> pl.DataFrame:
     """
     starts, ends = terms["first_day"].to_list(), terms["last_day"].to_list()
     returns = [first_working_day(year=y) for y in range(FIRST_DATE.year, LAST_DATE.year + 2)]
-    dates = pl.date_range(FIRST_DATE - timedelta(days=PLACEBO_SHIFT_DAYS), LAST_DATE, eager=True)
+    dates = pl.date_range(
+        FIRST_DATE - timedelta(days=PLACEBO_SHIFT_DAYS),
+        LAST_DATE + timedelta(days=PLACEBO_SHIFT_DAYS),
+        eager=True,
+    )
     base = pl.DataFrame({"local_date": dates})
     local = pl.col("local_date")
     in_term = pl.any_horizontal([local.is_between(a, b) for a, b in zip(starts, ends, strict=True)])
@@ -163,13 +170,14 @@ def calendar_frame(*, terms: pl.DataFrame) -> pl.DataFrame:
         ),
     )
     columns = [c for c in real.columns if c != "local_date"]
-    placebo = real.select(
-        (pl.col("local_date") + pl.duration(days=PLACEBO_SHIFT_DAYS)).alias("local_date"),
-        *[pl.col(c).alias(f"placebo_{c}") for c in columns],
-    )
-    return real.join(placebo, on="local_date", how="inner", validate="1:1").filter(
-        pl.col("local_date") >= FIRST_DATE
-    )
+    frame = real
+    for prefix, shift in (("placebo_a_", PLACEBO_SHIFT_DAYS), ("placebo_b_", -PLACEBO_SHIFT_DAYS)):
+        placebo = real.select(
+            (pl.col("local_date") + pl.duration(days=shift)).alias("local_date"),
+            *[pl.col(c).alias(f"{prefix}{c}") for c in columns],
+        )
+        frame = frame.join(placebo, on="local_date", how="left", validate="1:1")
+    return frame.filter(pl.col("local_date").is_between(FIRST_DATE, LAST_DATE))
 
 
 def main() -> None:

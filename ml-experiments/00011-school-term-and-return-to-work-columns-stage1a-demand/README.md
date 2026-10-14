@@ -22,4 +22,5 @@ schools, and foundation schools set their own dates and often differ by a day or
 rests on one school's copy of the council's calendar plus the council's note about its amendment.
 An older copy of that calendar (Olive Anderson School) gives term 5 starting 22 April and term 6
 starting 3 June 2025, which the council's amendment later replaced. Years before 2021-22 are not
-collected, so the experiment trains every arm from 2021-09-01.
+collected, so the experiment trains every arm from 2021-09-01. Only 2025-26 has a second source, so
+`e00011_term_dates.py` cannot catch a mistyped date in another year that still looks plausible.
