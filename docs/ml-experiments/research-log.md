@@ -167,7 +167,7 @@ ERA5 shortwave and CAMS irradiance, fitted per substation on 2024-07 to 2025-06 
 (98.33% interval 38.4% to 53.1%), just under the planned 50%. A fixed daytime shift alone removed
 39.1%, CAMS given ERA5 added a partial R squared of 0.11 (0.08 to 0.13), and the stability ratio was
 0.84. One substation sets the pooled figure: without it the share is 18.2%. A CAMS-trained stage 1a
-(P4) is worth its own test, and the slope statistics of P2 wait for it. See
+(the second stage of P2) is worth its own test, and the slope statistics of P2 wait for it. See
 [`result.md`](00007-cams-static-correction-stage1a-residual/result.md) and [PR #1210 (Experiment 7:
 does a static CAMS correction remove the stage 1a daytime
 residual?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1210).
