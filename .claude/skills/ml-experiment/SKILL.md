@@ -83,19 +83,25 @@ review as `implement-issue` does.
 the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
 the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
-`failed`), the best arm with its headline number, and `advice`. A finished experiment
-also has `production_status` (`candidate`, `adopted`, `superseded`, or `not-for-production`) and
+`failed`), the best arm with its headline number, the lessons learned, and `advice` (below). A
+finished experiment also has `production_status` (`candidate`, `adopted`, `superseded`, or `not-for-production`) and
 `adopted_in` (the model release number, or `none`). Every result has the same front matter, so a later
 session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
-**`advice` is a list of one-line instructions for future experiments, and a result is not finished
-without it.** Each item says what to do, where it applies, and which contrast or section supports it,
-for example "Put recent power into the stage 2 calibrator before building a stage 1b (C1)". Write
-the items from the write-up's lessons and headline contrasts, and drop any item that no number or
-statement in the write-up supports. Before planning a new experiment, read the earlier advice with
+**`advice` is a YAML list of one-line imperatives for future experiments, and a result is not
+finished without it.** Each item says what to do and where it applies, and ends with a pointer to the
+evidence, such as a planned contrast (C1) or a section of the write-up. For example: "Put recent
+power in the stage 2 calibrator, not in stage 1b, for Primary substations (C1)." Write each item as
+a folded YAML scalar (`- >-`), wrapped at 100 characters, so that it makes sense without the page
+around it. Write the items from the write-up's lessons and headline contrasts, and drop any item
+that no number or statement in the write-up supports. The field is separate from the `lessons`
+summary and the page's lessons section, which explain the reasoning, and from `production_status`,
+which says whether the winner is ready for production. Before planning a new experiment, read the
+earlier advice with
 `awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f' docs/ml-experiments/*/result.md`,
-and say in the plan which items it follows and which it departs from. The research log's "What the
-experiments taught us so far" section is the curated roll-up of the `advice` lists.
+which prints a whole list however long it is, and say in the plan which items the plan follows and
+which it departs from. The research log's "What the experiments taught us so far" section is the
+curated roll-up of the `advice` lists.
 
 ## How to score
 
