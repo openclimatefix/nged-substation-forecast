@@ -13,11 +13,8 @@ prediction: >-
   points at the unlisted series.
 decision_rule: >-
   Supported if C1 and C2 are both material at B2: the 98.3% month-resampled interval (95%
-  familywise,
-  Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point estimate is at
-  least 0.1
-  points in the
-  direction stated. Refuted if the C1 interval at B2 excludes a gain of 0.3 points. Otherwise
+  familywise, Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point
+  estimate is at least 0.1 points in the direction stated. Refuted if the C1 interval at B2 excludes a gain of 0.3 points. Otherwise
   inconclusive. The selection year decides; the confirmation year is scored once, and if its
   C1 interval at B2 excludes the selection year's point estimate the verdict is inconclusive.
   Before any fit, the half-width of B2's interval is computed from experiment 00006's per-month
@@ -28,8 +25,8 @@ benchmark: >-
   The experiment 00006 Primary input set with recency weights (arm BASE), and a month-by-half-hour
   climatology row.
 row_set_id: era5_val_2024_07_to_2025_06_v1
-metric: mean absolute error of the median, points of capacity (power over effective capacity, times
-100)
+metric: >-
+  mean absolute error of the median, points of capacity (power over effective capacity, times 100)
 verdict: null
 advice: []
 production_status: null
