@@ -27,6 +27,7 @@ the maintainer to confirm.
 | [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
 | [00005](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | Not yet merged |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
+| [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -156,6 +157,23 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
   substations, the calibrator with recent-origin inputs beat a stage 1b correction, and a lag-free
   calibrator is worth about 1 point of capacity at short leads (00005).
 
+### 00008: summaries of recent power in the stage 2 calibrator
+
+**Adding the minimum, mean, and maximum of the last 24 hours and of the same weekday to the
+calibrator with raw lags changed the score by no resolvable amount.** The experiment reused 00005's
+stage 1 statistics on the same 73 runs, and every arm with ERA5 residuals is a ceiling.
+
+- **Headline result:** C1 (summaries added to L3) was -0.02 points of capacity for leads up to 48
+  hours (98.75% interval -0.14 to +0.13). Replacing the raw power lags with summaries was worse
+  (+0.29).
+- **Finding for later experiments:** summaries alone, without ERA5 residuals, scored 1.18 points
+  better than no recent power up to 48 hours, so they are a forecast-time input.
+- **Write-up and pull request:** [result](00008-lag-summaries-in-stage2-calibrator-demand/result.md),
+  [PR #1209 (Plan experiment 00008: summaries of recent power in the stage 2
+  calibrator)](https://github.com/openclimatefix/nged-substation-forecast/pull/1209).
+
+![Summaries alone clearly beat no recent power](00008-lag-summaries-in-stage2-calibrator-demand/figure_2.svg)
+
 ## Planned experiments
 
 Each planned experiment has a `result.md` with status `planned`, committed before any code runs. An
@@ -165,7 +183,6 @@ committed, and the tentative id then disappears.
 
 | Id | Question | State |
 |---|---|---|
-| [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Planned |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Waits for 00005, and for the 00006 residual analysis to be published |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Source chosen (Elexon Market Index Data); needs a plan |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | Needs school-term dates, and follows 00006 |

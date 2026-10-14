@@ -1,7 +1,7 @@
 ---
 id: "00008"
 slug: lag-summaries-in-stage2-calibrator-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For Primary substation demand series, giving the stage 2 calibrator the minimum, mean, and maximum
@@ -26,15 +26,99 @@ row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score: twice the mass-weighted mean pinball loss over 9 quantile levels, an estimate of
   the continuous ranked probability score (CRPS), in points of capacity
-verdict: null
+verdict: inconclusive
+best_arm: S1 (L3 plus the six summaries), within 0.02 points of L3 up to 48 h
+headline: >-
+  Primary substations, leads up to 48 h, C1 (S1 minus L3): -0.02 (-0.14 to +0.13 at 98.75%), 7 of
+  12 months negative; L3 scores 5.31 and S1 5.29. Summaries replace the raw lags worse (C2 +0.29,
+  C3 +0.35), and summaries alone beat no recent power by 1.18 (C4).
+advice:
+  - >-
+    Keep the raw power lags in the calibrator. Dropping them for summaries raised the quantile
+    score by 0.29 points up to 48 h (S2 minus L3), and the exploratory S1 minus S2 gain from adding
+    the raw lags back was -0.31.
+  - >-
+    Daily minimum, mean, and maximum power carry most of the benefit of lagged power without
+    ERA5 residuals: summaries alone scored 1.18 points better than no recent power up to 48 h
+    (C4), against 1.80 for L3. A production calibrator can take them at forecast time.
+  - >-
+    A gain of 0.15 points is below what 16 Primary substations and 12 months can resolve here: the
+    C1 interval is 0.27 points wide up to 48 h.
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00008-lag-summaries-in-stage2-calibrator-demand/
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1209
 ---
 
 # Do summaries of recent power help the stage 2 calibrator?
 
-**Status: planned.** This page holds the plan only. The results are added after the fits run.
+**Verdict: inconclusive.** Adding the six summaries to 00005's L3 calibrator changed the quantile
+score for leads up to 48 hours by -0.02 points of capacity (98.75% interval -0.14 to +0.13), so the
+prediction of at least -0.15 failed and the interval does not exclude zero. The plan below was
+committed before any fit, and the results above it were written after the run.
+
+## Results
+
+**Adding the summaries to L3 did not change the score by a resolvable amount.** Up to 48 hours
+ahead, the Primary substations' quantile score (twice the mass-weighted pinball loss, an estimate of
+the continuous ranked probability score; smaller is better) was 5.31 for L3, 5.29 for S1, 5.59 for
+S2, 5.65 for S3, 5.93 for S4, 7.11 for R0c, and 8.14 for day-type climatology. Over all leads the
+scores were 6.36, 6.29, 6.46, 6.49, 6.73, 7.47, and 8.21. The refitted L3 matched 00005's L3 exactly
+to two decimals (5.31 up to 48 h, 6.36 over all leads), so the pipeline reproduces 00005.
+
+![Summaries add little to the calibrator that already has raw lags](figure_1.svg)
+
+**All four planned contrasts, Primary substations.** Negative means the first arm is better, and the
+intervals are at 98.75%.
+
+- **C1 (primary), S1 minus L3:** -0.02 up to 48 h (-0.14 to +0.13), 7 of 12 months and 8 of 16
+  series negative. Over all leads -0.06 (-0.18 to +0.06). The gain grows with lead, reaching -0.08
+  at 7 to 10 days (-0.22 to +0.02), and no band excludes zero.
+- **C2, S2 minus L3:** +0.29 up to 48 h (+0.11 to +0.51), 0 of 12 months negative. Replacing the raw
+  power lags with summaries is worse at short leads, and the loss shrinks to +0.04 at 7 to 10 days.
+- **C3, S3 minus L3:** +0.35 up to 48 h (+0.15 to +0.58), 0 of 12 months negative.
+- **C4, S4 minus R0c:** -1.18 up to 48 h (-1.83 to -0.58), 12 of 12 months and 16 of 16 series
+  negative, and -0.74 over all leads (-1.19 to -0.37). Summaries alone, without any ERA5 residual,
+  recover about two thirds of the 1.80 points that L3 gains over R0c (exploratory E3).
+- **Exploratory, S1 minus S2:** -0.31 up to 48 h (95% interval -0.45 to -0.19), so the raw power lags
+  are worth keeping even when the summaries are present.
+
+![Only summaries alone clearly beat no recent power](figure_2.svg)
+
+**The prediction's second clause, a gain within plus and minus 0.15 from 3 to 6 days onward, held
+for C1.** C1 was -0.04 (-0.16 to +0.07) at 3 to 6 days, -0.08 (-0.22 to +0.02) at 7 to 10 days, and
+-0.08 (-0.23 to +0.09) at 11 to 15 days. That clause could not change the verdict.
+
+**The BSP and GSP results are descriptive, from two series each.** Up to 48 h, C1 was +0.10 (-0.08
+to +0.31) for the two bulk supply points and -0.25 (-0.69 to +0.23) for the two grid supply points.
+C4 was -0.04 (-0.23 to +0.15) for the bulk supply points and -1.57 (-3.09 to -0.62) for the grid
+supply points, where drift dominates the error.
+
+## Caveats
+
+- **C1 to C3 are ceilings.** L3, S1, S2, and S3 use ERA5 weather at lag times in their residual
+  columns, which production does not have in time. Only S4 uses recent power alone, and its gain
+  over R0c is the deployable result. S4 still uses the stage 1 statistics of 00005's stage 1a, whose
+  inputs are ERA5-trained.
+- **C2 and C3 change several inputs at once.** Each drops inputs and adds the summaries, so a loss
+  cannot be attributed to either change.
+- **The residuals are partly in-sample when the calibrator trains.** This is shared with 00005 and
+  affects L3, S1, S2, and S3 alike.
+- **The same-weekday summary goes stale with lead.** It covers the previous week's day at leads
+  under a day and a day about a week old at leads near 6 to 7 days. The 48 half-hours start at
+  UTC midnight, so each window holds the previous day's last half-hour stamp and 47 of the target
+  day's own half-hours.
+- **The reviews used Sonnet.** The plan and the code each had one fresh Sonnet review. The code
+  review found no lookahead: it overwrote power and residual with 99 from the origin onward and
+  found every input unchanged.
+
+## Lessons learned
+
+- **Keep the raw power lags.** Replacing them with summaries cost 0.29 points up to 48 h.
+- **Summaries are a cheap forecast-time substitute for lagged residuals.** Daily minimum, mean, and
+  maximum power alone beat no recent power by 1.18 points up to 48 h.
+- **An effect of 0.15 points is near this design's resolution.** The C1 interval is 0.27 points
+  wide, so a larger fold or more series would be needed to resolve it.
 
 ## Plan
 
