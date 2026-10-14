@@ -117,17 +117,17 @@ conventions from data would waste a short history and could not be unit-tested. 
 (diurnal profile against solar geometry) catches an undeclared convention change and raises a WARN
 asset check, not an exception.
 
-**Stage 1 is NWP-agnostic and lead-agnostic.** It trains on analysis weather (ERA5 and CAMS) to
-power. Most trial-area power series go back to late 2019 and the ERA5 ingest starts in 2020, so it
-could use up to roughly 7 years against the roughly 2 years of ENS. Experiments 00001 and 00003
-found that the extra years do not help generators and hurt demand, so the training start is a
-setting for each technology. Stage 1 outputs conditional quantiles of power given the weather, which
-cover what remains uncertain when the weather is known (cloud flicker, unmetered load, site
-variation). The forecast chain uses the per-member median as the member's point value and, as a
-baseline, the mixture of the quantiles over members. **CAMS on disk covers the six solar farms and
-the 22 demand series of the experiments:** hourly point downloads from 2019-09-01 in
-`data/studies/downloads/reanalysis/CAMS`, fetched for [issue #784 (Throwaway experiment: does the
-beam/diffuse split help an XGBoost PV
+**Stage 1 is NWP-agnostic and lead-agnostic.** The experiments call stage 1 "stage 1a" when it has
+no lags and no lead. It trains on analysis weather (ERA5 and CAMS) to power. Most trial-area power
+series go back to late 2019 and the ERA5 ingest starts in 2020, so it could use up to roughly 7
+years against the roughly 2 years of ENS. Experiments 00001 and 00003 found that the extra years do
+not help generators and hurt demand, so the training start is a setting for each technology. Stage 1
+outputs conditional quantiles of power given the weather, which cover what remains uncertain when
+the weather is known (cloud flicker, unmetered load, site variation). The forecast chain uses the
+per-member median as the member's point value and, as a baseline, the mixture of the quantiles over
+members. **CAMS on disk covers the six solar farms and the 22 demand series of the experiments:**
+hourly point downloads from 2019-09-01 in `data/studies/downloads/reanalysis/CAMS`, fetched for
+[issue #784 (Throwaway experiment: does the beam/diffuse split help an XGBoost PV
 forecast?)](https://github.com/openclimatefix/nged-substation-forecast/issues/784) and [PR #1201
 (Download and validate CAMS irradiance at the demand series'
 locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201). Stage 1 for 2,500
@@ -253,12 +253,15 @@ variogram score and include the Schaake shuffle there. The output is always the 
 Other NWPs enter stage 2 as pooled rows and a blend component and do not add members, which removes
 the question of how to pool members of different NWPs.
 
-**Models are specific to each site for substations and pooled for solar and wind.** Experiment 00006
-found that one model per Primary substation scored better than one model per substation type with a
-series identifier (7.11 against 7.34 points of capacity in mean absolute error). The same
-site-specific choice holds for bulk supply points and grid supply points. Solar and wind farms share
-a model, because their output follows the weather and a farm has too little history to carry a model
-of its own. The pooled choice for solar and wind is a decision and not an experimental result.
+**Models are specific to each site for substations and pooled for solar and wind, as a decision of
+the maintainer.** For Primary substations, experiment 00006 found one model per substation slightly
+better than one model per type with a series identifier (7.11 against 7.34 points of capacity), by a
+small unpaired margin whose intervals overlap. For bulk supply points and grid supply points the
+pooled model was marginally lower (8.93 against 9.06, and 23.91 against 23.97), and 00006 says the
+margin is not established. The quick-wins study found the pooled model with a site identifier its
+best arm. The evidence is mixed, so a later experiment may revisit the choice. Solar and wind farms
+share a model, because their output follows the weather and a farm has too little history to carry a
+model of its own. The pooled choice for solar and wind has no experiment behind it.
 
 **Targets for solar and wind power.** Stage 1 could predict a ratio for solar: power divided by
 clear-sky PV power, multiplied back by the known half-hourly clear-sky curve, so the output stays in
@@ -403,7 +406,7 @@ versioned stage 1 artefact, and a rule-based detector first.
 
 ## What the experiments show
 
-**Six experiments and one closed study give the evidence so far.** The [research
+**Seven experiments and one closed study give the evidence so far.** The [research
 log](../ml-experiments/research-log.md) holds
 each experiment's question, verdict, and figures; the bullets give the headline of each. Pull
 request numbers for 00005 and 00006 are [PR #1195 (Experiment 5: where lagged power enters a
@@ -443,6 +446,10 @@ model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202).
   irradiance was inconclusive. CAMS added to ERA5 shortwave had a partial R² of 0.110, and the
   result rests largely on one substation, so it does not separate an irradiance error from a change
   in embedded solar capacity.
+- **00008, Primary substations:** summaries of recent power (the minimum, mean, and maximum of the
+  latest 24 hours and of the latest day on the same weekday) in the stage 2 calibrator added -0.02
+  points to raw lags up to 48 hours (98.75% interval -0.14 to +0.13). The interval is too wide to
+  resolve 0.15 points, so the verdict is inconclusive.
 - **Indicative inputs from a closed study ([PR #1175 (Study XGBoost pipeline fixes, lean inputs and
   calibration
   diagnostics)](https://github.com/openclimatefix/nged-substation-forecast/pull/1175)):** the
