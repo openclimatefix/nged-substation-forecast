@@ -45,6 +45,7 @@ from studies.era5_grid import (
     LAST_DATE,
     LAST_YEAR,
     OUTPUT_SUFFIX,
+    PUBLISHED_LAST_DATE,
     first_date_of,
 )
 from studies.sources import CAMS_PRODUCT_DIR
@@ -218,8 +219,9 @@ def fetch_one(*, job: SiteYear) -> Path:
             client.retrieve(DATASET, request_body(job=job), str(partial))
             strip_coordinates(path=partial)
             assert_no_coordinates(path=partial, job=job)
-        except Exception:  # noqa: BLE001  # any failure of the remote call is retried, then raised
+        except Exception as error:  # noqa: BLE001  # any failure of the remote call is retried, then raised
             partial.unlink(missing_ok=True)
+            _LOG.warning("site %s %d: %s", job.site, job.year, type(error).__name__)
             if attempt == len(RETRY_WAITS_SECONDS):
                 msg = f"site {job.site} {job.year} failed after {attempt + 1} attempts"
                 raise RuntimeError(msg) from None
@@ -437,7 +439,7 @@ def check_series(*, series: pl.DataFrame) -> None:
 
 def main() -> int:
     """Download every site-year and write the tidy frame, `lineage.json`, and `README.md`."""
-    if FIRST_DATE_OVERRIDE or OUTPUT_SUFFIX:
+    if FIRST_DATE_OVERRIDE or OUTPUT_SUFFIX or LAST_DATE != PUBLISHED_LAST_DATE:
         msg = "this script writes only the published window; unset the ERA5_* overrides"
         raise SystemExit(msg)
     parser = argparse.ArgumentParser(description=__doc__.split("\n", maxsplit=1)[0])

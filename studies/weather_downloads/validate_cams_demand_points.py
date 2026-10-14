@@ -9,7 +9,8 @@ Run after `fetch_cams_demand_points.py` finishes. It applies the `data-validatio
 - the mean daily profile by hour of day (one smooth daytime peak near local solar noon);
 - the timestamp convention, by correlating the hourly irradiance with ERA5's hourly shortwave
   at shifts of -1, 0, and +1 hour: the unshifted label (hour-ending) should correlate best;
-- steps in the monthly mean at any series.
+- the largest and smallest year-on-year ratio of a series' monthly mean (a seasonal-size range, not
+  a step test).
 
 No coordinate is read or written: the series are the labels D1 to D22.
 
@@ -87,6 +88,7 @@ def main() -> None:
         .agg(pl.col("shortwave").mean().alias("era5"))
     )
     correlations = {}
+    findings["rows_joined_with_era5"] = frame.join(hourly, on=["site", "time"]).height
     for shift in (-1, 0, 1):
         shifted = frame.with_columns(time=pl.col("time").dt.offset_by(f"{shift}h"))
         joined = shifted.join(hourly, on=["site", "time"], how="inner")
