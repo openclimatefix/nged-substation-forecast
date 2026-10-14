@@ -84,9 +84,21 @@ the code runs, so the commit order proves the hypothesis came first. Its front m
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
 the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
 `failed`), the best arm with its headline number, and the lessons learned. A finished experiment
-also has `production_status` (`candidate`, `adopted`, `superseded`, or `not-for-production`) and
-`adopted_in` (the model release number, or `none`). Every result has the same front matter, so a later
-session finds results with `grep` over `docs/ml-experiments/*/result.md`.
+also has an `advice` list (below), `production_status` (`candidate`, `adopted`, `superseded`, or
+`not-for-production`) and `adopted_in` (the model release number, or `none`). Every result has the
+same front matter, so a later session finds results with `grep` over
+`docs/ml-experiments/*/result.md`.
+
+**A finished experiment's front matter has an `advice` field, which every new plan starts by
+reading.** The field is a YAML list of one-line imperatives, each saying what to do and where it
+applies, and each ending with a pointer to the evidence, such as a planned contrast (P1) or a
+section of the write-up. For example: "Put recent power in the stage 2 calibrator, not in stage 1b,
+for Primary substations (C1)." Write each item as a folded YAML scalar (`- >-`), wrapped at 100
+characters. A plan begins by reading the `advice` list of every `result.md`, with `grep -A20
+'^advice:' docs/ml-experiments/*/result.md`, so each item must make sense without the page around
+it. The field is separate from the page's "Lessons" section, which explains the reasoning in prose,
+and from `production_status`, which says whether an experiment's winner is ready for production. The
+research log's "What the experiments taught us so far" section stays the curated roll-up.
 
 ## How to score
 

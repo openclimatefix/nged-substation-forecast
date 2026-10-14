@@ -41,6 +41,41 @@ lessons: >-
   The weather block already carries the season, so time-of-year columns show no detectable gain;
   windchill changes nothing; the choice of training window and lockdown handling matters about as
   much as any added column.
+advice:
+  - >-
+    Use the weather block, hour, weekday, and the COVID indicator as the stage 1a demand inputs for
+    Primary, BSP, and GSP substations (P1, P6, section "What to use for each substation type").
+  - >-
+    Window the days to Christmas to 14 days either side of 25 December and leave it missing
+    elsewhere, because the unwindowed column also flips sign every late June (Christmas control,
+    special-day windows).
+  - >-
+    Weight recent years more when training the stage 1a demand model, with a half-life of 2 years
+    (P7).
+  - >-
+    Choose the training window and the lockdown handling before adding columns, and do not add their
+    gains together (P6, P7, P9).
+  - >-
+    Treat a training start of 2023-09 as unconfirmed until a fresh year scores it (P9).
+  - >-
+    Leave time-of-year columns out of the stage 1a demand model, because the weather block already
+    carries the season (P2).
+  - >-
+    Leave windchill out of the stage 1a demand model (P5, section "Windchill changes nothing").
+  - >-
+    Score a new calendar column on the Christmas, Easter, and summer-holiday windows as well as on
+    the whole year, because a column can help a few days a year and barely move the average
+    (special-day windows).
+  - >-
+    Add a half-year flag control whenever a calendar column is signed or cyclic, before crediting it
+    (Christmas control).
+  - >-
+    Treat BSP and GSP findings as provisional until more series are scored, because each type has
+    two series (section "What to use for each substation type").
+  - >-
+    Compare irradiance read at the substation's own location, such as CAMS, with ERA5 shortwave
+    before building an embedded-solar feature (section "The daytime errors of the typical substation
+    follow satellite irradiance").
 production_status: candidate
 adopted_in: none
 code: ml-experiments/00006-stage1a-demand-input-feature-sweep/
