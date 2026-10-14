@@ -8,9 +8,8 @@ Stages (each writes predictions under `fits/<stage>/<fold>/`):
 - `drop_one`: the chosen set with each group removed.
 - `confirm`: the frozen set, run only on the confirmation fold, after `selection.json` exists.
 
-    uv run python \
-        ml-experiments/00006-stage1a-demand-input-feature-sweep/e00006_sweep.py \
-        add_one_in select_2024
+    cd ml-experiments/00006-stage1a-demand-input-feature-sweep
+    uv run python e00006_sweep.py add_one_in select_2024
 """
 
 import json
