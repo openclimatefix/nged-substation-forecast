@@ -51,13 +51,14 @@ def _features(rows: Sequence[tuple[int, datetime, float | None]]) -> pt.LazyFram
 
 
 def _forecaster(
-    *, experiment_name: str = "", ml_flow_experiment_id: int | None = None
+    *, experiment_name: str = "", ml_flow_experiment_id: int | None = None, model_release: int = 0
 ) -> ClimatologyForecaster:
     return ClimatologyForecaster(
         BaseForecasterConfig(
             selected_features=set(),
             experiment_name=experiment_name,
             ml_flow_experiment_id=ml_flow_experiment_id,
+            model_release=model_release,
         )
     )
 
@@ -192,14 +193,14 @@ def test_train_on_no_samples_warns_and_predict_drops_every_row(
 
 
 def test_predict_stamps_the_identity_columns() -> None:
-    forecaster = _forecaster(experiment_name="exp_clim", ml_flow_experiment_id=7)
+    forecaster = _forecaster(experiment_name="exp_clim", ml_flow_experiment_id=7, model_release=3)
     forecaster.train(_features(_january_weekday_samples()), [1])
 
     forecast = forecaster.predict(_features([(1, _utc(2025, 1, 14), 5.0)]), fold_id="fold_x")
 
     assert forecast.height == CLIMATOLOGY_MEMBER_COUNT
     assert forecast["power_fcst_model_name"].unique().to_list() == ["climatology"]
-    assert forecast["power_fcst_model_version"].unique().to_list() == [1]
+    assert forecast["power_fcst_model_version"].unique().to_list() == [3]
     assert forecast["experiment_name"].unique().to_list() == ["exp_clim"]
     assert forecast["ml_flow_experiment_id"].unique().to_list() == [7]
     assert forecast["fold_id"].unique().to_list() == ["fold_x"]

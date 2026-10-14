@@ -28,7 +28,6 @@ from per_run_scores import (
 from report_tables import markdown_table
 from studies.guards import refuse_to_overwrite
 from studies.power import scan_power
-from xgboost_forecaster.forecaster import XGBoostForecaster
 
 STORED_EXPERIMENTS: Final[tuple[str, ...]] = (
     "xgboost_baseline",
@@ -72,8 +71,8 @@ def _score_stored(
 def _stored_config(*, experiment: str) -> str:
     """Describe whether the stored experiment's registered configuration equals the yaml's.
 
-    The comparison drops the two fields that name the experiment, and the stored forecast rows'
-    model version is compared with the forecaster class's. The stored rows' `power_fcst` was
+    The comparison drops the two fields that name the experiment, and `model_release`, which
+    is not a model setting. The stored rows' `power_fcst` was
     rounded to a reduced significand on write, which the refit's unrounded values are not.
     """
     mlflow.set_tracking_uri(Settings().mlflow_tracking_uri)
@@ -81,7 +80,7 @@ def _stored_config(*, experiment: str) -> str:
     if found is None or "config" not in found.tags:
         return f"No registered configuration was found for {experiment}, so it was not compared."
     stored = json.loads(found.tags["config"])
-    ignored = {"experiment_name", "ml_flow_experiment_id"}
+    ignored = {"experiment_name", "ml_flow_experiment_id", "model_release"}
     current = inputs.production_config().model_dump(mode="json")
     differing = sorted(
         key for key in (set(stored) | set(current)) - ignored if stored.get(key) != current.get(key)
@@ -97,7 +96,7 @@ def _stored_config(*, experiment: str) -> str:
     return (
         f"Fields differing between the registered configuration of {experiment} and "
         f"`conf/model/xgboost.yaml`: {differing or 'none'}. Stored rows carry model version "
-        f"{versions}; the forecaster class is version {XGBoostForecaster.MODEL_VERSION}."
+        f"{versions}."
     )
 
 

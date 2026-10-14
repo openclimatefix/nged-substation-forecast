@@ -11,7 +11,7 @@
 #   docker build --platform linux/arm64 \
 #     --build-context production_model="$(realpath data/production_model)" \
 #     --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD) \
-#     -t nged-forecast:<id-short> .
+#     -t nged-forecast:<id-short>-<commit-short> .
 #
 # The champion model must already be promoted to data/production_model/ (via the
 # `promoted_model` Dagster asset) before running this build — the build itself never talks to

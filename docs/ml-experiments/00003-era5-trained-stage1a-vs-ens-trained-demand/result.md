@@ -20,13 +20,15 @@ benchmark: >-
 row_set_id: fold_a_every5d_v1
 metric: mean absolute error of the ensemble-mean forecast, points of capacity
 verdict: not supported
+production_status: not-for-production
+adopted_in: none
 best_arm: s1_short (V2)
 headline: >-
   D1, s1_memberavg minus ens_trained, weather only, all leads: +1.37 (+0.68 to +2.17), 22 series;
   with calendar +1.38 (D2, against the one-row-per-valid-time arm: +1.67); with calendar and
   lags +0.10 (-0.26 to +0.50). Not supported.
 code: studies/stage1_pilot/
-pull_request: pending
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1192
 ---
 
 # Does an ERA5-trained weather-to-power model beat the same model trained on ENS, for demand?

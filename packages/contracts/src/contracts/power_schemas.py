@@ -500,7 +500,7 @@ class PowerForecast(pt.Model):
     power_fcst_model_version: int = pt.Field(
         dtype=pl.Int16,
         description=(
-            "Model version integer, bumped with each breaking change to the model implementation."
+            "Production model release number. 0 for a CV run that is not a numbered release."
         ),
     )
 

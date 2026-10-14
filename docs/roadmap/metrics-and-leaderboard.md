@@ -382,7 +382,7 @@ tracked in [#1087](https://github.com/openclimatefix/nged-substation-forecast/is
 helper, which the climatology PR extracted into `baseline_forecasters`. No `StatelessForecaster`
 base class until a third stateless model exists.
 
-- `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`. Config default
+- `MODEL_NAME = "persistence"`. Config default
   `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
 - `train()` records the sorted `trained_time_series_ids` (the requested ids present in the data,
   mirroring XGBoost's "no usable rows → not trained" semantics). `predict()` = `pl.coalesce` of the
