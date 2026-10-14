@@ -53,7 +53,15 @@ class FittedArm:
 
 
 def arm_columns(*, arm: common.ArmType, technology: common.TechnologyType) -> list[str]:
-    """Return the input columns of an arm."""
+    """Return the input columns of an arm.
+
+    Args:
+        arm: The arm's name.
+        technology: The series' technology.
+
+    Returns:
+        The column names, in model order.
+    """
     if arm == "small_block":
         return list(common.SMALL_SOLAR_FEATURES)
     if arm == "speed_block":
@@ -196,22 +204,39 @@ def weather_for_arm(
     *, arm: common.ArmType, frame: pl.DataFrame, stage0: xgb.Booster | None
 ) -> pl.DataFrame:
     """Return the frame with the shortwave an arm reads: stage 0's for `cams_stage0`."""
-    if arm == "cams_stage0" and stage0 is not None:
-        return frame.with_columns(shortwave=pl.Series(apply_stage0(booster=stage0, frame=frame)))
-    return frame
+    if arm != "cams_stage0":
+        return frame
+    if stage0 is None:
+        msg = "arm cams_stage0 needs a stage 0 model"
+        raise ValueError(msg)
+    return frame.with_columns(shortwave=pl.Series(apply_stage0(booster=stage0, frame=frame)))
 
 
 def member_average(*, frame: pl.DataFrame, point: np.ndarray, arm: str) -> pl.DataFrame:
     """Average an arm's per-member predictions over the 51 members of each case.
+
+    Args:
+        frame: The ENS rows the predictions were made for, with the key columns and
+            `ensemble_member`.
+        point: The arm's power fraction for each row of `frame`.
+        arm: The arm's name.
+
+    Returns:
+        One row per case with the keys, `point_norm` (the member average), `control_norm` (member
+        0's value), and `arm`.
 
     Raises:
         ValueError: If a case does not hold every member.
     """
     averaged = (
         frame.select(*common.KEY_COLUMNS)
-        .with_columns(point_norm=pl.Series(point))
+        .with_columns(point_norm=pl.Series(point), ensemble_member=frame["ensemble_member"])
         .group_by(common.KEY_COLUMNS)
-        .agg(pl.col("point_norm").mean(), members=pl.len())
+        .agg(
+            pl.col("point_norm").mean(),
+            control_norm=pl.col("point_norm").filter(pl.col("ensemble_member") == 0).first(),
+            members=pl.len(),
+        )
     )
     if (averaged["members"] != common.MEMBERS).any():
         msg = f"arm {arm}: a case does not have all {common.MEMBERS} members"
@@ -252,6 +277,36 @@ def stage0_sanity(*, ens_train: pl.DataFrame, cams: pl.DataFrame) -> None:
     print("\n".join(lines), flush=True)
 
 
+def write_ceiling(
+    *,
+    seed: int,
+    sites: pl.DataFrame,
+    analysis: pl.DataFrame,
+    fitted: dict[tuple[int, common.ArmType], FittedArm],
+) -> None:
+    """Apply arm `w` to ERA5 weather at the validation valid times and write the result."""
+    ceiling_target = CEILING_DIR / f"seed{seed}.parquet"
+    window = analysis.filter(
+        (pl.col("valid_time") >= common.VALIDATION_START) & (pl.col("valid_time") < common.HOLDOUT)
+    )
+    ceiling = [
+        window.filter(pl.col("time_series_id") == series)
+        .select("time_series_id", "valid_time")
+        .with_columns(
+            point_norm=pl.Series(
+                predict_arm(
+                    fitted=fitted[series, "w"],
+                    frame=window.filter(pl.col("time_series_id") == series),
+                )
+            )
+        )
+        for series in sites["time_series_id"].to_list()
+    ]
+    CEILING_DIR.mkdir(parents=True, exist_ok=True)
+    pl.concat(ceiling).write_parquet(ceiling_target.with_suffix(".tmp"))
+    ceiling_target.with_suffix(".tmp").rename(ceiling_target)
+
+
 def fit_seed(
     *,
     seed: int,
@@ -282,7 +337,10 @@ def fit_seed(
 
     pieces: list[pl.DataFrame] = []
     for path in sorted(common.ENS_VALIDATION_DIR.glob("init=*.parquet")):
-        frame = pl.read_parquet(path)
+        frame = pl.read_parquet(path).with_columns(
+            lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
+            / 60.0
+        )
         for (series_key,), part in frame.partition_by("time_series_id", as_dict=True).items():
             series = int(series_key)
             if (series, "w") not in fitted:
@@ -290,33 +348,14 @@ def fit_seed(
             for (fitted_series, arm_name), model in fitted.items():
                 if fitted_series != series:
                     continue
-                arm = arm_name
-                inputs = weather_for_arm(arm=arm, frame=part, stage0=stage0)
+                inputs = weather_for_arm(arm=arm_name, frame=part, stage0=stage0)
                 point = predict_arm(fitted=model, frame=inputs)
-                pieces.append(member_average(frame=part, point=point, arm=arm))
+                pieces.append(member_average(frame=part, point=point, arm=arm_name))
     MEMBER_AVERAGE_DIR.mkdir(parents=True, exist_ok=True)
     pl.concat(pieces).write_parquet(target.with_suffix(".tmp"))
     target.with_suffix(".tmp").rename(target)
 
-    window = analysis.filter(
-        (pl.col("valid_time") >= common.VALIDATION_START) & (pl.col("valid_time") < common.HOLDOUT)
-    )
-    ceiling = [
-        window.filter(pl.col("time_series_id") == series)
-        .select("time_series_id", "valid_time")
-        .with_columns(
-            point_norm=pl.Series(
-                predict_arm(
-                    fitted=fitted[series, "w"],
-                    frame=window.filter(pl.col("time_series_id") == series),
-                )
-            )
-        )
-        for series in sites["time_series_id"].to_list()
-    ]
-    CEILING_DIR.mkdir(parents=True, exist_ok=True)
-    pl.concat(ceiling).write_parquet(ceiling_target.with_suffix(".tmp"))
-    ceiling_target.with_suffix(".tmp").rename(ceiling_target)
+    write_ceiling(seed=seed, sites=sites, analysis=analysis, fitted=fitted)
     print(f"seed {seed} done in {time.monotonic() - started:.0f} s", flush=True)
 
 

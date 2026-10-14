@@ -141,7 +141,7 @@ MAX_ZENITH_DEGREES: Final[float] = 85.0
 CLEAR_SKY_FIT_MIN_W_M2: Final[float] = 300.0
 CLEAR_SKY_QUANTILE: Final[float] = 0.99
 MIN_CLEAR_SKY_FRACTION: Final[float] = 0.01
-"""Rows whose clear-sky power is below this fraction of capacity get a ratio of zero."""
+"""Training rows whose clear-sky power is below this fraction of capacity are dropped."""
 MAX_RATIO: Final[float] = 2.0
 SPEED_BIN_WIDTH_M_S: Final[float] = 0.5
 
@@ -186,7 +186,7 @@ def site_table() -> pl.DataFrame:
 
 
 def observed_training_power(*, sites: pl.DataFrame) -> pl.DataFrame:
-    """Return cleaned power over capacity from the ERA5 era to the validation start.
+    """Return cleaned power over capacity from the ERA5 era to the end of training.
 
     Rows before each series' settling cutoff are dropped, as the stage 1 pilot did.
 
@@ -201,7 +201,7 @@ def observed_training_power(*, sites: pl.DataFrame) -> pl.DataFrame:
         .filter(
             pl.col("time_series_id").is_in(sites["time_series_id"].to_list()),
             pl.col("time") >= ERA5_START,
-            pl.col("time") < VALIDATION_START,
+            pl.col("time") < TRAIN_END,
         )
         .select("time_series_id", pl.col("time").alias("valid_time"), "power")
         .collect()
