@@ -148,6 +148,7 @@ nav:
       - "Where should lagged power enter a two-stage demand forecast?": ml-experiments/00005-lag-placement-stage1b-vs-stage2-demand/result.md
       - "Which inputs work best for the ERA5-trained demand model?": ml-experiments/00006-stage1a-demand-input-feature-sweep/result.md
       - "Does a static CAMS correction remove the stage 1a daytime residual?": ml-experiments/00007-cams-static-correction-stage1a-residual/result.md
+      - "Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?": ml-experiments/00011-school-term-and-return-to-work-columns-stage1a-demand/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
