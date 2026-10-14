@@ -10,7 +10,8 @@ hypothesis: >-
   `manual_heuristic` on the quantile score.
 prediction: >-
   The chain with serving-latency lag anomalies scores 0.3 to 0.8 points of capacity below N1 on the
-  quantile score over all leads, and 0.3 to 0.5 points better than `manual_heuristic` (a lower score is better). It keeps at least
+  quantile score over all leads, and 0.3 to 0.5 points better than `manual_heuristic` (a lower
+  score is better). It keeps at least
   half of the 1.80-point gain over the lag-free calibrated stage 1 that experiment 00005 measured
   with ERA5 weather and no telemetry delay. The 5% to 95% band covers 83% to 87% before a spread
   factor and 88% to 91% after.
@@ -108,11 +109,11 @@ from 2024-04-01 to 2025-06-30). They differ only in the recent-origin inputs. Se
   `manual_heuristic`, so C1 and C3 can be read at equal telemetry freshness. It is exploratory.
 - **CH-E-nodelay (replicates 00005's L3):** final ERA5 and a 0.5-hour delay, as 00005 had.
 - **CH-S-spread:** CH-S quantiles with the spread scaled about the median, `q50 + k (q - q50)`, by
-  one factor `k` for the Primary substations (and one each for the bulk and grid supply points). `k` is chosen from the grid 1.00 to 1.60 in steps of 0.05 on
-  held-out calibration rows: a calibrator fitted on the calibration runs before 2025-01-01 scored on
+  one factor `k` for the Primary substations (and one each for the bulk and grid supply points).
+  `k` is chosen from the grid 1.00 to 1.60 in steps of 0.05 on held-out calibration rows: a calibrator fitted on the calibration runs before 2025-01-01 scored on
   the runs from 2025-01-01 to 2025-06-30 by quantile score. The scored arm uses the full-window
-  calibrator and that `k`. No validation row influences `k`. N1 gets no equivalent tuning, so C6 is descriptive and the
-  verdict never rests on it.
+  calibrator and that `k`. No validation row influences `k`. N1 gets no equivalent tuning, so C6 is
+  descriptive and the verdict never rests on it.
 - **References from stored predictions:** N1 (00013), `manual_heuristic`, `climatology`, and the
   production recipe (00013), and R0c, the lag-free calibrated stage 1 (00005), each repeated once
   per seed where unseeded.
@@ -155,9 +156,9 @@ post hoc), so the drift is not mistaken for a difference between arms.
 
 - Nothing is scored on or after 2026-07-01.
 - Lag times, ERA5, CAMS, and proxy rows are all at or before the newest usable half-hour, which is at
-  or before the origin minus 7 hours; a unit check asserts this on every case, and also each source's cutoff: ERA5T times at least
-  5 days before the origin, CAMS times up to 00:00 UTC of the origin day, and proxy values from a
-  run started by the lag time.
+  or before the origin minus 7 hours; a unit check asserts this on every case, and also each
+  source's cutoff: ERA5T times at least 5 days before the origin, CAMS times up to 00:00 UTC of the
+  origin day, and proxy values from a run started by the lag time.
 - Stage 1 models are never refitted. The calibrator trains on valid times up to 2025-06-30 23:30.
 - The spread factor `k` uses calibration runs only.
 - No calendar column enters the calibrator, as in 00005.
