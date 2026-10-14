@@ -98,8 +98,9 @@ so N1 trains on 15 months where S1 trains on 22. C5 therefore mixes the effect o
 with the effect of the shorter window. The stored arms have no seed, so each is repeated once per
 seed as the skill requires; the three copies are identical, and the intervals resample months.
 
-**Diagnosis of the production gap.** The stored forecasts are split by lead band and series; the gap between production and `manual_heuristic` is decomposed into bias (mean error) and
-the rest; and the ladder PROD, S1, N1-nolag, N1 shows which step recovers the gap.
+**Diagnosis of the production gap.** The stored forecasts are split by lead band and series; the
+gap between production and `manual_heuristic` is decomposed into bias (mean error) and the rest;
+and the ladder PROD, S1, N1-nolag, N1 shows which step recovers the gap.
 
 ## Planned contrasts (99%, Primary substations)
 
