@@ -309,10 +309,11 @@ so every arm's slope is well below 1 and only the paired differences are compara
   alone, `s1_control` minus `ens_trained_control` is -6.95 (-8.39 to -5.23). At 7 to 10 days it is
   -1.22 (-2.46 to -0.08) and at 11 to 15 days +0.12 (-1.17 to +1.56). Top-decile wind errors are
   large for every arm except `era5_ceiling` (13 points), so the weather input is associated with
-  most of the top-decile error. - **For solar, the tail gain is larger in points but not in
-  certainty, and smaller in relative terms (4% against 7%).** `s1_memberavg` minus `ens_trained` is
-  -1.05 over all leads (-3.93 to +1.25, 7 of 11 months with a top-decile case), -3.52 at 1 to 2 days
-  (-6.24 to -0.89), and near zero at 7 to 15 days.
+  most of the top-decile error.
+- **For solar, the tail gain is larger in points but not in certainty, and smaller in relative terms
+  (4% against 7%).** `s1_memberavg` minus `ens_trained` is -1.05 over all leads (-3.93 to +1.25, 7
+  of 11 months with a top-decile case), -3.52 at 1 to 2 days (-6.24 to -0.89), and near zero at 7 to
+  15 days.
 
 **Other results.**
 
