@@ -136,3 +136,21 @@ Absolute scores are reported for every arm.
 
 **Not tested here.** Lagged power, forecasting from ENS weather, and downloaded COVID series
 (Oxford stringency, Google mobility).
+
+## Selection on 2024-07 to 2025-06, and the frozen set
+
+**Written before anything was scored on 2025-07-01 to 2026-06-30.** The selection fold scores 17
+series (13 Primary, 2 BSP, 2 GSP): series without a year of observed training power before the
+fold are left out of it (3 series). Mean absolute error of the median, points of capacity, one
+model per series, one seed for the sweep, three for the planned contrasts.
+
+- **Greedy forward selection from W plus the clock** added the COVID indicator (-0.39 points) and
+  then the signed days to the nearest holiday (-0.13 points), and stopped when the next best
+  addition (azimuth sine and cosine) gained 0.04 points, under the 0.1-point minimum.
+- **Frozen feature set:** W plus `hour_local`, `day_of_week_local`, `covid_indicator`, and
+  `days_to_nearest_holiday`. Training from the whole history with recency weights (half-life 2
+  years) scored 0.3 points lower than unweighted training on the selection fold, so both the
+  weighted and the unweighted fit are scored on the confirmation fold.
+- **Planned contrasts P1 to P7 on the selection fold** (Bonferroni-widened 99.4% intervals): P1
+  -0.51 (-0.66 to -0.37), P2 +0.14 (-0.56 to +0.81), P3 -0.10 (-0.21 to -0.01), P4 +0.05 (-0.03 to
+  +0.12), P5 -0.003 (-0.024 to +0.013), P6 -0.40 (-0.60 to -0.19), P7 -0.46 (-0.63 to -0.24).

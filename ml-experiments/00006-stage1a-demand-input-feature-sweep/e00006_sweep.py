@@ -20,7 +20,7 @@ import e00006_fit as fit
 import e00006_inputs as inputs
 import polars as pl
 
-MIN_GAIN_POINTS: Final[float] = 0.05
+MIN_GAIN_POINTS: Final[float] = 0.1
 """Greedy selection stops when the best addition lowers the error by less than this."""
 MAX_GREEDY_STEPS: Final[int] = 6
 SELECTION_PATH: Final[Path] = inputs.EXPERIMENT_DIR / "selection.json"
@@ -98,10 +98,47 @@ def drop_one(*, fold_name: str) -> None:
     fit.run_stage(stage="drop_one", fold_name=fold_name, config="series", arm_names=names, seeds=[0])
 
 
+def selected_groups() -> tuple[str, ...]:
+    """Return the groups of the set greedy selection ended on."""
+    return tuple(json.loads(SELECTION_PATH.read_text())["path"][-1]["set"])
+
+
+def candidates(*, fold_name: str) -> None:
+    """Fit the selected set with each treatment and training start (one seed)."""
+    chosen = selected_groups()
+    without_flag = tuple(g for g in chosen if g != "covid_flag")
+    names = [
+        fit.Arm(groups=chosen).name,
+        fit.Arm(groups=chosen, treatments=("recency",)).name,
+        fit.Arm(groups=chosen, treatments=("block",)).name,
+        fit.Arm(groups=without_flag, treatments=("nocovid",)).name,
+        fit.Arm(groups=without_flag, treatments=("recency", "nocovid")).name,
+        fit.Arm(groups=chosen, train_start="2023-09").name,
+        fit.Arm(groups=chosen, train_start="2024-04").name,
+        fit.Arm(groups=chosen, treatments=("recency",), train_start="2023-09").name,
+    ]
+    fit.run_stage(stage="candidates", fold_name=fold_name, config="series", arm_names=names, seeds=[0])
+
+
+def planned(*, fold_name: str) -> None:
+    """Fit the arms of the planned contrasts P1 to P7 with three seeds."""
+    names = [
+        fit.Arm(groups=()).name,
+        fit.Arm(groups=("windchill",)).name,
+        fit.Arm(groups=("clock",)).name,
+        fit.Arm(groups=("clock", "doy1")).name,
+        fit.Arm(groups=("clock", "hol_flags")).name,
+        fit.Arm(groups=("clock", "t24")).name,
+        fit.Arm(groups=("clock", "covid_flag")).name,
+        fit.Arm(groups=("clock",), treatments=("recency",)).name,
+    ]
+    fit.run_stage(stage="planned", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+
+
 def main() -> None:
     """Dispatch a stage named on the command line."""
     stage, fold_name = sys.argv[1], sys.argv[2]
-    {"add_one_in": add_one_in, "greedy": greedy, "drop_one": drop_one}[stage](fold_name=fold_name)
+    {"add_one_in": add_one_in, "greedy": greedy, "drop_one": drop_one, "candidates": candidates, "planned": planned}[stage](fold_name=fold_name)
 
 
 if __name__ == "__main__":
