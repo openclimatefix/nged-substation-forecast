@@ -66,8 +66,8 @@ advice:
     small gain (-0.021, -0.043 to -0.002; W5, W3).
   - >-
     Leave stage 0 out of the solar stage 1a: a quantile mapping of ENS shortwave onto CAMS did not lower the
-    CRPS (+0.036, -0.093 to +0.208) and widened the daylight member spread by 25%, with monthly ratios to
-    CAMS from 0.83 to 1.10 (S3, stage 0 check).
+    CRPS (+0.036, -0.093 to +0.208) and widened the daylight member spread by 25%, with monthly
+    ratios to CAMS from 0.83 to 1.10 (S3, stage 0 check).
   - >-
     Do not expect a point-forecast gain for CAMS-trained solar stage 1a to show in the pooled
     mixture's CRPS: it was -0.009 (-0.127 to +0.072), against -0.14 in the mean absolute error of
@@ -188,7 +188,8 @@ the base margin from the wind stack gives `base_spread`.
 
 ## Planned contrasts
 
-The experiment plans 12 contrasts. Each is the arm named first minus the arm named second, scored per technology.
+The experiment plans 12 contrasts. Each is the arm named first minus the arm named second, scored
+per technology.
 
 | Id | Solar | Id | Wind |
 |---|---|---|---|
@@ -232,11 +233,11 @@ climatology row of experiment 00002.
 - **Stage 0 check.** Over the validation year, the mapped ENS daylight shortwave is 0.988 of CAMS
   (raw ENS: 1.045), but the monthly ratio ranges from 0.83 (November) to 1.10 (July), and the mean
   member spread is 25% wider than before the mapping.
-- **Prediction against result.** The CAMS-trained gain (S2, predicted near -0.08) came out at -0.009,
-  and stage 0 (S3, predicted +0.05 to -0.07) at +0.036, inside its range. For the full stack, the solar prediction (-0.10, plausible range +0.02 to -0.20) was
-  wrong in sign. The wind prediction (-0.04, reaching only a small gain) was
-  too cautious: the stack reached the gain threshold. The solar spread factor was predicted to be
-  dropped, and was.
+- **Prediction against result.** The CAMS-trained gain (S2, predicted near -0.08) came out at
+  -0.009, and stage 0 (S3, predicted +0.05 to -0.07) at +0.036, inside its range. For the full
+  stack, the solar prediction (-0.10, plausible range +0.02 to -0.20) was wrong in sign. The wind
+  prediction (-0.04, reaching only a small gain) was too cautious: the stack reached the gain
+  threshold. The solar spread factor was predicted to be dropped, and was.
 
 ## Failures and limits
 

@@ -292,7 +292,8 @@ component in turn, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_
   gives -0.009, stage 0 +0.036, and the spread factor +0.006, each with an interval that includes
   zero.
 - **Finding for later experiments:** the stage 0 quantile mapping widens the member spread by about a
-  quarter and leaves monthly ratios to CAMS from 0.83 to 1.10, and it did not lower the solar CRPS in this experiment.
+  quarter and leaves monthly ratios to CAMS from 0.83 to 1.10, and it did not lower the solar CRPS
+  in this experiment.
 - **Write-up and pull request:** [result](00020-solar-wind-stack-cams-stage0-spread-margin/result.md),
   [PR #1226 (Experiment 20: do the candidate changes for solar and wind add up to a better pooled
   mixture?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1226).

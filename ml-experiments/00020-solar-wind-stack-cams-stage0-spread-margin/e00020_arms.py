@@ -55,6 +55,15 @@ def read_mixture(
 ) -> np.ndarray:
     """Return a variant's mixture quantiles for a technology's cases, in `cases` order.
 
+    Args:
+        cases: The technology's validation cases.
+        technology: The technology whose mixtures to read.
+        variant: The fitted-and-applied variant.
+        seed: The fitting seed.
+
+    Returns:
+        Array of shape (cases, 9) of mixture quantiles, a fraction of capacity.
+
     Raises:
         ValueError: If a case has no mixture.
     """

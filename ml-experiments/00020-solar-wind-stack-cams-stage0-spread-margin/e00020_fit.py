@@ -80,6 +80,12 @@ def fit_mapping(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Fit one quantile mapping per lead band and zenith bin.
 
+    Args:
+        ens: Paired ENS shortwave.
+        target: Paired target irradiance.
+        lead_hours: Lead of each pair.
+        cos_zenith: Cosine of the solar zenith at each pair's valid time.
+
     Returns:
         Arrays of shape (bands, zenith bins, quantile points) holding the ENS quantiles and the
         target quantiles, and the pair count of each bin. A bin with too few pairs takes the
