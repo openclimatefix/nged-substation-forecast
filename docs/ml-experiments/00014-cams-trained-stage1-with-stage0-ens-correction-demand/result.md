@@ -73,24 +73,23 @@ seeds) are loaded as they are. Only the input they read at validation changes, s
 00009's CAMS-trained arm in one input: the ENS shortwave column.
 
 **Stage 0 is an empirical quantile mapping from ENS shortwave to CAMS irradiance.** The mapping is
-fitted on the training times before 2025-06-17 (14 days before the first validation run), from
-the stage 1 pilot's ENS training table (one ensemble member per run, 456 runs from 2024-04-01;
-the script prints which member and reports it, since the control member is not exchangeable with
-the perturbed ones), filtered to `valid_time` before 2025-06-17 (not to init time, because the table
-runs to 2025-06-30), with an assertion on the maximum valid time. The table holds 22 series, and
-the mapping uses only the 20 modelled ones paired with
-CAMS held half-hourly at the series' own point. The pairs are pooled over the 20 series and
-binned by lead band (the five bands of 00009) and by solar zenith (6 bins of equal cosine width,
-daylight only, zenith below 80°). Within a bin, 99 quantiles of the ENS values are matched to the
-same quantiles of the CAMS values, and the mapping is piecewise linear between them and clamped
-to the end points outside the fitted range. A bin with fewer than 1,000 pairs borrows the mapping of
-its neighbouring zenith bin. At validation,
-each member's value is mapped on its own, so the 51 members keep their spread. Night rows pass
-through unchanged. CAMS is needed only at training times, never at forecast time.
+fitted on the training times before 2025-06-17 (14 days before the first validation run), from the
+stage 1 pilot's ENS training table (one ensemble member per run, 456 runs from 2024-04-01; the
+script prints which member and reports it, since the control member is not exchangeable with the
+perturbed ones), filtered to `valid_time` before 2025-06-17 (not to init time, because the table
+runs to 2025-06-30), with an assertion on the maximum valid time. The table holds 22 series, and the
+mapping uses only the 20 modelled ones paired with CAMS held half-hourly at the series' own point.
+The pairs are pooled over the 20 series and binned by lead band (the five bands of 00009) and by
+solar zenith (6 bins of equal cosine width, daylight only, zenith below 80°). Within a bin, 99
+quantiles of the ENS values are matched to the same quantiles of the CAMS values, and the mapping is
+piecewise linear between them and clamped to the end points outside the fitted range. A bin with
+fewer than 1,000 pairs borrows the mapping of its neighbouring zenith bin. At validation, each
+member's value is mapped on its own, so the 51 members keep their spread. Night rows pass through
+unchanged. CAMS is needed only at training times, never at forecast time.
 
-**The stage 0 output is checked before stage 1a reads it.** The mismatch table lists the mean daylight shortwave
-of CAMS, raw ENS, and corrected ENS by month of the validation year, with the ratio to CAMS, plus the
-mean spread of the 51 members before and after.
+**The stage 0 output is checked before stage 1a reads it.** The mismatch table lists the mean
+daylight shortwave of CAMS, raw ENS, and corrected ENS by month of the validation year, with the
+ratio to CAMS, plus the mean spread of the 51 members before and after.
 
 **Two planned contrasts, kept separate, both on Primary substations over all leads.** C1 is the
 CAMS-trained arm on raw ENS minus the ERA5-trained arm, recomputed here from 00009's models on the
