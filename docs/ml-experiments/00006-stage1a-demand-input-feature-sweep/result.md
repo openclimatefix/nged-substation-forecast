@@ -83,6 +83,23 @@ series each:
 | Primary | COVID indicator, then days to 25 December (-0.25, then -0.14 points) | 13 |
 | BSP | holiday flags: the day, the day before, and the day after (-0.16 points) | 2 |
 | GSP | COVID indicator, days to the nearest holiday, heating degree-hours (-1.67, -0.24, -0.14 points) | 2 |
+| One set for all three types (recommended if a single set is required) | COVID indicator | 18 |
+
+**If one set must serve all three types, use the weather block, the clock, and the COVID indicator,
+and weight Primary substations' evidence above that of BSP and GSP.** The choice rests on three
+points. The clock is the largest gain for Primary substations and helps BSP, and its small effect on
+GSP has an interval that includes zero, so it costs GSP nothing measurable. The COVID indicator
+gains -0.26 points for Primary (99.4% interval -0.40 to -0.10) and -1.74 for GSP (-2.76 to -0.69) on
+the selection year, and is neutral for BSP (-0.02). The days to Christmas is left out because the
+Christmas control above could not separate it from a half-year step, and the holiday flags are left
+out because only BSP selected them and the Primary gain is not replicated for Primary on the second selection year. On
+the confirmation year this set scores 7.70 for Primary, 9.43 for BSP, and 26.73 for GSP, against
+7.57, 9.41, and 26.47 for the Primary set with the days to Christmas added. The BSP set scores 9.53
+and the GSP set 27.71, so for those two types the single set beats the set chosen for the type. The
+days to Christmas is the only optional extra: it lowers the confirmation-year error by 0.13 for
+Primary (95% interval -0.36 to +0.11), and by 0.02 for BSP and 0.26 for GSP, with the BSP and GSP
+differences resting on two series each. Recency weights are a training choice, not a column, and are
+unaffected by this recommendation.
 
 **The clock helps Primary substations and BSP but not GSP.** On the confirmation year the clock
 changes the error by -0.46 for Primary (99.4% interval -0.61 to -0.30), -0.30 for BSP (-0.41 to
