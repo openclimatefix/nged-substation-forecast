@@ -38,6 +38,7 @@ from e00016_common import (
     WORK_DIR,
     ArmType,
     add_level_offsets,
+    crps_estimate,
     fit_level_offsets,
     fit_location_and_scale,
     fit_spread_factor,
@@ -61,6 +62,7 @@ def mixture_for_seed(*, seed: int, cases: pl.DataFrame) -> np.ndarray:
         return np.load(cache)
     keys = cases.select(KEY_COLUMNS)
     pieces = []
+    key_pieces = []
     for path in sorted(ENS_VALIDATION_DIR.glob("init=*.parquet")):
         members = (
             pl.read_parquet(MEMBER_QUANTILES_DIR / f"seed{seed}" / path.name)
@@ -70,13 +72,18 @@ def mixture_for_seed(*, seed: int, cases: pl.DataFrame) -> np.ndarray:
         if members.height % MEMBERS:
             msg = f"{path.name}: a case lacks some of the {MEMBERS} members"
             raise ValueError(msg)
+        key_pieces.append(
+            members.filter(pl.col("ensemble_member") == members["ensemble_member"].min()).select(
+                KEY_COLUMNS
+            )
+        )
         matrix = members.select(LEVEL_COLUMNS).to_numpy().reshape(-1, MEMBERS, len(LEVEL_COLUMNS))
         pieces.append(
             read_levels(fine=mixture_quantiles(member_quantiles=matrix.astype(np.float32)))
         )
     mixture = np.concatenate(pieces)
-    if mixture.shape[0] != cases.height:
-        msg = f"{mixture.shape[0]} mixtures built for {cases.height} cases"
+    if mixture.shape[0] != cases.height or not pl.concat(key_pieces).equals(keys):
+        msg = "the mixtures are not in the order of the scored cases"
         raise ValueError(msg)
     cache.parent.mkdir(parents=True, exist_ok=True)
     np.save(cache, mixture)
@@ -163,9 +170,31 @@ def correct(
                         quantiles=mixture[target], offsets=offsets
                     )
                     parameters.append(
-                        {**base, "arm": "free_quantile", "fitted": True, "shift": float(offsets[4])}
+                        {
+                            **base,
+                            "arm": "free_quantile",
+                            "fitted": True,
+                            "median_offset": float(offsets[4]),
+                        }
                     )
     return out, pl.DataFrame(parameters, infer_schema_length=None)
+
+
+def _check_reproduction(*, none: pl.DataFrame) -> None:
+    """Raise unless `none` reproduces experiment 00002's mean CRPS per technology.
+
+    Raises:
+        ValueError: If a technology's mean CRPS differs by more than 0.05 points of capacity from
+            11.11 (wind) or 5.05 (solar).
+    """
+    quantiles = none.select(LEVEL_COLUMNS).to_numpy().astype(np.float64)
+    crps = 100.0 * crps_estimate(quantiles=quantiles, actual=none["actual_norm"].to_numpy())
+    for tech, published in (("wind", 11.11), ("solar", 5.05)):
+        here = float(crps[(none["technology"] == tech).to_numpy()].mean())
+        print(f"{tech}: none scores {here:.3f}, experiment 00002 {published}", flush=True)
+        if abs(here - published) > 0.05:
+            msg = f"{tech}: none scores {here:.3f}, experiment 00002 scored {published}"
+            raise ValueError(msg)
 
 
 def main() -> None:
@@ -185,6 +214,7 @@ def main() -> None:
                 )
             )
         print(f"seed {seed} done", flush=True)
+    _check_reproduction(none=pl.concat(frames["none"]))
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     pl.concat(all_parameters, how="diagonal").write_parquet(WORK_DIR / "parameters.parquet")
     for arm, pieces in frames.items():

@@ -108,7 +108,8 @@ situation), and reports coverage over the corrected months alone as well as over
 | `locscale` | `m + a + k (q - m)`, one `(a, k)` per technology and lead band, minimising the mean CRPS on a grid (`a` from -0.05 to +0.05 in steps of 0.01, `k` as above) |
 | `free_quantile` | `q_t + d_t`, where `d_t` is the t-quantile of the observed power minus `q_t` over the fitted cases, per technology, lead band, and level |
 
-Each corrected quantile is clipped to 0 to 1 of capacity and the nine are then sorted.
+The `locscale` fit draws at most 30,000 of the fitting cases, at random with a fixed seed, to
+limit the cost of its grid search. Each corrected quantile is clipped to 0 to 1 of capacity and the nine are then sorted.
 
 ## Planned contrasts
 
