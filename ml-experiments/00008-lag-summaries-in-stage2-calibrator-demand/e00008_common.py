@@ -120,8 +120,10 @@ CALIBRATOR_PARAMETERS: Final[dict[str, object]] = {
 CALIBRATOR_ROUNDS: Final[int] = 300
 
 
-def series_table() -> pl.DataFrame:
+def series_table(*, full: bool = False) -> pl.DataFrame:
     """Return the 20 substation series with label, substation type, and effective capacity.
+
+    A smoke test returns two series unless `full` is set.
 
     Returns:
         One row per series with `time_series_id`, `site` (D1 to D22), `substation_type`, and
@@ -146,7 +148,7 @@ def series_table() -> pl.DataFrame:
         .select("time_series_id", "site", "substation_type", "effective_capacity_mw")
         .sort(pl.col("site").str.slice(1).cast(pl.Int32))
     )
-    if SMOKE:
+    if SMOKE and not full:
         return kept.head(2)
     if kept.height != 20 or not set(kept["substation_type"].to_list()) <= SUBSTATION_TYPES:
         msg = "expected the 20 Primary, BSP, and GSP series"
@@ -192,9 +194,18 @@ def load_power(*, series: pl.DataFrame) -> dict[str, np.ndarray]:
 
 
 def read_era5_pred(*, seed: int, sites: list[str]) -> dict[str, np.ndarray]:
-    """Read experiment 00005's stage 1a predictions at ERA5 weather, each series on the grid."""
+    """Read experiment 00005's stage 1a predictions at ERA5 weather, each series on the grid.
+
+    Args:
+        seed: The fitting seed.
+        sites: The site labels to return.
+
+    Returns:
+        Each requested site label's array on the grid.
+    """
     path = E00005_WORK_DIR / "era5_pred" / f"{CONFIG}_seed{seed}.npy"
-    return dict(zip(sites, np.load(path), strict=True))
+    stored = dict(zip(series_table(full=True)["site"], np.load(path), strict=True))
+    return {site: stored[site] for site in sites}
 
 
 def take(*, values: np.ndarray, index: np.ndarray) -> np.ndarray:
