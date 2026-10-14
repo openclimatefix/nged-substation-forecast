@@ -30,22 +30,23 @@ benchmark: >-
   The base arm (weather block W, hour and weekday, days to Christmas inside a 14-day window,
   trained from 2021-09-01), and a month-by-half-hour climatology row.
 row_set_id: era5_val_3folds_2023_07_to_2026_06_v1
-metric: mean absolute error of the median, points of capacity (power over effective capacity, times 100)
----
+metric: mean absolute error of the median, points of capacity (power over effective capacity, times
+100) ---
 
 # Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?
 
 **Status: planned.** This page is the plan. It fixes the arms, the windows, and the contrasts before
 any fit. It continues experiment 00006, which found that a windowed days-to-Christmas column lowers
-the Primary error by 1.8 points from 15 December to 7 January, and which left Easter and the school holidays without a column.
+the Primary error by 1.8 points from 15 December to 7 January, and which left Easter and the school
+holidays without a column.
 
 ## Size
 
 **The size is complex, because the experiment adds data and admits more than one defensible
 design.**
 
-- **What gets stored:** one new committed file of hand-collected term dates, and private predictions.
-  No schema in `packages/contracts/` changes.
+- **What gets stored:** one new committed file of hand-collected term dates, and private
+  predictions. No schema in `packages/contracts/` changes.
 - **Production serving path:** not touched. The columns are candidates for a later model release.
 - **Degradation rule:** not touched.
 - **More than one defensible design:** yes. The window lengths, the encoding of a term boundary
@@ -70,11 +71,12 @@ design.**
 `latitude` and `longitude` columns of the metadata place every Primary, BSP, and GSP series between
 52.7 and 53.3 degrees north and -0.2 and 0.33 degrees east, in the East Midlands licence area. The
 box edge near 52.7 degrees north and 0.2 degrees east lies close to Norfolk, and no series was
-checked against the local authority boundary. The planned split "by nation and by local authority" therefore has one nation (England)
-and one local authority. The calendar is Lincolnshire County Council's recommended calendar, which
-binds community and voluntary-controlled schools. Academies and voluntary-aided schools set their own
-dates, often within a day or two of it. The columns are therefore a proxy for the calendar of the
-schools near a substation, not a count of pupils in school.
+checked against the local authority boundary. The planned split "by nation and by local authority"
+therefore has one nation (England) and one local authority. The calendar is Lincolnshire County
+Council's recommended calendar, which binds community and voluntary-controlled schools. Academies
+and voluntary-aided schools set their own dates, often within a day or two of it. The columns are
+therefore a proxy for the calendar of the schools near a substation, not a count of pupils in
+school.
 
 **The dates are in the CSV file `lincolnshire_term_dates.csv` in the experiment's code folder, with
 sources and licence in the README beside it.** The first and last day of 30 terms (2021-22 to
@@ -137,21 +139,20 @@ decision. It tests whether a smooth seasonal curve already explains a gain.
 **Windows are fixed by local date, and each has three occurrences, one per fold.**
 
 - **Return window:** 2 to 20 January.
-- **Easter window:** from the first day of the Easter holiday (the day after term 4 ends) to the sixth
-  day of term 5.
-- **Half-term holidays:** the autumn, February, and May half-term holidays, from the day after a term
-  ends to the day before the next begins (nine holidays across the three folds).
+- **Easter window:** from the first day of the Easter holiday (the day after term 4 ends) to the
+  sixth day of term 5.
+- **Half-term holidays:** the autumn, February, and May half-term holidays, from the day after a
+  term ends to the day before the next begins (nine holidays across the three folds).
 - **Summer holiday:** from the day after term 6 ends to 2 September.
 - **Whole year:** every day of the validation year.
 
 ## Planned contrasts
 
-**There are six planned contrasts, all for Primary substations, against the Base arm unless stated.**
-The level is 99.2% (a Bonferroni correction of 95% across six). Each window interval first
-averages the three fitting seeds, then resamples 7-day blocks of local days. Neighbouring days
-share weather, so the interval still understates the uncertainty, and the rule that the sign must
-agree in all three folds is the stricter gate. C5 uses the month-resampling bootstrap of
-`studies.bootstrap`.
+**There are six planned contrasts, all for Primary substations, against the Base arm unless
+stated.** The level is 99.2% (a Bonferroni correction of 95% across six). Each window interval first
+averages the three fitting seeds, then resamples 7-day blocks of local days. Neighbouring days share
+weather, so the interval still understates the uncertainty, and the rule that the sign must agree in
+all three folds is the stricter gate. C5 uses the month-resampling bootstrap of `studies.bootstrap`.
 
 | Contrast | Arms | Where | Prediction |
 | --- | --- | --- | --- |
@@ -171,14 +172,14 @@ term 3 differ by 0 or 1 day until 2024, so their separate contrasts cannot be to
 
 ## Known limits
 
-- **Fold 1 trains on 1.8 years, and one of its Januaries is unusual.** It trains on 2021-09 to 2023-06,
-  which holds two Januaries. January 2022 falls under the England Plan B guidance to work from home,
-  which the COVID indicator (ending 2021-07-19) does not cover. Fold 1 is expected to show the weakest
-  return-to-work effect, and the Reference arm, trained from the full history, shows whether the
-  2021 start is the cause.
-- **The stage 1a model is fitted and scored on ERA5.** ERA5 is an estimate of past weather, so a gain
-  here need not carry over to forecast weather at serving time. The columns themselves are known in
-  advance. The experiment uses no lagged weather or power.
+- **Fold 1 trains on 1.8 years, and one of its Januaries is unusual.** It trains on 2021-09 to
+  2023-06, which holds two Januaries. January 2022 falls under the England Plan B guidance to work
+  from home, which the COVID indicator (ending 2021-07-19) does not cover. Fold 1 is expected to
+  show the weakest return-to-work effect, and the Reference arm, trained from the full history,
+  shows whether the 2021 start is the cause.
+- **The stage 1a model is fitted and scored on ERA5.** ERA5 is an estimate of past weather, so a
+  gain here need not carry over to forecast weather at serving time. The columns themselves are
+  known in advance. The experiment uses no lagged weather or power.
 - **The Christmas figure behind the Return-window prediction is not rechecked here.** The research
   plan quotes 00006 errors of 9.3 to 10.3 points from 5 to 8 January, against a base of 9.8 to 10.5.
   Experiment 00006's page does not state those figures, so the report recomputes the Base error in
@@ -188,8 +189,8 @@ term 3 differ by 0 or 1 day until 2024, so their separate contrasts cannot be to
 
 ## Resources and reporting
 
-**The fits use the 10 cores of the experiment manager's slot B on the CPU.** `e00011_fit.py` copies the structure of
-`e00006_fit.py`. Reading experiment 00006's private feature table is allowed, and the new columns
-join on the local date at fit time. The experiment scores no valid time on or after 2026-07-01.
-Predictions are written with `experiment_store.write_predictions` under row set
+**The fits use the 10 cores of the experiment manager's slot B on the CPU.** `e00011_fit.py` copies
+the structure of `e00006_fit.py`. Reading experiment 00006's private feature table is allowed, and
+the new columns join on the local date at fit time. The experiment scores no valid time on or after
+2026-07-01. Predictions are written with `experiment_store.write_predictions` under row set
 `era5_val_3folds_2023_07_to_2026_06_v1`.
