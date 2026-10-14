@@ -182,8 +182,8 @@ interval's resolution. The 20 series and 73 runs are 00005's choice and were not
 by 0.035 points, a sixth of the 0.2 points the plan required.** C1 is -0.035 (97.5% interval -0.070
 to +0.001), so the data exclude a gain of 0.2 points. C2, without the substation that set 00007's
 pooled figure (P2), is -0.043 (-0.081 to -0.004), so the small gain does not rest on that
-substation. In both contrasts 10 of 12 validation months and 12 of the series favour the CAMS-trained
-arm (12 of 16 for C1, 12 of 15 for C2). The refit of the ERA5-trained arm reproduces experiment
+substation. In both contrasts the CAMS-trained arm is better in 10 of 12 months, and in 12 of the
+series (of 16 for C1, of 15 for C2). The refit of the ERA5-trained arm reproduces experiment
 00005's `r0_from2023` exactly (a mean absolute difference of 0.000 in all 9 quantiles over 2,898,789
 rows), so the benchmark is the same forecast that experiment scored.
 
@@ -217,7 +217,7 @@ ERA5 in the training period and 263 and 262 in the validation year, against 281 
 
 ![Daylight error of the median at the observed weather and at ENS](figure_3.svg)
 
-**The product and the location carry the difference, not the hourly holding.** Holding ERA5
+**Hourly holding of the irradiance does not explain the difference.** Holding ERA5
 shortwave hourly changes the score by -0.012 (X1, -0.064 to +0.030). The CAMS-trained arm against
 the hourly-held ERA5 arm is -0.022 (X2, -0.075 to +0.038), so the remaining difference of the bundle
 cannot be split between product and location at this resolution.

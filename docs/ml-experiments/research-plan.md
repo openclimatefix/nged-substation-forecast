@@ -14,12 +14,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-<<<<<<< HEAD
-| P1 | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | 1 | Nothing | Running as experiment 00008, in [PR #1209 (Plan experiment 00008: summaries of recent power in the stage 2 calibrator)](https://github.com/openclimatefix/nged-substation-forecast/pull/1209) |
-| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing for the second stage; the slope statistics wait for the second stage | Its cheap first test, experiment 00007, was inconclusive; the second stage is planned as experiment 00009 in [PR #1213 (Plan experiment 9: CAMS-trained stage 1a against ERA5-trained, for demand)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213); the slope statistics wait for its result |
-=======
-| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing for the second stage; the slope statistics wait for the second stage | Its cheap first test, experiment 00007, was inconclusive; the slope statistics wait for a CAMS-trained stage 1a |
->>>>>>> origin/main
+| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Needs school-term dates, and follows 00006 |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | 4 | A plan; the price source is chosen | Source chosen (Elexon Market Index Data); needs a plan |
 
@@ -102,27 +97,6 @@ excludes zero, and it is absent in the night-time residuals. A second candidate:
 arm lowers the confirmation-year daylight quantile score at Primary substations by at least 0.2
 points of capacity, with a month-block bootstrap interval that excludes zero. Otherwise the
 hypothesis is refuted. The thresholds are proposals for the planning step to confirm.
-
-#### Second stage: CAMS irradiance in place of ERA5 for stage 1a training
-
-**A second stage of P2 could train stage 1a on CAMS irradiance, where the first test uses CAMS only
-to read the residuals.** The stage 1a XGBoost model would train with CAMS shortwave in place of
-ERA5's and be applied to ENS weather members, with the other weather columns staying ERA5. CAMS has
-no forecast, so it can be an input in training only. This departs from the requirement above that
-training use the source available at forecast time, and it creates a mismatch: the stage 1a XGBoost
-model trains on satellite-derived irradiance and is applied to forecast irradiance. The comparison
-shows what the departure costs or gains. The arms would be the ERA5-trained stage 1a XGBoost model
-and the same model with CAMS in place of ERA5 shortwave, on the 20 series of experiment 00005 (16
-Primary, 2 bulk-supply point, and 2 grid-supply point series), using experiment 00005's folds and
-quantile score.
-
-**The outcome of experiment 00007, the first test of P2, is the proposed gate for the second
-stage.** If the outcome finds that a static CAMS correction removes most of the residual, which
-points to an irradiance error, the second stage would ask whether training on CAMS removes the
-residual at the source. If the residual remains, or the cause is a change in solar capacity, the
-second stage would not be worth running. A candidate decision rule: the CAMS-trained arm lowers the
-quantile score at Primary substations by at least 0.2 points of capacity, with a month-block
-bootstrap interval that excludes zero. The threshold is a proposal for the planning step to confirm.
 
 ### P3: historical electricity prices as lagged inputs
 
