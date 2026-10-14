@@ -140,6 +140,16 @@ therefore rests on C1 and C2 at B2, the only series with a battery that is large
 series. P4 is reported beside B2. The advice for a later experiment is to repeat the test on a
 series set with more battery sites. No series is added after seeing results.
 
+## Power check, run before any fit
+
+**B2's 98.3% interval will be about 0.3 to 0.4 points wide on each side, so the refuted branch
+cannot be reached.** The check resampled the 12 validation months of one seed of two close arms from
+experiment 00006's stored fits at B2 (the clock-only arm against the clock, COVID indicator, and
+days-to-Christmas arm), a difference of typical size. The half-width was 0.40 points, and 0.30 for
+a larger difference. The decision rule's rule therefore applies: the refuted branch is dropped, and
+the verdict is `supported` or `inconclusive`. A gain at B2 needs to be about 0.4 points or more to
+be material.
+
 ## Resources and sizing
 
 **Sizing, one line per `plan-issue` trigger.** Stores: only private predictions and a price
