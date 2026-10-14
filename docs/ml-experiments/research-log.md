@@ -27,6 +27,7 @@ the maintainer to confirm.
 | [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
 | [00005](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | Not yet merged |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
+| [00007](00007-cams-static-correction-stage1a-residual/result.md) | Does a static CAMS correction fitted on one year remove most of the next year's daytime stage 1a residual? | Inconclusive | Not for production | Not yet merged |
 | [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -157,6 +158,21 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
   substations, the calibrator with recent-origin inputs beat a stage 1b correction, and a lag-free
   calibrator is worth about 1 point of capacity at short leads (00005).
 
+### 00007: does a static CAMS correction remove the stage 1a daytime residual?
+
+**The cheap first test for P2 and P4 was inconclusive.** A correction with fixed coefficients on
+ERA5 shortwave and CAMS irradiance, fitted per substation on 2024-07 to 2025-06 and scored on
+2025-07 to 2026-06, removed 46.6% of the daylight squared residual at 13 Primary substations
+(98.33% interval 38.4% to 53.1%), just under the planned 50%. A fixed daytime shift alone removed
+39.1%, CAMS given ERA5 added a partial R squared of 0.11 (0.08 to 0.13), and the stability ratio was
+0.84. One substation sets the pooled figure: without it the share is 18.2%. A CAMS-trained stage 1a
+(P4) is worth its own test, and the slope statistics of P2 wait for it. See
+[`result.md`](00007-cams-static-correction-stage1a-residual/result.md) and [PR #1210 (Experiment 7:
+does a static CAMS correction remove the stage 1a daytime
+residual?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1210).
+
+![Share removed by substation](00007-cams-static-correction-stage1a-residual/figure_1.svg)
+
 ### 00008: summaries of recent power in the stage 2 calibrator
 
 **Adding the minimum, mean, and maximum of the last 24 hours and of the same weekday to the
@@ -183,7 +199,7 @@ committed, and the tentative id then disappears.
 
 | Id | Question | State |
 |---|---|---|
-| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Waits for 00005, and for the 00006 residual analysis to be published |
+| [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Its cheap first test, experiment 00007, was inconclusive; the slope statistics wait for a CAMS-trained stage 1a |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Source chosen (Elexon Market Index Data); needs a plan |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | Needs school-term dates, and follows 00006 |
 
@@ -192,7 +208,7 @@ committed, and the tentative id then disappears.
 **The embedded-solar proposal rests on one follow-up check of experiment 00006's residuals, which
 motivates two different questions and tests neither.** The check was run by the 00006 session on
 CAMS irradiance at each demand series' own location, and its figures and script are in the write-up
-of [PR #1202 (Experiment 00006: which input features work best for the ERA5-trained demand
+of [PR #1202 (Experiment 6: which input features work best for the ERA5-trained demand
 model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202). It was not
 pre-registered. At Primary substation 12 (P12), the median-error Primary substation, the residual of
 the chosen-feature stage 1a XGBoost model averaged -5.3 points of capacity from 08:00 to 16:59 in
@@ -253,8 +269,9 @@ no forecast, so the CAMS satellite-derived irradiance can feed the statistics on
 CAMS irradiance at each demand series' own location comes from [PR #1201 (Download and validate CAMS
 irradiance at the demand series'
 locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201), which covers the
-22 demand series of experiment 00003. The experiment could compute each statistic from ERA5 alone
-and from CAMS and ERA5 together.
+22 series of experiment 00003 (16 Primary demand series, 4 bulk-supply and grid-supply point flows,
+and 2 non-demand series, a battery and a biofuel generator). The experiment could compute each
+statistic from ERA5 alone and from CAMS and ERA5 together.
 
 **A decision rule could be fixed before any fit.** One candidate: the trend in the monthly change
 from a year earlier is negative at 70% or more of the substations in the top quartile of registered
@@ -263,6 +280,27 @@ excludes zero, and it is absent in the night-time residuals. A second candidate:
 arm lowers the confirmation-year daylight quantile score at Primary substations by at least 0.2
 points of capacity, with a month-block bootstrap interval that excludes zero. Otherwise the
 hypothesis is refuted. The thresholds are proposals for the planning step to confirm.
+
+#### Second stage: CAMS irradiance in place of ERA5 for stage 1a training
+
+**A second stage of P2 could train stage 1a on CAMS irradiance, where the first test uses CAMS only
+to read the residuals.** The stage 1a XGBoost model would train with CAMS shortwave in place of
+ERA5's and be applied to ENS weather members, with the other weather columns staying ERA5. CAMS has
+no forecast, so it can be an input in training only. This departs from the requirement above that
+training use the source available at forecast time, and it creates a mismatch: the stage 1a XGBoost
+model trains on satellite-derived irradiance and is applied to forecast irradiance. The comparison
+shows what the departure costs or gains. The arms would be the ERA5-trained stage 1a XGBoost model
+and the same model with CAMS in place of ERA5 shortwave, on the 20 series of experiment 00005 (16
+Primary, 2 bulk-supply point, and 2 grid-supply point series), using experiment 00005's folds and
+quantile score.
+
+**The outcome of experiment 00007, the first test of P2, is the proposed gate for the second
+stage.** If the outcome finds that a static CAMS correction removes most of the residual, which
+points to an irradiance error, the second stage would ask whether training on CAMS removes the
+residual at the source. If the residual remains, or the cause is a change in solar capacity, the
+second stage would not be worth running. A candidate decision rule: the CAMS-trained arm lowers the
+quantile score at Primary substations by at least 0.2 points of capacity, with a month-block
+bootstrap interval that excludes zero. The threshold is a proposal for the planning step to confirm.
 
 ### P3: historical electricity prices as lagged inputs
 
