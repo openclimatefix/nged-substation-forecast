@@ -91,7 +91,8 @@ def figure_1() -> alt.Chart:
             title="Recent training rows and an error correction lower the demand error",
             lines=[
                 (
-                    "Each arm minus A, which trains on all history and retrains monthly. A's error is "
+                    "Each arm minus A, which trains on all history and retrains monthly. A's error "
+                    "is "
                     "7.62 points of capacity. Dot: estimate. Line: 99.44% interval from resampling "
                     "whole months. "
                     "Rule at zero: same as A."
@@ -150,7 +151,8 @@ def figure_2() -> alt.Chart:
                 title="Forecast bias swung from too high to too low",
                 lines=[
                     (
-                        "Mean of observed minus forecast median over each calendar year. Positive: the "
+                        "Mean of observed minus forecast median over each calendar year. "
+                        "Positive: the "
                         "forecast is too low."
                     ),
                     SCOPE,
