@@ -17,8 +17,12 @@ decision_rule: >-
   Five planned contrasts, read at 99% (Bonferroni across five), on Primary substations, months
   resampled and the three seeds. C1, N1 minus `manual_heuristic`, is the primary contrast and counts
   as a gain when the MAE interval over all leads is wholly below zero and the quantile-score interval
-  is wholly below zero. N1 passes the gate for P7 and P8 when C1 is a gain. If C1's MAE interval
-  includes zero, P7 compares against `manual_heuristic` too.
+  is wholly below zero. N1 passes the gate for P7 and P8 when C1 is a gain. If only the MAE interval
+  is wholly below zero, the verdict is partly supported and P7 compares against `manual_heuristic`
+  too. If C1's MAE interval is wholly above zero, or C3's all-lead MAE interval is not wholly above
+  zero (production does not lose to `manual_heuristic` on these rows), the hypothesis is refuted.
+  The clause that N1-nolag recovers half the production gap is exploratory: C5's all-lead point
+  estimate beyond 3 days must be at most -50% of C3's.
 benchmark: >-
   `manual_heuristic` (stored), `climatology` (stored), and the production recipe (stored), all
   re-scored on the row set; reference arms from 00005 (R0 lag-free ERA5-trained stage 1, R1
@@ -65,7 +69,16 @@ headline; BSP and GSP (2 series each) are reported separately and never averaged
   available to ENS-trained arms), valid times up to 2025-06-30 23:30. Columns: the 00006 Primary set
   (weather block, solar position, hour, weekday, COVID indicator, windowed days to Christmas), the
   lead in hours, and three lags measured from the forecast origin. Recency weights use a half-life
-  of 2 years. The forecast is the mixture of the 51 members' quantile distributions.
+  of 2 years, anchored at 2025-06-30 (the last training valid time), not at each row's own date.
+  The fit runs a fixed 500 rounds with no early stopping and no validation split. A training row is
+  kept only when its valid time is on or before 2025-06-30 23:30, and every lag of a training row
+  lies before that row's origin.
+- **Pooling.** The 51 members' 9 quantiles each give 459 values with equal member weights and the
+  9-level atom masses; the forecast quantiles are the weighted quantiles of those values at the 9
+  levels, sorted so none cross. A model trained on the control member and applied to perturbed
+  members adds its own spread to the ensemble's spread, so the bands may be too wide, which raises
+  the quantile score. N1-control, N1 applied to the control member alone, checks this
+  (exploratory).
 - **N1-nolag:** N1 without the lag columns (isolates the lags, and ENS-trained against ERA5-trained
   once compared with S1).
 - **N1-nocal:** N1 without hour, weekday, and days to Christmas (the no-calendar control).
@@ -77,10 +90,15 @@ last half-hour is the newest value. The lags are the power at that newest half-h
 latest earlier time with the same half-hour of day as the valid time, and the power at the latest
 earlier time with the same weekday and half-hour. All three are zero-lookahead by construction. The
 telemetry delay is an assumption, not a measurement of NGED's delay; the live ingest's download time
-is the only evidence in the repository.
+is the only evidence in the repository. Every N1 result is conditional on the 3.5-hour figure, and
+no sensitivity run is planned.
 
-**Diagnosis of the production gap.** The stored forecasts are split by lead band, hour of day, and
-series; the gap between production and `manual_heuristic` is decomposed into bias (mean error) and
+**Deviation from P6.** P6 names a 2023-09 start for N1. The stored ENS archive starts on 2024-04-01,
+so N1 trains on 15 months where S1 trains on 22. C5 therefore mixes the effect of training on ENS
+with the effect of the shorter window. The stored arms have no seed, so each is repeated once per
+seed as the skill requires; the three copies are identical, and the intervals resample months.
+
+**Diagnosis of the production gap.** The stored forecasts are split by lead band and series; the gap between production and `manual_heuristic` is decomposed into bias (mean error) and
 the rest; and the ladder PROD, S1, N1-nolag, N1 shows which step recovers the gap.
 
 ## Planned contrasts (99%, Primary substations)
