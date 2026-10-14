@@ -18,7 +18,7 @@ from stage1_score_arms import ARMS as NEW_ARMS
 from stage1_score_arms import MEMBER_ARMS as NEW_MEMBER_ARMS
 from stage1_score_arms import SCORE_DIR
 
-RESULT_DIR: Final[Path] = inputs.OUTPUT_ROOT / "results"
+RESULT_DIR: Final[Path] = inputs.RESULTS_DIR
 
 PRIOR_SCORE_DIR: Final[Path] = (
     inputs.OUTPUT_ROOT / "superseded" / "with_calendar_and_production_columns" / "scores"
@@ -66,6 +66,7 @@ the scientific reviews: the reference changed from the production-column control
 SLOPE_ARMS: Final[tuple[str, ...]] = (
     "c0",
     "ens_trained",
+    "ens_trained_control",
     "climatology",
     "s1_memberavg",
     "s1_control",
@@ -77,7 +78,14 @@ SLOPE_ARMS: Final[tuple[str, ...]] = (
 """Arms whose slope is reported; the ceiling is the slope with no forecast error in the weather."""
 
 EXPLORATORY: Final[dict[str, tuple[str, str]]] = {
-    "E1: s1_control minus ens_trained": ("s1_control", "ens_trained"),
+    "E1: s1_control minus ens_trained_control (ERA5 against ENS training, control member only)": (
+        "s1_control",
+        "ens_trained_control",
+    ),
+    "E1b: ens_trained minus ens_trained_control (averaging the members, ENS-trained)": (
+        "ens_trained",
+        "ens_trained_control",
+    ),
     "E2: s1_memberavg minus s1_control (averaging the members)": ("s1_memberavg", "s1_control"),
     "E3: s1_cams minus ens_trained (solar)": ("s1_cams", "ens_trained"),
     "E4: s1_cams minus s1_memberavg (solar)": ("s1_cams", "s1_memberavg"),

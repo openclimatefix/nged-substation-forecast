@@ -15,12 +15,24 @@ import polars as pl
 from studies.anonymise import LABEL_PERMUTATION_SEED, SITE_LABELS
 from studies.pv_dataset import nearest_era5_cell, pv_sites, wind_sites
 from studies.solar import azimuth, cos_zenith, zenith
-from studies.sources import PER_STUDY_DIR, REPO_DATA_DIR
+from studies.sources import PER_STUDY_DIR, product_dir_for, site_points_dir_for
 
 TechnologyType = Literal["solar", "wind"]
 
 OUTPUT_ROOT: Final[Path] = PER_STUDY_DIR / "stage1_pilot"
 """Where this study writes every table, prediction file, and report."""
+
+
+def study_subfolder(*, name: str) -> Path:
+    """Return one of this study's output folders, such as `inputs` or `results`."""
+    return OUTPUT_ROOT / name
+
+
+INPUTS_DIR: Final[Path] = study_subfolder(name="inputs")
+"""The weather and ENS inputs the study builds for stage 1a."""
+
+RESULTS_DIR: Final[Path] = study_subfolder(name="results")
+"""The report tables the charts read."""
 
 FIXED_ROOT: Final[Path] = PER_STUDY_DIR / "quick_wins_fixed_pipeline_1156"
 """The fixed-pipeline study whose fold A frames and control fits this study reuses, read only."""
@@ -95,17 +107,9 @@ farms' cells, so only the wind speeds and bearings are used."""
 FEATURES: Final[dict[str, tuple[str, ...]]] = {"solar": SOLAR_FEATURES, "wind": WIND_FEATURES}
 """Stage 1a's feature columns by technology."""
 
-ERA5_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "weather" / "ERA5"
-WIND_2019_2023_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "weather" / "ERA5-WIND-2019-2023"
-CAMS_PATH: Final[Path] = (
-    REPO_DATA_DIR
-    / "studies"
-    / "downloads"
-    / "reanalysis"
-    / "CAMS"
-    / "site_points"
-    / "beam_diffuse_cams.parquet"
-)
+ERA5_DIR: Final[Path] = product_dir_for(product="ERA5")
+WIND_2019_2023_DIR: Final[Path] = product_dir_for(product="ERA5-WIND-2019-2023")
+CAMS_PATH: Final[Path] = site_points_dir_for(product="CAMS") / "beam_diffuse_cams.parquet"
 
 ENS_COLUMNS: Final[dict[str, str]] = {
     "shortwave": "downward_short_wave_radiation_flux_surface",
@@ -183,7 +187,9 @@ def solar_hourly(*, sites: pl.DataFrame) -> pl.DataFrame:
         (period-ending), `temperature_2m`, `dew_point_temperature_2m`, `pressure_surface`,
         `u10`, `v10` (instants), in W m-2, kg m-2 s-1, degrees Celsius, Pa, and m s-1.
     """
-    mirror = pl.read_parquet(ERA5_DIR / "site_points" / "beam_diffuse_open_meteo.parquet")
+    mirror = pl.read_parquet(
+        site_points_dir_for(product="ERA5") / "beam_diffuse_open_meteo.parquet"
+    )
     cells = nearest_era5_cell(sites=sites, era5=mirror).select(
         "time_series_id",
         pl.col("cell_latitude").alias("latitude"),

@@ -1,13 +1,14 @@
 """Draw the stage 1 pilot's charts from the saved results tables, as SVG.
 
-Reads `results/*.parquet` (written by `stage1_report.py`) and the per-row scores, and writes five
+Reads `results/*.parquet` (written by `stage1_report.py`) and the per-row scores, and writes six
 SVG charts under `data/studies/per_study/stage1_pilot/charts/`:
 
 1. mean absolute error by lead band for each arm, with 95% intervals (the headline chart);
 2. the two planned paired contrasts, P1 and P2, with 95% intervals;
 3. the slope of observed on predicted power (the over-reaction diagnostic);
 4. the post hoc effect of the feature lists, against the first run;
-5. an extreme day and a random day at one solar farm and one wind farm.
+5. an extreme day and a random day at one solar farm and one wind farm;
+6. the ERA5-trained gain on the top decile of observed power against all cases.
 
 `--text-only` prints every figure's text for review without drawing. The SVGs are then optimised
 with `npx svgo@4 --multipass --precision=1 --final-newline`. No calendar date appears on any chart:
@@ -26,7 +27,7 @@ import polars as pl
 import stage1_inputs as inputs
 from stage1_score_arms import SCORE_DIR
 
-RESULT_DIR: Final[Path] = inputs.OUTPUT_ROOT / "results"
+RESULT_DIR: Final[Path] = inputs.RESULTS_DIR
 CHART_DIR: Final[Path] = inputs.OUTPUT_ROOT / "charts"
 WIDTH: Final[int] = 640
 
@@ -155,6 +156,25 @@ FIGURE_TEXT: Final[dict[str, list[str]]] = {
             "day-average ERA5 wind speed at 100 m (wind farm W1). Random days: drawn at "
             f"random from the held-out year with seed {RANDOM_DAY_SEED}. " + DEFINITIONS
         ),
+    ],
+    "6": [
+        (
+            "Training on ERA5 lowers wind error much more on the largest outputs than on "
+            "average; for solar the tail gain is uncertain"
+        ),
+        (
+            "Change in mean absolute error from the ENS-trained model with the same columns, "
+            "points of capacity (more negative is better), for the cases in the top decile of "
+            "observed power and for all cases, by how many days ahead the forecast is."
+        ),
+        (
+            "Top decile: cases where observed power exceeds the generator's 90th percentile of "
+            "power in 2019-09 to 2025-06. Dot: estimate. Line: 95% interval. Solid line at zero: "
+            "same as the ENS-trained model. Orange: top decile. Blue: all cases (planned "
+            "contrast P1)."
+        ),
+        DEFINITIONS,
+        SCOPE,
     ],
 }
 """Every figure's text, in one place so it can be reviewed before any figure is drawn."""
@@ -352,10 +372,39 @@ def figure_4() -> alt.TopLevelMixin:
     )
 
 
+def figure_6() -> alt.TopLevelMixin:
+    """The ERA5-trained gain on the top decile of observed power against all cases."""
+    tail = (
+        _frame(name="tail")
+        .filter(pl.col("arm") == "s1_memberavg minus ens_trained")
+        .select(
+            "technology",
+            "band",
+            difference="mae",
+            lower="mae_lower",
+            upper="mae_upper",
+            label=pl.lit("Top decile of observed power"),
+        )
+    )
+    overall = (
+        _frame(name="contrasts")
+        .filter(pl.col("planned") & (pl.col("contrast") == "P1 (revised)"))
+        .select("technology", "band", "difference", "lower", "upper", label=pl.lit("All cases"))
+    )
+    data = pl.concat([tail, overall]).filter(pl.col("band") != "all")
+    labels = {"Top decile of observed power": ocf.BRAND_ORANGE, "All cases": ocf.DATA_BLUE}
+    panels = _contrast_panels(
+        data=data, labels={name: name for name in labels}, colours=list(labels.values())
+    )
+    return (
+        alt.vconcat(*panels).properties(title=_titles(key="6")).resolve_scale(color="independent")
+    )
+
+
 def _example_rows(*, technology: str, series_site: str, column: str, pick: str) -> pl.DataFrame:
     sites = inputs.site_table()
     series = sites.filter(pl.col("site") == series_site)["time_series_id"].item()
-    analysis = pl.read_parquet(inputs.OUTPUT_ROOT / "inputs" / "analysis_features.parquet").filter(
+    analysis = pl.read_parquet(inputs.INPUTS_DIR / "analysis_features.parquet").filter(
         (pl.col("time_series_id") == series)
         & (pl.col("valid_time") >= inputs.VALIDATION_START)
         & (pl.col("valid_time") < pl.datetime(2026, 7, 1, time_zone="UTC"))
@@ -456,6 +505,7 @@ def main() -> None:
         "3": figure_3,
         "4": figure_4,
         "5": figure_5,
+        "6": figure_6,
     }.items():
         chart = build()
         chart.save(CHART_DIR / f"figure_{key}.svg")

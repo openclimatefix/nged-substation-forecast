@@ -38,7 +38,7 @@ import xgboost as xgb
 from studies.power import scan_power
 
 STAGE_DIR: Final[Path] = inputs.OUTPUT_ROOT / "stage1a"
-INPUT_DIR: Final[Path] = inputs.OUTPUT_ROOT / "inputs"
+INPUT_DIR: Final[Path] = inputs.INPUTS_DIR
 
 PARAMETERS: Final[dict[str, float | int | str]] = {
     "eta": 0.05,

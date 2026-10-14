@@ -32,7 +32,7 @@ import xgboost as xgb
 OUT_DIR: Final[Path] = inputs.OUTPUT_ROOT / "ens_trained"
 STAGE_DIR: Final[Path] = inputs.OUTPUT_ROOT / "stage1a"
 ARMS: Final[tuple[str, ...]] = ("ens_trained", "ens_trained_plus_s1")
-ENS_FEATURES_DIR: Final[Path] = inputs.OUTPUT_ROOT / "inputs" / "ens_features"
+ENS_FEATURES_DIR: Final[Path] = inputs.INPUTS_DIR / "ens_features"
 EXTRA_COLUMN: Final[str] = "stage1a_prediction"
 N_ROUNDS: Final[int] = 500
 PARAMETERS: Final[dict[str, float | int | str]] = {

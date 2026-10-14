@@ -54,6 +54,7 @@ weather.
 | `ens_trained` | Stage 1a's columns trained on the ENS control member's weather, 2024-04 to 2025-06. Applied to each of the 51 members and averaged. The paired control for every stage 1a arm. |
 | `s1_memberavg` | Stage 1a (ERA5-trained, 2019-09 to 2025-06-16) applied to each of the 51 members' weather, predictions averaged. |
 | `s1_control` | Stage 1a applied to ENS member 0's weather. |
+| `ens_trained_control` | `ens_trained` applied to ENS member 0's weather only: the like-for-like reference for `s1_control`. |
 | `s1_short` | `s1_memberavg` with stage 1a trained on ERA5 from 2024-04 only, the months `ens_trained` trains on. Separates the training weather from the training length. |
 | `s1_cams` | Solar farms only. As `s1_memberavg`, with stage 1a trained on CAMS irradiance. |
 | `ens_trained_plus_s1` | `ens_trained` with stage 1a's prediction as an extra column. Training rows carry a forward-chained out-of-fold value (one model per month, trained on ERA5 up to 14 days before the month starts); validation rows carry the pre-validation model's prediction for the row's own member. |
@@ -172,6 +173,7 @@ Series appear as A to F (solar) and W1 to W3 (wind), and no chart carries a cale
 | `stage1_score_arms.py` | Scores every arm, and the climatology, on the same cases; saves per-row losses. |
 | `stage1_stats.py` | Month-resampled intervals for levels, contrasts, and slopes. |
 | `stage1_report.py` | Prints `results/report.md` and saves the tables the charts read. |
+| `stage1_tail.py` | Top-decile comparison (exploratory): MAE, slope, and paired differences on the cases where observed power exceeds the series' training-period 90th percentile; writes `results/tail.md`. |
 | `stage1_charts.py` | Draws the charts. |
 
 Outputs are under `data/studies/per_study/stage1_pilot/`: `inputs/`, `stage1a/` (predictions),
@@ -188,6 +190,7 @@ uv run python studies/stage1_pilot/stage1_fit_enstrained.py --stage noise
 uv run python studies/stage1_pilot/stage1_fit_enstrained.py --stage all
 uv run python studies/stage1_pilot/stage1_score_arms.py
 uv run python studies/stage1_pilot/stage1_report.py
+uv run python studies/stage1_pilot/stage1_tail.py
 uv run python studies/stage1_pilot/stage1_charts.py
 ```
 
@@ -227,7 +230,7 @@ lead band is named, with 95% intervals in brackets.
 **Figure 1 (mean absolute error by lead band):** drawn to `charts/figure_1.svg` by
 `stage1_charts.py`.
 
-- **P1 (revised) is material for wind to day 6 and for solar to day 6.** `s1_memberavg` minus
+- **P1 (revised) is material for both technologies up to day 6.** `s1_memberavg` minus
   `ens_trained` is -1.70 for wind over all leads (-2.33 to -1.08) and -0.57 for solar (-0.83 to
   -0.32). By band, the wind difference is -3.18, -4.04 and -2.37 at 0 to 24 h, 1 to 2 days, and
   3 to 6 days, and the solar difference is -1.23, -1.41 and -0.73. At 7 to 10 and 11 to 15 days
@@ -238,8 +241,9 @@ lead band is named, with 95% intervals in brackets.
   at 11 to 15 days by 0.10 for solar (-0.41 to +0.24) and 1.03 for wind (-1.81 to -0.39). The
   ENS-trained control is no better than climatology beyond day 6 (+0.02 solar and -0.42 wind at
   11 to 15 days, both intervals spanning zero).
-- **The gain is associated with the training weather, not the training length.** `s1_short` (ERA5
-  from 2024-04 only) minus `ens_trained` is -0.60 for solar (-0.90 to -0.35) and -1.70 for wind
+- **The gain is associated with the training weather, not the training length.** With the 51
+  members averaged in both arms, `s1_short` (ERA5 from 2024-04 only) minus `ens_trained` is -0.60
+  for solar (-0.90 to -0.35) and -1.70 for wind
   (-2.28 to -1.13). `s1_memberavg` minus `s1_short` is +0.02 and -0.01. Both contrasts are
   exploratory.
 - **Absolute levels, all leads.** Solar: `ens_trained` 8.25, `s1_memberavg` 7.67 (`s1_cams` 7.54),
@@ -248,8 +252,18 @@ lead band is named, with 95% intervals in brackets.
   place of ERA5 as stage 1a's input, error is 1.70 points higher for solar and 7.49 higher for
   wind. At 0 to 24 h for solar, `s1_memberavg` (5.57) is not worse than `era5_ceiling` (5.63), so
   the ceiling is not a bound.
-- **Averaging 51 members helps.** `s1_memberavg` minus `s1_control` is -0.70 for solar and -2.23
-  for wind over all leads, and the gain is larger at long leads (wind -4.28 at 11 to 15 days).
+- **Averaging the 51 members helps the ERA5-trained model much more than the ENS-trained one.**
+  `s1_memberavg` minus `s1_control` is -0.70 for solar and -2.23 for wind over all leads (wind
+  -4.28 at 11 to 15 days). `ens_trained` minus `ens_trained_control` (the ENS-trained model on the
+  control member alone) is -0.15 for solar (-0.30 to -0.05) and -0.22 for wind (-0.41 to -0.05).
+- **With the control member alone, ERA5 training is associated with lower error at short leads.**
+  `s1_control` minus `ens_trained_control` is -1.07 (solar) and -2.75 (wind) at 0 to 24 h, -1.06 and
+  -3.56 at 1 to 2 days, +0.55 and +2.09 at 7 to 10 days, and +0.64 and +2.94 at 11 to 15 days. Over
+  all leads it is -0.02 (-0.30 to +0.32) for solar and +0.31 (-0.49 to +1.06) for wind. Both are
+  exploratory. Over all leads and all cases, the P1 gain is associated with the combination of ERA5
+  training and member averaging. At 0 to 24 h, ERA5 training alone is associated with most of the
+  gain, and on the wind top decile the control-member contrast (-6.95) is as large as the
+  member-averaged one (-6.14).
 
 **Figure 2 (the planned contrasts):** drawn to `charts/figure_2.svg` by `stage1_charts.py`.
 
@@ -282,6 +296,24 @@ lead band is named, with 95% intervals in brackets.
 
 **Figure 5 (an extreme day and a random day):** drawn to `charts/figure_5.svg` by
 `stage1_charts.py`.
+
+**Top decile of observed power (exploratory, `results/tail.md`).** The cases are those where
+observed power exceeds the series' 90th percentile of cleaned power in the stage 1a training window
+(20,020 solar and 9,747 wind cases per seed). Selecting on the observed value truncates the outcome,
+so every arm's slope is well below 1 and only the paired differences are comparable.
+
+- **For wind, the gain from ERA5 training is much larger in the tail, in points.** It is about 12%
+  of the top-decile error against 10% of the all-case error. `s1_memberavg` minus `ens_trained` on
+  the top-decile cases is -6.14 points over all leads (-7.66 to -4.33, 12 of 12 months), against
+  -1.70 on all cases, and -16.54 at 0 to 24 h and -17.56 at 1 to 2 days. With the control member
+  alone, `s1_control` minus `ens_trained_control` is -6.95 (-8.39 to -5.23). At 7 to 10 days it is
+  -1.22 (-2.46 to -0.08) and at 11 to 15 days +0.12 (-1.17 to +1.56). Top-decile wind errors are
+  large for every arm except `era5_ceiling` (13 points), so the weather input is associated with
+  most of the top-decile error.
+- **For solar, the tail gain is larger in points but not in certainty, and smaller in relative terms
+  (4% against 7%).** `s1_memberavg` minus `ens_trained` is -1.05 over all leads (-3.93 to +1.25, 7
+  of 11 months with a top-decile case), -3.52 at 1 to 2 days (-6.24 to -0.89), and near zero at 7 to
+  15 days.
 
 **Other results.**
 
