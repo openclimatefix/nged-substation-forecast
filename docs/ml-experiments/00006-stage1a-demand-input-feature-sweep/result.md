@@ -21,7 +21,7 @@ decision_rule: >-
   every other input's add-one-in contrast against the weather block.
 benchmark: >-
   The weather block W alone, and a month-by-half-hour climatology row.
-row_set_id: era5_val_2025_07_to_2026_06_v1
+row_set_id: era5_val_2024_07_to_2025_06_v1
 metric: mean absolute error of the median, points of capacity (power over effective capacity, times 100)
 verdict: pending
 code: ml-experiments/00006-stage1a-demand-input-feature-sweep/
@@ -59,12 +59,15 @@ by the mean of the 3 by 3 block of cells around it.
 and `solar_azimuth`. Every column is a function of forecast weather and the clock, so it is
 available at forecast time.
 
-**Folds.** The main fold validates on 2025-07-01 to 2026-06-30 and trains on ERA5 from 2019-09-01
-to one week before validation. The second fold validates on 2024-07-01 to 2025-06-30 and trains
-before it, with the same purge. **Selection uses the second fold only:** greedy additions and
-drop-one-out are decided on the second fold, and the chosen sets are then scored once on the main
-fold. Scoring the sets on the data that chose them would favour the wider sets. No valid time on or
-after 2026-07-01 is scored.
+**Folds.** The experiment feeds the lag experiment 00005, which validates on 2025-07 onwards, so
+no choice may be influenced by that year. **Selection fold:** validate on 2024-07-01 to
+2025-06-30, train on ERA5 from 2019-09-01 to one week before validation (and, for the recent-start
+variants, from 2023-09). A second selection fold validates on 2023-07-01 to 2024-06-30 if time
+allows. Every add-one-in, greedy, and drop-one-out decision uses the selection folds only. The
+chosen feature set is then frozen and written into this page before anything is scored on
+2025-07-01 to 2026-06-30. **Confirmation fold:** the frozen set, the weather block W, and W plus the
+clock are scored once on 2025-07-01 to 2026-06-30, training up to one week before it, and reported
+as confirmation and not as selection. No valid time on or after 2026-07-01 is scored.
 
 **Models.** Two configurations, each run for every arm.
 
@@ -112,8 +115,9 @@ outside capacity series), school terms (dates must be collected by hand), coolin
 temperature change over 24 hours, snow, humidity, days since the clock change, sporting events, and
 the substation-type fields.
 
-**Planned contrasts** (mean absolute error of the median, points of capacity, main fold, one
-model per series; the interval resamples whole validation months):
+**Planned contrasts** (mean absolute error of the median, points of capacity, one model per series;
+the interval resamples whole validation months). P1 to P7 are scored on the selection fold. P8 and
+P9 are scored on the confirmation fold, and P8 is the one contrast the frozen set must pass.
 
 - **P1:** W plus clock minus W.
 - **P2:** W plus clock plus one harmonic minus W plus clock.
@@ -122,11 +126,11 @@ model per series; the interval resamples whole validation months):
 - **P5:** W plus windchill (the formula) minus W.
 - **P6:** W plus clock plus the COVID indicator minus W plus clock.
 - **P7:** W plus clock with recency weights minus W plus clock.
-- **P8:** the set selected on the second fold minus W plus clock.
+- **P8:** the frozen set selected on the selection fold minus W plus clock.
 - **P9:** the selected set trained from 2023-09 minus the same set trained from 2019-09.
 
 Every other number is exploratory and labelled so: the add-one-in arms against W and against W plus
-clock, the drop-one-out, the pooled configurations, the second fold, and the breakdowns by type,
+clock, the drop-one-out, the pooled configurations, the second selection fold, and the breakdowns by type,
 hour, and season. A month-by-half-hour climatology (`ClimatologyForecaster`) is the reference row.
 Absolute scores are reported for every arm.
 
