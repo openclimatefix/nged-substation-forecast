@@ -3,15 +3,25 @@ id: "00001"
 slug: era5-trained-stage1a-vs-ens-trained
 status: done
 size: complex
-hypothesis: A weather-to-power XGBoost model trained on ERA5 and CAMS (2019-09 onward) and applied to ENS weather has a lower point-forecast error than the same columns trained on ENS weather.
-prediction: The mean absolute error of the ensemble-mean forecast falls by at least 0.15 points of capacity at most lead bands, for both solar and wind.
-decision_rule: Material if the mean paired difference is at most -0.15 points, the 95% month-resampled interval is wholly below zero, and at least 9 of 12 validation months agree.
-benchmark: ens_trained (the same columns trained on the ENS control member, 2024-04 to 2025-06), with a month-by-half-hour climatology as a reference.
+hypothesis: >-
+  A weather-to-power XGBoost model trained on ERA5 and CAMS (2019-09 onward) and applied to ENS
+  weather has a lower point-forecast error than the same columns trained on ENS weather.
+prediction: >-
+  The mean absolute error of the ensemble-mean forecast falls by at least 0.15 points of capacity
+  at most lead bands, for both solar and wind.
+decision_rule: >-
+  Material if the mean paired difference is at most -0.15 points, the 95% month-resampled interval
+  is wholly below zero, and at least 9 of 12 validation months agree.
+benchmark: >-
+  ens_trained (the same columns trained on the ENS control member, 2024-04 to 2025-06), with a
+  month-by-half-hour climatology as a reference.
 row_set_id: fold_a_tuesdays_v1
 metric: mean absolute error of the ensemble-mean forecast, points of capacity
 verdict: supported
 best_arm: s1_memberavg
-headline: "P1 (revised), s1_memberavg minus ens_trained, all leads: wind -1.70 (-2.33 to -1.08), solar -0.57 (-0.83 to -0.32); material up to day 6, not beyond."
+headline: >-
+  P1 (revised), s1_memberavg minus ens_trained, all leads: wind -1.70 (-2.33 to -1.08), solar
+  -0.57 (-0.83 to -0.32); material up to day 6, not beyond.
 code: studies/stage1_pilot/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1184
 ---
@@ -61,6 +71,7 @@ Mean absolute error, points of capacity, with 95% intervals that resample whole 
 - **Removing hour and day-of-year columns lowered the ENS-trained error by 1.13 (solar) and 3.40
   (wind) points** and the ERA5-trained error by 0.23 (solar) and 0 (wind). The first run's control,
   with 24 production columns, looked like it memorised calendar position.
+
 ## Gains in the tails (exploratory)
 
 **For wind, the gain from ERA5 training is much larger on the largest outputs; for solar it is
