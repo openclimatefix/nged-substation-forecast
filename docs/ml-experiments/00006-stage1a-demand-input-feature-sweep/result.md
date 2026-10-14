@@ -344,6 +344,56 @@ to 10% to 40% of capacity for hours at a time, which none of the weather, clock,
 columns explains. The cause is not tested here. The three point forecasts stay near 60% to 90%
 of capacity, and the quantile band widens to cover the swings only partly.
 
+### The daytime errors of the typical substation follow satellite irradiance
+
+![P12's residual against CAMS irradiance and against ERA5 shortwave](figure_8.svg)
+
+**In summer, the forecast for P12 is too high in daylight and about right at night, and the gap
+follows satellite-derived irradiance more closely than it follows ERA5 shortwave.** The residual is
+the observed power minus the chosen set's forecast, in points of capacity. This check was run after
+the experiment, to test a guess about the example above, and none of it was pre-registered. From
+June to August of the confirmation year the mean residual is -5.3 points between 08:00 and 17:00 and
+-1.0 at night, and the mean absolute residual is 6.8 points by day and 3.5 at night.
+
+![P12's mean residual and mean absolute residual by hour of day in summer](figure_9.svg)
+
+**CAMS irradiance read at the substation's own location explains 25% of the variance of P12's hourly
+residual in July 2025, against 4% for ERA5 shortwave.** CAMS is the Copernicus Atmosphere Monitoring
+Service's satellite-derived irradiance. Over the 431 daylight hours of July 2025 (solar zenith under
+80 degrees), the correlation of the residual with CAMS irradiance is -0.50 and with ERA5 shortwave
+-0.20. The two irradiances correlate 0.84 with each other. A fit on both explains 43%. The hours
+with the most irradiance are the hours where the forecast is highest compared with the observed
+power, which fits embedded solar generation that the weather block does not see.
+
+![P12's week in July 2025 from the figure above, with CAMS irradiance below](figure_11.svg)
+
+**On the five weekdays, when the irradiance is above 450 W/m², the observed power dips 10 to 25
+points of capacity below the forecasts, and on the cloudy weekend it does not.** The dips come on
+Monday, Tuesday, Wednesday, Thursday, and Friday around midday and in the afternoon, and the largest
+is on Wednesday, when the irradiance climbs to the clear-sky line. On Saturday and Sunday the
+irradiance stays under 300 W/m² and the observed power follows the forecasts. The weekend is also
+lower demand, so one week cannot separate cloud from weekday. The week was chosen in advance for
+figure 7, not for this check.
+
+![Variance of the residual explained by each irradiance, for 14 Primary substations](figure_10.svg)
+
+**The pattern holds for the 14 Primary series that have CAMS values.** Over the 14 series, CAMS
+alone explains more variance than ERA5 alone in every series, with a median of 24% against 3%, and
+both together explain a median of 40%. P2, the worst-error series in the example above, is the
+exception: both irradiances explain under 3% of its residual, which agrees with its error being a
+level shift and not a daily solar pattern. P15's residual correlates positively with CAMS irradiance
+(+0.38), so the sign is not the same in every series. Two Primary series have no CAMS download.
+
+**The caveats are the short span, the target, and the cause.** The check covers one month and one
+fitted model per series. The R squared values are in-sample fits of a line to hours that are
+correlated with their neighbours. The check shows that irradiance at a finer cloud scale is related
+to the residual, and not that embedded solar is the cause, or that a feature built from forecast
+irradiance would close the gap: CAMS is observed after the fact, so a forecast-time feature would
+use a numerical weather model's irradiance, which has not been tested here. The same check with CAMS
+read at a PV site 10.3 km away gave 19% against 5% for P12, so the closer location widens the gap.
+The numbers come from `e00006_solar_residual.py`, which reads the CAMS download at the 22 demand
+locations (`data/studies/downloads/reanalysis/CAMS/demand_points/`).
+
 ## Probabilistic scores
 
 **The nine quantile levels (0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95) give the same ranking
@@ -401,10 +451,10 @@ Calibration is the job of stage 2, not of this experiment.
 The scripts are in `ml-experiments/00006-stage1a-demand-input-feature-sweep/`. `e00006_inputs.py`
 builds the feature table, `e00006_sweep.py` runs each stage (add-one-in, greedy, drop-one-out,
 masking, the Christmas control, and the finals), `e00006_report.py` writes the tables every number
-on this page comes from, and `e00006_charts.py` and `e00006_examples.py` draw the figures. The
-tables, predictions, and fits are under the private `data/ml-experiments/` folder. Planned
-contrasts, the masking ablation, the graded lockdown arm, and the Christmas control use three
-fitting seeds; the add-one-in, greedy, and drop-one-out stages use one.
+on this page comes from, and `e00006_charts.py`, `e00006_examples.py`, and
+`e00006_solar_residual.py` draw the figures. The tables, predictions, and fits are under the private
+`data/ml-experiments/` folder. Planned contrasts, the masking ablation, the graded lockdown arm, and
+the Christmas control use three fitting seeds; the add-one-in, greedy, and drop-one-out stages use one.
 
 ## Untested ideas
 
