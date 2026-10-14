@@ -498,8 +498,8 @@ as such. Studies write code under `studies/` only.
    in study 4). Until then the claim stays unresolved. Score a learning curve at 1, 2, 3, 6, and 12
    months of history, rotating the truncation window across at least two starting seasons, scoring
    by season, and reporting in-season and out-of-season gaps separately. **Safe entry:** at 1 and 2
-   months, the forecast with the new product must be equivalent to ENS alone (the t-interval inside
-   ±0.15 points). Include an hourly-step transfer test, and stage 2 against the single-stage
+   months, the forecast with the new product must be equivalent to ENS alone (the bootstrap interval
+   inside ±0.15 points). Include an hourly-step transfer test, and stage 2 against the single-stage
    challenger. The `tcc` (total cloud cover) natural experiment (served from 21 November 2025;
    [issue #1157 (Ingest total cloud cover (tcc) from Dynamical.org's ECMWF IFS
    ensemble)](https://github.com/openclimatefix/nged-substation-forecast/issues/1157))
@@ -513,14 +513,17 @@ as such. Studies write code under `studies/` only.
    Cooperative; needs approval against the £30 egress cap.
 
 **Decision rule.** A planned contrast passes when the mean paired difference is at most −0.15 CRPS
-points, the month-level t-interval is wholly below zero (Holm-adjusted across the study's planned
-contrasts), at least 9 of 12 months agree on fold A, and the sign matches on fold B. Fold A trains
-on April 2024 to June 2025, as in quick-wins. Solar-specific contrasts count daylight-weighted
-months, or March to October only, stated in advance, because winter solar differences are near zero.
-Fold B is weak confirmation because the folds share series and weather regimes, so each finalist is
-also scored once on the untouched holdout from July 2026 onward. **Equivalence** means the t-interval
-lies inside ±0.15 points. **A stage stays** only if it beats the previous design by the rule, or is
-equivalent to it and helps a short-history NWP in study 3 or study 4.
+points, the month-resampled bootstrap interval is wholly below zero (at a Bonferroni-adjusted level
+across the study's planned contrasts), at least 9 of 12 months agree on fold A, and the sign matches
+on fold B. Fold A trains on April 2024 to June 2025, as in quick-wins. Solar-specific contrasts
+count daylight-weighted months, or March to October only, stated in advance, because winter solar
+differences are near zero. Fold B is weak confirmation because the folds share series and weather
+regimes, so each finalist is also scored once on the untouched holdout from July 2026 onward.
+**Equivalence** means the bootstrap interval lies inside ±0.15 points. The intervals come from
+`studies.bootstrap`, which resamples whole months and returns intervals but no p-values, so Holm's
+procedure (which needs p-values) is replaced by the more conservative Bonferroni level. **A stage
+stays** only if it beats the previous design by the rule, or is equivalent to it and helps a
+short-history NWP in study 3 or study 4.
 
 **Constraints.** Production-system data plus ERA5, CAMS, and (if approved) the ENS backfill. No
 production code changes. NGED generators are anonymised in every published figure. Validation months
@@ -615,8 +618,8 @@ This section is a record of what changed; it is not part of the design.
   forward-chained out-of-fold predictions; lag anomalies built from the source serving has; the
   perfect-prognosis risk and the early-lead stage 1 arm; the ECC-Q specification; genuinely different
   products for the short-history test with a rotated truncation window; pre-registered contrasts with
-  Holm adjustment and an untouched holdout; daylight-weighted solar months; a separate `tcc` split;
-  the ratio-target conditions; a cleaning-recall test before reuse.
+  Bonferroni-adjusted intervals and an untouched holdout; daylight-weighted solar months; a
+  separate `tcc` split; the ratio-target conditions; a cleaning-recall test before reuse.
 - **Accepted from a later external review (GPT-6 Astra) of the pushed plan:** stage 2 now says how
   knowledge transfers between products (Designs 1 and 2) and the short-history claim stays
   unresolved until a different model family passes; the monthly promotion uses rolling-origin
