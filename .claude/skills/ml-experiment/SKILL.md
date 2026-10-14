@@ -34,6 +34,14 @@ name.
 matter of `result.md`: the claim, a prediction that could fail (a direction and a size of effect),
 and the decision rule (which interval, against which benchmark, would count as support).
 
+**State the smallest gain worth the cost of porting the change, and set it by that cost.** A change
+that costs nothing in production, such as a different column, training start, or loss, is worth
+porting at any gain whose interval excludes zero, so its threshold is zero. A change that adds a
+model, a data source, or a pipeline step needs a threshold that pays for the added complexity. Write
+the threshold into the decision rule, with the reason. Do not copy a threshold from an earlier
+experiment, because a paired contrast on the same rows often resolves gains much finer than the
+whole-sample figures the research plan quotes.
+
 **Size the experiment with the five `plan-issue` triggers, and write one line for each:** what gets
 stored, whether the experiment touches the production serving path, whether it touches a degradation
 rule, whether more than one design would defensibly test the hypothesis, and whether it spans code
@@ -83,9 +91,9 @@ review as `implement-issue` does.
 **`result.md` is the plan first and the write-up second.** Commit it with status `planned` before
 the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
 hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
-the metric, and, when finished, the verdict (`supported`, `refuted`, `inconclusive`, `invalid`, or
-`failed`), the best arm with its headline number, the lessons learned, and `advice` (below). A
-finished experiment also has `production_status` (`candidate`, `adopted`, `superseded`, or
+the metric, and, when finished, the verdict (`supported`, `small gain`, `refuted`, `inconclusive`,
+`invalid`, or `failed`), the best arm with its headline number, the lessons learned, and `advice`
+(below). A finished experiment also has `production_status` (`candidate`, `adopted`, `superseded`, or
 `not-for-production`) and `adopted_in` (the model release number, or `none`). Every result has the
 same front matter, so a later session finds results with `grep` over
 `docs/ml-experiments/*/result.md`.
@@ -152,13 +160,25 @@ folder yet goes in the table of `research-plan.md` marked "Proposed". An experim
 `invalid` or `failed` keeps its entry, and the entry says why. Write the entry for a reader who has
 not opened `result.md`.
 
+## Small gains and stacking
+
+**`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls
+under the stated threshold.** It is not `inconclusive`, because the direction is established. The
+write-up says how large the gain is and what the change costs, and the experiment is flagged
+`candidate`.
+
+**Gains from different experiments may not add, so test them together.** Two changes can act on the
+same error. When several `candidate` and `small gain` results exist for one target (solar and wind,
+or Primary demand), run one stacking experiment that combines all of them against the production
+recipe. It reports the combined gain, and the loss in score when each component is dropped in turn.
+
 ## When a winner reaches production
 
 **Flag each finished experiment for the next model release.** Set `production_status` in
-`result.md` to `candidate` when the verdict is `supported` or `partly supported` and the result is
-worth considering for the next model release, and to `not-for-production` for a diagnostic, a
-refuted idea, or a stage that failed its test. The log's "Candidates for the next release" section
-is the agenda for the maintainer's release review.
+`result.md` to `candidate` when the verdict is `supported`, `small gain`, or `partly supported` and
+the result is worth considering for the next model release, and to `not-for-production` for a
+diagnostic, a refuted idea, or a stage that failed its test. The log's "Candidates for the next
+release" section is the agenda for the maintainer's release review.
 
 **The pull request that cuts a model release records which experiments it adopted.** In that pull
 request, set `production_status` to `adopted` and `adopted_in` to the model release number in each
