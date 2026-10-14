@@ -637,8 +637,9 @@ training on CRPS, and features from the ensemble itself.
 - **Several ideas and every combination arm were chosen after the first results.** The gain of the
   winning arm on fold A is biased upward. Fold B repeats the direction at a similar size.
 - **The scores are not leaderboard scores.** The study did not submit to the scorer. Its 53-run
-  sample is a subset of the leaderboard's runs, and its quantile arms number `ensemble_member` from
-  0 to 458, which the leaderboard's forecast table cannot hold.
+  sample is a subset of the leaderboard's runs. Its quantile arms also number `ensemble_member` from
+  0 to 458, a range that the leaderboard's `power_forecasts` table cannot hold in its Int8
+  `ensemble_member` column.
 - **Nothing was fitted at `colsample_bytree` 0.8 except the production arm.**
 - **The quantile arms use 9 untuned levels and weight every member and level equally,** and the
   resulting 459-value distribution is too narrow (57% coverage of a nominal 80% band). The control

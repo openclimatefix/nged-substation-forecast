@@ -47,10 +47,10 @@ Fold B (the backwards-in-time robustness fold) takes `--fold backwards_2025_07_t
 Every arm is scored on 53 ECMWF runs started every 7 days from the start of the validation year,
 with `ml_core.metrics`' fair CRPS and the absolute error of the ensemble mean, and each row's error
 is divided by its series' effective capacity. These are the study's own scores. They are not
-leaderboard numbers: the study did not submit to `score_study.py`, because the script needs every
-daily run of the validation year and Quick wins forecasts one run in 7 days, and because its
-quantile arms number `ensemble_member` from 0 to 458, outside the Int8 range that `PowerForecast`
-holds.
+leaderboard numbers, because the study did not submit to `score_study.py`. The script needs the row
+keys of the reference experiment, which holds a run for every day of the validation year, and Quick
+wins forecasts one run in 7 days. The script also cannot hold Quick wins' quantile arms, whose
+`ensemble_member` codes run from 0 to 458, outside the Int8 range that `PowerForecast` uses.
 
 Generators are never named: the scripts print series by type, and charts normalise power by
 capacity.
