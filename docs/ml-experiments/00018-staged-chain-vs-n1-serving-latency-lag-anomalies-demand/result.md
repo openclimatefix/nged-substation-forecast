@@ -10,7 +10,7 @@ hypothesis: >-
   `manual_heuristic` on the quantile score.
 prediction: >-
   The chain with serving-latency lag anomalies scores 0.3 to 0.8 points of capacity below N1 on the
-  quantile score over all leads, and about 0.2 points below `manual_heuristic`. It keeps at least
+  quantile score over all leads, and 0.3 to 0.5 points better than `manual_heuristic` (a lower score is better). It keeps at least
   half of the 1.80-point gain over the lag-free calibrated stage 1 that experiment 00005 measured
   with ERA5 weather and no telemetry delay. The 5% to 95% band covers 83% to 87% before a spread
   factor and 88% to 91% after.
@@ -23,7 +23,8 @@ decision_rule: >-
   is set by the cost of porting: a second model per series, a second weather product at lag times,
   and a calibrator that must be refitted. The verdict is `small gain` when both intervals are wholly
   below zero and either point estimate is above -0.3, `refuted` when the C1 interval is wholly above
-  zero or the C3 interval is wholly above zero, and `inconclusive` otherwise. The mean absolute
+  zero or the C3 interval is wholly above zero, and `inconclusive` otherwise. A split outcome, in which
+  one of C1 and C3 is wholly below zero and the other wholly above, is `refuted`. The mean absolute
   error of the median is reported beside the quantile score and decides nothing.
 benchmark: >-
   N1 and `manual_heuristic` from experiment 00013 (stored predictions, same row set), plus the
@@ -74,9 +75,15 @@ the chain.
   analysis proxy is the ENS control member of the freshest run that had started by the lag time
   (lead 0 to 24 hours, so a run's first day), as `weather_utils.analysis_proxy` defines it, and is
   available to the origin. ERA5T differs slightly from final ERA5, and the emulation ignores that.
+- **Lag times.** The anomalies and residuals use the times 24, 48, 168, and 336 hours before the
+  valid time, the newest usable half-hour and the ones 1 and 3 hours before it, and the latest
+  earlier time with the valid time's half-hour of day and of week. A lag is null when its time is
+  after the newest usable half-hour (origin minus 7 hours), so the 24-hour lag is unusable at leads
+  up to 17 hours.
 - **Which stage 1 models.** Calibration origins use the forward-chain stage 1 model of their
-  quarter, and validation origins use the final model, both from experiment 00005. Both were fitted
-  before any lag time the origin reads, so no expectation is in-sample. The experiment refits
+  quarter, and validation origins use the final model, both from experiment 00005. A chain model stops
+  15 days before its quarter starts, and an origin reads lag times no earlier than 14 days before
+  itself, so every expectation is out of sample. The experiment refits
   nothing in stage 1.
 
 ## Plan: arms
@@ -97,12 +104,15 @@ from 2024-04-01 to 2025-06-30). They differ only in the recent-origin inputs. Se
 - **CH-S-noCAMS:** as CH-S, without the CAMS swap.
 - **CH-P (proxy):** the analysis proxy at every lag time.
 - **CH-E (ceiling, real delay):** final ERA5 at every lag time, with the 7-hour delay.
+- **CH-S-delay3.5:** as CH-S with the 3.5-hour delay that experiment 00013 gave N1 and
+  `manual_heuristic`, so C1 and C3 can be read at equal telemetry freshness. It is exploratory.
 - **CH-E-nodelay (replicates 00005's L3):** final ERA5 and a 0.5-hour delay, as 00005 had.
 - **CH-S-spread:** CH-S quantiles with the spread scaled about the median, `q50 + k (q - q50)`, by
-  one factor `k` per substation type. `k` is chosen from the grid 1.00 to 1.60 in steps of 0.05 on
+  one factor `k` for the Primary substations (and one each for the bulk and grid supply points). `k` is chosen from the grid 1.00 to 1.60 in steps of 0.05 on
   held-out calibration rows: a calibrator fitted on the calibration runs before 2025-01-01 scored on
   the runs from 2025-01-01 to 2025-06-30 by quantile score. The scored arm uses the full-window
-  calibrator and that `k`. No validation row influences `k`.
+  calibrator and that `k`. No validation row influences `k`. N1 gets no equivalent tuning, so C6 is descriptive and the
+  verdict never rests on it.
 - **References from stored predictions:** N1 (00013), `manual_heuristic`, `climatology`, and the
   production recipe (00013), and R0c, the lag-free calibrated stage 1 (00005), each repeated once
   per seed where unseeded.
@@ -130,11 +140,24 @@ reports the mean signed error of the median for every arm and lead band, and the
 after subtracting each arm's per-series mean signed error (an oracle on the validation year, labelled
 post hoc), so the drift is not mistaken for a difference between arms.
 
+## Plan: design confounds
+
+- **Training data differs by design.** Stage 1 trains on ERA5 from 2023-09, which predates the ENS
+  archive that N1 trains on (from 2024-04). That difference is part of the staged design under
+  test, not a defect.
+- **Column choice.** Experiment 00006 chose stage 1's 13 columns on its own selection year
+  (2024-07 to 2025-06), before any 2025-07 data was scored.
+- **Residual scale.** Calibration residuals come from models at most 3 months past their fit, and
+  validation residuals from a final model up to 12 months past its fit. The write-up reports the
+  residual scale by months since fit.
+
 ## Plan: leakage and cleanliness
 
 - Nothing is scored on or after 2026-07-01.
 - Lag times, ERA5, CAMS, and proxy rows are all at or before the newest usable half-hour, which is at
-  or before the origin minus 7 hours; a unit check asserts this on every case.
+  or before the origin minus 7 hours; a unit check asserts this on every case, and also each source's cutoff: ERA5T times at least
+  5 days before the origin, CAMS times up to 00:00 UTC of the origin day, and proxy values from a
+  run started by the lag time.
 - Stage 1 models are never refitted. The calibrator trains on valid times up to 2025-06-30 23:30.
 - The spread factor `k` uses calibration runs only.
 - No calendar column enters the calibrator, as in 00005.
