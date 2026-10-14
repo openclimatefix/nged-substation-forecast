@@ -77,13 +77,14 @@ def source_predictions(
     cams_features[~np.isfinite(cams), :] = proxy_features[~np.isfinite(cams), :]
     # CAMS rows keep the proxy's other variables; a row is NaN wherever the proxy is NaN.
     cams_features[~np.isfinite(proxy_features[:, columns.index("temperature_2m")]), :] = np.nan
+    weather_index = [columns.index(name) for name in weather]
     matrices = {"E": era5, "P": proxy_features, "CP": cams_features}
     out: dict[str, dict[str, np.ndarray]] = {}
     for tag, model in models.items():
         out[tag] = {}
         for source, matrix in matrices.items():
             prediction = common.predict(model=model, features=matrix)
-            prediction[~np.isfinite(matrix[:, : len(weather)]).all(axis=1)] = np.nan
+            prediction[~np.isfinite(matrix[:, weather_index]).all(axis=1)] = np.nan
             out[tag][source] = prediction.astype(np.float32)
     return out
 
@@ -247,9 +248,13 @@ def main() -> None:
                     )
                 )
                 if name == "s":
-                    early = (train["power_fcst_init_time"] < K_SPLIT).to_numpy()
+                    early = (train["power_fcst_init_time"] < K_SPLIT).to_numpy() & (
+                        train["valid_time"] < K_SPLIT
+                    ).to_numpy()
                     early_model = fit_calibrator(x=x_train[early], y=y_train[early], seed=seed)
-                    held = ~early & np.isfinite(y_train)
+                    held = (train["power_fcst_init_time"] >= K_SPLIT).to_numpy() & np.isfinite(
+                        y_train
+                    )
                     held_q = np.sort(
                         common.predict(model=early_model, features=x_train[held]), axis=1
                     )

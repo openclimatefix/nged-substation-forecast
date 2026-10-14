@@ -15,6 +15,15 @@ import e00018_common as common
 import numpy as np
 
 
+def recent_day_index(target: np.ndarray, newest: int) -> np.ndarray:
+    """Return the latest earlier time with each target's half-hour of day, at or before `newest`."""
+    gap = target - newest
+    index = target - common.STEPS_PER_DAY * np.ceil(gap / common.STEPS_PER_DAY).astype(int)
+    assert (index <= newest).all()
+    assert ((target - index) % common.STEPS_PER_DAY == 0).all()
+    return index
+
+
 def main() -> None:
     """Run the checks."""
     size = int(common.grid_index(times=datetime(2026, 8, 1, tzinfo=UTC)))
@@ -58,6 +67,16 @@ def main() -> None:
             assert np.isnan(column[target - lag > newest]).all()
             assert np.isfinite(column[target - lag <= newest]).all()
         assert recent[0, 0] == power[newest]
+        assert (target - recent_day_index(target, newest) >= 0).all()
+        full = common.recent_inputs(
+            power=power,
+            residual=power * 0.5,
+            target=target,
+            origin=np.full(target.size, origin),
+            delay_steps=common.DELAY_STEPS,
+        )
+        assert full.shape[1] == len(common.recent_columns(with_residuals=True))
+        assert np.allclose(full[:, 9:], full[:, :9] * 0.5, equal_nan=True)
     print("availability checks passed")
 
 
