@@ -42,6 +42,7 @@ the maintainer to confirm.
 | [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error? | Supported | Candidate | 2026-10-14 |
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
 | [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
+| [00018](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -270,6 +271,27 @@ Primary substations and the 73 runs of `fold_a_every5d_v1`.
   baselines)](https://github.com/openclimatefix/nged-substation-forecast/pull/1218).
 
 ![The five planned contrasts](00013-primary-demand-against-stored-baselines/figure_2.svg)
+
+### 00018: the staged chain against the single-stage model for Primary demand
+
+**The staged chain, built only from weather that serving has and with NGED's real telemetry delay,
+scored the same as N1 and behind `manual_heuristic` on the quantile score.** The experiment gave the
+stage 2 calibrator lag anomalies from ERA5T, CAMS, and the ENS control member's early leads, with
+the newest usable power 7 hours before the 09:00 UTC origin.
+
+- **Headline result:** the chain minus N1 was +0.08 points of capacity over all leads (99.17%
+  interval -0.11 to +0.25), -0.27 up to 48 hours (-0.62 to +0.03). The chain minus
+  `manual_heuristic` was +0.52 (-0.25 to +1.25).
+- **Absolute scores (all leads):** `manual_heuristic` 5.89, N1 6.33, chain 6.41.
+- **What the serving sources cost:** 0.13 points against final ERA5, and 3.5 more hours of telemetry
+  delay cost another 0.13. Lag anomalies added 0.04 to raw lagged power.
+- **Finding for later experiments:** a spread factor of 1.15 lifts the 5% to 95% coverage from 86%
+  to 90%, and every arm under-forecast the validation year by 1.3 to 3.5 points.
+- **Write-up and pull request:** [result](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md),
+  [PR #1224 (Experiment 18: does the staged chain beat the single-stage model for Primary
+  substation demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1224).
+
+![The six planned contrasts](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/figure_2.svg)
 
 ### 00014: a stage 0 for the CAMS-trained demand model
 

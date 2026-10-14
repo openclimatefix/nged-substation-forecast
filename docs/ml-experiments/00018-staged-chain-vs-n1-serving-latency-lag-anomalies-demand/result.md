@@ -1,7 +1,7 @@
 ---
 id: "00018"
 slug: staged-chain-vs-n1-serving-latency-lag-anomalies-demand
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 16 Primary substation demand series, the staged chain (an ERA5-trained stage 1 and the
@@ -36,11 +36,130 @@ metric: >-
   continuous ranked probability score) and mean absolute error of the median, in points of capacity
   (1 point is 1% of the series' effective capacity); coverage of the 5% to 95% band; mean signed
   error reported separately as bias
+verdict: inconclusive
+best_arm: >-
+  The chain with serving-latency lag anomalies (S) up to 48 hours (5.32 against 5.59 for N1 and 5.68
+  for `manual_heuristic`); `manual_heuristic` over all leads (5.89 against 6.41 for the chain)
+headline: >-
+  C1, the chain minus N1, quantile score over all leads, Primary substations: +0.08 points of
+  capacity (99.17% interval -0.11 to +0.25). C3, the chain minus `manual_heuristic`: +0.52 (-0.25
+  to +1.25). Neither interval excludes zero, so the verdict is inconclusive.
+lessons: >-
+  Lag anomalies built from serving sources add little to raw lagged power (-0.04, -0.12 to +0.07),
+  and 3.5 hours more telemetry delay costs 0.13 points. A calibrator spread factor of 1.15 lifts
+  the 5% to 95% coverage from 86% to 90%.
+advice:
+  - >-
+    Do not build lag-anomaly machinery for demand until raw lagged power in the calibrator is shown
+    to fall short: lag anomalies lowered the quantile score by 0.04 over all leads (-0.12 to +0.07)
+    and 0.14 up to 48 h (-0.30 to -0.03) against raw lags (C5).
+  - >-
+    Treat telemetry delay as a lever as large as the weather source: 3.5 hours more delay cost 0.13
+    points of quantile score (E7), against 0.13 for ERA5T and proxy weather in place of final ERA5
+    (C4).
+  - >-
+    Apply a spread factor of about 1.15 to a calibrated chain, which raised the 5% to 95% coverage
+    from 86% to 90% for 0.04 points of quantile score (C6), and check N1's 80% coverage, which no
+    spread factor has touched.
+  - >-
+    Test the chain only for leads up to 2 days, where it was 0.27 below N1 (-0.62 to +0.03, C1) and
+    0.43 below N1 at equal telemetry delay (E5), and use N1 or `manual_heuristic` beyond 3 days,
+    where the chain was 0.15 above N1 (C1).
+  - >-
+    Score every Primary arm against `manual_heuristic` on the quantile score too: it scored 5.89
+    over all leads and 5.94 beyond 3 days, below every other arm (C3).
+production_status: not-for-production
+adopted_in: none
+code: ml-experiments/00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1224
 ---
 
 # Does the staged chain beat the single-stage model for Primary substation demand?
 
-**Status: planned.** This page holds the pre-registered plan. Results are added after the run.
+**Verdict: inconclusive.** With lag anomalies built only from weather that serving has, and with
+NGED's real telemetry delay, the chain scores the same as N1: the quantile score over all leads is
+6.41 against 6.33, and C1 is +0.08 points of capacity (99.17% interval -0.11 to +0.25). The chain
+trails `manual_heuristic`, 5.89, by +0.52 (-0.25 to +1.25, C3). Neither interval excludes zero. The
+decision rule needed both to be wholly below zero by at least 0.3, so the staged design is not
+supported for demand. A point is 1% of the series' effective capacity. The substations are not
+named.
+
+![Quantile score by lead band](figure_1.svg)
+
+## What the arms score
+
+Every arm is scored on the same 768,073 cases per seed (Primary substations; 965,723 for all 20
+series), on the 73 runs of `fold_a_every5d_v1`. Intervals resample whole months and the three
+seeds. Quantile score (an estimate of the continuous ranked probability score), smaller is better:
+
+| Arm | All leads | Up to 48 h | 3 days or more | Median error, all leads | Bias | Coverage |
+|---|---|---|---|---|---|---|
+| `manual_heuristic` | 5.89 | 5.68 | 5.94 | 8.23 | -1.34 | 80.9% |
+| N1 | 6.33 | 5.59 | 6.51 | 8.45 | -2.60 | 80.1% |
+| Chain, final ERA5 lag anomalies (ceiling) | 6.28 | 5.32 | 6.50 | 8.47 | -1.99 | 86.2% |
+| Chain, serving-latency lag anomalies (S) | 6.41 | 5.32 | 6.66 | 8.64 | -2.12 | 86.1% |
+| Chain, S with a spread factor of 1.15 | 6.37 | 5.31 | 6.61 | 8.64 | -2.12 | 90.0% |
+| Chain, raw lagged power only | 6.46 | 5.45 | 6.70 | 8.64 | -2.22 | 86.3% |
+| Chain, S at 3.5 hours of delay | 6.28 | 5.16 | 6.54 | 8.52 | -2.30 | 86.3% |
+| Stage 1 and calibrator, no lagged power (R0c) | 7.46 | 7.11 | 7.56 | 10.02 | -3.45 | 85.8% |
+| `climatology` | 7.46 | 7.39 | 7.49 | 10.33 | -2.87 | 83.0% |
+| Production recipe | 9.52 | 9.38 | 9.58 | 9.92 | -2.28 | 9.7% |
+
+Bias is the mean of the median forecast minus the observed power, in points of capacity. Coverage is
+the share of observations inside the 5% to 95% band.
+
+## The six planned contrasts
+
+Quantile score, Primary substations, 99.17% intervals; negative means the first arm is better.
+
+- **C1 (primary), chain minus N1:** +0.08 over all leads (-0.11 to +0.25), -0.27 up to 48 h (-0.62
+  to +0.03), +0.15 beyond 3 days (-0.07 to +0.36).
+- **C2, chain minus R0c:** -1.05 over all leads (-1.64 to -0.58), -1.79 up to 48 h. Experiment 00005
+  measured -1.80 over leads up to 48 hours with final ERA5 and no delay.
+- **C3, chain minus `manual_heuristic`:** +0.52 (-0.25 to +1.25), -0.36 up to 48 h (-0.89 to +0.12),
+  +0.72 beyond 3 days (-0.14 to +1.54).
+- **C4, chain minus the final-ERA5 ceiling:** +0.13 (+0.02 to +0.25), so serving sources lose 0.13.
+- **C5, chain minus raw lagged power only:** -0.04 (-0.12 to +0.07), -0.14 up to 48 h (-0.30 to
+  -0.03). Lag anomalies add little to the lags themselves.
+- **C6, spread factor minus no factor:** -0.04 (-0.08 to -0.00). The factor `k` was 1.15, chosen on
+  calibration rows only, and lifts the coverage from 86.1% to 90.0%.
+
+![The six planned contrasts](figure_2.svg)
+
+## Exploratory contrasts (95% intervals)
+
+- **The CAMS swap and the proxy make no difference.** The chain with and without CAMS shortwave
+  differ by +0.01 (E1), and the proxy alone against the serving mix by 0.00 (E2).
+- **Telemetry delay matters.** The chain with final ERA5 and the 7-hour delay scores 0.05 better
+  than with a 0.5-hour delay over all leads (E3, -0.17 to +0.05), but 0.11 worse up to 48 h. With
+  3.5 hours of delay, as N1 had, the chain beats N1 up to 48 h by 0.43 (-0.72 to -0.15, E5) and is
+  level with it over all leads (-0.04, -0.18 to +0.07). The extra 3.5 hours cost 0.13 (E7).
+- **The production recipe is far behind.** The chain beats it by 3.11 (E4).
+
+## Limits
+
+- **ERA5T is emulated by final ERA5**, and the CAMS values are the real history rather than the
+  value available on the day, so C4 may understate the cost of serving latency.
+- **One calibrator and spread factor per substation type**; N1 has no calibration, so its 80%
+  coverage is part of its score.
+- **Calibration residuals are at most 3 months from a model's fit**, while validation residuals
+  come from a final model up to 12 months old. The page did not measure the residual scale by months
+  since fit.
+- **16 series and 12 months** leave 99.17% intervals of about plus or minus 0.2 for the paired
+  contrasts and plus or minus 0.8 against `manual_heuristic`.
+- **Every arm under-forecast the validation year** by 1.3 to 3.5 points (the bias column), so the
+  scores above mix bias with the other error.
+- **The review used Sonnet, not Opus,** because the maintainer asked for Opus only where vital.
+
+## Lessons learned
+
+- **The chain is not worth its extra stage for demand.** It matches N1 and trails `manual_heuristic`
+  on the quantile score, and its only gains are up to 2 days.
+- **Raw lagged power carries most of the lag signal.** Lag anomalies add 0.04 over all leads.
+- **Fresh telemetry is worth as much as better weather at lag times.**
+- **A spread factor is cheap.** Coverage rose from 86% to 90% for 0.04 points.
+
+## Plan, written before any code ran
 
 ## Plan: sizing
 
