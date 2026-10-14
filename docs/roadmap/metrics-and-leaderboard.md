@@ -30,8 +30,8 @@ A key deliverable is a **leaderboard** comparing many forecasting approaches. We
 leaderboard per `time_series_type`**, e.g. primary substations, GSPs, BSPs, solar PV sites, wind
 farms, BESS, etc.
 
-Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **CV run**: a
-particular model, trained with a particular set of features, processed a particular way. Entrants
+Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **CV run**: a particular
+forecasting model, trained with a particular set of features, processed a particular way. Entrants
 must be compared apples-to-apples — same test dataset, same metrics, same assumptions.
 
 The configuration, trained weights, and metrics of each CV run are stored in the project's
@@ -342,7 +342,7 @@ annual analogue, and its ensemble then holds only the weekly members.
 v0.3 epic.** The metrics collapse can land before or after any baseline. Implements the
 [metric-matched collapse
 decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters emit
-**members only**; every collapse lives in the metrics layer, so there is no per-CV run
+**members only**; every collapse lives in the metrics layer, so there is no per-CV-run
 collapse config and no designated point-forecast columns on `PowerForecast`. In
 `packages/ml_core/src/ml_core/metrics.py`:
 
@@ -1039,7 +1039,7 @@ like — is the durable explainer [Probabilistic forecasting from NWP
 ensembles](../techniques/probabilistic-forecasting.md). This section is the *plan* that applies it.
 
 Fix in four phases, each an independent PR (Phase D is itself several PRs). Phases A and B are pure
-evaluation (no model changes) and should land before any further MAE-driven tuning.
+evaluation (no model changes) and should land before any further MAE-driven changes.
 
 ### Phase A — horizon-sliced metrics ✅
 

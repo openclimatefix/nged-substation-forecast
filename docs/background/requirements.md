@@ -98,16 +98,15 @@ Nearly every objective above is an open research question — improving NRA fore
 switching events, estimating effective capacity, flagging faulty meters, disaggregating DERs — and
 we hold far more ideas than we can try at once. That turns the throughput of cross-validation runs
 (CV runs) into an infrastructure requirement in its own right: we need to run **on the order of
-hundreds of CV runs per month**, and the workflow must make each CV run as frictionless as
-possible.
+hundreds of CV runs per month**, and the workflow must make each CV run as frictionless as possible.
 That the throughput produces a better forecast is a bet this project is making rather than a result
 the literature has settled, for the reasons set out in [Our approach to
-MLOps](../cross-validation/index.md#our-approach-to-mlops). [H2, a hundred CV runs per person
-in a peak
+MLOps](../cross-validation/index.md#our-approach-to-mlops). [H2, a hundred CV runs per person in a
+peak
 month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month)
 is the pre-registered version of that requirement, deliberately relaxed to a peak-month, per-person
-claim so that months spent hardening the service are not spurious falsifications. The promotion
-half below is [H3, one-click promotion and one-click
+claim so that months spent hardening the service are not spurious falsifications. The promotion half
+below is [H3, one-click promotion and one-click
 rollback](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 Three properties matter as much as raw throughput:

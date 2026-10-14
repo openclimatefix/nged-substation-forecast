@@ -1,4 +1,4 @@
-# Cross-Validation Orchestration — Design Decisions
+# ML Orchestration — Design Decisions
 
 This page records the design decisions behind the Dagster/MLflow cross-validation layer
 (registration → training → forecasting → metrics) and the alternatives we rejected, so the
@@ -11,7 +11,7 @@ end-to-end](../cross-validation/dagster-workflow.md).
 |---|---|
 | **Cross-validation run (CV run)** | One specific combination of model class + config (features, hyperparameters), trained and scored on one or more CV folds, identified by a human-readable `experiment_name`. Stamped onto every forecast row in a dedicated `experiment_name` column — **not** overloaded onto `power_fcst_model_name`, which keeps its meaning as the model *family* (`MODEL_NAME`). |
 | **CV fold** | One expanding-window train/validation split, identified by a short `fold_id` label. Date ranges live in `conf/cv/default.yaml` and are immutable per leaderboard epoch (see [Cross-validation folds](../cross-validation/cross-validation-folds.md)). |
-| **Dagster partition key** | `"{experiment_name}__{fold_id}"` on a `DynamicPartitionsDefinition`. Encodes both dimensions; unique by construction because MLflow enforces unique CV run names. |
+| **Dagster partition key** | `"{experiment_name}__{fold_id}"` on a `DynamicPartitionsDefinition`. Encodes both dimensions; unique by construction because MLflow enforces unique MLflow experiment names. |
 | **MLflow experiment** | One per `experiment_name`; carries the resolved config as tags and holds the parent run and the fold runs of that CV run. |
 | **MLflow parent run** | One per CV run (`cv_summary`, tagged `cv_role=parent`). Holds the flattened config params and the mean-across-folds aggregate metrics — the row the leaderboard sorts on. |
 | **MLflow fold run** | One per fold, nested under the parent (tagged `cv_role=fold`, `fold_id=…`). Holds per-fold training tags (`train_start`, `train_end`, `n_eligible_time_series`, `n_trained_time_series` — tags, not params, because the run is reused on every re-materialisation), per-fold metrics, and the trained model artifacts. |

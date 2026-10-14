@@ -71,7 +71,7 @@ service)](#option-b-port-only-the-live-service-promising-with-a-real-two-orchest
 Concretely, the workflow we designed for Flexpectation is: mint an `{experiment_name}__{fold_id}`
 partition key per cross-validation cell at runtime, and get individually addressable, retryable,
 observable materialisations per key — with a UI that shows at a glance which (CV run, fold)
-cells exist, succeeded, or failed, across every CV run ever run. Dagster's
+cells exist, succeeded, or failed, across every CV run to date. Dagster's
 `DynamicPartitionsDefinition` provides exactly this; [ML Orchestration Design](ml-orchestration.md)
 documents the layer built on it.
 
@@ -184,7 +184,7 @@ it lacks is the catalog** — the persistent per-cell status surface and in-plac
 that Dagster gives us for free — and re-platforming to chase a weeks-old partition feature whose
 observability UI is still on the roadmap would be premature. At our [CV run
 volume](../background/requirements.md#cross-validation-runs-at-scale) — hundreds of runs a month,
-with routine re-runs of old CV runs — small per-CV run friction compounds into a real tax on the
+with routine re-runs of old CV runs — small per-CV-run friction compounds into a real tax on the
 project's core output.
 
 ## What would a port look like?

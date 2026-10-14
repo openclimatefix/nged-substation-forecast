@@ -177,8 +177,9 @@ IDENTITY_TAGS: Final[tuple[IdentityTagType, ...]] = ("config", "forecaster_targe
 
 The ``description`` tag is deliberately absent: prose about a CV run is not part of what
 makes a CV run that CV run, so it stays freely editable by re-registering. A tag absent
-from the *stored* CV run is likewise not a change — that is the untagged CV run
-``get_or_create_experiment`` leaves behind, and this registration is entitled to complete it.
+from the *stored* MLflow experiment is likewise not a change — that is the untagged MLflow
+experiment ``get_or_create_experiment`` leaves behind, and this registration is entitled to
+complete it.
 Fuller reasoning:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-a-cv-run-under-a-changed-config-is-rejected>
 """
@@ -258,15 +259,15 @@ def _reject_changed_identity(
     A CV run's identity **is** its config: every fold of a CV run must be trained and
     scored under one config, or its leaderboard row silently mixes two different models. Folds
     already materialised under the old config cannot be un-trained, and the assets read the config
-    back from the CV run tag (``load_experiment_forecaster``), so re-pointing that tag
+    back from the MLflow experiment tag (``load_experiment_forecaster``), so re-pointing that tag
     mid-flight would poison every comparison built on the CV run. A changed config is therefore
     a *new* CV run, and the only correct answer is to reject it — before anything has been
     written. Fuller reasoning:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-a-cv-run-under-a-changed-config-is-rejected>
 
-    Called with the CV run's stored tags before any write, so a rejection leaves MLflow exactly
-    as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged
-    CV run ``get_or_create_experiment`` creates as its self-healing fallback, which this
+    Called with the MLflow experiment's stored tags before any write, so a rejection leaves MLflow
+    exactly as it found it. A tag absent from ``stored_tags`` is not a change: that is the untagged
+    MLflow experiment ``get_or_create_experiment`` creates as its self-healing fallback, which this
     registration is entitled to complete.
 
     The decision to reject *is* the list of differences to report, so the error can never claim a
@@ -274,7 +275,7 @@ def _reject_changed_identity(
 
     Args:
         experiment_name: The MLflow experiment name, for the error message.
-        stored_tags: The existing CV run's tags (empty for a brand-new CV run).
+        stored_tags: The existing MLflow experiment's tags (empty for a brand-new one).
         requested_tags: The identity this registration is asking for, from ``_identity_tags``.
 
     Raises:
@@ -294,8 +295,8 @@ def _reject_changed_identity(
         return
     raise ExperimentIdentityChangedError(
         f"MLflow experiment {experiment_name!r} is already registered with a different"
-        " configuration. An experiment's identity is its configuration — every fold must be"
-        " trained and scored under the same one — so a changed configuration is a new experiment."
+        " configuration. A CV run's identity is its configuration — every fold must be"
+        " trained and scored under the same one — so a changed configuration is a new CV run."
         " Register it under a new experiment_name.\nDifferences (registered -> requested):\n"
         + "\n".join(differences)
     )
@@ -314,7 +315,7 @@ def _fold_ids_for_run_mode(run_mode: str, cv_config: CvConfig) -> list[str]:
 
 @op
 def register_experiment(context: OpExecutionContext, config: RegisterExperimentConfig) -> None:
-    """Create the MLflow experiment + parent run and add the CV run's CV partition keys.
+    """Create the MLflow experiment + parent run and add the CV run's fold partition keys.
 
     Idempotent for the *same* config: re-running with the same ``experiment_name`` resolves the
     existing CV run, parent run, and partition keys rather than duplicating them, and may
@@ -348,7 +349,7 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
 
     # get_or_create_experiment writes nothing when the name already exists, so the check below
     # still runs before this registration's first write. On a brand-new name it creates the
-    # (untagged) CV run, which has no stored identity to conflict with.
+    # (untagged) MLflow experiment, which has no stored identity to conflict with.
     experiment_id = get_or_create_experiment(config.experiment_name)
     client = MlflowClient()
     _reject_changed_identity(
@@ -357,15 +358,16 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
         requested_tags=identity_tags,
     )
 
-    # Log the params before the CV run tags. MLflow params are write-once, so this is the one
-    # write the tracking store can reject; doing it first means a rejection can never leave the
-    # CV run tagged with a config that its params contradict. The check above should make such
-    # a rejection unreachable, but a CV run registered before that check existed may already
-    # carry params that disagree with its tag, and the ordering keeps even that case one-sided.
-    # log_params is not itself atomic — a batch containing one conflicting key still writes the
-    # batch's other keys before raising — so this bounds the damage to the params rather than
-    # eliminating it. Reaching that requires a CV run whose tags failed to write on an earlier
-    # registration, which is why the tags are the last thing written.
+    # Log the params before the MLflow experiment tags. MLflow params are write-once, so this is
+    # the one write the tracking store can reject; doing it first means a rejection can never
+    # leave the MLflow experiment tagged with a config that its params contradict. The check
+    # above should make such a rejection unreachable, but an MLflow experiment registered before
+    # that check existed may already carry params that disagree with its tag, and the ordering
+    # keeps even that case one-sided. log_params is not itself atomic — a batch containing one
+    # conflicting key still writes the batch's other keys before raising — so this bounds the
+    # damage to the params rather than eliminating it. Reaching that requires an MLflow
+    # experiment whose tags failed to write on an earlier registration, which is why the tags
+    # are the last thing written.
     parent_run_id = get_or_create_parent_run(experiment_id)
     with mlflow.start_run(run_id=parent_run_id):
         mlflow.log_params(flatten_config(forecaster_config))
@@ -415,7 +417,7 @@ def register_experiment_job() -> None:
     Manually launched from the Dagster UI launchpad with a ``RegisterExperimentConfig`` —
     ``experiment_name``, a ``base_model_config`` YAML path, optional ``config_overrides``, and a
     ``run_mode``. Resolves the forecaster class and config from the YAML, creates the MLflow
-    CV run and its parent run if they do not already exist, and adds this CV run's CV
+    experiment and its parent run if they do not already exist, and adds this CV run's
     fold partition keys to the ``cv_experiment_folds`` dynamic partition set:
     ``run_mode="smoke_test"`` (the default) adds the non-leaderboard dev folds, and ``"full_cv"``
     / ``"register_only"`` add the leaderboard folds from ``conf/cv/default.yaml``. Materialises

@@ -394,7 +394,8 @@ class Metrics(pt.Model):
         dtype=pl.String,  # String (not Categorical) — Delta partition column, see fold_id above.
         allow_missing=True,
         description=(
-            "CV run that produced these forecasts. Delta partition key alongside fold_id. "
+            "`experiment_name` of the forecasts these metrics score. "
+            "Delta partition key alongside fold_id. "
             "Populated by the metrics Dagster asset after compute_metrics() returns; "
             "allow_missing so compute_metrics() itself need not produce it."
         ),

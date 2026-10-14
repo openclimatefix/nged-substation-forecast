@@ -2562,7 +2562,7 @@ carries just as a small row count would. The structural fix is a final-test wind
 selection is allowed to touch, and that final-test window is scheduled. Until the final-test window
 lands, three limits hold: leaderboard numbers are selection metrics rather than estimates of future
 skill, differences smaller than fold-level noise should not drive decisions, and the number of
-CV runs run against a fold is itself a statistic worth publishing beside the fold's results.
+CV runs scored against a fold is itself a statistic worth publishing beside the fold's results.
 
 **Rankings travel better than absolute numbers do.** Where a benchmark has enough data behind it,
 the ordering of models survives a change of test set even when the accuracy level does not. The

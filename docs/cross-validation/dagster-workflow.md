@@ -3,7 +3,7 @@
 How to go from raw data to a trained, MLflow-tracked model using the Dagster pipeline.
 
 The pipeline has two layers. The **data layer** (steps 1–5) is built once and refreshed as new data
-arrives; it is shared by all CV runs. The **model layer** (steps 6–9) is repeated for each
+arrives; it is shared by all CV runs. The **CV-run layer** (steps 6–9) is repeated for each
 new model or hyperparameter configuration — see [Model configuration](model-configuration.md) for
 how to choose features and set hyperparameters.
 
@@ -263,7 +263,7 @@ run config dialog before launching.
    scope dates its evaluation window from the CV config's leaderboard folds and has none for those
    rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
    takes the window from the forecast rows themselves.
-3. Discovers the matching `(experiment_name, fold_id)` groups, skips every `study/` CV run of an
+3. Discovers the matching `(experiment_name, fold_id)` groups, skips every `study/` forecast of an
    unfiltered run (naming them in the `skipped_study_experiments` metadata), and checks every
    remaining group before scoring any, raising on a refusal; see [What the `metrics` asset refuses
    to score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score). A run that scores

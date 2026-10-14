@@ -20,7 +20,7 @@ answers several scientific questions, often on a new dataset, run with the `stud
 **"Experiment" means only an ml-experiment.** A pass of the production pipeline over the
 cross-validation folds is a cross-validation run, and `docs/cross-validation/` describes it. Adding
 an improvement to the production pipeline after an experiment supports it is updating the pipeline,
-and the cross-validation run that follows checks the update. It is not a second experiment.
+and the cross-validation run that follows checks the update. That run is not a second experiment.
 
 **Work autonomously by default.** Plan, run, review, and write up without waiting for the
 maintainer. When the maintainer asks to review the plan first, push the plan, say so, and wait for
@@ -120,8 +120,9 @@ session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 the same change, set `informs` in the experiment's `result.md` to the setting the experiment
 decided, and add a row to the table in `docs/architecture/design-evidence.md`: the production
 setting, what production now does, a link to the experiment, and its verdict. A `supported` or
-`refuted` verdict earns a row, and an `inconclusive` or `invalid` one does not. An experiment that
-later overturns a row changes the row in place, and a row whose setting production drops is deleted.
+`refuted` verdict earns a row, and an `inconclusive` or `invalid` one does not. The first row
+replaces the "None yet" placeholder. An experiment that later overturns a row changes the row in
+place, and a row whose setting production drops is deleted.
 
 ## The write-up
 

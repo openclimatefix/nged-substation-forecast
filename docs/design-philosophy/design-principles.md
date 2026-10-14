@@ -116,11 +116,11 @@ image](../architecture/production-deployment.md#bake-the-model-into-the-image-at
 The code that implements the best-performing model in R&D *is* the code we deploy. Note the
 direction of travel: this is emphatically **not** "push the research notebook to production" — it is
 the opposite. Research runs on the production pipeline, so research code is held to production
-standards from the first CV run onwards. Exploratory notebooks are still allowed, but an idea
-becomes a *CV run* — a candidate that can be promoted to production — only once it is
-implemented in the pipeline's own code, behind the same data contracts and tests as everything else.
-There is then no "now rewrite the research code for production" step, because there was never a
-second, scruffier implementation to rewrite (and this should *accelerate* research, not slow it
+standards from the first cross-validation run (CV run) onwards. Exploratory notebooks are still
+allowed, but an idea becomes a *CV run* — a candidate that can be promoted to production — only once
+it is implemented in the pipeline's own code, behind the same data contracts and tests as everything
+else. There is then no "now rewrite the research code for production" step, because there was never
+a second, scruffier implementation to rewrite (and this should *accelerate* research, not slow it
 down). This is also what makes a one-command promotion *safe* rather than merely fast: the model
 that won the leaderboard is, bit for bit, the model that serves, so there is no re-implementation
 whose divergence from the measured version can only be discovered in production.

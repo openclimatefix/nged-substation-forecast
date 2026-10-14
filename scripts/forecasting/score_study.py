@@ -2,11 +2,11 @@
 
 A study's leaderboard number comes only from this script. The script takes a predictions file and
 nothing else: no code, no actuals, no scoring options. It runs `metrics` in leaderboard scope on the
-file's rows, stored in `power_forecasts` under the CV run name `study/<study name>`.
+file's rows, stored in `power_forecasts` under the `experiment_name` `study/<study name>`.
 
 Before anything is written, the script refuses a file whose row keys `(time_series_id,
 power_fcst_init_time, valid_time, ensemble_member)` differ from those of the cross-validation (CV)
-config's `reference_experiment_name` CV run for the same fold. A study therefore cannot abstain
+config's `reference_experiment_name` for the same fold. A study therefore cannot abstain
 on hard rows or choose its own ensemble members. The `metrics` asset repeats the check when it
 scores a study, because the asset is the one source of a leaderboard number.
 
@@ -59,8 +59,8 @@ from nged_substation_forecast.defs.cv_assets import MetricsConfig, PopulationFil
 STUDY_NAME_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_-]{1,64}$")
 """A study name is lower-case letters, digits, underscores, and hyphens.
 
-The Delta writers build their overwrite predicate from the CV run name by string formatting, so
-a name containing a quote could overwrite other CV runs' rows.
+The Delta writers build their overwrite predicate from the `experiment_name` by string formatting,
+so a name containing a quote could overwrite other experiments' rows.
 """
 
 SUBMISSION_LOG_NAME: Final[str] = "study_submissions.jsonl"
@@ -104,7 +104,7 @@ def _open_predictions(*, predictions: Path, experiment_name: str, fold_id: str) 
 
     Args:
         predictions: Parquet file of `PowerForecast` rows.
-        experiment_name: The `study/<name>` CV run the rows are stored under.
+        experiment_name: The `study/<name>` `experiment_name` the rows are stored under.
         fold_id: The leaderboard fold the rows forecast.
 
     Returns:
@@ -131,7 +131,7 @@ def _open_predictions(*, predictions: Path, experiment_name: str, fold_id: str) 
 
 
 def _partition_has_rows(*, forecasts: pl.LazyFrame, experiment_name: str, fold_id: str) -> bool:
-    """Return whether `power_forecasts` already holds rows for the CV run and fold."""
+    """Return whether `power_forecasts` already holds rows for the `experiment_name` and fold."""
     existing = PopulationFilter(experiment_name=experiment_name, fold_id=fold_id).apply(forecasts)
     return existing.head(1).collect(engine="streaming").height > 0
 

@@ -172,8 +172,8 @@ def require_same_row_keys(
     reference_ids = _distinct_series_ids(reference)
     if not reference_ids:
         raise RowKeyMismatchError(
-            f"Reference experiment {reference_label!r} has no forecast rows for group "
-            f"({group_label}). Materialise the reference experiment for this fold first."
+            f"Reference CV run {reference_label!r} has no forecast rows for group "
+            f"({group_label}). Materialise the reference CV run for this fold first."
         )
     study_ids = _distinct_series_ids(study)
     if study_ids != reference_ids:

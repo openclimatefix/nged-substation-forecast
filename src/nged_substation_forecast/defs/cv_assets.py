@@ -699,7 +699,7 @@ class MetricsConfig(Config):
     """Which evaluation scope this run produces.
 
     - ``"leaderboard"``: logs per-fold + aggregate metrics to the golden leaderboard MLflow
-      CV runs (canonical complete-window folds only). The population filter may not
+      experiments (canonical complete-window folds only). The population filter may not
       set ``valid_time_min`` or ``valid_time_max`` in this scope, because a trimmed window would be
       scored under the full fold's label.
     - ``"ad_hoc"``: writes to ``forecast_metrics`` Delta only; no MLflow logging.
@@ -1283,7 +1283,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     Every group is checked before any group is scored, and each check raises. In leaderboard scope,
     every row's ``valid_time`` must lie inside the fold's window.
 
-    CV runs whose name starts with ``study/`` hold forecasts submitted through
+    Forecasts whose ``experiment_name`` starts with ``study/`` were submitted through
     ``scripts/forecasting/score_study.py``. In leaderboard scope each study must carry
     exactly the row keys ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)`` of
     the CV config's ``reference_experiment_name`` for the same fold, so a study cannot abstain on

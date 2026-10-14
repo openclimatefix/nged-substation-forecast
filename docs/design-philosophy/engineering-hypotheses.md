@@ -86,6 +86,10 @@ training exercise.
 > When cross-validation is the active workstream, one person can register at least 100 leaderboard
 > CV runs in a month.
 
+A cross-validation run (CV run) is one pass of the production pipeline that trains and scores a
+forecaster configuration on the cross-validation folds, as
+[Cross-validation](../cross-validation/index.md) describes.
+
 **Why a hundred, rather than "as many as we can manage"?** Because a low hit rate is the normal
 condition of machine-learning (ML) research, and it makes throughput the denominator of everything
 else. John Jumper, who shared the 2024 Nobel Prize in Chemistry for his work on AlphaFold, puts the

@@ -199,7 +199,7 @@ class BaseForecasterConfig(BaseModel):
     a model YAML's ``model_params`` validates them at load time. Every ``conf/model/*.yaml`` file
     carries both tag fields under ``model_params``.
 
-    ``experiment_name`` is the per-CV run key, set to the MLflow experiment name at
+    ``experiment_name`` is the per-CV-run key, set to the MLflow experiment name at
     registration and stored in the saved config. Every ``PowerForecast`` row carries
     ``experiment_name``, distinct from the model-family ``MODEL_NAME``. ``random_seed`` is
     threaded into each model's training so that re-training a fold reproduces the same model —

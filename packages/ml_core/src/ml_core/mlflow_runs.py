@@ -33,8 +33,7 @@ from mlflow.tracking import MlflowClient
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 
 CV_PARENT_RUN_NAME: Final[str] = "cv_summary"
-"""Run name of an MLflow experiment's parent run, which carries the aggregate leaderboard
-metrics."""
+"""Run name of an MLflow experiment's parent run; it carries the aggregate leaderboard metrics."""
 
 
 def load_experiment_forecaster(
