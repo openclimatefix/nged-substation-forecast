@@ -30,8 +30,9 @@ benchmark: >-
   The base arm (weather block W, hour and weekday, days to Christmas inside a 14-day window,
   trained from 2021-09-01), and a month-by-half-hour climatology row.
 row_set_id: era5_val_3folds_2023_07_to_2026_06_v1
-metric: mean absolute error of the median, points of capacity (power over effective capacity, times
-100) ---
+metric: >-
+  mean absolute error of the median, points of capacity (power over effective capacity, times 100)
+---
 
 # Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?
 
