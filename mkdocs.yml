@@ -146,6 +146,7 @@ nav:
       - "Does an ERA5-trained model beat the same model trained on ENS, for demand series?": ml-experiments/00003-era5-trained-stage1a-vs-ens-trained-demand/result.md
       - "Where should lagged power enter a two-stage demand forecast?": ml-experiments/00005-lag-placement-stage1b-vs-stage2-demand/result.md
       - "Which inputs work best for the ERA5-trained demand model?": ml-experiments/00006-stage1a-demand-input-feature-sweep/result.md
+      - "Does a static CAMS correction remove the stage 1a daytime residual?": ml-experiments/00007-cams-static-correction-stage1a-residual/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
