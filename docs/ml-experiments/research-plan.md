@@ -184,8 +184,8 @@ longer training history has hurt so far, so the backfill is valuable first as va
 **Generators depend on weather more than demand does, so lags may help less.** The experiment
 repeats the 00005 comparison for solar and wind farms: no lags, lagged power in the stage 2
 calibrator, and lag anomalies built from the sources serving has (as experiment 00018 did for
-demand). It also repeats experiment 00008, which tested summaries of recent power (the minimum, mean, and maximum of the latest 24 hours
-and of the latest day on the same weekday) for demand: raw lags against summaries against both.
+demand). It also repeats experiment 00008, which tested summaries of recent power (the minimum,
+mean, and maximum of the latest 24 hours and of the latest day on the same weekday) for demand: raw lags against summaries against both.
 Lagged power can also carry curtailment and capacity that the weather does not explain. The planned
 contrast is the lagged calibrator against the lag-free calibrated stage 1, per technology.
 
