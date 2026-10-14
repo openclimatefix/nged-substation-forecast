@@ -37,6 +37,9 @@ row set `fold_a_tuesdays_v1`).
   and 0.57 for solar (−0.83 to −0.32). Beyond day 6 the gain is not material.
 - **The gain comes from training on ERA5 weather,** not from the length of the history: a model
   trained on only the ENS months had the same error.
+- **A likely reason (not tested directly):** a model trained on forecast weather learns the
+  forecast's errors, which flattens the weather-to-power curve, most of all for wind, where power
+  rises steeply with wind speed. A model trained on ERA5 learns the sharper curve.
 - **Wind peaks gain most.** In the top decile of observed wind power the gain is 6.14 points.
 - **A flaw in the first run:** the production-recipe control memorised calendar position, which
   inflated the first result by 1.13 points for solar and 3.40 for wind. Every arm now omits calendar
@@ -58,6 +61,9 @@ experiment scored the continuous ranked probability score (CRPS) on the same 9 g
   mixture was not material (solar +0.40, wind +0.26).
 - **Training on the long ERA5 history** changed the CRPS by only 0.01 to 0.09 points against
   training on the ENS months.
+- **A likely reason stage 2 did not help:** it had little to correct. The mixture is already close
+  to calibrated for one product, and the calibrator was trained on about 15 months of ENS data for 9
+  series.
 - **What the test did not stress:** it used one weather product and no lagged power, so it did not
   test the two jobs stage 2 is meant to do.
 - **Write-up and pull request:** [result](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md),
@@ -90,7 +96,11 @@ experiment repeated 00001 on 22 series that are not wind or solar farms, on a ne
   valid time.
 - **Choose a row set that covers every weekday.** The 53 Tuesday runs of 00001 and 00002 put every
   case of the first day on a Tuesday or Wednesday, which does not suit demand.
-- **Long ERA5 history helps neither solar nor wind, and it hurts demand** in the experiments so far.
+- **Training on ERA5 weather helps solar and wind, but a longer history does not add to it, and for
+  demand a long history hurt.** The solar and wind gain appeared even when the ERA5-trained model
+  saw only the ENS-era months, so the gain comes from the weather it was trained on and not from the
+  years. For demand, training from 2019 was worse than training from 2023, probably because the
+  customer mix and embedded generation drifted.
 
 ## Planned experiments
 
