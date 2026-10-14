@@ -417,6 +417,9 @@ def write_notes(
 def check_series(*, series: pl.DataFrame) -> None:
     """Raise unless the table holds 22 rows labelled D1 to D22 with no nulls.
 
+    Args:
+        series: The private series table, with a `site` label column.
+
     Raises:
         SystemExit: If the labels or the shape are wrong, so that no identifier can reach a file
             name. The message names no value.
