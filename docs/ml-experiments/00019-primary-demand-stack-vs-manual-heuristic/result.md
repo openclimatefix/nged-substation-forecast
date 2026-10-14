@@ -2,17 +2,21 @@
 id: "00019"
 slug: primary-demand-stack-vs-manual-heuristic
 status: planned
-size: medium
+size: complex
 hypothesis: >-
   For the 16 Primary substation demand series, stacking three changes on the single-stage ENS-trained
   quantile model N1 (a 14-day correction from the model's own recent errors, a recency half-life of
   0.5 years, and a spread factor of 1.15) beats `manual_heuristic` on ENS weather, which N1 alone
   does not.
 prediction: >-
-  The full stack scores 0.3 to 0.9 points of capacity below `manual_heuristic` on the quantile score
-  over all leads (5.89), and 0.5 to 1.0 below N1 (6.33). The correction supplies most of the gain
-  (0.4 to 0.9), the half-life 0.0 to 0.2, and the spread factor 0.03 to 0.05. The three gains add
-  to within 0.2 points of the stack's gain.
+  N1 scores 0.44 points of capacity above `manual_heuristic` on the quantile score over all leads
+  (6.33 against 5.89). The full stack scores 0.6 to 1.2 below N1 and so 0.2 to 0.8 below
+  `manual_heuristic`. The correction supplies most of the gain (0.4 to 0.9 below), the half-life
+  between 0.2 below and 0.1 above (it is tested on a frozen model, so a loss is possible), and the
+  spread factor 0.03 to 0.05 below. The three single gains add to within 0.2 points of the stack's
+  gain. The 99.44% interval on C1 is about plus or minus 0.7 points (00013's C1 was plus or minus
+  0.67 at 99%), so C1 may well straddle zero even when the point estimate is as predicted; C2, a
+  paired contrast against N1, is expected to be much tighter.
 decision_rule: >-
   Nine planned contrasts on the 16 Primary substations, quantile score over all leads, read at
   99.44% (Bonferroni across nine), whole months and seeds resampled. C1 (primary) is the full stack
@@ -22,11 +26,12 @@ decision_rule: >-
   C9 are N1 plus one component minus N1. The stack is supported when C1 and C2 have intervals wholly
   below zero and C2's point estimate is at most -0.3 points, a threshold that pays for porting a
   pipeline step that reads observed power; it is `small gain` when both intervals are wholly below
-  zero and C2's point estimate is above -0.3; it is refuted when C1's interval is wholly above zero;
-  otherwise it is inconclusive. A component earns a place in the release when its drop contrast
-  (C4 to C6) is wholly above zero; the threshold is zero for the half-life and the spread factor
-  (they change a number in the fit or the output) and 0.10 points for the correction (a new
-  pipeline step). The mean absolute error of the median is reported beside the quantile score and
+  zero and C2's point estimate is above -0.3; it is refuted when C1's interval is wholly above zero
+  or C2's interval is wholly above zero (the stack is worse than N1); otherwise it is inconclusive.
+  A component earns a place in the release when its drop contrast (C4 to C6) has an interval wholly
+  above zero and a point estimate of at least the threshold: 0 for the half-life and the spread
+  factor (they change a number in the fit or the output) and 0.10 points for the correction (a new
+  pipeline step). C3 and C7 to C9 decide no verdict but count in the Bonferroni family. The mean absolute error of the median is reported beside the quantile score and
   decides nothing.
 benchmark: >-
   `manual_heuristic`, `climatology`, and the production recipe (stored, 00013), and N1 (00013).
@@ -71,6 +76,25 @@ experiment 00013 (73 runs of `fold_a_every5d_v1`, valid times before 2026-07-01)
   where the correction applies. The factor is 00018's, fitted on the staged chain, not on N1.
 - **Arms by component:** N1, N1+C, N1+H, N1+S, the full stack F = H+C+S, and the three drops
   F-C (H+S), F-H (N1+C+S), F-S (H+C).
+
+## Plan: leakage checks
+
+The scoring script asserts that every observation entering a correction has a grid index at or
+before the origin minus 7 half-hours, that the run supplying the forecast for a past half-hour has
+an origin at or before that half-hour, that a run with fewer than 3 days of history gets a
+correction of zero (and reports how many rows that is), and that N1H's training rows end at
+2025-06-30 23:30. Observed power is read through `load_series_arrays`, as in 00013, and the median
+is the pooled mixture's q50. The spread factor is not re-tuned on N1; the 5% to 95% coverage of every
+arm is reported.
+
+## Plan: limits stated in advance
+
+- **The half-life was chosen on the scored year.** 00017 chose 0.5 years on origins through June
+  2026, which overlap this validation year, and 00017 retrained monthly. N1H is frozen and trained
+  on 15 months, so its weights fall to about a quarter at the start of the archive.
+- **The correction's history has leads of 0 to 5 days** (runs are 5 days apart) and is applied to
+  leads up to 15 days, and N1 already carries origin lags, so 00017's 1.5-point gain, measured on a
+  model with no power lags, may not transfer.
 
 ## Plan: past weather
 
