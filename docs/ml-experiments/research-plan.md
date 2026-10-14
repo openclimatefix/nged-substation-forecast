@@ -23,6 +23,7 @@ sooner.
 | [P7](#p7-the-staged-chain-against-the-upgraded-single-stage-model) | Does the staged chain, with lag anomalies built from the sources serving has, beat the upgraded single-stage model N1 on Primary substations, by lead band? | 2 | P6 | Proposed; the go or no-go for the staged design on demand. It repeats the 00005 lag contrast without the ceiling, on purpose |
 | [P8](#p8-training-window-and-drift) | Which training window and retraining rule handle the drift of demand best (sliding windows, recency half-lives, a monthly retrain)? | 2 | P6 | Proposed |
 | [P17](#p17-input-features-for-solar-and-wind) | Which input features and which training start are best for the solar and wind stage 1 model (the weather block, the clear-sky ratio target for solar, and a power-curve `base_margin` for wind)? | 2 | Nothing | Proposed; a different data set from P6, so a separate session can run it |
+| [P20](#p20-a-cams-trained-stage-1-with-a-stage-0-for-demand) | For Primary, BSP, and GSP demand series, does a stage 1 model trained on CAMS irradiance and fed ENS irradiance for all 51 members beat the ERA5-trained stage 1, and does a stage 0 model that maps ENS irradiance to CAMS irradiance help further? | 2 | Nothing; CAMS values must exist at the BSP and GSP series | Proposed; the follow-up to experiment 00009, which tested Primary substations only, without stage 0 |
 | [P4](#p4-return-to-work-and-school-term-columns-for-the-holiday-periods) | Do columns for the return to work and for school terms lower the stage 1a demand error in the weeks after Christmas, at Easter, and in the school holidays, against the 14-day-window Christmas column of 00006? | 3 | School-term dates | Planned as experiment 00011, in [PR #1214 (Plan experiment 11: school-term and return-to-work columns for the stage 1a demand model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214), with no fits yet |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | P7 and P17 | Proposed |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | 4 | A plan; the price source is chosen | The Elexon Market Index Data pull is under way, and a plan follows it |
@@ -403,6 +404,19 @@ contrast on 9 generator series.
 
 **Resolution limit.** 6 solar farms in one weather region and 3 wind farms cannot resolve gains
 under about 0.3 points of capacity, so the claim rests on those farms.
+
+### P20: a CAMS-trained stage 1 with a stage 0 for demand
+
+**Experiment 00009 found no gain from training stage 1a on CAMS irradiance for Primary demand, and
+this follow-up adds a stage 0 model and the other substation types.** The maintainer asked for it on
+2026-10-14. Stage 1 trains on CAMS irradiance and is fed ENS irradiance for each of the 51 members at
+inference. Stage 0 is a small model that maps ENS irradiance to CAMS irradiance, trained on the period
+when both exist, and its output feeds stage 1. The arms are ERA5-trained stage 1, CAMS-trained stage 1
+without stage 0, and CAMS-trained stage 1 with stage 0, on Primary, BSP, and GSP series, scored by
+type. Two contrasts, kept separate: CAMS-trained against ERA5-trained, then stage 0 against plain
+CAMS-trained. The plan has to check first that CAMS values exist at the BSP and GSP series
+([PR #1201](https://github.com/openclimatefix/nged-substation-forecast/pull/1201) covers the 22
+series of 00003), and has to reuse the code of 00009.
 
 ### P18: lagged power and summaries of recent power for solar and wind
 
