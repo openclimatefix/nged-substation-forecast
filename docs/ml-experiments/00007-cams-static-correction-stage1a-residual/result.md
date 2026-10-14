@@ -17,16 +17,16 @@ prediction: >-
   itself, is at least 0.8.
 decision_rule: >-
   Share removed is one minus the sum of squared daylight residuals after the correction over the
-  sum before it (uncentred, pooled over the 14 substations), so a fixed bias counts as error. The
-  gate points to P4 (train stage 1a on CAMS irradiance) when all four hold: the share removed by
-  the ERA5-plus-CAMS correction is at least 50%; the partial R squared of CAMS given ERA5 is above
-  zero; the daylight mean absolute error of the median falls by at least 0.3 points of capacity
-  against the fixed-shift arm; and the stability ratio is at least 0.8. The three quantities with
-  intervals (share removed, partial R squared, MAE gain) must have 98.33% month-block intervals
-  (Bonferroni across the three) that exclude the zero of their own contrast, and the share
-  removed's interval must also lie above 25%. The gate points to the capacity-change statistics of
-  P2 when the share removed is 20% or lower, or when the stability ratio is below 0.5. Every other
-  outcome is inconclusive.
+  sum before it (uncentred, pooled over the 13 substations that have residuals in both years), so a
+  fixed bias counts as error. The gate points to P4 (train stage 1a on CAMS irradiance) when all
+  four hold: the share removed by the ERA5-plus-CAMS correction is at least 50%; the partial R
+  squared of CAMS given ERA5 is above zero; the daylight mean absolute error of the median falls by
+  at least 0.3 points of capacity against the fixed-shift arm; and the stability ratio is at least
+  0.8. The three quantities with intervals (share removed, partial R squared, MAE gain) must have
+  98.33% month-block intervals (Bonferroni across the three) that exclude the zero of their own
+  contrast, and the share removed's interval must also lie above 25%. The gate points to the
+  capacity-change statistics of P2 when the share removed is 20% or lower, or when the stability
+  ratio is below 0.5. Every other outcome is inconclusive.
 benchmark: >-
   The uncorrected median forecast of 00006's chosen arm (weather block, hour, weekday, COVID
   indicator, days to Christmas, recency weights), and the same forecast with a fixed daylight
@@ -47,12 +47,12 @@ headline: >-
   against the shift (0.62 to 0.84), from 8.78 uncorrected to 6.80. The stability ratio is 0.84.
 lessons: >-
   Most of the removable residual is a fixed bias, and the pooled share depends on one substation
-  (P2): without it the share falls from 46.6% to 18.2%. CAMS helps at most substations, but the gate
-  does not open on a pooled rule.
+  (P2): without it the share falls from 46.6% to 18.2%. CAMS adds a positive partial R squared at
+  all 13 substations, but the gate does not open on a pooled rule.
 advice:
   - >-
-    Treat the gate as open for a CAMS-trained stage 1a only as a candidate for a separate test,
-    not as a result, because the pooled share is below the 50% planned and rests on one substation.
+    Treat a CAMS-trained stage 1a (P4) as worth its own test, not as a result,
+    because the pooled share is below the 50% planned and rests on one substation.
   - >-
     Report a pooled share of variance removed with and without the substation that has the largest
     residual, because one level-shifted series can set the headline.
@@ -66,17 +66,19 @@ adopted_in: none
 [research log](../research-log.md#p2-embedded-solar-capacity-from-lagged-residuals).** The result
 says whether the daytime residual of the stage 1a demand model tracks a fixed error in the ERA5
 irradiance input, or a change in embedded solar capacity that a correction with fixed coefficients
-cannot follow. The page is a plan now and becomes the write-up after the run.
+cannot follow. The plan was committed before the code ran; the Results section reports the run.
 
 ## Size
 
 - **What gets stored:** residual tables and figures only, under this experiment's private folder.
-  Nothing enters a Delta table. - **Production serving path:** not touched. - **Degradation rule:**
-  not touched. - **Designs that would test the hypothesis defensibly:** two. A linear correction of
-  the residuals answers the question cheaply and is the planned design. Retraining the XGBoost model
-  with CAMS as a feature is the later P4. - **Callers that need searching for:** none, because the
-  script reads 00006's stored predictions and the CAMS download from [PR #1201 (Download and
-  validate CAMS irradiance at the demand series'
+  Nothing enters a Delta table.
+- **Production serving path:** not touched.
+- **Degradation rule:** not touched.
+- **Designs that would test the hypothesis defensibly:** two. A linear correction of the residuals
+  answers the question cheaply and is the planned design. Retraining the XGBoost model with CAMS as
+  a feature is the later P4.
+- **Callers that need searching for:** none, because the script reads 00006's stored predictions and
+  the CAMS download from [PR #1201 (Download and validate CAMS irradiance at the demand series'
   locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201).
 
 The experiment is medium: it uses a new data source and a new method, but touches nothing stored
@@ -95,7 +97,8 @@ years are 2024-07 to 2025-06 (year A, fold `select_2024`) and 2025-07 to 2026-06
 **The correction is fitted on year A and scored on year B, per substation.** Each correction is an
 ordinary least-squares fit of the hourly residual on the columns below, with its coefficients
 frozen after year A. Scoring on year B is the walk-forward test of a static correction. The
-substations are the Primary series that have CAMS values (14).
+substations are the Primary series that have CAMS values (14 planned; one has no year A rows, so 13
+are scored).
 
 | Arm | Fitted columns | Role |
 |---|---|---|
@@ -114,13 +117,13 @@ stability ratio is the out-of-sample share removed divided by the share removed 
 correction is fitted on year B itself. A ratio near 1 means the relation is stable. A low ratio
 means the coefficients drift between the years.
 
-**The interval resamples whole months, each with all 14 substations.** Weather is shared across
-substations and hours within a day, so the block is a month of year B with every substation in it.
-The 98.33% interval (Bonferroni across the three interval conditions) comes from 10,000 resamples
-of the 12 months, rescored from the frozen coefficients. With 12 blocks the tails are coarse, and
-the write-up says so. The write-up also reports the share removed for each substation, and the
-share removed with each substation left out in turn. A secondary figure repeats the scoring with a
-leave-one-month-out fit inside year B, which keeps the within-year seasonality in both halves.
+**The interval resamples whole months, each with all 13 scored substations.** Weather is shared
+across substations and hours within a day, so the block is a month of year B with every substation
+in it. The 98.33% interval (Bonferroni across the three interval conditions) comes from 10,000
+resamples of the 12 months, rescored from the frozen coefficients. With 12 blocks the tails are
+coarse, and the write-up says so. The write-up also reports the share removed for each substation,
+and the share removed with each substation left out in turn.  The script does not run the
+leave-one-month-out repeat that an earlier draft of the plan mentioned.
 
 **The stability ratio is pooled.** Its numerator is the out-of-sample share removed and its
 denominator is the share removed by the same correction fitted on year B. A denominator below 5%
@@ -158,10 +161,11 @@ capacity drift in this test.
 **The gate does not open for P4, and does not close for P2: the outcome is inconclusive.** The
 planned share removed was 50% or more. The result is 46.6%, with a 98.33% month-block interval of
 38.4% to 53.1% that straddles 50%. The stability ratio is 0.84, so the relation held across the two
-years, which a growing capacity would not do. Share removed in the 20% to 50% band with a ratio of
-0.5 or more is "inconclusive" in the plan's table. Three conditions held: the partial R squared is
-above zero, the MAE gain against the shift is at least 0.3 points (0.73), and the stability ratio
-is at least 0.8. The lower bound of the share's interval is above 25% (38.4%). One condition
+years. A fixed irradiance error gives a stable relation, and a steady capacity gives one too. The
+plan's table calls a share of 20% to 50% with a ratio of 0.5 or more "inconclusive". Seven
+conditions held: the partial R squared is above zero, the MAE gain against the shift is at least 0.3
+points (0.73), and the stability ratio is at least 0.8. The lower bound of the share's interval is
+above 25% (38.4%). One condition
 failed: the share removed is below 50%.
 
 | Arm | Share of daylight squared residual removed | Daylight MAE of the median (points of capacity) |
@@ -183,16 +187,17 @@ year gives 55.8%, from which the stability ratio of 0.84 follows.
 figure.** The shift arm alone removes 39.1%, so CAMS adds 7.5 percentage points of share on top.
 Substation P2 has a mean absolute error of 34.1 points before correction, against a median of 5.8 at
 the other substations, and its shift alone removes 64.5%. Without P2 the pooled share is 18.2%,
-which would sit in the plan's P2-capacity branch. The median substation's share is 34.4%. The
-correction makes the next year worse at 2 of the 13 substations (P13 and P15), removes almost
-nothing at P16 (1.2%), and has its largest partial R squared at P3 (0.41).
+and an 18.2% share would sit in the plan's P2-capacity branch. The median substation's share is
+34.4%. The correction makes the next year worse at 2 of the 13 substations (P13 and P15), removes
+almost nothing at P16 (1.2%), and has its largest partial R squared at P3 (0.41).
 
 **What this means for the follow-up work.** CAMS carries information that ERA5 shortwave lacks at
-most substations, so a CAMS-trained stage 1a (P4) is worth a test of its own, with the substation
-that sets the pooled figure treated separately. The result does not show that the residual is an
-irradiance error and not a change in capacity. A growing capacity and a fixed ERA5 cloud error both
-give a stable relation, and the model behind year B was trained on year A, so it may have absorbed
-part of the error. The slope statistics of P2 should wait for that follow-up.
+all 13 substations (partial R squared above zero), so a CAMS-trained stage 1a (P4) is worth a test
+of its own, with the substation that sets the pooled figure treated separately. The result does not
+show that the residual is an irradiance error and not a change in capacity. A growing capacity and a
+fixed ERA5 cloud error both give a stable relation, and the model behind year B was trained on year
+A, so it may have absorbed part of the error. The slope statistics of P2 should wait for that
+follow-up.
 
 **Caveats.** The 98.33% interval resamples 12 months, so its tails are coarse. The MAE is of the
 hourly mean residual in daylight hours, not of half-hours. Year B is 00006's confirmation fold, and
