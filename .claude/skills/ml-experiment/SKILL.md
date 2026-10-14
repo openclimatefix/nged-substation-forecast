@@ -91,11 +91,11 @@ session finds results with `grep` over `docs/ml-experiments/*/result.md`.
 **`advice` is a list of one-line instructions for future experiments, and a result is not finished
 without it.** Each item says what to do, where it applies, and which contrast or section supports it,
 for example "Put recent power into the stage 2 calibrator before building a stage 1b (C1)". Write
-the items from the write-up's lessons, and drop any lesson that no number in the write-up supports.
-Before planning a new experiment, read the earlier advice with `grep -A12 '^advice:'
-docs/ml-experiments/*/result.md`, and say in the plan which items it follows and which it departs
-from. The research log's "What the experiments taught us so far" section is the curated roll-up of
-the `advice` lists.
+the items from the write-up's lessons and headline contrasts, and drop any item that no number or
+statement in the write-up supports. Before planning a new experiment, read the earlier advice with
+`awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f' docs/ml-experiments/*/result.md`,
+and say in the plan which items it follows and which it departs from. The research log's "What the
+experiments taught us so far" section is the curated roll-up of the `advice` lists.
 
 ## How to score
 
@@ -161,10 +161,11 @@ experiment and names the new one in the log.
 
 **Keep `result.md` to about a screen:** the verdict in one sentence, the winner with its interval,
 each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and the lessons
-learned. **A published page never names a generator, gives its identifier, or shows its time series
-beside either.** Use the anonymised labels the `study` skill describes. Print every number the page
-quotes from a committed script, as the `study` skill requires. An experiment that plots feature
-importance follows the recipe in the `study` skill's "Design rules that keep a comparison fair".
+for later experiments, which also become `advice`. **A published page never names a generator, gives
+its identifier, or shows its time series beside either.** Use the anonymised labels the `study`
+skill describes. Print every number the page quotes from a committed script, as the `study` skill
+requires. An experiment that plots feature importance follows the recipe in the `study` skill's
+"Design rules that keep a comparison fair".
 
 ## Running a night's experiments
 

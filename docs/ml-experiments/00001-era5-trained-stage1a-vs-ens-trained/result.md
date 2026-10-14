@@ -26,13 +26,14 @@ headline: >-
   -0.57 (-0.83 to -0.32); material up to day 6, not beyond.
 advice:
   - >-
-    Train the solar and wind stage 1a on ERA5 and apply it to the ENS members. The gain is material
-    up to day 6 and not beyond.
+    Train the solar and wind stage 1a on ERA5 and apply it to the ENS members. The gain is
+    material up to day 6 and not beyond (P1: wind -1.70, solar -0.57; 6 solar and 3 wind farms,
+    one validation year, no calendar or lag columns).
   - >-
     Give every arm the same feature columns, and add a control without calendar columns whenever
-    the training rows repeat a valid time.
+    the training rows repeat a valid time (lessons).
   - >-
-    Report the benchmark's absolute score and a climatology row beside every contrast.
+    Report the benchmark's absolute score and a climatology row beside every contrast (lessons).
 code: studies/stage1_pilot/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1184
 ---
