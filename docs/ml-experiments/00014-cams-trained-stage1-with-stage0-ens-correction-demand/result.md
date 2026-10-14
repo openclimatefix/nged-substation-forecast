@@ -93,9 +93,10 @@ of CAMS, raw ENS, and corrected ENS by month of the validation year, with the ra
 mean spread of the 51 members before and after.
 
 **Two planned contrasts, kept separate, both on Primary substations over all leads.** C1 is the
-CAMS-trained arm on raw ENS minus the ERA5-trained arm, recomputed here from 00009's models on the same rows; a value differing from
-00009's -0.035 by more than 0.005 is reported and read as the noise floor of GPU prediction. C2 is the stage 0 contrast. The threshold of -0.03 is a little under
-the half-width of 00009's interval, so a gain of that size is resolvable.
+CAMS-trained arm on raw ENS minus the ERA5-trained arm, recomputed here from 00009's models on the
+same rows; a value differing from 00009's -0.035 by more than 0.005 is reported and read as the
+noise floor of GPU prediction. C2 is the stage 0 contrast. The threshold of -0.03 is a little under
+the half-width of 00009's interval, so a gain of that size is at the edge of what the rows resolve.
 
 **Exploratory contrasts are read at 95%.** They are: C2 for the four bulk supply point and grid
 supply point series together (the CAMS values exist for all 20 series, which 00009 used); C2 by lead
@@ -106,10 +107,10 @@ whichever product stage 1a trained on); and C2 for each Primary series.
 **Leakage and calendar checks.** Stage 0 sees no valid time from 2025-06-17 on. Stage 1a models are
 00009's, trained before the same date. No calendar column is added.
 
-**Known limits.** CAMS is held hourly while the ENS shortwave is interpolated to half-hours, which the marginal
-mapping ignores. The mapping is fitted on 14 months, is unconditional on the day's weather, and
-corrects the offset in distribution, not the forecast error of an individual member. The training
-table holds one member per run, assumed exchangeable with the other 50.
+**Known limits.** CAMS is held hourly while the ENS shortwave is interpolated to half-hours, which
+the marginal mapping ignores. The mapping is fitted on 14 months, is unconditional on the day's
+weather, and corrects the offset in distribution, not the forecast error of an individual member.
+The training table holds one member per run, assumed exchangeable with the other 50.
 
 ## Results
 
