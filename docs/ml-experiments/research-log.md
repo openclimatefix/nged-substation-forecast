@@ -25,6 +25,7 @@ the maintainer to confirm.
 | [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
 | [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
 | [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
+| [00005](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | Not yet merged |
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -91,6 +92,26 @@ experiment repeated 00001 on 22 series that are not wind or solar farms, on a ne
 
 ![Contrasts by lead band](00003-era5-trained-stage1a-vs-ens-trained-demand/figure_2.svg)
 
+### 00005: where lagged power enters a two-stage demand forecast
+
+**For Primary substations, recent power helps more in the stage 2 calibrator than in stage 1b.** The
+experiment gave both placements identical inputs and calibrated both, on 20 substation series and
+the 73 runs of the validation year. Every lagged arm is a ceiling, because the recent residuals use
+ERA5 weather at past times.
+
+- **Headline result:** the primary contrast, stage 1b with a calibrator minus the calibrator with
+  lags, was +0.84 points of capacity for leads up to 48 hours (99% interval +0.28 to +1.50, 9 of 12
+  months favouring the calibrator). Lagged power in the calibrator scored 5.31 against 6.14 for
+  stage 1b and 7.11 for no lags. Using both placements lowered the quantile score by at most 0.12 points.
+- **Finding for later experiments:** a lag-free calibrator lowered the quantile score by about 1
+  point of capacity at short leads and raised the median's error. Stage 1a alone scored no better
+  than day-type climatology. The grid supply points' error is dominated by drift.
+- **Write-up and pull request:** [result](00005-lag-placement-stage1b-vs-stage2-demand/result.md),
+  [PR #1195 (Experiment 5: where lagged power enters a two-stage demand
+  forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195).
+
+![Lagged power in the calibrator beats lagged power in stage 1b at every lead](00005-lag-placement-stage1b-vs-stage2-demand/figure_2.svg)
+
 ### 00006: which inputs work best for the ERA5-trained demand model (stage 1a)
 
 **The clock is the largest single input for Primary substations, but it lowers the error by only
@@ -131,6 +152,9 @@ It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06
   saw only the ENS-era months, so the gain comes from the weather it was trained on and not from the
   years. For demand, training from 2019 was worse than training from 2023, probably because the
   customer mix and embedded generation drifted.
+- **Put recent power in the stage 2 calibrator, and calibrate before judging it.** For Primary
+  substations, the calibrator with recent-origin inputs beat a stage 1b correction, and a lag-free
+  calibrator is worth about 1 point of capacity at short leads (00005).
 
 ## Planned experiments
 
@@ -141,7 +165,6 @@ committed, and the tentative id then disappears.
 
 | Id | Question | State |
 |---|---|---|
-| 00005 | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Planned, in [PR #1195 (Experiment 00005 (planned): where lagged power enters a two-stage demand forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195) |
 | P1 | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Waits for 00005, and for the 00006 residual analysis to be published |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Source chosen (Elexon Market Index Data); needs a plan |
