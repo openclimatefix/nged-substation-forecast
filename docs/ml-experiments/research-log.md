@@ -359,6 +359,7 @@ judged. The correction stacks with a 0.5-year half-life (5.82 points, post hoc).
 
 Details: [result.md](00017-training-window-and-retraining-rule-drift-demand/result.md),
 [PR #1223](https://github.com/openclimatefix/nged-substation-forecast/pull/1223).
+
 ### 00016: calibration of the pooled mixture for solar and wind
 
 **A scalar spread factor brings the pooled mixture's 5% to 95% band for solar from about 95% to
