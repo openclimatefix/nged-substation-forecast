@@ -55,7 +55,11 @@ CRPS in points of capacity.
 | `b_mixture_full` | 5.05 | 11.11 |
 | `c_stage2_full_blp` | 5.45 | 11.37 |
 
+![CRPS by lead band](figure_1.svg)
+
 ## Planned contrasts
+
+![Planned contrasts by lead band](figure_2.svg)
 
 - **Q1 (stage 2 minus the mixture) is not material.** Solar +0.40 (+0.26 to +0.61), wind +0.26
   (-0.17 to +0.64).

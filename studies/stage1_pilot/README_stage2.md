@@ -118,6 +118,7 @@ uv run python studies/stage1_pilot/stage2_fit_arm_a.py
 uv run python studies/stage1_pilot/stage2_fit_calibrator.py
 uv run python studies/stage1_pilot/stage2_score.py
 uv run python studies/stage1_pilot/stage2_report.py
+uv run python studies/stage1_pilot/stage2_charts.py
 ```
 
 Every script skips outputs that exist.
@@ -143,6 +144,13 @@ of solar. Stage 2 did not beat it, and the learned blend added nothing reliable.
   better by 0.24 points (interval -0.36 to -0.06; 11 of 12 months) and wind by 0.62 points (interval
   -0.99 to -0.26; 10 of 12 months). The MAE of the median agrees: -0.40 for solar and -0.99 for
   wind, both material.
+
+### Figures
+
+`stage2_charts.py` draws `charts/figure_1.svg` (CRPS by lead band for the benchmark, the pooled
+mixture, stage 2 with the blend, and climatology) and `charts/figure_2.svg` (the planned contrasts
+Q1 to Q3 by lead band). Both are reproduced in
+`docs/ml-experiments/00002-stage2-calibrator-and-mixture-vs-ens-quantile/`.
 
 ### Absolute scores
 
