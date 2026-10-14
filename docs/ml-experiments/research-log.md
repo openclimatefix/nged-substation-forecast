@@ -116,14 +116,14 @@ committed, and the tentative id then disappears.
 | P1 | Do statistical summaries of lagged power (the minimum, mean, and maximum of the most recent 24 hours, and of the most recent day on the same weekday) help, in the placement that 00005 finds best? | Waits for 00005 |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | Waits for 00005, and for the 00006 residual analysis to be published |
 | [P3](#p3-historical-electricity-prices-as-lagged-inputs) | Does the historical electricity price, as an input at lag times, reduce the error of the stage 1a XGBoost demand model at substations with price-responsive generation and storage? | Needs a source of historical prices |
-| [P4](#p4-cams-irradiance-in-place-of-era5-for-stage-1a-training) | Does a stage 1a XGBoost model trained on CAMS irradiance in place of ERA5 shortwave, and applied to ENS weather, beat the ERA5-trained model on substation series? | Follows the first test in P2 |
+| [P4](#p4-cams-irradiance-in-place-of-era5-for-stage-1a-training) | Does a stage 1a XGBoost model trained on Copernicus Atmosphere Monitoring Service (CAMS) irradiance in place of ERA5 shortwave, and applied to ENS weather, beat the ERA5-trained model on substation series? | Follows the first test in P2, and needs the 00006 column list merged |
 
 ### P2: embedded-solar capacity from lagged residuals
 
 **The embedded-solar proposal rests on one follow-up check of experiment 00006's residuals, which
 motivates two different questions and tests neither.** The check was run by the 00006 session on
 CAMS irradiance at each demand series' own location, and its figures and script are in the write-up
-of [PR #1202 (Experiment 00006: which input features work best for the ERA5-trained demand
+of [PR #1202 (Experiment 6: which input features work best for the ERA5-trained demand
 model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202). It was not
 pre-registered. At Primary substation 12 (P12), the median-error Primary substation, the residual of
 the chosen-feature stage 1a XGBoost model averaged -5.3 points of capacity from 08:00 to 16:59 in
@@ -184,8 +184,9 @@ no forecast, so the CAMS satellite-derived irradiance can feed the statistics on
 CAMS irradiance at each demand series' own location comes from [PR #1201 (Download and validate CAMS
 irradiance at the demand series'
 locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201), which covers the
-22 demand series of experiment 00003. The experiment could compute each statistic from ERA5 alone
-and from CAMS and ERA5 together.
+22 series of experiment 00003 (16 Primary demand series, 4 bulk-supply and grid-supply point flows,
+and 2 others). The experiment could compute each statistic from ERA5 alone and from CAMS and ERA5
+together.
 
 **A decision rule could be fixed before any fit.** One candidate: the trend in the monthly change
 from a year earlier is negative at 70% or more of the substations in the top quartile of registered
@@ -219,24 +220,32 @@ groups would refute the battery-response mechanism even if accuracy improves.
 
 **This proposal changes the irradiance that stage 1a trains on, where P2 uses irradiance only to
 read the residuals.** The Copernicus Atmosphere Monitoring Service (CAMS) irradiance at each demand
-series' own location agrees with ERA5 shortwave (correlation 0.947 over the hourly series,
-hour-ending labels), and P2's evidence suggests it carries more of the hourly cloud signal that
-explains a substation's daytime residual. The experiment could train the stage 1a XGBoost model with
-CAMS shortwave replacing ERA5's, in training only, and apply it to ENS weather members. CAMS is
-satellite-derived and has no forecast, so it cannot be an input at forecast time, and the
-training-only use is what makes the comparison possible. The arms would be the ERA5-trained stage 1a
-model with the column list chosen in [PR #1202 (Experiment 00006: which input features work best for
-the ERA5-trained demand
-model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202) and the same model
-with CAMS in place of ERA5 shortwave, on the same series, folds, and scoring as experiment 00005.
-The CAMS irradiance comes from [PR #1201 (Download and validate CAMS irradiance at the demand
-series' locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201), which
-covers the 22 demand series of experiment 00003.
+series' own location agrees with ERA5 shortwave, with a correlation of 0.947 pooled over the 22
+series and hour-ending labels. The check behind P2 found that CAMS explains more of the hourly
+residual's variance than ERA5 shortwave does (25.5% against 3.8% at Primary substation 12), without
+showing why.
 
-**The first test in P2 decides whether P4 is worth running.** If adding CAMS at lag times removes
-most of the residual, P4 asks whether training on CAMS removes it at the source. If it does not, the
-residual comes from something other than the irradiance input. A candidate decision rule: the
-CAMS-trained arm lowers the quantile score at Primary substations by at least 0.2 points of
-capacity, with a month-block bootstrap interval that excludes zero. The threshold is a proposal for
-the planning step to confirm. A positive result would also change P2's baseline, because a
-CAMS-trained stage 1a leaves a smaller irradiance-error residual.
+**The experiment could train the stage 1a XGBoost model with CAMS shortwave in place of ERA5's, and
+apply it to ENS weather members.** The other weather columns would stay ERA5. CAMS irradiance is
+satellite-derived and has no forecast, so it can be an input in training only. That creates a
+mismatch: the stage 1a XGBoost model trains on satellite-derived irradiance and is applied to the
+ENS forecast irradiance, and the comparison shows whether the mismatch costs or gains skill. The
+arms would be the ERA5-trained stage 1a XGBoost model with the column list chosen in [PR #1202
+(Experiment 6: which input features work best for the ERA5-trained demand
+model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202), which is not yet
+merged, and the same stage 1a XGBoost model with CAMS in place of ERA5 shortwave. Both would use the
+20 series of experiment 00005 (16 Primary, 2 bulk-supply point, and 2 grid-supply point series), and
+its folds and quantile score. The CAMS irradiance comes from [PR #1201 (Download and validate CAMS
+irradiance at the demand series'
+locations)](https://github.com/openclimatefix/nged-substation-forecast/pull/1201), which covers the
+22 series of experiment 00003 (16 Primary demand series, 4 bulk-supply and grid-supply point flows,
+and 2 others).
+
+**The first test in P2 is the proposed gate for P4.** If adding CAMS at lag times removes most of
+the residual, P4 asks whether training on CAMS removes the residual at the source. If adding CAMS
+leaves most of the residual, the residual comes from something other than the irradiance input, and
+P4 would not be worth running. A candidate decision rule: the CAMS-trained arm lowers the quantile
+score at Primary substations by at least 0.2 points of capacity, with a month-block bootstrap
+interval that excludes zero. The threshold is a proposal for the planning step to confirm. A
+positive result would also change P2's baseline, because a CAMS-trained stage 1a leaves a smaller
+irradiance-error residual.
