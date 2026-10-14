@@ -89,6 +89,7 @@ GROUP_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "windchill": ("windchill_c",),
     "wind_heat_loss": ("wind_heat_loss",),
     "covid_flag": ("covid_indicator",),
+    "covid_graded": ("covid_graded",),
     "month_cat": ("month_local",),
 }
 """The column groups an arm can add to `W`, each computable at forecast time."""

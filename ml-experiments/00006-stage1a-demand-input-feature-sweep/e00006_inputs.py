@@ -60,6 +60,17 @@ HALF_HOURS_PER_DAY: Final[int] = 48
 LOCKDOWN_START: Final[datetime] = datetime(2020, 3, 23, tzinfo=UTC)
 LOCKDOWN_END: Final[datetime] = datetime(2021, 7, 19, tzinfo=UTC)
 """The 0/1 lockdown indicator reads 1 from the first to the last of these days, inclusive."""
+LOCKDOWN_LEVELS: Final[tuple[tuple[str, str, float], ...]] = (
+    ("2020-03-23", "2020-05-12", 1.0),
+    ("2020-05-13", "2020-11-04", 0.5),
+    ("2020-11-05", "2020-12-01", 1.0),
+    ("2020-12-02", "2021-01-05", 0.5),
+    ("2021-01-06", "2021-03-07", 1.0),
+    ("2021-03-08", "2021-07-18", 0.5),
+)
+"""First day, last day, and level of the graded lockdown indicator: 1 for a national lockdown, 0.5
+for the restrictions between the lockdowns. The levels are approximate dates and judgement, not a
+measured series."""
 HEATING_BASE_C: Final[float] = 15.5
 BLOCK_RADIUS_CELLS: Final[int] = 1
 """The block mean covers the nearest cell and this many cells on each side (3 by 3)."""
@@ -387,6 +398,18 @@ def windchill_celsius(*, temperature_c: pl.Expr, wind_m_s: pl.Expr) -> pl.Expr:
     return pl.when((temperature_c <= 10.0) & (speed > 4.8)).then(chill).otherwise(temperature_c)
 
 
+def _graded_lockdown(*, date: pl.Expr) -> pl.Expr:
+    """Return the graded lockdown level of each local date: 0 outside the listed periods."""
+    level = pl.lit(0.0)
+    for first, last, value in LOCKDOWN_LEVELS:
+        level = (
+            pl.when(date.is_between(pl.lit(first).str.to_date(), pl.lit(last).str.to_date()))
+            .then(value)
+            .otherwise(level)
+        )
+    return level
+
+
 def _trailing_columns() -> list[pl.Expr]:
     """Return the trailing-temperature columns, computed per series in time order.
 
@@ -448,6 +471,7 @@ def candidate_columns(*, frame: pl.DataFrame, latitude: float, longitude: float)
             )
             .cast(pl.Float64)
             .alias("covid_indicator"),
+            _graded_lockdown(date=local.dt.date()).alias("covid_graded"),
         )
         .with_columns(*_trailing_columns())
         .join(holiday_frame, on="date", how="left")

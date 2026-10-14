@@ -24,7 +24,11 @@ MIN_GAIN_POINTS: Final[float] = 0.1
 """Greedy selection stops when the best addition lowers the error by less than this."""
 MAX_GREEDY_STEPS: Final[int] = 6
 SELECTION_PATH: Final[Path] = inputs.EXPERIMENT_DIR / "selection_Primary.json"
-FEATURE_GROUPS: Final[tuple[str, ...]] = tuple(fit.GROUP_COLUMNS)
+FEATURE_GROUPS: Final[tuple[str, ...]] = tuple(
+    g for g in fit.GROUP_COLUMNS if g not in ("month_cat", "covid_graded")
+)
+"""The groups the add-one-in and greedy stages consider. The month categorical and the graded
+lockdown indicator are tested in their own stages."""
 
 
 def read_stage(*, stage: str, fold_name: str, config: str = "series", seed: int = 0) -> pl.DataFrame:
@@ -177,6 +181,18 @@ def masking(*, fold_name: str) -> None:
     fit.run_stage(stage="masking", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
 
 
+def graded_covid(*, fold_name: str) -> None:
+    """Fit the Primary set with the graded lockdown indicator in place of the 0/1 one."""
+    base = tuple(g for g in selected_groups() if g != "covid_flag")
+    names = [
+        fit.Arm(groups=base).name,
+        fit.Arm(groups=(*base, "covid_flag")).name,
+        fit.Arm(groups=(*base, "covid_graded")).name,
+        fit.Arm(groups=(*base, "covid_flag", "covid_graded")).name,
+    ]
+    fit.run_stage(stage="graded_covid", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+
+
 def finals(*, fold_name: str) -> None:
     """Fit the frozen set and its reference arms: three seeds, quantiles, pooled, importance."""
     chosen = selected_groups()
@@ -220,13 +236,26 @@ def finals(*, fold_name: str) -> None:
     )
 
 
+def type_sets(*, fold_name: str) -> None:
+    """Fit each substation type's own selected set, and the all-series set, with three seeds."""
+    sets = {"BSP": ("clock", "hol_flags"), "GSP": ("clock", "covid_flag", "hol_nearest", "hdh")}
+    all_series = ("clock", "covid_flag", "hol_nearest")
+    names = []
+    for groups in (*sets.values(), all_series):
+        names += [
+            fit.Arm(groups=groups).name,
+            fit.Arm(groups=groups, treatments=("recency",)).name,
+        ]
+    fit.run_stage(stage="type_sets", fold_name=fold_name, config="series", arm_names=names, seeds=[0, 1, 2])
+
+
 def main() -> None:
     """Dispatch a stage named on the command line."""
     stage, fold_name = sys.argv[1], sys.argv[2]
-    if stage == "greedy_primary":
-        greedy(fold_name=fold_name, substation_type="Primary")
+    if stage.startswith("greedy_"):
+        greedy(fold_name=fold_name, substation_type=stage.removeprefix("greedy_"))
         return
-    {"add_one_in": add_one_in, "greedy": greedy, "drop_one": drop_one, "candidates": candidates, "finals": finals, "masking": masking, "planned": planned}[stage](fold_name=fold_name)
+    {"add_one_in": add_one_in, "greedy": greedy, "drop_one": drop_one, "candidates": candidates, "finals": finals, "type_sets": type_sets, "graded_covid": graded_covid, "masking": masking, "planned": planned}[stage](fold_name=fold_name)
 
 
 if __name__ == "__main__":
