@@ -13,7 +13,7 @@ Planning content lives in five places with deliberately non-overlapping jobs:
 | Place | Job |
 |---|---|
 | **[`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md)** | **Our own falsifiable claims** — what we assert the engineering will achieve, the threshold that decides it, and what would falsify it. Not design (that is `roadmap/` or `architecture/`) and not NGED-derived requirement (that is `background/`): a claim we are on the hook for, and a natural Network Innovation Allowance (NIA) deliverable. One page; append tests, never renumber them. |
-| **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list** — including quick tweaks and non-code tasks — plus all discussion. **Fine-grained prioritisation lives only in GitHub.** Epics map 1:1 to the [roadmap milestones](roadmap/index.md#milestones); dependencies are recorded as `blocked by` issue relationships. |
+| **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list for the production code** — including quick tweaks and non-code tasks — plus all discussion. **Fine-grained prioritisation for the production code lives only in GitHub.** The queue of ml-experiments lives in the research plan under `docs/ml-experiments/`, because experiments finish too quickly for issues to keep up. Epics map 1:1 to the [roadmap milestones](roadmap/index.md#milestones); dependencies are recorded as `blocked by` issue relationships. |
 | **[`docs/roadmap/`](roadmap/index.md)** | Design depth: What we plan to build and *why*. The milestone arc and inter-plan dependencies are recorded here; fine-grained task-level ordering is not. |
 | **`docs/`[techniques](techniques/index.md), [background](background/index.md), [architecture](architecture/overview.md), [cross-validation](cross-validation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`cross-validation/`, `live_service/`) alike. These pages are where content moves to from `docs/roadmap/` after implementation. |
 | **`studies/`** (not published) | **Throwaway code that answered a question once.** Kept, and held to a lower standard than the rest of the repository: no maintenance, no backwards compatibility, never run in production. A study whose findings are cited in `docs/` has to merge, so a reader who doubts a number can re-run the code that produced it. The machinery a study calls is tested, in `packages/studies/`; the study's own arms, charts and write-up are not. `studies/README.md` states the tier in full. |
@@ -93,7 +93,7 @@ across a cross-validation fold, say.
 
 | I want to… | Go to |
 |---|---|
-| Decide what to work on this morning | The GitHub Project board (complete, ordered) |
+| Decide what to work on this morning | The GitHub Project board (complete, ordered) for production code; the research plan for the next ml-experiment |
 | Discuss / challenge a plan | GitHub issue comments (fold conclusions back into the roadmap page) |
 | Think through a substantial design | A `docs/roadmap/` page, reviewed via PR |
 | Communicate direction to NGED / leadership | The [milestones](roadmap/index.md#milestones) (published site) |

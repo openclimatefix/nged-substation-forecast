@@ -45,6 +45,10 @@ best-estimate, not a guarantee.
   pooling variants, how a weather product with a few months of history could enter the forecast,
   the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
   a promotion criterion.
+- [A staged probabilistic forecast](staged-probabilistic-forecast.md) — 🔬 a design under test: a
+  stage 1 that turns weather into power, a stage 2 that calibrates, uses lagged power, and blends
+  weather products, and coupling that restores coherent ensemble members. The experiments that test
+  it are in the [research log](../ml-experiments/research-log.md).
 - [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent
   searching for improvements to the XGBoost forecasting model in two phases: experiments run overnight
   from a plan agreed the day before, then a careful search in which the agent runs as a separate
