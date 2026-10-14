@@ -1,7 +1,7 @@
 ---
 id: "00015"
 slug: same-time-price-stage1-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   Adding the intra-day price at the same half-hour as the target (Elexon Market Index Data, observed
@@ -27,21 +27,103 @@ benchmark: >-
 row_set_id: era5_val_2024_07_to_2025_06_v1
 metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
-verdict: null
-best_arm: null
-lessons: null
-advice: []
-production_status: null
-adopted_in: null
+verdict: inconclusive
+best_arm: >-
+  CONTROL (national demand and wind at time t) in the confirmation year, 8.50 points pooled; PRICE
+  in the selection year, 9.34, level with CONTROL at 9.35. No arm that adds the price beat the
+  price from another week with an interval that excludes zero.
+headline: >-
+  C1, price against no price, pooled: -0.52 points (97.5% interval -0.88 to -0.11) in the selection
+  year and -0.18 (-0.50 to +0.08) in the confirmation year. C2, price against a price from another
+  week: -0.07 (-0.17 to +0.03) and -0.06 (-0.18 to +0.07).
+lessons: >-
+  Most of the gain from adding a price column came from any price column carrying the week's price
+  level, because a price from another week reproduced 0.45 of the 0.52 points. The gain was largest
+  from 12:00 to 20:00 and at the series with the largest errors, and it did not repeat at B2.
+advice:
+  - >-
+    Do not use the same-time price as the estimator of expected past power, because C2 shows a
+    price from another week removes most of its gain and C1 did not repeat in the confirmation year
+    (C1, C2).
+  - >-
+    Try national demand and wind at time t as the extra inputs of the expected-power model instead
+    of the price, because they matched the price in the selection year and beat it by 0.43 points
+    in the confirmation year (C3).
+  - >-
+    Keep a price from another week as the control in any later price experiment, because it
+    removed most of the gain here (C2).
+  - >-
+    Read any per-hour or per-series gain beside PRICE minus SHUFFLED, because at the largest-error
+    series the other-week price removed most of the gain (figure 3).
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00015-same-time-price-stage1-demand/
 pull_request: null
 ---
 
 # Does the same-time electricity price help a stage 1 demand model explain power?
 
-**Status: planned.** Written before any fit. Follows
+**Verdict: inconclusive.** The same-time price lowered the pooled error in the selection year, but a
+price from another week reproduced most of that gain, and the gain did not repeat in the
+confirmation year. Follows
 [experiment 10](../00010-elexon-price-lags-stage1a-demand/result.md), which tested the price from
 7 days earlier at two battery sites and was inconclusive.
+
+**Absolute scores** (mean absolute error of the median, points of capacity, 3 seeds, pooled over
+17 fitted series in the selection year and 18 in the confirmation year):
+
+| Scope and year | BASE | PRICE | SHUFFLED | CONTROL | CLIMATOLOGY |
+| --- | --- | --- | --- | --- | --- |
+| Pooled, selection | 9.86 | 9.34 | 9.41 | 9.35 | 12.38 |
+| Pooled, confirmation | 9.11 | 8.93 | 8.99 | 8.50 | 12.36 |
+| B2, selection | 10.98 | 9.88 | 9.77 | 10.08 | 15.46 |
+| B2, confirmation | 10.12 | 10.13 | 10.09 | 9.23 | 15.01 |
+
+![Pooled contrasts with 97.5% intervals](figure_1.svg)
+
+![Change in error by hour of day](figure_2.svg)
+
+![Change in error by series](figure_3.svg)
+
+## What the contrasts say
+
+- **C1 passed in the selection year only.** −0.52 (−0.88 to −0.11), with 10 of 12 months below
+  zero. In the confirmation year it is −0.18 (−0.50 to +0.08), with 6 of 12 months below zero.
+- **C2 failed.** The price against the other-week price is −0.07 (−0.17 to +0.03) in the selection
+  year and −0.06 (−0.18 to +0.07) in the confirmation year, so the point estimate misses the
+  −0.1 threshold and the interval includes zero. The other-week price carries the week's price
+  level and so removes 0.45 of the 0.52 points. This is a gain from any price column, not from the
+  price at time t.
+- **C3, price against national demand and wind:** −0.01 (−0.39 to +0.41) in the selection year and
+  +0.43 (−0.03 to +0.86) in the confirmation year. National demand and wind explain the demand
+  series as well as the price in one year and better in the other, so the price at time t is a
+  proxy for national conditions here.
+- **C4, by hour (selection year):** −0.27 (0 to 4), −0.56 (8 to 12), −0.78 (12 to 16), −0.83 (16 to
+  20), and −0.40 (20 to 24). In the confirmation year the gain is −0.30 (8 to 12), −0.38 (12 to
+  16), −0.31 (16 to 20), and +0.07 (20 to 24). The prediction that the gain peaks from 16:00 to
+  20:00 held in the selection year only.
+- **B2:** −1.09 (−2.25 to −0.10) in the selection year, where the other-week price gave about the
+  same (−1.20 against BASE). In the confirmation year B2 gained 0.00.
+- **By series:** in the selection year the price removes 0.11 to 0.19 of the squared residual at B1,
+  B2, G1, G2, P2, and P6, and 0.05 or less at the other 11. Beside the other-week price it removes
+  a further 0.06 or less at those six, so most of the gain at them is price-level signal and not the
+  price at time t. At G1 the price lowers the error by 4.34 points, and by 0.54 points more than the
+  other-week price does. In the confirmation year only P2 (0.21) and P6 (0.15) keep a gain, and P2
+  gains 1.04 points more than from the other-week price.
+
+## Failures and deviations
+
+- **Some series have too little training history** (17,520 half-hours before the purge), so 17
+  series were fitted in the selection year and 18 in the confirmation year, as in experiment 10.
+- **The decision rule gives `inconclusive`:** C1 and C2 did not both pass in the selection year,
+  and the refuted branch needed the C1 interval wholly above −0.1 in both years, which it was
+  not. This is not a small gain, because C2 includes zero.
+- **The residual breakdowns do not give out-of-fold residuals over the whole history,** which the
+  later experiment needs.
+- **No Opus review was run.** Sonnet reviewed the plan and the code; the code review found no
+  bug. The shuffled price is built over the whole history, so a training row within 4 weeks of the
+  fold's end can carry a price from the purge or validation weeks. That is a price, not a
+  target, so no outcome leaks.
 
 ## Purpose
 

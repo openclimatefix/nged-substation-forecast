@@ -32,6 +32,7 @@ the maintainer to confirm.
 | [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | 2026-10-14 |
 | [00009](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, when both are applied to ENS members? | Refuted: a gain of 0.035 points, not 0.2 | Not for production | 2026-10-14 |
 | [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | 2026-10-14 |
+| [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -234,3 +235,21 @@ an earlier week.
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1215).
 
 ![Planned contrasts with 98.3% intervals](00010-elexon-price-lags-stage1a-demand/figure_2.svg)
+
+### 00015: the same-time electricity price in a stage 1 demand model
+
+**The price at the same half-hour as the target lowered the pooled demand error in the selection
+year, but a price from another week did almost as well, and the gain did not repeat in the
+confirmation year.** The model maps the observed price and ERA5 weather at time t to power at time t
+on 17 series (18 in the confirmation year), scored at observed values.
+
+- **Headline result:** price against no price, pooled: -0.52 points of capacity (97.5% interval
+  -0.88 to -0.11) in the selection year and -0.18 (-0.50 to +0.08) in the confirmation year. Price
+  against a price from another week: -0.07 (-0.17 to +0.03) and -0.06 (-0.18 to +0.07).
+- **Finding for later experiments:** national demand and wind at time t explain the demand series as
+  well as the price in one year and better in the other (+0.43 points in the confirmation year), so
+  the price is a proxy for national conditions. The gain was largest from 12:00 to 20:00 and at the
+  series with the largest errors, and the other-week price reproduced most of it there.
+- **Write-up and pull request:** [result](00015-same-time-price-stage1-demand/result.md), PR #1220.
+
+![Pooled contrasts with 97.5% intervals](00015-same-time-price-stage1-demand/figure_1.svg)
