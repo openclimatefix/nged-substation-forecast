@@ -12,16 +12,16 @@ prediction: >-
   the median at the listed substation (B2) by at least 0.5 points of capacity, and by less than 0.1
   points at the unlisted series.
 decision_rule: >-
-  Supported if C1 and C2 are both material at B2: the 98.3% month-resampled interval (95%
-  familywise, Bonferroni across the three verdict contrasts C1 to C3) excludes zero and the point
-  estimate is at least 0.1 points in the direction stated. Refuted if the C1 interval at B2 excludes a gain of 0.3 points.
-  Otherwise
-  inconclusive. The selection year decides; the confirmation year is scored once, and if its
-  C1 interval at B2 excludes the selection year's point estimate the verdict is inconclusive.
-  Before any fit, the half-width of B2's interval is computed from experiment 00006's per-month
-  losses; if it exceeds 0.3 points the refuted branch is dropped and the best possible verdict is
-  supported or inconclusive. C4, the listed against unlisted comparison, rests on
-  two listed series and is reported but cannot change the verdict.
+  Supported if C1 and C2 are both material at B2. A contrast is material if its 98.3%
+  month-resampled interval (95% familywise, Bonferroni across the three verdict contrasts C1 to
+  C3) excludes zero and its point estimate is at least 0.1 points in the direction stated.
+  Refuted if the C1 interval at B2 excludes a gain of 0.3 points. Otherwise inconclusive. The
+  selection year decides; the confirmation year is scored once, and if its C1 interval at B2
+  excludes the selection year's point estimate the verdict is inconclusive. Before any fit, the
+  half-width of B2's interval is computed from experiment 00006's per-month losses; if it exceeds
+  0.3 points the refuted branch is dropped and the best possible verdict is supported or
+  inconclusive. C4, the listed against unlisted comparison, rests on two listed series and is
+  reported but cannot change the verdict.
 benchmark: >-
   The experiment 00006 Primary input set with recency weights (arm BASE), and a month-by-half-hour
   climatology row.
