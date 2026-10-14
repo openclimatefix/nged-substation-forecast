@@ -32,7 +32,7 @@ the maintainer to confirm.
 | [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | 2026-10-14 |
 | [00009](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, when both are applied to ENS members? | Refuted: a gain of 0.035 points, not 0.2 | Not for production | 2026-10-14 |
 | [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | 2026-10-14 |
-| [00011](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written: no gain in any window | Not for production | Not yet merged |
+| [00011](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written (inconclusive as intended): no gain in any window | Not for production | Not yet merged |
 | [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -182,11 +182,12 @@ later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesda
 - **Put recent power in the stage 2 calibrator, and calibrate before judging it.** For Primary
   substations, the calibrator with recent-origin inputs beat a stage 1b correction, and a lag-free
   calibrator is worth about 1 point of capacity at short leads (00005).
-- **The term and return-to-work columns add nothing to the Christmas column for Primary demand.**
-  Over the three validation years, the return and term columns moved the Primary error by +0.06
-  points from 2 to 20 January (99.2% interval -0.17 to +0.30), +0.20 at Easter (-0.19 to +0.59),
-  and -0.29 over the half terms (-0.68 to +0.07), and a calendar shifted by 17 days did as well
-  (00011). A training start of 2021-09 beat the full history by 0.26 points on the whole year.
+- **The term and return-to-work columns showed no detectable gain on top of the Christmas column for
+  Primary demand.** Over the three validation years, the return and term columns moved the Primary
+  error by +0.06 points from 2 to 20 January (99.2% interval -0.17 to +0.30), +0.20 at Easter (-0.19
+  to +0.59), and -0.29 over the half terms (-0.68 to +0.07), and Both was not 0.2 points better than
+  a calendar shifted by 17 days (00011). The arm with the full history and the COVID indicator
+  scored 0.26 points higher on the whole year than the base arm.
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -265,23 +266,26 @@ an earlier week.
 ### 00011: school-term and return-to-work columns in the stage 1a demand model
 
 **The return-to-work and school-term columns did not lower the Primary demand error after Christmas,
-at Easter, or over the half-term holidays.** All 20 series sit in Lincolnshire, so the experiment
-used Lincolnshire County Council's recommended term calendar for 2021-22 to 2025-26, collected by
-hand and validated by script. The base arm was the model of experiment 00006 with the 14-day
-Christmas column, trained from 2021-09-01.
+at Easter, or over the half-term holidays.** All 20 series lie in a box that is essentially
+Lincolnshire, so the experiment used Lincolnshire County Council's recommended term calendar for
+2021-22 to 2025-26, collected by hand and validated by script. The base arm was the XGBoost arm of
+experiment 00006 with the 14-day Christmas column, trained from 2021-09-01.
 
 - **Headline result:** for Primary substations, the return and term columns together changed the
   error by +0.06 points of capacity from 2 to 20 January (99.2% interval -0.17 to +0.30), +0.20 over
   Easter (-0.19 to +0.59), and -0.29 over the half terms (-0.68 to +0.07), against 7.18 for the base
-  arm over the whole year. Two calendars shifted by 17 days in either direction scored the same, so
-  C6 failed.
+  arm over the whole year. Both was not 0.2 points better than either calendar shifted by 17 days,
+  so C6 failed, and C5 failed because its interval reaches -0.11.
 - **Verdict wording:** the rule as pre-registered gives "refuted". Its refutation clause was looser
-  than intended, and the data do not rule out a half-term gain of 0.15 points.
-- **Finding for later experiments:** the Primary error from 2 to 20 January stays at 8 to 10 points
-  with every arm. A training start of 2021-09 scored 0.26 points lower on the whole year than the
-  full history (99.2% interval 0.12 to 0.43).
-- **Write-up and pull request:** [result](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md),
-  [PR #1214 (Plan experiment 11: school-term and return-to-work columns for the stage 1a demand
+  than intended. Read as intended, the verdict is inconclusive for Easter and the half terms,
+  because the data do not rule out a gain of 0.15 points there.
+- **Finding for later experiments:** the base arm's Primary error averages 8.4 points from 2 to 20
+  January, and the new columns change it by +0.06. The arm with the full history and the COVID
+  indicator scored 0.26 points higher on the whole year than the base arm (99.2% interval 0.12 to
+  0.43).
+- **Write-up and pull request:**
+  [result](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md), [PR #1214 (Plan
+  experiment 11: school-term and return-to-work columns for the stage 1a demand
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1214).
 
 ![Change in error by window and column set](00011-school-term-and-return-to-work-columns-stage1a-demand/figure_1.svg)

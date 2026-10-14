@@ -34,41 +34,40 @@ metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
 verdict: refuted
 best_arm: >-
-  None. No arm beat the base arm (weather block, hour, weekday, and the Christmas column set within
-  14 days of 25 December, trained from 2021-09-01) in any planned window. The return and term
-  columns together scored 7.15 points on the whole year against the base arm's 7.18, for Primary
-  substations.
+  None. No arm's interval excluded zero below zero against the base arm (weather block, hour,
+  weekday, and the Christmas column set within 14 days of 25 December, trained from 2021-09-01) in
+  any planned window. The return and term columns together scored 7.15 points on the whole year
+  against the base arm's 7.18, for Primary substations.
 headline: >-
   Return and term columns against the base arm, Primary substations: +0.06 points from 2 to 20
   January (99.2% interval -0.17 to +0.30), +0.20 over the Easter window (-0.19 to +0.59), and -0.29
   over the half-term holidays (-0.68 to +0.07). Over the whole year the change is -0.02 (-0.11 to
   +0.07).
 lessons: >-
-  The Christmas column of experiment 6 already carries what a return-to-work column could add
-  (+0.02, -0.20 to +0.23 for the return column alone). The half-term gain of the term columns
-  (-0.28) has an interval that includes zero, and a smooth time-of-year curve does as well
-  (-0.46). A training start of 2021-09 scored 0.26 points lower on the whole year than the full
-  history (99.2% interval 0.12 to 0.43).
+  A return-to-work column added no detectable gain on top of the Christmas column (+0.02, -0.20 to
+  +0.23 for the return column alone). The half-term change of the term columns (-0.28) has an
+  interval that includes zero, and a smooth time-of-year curve does as well (-0.46). The arm with
+  the full history and the COVID indicator scored 0.26 points higher on the whole year than the
+  base arm (99.2% interval 0.12 to 0.43).
 advice:
   - >-
-    Leave the return-to-work column out of the stage 1a demand model, because it changes the
-    Primary error from 2 to 20 January by +0.02 points (-0.20 to +0.23) (C1, return column only).
+    Leave the return-to-work column out of the stage 1a XGBoost demand model, because it showed no
+    detectable effect from 2 to 20 January, +0.02 points (-0.20 to +0.23) (C1, return column only).
   - >-
-    Do not add school-term columns to the stage 1a demand model for Easter, because the change is
-    +0.20 points (-0.19 to +0.59), which is positive in two of three years and zero in the third
+    Do not expect school-term columns to help the stage 1a XGBoost demand model at Easter: the
+    change was +0.20 points (-0.19 to +0.59), positive in two of three years and zero in the third
     (C2).
   - >-
-    Test a half-term effect with more than three occurrences per window, for example by adding
-    other counties' term calendars, because -0.29 points (-0.68 to +0.07) cannot be told from zero
-    or from a one-harmonic time-of-year column at -0.46 (C3).
+    Test a half-term effect with more half-term holidays than the nine here, because -0.29 points
+    (-0.68 to +0.07) cannot be told from zero, or from a one-harmonic time-of-year column at -0.46
+    (C3).
   - >-
-    Train the stage 1a demand model from 2021-09-01 and not from the full history for Primary
-    substations, because it scored 0.26 points lower on the whole year (99.2% interval 0.12 to
-    0.43) (Both against Reference, whole-year table).
+    Test the training start and the COVID indicator separately for Primary substations, because the
+    arm with the full history and the COVID indicator scored 0.26 points higher on the whole year
+    (99.2% interval 0.12 to 0.43) (Reference against base, whole-year table).
   - >-
-    Add a placebo calendar shifted by a fixed number of days, in both directions, to any new
-    calendar-column test, because a shifted calendar raised the GSP error by 1.29 points (0.19 to
-    2.43) (Placebo A against base).
+    Include a placebo calendar shifted by a fixed number of days in any new calendar-column test,
+    because Both was not 0.2 points better than either shifted calendar over the three windows (C6).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00011-school-term-and-return-to-work-columns-stage1a-demand/
@@ -79,22 +78,28 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 **Verdict: refuted, by the decision rule as pre-registered.** For the Primary substations, the
 return-to-work and school-term columns did not lower the error in the weeks after Christmas or at
-Easter, and the half-term gain of -0.29 points has an interval that includes zero. The rule's
-refutation clause is looser than intended. It required the upper bounds of C1, C2, and C3 to exceed
--0.25, -0.15, and -0.15, which every interval with a point estimate near zero satisfies, and also an
-interval such as -1.4 to +0.2. Read as intended, with the lower bounds above those values, the
-data rule out a gain of 0.25 points in the January window (lower bound -0.17) and do not rule out
-a gain of 0.15 points at Easter (-0.19) or over the half terms (-0.68). The verdict field keeps the
-rule as written. All 20 series sit in Lincolnshire, so the term calendar is Lincolnshire County
-Council's recommended calendar. Primary substations are the headline (13, 13, and 14 series in the
-three validation years), and every score is the mean absolute error of the median in points of
-capacity.
+Easter. The half-term change of -0.29 points has an interval that includes zero.
+
+**The refutation clause of the rule is looser than intended, and the intended reading gives
+"inconclusive".** The clause required the upper bounds of C1, C2, and C3 to exceed -0.25, -0.15, and
+-0.15, which every interval that includes zero satisfies, and so does an interval such as -1.4 to
++0.2. Ruling out a gain of half the predicted size needs the lower bound above those values.
+Read that way, the data rule out a gain of 0.25 points in the January window (lower bound -0.17).
+They do not rule out a gain of 0.15 points at Easter (lower bound -0.19) or over the half terms
+(-0.68), so the intended reading is inconclusive for those two windows. The verdict field keeps the
+rule as written.
+
+**All 20 series lie in a box that is essentially Lincolnshire, so the term calendar is Lincolnshire
+County Council's recommended calendar.** Primary substations are the headline, with 13, 13, and 14
+series in the three validation years. Every score is the mean absolute error of the median, in
+points of capacity.
 
 ![Change in error by window and column set, Primary substations](figure_1.svg)
 
 ## Planned contrasts
 
-**None of C1 to C3 is a gain, and C6 fails.** The table gives the change for the return and term
+**None of C1 to C3 is a gain, and C5 and C6 fail.** The whole-year point estimate of -0.02 is inside
+the predicted 0.1, but its interval is not. The table gives the change for the return and term
 columns together (Both) against the base arm, for Primary substations, with each year's change.
 The level is 99.2%, and each interval resamples 7-day blocks of days after averaging the three
 fitting seeds. The intervals understate the uncertainty, because neighbouring days share weather
@@ -105,22 +110,24 @@ and each window has three occurrences.
 | C1: 2 to 20 January | +0.06 | -0.17 to +0.30 | +0.14 | +0.06 | -0.03 | 8.44 | Not a gain |
 | C2: Easter | +0.20 | -0.19 to +0.59 | +0.37 | +0.22 | -0.01 | 7.17 | Not a gain |
 | C3: half-term holidays | -0.29 | -0.68 to +0.07 | -0.25 | -0.12 | -0.49 | 7.73 | Not a gain (interval includes zero) |
-| C4: summer holiday (descriptive) | -0.02 | -0.25 to +0.21 | -0.40 | +0.09 | +0.24 | 6.51 | No harm |
-| C5: whole year | -0.02 | -0.11 to +0.07 | | | | 7.18 | Holds (inside -0.1 to +0.1) |
+| C4: summer holiday (descriptive) | -0.02 | -0.25 to +0.21 | -0.40 | +0.09 | +0.24 | 6.51 | No harm detected for Primary |
+| C5: whole year | -0.02 | -0.11 to +0.07 | | | | 7.18 | Does not hold (lower bound -0.11 is outside -0.1) |
 | C6: against Placebo A, three windows | -0.03 | -0.25 to +0.19 | +0.11 | -0.05 | -0.13 | 7.73 | Fails |
 | C6: against Placebo B, three windows | -0.04 | -0.19 to +0.11 | +0.12 | -0.05 | -0.18 | 7.74 | Fails |
 
-**Both is no better than a calendar shifted by 17 days.** The shifted calendars score the same as
-the base arm (Placebo A +0.00, -0.13 to +0.12, and Placebo B +0.01, -0.18 to +0.20, pooled over
-the three windows), so for Primary substations the extra columns neither help nor hurt.
+**Both is not 0.2 points better than either shifted calendar, so C6 fails.** The shifted calendars
+score the same as the base arm (Placebo A +0.00, -0.13 to +0.12, and Placebo B +0.01, -0.18 to
++0.20, pooled over the three windows), so for Primary substations the extra columns show no
+detectable effect.
 
 ![Change for the return and term columns, by validation year](figure_2.svg)
 
 ## Which columns, and what else was measured
 
-**The return column does nothing, and the term columns' half-term effect cannot be separated from
-a smooth seasonal curve.** The descriptive contrasts against the base arm, for Primary substations,
-are in the table. None was part of the decision.
+**The return column shows no detectable effect in January, and the term columns' half-term effect
+cannot be separated from a smooth seasonal curve.** The table gives descriptive contrasts against
+the base arm for Primary substations, and none was part of the decision. The return column is
+missing outside its window, so its zero effect at Easter and in half terms holds by construction.
 
 | Arm | 2 to 20 January | Easter | Half-term holidays |
 | --- | --- | --- | --- |
@@ -130,17 +137,23 @@ are in the table. None was part of the decision.
 
 ![Primary error around Christmas and New Year](figure_3.svg)
 
-**Primary error is highest in the weeks after Christmas, and none of the arms changes the daily
-shape.** The base arm's error rises from 6 to 8 points just before Christmas to 9 to 10 in the
-second and third weeks of January. The return and term columns track the base arm through those
-weeks, as the one harmonic of time of year does.
+**Primary error is higher in the weeks after Christmas than just before, and the arms differ only
+in single days.** The lines are means of three days. The base arm's error is 6 to 8 points before
+Christmas and 7 to 10 from 8 to 26 days after it, averaging 8.4 from 2 to 20 January. Over the
+Christmas weeks (15 December to 7 January), Both is +0.12 points against the base arm (-0.21 to
++0.61), and +0.64 in 2023-24, above the 0.1 tolerance the plan set. On the four days before
+Christmas Day, Both is 0.5 to 1.1 points worse than the base arm. The one harmonic of time of year
+tracks the base arm more closely.
 
-**A training start of 2021-09-01 scored lower on the whole year than the full history.** The
-Reference arm (the base columns plus the COVID indicator, trained from 2019-09-01) scores 7.44 for
-Primary substations against 7.18 for the base arm: +0.26 (99.2% interval +0.12 to +0.43). Over the
-three windows pooled, Both scores -0.21 (-0.50 to +0.04) against the Reference arm. This agrees with
-the 2023-09 start of experiment 6, and the arm was planned as a descriptive reference, so it does
-not belong to the decision.
+**The arm with the full history and the COVID indicator scored higher on the whole year than the
+base arm.** The Reference arm (the base columns plus the COVID indicator, trained from 2019-09-01)
+scores 7.44 for Primary substations against 7.18 for the base arm: +0.26 (99.2% interval +0.12 to
++0.43). The two arms differ in the start date and in the COVID indicator, so the gap cannot be
+assigned to either alone. For GSP the Reference arm scores lower (-0.48, -1.05 to +0.05), and for
+BSP higher (+0.17, 0.02 to 0.33). Over the three windows pooled, Both scores -0.21 (-0.50 to +0.04)
+against the Reference arm. Experiment 6 found a lower Primary error for a 2023-09 start on its
+confirmation year (-0.86) and no change on its selection year (-0.05). The arm was planned as a
+descriptive reference, so it does not belong to the decision.
 
 | Arm | Primary | BSP | GSP |
 | --- | --- | --- | --- |
@@ -155,37 +168,37 @@ not belong to the decision.
 | One harmonic of time of year | 7.19 | 8.96 | 28.99 |
 
 **The columns do not help BSP and GSP either, and a shifted calendar raises the GSP error.** The
-table gives whole-year error over the three validation years. Over the three windows, Both is
-+0.35 (-0.50 to +1.48) for BSP in January and +1.30 (-0.99 to +3.84) for GSP, and in the summer
-holiday it raises the BSP error by 1.31 (+0.47 to +2.80). Placebo A raises the GSP error over the
-three windows by 1.29 (+0.19 to +2.43), from two series. The BSP and GSP groups have two series
-each, so none of their intervals is decisive.
+table gives whole-year error over the three validation years. In the 2 to 20 January window, Both
+is +0.35 (-0.50 to +1.48) for BSP and +1.30 (-0.99 to +3.84) for GSP. In the summer holiday, Both
+raises the BSP error by 1.31 (+0.47 to +2.80), so the Primary result for C4 does not carry to BSP.
+Placebo A raises the GSP error over the three windows by 1.29 (+0.19 to +2.43), from two series. The
+BSP group has one or two series per year and the GSP group two, so none of their intervals is
+decisive.
 
 ## Limits
 
-- **Three occurrences per window.** The January, Easter, and summer windows have one occurrence per
+- **Few occurrences per window.** The January, Easter, and summer windows have one occurrence per
   year, and the half-term window has three short holidays per year. A real effect of 0.3 points
-  would need an interval narrower than these give.
+  needs an interval narrower than the 0.5 to 0.8 points these windows give.
 - **Midnight half-hours.** `hour_local` and `day_of_week_local` describe the day that starts at
   `valid_time`, and the term and return columns describe the day the period ends in. The two differ
   only for the half-hour ending at 00:00.
 - **Series set.** A series needs a year of observed half-hours after 2021-09-01, so the three
   validation years score 13, 13, and 14 Primary series, and a Primary series that experiment 6
   scored can be absent.
-- **ERA5 weather.** The stage 1a model is fitted and scored on ERA5, so a gain here need not carry
-  over to forecast weather. The term and return columns are known in advance.
-- **Post hoc work.** None. Every number above is from the pre-registered arms and windows, and
-  `e00011_report.py` prints each of them.
+- **ERA5 weather.** The stage 1a XGBoost model is fitted and scored on ERA5, so a gain here need not
+  carry over to forecast weather. The term and return columns are known in advance.
+- **Post hoc work.** The intended reading of the refutation clause is post hoc. Every number above
+  is from the pre-registered arms and windows, and `e00011_report.py` prints each of them.
 
 ## Lessons for later experiments
 
-- **The return and term columns do not lower the post-Christmas error.** The Christmas column of
-  experiment 6 covers 25 December, and the 2 to 20 January error stays at 8 to 10 points with or
-  without the new columns.
-- **A half-term effect needs more occurrences to test.** Three occurrences per window gave
-  intervals of about 0.7 points.
-- **Shorter training histories deserve their own test.** The 2021-09 start beat the full history
-  on the whole year by 0.26 points.
+- **The return and term columns show no detectable gain on top of the Christmas column.** The
+  2 to 20 January error averages 8.4 points for the base arm, and Both differs from it by +0.06.
+- **A half-term effect needs more occurrences to test.** The Easter and half-term windows gave
+  intervals about 0.8 points wide.
+- **A shorter training history, or the COVID indicator, deserves its own test.** The arm with the
+  full history and the COVID indicator scored 0.26 points higher on the whole year.
 
 ## Pre-registered plan
 

@@ -105,7 +105,7 @@ def figure_1(*, table: pl.DataFrame) -> alt.TopLevelMixin:
         width=CONTENT_WIDTH_PX - 200,
         height=250,
         title=_title(
-            text="No column set lowers the Primary error in the three windows",
+            text="No column set is shown to lower the Primary error in the three windows",
             subtitle=(
                 "Mean absolute error of the median, 13 or 14 Primary substations in Lincolnshire, "
                 "three validation years (2023-24 to 2025-26). Dot: estimate. Line: 99.2% "
@@ -231,7 +231,7 @@ def figure_3(*, daily: pl.DataFrame) -> alt.TopLevelMixin:
             width=CONTENT_WIDTH_PX - 60,
             height=230,
             title=_title(
-                text="The new columns do not change the post-Christmas error",
+                text="The new columns do not visibly change the error after Christmas",
                 subtitle=(
                     "Mean absolute error of the median over the Primary substations, averaged "
                     "over the three validation years, for each day from 10 days before to 32 "
