@@ -68,14 +68,14 @@ and calibrator models use the 2a feature lists (no calendar column, no power lag
 ## Mixture and scores
 
 - **Mixture.** Each member's 9 quantiles are treated as atoms with the probability masses
-  0.05, 0.10, 0.15, 0.125, 0.10, 0.125, 0.15, 0.10, 0.05 (half the gap to each neighbouring level),
-  each member weighted 1/51. The mixture quantile function interpolates the weighted atoms linearly
+  0.075, 0.10, 0.15, 0.125, 0.10, 0.125, 0.15, 0.10, 0.075 (the interval between the mid-points to
+  the neighbouring levels, so the masses sum to 1), each member weighted 1/51. The mixture quantile function interpolates the weighted atoms linearly
   at their mass mid-points on a 199-level grid. **Tail rule:** a mixture quantile below the lowest
   atom or above the highest atom takes that atom's value, so tails never extrapolate, and a level
   between two atoms interpolates linearly. Output quantiles are read from the 199-level grid.
 - **CRPS estimate.** Twice the mass-weighted mean pinball loss over the 9 levels, with the masses
-  above as weights. It approximates the continuous ranked probability score from 9 levels, and the
-  two tail masses (0 to 0.05 and 0.95 to 1) are carried by the 0.05 and 0.95 levels.
+  above as weights. It approximates the continuous ranked probability score from 9 levels. The two
+  tails (below 0.075 and above 0.925) are carried by the 0.05 and 0.95 levels.
 - **MAE of the median.** Absolute error of the 0.5 quantile, points of capacity.
 - **Coverage.** The share of cases with the observation inside the closed 10 to 90 and 5 to 95
   quantile intervals (the nominal values are 80% and 90%). Where the interval has zero width
