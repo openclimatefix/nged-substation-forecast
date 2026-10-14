@@ -204,8 +204,8 @@ only. At the observed weather, where the CAMS-trained arm also reads CAMS, the d
 median falls by 0.88 points, so the smaller gain at ENS is probably a mismatch at application: the
 ENS members' shortwave averages 7% above ERA5's, which this experiment did not test. The paired
 interval was far narrower than the plan guessed (0.035 points either side, not 0.2). See
-[`result.md`](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) and [PR #1213 (Plan
-experiment 9: CAMS-trained stage 1a against ERA5-trained, for
-demand)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213).
+[`result.md`](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) and [PR #1213 (Experiment
+9: does a stage 1a trained on CAMS irradiance beat one trained on ERA5
+shortwave?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213).
 
 ![Contrast of the CAMS-trained arm by scope](00009-cams-trained-stage1a-vs-era5-trained-demand/figure_1.svg)
