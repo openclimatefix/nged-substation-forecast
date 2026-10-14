@@ -1,12 +1,14 @@
 """Validate the ERA5 stage 1 box download against the held CDS tables and the physics.
 
 Reads the combined parquet files that `fetch_era5_stage1_box_arco.py` wrote, runs the
-`data-validation` checklist on each, and compares the cells it shares with the tables already held
-from the Copernicus Climate Data Store (CDS):
+`data-validation` checklist on each, and compares the cells it shares with the tables already held:
 
-- `ERA5/solar_variables/<name>.parquet` (d2m, sp, strd, tcc, tp, u10, v10), on 20 cells;
-- the `ERA5/beam_diffuse/*.zip` archives (t2m, ssrd, fdir), on the same 20 cells;
-- `ERA5-WIND-2019-2023/wind_era5_cds.parquet` (u10, v10, u100, v100), on 90 cells to 2023-12.
+- `ERA5/solar_variables/<name>.parquet` (d2m, sp, strd, tcc, tp, u10, v10), on 20 cells. Only `tcc`
+  came from the Copernicus Climate Data Store (CDS); the other six were read from ARCO, so their
+  agreement checks the cell selection and not the source;
+- the `ERA5/beam_diffuse/*.zip` archives (t2m, ssrd, fdir), from the CDS, on the same 20 cells;
+- `ERA5-WIND-2019-2023/wind_era5_cds.parquet` (u10, v10, u100, v100), from the CDS, on 90 cells to
+  2023-12, of which 77 lie in the block.
 
 The report goes to `validation.json` beside the data. No coordinate is printed or written to the
 report: cells are named by integer quarter-degree indices only inside this process.
@@ -27,12 +29,10 @@ import polars as pl
 import xarray as xr
 from fetch_era5_stage1_box_arco import (
     OUTPUT_DIR,
+    ROUNDING_TOLERANCE,
     VARIABLES,
     Stage1Variable,
     expected_hour_count,
-)
-from fetch_era5_stage1_box_arco import (
-    ROUNDING_TOLERANCE as ROUNDING_SLACK,
 )
 from lineage import write_readme
 from studies.sources import (
@@ -197,8 +197,8 @@ def checklist(*, frame: pl.DataFrame, variable: Stage1Variable) -> dict[str, obj
         "maximum": float(frame["value"].max()),  # ty: ignore[invalid-argument-type]
         "outside_limits": int(
             (
-                (frame["value"] < variable.minimum - ROUNDING_SLACK * variable.maximum)
-                | (frame["value"] > variable.maximum + ROUNDING_SLACK * variable.maximum)
+                (frame["value"] < variable.minimum - ROUNDING_TOLERANCE * variable.maximum)
+                | (frame["value"] > variable.maximum + ROUNDING_TOLERANCE * variable.maximum)
             ).sum()
         ),
         "grid_is_regular_quarter_degree": grid_is_regular,
@@ -254,7 +254,7 @@ def write_stage1_readme(*, tables: dict[str, pl.DataFrame], report: dict[str, ob
     write_readme(
         product_dir=OUTPUT_DIR,
         product_name="ERA5 hourly weather variables for stage 1 of the staged forecast",
-        source_web_page="https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels",
+        source_web_page="https://github.com/google-research/arco-era5",
         script_path="studies/weather_downloads/fetch_era5_stage1_box_arco.py",
         columns={
             "time": f"Valid time, UTC, stored as {first.schema['time']}. An accumulation (`ssrd`, "
@@ -294,10 +294,12 @@ def write_stage1_readme(*, tables: dict[str, pl.DataFrame], report: dict[str, ob
                 "float noise of about 5e-5, so the fetch rounds them to integers. Values seen: "
                 "0, 1, 3, 5, 6, 7, 8."
             ),
-            "**Agreement with the held CDS tables.** "
+            "**Agreement with the held tables.** "
             + ", ".join(f"`{n}`" for n in solar_exact)
-            + " match the held `solar_variables/` tables bit for bit. `tcc` differs by at most "
-            "8e-6. `t2m`, `ssrd`, `fdir` and the four wind components differ from the held "
+            + " match the held `solar_variables/` tables bit for bit, but those tables were also "
+            "read from ARCO, so this checks the cell selection only. `tcc`, the one CDS table "
+            "there, differs by at most 8e-6. `t2m`, `ssrd`, `fdir` and the four wind components differ "
+            "from the held "
             "`beam_diffuse/` archives and `ERA5-WIND-2019-2023/` by at most about 6e-5 of the "
             "variable's maximum, in no pattern by cell, consistent with 16-bit packing in those "
             "netCDF files. Details are in `validation.json`.",

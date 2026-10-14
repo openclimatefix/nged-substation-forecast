@@ -75,11 +75,14 @@ way):
 - `fetch_era5_stage1_box_arco.py` and `validate_era5_stage1_box.py` — hourly ERA5 from 2019-09-01
   to 2026-07-31 for the staged probabilistic forecast's stage 1: 2 m temperature and dewpoint, 10 m
   and 100 m wind components, surface and mean-sea-level pressure, total cloud cover, precipitation
-  type, the three accumulated fields `ssrd`, `fdir`, and `strd`, and total precipitation. The cells are the block enclosing the trial-area box, widened by 3 cells
-  in every direction. The values are read from Google's public ARCO-ERA5 zarr store, needs `uv run
-  --with zarr --with gcsfs`, with one parquet file per variable per month under `_month_cache/`.
-  Geopotential at 500 hPa is not fetched, because ARCO stores all 37 pressure levels in each hourly
-  chunk of 80 MB. The validator compares the cells it shares with the held CDS tables.
+  type, the three accumulated fields `ssrd`, `fdir`, and `strd`, and total precipitation. The cells
+  are the block enclosing the trial-area box, widened by 3 cells in every direction. The fetch
+  script reads Google's public ARCO-ERA5 zarr store and needs `uv run --with zarr --with gcsfs`. It
+  writes one parquet file per variable per month under `_month_cache/`. Geopotential at 500 hPa is
+  not fetched, because ARCO stores all 37 pressure levels in each hourly chunk of 80 MB. The
+  validator compares the cells it shares with the held tables. Six of the seven tables in
+  `ERA5/solar_variables/` it compares against also came from ARCO, so only `tcc` among them is an
+  independent check.
 - `fetch_midas_open.py` and `validate_midas_open.py` — Met Office MIDAS Open station observations.
 - `fetch_icon_dream.py` — DWD's ICON-DREAM-EU, whole-domain monthly GRIB cropped to the box then
   deleted, needs `uv run --with cfgrib --with eccodes --with requests`.

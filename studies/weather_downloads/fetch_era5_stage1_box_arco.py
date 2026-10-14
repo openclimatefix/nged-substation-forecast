@@ -94,20 +94,46 @@ class Stage1Variable:
 
 
 VARIABLES: Final[tuple[Stage1Variable, ...]] = (
-    Stage1Variable("t2m", "instantaneous", "K", 200.0, 340.0),
-    Stage1Variable("d2m", "instantaneous", "K", 200.0, 340.0),
-    Stage1Variable("u10", "instantaneous", "m s**-1", -80.0, 80.0),
-    Stage1Variable("v10", "instantaneous", "m s**-1", -80.0, 80.0),
-    Stage1Variable("u100", "instantaneous", "m s**-1", -100.0, 100.0),
-    Stage1Variable("v100", "instantaneous", "m s**-1", -100.0, 100.0),
-    Stage1Variable("sp", "instantaneous", "Pa", 40_000.0, 110_000.0),
-    Stage1Variable("msl", "instantaneous", "Pa", 90_000.0, 109_000.0),
-    Stage1Variable("tcc", "instantaneous", "(0 - 1)", 0.0, 1.0),
-    Stage1Variable("ptype", "instantaneous", "code table (4.201)", 0.0, 12.5),
-    Stage1Variable("ssrd", "accumulation", "J m**-2", 0.0, 4.0e6),
-    Stage1Variable("fdir", "accumulation", "J m**-2", 0.0, 4.0e6),
-    Stage1Variable("strd", "accumulation", "J m**-2", 0.0, 2.5e6),
-    Stage1Variable("tp", "accumulation", "m", 0.0, 0.2),
+    Stage1Variable(short_name="t2m", kind="instantaneous", units="K", minimum=200.0, maximum=340.0),
+    Stage1Variable(short_name="d2m", kind="instantaneous", units="K", minimum=200.0, maximum=340.0),
+    Stage1Variable(
+        short_name="u10", kind="instantaneous", units="m s**-1", minimum=-80.0, maximum=80.0
+    ),
+    Stage1Variable(
+        short_name="v10", kind="instantaneous", units="m s**-1", minimum=-80.0, maximum=80.0
+    ),
+    Stage1Variable(
+        short_name="u100", kind="instantaneous", units="m s**-1", minimum=-100.0, maximum=100.0
+    ),
+    Stage1Variable(
+        short_name="v100", kind="instantaneous", units="m s**-1", minimum=-100.0, maximum=100.0
+    ),
+    Stage1Variable(
+        short_name="sp", kind="instantaneous", units="Pa", minimum=40_000.0, maximum=110_000.0
+    ),
+    Stage1Variable(
+        short_name="msl", kind="instantaneous", units="Pa", minimum=90_000.0, maximum=109_000.0
+    ),
+    Stage1Variable(
+        short_name="tcc", kind="instantaneous", units="(0 - 1)", minimum=0.0, maximum=1.0
+    ),
+    Stage1Variable(
+        short_name="ptype",
+        kind="instantaneous",
+        units="code table (4.201)",
+        minimum=0.0,
+        maximum=12.5,
+    ),
+    Stage1Variable(
+        short_name="ssrd", kind="accumulation", units="J m**-2", minimum=0.0, maximum=4.0e6
+    ),
+    Stage1Variable(
+        short_name="fdir", kind="accumulation", units="J m**-2", minimum=0.0, maximum=4.0e6
+    ),
+    Stage1Variable(
+        short_name="strd", kind="accumulation", units="J m**-2", minimum=0.0, maximum=2.5e6
+    ),
+    Stage1Variable(short_name="tp", kind="accumulation", units="m", minimum=0.0, maximum=0.2),
 )
 """The variables to fetch.
 
