@@ -47,10 +47,10 @@ headline: >-
   capacity (97.5% interval -0.070 to +0.001), a sixth of the planned 0.2-point gain. Without
   substation P2 (C2): -0.043 (-0.081 to -0.004).
 lessons: >-
-  Training on CAMS lowers the daylight error of the median by 0.88 points when CAMS is also the
-  input, but only 0.04 to 0.17 points when the input is an ENS forecast, and nothing beyond a week
-  ahead. The ENS members' daylight shortwave is 7% above ERA5's, which the CAMS-trained arm never
-  saw in training.
+  Training on CAMS lowers the daylight error of the median by 0.88 points when each arm reads its
+  own observed irradiance, but only 0.04 to 0.17 points when the input is an ENS forecast, and no
+  gain is resolved from day 7. The ENS members' daylight shortwave is 7% above ERA5's, a candidate
+  cause of the smaller gain that this experiment did not test.
 advice:
   - >-
     Do not expect a gain of 0.2 points from training stage 1a on CAMS irradiance when stage 1a is
@@ -60,15 +60,15 @@ advice:
     shortwave bias-corrected, because the arm that reads CAMS at validation gained 0.88 points of
     daylight error and the arm that reads ENS gained 0.04 (observed-weather diagnostic, figure 3).
   - >-
-    Size a planned threshold from the interval of a paired contrast on the same row set, not from
-    an unpaired one: the 97.5% interval of C1 was 0.035 points either side, where the plan had
-    guessed 0.2 from a different contrast.
+    Take a planned threshold's resolution from a contrast between two arms trained alike: the 97.5%
+    interval of C1 was 0.035 points either side, where the plan had guessed 0.2 from experiment
+    00005's contrast between training windows (E11).
   - >-
     Score any irradiance-input change by lead band as well as in total, because the CAMS-trained
     gain is 0.07 to 0.08 points in the first 2 days and absent from day 7 (figure 1).
   - >-
-    Skip hourly holding of a half-hourly input as a suspect for small differences: holding ERA5
-    shortwave hourly changed the score by -0.012 points (X1, interval -0.064 to +0.030).
+    Treat hourly holding of a half-hourly input as unresolved: holding ERA5 shortwave hourly changed
+    the score by -0.012 points, and the interval (-0.064 to +0.030) spans the size of C1 (X1).
 production_status: not-for-production
 adopted_in: none
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1213
@@ -92,20 +92,19 @@ scores it on ENS.
 - **Degradation rule:** not touched.
 - **Designs that would test the hypothesis defensibly:** two. Replacing ERA5 shortwave by CAMS at
   the training times, planned here, is the simpler. Keeping ERA5 for training and quantile-mapping
-  the ENS shortwave onto CAMS at application would also be defensible, and is left to a later
-  experiment.
+  the ENS shortwave onto CAMS at application would also be defensible, and was not run here.
 - **Callers that need searching for:** none. The scripts copy the patterns of
   `ml-experiments/00005-*` and `ml-experiments/00006-*` and read their inputs.
 
-The experiment is medium: it adds a data source to training and a method nobody has run here, and
-touches nothing stored for production. It gets a Sonnet review of the plan, one of the code, and one
-of the write-up. The earlier `advice` lists were read: this plan follows "Train a demand stage 1a
-from 2023-09" (00005), "Use the weather block, hour, weekday, and the COVID indicator" (00006),
-"Report a pooled share with and without the substation that has the largest residual" (00007), and
-"Compare irradiance read at the substation's own location, such as CAMS, with ERA5 shortwave"
-(00006). The plan departs from "Weight recent years more" (00006), so that the ERA5-trained arm
-matches 00005's `r0_from2023`. The residuals of experiment 00007 came from a forecast that used
-recency weights, so 00007's evidence transfers to this plan only approximately.
+The experiment is medium: it adds a data source to training and a method not yet run in this
+repository, and touches nothing stored for production. It gets a Sonnet review of the plan, one of
+the code, and one of the write-up. The earlier `advice` lists were read: this plan follows "Train a
+demand stage 1a from 2023-09" (00005), "Use the weather block, hour, weekday, and the COVID
+indicator" (00006), "Report a pooled share with and without the substation that has the largest
+residual" (00007), and "Compare irradiance read at the substation's own location, such as CAMS, with
+ERA5 shortwave" (00006). The plan departs from "Weight recent years more" (00006), so that the
+ERA5-trained arm matches 00005's `r0_from2023`. The residuals of experiment 00007 came from a
+forecast that used recency weights, so 00007's evidence transfers to this plan only approximately.
 
 ## Design
 
@@ -128,14 +127,14 @@ handling alone.
 
 **CAMS is hourly and the grid is half-hourly.** A CAMS value is the mean over the hour ending at its
 stamp. Both half-hours of that hour take the value. Hourly holding differs from the half-hourly
-construction of ERA5 shortwave, and the write-up repeats the point.
+construction of ERA5 shortwave, and the Results section states the difference.
 
 **Each arm gives 9 quantiles from the 51 ENS members.** The stage 1a XGBoost model is applied to
 every member and the quantiles are the empirical quantiles of the 51 forecasts, as in 00005's `r0`
 arms. There is no calibrator, no stage 1b, and no lagged power, so no weather has to exist at lag
 times. CAMS is used in training only and is never needed at forecast time.
 
-**The scored rows are those of 00005.** They are the 73 runs of `fold_a_every5d_v1` for the 20
+**The scored rows are those of 00005.** The rows are the 73 runs of `fold_a_every5d_v1` for the 20
 series, restricted to valid times with an observed power and before 2026-07-01. The 16 Primary
 series are the headline, and the substation that sets 00007's pooled figure (P2) is one of them. The
 2 bulk supply point and 2 grid supply point series are reported separately and decide nothing.
@@ -179,13 +178,14 @@ interval's resolution. The 20 series and 73 runs are 00005's choice and were not
 ## Results
 
 **The hypothesis is refuted: training stage 1a on CAMS irradiance lowers the Primary quantile score
-by 0.035 points, a sixth of the 0.2 points the plan required.** C1 is -0.035 (97.5% interval -0.070
-to +0.001), so the data exclude a gain of 0.2 points. C2, without the substation that set 00007's
-pooled figure (P2), is -0.043 (-0.081 to -0.004), so the small gain does not rest on that
+by 0.035 points, a sixth of the 0.2 points the plan required.** The refutation is of a gain of the
+planned size. A small gain is present in daylight and at short range. C1 is -0.035 (97.5% interval
+-0.070 to +0.001), so the data exclude a gain of 0.2 points. C2, without the substation that set
+00007's pooled figure (P2), is -0.043 (-0.081 to -0.004), so the small gain does not rest on that
 substation. In both contrasts the CAMS-trained arm is better in 10 of 12 months, and in 12 of the
-series (of 16 for C1, of 15 for C2). The refit of the ERA5-trained arm reproduces experiment
-00005's `r0_from2023` exactly (a mean absolute difference of 0.000 in all 9 quantiles over 2,898,789
-rows), so the benchmark is the same forecast that experiment scored.
+series (of 16 for C1, of 15 for C2). The refit of the ERA5-trained arm reproduces experiment 00005's
+`r0_from2023` exactly (a mean absolute difference of 0.000 in all 9 quantiles over 2,898,789 rows),
+so the benchmark is the same forecast that experiment scored.
 
 | Arm | Primary quantile score | BSP | GSP | Primary error of the median |
 | --- | --- | --- | --- | --- |
@@ -200,27 +200,30 @@ together from month to month, which pairing removes from a contrast.
 
 ![The CAMS-trained arm's contrast by scope](figure_1.svg)
 
-**The gain is real but small, concentrated in daylight, and gone by day 7.** In daylight the
-contrast is -0.089 (95% interval -0.149 to -0.034), and at night it is +0.001 (-0.041 to +0.031),
-as expected if the extra gain comes from the irradiance input. By lead band it is -0.072 up to 1 day,
--0.080 for 1 to 2 days, -0.063 for 3 to 6 days, -0.021 for 7 to 10 days (-0.057 to +0.019), and -0.004
-beyond. The gain is larger for the 2 grid supply points (-0.104, -0.211 to -0.006) than for the 2 bulk
-supply points (-0.044, -0.150 to +0.041), and the 4 series are too few to say more.
+**The gain is small, its interval just reaches zero, and it is concentrated in daylight and in the
+first 6 days.** In daylight the contrast is -0.089 (95% interval -0.149 to -0.034), and at night it
+is +0.001 (-0.041 to +0.031), which fits a gain that comes from the irradiance input. By lead band
+it is -0.072 up to 1 day, -0.080 for 1 to 2 days, -0.063 for 3 to 6 days, -0.021 for 7 to 10 days
+(-0.057 to +0.019), and -0.004 for 11 to 15 days. The gain is larger for the 2 grid supply points
+(-0.104, -0.211 to -0.006) than for the 2 bulk supply points (-0.044, -0.150 to +0.041), and the 4
+series are too few to say more.
 
-**The cause of the small gain is the mismatch at application, not a failure of the training.** At
-the observed weather, with each arm reading its own irradiance, the CAMS-trained arm's daylight
-error of the median is 10.46 points against 11.34 (-0.88, 95% interval -1.00 to -0.72). With ENS
-forecasts as input the same contrast is -0.17 up to 1 day (-0.31 to -0.03) and -0.04 over all leads
-(-0.13 to +0.04). The mean daylight shortwave of the 16 Primary series is 261 W/m² for both CAMS and
-ERA5 in the training period and 263 and 262 in the validation year, against 281 for the ENS members
-(7% higher). The CAMS-trained model never saw that ENS bias.
+**A mismatch at application is a likely reason for the small gain, and this experiment does not test
+it.** At the observed weather, with each arm reading its own irradiance, the CAMS-trained arm's
+daylight error of the median is 10.46 points against 11.34 (-0.88, 95% interval -1.00 to -0.72).
+With ENS forecasts as input the same contrast is -0.17 up to 1 day (-0.31 to -0.03) and -0.04 over
+all leads (-0.13 to +0.04). The mean daylight shortwave of the 16 Primary series is 261 W/m² for
+both CAMS and ERA5 in the training period and 263 and 262 in the validation year, against 281 for
+the ENS members (7% higher). Neither arm saw that bias in training. The bias varies by month, and
+the ENS forecast's own cloud errors would also dilute a gain, so the shortwave comparison is a
+candidate cause only. A bias-corrected ENS shortwave would test it.
 
 ![Daylight error of the median at the observed weather and at ENS](figure_3.svg)
 
-**Hourly holding of the irradiance does not explain the difference.** Holding ERA5
-shortwave hourly changes the score by -0.012 (X1, -0.064 to +0.030). The CAMS-trained arm against
-the hourly-held ERA5 arm is -0.022 (X2, -0.075 to +0.038), so the remaining difference of the bundle
-cannot be split between product and location at this resolution.
+**Hourly holding of the irradiance cannot be separated from the difference at this resolution.**
+Holding ERA5 shortwave hourly changes the score by -0.012 (X1, -0.064 to +0.030). The CAMS-trained
+arm against the hourly-held ERA5 arm is -0.022 (X2, -0.075 to +0.038), so the remaining difference
+of the bundle cannot be split between product and location at this resolution.
 
 ![The contrast of each Primary series](figure_2.svg)
 

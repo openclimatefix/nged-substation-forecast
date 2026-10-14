@@ -120,9 +120,9 @@ ERA5 weather at past times.
 
 **The clock is the largest single input for Primary substations, but it lowers the error by only
 about 0.5 points of capacity, and the choice of training window matters as much.** The experiment
-trained one XGBoost model per substation on ERA5 weather and scored held-out ERA5 months (it does not
-forecast), for 14 scored Primary substations, two bulk supply points, and two grid supply points.
-It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06.
+trained one XGBoost model per substation on ERA5 weather and scored held-out ERA5 months (it does
+not forecast), for 14 scored Primary substations, two bulk supply points, and two grid supply
+points. It chose inputs on 2024-07 to 2025-06 and scored them once on 2025-07 to 2026-06.
 
 - **Headline result:** hour and weekday lower the Primary error by 0.55 points (99.4% interval
   -0.71 to -0.41) on the selection year and 0.46 (-0.61 to -0.30) on the confirmation year, against
@@ -198,13 +198,14 @@ stage 1 statistics on the same 73 runs, and every arm with ERA5 residuals is a c
 **Training stage 1a on CAMS irradiance in place of ERA5 shortwave lowered the Primary quantile score
 by 0.035 points of capacity, a sixth of the 0.2 points the plan required.** The contrast over all
 leads at the 16 Primary substations is -0.035 (97.5% interval -0.070 to +0.001), and -0.043 (-0.081
-to -0.004) without the substation that set experiment 00007's pooled figure. The gain is -0.07 to
--0.08 points in the first 2 days, absent from day 7, and appears in daylight only. At the observed
-weather, where the CAMS-trained arm also reads CAMS, the daylight error of the median falls by 0.88
-points, so the small gain comes from applying the model to ENS shortwave, which averages 7% above
-ERA5's. The paired interval was far narrower than the plan guessed (0.035 points either side, not
-0.2). See [`result.md`](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) and [PR #1213
-(Plan experiment 9: CAMS-trained stage 1a against ERA5-trained, for
+to -0.004) without the substation that set experiment 00007's pooled figure. The score falls by 0.07
+to 0.08 points in the first 2 days, no gain is resolved from day 7, and the gain appears in daylight
+only. At the observed weather, where the CAMS-trained arm also reads CAMS, the daylight error of the
+median falls by 0.88 points, so the smaller gain at ENS is probably a mismatch at application: the
+ENS members' shortwave averages 7% above ERA5's, which this experiment did not test. The paired
+interval was far narrower than the plan guessed (0.035 points either side, not 0.2). See
+[`result.md`](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) and [PR #1213 (Plan
+experiment 9: CAMS-trained stage 1a against ERA5-trained, for
 demand)](https://github.com/openclimatefix/nged-substation-forecast/pull/1213).
 
 ![Contrast of the CAMS-trained arm by scope](00009-cams-trained-stage1a-vs-era5-trained-demand/figure_1.svg)

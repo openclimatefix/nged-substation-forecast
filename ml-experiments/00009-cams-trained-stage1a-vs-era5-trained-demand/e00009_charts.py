@@ -109,8 +109,8 @@ def figure_1(*, planned: pl.DataFrame, exploratory: pl.DataFrame) -> None:
     chart = _dot_and_interval(
         frame=frame,
         title=[
-            "The CAMS-trained arm scores about 0.04 points better than the ERA5-trained arm,",
-            "a fifth of the 0.2-point gain the plan required",
+            "The CAMS-trained arm scores 0.035 points better than the ERA5-trained arm,",
+            "a sixth of the 0.2-point gain the plan required",
         ],
         x_title=(
             "CAMS-trained minus ERA5-trained quantile score, Primary (points of capacity; "
@@ -142,7 +142,7 @@ def figure_2(*, exploratory: pl.DataFrame) -> None:
     chart = _dot_and_interval(
         frame=rows,
         title=[
-            "The CAMS-trained arm scores better at 12 of the 16 Primary series, and worse at P2,",
+            "The CAMS-trained arm scores better at 12 of the 16 Primary series, and worst at P2,",
             "the series with the largest residual in experiment 7",
         ],
         x_title=(
