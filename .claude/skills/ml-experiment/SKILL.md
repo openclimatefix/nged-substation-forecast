@@ -140,9 +140,10 @@ is the agenda for the maintainer's release review.
 
 **The pull request that ports a winner into the production pipeline records why.** In the same
 change, set `production_status` to `adopted` and `adopted_in` to the model release number in the
-experiment's `result.md`, move its row in the research log, and add the experiment to the release
-log's row for that release. A later experiment that overturns an adopted result sets
-`production_status` to `superseded` on the old experiment and names the new one in the log.
+experiment's `result.md`, move its row in the research log, and add a row to
+`docs/live_service/model-releases.md` listing the experiments the release incorporates. A later
+experiment that overturns an adopted result sets `production_status` to `superseded` on the old
+experiment and names the new one in the log.
 
 ## The write-up
 

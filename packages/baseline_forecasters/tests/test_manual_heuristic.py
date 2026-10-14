@@ -182,6 +182,27 @@ def test_predict_drops_a_row_whose_lags_are_all_null() -> None:
     assert forecast["ensemble_member"].to_list() == [0]
 
 
+def test_predict_stamps_the_configured_model_release() -> None:
+    init_time = datetime(2025, 1, 1, tzinfo=UTC)
+    data = _lag_frame(
+        [
+            {
+                "valid_time": init_time + timedelta(hours=1),
+                "time_series_id": 1,
+                "power_fcst_init_time": init_time,
+                "power_lag_168h": 5.0,
+            }
+        ],
+        ["power_lag_168h"],
+    )
+
+    forecast = ManualHeuristicForecaster(
+        BaseForecasterConfig(selected_features={"power_lag_168h"}, model_release=4)
+    ).predict(data)
+
+    assert forecast["power_fcst_model_version"].unique().to_list() == [4]
+
+
 def test_predict_on_empty_input_returns_a_valid_empty_frame() -> None:
     columns = ["power_lag_168h", "power_lag_336h"]
 

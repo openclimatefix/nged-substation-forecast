@@ -158,6 +158,7 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 | `weather_source` | `""` | Leaderboard tag, e.g. `"ecmwf_control"` or `"ecmwf_ens"`. |
 | `training_strategy` | `""` | Leaderboard tag, e.g. `"horizon_as_feature"`. |
 | `random_seed` | `0` | Passed to XGBoost's `seed` param; makes re-training a fold reproduce the same model. |
+| `model_release` | `0` | Number of the production model release, stamped on every forecast row as `power_fcst_model_version`. `0` means the run is not a release. Range 0 to 32767. |
 | `experiment_name` | `""` | Set from the job's own `experiment_name`; cannot be overridden. |
 | `ml_flow_experiment_id` | `None` | Stamped onto every `PowerForecast` row. Nothing sets it automatically. |
 

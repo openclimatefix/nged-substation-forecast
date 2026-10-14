@@ -4,8 +4,8 @@
 it found.** A reader who wants the headline of each experiment, or wants to know what is planned
 next, starts here and follows the link to the experiment's `result.md` for the numbers. Each
 experiment carries a production status. The maintainer reviews the candidates every one to two weeks
-and ports the best into a new model release; the release log records which experiments each release
-adopted.
+and ports the best into a new model release; the [release log](../live_service/model-releases.md)
+records which experiments each release adopted.
 
 ## Candidates for the next release
 

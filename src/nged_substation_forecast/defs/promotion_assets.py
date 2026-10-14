@@ -101,6 +101,7 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
             "mlflow_run_id": config.mlflow_run_id,
             "model_class": meta.get("model_class"),
             "experiment_name": model_params.get("experiment_name"),
+            "model_release": model_params.get("model_release", 0),
             "n_trained_time_series": len(meta.get("trained_time_series_ids", [])),
             "path": str(production_model_path),
         }

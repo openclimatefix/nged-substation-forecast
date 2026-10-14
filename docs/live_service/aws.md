@@ -194,14 +194,14 @@ the one-time fix (`docker run --privileged --rm tonistiigi/binfmt --install arm6
 > `_internal.TableNotFoundError: Local path
 "/app/data/NWP" does not exist or you don't have access!`. That halt is correct behaviour.
 
-The script builds the image tagged with the promoted model's run id, runs it offline, and prints the
-container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded, arbitrary
-partition key — the offline run fails at the NWP lookup long before the slot's validity could
-matter, so there is no key worth choosing.) It hard-fails only if the runtime touches MLflow — the
-hermeticity guarantee worth automating — and otherwise asks you to confirm by eye that the run
-loaded the model and failed *only* on missing NWP data (expected: no data tables are mounted for
-this isolated test). The script header documents every choice it makes and is the source of truth
-for the mechanics.
+The script builds the image tagged with the promoted model's run id and the git commit, runs it
+offline, and prints the container log with a pass/fail summary. (The smoke test's one-shot run uses
+a hard-coded, arbitrary partition key — the offline run fails at the NWP lookup long before the
+slot's validity could matter, so there is no key worth choosing.) It hard-fails only if the runtime
+touches MLflow — the hermeticity guarantee worth automating — and otherwise asks you to confirm by
+eye that the run loaded the model and failed *only* on missing NWP data (expected: no data tables
+are mounted for this isolated test). The script header documents every choice it makes and is the
+source of truth for the mechanics.
 
 ## Step 5 — Create the ECR repository
 
@@ -219,7 +219,7 @@ console](https://eu-west-2.console.aws.amazon.com) →
   derived URI.
 - **Every other setting on the create-repository form can stay at its console default:**
     - **Image tag mutability** (Mutable) and **Mutable tag exclusions** (empty) — image tags here
-      are already unique per promoted model (the run id's short prefix from [Step
+      are already unique per build (the run id's short prefix plus the git commit, from [Step
       4](#step-4-build-and-verify-the-image)), so nothing relies on retagging — but nothing needs
       immutability enforced, either.
     - **Encryption settings** (AES-256) — the console warns this can't be changed after creation,
@@ -246,10 +246,10 @@ scripts/deploy/push_and_deploy_image.sh    # no arguments — everything is deri
 ```
 
 The script takes no arguments by design, so mistyping is not possible: the tag is derived from
-`data/production_model/promotion.json` exactly as Step 4's build script derives it (so only an image
-that was built and verified can be pushed), and the AWS account id comes from `aws sts
-get-caller-identity`. The script logs Docker into ECR, tags, and pushes; then, if the
-`nged-forecast` task-definition family already exists ([Step
+`data/production_model/promotion.json` and the current git commit exactly as Step 4's build script
+derives it (so only an image that was built and verified, from this commit, can be pushed), and the
+AWS account id comes from `aws sts get-caller-identity`. The script logs Docker into ECR, tags, and
+pushes; then, if the `nged-forecast` task-definition family already exists ([Step
 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), it registers a new revision
 pointing at the new image. If this is the first pass through the runbook then the family doesn't
 exist yet — the script says so and exits cleanly, and the push is all this step needs. The script
@@ -473,9 +473,9 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       container** at **Yes**.
     - **Image URI**: `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>` from [Step
       6](#step-6-push-the-image-to-ecr) — `<tag>` is the first 12 characters of the promoted model's
-      MLflow run id. Step 6's script prints the full URI as it pushes; to recover it later, copy it
-      from the pushed image in the ECR console, or run `jq -r '.mlflow_run_id[:12]'
-      data/production_model/promotion.json` on the machine that built the image.
+      MLflow run id, a hyphen, and the short git commit hash the image was built
+      from. Step 6's script prints the full URI as it pushes; to recover it later, copy it from the
+      pushed image in the ECR console, or read it from the [model release log](model-releases.md).
     - **Port mappings**: **Remove** the pre-filled port-80/HTTP row — every task here is a batch run
       that listens on nothing; port mappings are for services that accept traffic.
     - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
@@ -851,10 +851,10 @@ docker pull "$REGISTRY/nged-forecast:<tag>"
 `REGISTRY` builds itself from the box's own 12-digit account id, which `aws sts get-caller-identity`
 reads from the instance role ([Step 11](#step-11-launch-the-control-plane-box)) — so there is
 nothing to paste for the account id. **You do still have to fill in `<tag>`**: it is the first 12
-characters of the promoted model's MLflow run id, naming exactly which image to deploy. Step 6's
-script prints the full URI as it pushes; to recover it later, copy it from the pushed image in the
-ECR console, or run `jq -r '.mlflow_run_id[:12]' data/production_model/promotion.json` on the
-machine that built the image.
+characters of the promoted model's MLflow run id, a hyphen, and the short git
+commit hash the image was built from, naming exactly which image to deploy. Step 6's script prints the
+full URI as it pushes; to recover it later, copy it from the pushed image in the ECR console, or
+read it from the [model release log](model-releases.md).
 
 No `aws configure` is needed — the instance role from [Step
 11](#step-11-launch-the-control-plane-box) supplies credentials. The ECR login token expires after

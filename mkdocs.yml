@@ -149,6 +149,7 @@ nav:
       - Setting up the live service on AWS: live_service/aws.md
       - Connecting to the AWS control plane: live_service/connecting.md
       - Operating the live service: live_service/operations.md
+      - Model releases: live_service/model-releases.md
       - Intervention log: live_service/intervention-log.md
       - Setting up Sentry telemetry: live_service/sentry.md
       - Backing up the workstation: live_service/backup.md
