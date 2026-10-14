@@ -106,7 +106,7 @@ def _legend(*, domain: list[str], range_: list[str]) -> alt.Color:
 
 def _panel(
     *, data: pl.DataFrame, labels: list[str], colours: list[str], x_title: str, title: str
-) -> alt.TopLevelMixin:
+) -> alt.LayerChart | alt.FacetChart:
     base = alt.Chart(data).encode(
         y=alt.Y("band:N", sort=list(BANDS), title="Forecast lead", axis=alt.Axis(labelLimit=200)),
         yOffset=alt.YOffset("label:N", sort=labels),
