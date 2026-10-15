@@ -21,13 +21,15 @@ decision_rule: >-
   sided), resampling whole validation months and the three seeds: C1 PV_Live level, C2 PV_Live share
   of capacity, C3 PV_Live-adjusted delta. The verdict follows the arm with the lowest estimate.
   Supported when its interval is wholly below zero and its estimate is at most -0.30 points,
-  because the change adds a data source and a serving step that reads a second published series. A
-  small gain when the interval is wholly below zero and the estimate is above -0.30, refuted when
-  the interval's lower bound is above -0.30, and inconclusive otherwise.
-  The stage 1 variant S1 and every other contrast are exploratory at 95%.
+  because the change adds a data source and a serving step that reads a second published series.
+  Refuted when its interval's lower bound is above -0.30 and the interval is not wholly below zero.
+  A small gain when the interval is wholly below zero but the arm is not supported. Inconclusive
+  otherwise. With 2 series the interval is expected to be wide, so inconclusive is the likeliest
+  verdict. The stage 1 variant S1 and every other contrast are exploratory at 95%.
 benchmark: >-
-  A0, the L3 calibrator of experiment 00005 refitted here for the two GSPs (checked against the
-  stored `l3_from2023` arm), and the day-type climatology (`r2`) of experiment 00005.
+  A0, the L3 calibrator of experiment 00005 refitted here for the two GSPs (its mean quantile score
+  is reported beside the stored `l3_from2023` arm, to within 0.1 points) and the day-type
+  climatology (`r2`) of experiment 00005.
 row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity,
@@ -83,6 +85,19 @@ delay: a PV_Live value is usable at origin `T` only when its half-hour ended at 
 `T`. Power and the stage 1a delta at the lag positions keep experiment 00005's rule (before `T`), so
 A1 to A3 use PV_Live values 1 day older than the newest delta. The script asserts the bound.
 
+**Positions and missing values.** Each PV_Live position is chosen by the PV_Live rule alone (the
+half-hour ended at least a day before the origin), so a PV_Live column can be present where the
+experiment 00005 lag is missing, and the reverse. A3 pairs each PV_Live value with the delta at the
+same position, computed from the observed power and stage 1a whether or not experiment 00005's own
+lag rule allows it. The write-up reports the share of cases with a usable value per lead band. The
+24-hour lag position is never usable. The `updated_at` column of the download is the time of the
+bulk download and not the time of each revision, so the settling delay cannot be checked from the
+data. PV_Live revises its estimates, so validation inputs are fully revised values, and every arm is
+a ceiling for PV_Live as well as for ERA5.
+
+**Sign check.** The write-up checks, on summer middays, that the adjusted delta is less correlated
+with PV_Live than the plain delta is. An hour-of-day and season split of A3 minus A0 is exploratory.
+
 **Past weather.** The delta uses stage 1a's prediction at ERA5 weather at the lag times, as in
 experiment 00005. ERA5 arrives about 5 days late, so every arm is a ceiling for the delta; PV_Live is
 a measurement and has no such gap. The comparison across arms is unaffected, because every arm
@@ -90,7 +105,7 @@ shares the same delta.
 
 **Rows and seeds.** The 73 runs of `fold_a_every5d_v1`, valid times before 2026-07-01, 3 seeds
 that A0 to A3 share. Calibration runs are experiment 00005's (every third day from 2024-04-01 to
-2025-06-30), and PV_Live is not used after the calibration cut-off.
+2025-06-30), and no model is fitted on PV_Live values after 2025-06-30.
 
 **Resolution.** Two series give 2 independent clusters. Intervals resample months and seeds, not
 series, so a result describes these two GSPs and may not carry to other GSPs. The interval will
