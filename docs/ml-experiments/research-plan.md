@@ -19,6 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
+| [P31](#p31-differentiable-physics-stage-1-for-the-solar-farms) | Does a differentiable PyTorch physics stage 1 (priors on tilt, azimuth, DC capacity, AC-to-DC ratio) feeding the XGBoost stage 2 beat the XGBoost stage 1 for the 6 solar farms? | 1 | Nothing | Planned as experiment 00029 |
 | [P28](#p28-a-simple-solar-forecast-for-each-gsp-fed-into-stage-2) | Does a simple XGBoost forecast of each GSP's PV_Live solar estimate, fed into the stage 2 demand model, lower the GSP quantile score, against no solar forecast and the true PV_Live value? | 1 | Nothing | Proposed; experiment 00027 found no gain from PV_Live at the lag times |
 
 ## Deferred until the first results are in
@@ -180,3 +181,11 @@ time.** A simple XGBoost model forecasts PV_Live's estimate for each of the 2 gr
 stage 2 model gets that forecast for the target time (no solar forecast, the forecast, and the true
 PV_Live value as an upper bound). The report gives the solar forecast's own score as a share of
 capacity before the demand effect. **Resolution limit:** 2 series, as in experiment 00027.
+
+### P31: differentiable physics stage 1 for the solar farms
+
+**The arms replace the XGBoost stage 1 of the 6 metered solar farms with fitted PV physics.** The
+physics model is the SciPy-fitted model from earlier studies, or a new PyTorch model with priors on
+tilt, azimuth, DC capacity, and the AC-to-DC ratio, fitted to metered power with CAMS irradiance.
+Its output feeds a per-farm quantile XGBoost stage 2. A hybrid adds the nine weather columns.
+**Resolution limit:** 6 farms, as in experiment 00012. Plan: experiment 00029.
