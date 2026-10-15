@@ -47,6 +47,7 @@ the maintainer to confirm.
 | [00018](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
 | [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies nearly all of it | Candidate | Not yet merged |
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Do the candidate changes for solar and wind (CAMS-trained stage 1a, a stage 0 quantile mapping, a power-curve base margin, a spread factor) add up to a lower CRPS than the pooled ERA5-trained mixture? | Partly supported: wind gains 0.071 points, solar does not | Candidate (wind) | Not yet merged |
+| [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -480,3 +481,22 @@ on 17 series (18 in the confirmation year), scored at observed values.
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1220).
 
 ![Pooled contrasts with 97.5% intervals](00015-same-time-price-stage1-demand/figure_1.svg)
+
+### 00023: recent observed power for solar and wind
+
+**Recent power did not help the stage 2 calibrator for solar or wind, and a 14-day correction built
+from the mean error made the forecast worse.** The experiment gave the calibrator lagged power and
+summaries of the latest day for 6 solar farms and 3 wind farms, and shifted the pooled mixture by
+its own mean error over the previous 14 days (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** lagged power added to the calibrator, solar -0.012 (99.58% interval -0.122 to
+  +0.088), wind +0.012 (-0.090 to +0.146). The 14-day correction on the mixture, solar +0.437
+  (+0.215 to +0.664), wind +0.413 (-0.003 to +0.924).
+- **Finding for later experiments:** a calibrator trained on the ENS control member alone scored 0.27
+  (solar) and 0.31 (wind) points worse than the pooled mixture before any lag was added. Shifting by
+  the median error (post hoc) instead of the mean error moved the CRPS by +0.010 (solar) and -0.064
+  (wind), both with intervals that include zero.
+- **Write-up and pull request:** [result](00023-lagged-power-and-error-correction-solar-wind/result.md),
+  [PR #1229 (Experiment 23: does recent observed power help solar and wind forecasts?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1229).
+
+![Contrasts](00023-lagged-power-and-error-correction-solar-wind/figure_1.svg)
