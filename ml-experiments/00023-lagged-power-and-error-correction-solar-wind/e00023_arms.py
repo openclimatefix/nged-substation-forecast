@@ -61,6 +61,15 @@ def read_mixture(
 ) -> np.ndarray:
     """Return an arm's mixture quantiles for a technology's cases, in `cases` order.
 
+    Args:
+        cases: The technology's validation cases.
+        technology: The technology whose mixtures to read.
+        arm: The calibrator arm or `mixture`.
+        seed: The fitting seed.
+
+    Returns:
+        Array of shape (cases, 9) of mixture quantiles, a fraction of capacity.
+
     Raises:
         ValueError: If a case has no mixture.
     """
@@ -84,6 +93,9 @@ def apply_correction(
         mixture: Shape (cases, 9) quantiles to correct.
         statistic: `mean` (the pre-registered correction) or `median` (post hoc) of the window's
             errors.
+
+    Returns:
+        Array of shape (cases, 9) of corrected quantiles.
     """
     actual = cases["actual_norm"].to_numpy().astype(np.float64)
     valid = cases["valid_time"].to_numpy()

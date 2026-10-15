@@ -228,6 +228,9 @@ def day_summaries(*, power: np.ndarray) -> np.ndarray:
     Missing half-hours are ignored, and a window with fewer than `MIN_OBSERVED` observed half-hours
     gives NaN. Windows that start before the grid are padded with missing half-hours.
 
+    Args:
+        power: Observed power over effective capacity on the grid, NaN where unobserved.
+
     Returns:
         A float32 array of shape (grid size, 3): minimum, mean, and maximum.
     """
@@ -311,6 +314,9 @@ def recent_power_columns(
 
 def site_table() -> pl.DataFrame:
     """Return the nine generator series with anonymous label, technology, and capacity.
+
+    Returns:
+        One row per series with `time_series_id`, `site`, `technology`, and `effective_capacity_mw`.
 
     Raises:
         ValueError: If the anonymisation helper's labels have changed.
