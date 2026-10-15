@@ -135,7 +135,7 @@ def verdict(*, rows: list[tuple[str, float, float, float]]) -> str:
 
 
 def availability(*, series: pl.DataFrame) -> list[str]:
-    """Return the share of validation cases with a usable PV_Live value per position and band."""
+    """Return the share of seed-0 validation cases with a PV_Live level, per position and band."""
     lines = [
         "| series | lead band | " + " | ".join(common.PV_POSITIONS) + " |",
         "|---|---|---|---|---|---|---|---|",
@@ -163,7 +163,7 @@ def sign_check(*, series: pl.DataFrame) -> list[str]:
     """Return, per series, the correlation of PV_Live with the delta and the adjusted delta.
 
     The delta is the observed power minus the final stage 1a prediction at ERA5 weather on summer
-    middays (June to August, 10:00 to 14:00 UTC) of the validation year; seed 0.
+    middays (June to August, period-ending 10:00 to 14:00 UTC) of the validation year; seed 0.
     """
     power = common.load_power(series=series)
     pv = common.load_pv_live(series=series)

@@ -556,7 +556,7 @@ its own mean error over the previous 14 days (row set `fold_a_tuesdays_v1`).
 
 ### 00027: PV_Live at the lag times for GSP demand
 
-**PV_Live at the lag times did not help the stage 2 calibrator for the 2 grid supply points
+**PV_Live at the lag times did not help the stage 2 calibrator for the two grid supply points
 (GSPs), Walpole and Bicker Fen.** The experiment gave the calibrator PV_Live's estimate of the GSP's
 solar generation at the lag times, as a level, as a share of PV_Live's capacity, and added to the
 lagged delta (row set `fold_a_every5d_v1`).
@@ -566,7 +566,8 @@ lagged delta (row set `fold_a_every5d_v1`).
   +0.08), PV_Live share -0.06 (-0.22 to +0.09). The arm without PV_Live scores 19.04.
 - **Finding for later experiments:** PV_Live at the valid time lowered stage 1a's point error at
   Bicker Fen by 1.28 points (-1.90 to -0.67) and not at Walpole (-0.03, -0.27 to +0.23), so a PV_Live
-  forecast as a stage 1 input is the open question.
+  forecast as a stage 1 input is the open question (exploratory; the valid-time value is not known
+  at the forecast origin).
 - **Write-up and pull request:** [result](00027-pvlive-lags-in-stage2-gsp-demand/result.md),
   [PR #1234 (Experiment 27: does PV_Live at the lag times help the stage 2 forecast of GSP demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1234).
 

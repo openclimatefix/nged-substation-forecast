@@ -36,20 +36,21 @@ metric: >-
   and mean absolute error of the median
 verdict: refuted
 best_arm: >-
-  A0, the stage 2 calibrator without PV_Live (quantile score 19.04 over all leads); no PV_Live arm
-  differed from it by more than 0.08 points.
+  No arm reliably beat A0, the stage 2 calibrator without PV_Live (19.04 over all leads). A1, the
+  lowest-scoring arm (18.97), differed from it by -0.08 points, with an interval that includes zero.
 headline: >-
   C3, delta plus PV_Live minus no PV_Live, over all leads: -0.03 points of capacity (98.33%
   interval -0.13 to +0.09). The best contrast was C1, PV_Live level: -0.08 (-0.26 to +0.08).
 lessons: >-
-  A gain of 0.3 points or more from PV_Live at the lag times is excluded for these 2 GSPs. PV_Live
+  A gain of 0.3 points or more (the decision threshold) from PV_Live at the lag times is excluded at
+  98.33% for these two GSPs. PV_Live
   at the valid time helps the stage 1a point forecast at Bicker Fen (-1.28 points of mean absolute
   error, -1.90 to -0.67) and not at Walpole (-0.03, -0.27 to +0.23).
 advice:
   - >-
     Do not add PV_Live at the lag times to the stage 2 calibrator for GSP demand, because no arm
-    lowered the quantile score by 0.3 points or more (C1 to C3, upper bounds of all leads -0.26 to
-    +0.09).
+    lowered the quantile score by 0.3 points or more (C1 to C3, all-lead lower bounds -0.26 to
+    -0.13, all above -0.30).
   - >-
     Test PV_Live at the valid time as a stage 1 input only where an observed or forecast PV_Live
     value exists at forecast time, because it lowered stage 1a's point error at Bicker Fen by
@@ -62,13 +63,13 @@ code: ml-experiments/00027-pvlive-lags-in-stage2-gsp-demand/
 
 # Does PV_Live at the lag times help the stage 2 forecast of GSP demand?
 
-**Verdict: refuted for the 2 GSPs, Walpole and Bicker Fen.** Giving the stage 2 calibrator
+**Verdict: refuted for the two GSPs, Walpole and Bicker Fen.** Giving the stage 2 calibrator
 Sheffield Solar's PV_Live estimate at the lag times lowered the quantile score by at most 0.08
 points of capacity, and every interval includes zero. The best planned contrast, C1 (PV_Live level
 minus no PV_Live, all leads), is -0.08 (98.33% interval -0.26 to +0.08). The three intervals all
-lie above -0.30, so a gain of the planned size is excluded for these 2 series, and the intervals
-say nothing about other GSPs. Scores are on 73 forecast runs, one every 5 days, July 2025 to June
-2026, with ENS weather, in points of capacity (1% of the series' effective capacity).
+lie above -0.30, so a gain of 0.3 points or more (the decision threshold) is excluded at 98.33%
+for these two series, and the intervals say nothing about other GSPs. Scores are on 73 forecast runs, one every 5 days, July
+2025 to June 2026, with ENS weather, in points of capacity (1% of the series' effective capacity).
 Attribution: Sheffield Solar PV_Live, CC BY 4.0.
 
 ![Stage 2 arms with PV_Live minus the arm without](figure_1.svg)
@@ -85,7 +86,8 @@ Attribution: Sheffield Solar PV_Live, CC BY 4.0.
 | Day-type climatology | 24.40 | 24.51 | |
 
 - **A0 reproduces experiment 00005's `l3` arm** for these 2 GSPs exactly (difference 0.000).
-- **No series, lead band, or season shows a gain that the intervals separate from zero.** The
+- **No series or lead band has an interval wholly below zero.** The season and hour split below has
+  no intervals. The
   largest nominal gain is at midday in March to May and September to November (A3 minus A0, -0.44
   over 31,365 rows; exploratory, no interval), and December to February is nominally worse (+0.08
   to +0.09).
@@ -111,10 +113,16 @@ gain for the forecast.
 ## Predictions against outcomes
 
 - **Missed:** the plan predicted a 0.5-point gain from the adjusted delta; C3 was -0.03.
-- **Met:** the plan expected a wide interval; the 98.33% intervals are 0.2 to 0.35 points wide.
+- **Missed:** the plan expected intervals too wide to resolve 0.3 points; the 98.33% intervals are
+  0.22 to 0.34 points wide, and each excludes -0.30.
+- **Partly missed:** gains were predicted mostly at midday in summer; the nominal gain is -0.14 at
+  midday in June to August and -0.44 in the other months of spring and autumn, with no intervals.
+- **Missed:** A1 and A2 were predicted to gain 0.2 points; they gained 0.08 and 0.06.
 
 ## Limits
 
+- **Availability shares** count a present PV_Live level over all validation cases of seed 0, so
+  A3 has slightly fewer usable values where the delta is missing.
 - **Two series.** The intervals resample months and seeds, not series, so the result describes
   Walpole and Bicker Fen only.
 - **PV_Live is fully revised.** The download holds the latest estimate, and its `updated_at`
@@ -194,9 +202,9 @@ shares the same delta.
 that A0 to A3 share. Calibration runs are experiment 00005's (every third day from 2024-04-01 to
 2025-06-30), and no model is fitted on PV_Live values after 2025-06-30.
 
-**Resolution.** Two series give 2 independent clusters. Intervals resample months and seeds, not
-series, so a result describes these two GSPs and may not carry to other GSPs. The interval will
-resolve gains of roughly 1 point of capacity, not 0.3.
+**Resolution.** Two series give two independent clusters. Intervals resample months and seeds, not
+series, so a result describes these two GSPs and may not carry to other GSPs. The plan expected the
+interval to resolve gains of roughly 1 point of capacity, not 0.3.
 
 ### Plan: references
 

@@ -318,16 +318,10 @@ def pv_inputs(
         Shape (cases, len(PV_POSITIONS)), float32, NaN where a position is unusable.
 
     Raises:
-        ValueError: If `arm` is unknown, or a position is not older than the settling delay.
+        ValueError: If `arm` is unknown.
     """
     positions = pv_positions(target=target, origin=origin)
     usable = positions >= 0
-    if (
-        positions[usable]
-        > np.broadcast_to(origin[:, None] - PV_SETTLE_STEPS, positions.shape)[usable]
-    ).any():
-        msg = "a PV_Live position is newer than the settling delay allows"
-        raise ValueError(msg)
     index = np.where(usable, positions, 0)
     level = np.where(usable, pv_level[index], np.nan)
     if arm == "a1":
