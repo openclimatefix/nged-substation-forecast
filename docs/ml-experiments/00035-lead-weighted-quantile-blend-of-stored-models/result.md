@@ -55,22 +55,27 @@ best_arm: >-
   points against 5.122 for the best member (difference -0.097, 98.33% interval -0.187 to -0.026).
   Solar (-0.039, -0.115 to +0.031) and wind (-0.074, -0.194 to +0.055) are null.
 lessons: >-
-  Averaging quantiles helps Primary demand by about 0.1 points, and one fixed weight vector does as
-  well as weights per lead band. Solar and wind gains are too small to resolve on 3 to 6 farms.
-  Applying the 14-day correction after the blend is worse than inside the members.
+  Averaging quantiles helps Primary demand by about 0.1 points, and one fixed weight vector scored
+  within 0.03 points of weights per lead band. Solar and wind gains are too small to resolve on 6
+  solar farms and 3 wind farms. Applying the 14-day correction after the blend scored worse than
+  applying it to each member first.
 advice:
   - >-
-    Use one weight vector, not weights per lead band, if a blend is ported: the two scored the same
-    for Primary demand (+0.005, -0.008 to +0.023) and for wind and solar (C2, C3, simpler-arm
-    contrasts).
+    Prefer one weight vector to weights per lead band if a blend is ported: it scored 5.020 against
+    5.025 for Primary demand (lead-band minus one-weight +0.005, -0.008 to +0.023), and its contrast
+    against the best member is -0.102 (-0.201 to -0.025); for solar and wind the difference is
+    unresolved (+0.009 and +0.028; simpler-arm contrasts).
   - >-
-    Apply the 14-day correction inside each member before a blend, not to the blend afterwards,
-    which scored 0.048 points worse for Primary demand (correction-placement contrast).
+    Apply the 14-day correction to each member before blending, not to the blend afterwards, which
+    scored 0.048 points worse (+0.008 to +0.101, 95%); leave the monthly-retrained N1 uncorrected,
+    because the headline blend with that member uncorrected beats the all-corrected blend
+    (correction-placement contrast; C1).
   - >-
-    Expect no gain from blending N1 with `a7` for BSP and GSP, where the lead-band blend minus the
-    better member was -0.014 (-0.083 to +0.060) over 4 series (descriptive contrast).
+    Do not expect a gain larger than 0.08 points from blending N1 with `a7` for BSP and GSP: the
+    lead-band blend minus the better member was -0.014 (-0.083 to +0.060) over 4 series
+    (descriptive contrast).
   - >-
-    Test a wind blend on more than 3 farms before deciding, because the short-lead gain of -0.36
+    Test a wind blend on more than 3 farms before deciding, because the short-lead gain of -0.37
     (-0.81 to +0.02) cannot be told from zero on 3 series (per-band contrast).
 production_status: candidate
 adopted_in: none
@@ -79,12 +84,16 @@ code: ml-experiments/00035-lead-weighted-quantile-blend-of-stored-models/
 
 # Experiment 35: does a lead-weighted blend of quantiles beat the best single model?
 
-**Primary demand gains 0.10 points from blending; solar and wind gain too little to resolve.**
-The lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack scores 5.025 points of
+**Primary demand gains 0.10 points of capacity from blending; solar and wind gain too little to
+resolve.**
+The stack is N1 with the 14-day correction and a spread factor of 1.15 (experiment 19). The
+lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack scores 5.025 points of
 capacity against 5.122 for the best member (difference -0.097, 98.33% interval -0.187 to -0.026),
 so the outcome for Primary demand is "port" (threshold 0.05). Solar is -0.039 (-0.115 to +0.031)
 and wind is -0.074 (-0.194 to +0.055), both "null". The stop rule did not fire anywhere (corner
 cells: Primary 0 of 60, solar 6, wind 7), so the verdict is `supported`, on Primary demand alone.
+The prediction held for Primary demand's size but not its verdict (expected `small gain`, found
+"port"), and failed for wind, where the estimate was -0.074 against a predicted -0.10 to -0.30.
 Intervals resample whole months, and for Primary demand one seed, so they say nothing about
 other substations or about wind farms beyond the three scored.
 
@@ -110,13 +119,16 @@ and is an optimistic bound.
   blend is +0.005 (-0.008 to +0.023) for Primary demand, +0.009 (-0.005 to +0.028) for solar, and
   +0.028 (-0.019 to +0.082) for wind. The equal-weights blend beats the best member by -0.063 for
   Primary demand (-0.279 to +0.091), so equal weights are not resolved.
-- **Primary demand gains at every lead band, wind at short leads.** The lead-band blend minus the
+- **Primary demand gains at every lead band; wind's short-lead gains are unresolved.** The lead-band
+  blend minus the
   best member for Primary demand is -0.17 at 0 to 24 h (-0.35 to -0.03) and -0.08 at 10 days or
-  more (-0.20 to -0.00). Wind is -0.36 at 0 to 24 h (-0.81 to +0.02) and +0.05 at 2 to 6 days
+  more (-0.20 to -0.002). Wind is -0.37 at 0 to 24 h (-0.81 to +0.02) and +0.05 at 2 to 6 days
   (-0.12 to +0.25).
-- **The correction belongs inside the members.** The blend with the correction applied afterwards
-  scores 5.208 against 5.160 with the correction inside the members (+0.048, 95% interval +0.008 to
-  +0.101; the contrast favours the inside arm, because that arm's weights were chosen on it).
+- **Correct each member before blending, not the blend afterwards.** The blend with the correction
+  applied afterwards scores 5.208 against 5.160 for the same blend with every member corrected
+  first (+0.048, 95% interval +0.008 to +0.101; the contrast favours the corrected-first arm,
+  because that arm's weights were chosen on it). Correcting the monthly-retrained N1 as well still
+  scores 0.135 points worse than the headline blend, whose monthly-retrained N1 is uncorrected.
 - **Against the stack of experiment 19, the Primary blend is -0.293** (-0.447 to -0.140, 95%). The
   monthly-retrained N1 alone is 0.196 below the stack on the same cases (5.122 against 5.318).
 
@@ -124,11 +136,12 @@ and is an optimistic bound.
 
 ## Chosen weights
 
-**The weights favour the more recent or the better-scored member and drift little.** Mean chosen
-weights over the 11 months with history, by lead band from 0 to 24 h to 10 days or more: Primary
-demand gives the monthly-retrained N1 0.61 to 0.70, `a7_cs` 0.30 to 0.39, and the stack 0.00 to
-0.05. Wind gives N1 0.68 and 0.61 under 2 days and 0.20 to 0.30 beyond. Solar is between 0.30 and
-0.57 for N1. No band chose a corner cell often enough to trigger the stop rule.
+**The weights favour the member with the lower score in that band, and for wind and solar they
+vary from band to band.** Mean chosen weights over the 11 months with history, by lead band from 0
+to 24 h to 10 days or more: Primary demand gives the monthly-retrained N1 0.59 to 0.70, `a7_cs`
+0.30 to 0.39, and the stack 0.00 to 0.05. Wind gives N1 0.68 and 0.61 under 2 days and 0.20 to 0.30
+beyond. Solar gives N1 between 0.30 and 0.57. Weights lie on a 0.25 grid. The stop rule counts
+corner cells over all 60 cells: Primary 0, solar 6, wind 7 (BSP and GSP 13).
 
 ## Porting cost
 

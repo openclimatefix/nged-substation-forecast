@@ -90,6 +90,9 @@ def vincent(*, member_quantiles: list[np.ndarray], weights: np.ndarray) -> np.nd
     Args:
         member_quantiles: One (cases, 9) array per member.
         weights: One weight per member, or shape (cases, members) for per-case weights.
+
+    Returns:
+        The blended quantiles, shape (cases, 9).
     """
     stacked = np.stack(member_quantiles, axis=0).astype(np.float64)
     if weights.ndim == 1:
@@ -254,6 +257,9 @@ def correction_table(
         frame: One series and seed: `power_fcst_init_time`, `valid_time`, `median`.
         power: Observed power over capacity on the half-hourly grid from `grid_start`.
         grid_start: Timestamp of the first grid cell.
+
+    Returns:
+        One row per run: `power_fcst_init_time` and `correction`.
     """
 
     def index(times: pl.Series) -> np.ndarray:

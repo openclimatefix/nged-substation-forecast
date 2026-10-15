@@ -747,7 +747,8 @@ refitted 00019's model on 20 demand series (8 Primary substations that meter in 
   over all leads: +0.15 points (99.44% interval +0.03 to +0.26); all series in one model: +0.29
   (+0.19 to +0.42). Absolute Primary scores: per series 5.32, by type 5.47, all series 5.61.
 - **Finding for later experiments:** the series identifier is essential. Without it the by-type
-  pool loses a further 0.82 points and the all-series pool 0.85. On the 16 Primary substations a random
+  pool loses a further 0.82 points and the all-series pool 0.85. On the 16 Primary substations a
+  random
   grouping scores the same as the by-type grouping (5.47 each), so the number of models matters
   more than which Primary substations share one.
 - **Write-up and pull request:** [result](00024-pooling-groupings-demand-xgboost/result.md),
@@ -785,13 +786,16 @@ only on earlier months, and scored the result on the cases of experiment 33. The
 supported, on Primary demand alone.
 
 - **Headline result:** the lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack
-  minus the monthly-retrained N1, Primary quantile score over all leads: -0.097 points (98.33%
+  minus the monthly-retrained N1 (the best single member, chosen with hindsight), Primary quantile
+  score over all leads: -0.097 points (98.33%
   interval -0.187 to -0.026; absolute 5.025 against 5.122). Solar -0.039 (-0.115 to +0.031) and
   wind -0.074 (-0.194 to +0.055) are null.
 - **Finding for later experiments:** one fixed weight vector scores as well as weights per lead
-  band (+0.005, -0.008 to +0.023 for Primary demand), and the 14-day correction belongs inside each
-  member, not after the blend (+0.048 worse after, +0.008 to +0.101).
-- **Write-up and pull request:** [result](00035-lead-weighted-quantile-blend-of-stored-models/result.md),
+  band (+0.005, -0.008 to +0.023 for Primary demand), and the blend scored 0.048 points worse when
+  the
+  14-day correction was applied afterwards instead of to each member first (+0.008 to +0.101, 95%).
+- **Write-up and pull request:**
+  [result](00035-lead-weighted-quantile-blend-of-stored-models/result.md),
   [PR #1244 (Experiment 35: does a lead-weighted blend of quantiles beat the best single model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1244).
 
 ![Blends minus the best single member](00035-lead-weighted-quantile-blend-of-stored-models/figure_1.svg)

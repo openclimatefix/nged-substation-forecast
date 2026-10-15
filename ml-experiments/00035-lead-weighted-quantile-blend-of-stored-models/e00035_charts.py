@@ -152,7 +152,7 @@ def figure_2() -> alt.TopLevelMixin:
         width=PLOT_WIDTH,
         height=330,
         title=_title(
-            text="Wind gains most under 2 days; Primary demand gains evenly",
+            text="Primary demand gains at every lead band; wind's gains are unresolved",
             lines=[
                 (
                     "Quantile score of the lead-band blend minus the best single member of its "
