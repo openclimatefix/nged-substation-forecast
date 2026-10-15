@@ -65,6 +65,7 @@ the maintainer to confirm.
 | [00032](00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints of each substation improve a by-type pooled demand model, and carry a substation held out of the pool? | Inconclusive: no fingerprint helped | Not for production | 2026-10-15 |
 | [00033](00033-best-guess-architecture-vs-production/result.md) | Does the best-guess architecture beat production, N1, and `manual_heuristic` on the quantile score, twCRPS, and exceedance metrics, and how much would perfect weather add? | Supported: 4.89, 3.81, and 6.27 points below production | Candidate | 2026-10-15 |
 | [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted average of the quantiles of already-scored models beat the best single model for Primary demand, solar, and wind? | Supported for Primary demand (-0.10 points); null for solar and wind | Candidate (Primary demand) | 2026-10-15 |
+| [00037](00037-switching-first-look/result.md) | Does a neighbour-balance detector find logged switching in the telemetry at a lower false-alarm rate than a single-series detector? | Inconclusive: size-weighted recall 0.326 (0.093 to 0.579) against the 0.35 bar | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -824,3 +825,25 @@ supported, on Primary demand alone.
   [PR #1244 (Experiment 35: does a lead-weighted blend of quantiles beat the best single model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1244).
 
 ![Blends minus the best single member](00035-lead-weighted-quantile-blend-of-stored-models/figure_1.svg)
+
+### 00037: logged switching in the telemetry
+
+**A detector that checks neighbouring substations recovered a third of the MW of the 18 visible
+validation transfers, but the verdict is inconclusive.** The experiment turned the NGED switching
+logs into 612 closures of 2 hours to 60 days, found that 37 of them show a visible step (about 6
+by chance), and scored two detectors that never read the logs against them, with thresholds set on
+odd months and recall measured on even months.
+
+- **Headline result:** the neighbour-balance detector D1 (4-hour window, threshold 4) reaches a
+  size-weighted recall of 0.326 (95% interval 0.093 to 0.579) at 0.38 unexplained alarms per
+  series-month, against 0.036 (0.000 to 0.131) for the single-series detector D0 at 0.14. Shifted
+  logs give 0.004. D1 misses the 0.35 bar and clears the 0.20 bar, so the verdict is inconclusive.
+- **Finding for later experiments:** at about 0.5 alarms per series-month D0 reaches 0.224 and D1
+  0.362, so the pre-registered grid overstated the gap. A 24-hour D0 reaches 0.276. The stack's
+  threshold-weighted score share in confirmed half-hours is 40%, but one 370-hour closure on series
+  18 holds nearly all of it.
+- **Write-up and pull request:** [result](00037-switching-first-look/result.md),
+  [PR #1246 (Experiment 37: do logged switching closures show up in the telemetry, and does a
+  neighbour-balance detector beat a plain one?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1246).
+
+![Validation recall against unexplained alarms](00037-switching-first-look/figure_1_headline.svg)
