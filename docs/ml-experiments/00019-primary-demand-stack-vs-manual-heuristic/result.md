@@ -1,7 +1,7 @@
 ---
 id: "00019"
 slug: primary-demand-stack-vs-manual-heuristic
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 16 Primary substation demand series, stacking three changes on the single-stage ENS-trained
@@ -39,9 +39,98 @@ row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels) and mean absolute error
   of the median, in points of capacity (1 point is 1% of the series' effective capacity)
+verdict: supported
+best_arm: >-
+  The full stack (6.34 down to 5.32 points on the quantile score over all leads), level with N1 plus
+  the correction alone (5.34)
+headline: >-
+  C1, the full stack minus manual_heuristic, quantile score over all leads: -0.56 points of capacity
+  (99.44% interval -0.93 to -0.26). C2, the stack minus N1: -1.00 (-1.88 to -0.14). The correction
+  supplies all of it (C4, +0.97 when dropped, +0.15 to +1.81).
+lessons: >-
+  N1's year-ahead forecasts sat 2.6 points too low, and the 14-day correction cut that bias to 0.5.
+  The half-life of 0.5 years added nothing to a model frozen at its training end, and the spread
+  factor of 1.15 added 0.03 to 0.05 points and lifted 5% to 95% coverage from 80% to 85%.
+advice:
+  - >-
+    Add the 14-day error correction to the Primary demand model before any other change, because it
+    lowered N1's quantile score by 0.99 (C7) and put N1 below manual_heuristic (C1).
+  - >-
+    Do not add the 0.5-year half-life to a model that is frozen at its training end, because it
+    moved the quantile score by -0.01 (-0.03 to +0.02, C5); test it with monthly retraining instead.
+  - >-
+    Apply the 1.15 spread factor to N1-style quantile output, because dropping it from the stack
+    raised the quantile score by 0.03 (+0.005 to +0.05, C6), though 5% to 95% coverage is still 85%.
+  - >-
+    Test the correction with forecasts made daily, not every 5 days, and with monthly retraining
+    in place, because both change how much bias is left to remove (limits).
+production_status: candidate
+adopted_in: none
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1225
+code: ml-experiments/00019-primary-demand-stack-vs-manual-heuristic/
 ---
 
 # Experiment 19: does stacking small gains beat `manual_heuristic` for Primary demand?
+
+**Supported: the full stack beats `manual_heuristic` and N1, and the 14-day correction supplies all
+of the gain.** Scores are the quantile score over all leads, in points of capacity (1 point is 1%
+of a series' effective capacity), on 16 Primary substations, 73 forecast runs every 5 days from July
+2025 to June 2026, with ENS weather. C1, the stack minus `manual_heuristic`, is -0.56 (99.44%
+interval -0.93 to -0.26), and the mean absolute error of the median agrees (-0.88, -1.51 to
+-0.30). C2, the stack minus N1, is -1.00 (-1.88 to -0.14), which meets the -0.3 threshold. The
+stack's quantile score is 5.32, N1's is 6.33, and `manual_heuristic`'s is 5.89. Up to 48 hours
+the stack scores 4.61 against 5.68 (C1, 95% interval -1.38 to -0.79), and from 3 days on 5.49
+against 5.94.
+
+![Quantile score by arm](figure_1.svg)
+
+| Arm | Quantile score | Median error | 5%-95% band covers | 10%-90% band covers |
+|---|---|---|---|---|
+| `manual_heuristic` | 5.89 | 8.23 | 81% | 72% |
+| `climatology` | 7.46 | 10.33 | 83% | 74% |
+| Production recipe | 9.52 | 9.92 | 10% | 8% |
+| N1 | 6.33 | 8.45 | 80% | 71% |
+| N1 plus correction | 5.34 | 7.34 | 80% | 70% |
+| N1 with half-life 0.5 years | 6.34 | 8.46 | 80% | 70% |
+| N1 plus spread factor | 6.28 | 8.45 | 85% | 77% |
+| Full stack | 5.32 | 7.35 | 85% | 76% |
+| Stack without correction | 6.29 | 8.46 | 85% | 77% |
+| Stack without half-life | 5.32 | 7.34 | 85% | 76% |
+| Stack without spread factor | 5.35 | 7.35 | 80% | 70% |
+
+![The nine planned contrasts](figure_2.svg)
+
+**The correction removes a level bias.** N1, frozen at 2025-06-30, forecast the validation year
+2.6 points too low on average. The correction cuts that bias to 0.5, and the median error falls by
+1.1 points (C7: -0.99 on the quantile score, -1.84 to -0.15 at 99.44%, 7 of 12 months below
+zero). Dropping the correction from the stack raises the score by 0.97 (C4, +0.15 to +1.81).
+**The half-life does nothing here.** C8 is +0.01 (-0.01 to +0.05) and C5 is -0.005 (-0.026 to
++0.016), so the 0.5-year half-life earns no place. **The spread factor is worth a small gain.** C9
+is -0.05 (-0.09 to -0.01), and dropping the factor raises the stack's score by 0.026 (C6, +0.005
+to +0.049, threshold zero), though 5% to 95% coverage is only 85%.
+
+**The singles add up.** The three single gains sum to -1.02 (C7 -0.99, C8 +0.01, C9 -0.05)
+against the stack's -1.00 (C2), so the components do not overlap.
+
+**Predictions.** The stack's gain over N1 (-1.00) falls in the predicted -0.6 to -1.2, and over
+`manual_heuristic` (-0.56) in -0.2 to -0.8. The correction's gain (-0.99) is above the predicted
+0.4 to 0.9, the half-life's (+0.01) is inside its range, and the spread factor's (-0.05) is at the
+top of its range. C1's interval is narrower than the plus or minus 0.7 predicted.
+
+## Limits
+
+- **The correction's history comes from 5-day-spaced runs.** A past half-hour's forecast has a
+  lead of 0 to 5 days, so the history errors are larger than a daily service would see, and the
+  correction is applied at every lead to 15 days. A daily service would use leads under 1 day.
+- **N1 is never retrained.** The correction partly stands in for monthly retraining, which
+  experiment 00017 found lowers the error by 0.5 to 0.9 points; the two have not been combined.
+- **The production row's coverage of 10% is a property of the stored forecast, not of this
+  experiment.** Its stored quantiles come from ensemble members and are not a calibrated band.
+- **The half-life was chosen on the scored year,** and 26 of 1,460 runs (the first of each series)
+  had no history and received a correction of zero.
+- **The 3.5-hour telemetry delay is assumed,** as in experiment 00013.
+
+## Plan, written before any code ran
 
 ## Plan: sizing
 

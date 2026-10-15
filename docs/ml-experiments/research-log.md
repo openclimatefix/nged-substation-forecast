@@ -20,6 +20,7 @@ the maintainer to confirm.
 | [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs | The Christmas column needs its 14-day window, a 2023 start needs a fresh year, and windchill can go |
 | [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Map the ENS shortwave onto CAMS (a stage 0 quantile mapping) before a CAMS-trained stage 1a reads it | The year's mean is corrected but individual months are up to 18.6% off, and the member spread widens by 27% |
 | [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Train the stage 1a demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day error correction | The correction needs live power 2 days old, and every gain is on ERA5 weather |
+| [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Add a 14-day error correction and a spread factor of 1.15 to the single-stage ENS-trained quantile model N1 for Primary demand | The correction supplies the whole gain (-0.99); it is tested on forecasts 5 days apart and on a model that is never retrained |
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
 
 ## The experiments so far
@@ -43,6 +44,7 @@ the maintainer to confirm.
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
 | [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
 | [00018](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
+| [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies all of it | Candidate | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -178,6 +180,9 @@ later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesda
 
 ### What the experiments taught us so far
 
+- **A 14-day error correction put N1 below `manual_heuristic` for Primary demand.** The correction
+  lowered the quantile score by 0.99 points on N1, a model frozen at its training end, and the 0.5-year
+  half-life added nothing to that frozen model (00019).
 - **Check for calendar memorisation.** When the same valid time repeats across many ENS runs, a model
   with calendar columns can memorise it. Give each experiment a climatology row, and group folds by
   valid time.
@@ -405,6 +410,27 @@ months, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
   wind)](https://github.com/openclimatefix/nged-substation-forecast/pull/1221).
 
 ![Coverage of the 5% to 95% band by lead band](00016-pooled-mixture-calibration-solar-wind/figure_1.svg)
+
+### 00019: stacking small gains on N1 for Primary demand
+
+**Stacking a 14-day error correction, a recency half-life, and a spread factor on N1 beat
+`manual_heuristic` on the quantile score, and the correction supplied all of the gain.** The
+experiment used the 16 Primary substations, ENS weather, and 73 forecast runs.
+
+- **Headline result:** the stack minus `manual_heuristic` was -0.56 points of capacity over all leads
+  (99.44% interval -0.93 to -0.26), and the stack minus N1 was -1.00 (-1.88 to -0.14).
+- **Absolute scores (all leads):** stack 5.32, `manual_heuristic` 5.89, N1 6.33.
+- **Components:** dropping the correction from the stack raised the score by 0.97 (+0.15 to +1.81);
+  the 0.5-year half-life moved it by -0.01 (-0.03 to +0.02); dropping the spread factor raised it by
+  0.03 (+0.005 to +0.05).
+- **Finding for later experiments:** N1 forecast the validation year 2.6 points too low, and the
+  correction cut that bias to 0.5. The correction was tested on forecasts 5 days apart and on a model
+  that is never retrained.
+- **Write-up and pull request:** [result](00019-primary-demand-stack-vs-manual-heuristic/result.md),
+  [PR #1225 (Experiment 19: does stacking small gains beat manual_heuristic for Primary
+  demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1225).
+
+![The nine planned contrasts](00019-primary-demand-stack-vs-manual-heuristic/figure_2.svg)
 
 ### 00015: the same-time electricity price in a stage 1 demand model
 
