@@ -106,9 +106,6 @@ def training_blocks(
             & pl.col("power").is_finite()
             & (pl.col("valid_time") <= common.LAST_TRAINING_VALID)
         )
-        if (own["valid_time"] > common.LAST_TRAINING_VALID).any():
-            msg = "training rows run past the last training time"
-            raise ValueError(msg)
         own = common.with_derived(frame=own, latitude=row["latitude"], longitude=row["longitude"])
         own = add_lags(frame=own, power=arrays[row["site"]].power)
         age_days = (common.LAST_TRAINING_VALID - own["valid_time"]).dt.total_seconds() / 86_400
@@ -228,6 +225,9 @@ def run_predict(*, series: pl.DataFrame, seeds: list[int], work_dir: Path, out_d
             members = run["ensemble_member"].n_unique()
             if run.height != run.select(*KEYS).n_unique() * members:
                 msg = "every valid time must hold every member"
+                raise ValueError(msg)
+            if run["ensemble_member"].min() != 0:
+                msg = "member 0, the control, must be the first member"
                 raise ValueError(msg)
             matrix = run.select(columns).to_numpy().astype(np.float32)
             keys = run.select(*KEYS).unique(maintain_order=True)
