@@ -111,6 +111,9 @@ def sky_tensors(
 def physical_parameters(*, u: torch.Tensor) -> dict[str, torch.Tensor]:
     """Turn standardised parameters `u` of shape (..., 4) into physical ones.
 
+    Args:
+        u: The standardised parameters, in units of the prior's standard deviation.
+
     Returns:
         `tilt` and `azimuth` in degrees, `dc` (DC capacity, fraction of effective capacity), `ac`
         (AC limit, the same unit), and `ratio` (DC over AC).

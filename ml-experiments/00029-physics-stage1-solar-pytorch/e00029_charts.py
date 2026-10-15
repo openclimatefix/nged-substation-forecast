@@ -63,7 +63,7 @@ def figure_1() -> alt.TopLevelMixin:
     )
     labels = list(ARM_LABELS.values())
     return (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
             x=alt.X("band:N", sort=bands, title="Lead time", axis=alt.Axis(labelAngle=0)),
@@ -154,7 +154,7 @@ def figure_3() -> alt.TopLevelMixin:
             .encode(x="a:Q", y="b:Q")  # ty: ignore[unresolved-attribute]
         )
         points = (
-            alt.Chart(data)
+            alt.Chart(data)  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=40, opacity=0.8)
             .encode(
                 x=alt.X(

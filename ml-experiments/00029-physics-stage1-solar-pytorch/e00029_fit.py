@@ -84,6 +84,10 @@ def scipy_sky(*, arrays: dict[str, np.ndarray], ghi: np.ndarray) -> SunAndSky:
 def fit_physics(*, sites: pl.DataFrame, training: dict[int, pl.DataFrame]) -> dict[int, dict]:
     """Fit both physics models to every farm's CAMS-driven training rows.
 
+    Args:
+        sites: `site_table()`.
+        training: Each series' training rows, with `target`, ERA5 weather, and CAMS shortwave.
+
     Returns:
         For each series id, `scipy` (tilt, azimuth, DC and AC capacity as fractions of capacity)
         and `torch` (the same four at the posterior mean, plus 90% intervals).
