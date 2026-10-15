@@ -48,20 +48,20 @@ lessons: >-
   Recent power gave the stage 2 calibrator nothing for solar or wind, and the calibrator trained on
   the control member alone scored 0.27 to 0.31 points worse than the pooled mixture without it. The
   14-day correction as pre-registered shifts every quantile by the mean of observed minus median,
-  which is not zero for a skewed distribution, and so it raised the CRPS and halved coverage.
+  which is not zero for a skewed distribution, and so it raised the CRPS and cut coverage to 53% to 77%.
 advice:
   - >-
     Do not add lagged power or summaries of recent power to a solar or wind calibrator: the lagged
-    calibrator moved the CRPS by -0.012 for solar and +0.012 for wind, and was worse at leads under 2
-    days (C1, by-band table).
+    calibrator moved the CRPS by -0.012 for solar and +0.012 for wind, and was worse in the first two
+    lead bands, under 3 days (C1, by-band table).
   - >-
     Do not apply a 14-day correction that shifts the quantiles by the mean of observed minus median
     to solar or wind: it raised the CRPS by 0.44 and 0.41 and cut the coverage of the 5% to 95% band
     to 53% to 77% (C5, coverage table).
   - >-
     Use the median of the window's errors, not the mean, if a 14-day correction is tried on a skewed
-    target again: it moved the CRPS by +0.010 for solar and -0.064 for wind and kept coverage near
-    80% to 92% (P1, post hoc, and with an interval that includes zero).
+    target again: it moved the CRPS by +0.010 for solar and -0.064 for wind and kept coverage at 78%
+    to 92% (P1, post hoc, and with an interval that includes zero).
   - >-
     Train a stage 2 calibrator on pooled members or leave it out: one trained on the control member
     alone and applied to each member scored 0.27 (solar) and 0.31 (wind) points worse than the
@@ -117,8 +117,8 @@ half-hour it spans, as in experiment 00019.
 experiment 00005) per technology, seed, and arm, trained on the ENS control member's rows with
 out-of-fold stage 1a quantiles from 2024-07 to 2025-06 (the calibration table of experiment 00002),
 with the observed power over effective capacity as the target. It takes the member's 9 stage 1a
-quantiles, the lead in hours, and the recent-power columns of its arm. No calendar column. It is
-applied to each of the 51 members, and the calibrated quantiles are pooled into a mixture as in
+quantiles, the lead in hours, and the recent-power columns of its arm. The calibrator has no
+calendar column. The calibrator is applied to each of the 51 members, and the calibrated quantiles are pooled into a mixture as in
 experiment 00020.
 
 **Recent-power columns.** Lagged power is the newest usable value, the value at the valid time's
@@ -131,7 +131,7 @@ ending at the newest usable value, and of the latest earlier usable day on the t
 the mixture's median over earlier runs' non-trivial cases (95% quantile above 1% of capacity) with a
 valid time in `[t - 14 d, t - 2 d]`, taking for each series and valid time the latest earlier run's
 forecast. Fewer than 500 such cases means no shift. The run's non-trivial quantiles are shifted by
-it, clipped to 0 to 1, and sorted.
+the correction, clipped to 0 to 1, and sorted.
 
 | Arm | What it is |
 |---|---|
@@ -155,7 +155,7 @@ it, clipped to 0 to 1, and sorted.
   mixture reproduces experiment 00002 (solar 5.03 against 5.05, wind 11.11 against 11.11).
 - **C1, lagged power in the calibrator (decides).** Solar -0.012 (-0.122 to +0.088), wind +0.012
   (-0.090 to +0.146): inconclusive, because the interval cannot rule out a gain of 0.05 or a loss of
-  0.1. By lead band the point estimate is positive (worse) under 3 days for both technologies, so
+  0.1. By lead band the point estimate is positive (worse) in the first two lead bands, under 3 days, for both technologies, so
   the lags did not help at the short leads where recent power should matter most.
 - **C2 and C3, summaries.** Summaries alone: solar +0.023 (-0.122 to +0.143), wind +0.115 (-0.051
   to +0.307). Adding them to the lagged calibrator: solar +0.015 (-0.057 to +0.063), wind +0.098
@@ -199,5 +199,5 @@ it, clipped to 0 to 1, and sorted.
 
 - **Weather explains these farms' output well enough that recent power adds nothing detectable
   at leads from 0 to 15 days,** unlike Primary substation demand in experiment 00005.
-- **A correction built from the mean error assumes a symmetric error.** That held for Primary demand
+- **A correction built from the mean error assumes a symmetric error.** The assumption held for Primary demand
   in experiments 00017 and 00019 and does not hold for a farm's output.
