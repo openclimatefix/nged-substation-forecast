@@ -53,9 +53,9 @@ headline: >-
 lessons: >-
   A recent effective-capacity feature did not lower the CRPS detectably for either technology, and
   the intervals cannot rule out a gain of 0.03 (solar) or a loss of 0.1. One solar farm (E) gained
-  0.235 points and the shuffled copy did not, but two other farms lost. The wind
-  power-over-wind-cubed feature added -0.061 (-0.107 to -0.025) to the single feature, an
-  exploratory contrast.
+  0.235 points against 0.034 for its shuffled copy, but solar farm A and wind farm W3 lost. Adding
+  the wind power-over-wind-cubed feature to the single feature lowered the wind CRPS by 0.061
+  (-0.107 to -0.025), an exploratory contrast.
 advice:
   - >-
     Do not port the top-decile effective-capacity feature to solar or wind on this evidence: C1 was
@@ -63,14 +63,11 @@ advice:
   - >-
     Test the wind power-over-wind-cubed feature (75th percentile of power over speed cubed, 3 to 8
     m/s, 28 days) again on its own, since it lowered the wind CRPS by 0.061 (-0.107 to -0.025)
-    beyond the single feature (C5, exploratory).
+    beyond the single feature (C5, exploratory; A4 against A0 is -0.048 and was not planned).
   - >-
-    Judge a capacity feature on the farms with a known loss of capacity: solar farm E gained 0.235
-    points from the single feature and its shuffled copy only 0.034, while farm A and wind farm W3
-    lost (per-farm figure).
-  - >-
-    Shuffle a slowly varying feature across years within the same calendar month when building a
-    control, so the control keeps the seasonal marginal (design, C2).
+    Judge a capacity feature farm by farm as well as on the pooled score: the single feature moved
+    the CRPS of solar farm E by -0.235 points and of solar farm A and wind farm W3 by +0.085 and
+    +0.113 (per-farm figure).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00026-capacity-features-solar-wind/
@@ -81,10 +78,11 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 **Verdict: inconclusive.** A feature stating each farm's recent effective capacity moved the
 continuous ranked probability score (CRPS) by -0.018 points of capacity for solar and +0.013 for
-wind, and the intervals include both no effect and the 0.03-point threshold. This is proposal P30 of
-the [research plan](../research-plan.md). The farms are 6 solar farms and 3 wind farms. ENS is the
-European Centre for Medium-Range Weather Forecasts ensemble, ERA5 its reanalysis of past weather,
-and CAMS the Copernicus Atmosphere Monitoring Service's satellite irradiance estimate.
+wind, and the intervals include both no effect and the 0.03-point threshold. The experiment is
+proposal P30 of the [research plan](../research-plan.md). The farms are 6 solar farms and 3 wind
+farms. ENS is the European Centre for Medium-Range Weather Forecasts ensemble, ERA5 its reanalysis
+of past weather, and CAMS the Copernicus Atmosphere Monitoring Service's satellite irradiance
+estimate.
 
 ## Size
 
@@ -200,15 +198,15 @@ Each contrast is the arm named first minus the arm named second, per technology 
 | C6 | A5 - A2 | does the same window a year earlier add (exploratory: a seasonal reference) |
 
 The write-up reports each arm's absolute CRPS, the climatology row, a per-farm breakdown (gains are
-expected to concentrate in the few months with a loss of capacity), .
+expected to concentrate in the few months with a loss of capacity).
 
 ## Limits stated in advance
 
-- **The sample resolves about 0.1 points for solar.** Experiment 00020's solar paired intervals were
-  0.19 to 0.30 points wide, so the threshold of 0.03 is below what 6 farms resolve unless a feature
-  effect is concentrated.
-- **The intervals resample initialisation months, not farms,** so the true uncertainty is larger than
-  reported.
+- **The pre-registered estimate was that the sample resolves about 0.1 points for solar.**
+  Experiment 00020's solar paired intervals were 0.19 to 0.30 points wide, so the threshold of 0.03
+  is below what 6 farms resolve unless a feature effect is concentrated.
+- **The intervals resample initialisation months, not farms,** so the true uncertainty is larger
+  than reported.
 - **The cutoff of 5 days applies to power as well as weather,** a deliberate simplification that
   dilutes a signal about a recent loss.
 - **The prior study found few real losses of capacity,** so little can be learned from most months.
@@ -234,21 +232,25 @@ expected to concentrate in the few months with a loss of capacity), .
   solar -0.016, wind +0.024.
 - **Per farm.** The single feature changed the CRPS of solar farm E by -0.235 points and of wind
   farm W1 by -0.044, and raised it for solar farm A by +0.085 and wind farm W3 by +0.113. The
-  shuffled copy changed farm E by -0.034, so the gain at farm E is not a column-count effect.
+  shuffled copy changed farm E by -0.034. The per-farm figures have no intervals, and farm E is one
+  farm of six.
 
 ![Per-farm differences](figure_2.svg)
 
-- **Coverage.** The 5% to 95% band of every feature arm covers 0.3 to 3.0 points less than A0's
-  (solar 93.1% to 95.0%, wind 87.4% to 92.6%, against 94.3% to 95.3% and 89.4% to 93.7%).
+- **Coverage.** The 5% to 95% band of every feature arm covers up to 2.7 points less than A0's
+  (solar 92.2% to 95.0%, wind 87.4% to 92.6%, against 94.3% to 95.3% and 89.4% to 93.7%).
 - **Null shares over the validation year.** The solar 7-day feature is null on average 24% of
-  days (44% at worst farm, in winter); every other feature is null under 2% of days.
+  days (44% at the worst farm); every other feature is null under 2% of days.
 - **Prediction against result.** The solar single-feature effect (-0.02) matched the estimate. The
-  wind effect (-0.03) came out at +0.01. The shuffled copy was predicted to move the CRPS by under
-  0.02 and moved solar by +0.023.
+  wind effect (-0.03, within its stated range) came out at +0.01. The shuffled copy was predicted to
+  move the CRPS by under 0.02 and moved solar by +0.023. Extra windows, a shape feature, and a
+  last-year feature were predicted to move the CRPS by under 0.03 beyond the single feature, and for
+  wind two of them moved it by more (C4 -0.052, C5 -0.061).
 
 ## Failures and limits
 
-- **The sample resolves about 0.15 points for solar and 0.1 for wind.** The decisive intervals are
+- **The observed interval widths show the sample resolves about 0.15 points for solar and 0.1 for
+  wind.** The decisive intervals are
   0.26 (solar) and 0.16 (wind) points wide, so a gain of the predicted size is not resolved.
 - **Intervals resample months, not farms.** The per-farm figure shows the spread between farms is
   larger than the contrast.
@@ -260,6 +262,6 @@ expected to concentrate in the few months with a loss of capacity), .
 
 - **A trailing capacity feature is not worth its serving step on this evidence.** The two decisive
   contrasts straddle zero, and the farm that gained most is one of six.
-- **The cubic power-to-speed feature is worth a separate test for wind.** It is the only feature
-  with an interval wholly below zero, and it needs no weather product beyond the wind speed already
-  used.
+- **The cubic power-to-speed feature is worth a separate test for wind.** The cubic power-to-speed
+  feature is the only feature with an interval wholly below zero among the descriptive contrasts (C5
+  is one of 12), and it needs no weather product beyond the wind speed already used.

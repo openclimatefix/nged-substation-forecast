@@ -639,9 +639,10 @@ stage 1a quantile models of 6 solar farms and 3 wind farms (row set `fold_a_tues
 
 - **Headline result:** single feature minus no feature, solar -0.018 (98.75% interval -0.162 to
   +0.096), wind +0.013 (-0.054 to +0.101).
-- **Finding for later experiments:** solar farm E gained 0.235 points and its shuffled copy only
-  0.034, while solar farm A and wind farm W3 lost. The wind power-over-wind-cubed feature gained
-  0.061 (-0.107 to -0.025) beyond the single feature, an exploratory contrast.
+- **Finding for later experiments:** the single feature moved solar farm E's CRPS by -0.235
+  points (its shuffled copy by -0.034) and raised it for solar farm A and wind farm W3. Adding the
+  wind power-over-wind-cubed feature lowered the wind CRPS by 0.061 (-0.107 to -0.025), an
+  exploratory contrast.
 - **Write-up and pull request:**
   [result](00026-capacity-features-solar-wind/result.md),
   [PR #1233 (Experiment 26: does a recent effective-capacity feature
