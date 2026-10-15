@@ -1,68 +1,94 @@
---- id: "00032" slug: substation-fingerprints-pooled-demand status: done size: complex hypothesis:
->- For demand series of Primary substations, adding a numeric fingerprint of each substation (its
-location, its mean level and daily and weekly shape over the training window, and its level over the
-14 days before the forecast origin) to a by-type pooled XGBoost quantile model closes part of the
-0.15-point gap between the pooled model with the series identifier and per-series models, and lets a
-substation held out of the pool be forecast better than a pooled model with no fingerprint.
-prediction: >- Recent-window statistics added to the identifier (A4) lower the Primary quantile
-score by 0.05 to 0.15 points of capacity against the identifier alone (C3), because they follow
-drift that a fixed identifier cannot. Location (C1) and training-window statistics (C2) add nothing
-beyond the identifier, within plus or minus 0.05, because the identifier already separates the
-series. The training-window statistics without the identifier (A6) score within 0.15 points of the
-identifier alone (C5), because 16 distinct fingerprints act as 16 identifiers. For a held-out
-substation, training-window statistics lower the score by 0.2 to 0.5 points against a pooled model
-with no fingerprint and no identifier (C7), and adding recent-window statistics lowers it by a
-further 0.05 to 0.2 (C8). decision_rule: >- Eight planned contrasts on the quantile score over all
-leads of the full stack (14-day error correction and spread factor 1.15), read at 99.375%
-(Bonferroni across eight), whole validation months and seeds resampled. C1 to C5 use the 16 Primary
-series and three seeds. C1 is A2 minus A1, C2 is A3 minus A1, C3 is A4 minus A1, C4 is A5 minus A1,
-C5 is A6 minus A1. C6 is A6 minus A0 (does a fingerprint beat dropping the identifier). C7 and C8
-use the 8 held-out Primary substations and seed 0: C7 is the held-out model with training-window
-statistics minus the held- out model with no fingerprint, C8 is the one with training-window and
-recent-window statistics minus the one with no fingerprint. Recent-window statistics need a rolling
-recomputation at every forecast origin in training and serving, a new pipeline step, so a column set
-that includes them is worth porting only when its interval lies wholly below -0.10 points. A static
-column set (location or training-window statistics) costs one table per retrain, and is worth
-porting at any interval wholly below zero. C5 non-inferior means an upper limit of at most +0.15
-points: the fingerprint can replace the identifier. Verdict: supported when C3 or C4 lies wholly
-below -0.10, or when both C7 and C8 lie wholly below zero. C1 and C2 are reported but decide the
-verdict only through a static-column port: they count as a static gain only when wholly below -0.05.
-Refuted when C1 to C4, C7, and C8 are all wholly at or above zero. Inconclusive otherwise. C5 and C6
-decide no verdict. C7 and C8 use one seed, so their intervals resample months only and are weaker
-than C1 to C5. Contrasts on BSP and GSP, the uncorrected arms (including C7 and C8 without the
-correction, to show whether the correction absorbs the cold-start effect), and the fingerprint
-columns S in the cold-start pool (K1) are exploratory at 95%. The report also gives the share of the
-A1-minus-per-series gap closed by A4 and A5, descriptively and without a test. benchmark: >- The by-
-type pooled model with the series identifier (A1, experiment 00024, 5.47 on Primary), the by-type
-model without it, per-series models (5.32), `manual_heuristic`, and `climatology`. row_set_id:
-fold_a_every5d_v1 metric: >- Quantile score (twice the mass-weighted mean pinball loss over 9
-levels), in points of capacity verdict: inconclusive best_arm: >- None. Every warm arm with
-fingerprint columns (A2 to A6) scores 5.47 to 5.50 on the 16 Primary substations, level with the
-identifier alone (5.47). For a substation held out of the pool, post hoc recent-window statistics
-alone score 5.86 against 6.08 with no fingerprint. headline: >- C4, identifier plus both
-fingerprints minus identifier alone, Primary quantile score over all leads: +0.02 points of capacity
-(99.375% interval -0.05 to +0.10). C7, held-out substation with training-window statistics minus
-none: +1.39 (+0.99 to +1.91), worse. lessons: >- The identifier already carries everything the
-fingerprints describe, so adding them changes nothing in the warm arms (C1 to C4 within 0.1 points).
-A likely cause of the cold-start failure, not tested, is that a pool of 7 other series gives the
-trees 7 distinct training-window fingerprints that act as 7 identifiers, and the held-out
-substation's 28-day statistics differ from the pool's 15-month ones (C7, C8; the whole-window post
-hoc arm removes about two thirds of the C7 damage). Recent-window statistics alone, which change
-over time and so cannot act as an identifier, helped the held-out substations by 0.23 points (post
-hoc). advice: - >- Do not add location, training-window statistics, or recent-window statistics to a
-pooled model that already has the series identifier, because the quantile score moved by at most
-0.02 points on the 16 Primary substations (C1 to C4). - >- Use training-window statistics only where
-the identifier cannot be used, and expect them to match it for series seen in training (C5, +0.01
-with upper limit +0.02). - >- For a substation that was not in the pool's training data, do not give
-the pooled model statistics fixed over the training window or its location, because a pool of 7
-series probably learns them as identifiers (untested) and scored 0.14 to 1.39 points worse than no
-fingerprint (C7, K1). - >- Test a pool of many more series (hundreds) before concluding that
-fingerprints cannot carry a new substation, because 7 other series may be too few for the trees to
-interpolate between fingerprints (untested; cold-start results). - >- Try recent-window statistics
-of power alone for a substation with no training history. In a post hoc test they lowered the held-
-out score by 0.23 points (-0.29 to -0.16, 95%, one seed). production_status: not-for-production
-adopted_in: none pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1241
-code: ml-experiments/00032-substation-fingerprints-pooled-demand/ ---
+---
+id: "00032"
+slug: substation-fingerprints-pooled-demand
+status: done
+size: complex
+hypothesis: >-
+  For demand series of Primary substations, adding a numeric fingerprint of each substation (its
+  location, its mean level and daily and weekly shape over the training window, and its level over
+  the 14 days before the forecast origin) to a by-type pooled XGBoost quantile model closes part of
+  the 0.15-point gap between the pooled model with the series identifier and per-series models, and
+  lets a substation held out of the pool be forecast better than a pooled model with no fingerprint.
+prediction: >-
+  Recent-window statistics added to the identifier (A4) lower the Primary quantile score by 0.05 to
+  0.15 points of capacity against the identifier alone (C3), because they follow drift that a fixed
+  identifier cannot. Location (C1) and training-window statistics (C2) add nothing beyond the
+  identifier, within plus or minus 0.05, because the identifier already separates the series. The
+  training-window statistics without the identifier (A6) score within 0.15 points of the identifier
+  alone (C5), because 16 distinct fingerprints act as 16 identifiers. For a held-out substation,
+  training-window statistics lower the score by 0.2 to 0.5 points against a pooled model with no
+  fingerprint and no identifier (C7), and adding recent-window statistics lowers it by a further
+  0.05 to 0.2 (C8).
+decision_rule: >-
+  Eight planned contrasts on the quantile score over all leads of the full stack (14-day error
+  correction and spread factor 1.15), read at 99.375% (Bonferroni across eight), whole validation
+  months and seeds resampled. C1 to C5 use the 16 Primary series and three seeds. C1 is A2 minus A1,
+  C2 is A3 minus A1, C3 is A4 minus A1, C4 is A5 minus A1, C5 is A6 minus A1. C6 is A6 minus A0
+  (does a fingerprint beat dropping the identifier). C7 and C8 use the 8 held-out Primary
+  substations and seed 0: C7 is the held-out model with training-window statistics minus the held-
+  out model with no fingerprint, C8 is the one with training-window and recent-window statistics
+  minus the one with no fingerprint. Recent-window statistics need a rolling recomputation at every
+  forecast origin in training and serving, a new pipeline step, so a column set that includes them
+  is worth porting only when its interval lies wholly below -0.10 points. A static column set
+  (location or training-window statistics) costs one table per retrain, and is worth porting at any
+  interval wholly below zero. C5 non-inferior means an upper limit of at most +0.15 points: the
+  fingerprint can replace the identifier. Verdict: supported when C3 or C4 lies wholly below -0.10,
+  or when both C7 and C8 lie wholly below zero. C1 and C2 are reported but decide the verdict only
+  through a static-column port: they count as a static gain only when wholly below -0.05. Refuted
+  when C1 to C4, C7, and C8 are all wholly at or above zero. Inconclusive otherwise. C5 and C6
+  decide no verdict. C7 and C8 use one seed, so their intervals resample months only and are weaker
+  than C1 to C5. Contrasts on BSP and GSP, the uncorrected arms (including C7 and C8 without the
+  correction, to show whether the correction absorbs the cold-start effect), and the fingerprint
+  columns S in the cold-start pool (K1) are exploratory at 95%. The report also gives the share of
+  the A1-minus-per-series gap closed by A4 and A5, descriptively and without a test.
+benchmark: >-
+  The by-type pooled model with the series identifier (A1, experiment 00024, 5.47 on Primary), the
+  by-type model without it, per-series models (5.32), `manual_heuristic`, and `climatology`.
+row_set_id: fold_a_every5d_v1
+metric: >-
+  Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity
+verdict: inconclusive
+best_arm: >-
+  None. Every warm arm with fingerprint columns (A2 to A6) scores 5.47 to 5.50 on the 16 Primary
+  substations, level with the identifier alone (5.47). For a substation held out of the pool, post
+  hoc recent-window statistics alone score 5.86 against 6.08 with no fingerprint.
+headline: >-
+  C4, identifier plus both fingerprints minus identifier alone, Primary quantile score over all
+  leads: +0.02 points of capacity (99.375% interval -0.05 to +0.10). C7, held-out substation with
+  training-window statistics minus none: +1.39 (+0.99 to +1.91), worse.
+lessons: >-
+  The identifier already carries everything the fingerprints describe, so adding them changes
+  nothing in the warm arms (C1 to C4 within 0.1 points). A likely cause of the cold-start failure,
+  not tested, is that a pool of 7 other series gives the trees 7 distinct training-window
+  fingerprints that act as 7 identifiers, and the held-out substation's 28-day statistics differ from
+  the pool's 15-month ones (C7, C8; the whole-window post hoc arm removes about two thirds of the C7
+  damage). Recent-window statistics alone, which change over time and so cannot act as an
+  identifier, helped the held-out substations by 0.23 points (post hoc).
+advice:
+  - >-
+    Do not add location, training-window statistics, or recent-window statistics to a pooled model
+    that already has the series identifier, because the quantile score moved by at most 0.02 points
+    on the 16 Primary substations (C1 to C4).
+  - >-
+    Use training-window statistics only where the identifier cannot be used, and expect them to
+    match it for series seen in training (C5, +0.01 with upper limit +0.02).
+  - >-
+    For a substation that was not in the pool's training data, do not give the pooled model
+    statistics fixed over the training window or its location, because a pool of 7 series probably
+    learns them as identifiers (untested) and scored 0.14 to 1.39 points worse than no fingerprint
+    (C7, K1).
+  - >-
+    Test a pool of many more series (hundreds) before concluding that fingerprints cannot carry a
+    new substation, because 7 other series may be too few for the trees to interpolate between
+    fingerprints (untested; cold-start results).
+  - >-
+    Try recent-window statistics of power alone for a substation with no training history. In a
+    post hoc test they lowered the held-out score by 0.23 points (-0.29 to -0.16, 95%, one seed).
+production_status: not-for-production
+adopted_in: none
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1241
+code: ml-experiments/00032-substation-fingerprints-pooled-demand/
+---
 
 # Experiment 32: do substation fingerprints improve a pooled demand model?
 
@@ -102,9 +128,10 @@ points worse than the identifier (C5, +0.00 to +0.02), well inside the 0.15-poin
 statistics identify a series as well as the identifier does.
 
 **Recent-window statistics did not help for series the pool saw in training.** C3 is +0.02 (-0.05 to
-+0.10) and C4 is +0.02 (-0.05 to +0.10). A possible reason, not tested here, is that the
-14-day error correction already follows the recent level. On the 4 BSP and GSP series A4 scores 14.15 against 13.96 for A1 (exploratory). The share of experiment 24's 0.15-point gap to per-series models closed
-by A4 or A5 is zero: both are 0.02 points worse than A1.
++0.10) and C4 is +0.02 (-0.05 to +0.10). A possible reason, not tested here, is that the 14-day
+error correction already follows the recent level. On the 4 BSP and GSP series A4 scores 14.15
+against 13.96 for A1 (exploratory). The share of experiment 24's 0.15-point gap to per-series models
+closed by A4 or A5 is zero: both are 0.02 points worse than A1.
 
 ![Quantile score of the cold-start arms](figure_2.svg)
 
