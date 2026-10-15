@@ -171,6 +171,7 @@ nav:
       - "Which lagged power columns lower the error of Primary substation demand forecasts?": ml-experiments/00030-lagged-power-feature-sets-primary-demand/result.md
       - "Do substation fingerprints improve a pooled demand model?": ml-experiments/00032-substation-fingerprints-pooled-demand/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
+      - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
   - Live service:
       - Overview: live_service/index.md
