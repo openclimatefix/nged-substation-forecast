@@ -284,10 +284,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke", action="store_true", help="one seed, scratch folder")
     parser.add_argument("--only", nargs="+", help="fit only these arms")
+    parser.add_argument("--seeds", type=int, nargs="+", default=list(common.SEEDS))
     args = parser.parse_args()
     out = ARMS_DIR.with_name("arms_smoke") if args.smoke else ARMS_DIR
     out.mkdir(parents=True, exist_ok=True)
-    for seed in common.SEEDS[:1] if args.smoke else common.SEEDS:
+    for seed in args.seeds[:1] if args.smoke else args.seeds:
         context = Context(seed=seed, smoke=args.smoke)
         targets = context.series.filter(pl.col("substation_type").is_in(["BSP", "GSP"]))
         pieces: dict[str, list[pl.DataFrame]] = {}
