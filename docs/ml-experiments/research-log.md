@@ -207,7 +207,7 @@ about 5 days late, so the arm is a ceiling and no serving system could use it.
 - **A 14-day error correction put N1 below `manual_heuristic` for Primary demand.** The correction
   lowered the quantile score by 0.99 points on N1, a model frozen at its training end, and the 0.5-year
   half-life added nothing to that frozen model (00019).
-- **A perfect-quality weather product would lower the Primary demand score by 1.9%.** ERA5 weather
+- **A weather product as accurate as ERA5 would lower the Primary demand score by 1.9%.** ERA5 weather
   in place of ENS weather lowered the quantile score by 0.10 points, nearly all from shortwave
   radiation and none up to 2 days ahead (00022).
 - **Check for calendar memorisation.** When the same valid time repeats across many ENS runs, a model

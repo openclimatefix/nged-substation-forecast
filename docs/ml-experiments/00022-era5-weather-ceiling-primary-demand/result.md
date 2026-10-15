@@ -40,9 +40,9 @@ headline: >-
   capacity (99.38% interval -0.16 to -0.04), so the 0.3-point gain the rule asked for is ruled out.
   ERA5 shortwave radiation alone gave -0.08 (-0.13 to -0.04).
 lessons: >-
-  A perfect-quality weather product (ERA5) would lower the Primary demand score by 1.9%, nearly all
-  from shortwave radiation, and none of it up to 2 days ahead. Weather error is not what limits the
-  Primary demand forecast.
+  A weather product as accurate as ERA5 would lower the Primary demand score by 1.9%, nearly all
+  from shortwave radiation, and none of it from the all-variable arm up to 2 days ahead. With a model
+  trained on ENS weather, weather error is a small part of the Primary demand error.
 advice:
   - >-
     Do not plan weather-source work for Primary demand on the grounds of skill, because ERA5 weather
@@ -86,11 +86,11 @@ serving system could use it: the arm is a ceiling for a weather product as accur
 **Shortwave radiation carries nearly all of the gain.** The seven single-column gains sum to -0.115
 against -0.100 for all columns together. Temperature, which the plan expected to lead, gave -0.013
 with an interval that includes zero. Precipitation is near zero in both sources, so its interval
-excluding zero is a rounding effect and not a finding.
+excluding zero is not a finding.
 
 ![All seven columns, by lead band](figure_2.svg)
 
-**ERA5 helps only from 3 days ahead.** The gain by lead band is -0.075 at 3 to 6 days (95% interval
+**The all-variable ERA5 arm helps only from 3 days ahead.** The gain by lead band is -0.075 at 3 to 6 days (95% interval
 -0.112 to -0.039), -0.130 at 7 to 10 days (-0.192 to -0.070) and -0.147 at 11 to 15 days (-0.216 to
 -0.078). It is +0.028 at 0 to 24 hours (+0.005 to +0.047) and +0.002 at 1 to 2 days (-0.036 to
 +0.038), so ERA5 is not better than ENS inside 2 days. The ENS arm scores 4.50 at 0 to 24 hours and
@@ -98,7 +98,7 @@ excluding zero is a rounding effect and not a finding.
 
 ## Limits
 
-- **The weather model was trained on ENS control-member weather and not on ERA5.** ERA5 differs
+- **The N1 XGBoost model was trained on ENS control-member weather and not on ERA5.** ERA5 differs
   from ENS in bias (for example, its mean shortwave is 132.6 against 139.1 W/m² over the validation
   year), so a model trained on ERA5 might gain more.
 - **The 5% to 95% band covers 86% with ERA5 against 85% with ENS, and the 10% to 90% band covers 74%
