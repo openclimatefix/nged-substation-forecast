@@ -28,7 +28,9 @@ from e00029_physics import (
 )
 from studies.pv_dataset import pv_sites
 
-PLANTS_PER_LOCATION = 6
+PLANTS_PER_LOCATION = 8
+ON_PRIOR_DRAWS = 6
+"""The first draws of a location are on-prior; the last two have off-prior orientations."""
 WINDOW_ROWS = 2 * 365 * 48
 NOISE_SD = 0.04
 NOISE_CORRELATION = 0.95
@@ -83,7 +85,7 @@ def main() -> None:  # noqa: PLR0915
     targets, masks = [], []
     for location, series_id in enumerate(series):
         frame = analysis.filter(pl.col("time_series_id") == series_id).sort("valid_time")
-        for _draw in range(PLANTS_PER_LOCATION):
+        for draw in range(PLANTS_PER_LOCATION):
             start = int(rng.integers(0, frame.height - WINDOW_ROWS))
             window = frame.slice(start, WINDOW_ROWS)
             ghi = window["shortwave_cams"].to_numpy()
@@ -99,6 +101,9 @@ def main() -> None:  # noqa: PLR0915
                 "azimuth": float(rng.uniform(150, 210)),
                 "dc": float(rng.uniform(0.9, 1.3)),
             }
+            if draw >= ON_PRIOR_DRAWS:
+                truth["tilt"] = float(rng.choice([5.0, 60.0]))
+                truth["azimuth"] = float(rng.choice([110.0, 250.0]))
             truth["ac"] = truth["dc"] * float(rng.uniform(0.7, 1.0))
             truth["ratio"] = truth["dc"] / truth["ac"]
             sky_np = {
@@ -127,6 +132,7 @@ def main() -> None:  # noqa: PLR0915
                 rows.append(
                     {
                         "version": version, "location": location, "plant": len(rows) // 2,
+                        "off_prior": draw >= ON_PRIOR_DRAWS,
                         **{f"truth_{k}": v for k, v in truth.items()},
                         "clip_share": float((clean[usable] > 0.98 * truth["ac"]).mean()),
                     }
@@ -167,8 +173,9 @@ def main() -> None:  # noqa: PLR0915
     frame = pl.DataFrame(results)
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(WORK_DIR / "synthetic.parquet")
-    for version in ("same", "different"):
-        part = frame.filter(pl.col("version") == version)
+    for version, off_prior in [(v, o) for v in ("same", "different") for o in (False, True)]:
+        part = frame.filter((pl.col("version") == version) & (pl.col("off_prior") == off_prior))
+        version = f"{version}{' (off-prior)' if off_prior else ''}"  # noqa: PLW2901
         fit_mae = 100 * float(np.mean(part["fit_mae"].to_numpy()))
         print(f"\n{version}: {part.height} plants, fit MAE {fit_mae:.2f} points")
         for name in PARAMETER_NAMES:

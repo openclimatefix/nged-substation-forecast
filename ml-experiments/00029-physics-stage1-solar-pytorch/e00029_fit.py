@@ -258,7 +258,7 @@ def train_layers(
     return models
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912
     """Fit the physics models, then every seed's layers, and write mixtures and point forecasts."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke", action="store_true", help="20 rounds, 2 runs, no output")
@@ -266,6 +266,9 @@ def main() -> None:
     sites = site_table()
     analysis = pl.read_parquet(ANALYSIS_PATH)
     observed = observed_training_power(sites=sites)
+    if "target" in analysis.columns:
+        msg = "the analysis frame already has a target column"
+        raise ValueError(msg)
     training = {
         int(series): analysis.filter(
             (pl.col("time_series_id") == series)
@@ -282,14 +285,18 @@ def main() -> None:
         for series in sites["time_series_id"]
     }
     started = time.monotonic()
-    fitted = fit_physics(sites=sites, training=training)
-    print(f"physics fits in {time.monotonic() - started:.0f} s", flush=True)
-    if not smoke:
-        WORK_DIR.mkdir(parents=True, exist_ok=True)
-        label_of = dict(zip(sites["time_series_id"], sites["site"], strict=True))
-        PARAMS_PATH.write_text(
-            json.dumps({label_of[k]: v for k, v in fitted.items()}, indent=1, sort_keys=True)
-        )
+    label_of = dict(zip(sites["time_series_id"], sites["site"], strict=True))
+    if PARAMS_PATH.exists() and not smoke:
+        stored = json.loads(PARAMS_PATH.read_text())
+        fitted = {k: stored[v] for k, v in label_of.items()}
+    else:
+        fitted = fit_physics(sites=sites, training=training)
+        print(f"physics fits in {time.monotonic() - started:.0f} s", flush=True)
+        if not smoke:
+            WORK_DIR.mkdir(parents=True, exist_ok=True)
+            PARAMS_PATH.write_text(
+                json.dumps({label_of[k]: v for k, v in fitted.items()}, indent=1, sort_keys=True)
+            )
     files = sorted(ENS_VALIDATION_DIR.glob("init=*.parquet"))[: 2 if smoke else None]
     for seed in SEEDS[:1] if smoke else SEEDS:
         targets = {arm: MIXTURE_DIR / f"{arm}_seed{seed}.parquet" for arm in ARMS}

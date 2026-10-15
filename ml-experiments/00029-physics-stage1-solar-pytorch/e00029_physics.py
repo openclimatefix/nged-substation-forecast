@@ -272,7 +272,7 @@ def fit_plants(
         optimiser.step()
         schedule.step()
     with torch.no_grad():
-        final = loss_terms(draws=8).reshape(plants, n_starts)
+        final = loss_terms(draws=64).reshape(plants, n_starts)
         best = final.argmin(dim=1)
         index = torch.arange(plants, device=device) * n_starts + best
         best_mean, best_sd = mean[index], torch.exp(log_sd[index])
