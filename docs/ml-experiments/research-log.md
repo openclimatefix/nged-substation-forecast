@@ -722,9 +722,9 @@ refitted 00019's model on 20 demand series (8 Primary substations that meter in 
   over all leads: +0.15 points (99.44% interval +0.03 to +0.26); all series in one model: +0.29
   (+0.19 to +0.42). Absolute Primary scores: per series 5.32, by type 5.47, all series 5.61.
 - **Finding for later experiments:** the series identifier is essential. Without it the by-type
-  pool loses a further 0.82 points and the all-series pool 0.85. A random grouping of 5 series scores
-  within 0.06 points of the by-type grouping, so the number of models matters more than which series
-  share one.
+  pool loses a further 0.82 points and the all-series pool 0.85. On the 16 Primary substations a random
+  grouping scores the same as the by-type grouping (5.47 each), so the number of models matters
+  more than which Primary substations share one.
 - **Write-up and pull request:** [result](00024-pooling-groupings-demand-xgboost/result.md),
   [PR #1230 (Experiment 24: which groupings of substations can share one XGBoost model (plan))](https://github.com/openclimatefix/nged-substation-forecast/pull/1230).
 

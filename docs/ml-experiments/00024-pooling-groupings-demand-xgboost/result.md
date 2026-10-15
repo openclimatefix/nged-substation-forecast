@@ -51,13 +51,13 @@ best_arm: >-
 headline: >-
   C1, by type with the identifier minus per series, Primary quantile score over all leads: +0.15
   points of capacity (99.44% interval +0.03 to +0.26). All series in one model, C2: +0.29 (+0.19 to
-  +0.42). Dropping the identifier costs a further 0.8 to 1.0 points (C5 to C8).
+  +0.42). Dropping the identifier costs 0.8 to 1.0 points (C5 to C8).
 lessons: >-
-  The 14-day correction removes 1.0 point from per-series models but only 0.6 from pooled models, so
-  pooled models lose 0.15 to 0.29 points once both are corrected. A random partition of the series
-  scores within 0.06 points of the by-type grouping, so the number of models matters more than which
-  series share one. The series identifier is essential: without it every pooled model loses 0.8 to
-  1.0 points.
+  The 14-day correction removes 1.0 point from per-series models but only 0.6 from pooled models,
+  so pooled models lose 0.15 to 0.29 points once both are corrected. On the 16 Primary series, a
+  random partition scores the same as the by-type grouping, so the number of models matters more
+  than which Primary substations share one. The series identifier is essential: without it every
+  pooled model loses 0.8 to 1.0 points.
 advice:
   - >-
     Give every pooled XGBoost demand model the series identifier as a categorical column, because
@@ -69,13 +69,15 @@ advice:
     Primary substations (C1, C3).
   - >-
     Do not train one model across all series when per-series models are affordable, because the
-    all-series pool lost 0.29 points (0.19 to 0.42, C2), mostly on BSP and GSP.
+    all-series pool lost 0.29 points on the Primary substations (0.19 to 0.42, C2) and 0.80 on the 2
+    BSP series (exploratory).
   - >-
-    Choose the pool by the number of models, not by the substations' type, because a random
-    partition scored within 0.06 points of the by-type grouping (C9).
+    For Primary substations, choose the pool by the number of models, not by the substations' type,
+    because a random partition scored the same as the by-type grouping (5.47 each, 16 series).
   - >-
     Re-test pooling on BSP and GSP with more than 4 series, because their intervals span 0.3 points
-    or more (exploratory contrasts).
+    or more (exploratory contrasts), and the by-type grouping scored 0.29 better than a random one
+    there.
 production_status: candidate
 adopted_in: none
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1230
@@ -117,22 +119,27 @@ by-type pools score the same to two decimal places.
 identifier the by-type pools score worse than `manual_heuristic` on Primary substations (+0.41,
 +0.15 to +0.69, exploratory, 95%).
 
-**Which series share a model hardly matters.** A random partition into 4 groups of 5 scores 5.47,
-the same as the by-type pools; the by-type pools beat it by 0.06 (C9, -0.13 to -0.01 on all 20
-series). The number of models explains most of the loss, not the similarity of the series.
+**On the Primary substations, which series share a model hardly matters.** A random partition into
+4 groups of 5 of all 20 series scores 5.47 on the 16 Primary substations, the same as the by-type
+pools (5.47). On all 20 series the by-type pools beat the random partition by 0.06 (C9, -0.13 to
+-0.01), and on the 4 BSP and GSP series by 0.29 (13.96 against 14.25, exploratory). Size bands (3
+models), by-type pools (4), and random groups (4) all lose 0.15 on Primary, so the data show a step
+between 1 model and 3 or 4 models, not an effect of the grouping.
 
 **The error correction helps pooled models less.** Without the correction, by-type pools beat
 per-series models by 0.30 on Primary (exploratory, -0.56 to -0.03, 95%): 6.04 against 6.34. The
 correction lowers per-series models by 1.0 points (6.34 to 5.32) and by-type pools by 0.6 (6.04 to
-5.47), so the corrected pools lose 0.15.
+5.47), so the corrected pools lose 0.15. The difference between the two reductions has no interval,
+so this finding is exploratory.
 
-**Pooling costs most on the biggest series.** By-type pools are worse than per-series models on 15
-of the 20 series (largest loss 0.57, largest gain 0.68). The all-series pool is worse on 18, and
-the BSP series lose 0.80 (0.64 to 1.00, exploratory, 95%). The 4 BSP and GSP series cannot separate
-the by-type pools from per-series models (+0.03, -0.15 to +0.15).
+**All-series pooling costs most on the BSP series.** By-type pools are worse than per-series models
+on 15 of the 20 series (largest loss 0.57, largest gain 0.68). The all-series pool is worse on 18,
+and the BSP series lose 0.80 (0.64 to 1.00, exploratory, 95%). The 4 BSP and GSP series cannot
+separate the by-type pools from per-series models (+0.03, -0.15 to +0.15).
 
 **The pooled stacks still beat `manual_heuristic` on Primary substations.** By-type pools: -0.42
-(-0.68 to -0.19). All-series pool: -0.27 (-0.56 to -0.03). Per-series models: -0.56 (-0.82 to -0.33).
+(-0.68 to -0.19). All-series pool: -0.27 (-0.56 to -0.03). Per-series models: -0.56 (-0.82 to
+-0.33).
 
 ## Cost
 
@@ -152,12 +159,15 @@ size falls from 435 MB to 22 to 95 MB with pooling.
 ## Predictions against outcomes
 
 - **Met:** by-type pools were predicted within plus or minus 0.3 points of per-series (+0.15), and
-  the all-series pool 0.2 to 1.0 worse (+0.29, at the low end).
+  the all-series pool 0.2 to 1.0 worse (+0.29, at the low end). The prediction that the loss falls
+  mostly on BSP and GSP was not confirmed: the Primary-only contrast is +0.29, and the BSP and GSP
+  contrast is +0.55 with an interval from -0.00 to +0.95 (exploratory).
 - **Met:** dropping the identifier raised the all-series score by 0.2 to 1.0 (+0.85).
 - **Missed:** dropping the identifier was predicted to raise the by-type score by at most 0.2; it
   raised it by 0.82.
 - **Met:** size-band pools fell between the by-type and all-series pools (level with by-type).
-- **Met, barely:** the random partition scored worse than by type (by 0.06).
+- **Met, barely:** the random partition scored worse than by type on all 20 series (by 0.06), and
+  level with it on the 16 Primary series.
 
 ## Limits
 
