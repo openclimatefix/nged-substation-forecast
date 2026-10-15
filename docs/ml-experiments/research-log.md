@@ -588,6 +588,6 @@ at the target time (row set `fold_a_every5d_v1`).
   absolute error 5.0 to 7.0 points of PV_Live capacity against 8.8 to 9.5), and its member mean was
   too high by 1.8 to 3.0 points at every lead band.
 - **Write-up and pull request:** [result](00028-pvlive-forecast-in-stage2-gsp-demand/result.md),
-  [PR #1235 (Experiment 28: does a forecast of the GSP's PV_Live solar generation help the stage 2 demand forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1235).
+  [PR #1235 (Experiment 28: does a GSP solar forecast help the stage 2 demand forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1235).
 
 ![Contrasts](00028-pvlive-forecast-in-stage2-gsp-demand/figure_1.svg)

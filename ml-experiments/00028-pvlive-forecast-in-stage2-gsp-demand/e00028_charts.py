@@ -92,7 +92,7 @@ def figure_2() -> alt.TopLevelMixin:
     return (
         alt.Chart(data)
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("band:N", sort=bands, title=None),
             xOffset="source:N",
             y=alt.Y("error:Q", title="Mean absolute error (points of PV_Live capacity)"),
