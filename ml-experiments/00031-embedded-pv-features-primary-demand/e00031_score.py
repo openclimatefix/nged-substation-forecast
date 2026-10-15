@@ -29,6 +29,7 @@ from studies import bootstrap, experiment_store
 ARMS_DIR: Final[Path] = common.WORK_DIR / "arms"
 RESULTS_DIR: Final[Path] = common.WORK_DIR / "results"
 HOLDOUT: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
+GSP_SITES: Final[tuple[str, ...]] = ("D1", "D6")
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time"]
 STORED_ARMS: Final[tuple[str, ...]] = ("manual_heuristic", "climatology")
 MEDIAN: Final[int] = 4
@@ -399,7 +400,10 @@ def build_arms(
     for name in FIT_ARMS:
         fit, _ = with_corrections(base=load_fit(name=name), series=series, power=power, grids=grids)
         arms[name] = stack(frame=fit)
-    directional = series.filter(pl.col("site").is_in(ecr.directional_sites(series=series)))
+    directional = series.filter(
+        (pl.col("substation_type") == "Primary")
+        & pl.col("site").is_in(ecr.directional_sites(series=series))
+    )
     others = arms["b0"].join(directional.select("time_series_id"), on="time_series_id", how="anti")
     arms["a4"] = pl.concat([arms["a4"], others.select(arms["a4"].columns)]).sort(*KEYS, "seed")
     for name in STORED_ARMS:
@@ -426,7 +430,7 @@ def main() -> None:
     context = _sky_columns(series=series, grids=grids).join(
         series.select(
             "time_series_id",
-            "site",
+            site_label=pl.col("site"),
             group=pl.col("substation_type"),
             directional=pl.col("site").is_in(directional),
         ),
@@ -457,9 +461,17 @@ def main() -> None:
             )
         except FileExistsError:
             continue
-    absolute = _absolute(scored=scored)
+    oracle = _oracle_at_gsps(
+        series=series, power=power, grids=grids, arms=arms, cases=cases, context=context
+    )
+    scored_oracle = prepare(arms=oracle, context=context)
+    absolute = _absolute(
+        scored={**scored, "a7": scored_oracle["a7"], "b0_gsp": scored_oracle["b0"]}
+    )
     absolute.write_parquet(RESULTS_DIR / "absolute.parquet")
-    contrasts = _contrasts(scored=scored)
+    contrasts = pl.concat(
+        [_contrasts(scored=scored), _oracle_contrast(scored=scored_oracle)], how="diagonal_relaxed"
+    )
     contrasts.write_parquet(RESULTS_DIR / "contrasts.parquet")
     _per_site(scored=scored, register=register, directional=directional).write_parquet(
         RESULTS_DIR / "per_site.parquet"
@@ -472,6 +484,51 @@ def main() -> None:
                 "label", "metric", "difference", "lower", "upper", "level", "months_negative"
             )
         )
+
+
+def _oracle_at_gsps(
+    *,
+    series: pl.DataFrame,
+    power: dict[str, np.ndarray],
+    grids: dict[str, pv.SiteGrid],
+    arms: dict[str, pl.DataFrame],
+    cases: pl.DataFrame,
+    context: pl.DataFrame,
+) -> dict[str, pl.DataFrame]:
+    """Return B0 and the PV_Live oracle A7 on the 2 GSPs, with their observed power attached."""
+    gsp_ids = series.filter(pl.col("site").is_in(GSP_SITES))["time_series_id"]
+    fit, _ = with_corrections(base=load_fit(name="a7"), series=series, power=power, grids=grids)
+    raw = {"b0": arms["b0"].filter(pl.col("time_series_id").is_in(gsp_ids)), "a7": stack(frame=fit)}
+    return {
+        name: frame.select(*KEYS, "seed", *common.LEVEL_COLUMNS).join(
+            cases, on=KEYS, how="inner", validate="m:1"
+        )
+        for name, frame in raw.items()
+    }
+
+
+def _oracle_contrast(*, scored: dict[str, pl.DataFrame]) -> pl.DataFrame:
+    """Return A7 minus B0 at the 2 GSPs, which is exploratory and decides nothing."""
+    return pl.DataFrame(
+        [
+            {
+                "label": "E6: A7 (PV_Live oracle) minus B0 at the 2 GSPs",
+                "planned": False,
+                **contrast(
+                    arms=scored,
+                    treatment="a7",
+                    reference="b0",
+                    subset="all leads",
+                    where=pl.lit(True),
+                    group="GSP",
+                    metric=metric,
+                    level=95.0,
+                    decisive=False,
+                ),
+            }
+            for metric in ("quantile_score", "median_error")
+        ]
+    )
 
 
 def _absolute(*, scored: dict[str, pl.DataFrame]) -> pl.DataFrame:
@@ -547,7 +604,9 @@ def _leave_outs(*, scored: dict[str, pl.DataFrame]) -> list[dict[str, object]]:
     """Return contrasts without the largest-B0-error site and without the three heavy PV sites."""
     b0 = scored["b0"].filter(pl.col("group") == "Primary")
     worst = (
-        b0.group_by("site").agg(pl.col("quantile_score").mean()).sort("quantile_score")["site"][-1]
+        b0.group_by("site_label")
+        .agg(pl.col("quantile_score").mean())
+        .sort("quantile_score")["site_label"][-1]
     )
     exclusions = {
         "without the worst B0 site": [worst],
@@ -562,7 +621,7 @@ def _leave_outs(*, scored: dict[str, pl.DataFrame]) -> list[dict[str, object]]:
                 treatment=treatment,
                 reference="b0",
                 subset=tag,
-                where=~pl.col("site").is_in(excluded),
+                where=~pl.col("site_label").is_in(excluded),
                 group="Primary",
                 metric="quantile_score",
                 level=95.0,
@@ -579,13 +638,14 @@ def _per_site(
 ) -> pl.DataFrame:
     """Return, per series, each arm's mean quantile score and the register share."""
     pieces = [
-        frame.group_by("site", "group")
+        frame.group_by("site_label", "group")
         .agg(score=pl.col("quantile_score").mean())
         .with_columns(arm=pl.lit(name))
         for name, frame in scored.items()
     ]
     return (
         pl.concat(pieces)
+        .rename({"site_label": "site"})
         .join(register.select("site", "role", "ecr_share"), on="site", validate="m:1")
         .with_columns(directional=pl.col("site").is_in(directional))
     )

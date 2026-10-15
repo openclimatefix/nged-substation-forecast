@@ -1,13 +1,13 @@
 ---
 id: "00031"
 slug: embedded-pv-features-primary-demand
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 16 Primary substation demand series, giving the single-stage ENS-trained quantile model N1
   trailing estimates of each substation's embedded (unmetered) solar capacity, built from the
-  Embedded Capacity Register (ECR) as a lower bound plus a non-negative amount learned from recent
-  power and irradiance, lowers the quantile score on sunny days, and a linear PV offset or a
+  Embedded Capacity Register (ECR) as a prior for Primaries and a floor for BSP and GSP series, plus
+  an amount learned from recent power and irradiance, lowers the quantile score on sunny days, and a linear PV offset or a
   sunshine-shaped correction does so more reliably than extra tree columns.
 prediction: >-
   All-lead Primary gains against the 00019 stack of 0 to -0.15 points of capacity, concentrated in
@@ -43,15 +43,114 @@ row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels) and mean absolute error
   of the median, in points of capacity (1 point is 1% of the series' effective capacity)
+verdict: inconclusive
+best_arm: >-
+  None. B0, the 00019 stack without the half-life (5.32 points on the quantile score over all
+  leads), is level with A3 (5.32) and A5 (5.33); the shuffled control A6 scores 5.31
+headline: >-
+  C3, A3 (PV products with the register) minus B0, quantile score over all leads: +0.006 points of
+  capacity (99.17% interval -0.022 to +0.033). C5, A5 (shaped correction) minus B0: +0.016 (-0.069
+  to +0.100). C1, A1 (capacity statistics) minus B0: +0.167 (+0.091 to +0.243), a loss in all 12
+  months.
+lessons: >-
+  The capacity estimates do not lower the all-lead score of Primary demand forecasts. The shaped
+  correction lowers the score by 0.28 points in sunny summer daylight (95% interval -0.43 to -0.15)
+  and raises it by 0.68 under heavy cloud (+0.37 to +1.04), so the two cancel. At the 2 GSPs, adding
+  PV_Live's true generation lowers the score by 0.82 (-1.06 to -0.55), which bounds what a perfect
+  PV forecast could give.
+advice:
+  - >-
+    Do not add the capacity statistics (cap_slope_28d, sunny_minus_cloudy_28d, cap_change_yoy) as
+    columns to N1, because they raised the quantile score by 0.17 in every month (C1).
+  - >-
+    Do not add PV products built from the register to N1, because the shuffled control scored 0.018
+    better than A3 (C6) and A3 itself is level with B0 (C3).
+  - >-
+    Calibrate ENS irradiance to CAMS before applying a fitted PV slope to ENS forecasts, because the
+    shaped correction gains 0.28 in sunny summer daylight and loses 0.68 under heavy cloud (figure 2).
+  - >-
+    Test the shaped correction only for forecasts under 48 hours, where it lowered the score by 0.07
+    (-0.13 to -0.02), and judge it against a second validation year (C5, 0-48 h).
+  - >-
+    Treat the register as a weak prior at Primaries: the median data estimate of PV capacity was 0.33
+    of effective capacity against a register median of 0.08, so the register adds little (feature
+    table).
 production_status: not-for-production
 adopted_in: none
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1239
 code: ml-experiments/00031-embedded-pv-features-primary-demand/
 ---
 
 # Experiment 31: do embedded-solar capacity features lower the error of Primary demand forecasts?
 
-**Planned.** This page is the plan, committed before any code runs. The design came from an Opus
-design brief of 2026-10-15; the departures from it are listed under "Departures from the design".
+**Inconclusive: none of the capacity features lowers the all-lead quantile score of Primary demand
+forecasts, and the two arms that came closest cannot be separated from zero.** B0 is the 00019
+stack without its half-life: N1 with the 14-day correction and the 1.15 spread factor. Scores are
+the quantile score over all leads, in points of capacity (1 point is 1% of a series' effective
+capacity), on 16 Primary substations, 73 forecast runs every 5 days from July 2025 to June 2026,
+with ENS weather. B0 scores 5.32. A3 (PV products using the register) scores 5.32, A5 (the shaped
+correction) 5.33, A4 (the linear offset) 5.33, and the shuffled control A6 5.31. A1 (capacity
+statistics as columns) scores 5.49 and A2 (PV products from data alone) 5.35, which are losses.
+
+![The six planned contrasts](figure_1.svg)
+
+| Arm | Quantile score | Median error | Contrast with B0 (99.17% interval) |
+|---|---|---|---|
+| B0, the 00019 stack | 5.32 | 7.34 | |
+| A1 capacity statistics | 5.49 | 7.59 | C1 +0.167 (+0.091 to +0.243) |
+| A2 PV products, data only | 5.35 | 7.39 | C2 +0.036 (+0.002 to +0.074) |
+| A3 PV products with the register | 5.32 | 7.35 | C3 +0.006 (-0.022 to +0.033) |
+| A4 linear offset | 5.33 | 7.34 | C4 +0.012 (-0.051 to +0.081) |
+| A5 shaped correction | 5.33 | 7.35 | C5 +0.016 (-0.069 to +0.100) |
+| A6 shuffled control of A3 | 5.31 | 7.33 | C6, A3 minus A6: +0.018 (-0.002 to +0.033) |
+| `manual_heuristic` | 5.89 | 8.23 | |
+| `climatology` | 7.46 | 10.33 | |
+
+**The verdict follows the pre-registered rule.** No arm reached "port" or "small gain". A1 and A2
+are losses (intervals wholly above zero), A3 is a null with a half-width of 0.03, and A4 and A5 are
+nulls with half-widths of 0.07 and 0.08, wider than the 0.05 that would have excluded a gain of that
+size, so the verdict is inconclusive and not refuted.
+
+**The shaped correction trades gains in sunny hours for losses in cloudy ones.** A5 lowers the score
+by 0.28 in April to September at a clear-sky index of 0.7 or more (95% interval -0.43 to -0.15; B0
+scores 5.63 there) and by 0.07 at leads under 48 hours (-0.13 to -0.02). It raises the score by 0.68
+at a clear-sky index under 0.3 (+0.37 to +1.04) and by 0.41 between 0.3 and 0.7. The slope of the
+14-day residuals on PV output was fitted in 1,380 of 1,460 series-runs and averaged -0.11 over all
+runs, so the substations hold PV that N1 under-allows for. The ENS irradiance forecast is biased against
+CAMS, which the slope was fitted on, so the correction is too large on cloudy forecasts.
+
+![Each arm's gain over B0 by sky condition, season, and lead](figure_2.svg)
+
+**The register adds little.** The median data estimate of PV capacity at a Primary was 0.33 of
+effective capacity against a register median of 0.08, so the weights favour the data estimate. A3
+minus A2 is -0.030 (-0.061 to -0.007), but A3 does not beat the shuffled control (C6), so the
+register's gain is not evidence of capacity information. The estimator recovered an injected
+capacity ramp in the known-answer check (F1's error under 0.001 share of capacity on 2 directional
+Primaries, within one standard error at every origin).
+
+**At the 2 GSPs, true PV_Live generation lowers the score by 0.82.** B0 scores 19.95 and the oracle
+A7 19.13 (A7 minus B0 -0.82, 95% interval -1.06 to -0.55; 12 of 12 months). The 2 BSPs and 2 GSPs
+are descriptive; A3 and A5 move them by less than 0.3 points, and no contrast is drawn.
+
+![Each Primary's gain from A3 and A5 over B0](figure_3.svg)
+
+## Limits
+
+- **One validation year gives 12 month blocks,** so A4 and A5 cannot exclude a gain of 0.07 to 0.08
+  points.
+- **A4 refits only the 8 directional Primaries,** so C4 is pooled over 16 and diluted by half; the
+  8 non-directional Primaries reuse B0. Their folded readings (PV above demand) also enter F1 to
+  F5, which no arm corrects.
+- **CAMS publication delay was not measured.** The features assume CAMS is available 48 hours
+  before the origin, as the ECMWF notice of February 2026 says ("up to yesterday").
+- **The register is a prior at Primaries by assumption:** rows of 1 MW or more are treated as
+  metered, because no larger solar farm is listed under a Primary in the metadata table.
+- **Not run:** the no-fit baseline (`manual_heuristic` on gross demand minus modelled PV), and the
+  weekly lags of 00030 in every arm.
+- **No tweak after the first run:** the plan allowed one post hoc change; the sunny and cloudy split
+  of A5 suggests calibrating ENS irradiance to CAMS first, which the next experiment can test.
+
+## Plan, written before any code ran
 
 ## Plan: sizing
 
