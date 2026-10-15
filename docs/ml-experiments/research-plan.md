@@ -19,6 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
+| [P26](#p26-fingerprints-for-a-pooled-demand-model) | Do numeric fingerprints of each substation close the gap between a pooled by-type model and per-series models, and carry a substation held out of the pool? | 1 | Experiment 00024 | Planned as [experiment 32](00032-substation-fingerprints-pooled-demand/result.md) |
 
 ## Deferred until the first results are in
 
@@ -38,6 +39,14 @@ model.** Each keeps its section below, and a result may promote it.
 **Resolution limits.** The sections below flag the experiments whose planned contrasts the available
 sample cannot resolve. The sample is 16 Primary substations, 9 generator series, and one validation
 year with 12 months, and it resolves gains of roughly 0.3 points of capacity or more.
+
+### P26: fingerprints for a pooled demand model
+
+**Experiment 00024 left a 0.15-point gap between a by-type pooled model with the series identifier
+and per-series models.** Scaling to 2,500 series needs pooled models that cope with a substation
+that has no training history. Experiment 32 tests location, training-window statistics, and
+recent-window statistics as fingerprint columns, with and without the identifier, and on held-out
+substations.
 
 ### P2: embedded-solar capacity from lagged residuals
 
