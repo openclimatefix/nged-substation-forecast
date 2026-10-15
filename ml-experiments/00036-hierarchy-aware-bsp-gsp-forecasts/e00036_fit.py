@@ -114,12 +114,20 @@ def with_extras(
     child_table = context.oof if training else context.val_children
     if arm in ("b1", "o"):
         names = child_columns(ids=[*primaries, *generators])
-        rows = rows.join(child_table.select(*keys, *names), on=keys, how="left", validate="m:1")
+        rows = rows.join(
+            child_table.select(*keys, *names),
+            on=keys,
+            how="left",
+            validate="m:1",
+            maintain_order="left",
+        )
         if arm == "o":
             observed = context.observed.select("valid_time", *names).rename(
                 {n: f"{n}_obs" for n in names}
             )
-            rows = rows.join(observed, on="valid_time", how="left", validate="m:1")
+            rows = rows.join(
+                observed, on="valid_time", how="left", validate="m:1", maintain_order="left"
+            )
             filled = sum(rows[f"{n}_obs"].is_null().sum() for n in names)
             context.fill_counts[row["time_series_id"], "train" if training else "val"] = (
                 int(filled),
@@ -139,9 +147,9 @@ def with_extras(
     if arm == "b4":
         pv = context.pv_train if training else context.pv_val
         pv = pv.filter(pl.col("time_series_id") == row["time_series_id"]).select(*keys, "pv_share")
-        rows = rows.join(pv, on=keys, how="left", validate="m:1").with_columns(
-            wind_power_index=wind_index(speed=pl.col("wind_speed_100m"))
-        )
+        rows = rows.join(
+            pv, on=keys, how="left", validate="m:1", maintain_order="left"
+        ).with_columns(wind_power_index=wind_index(speed=pl.col("wind_speed_100m")))
         return rows, ["wind_power_index", "pv_share"]
     return rows, []
 
@@ -181,6 +189,10 @@ def pool(*, run: pl.DataFrame, raw: np.ndarray) -> pl.DataFrame:
     if run.height != run.select(*RUN_KEYS).n_unique() * members or members != common.MEMBERS:
         msg = "every valid time must hold all 51 members"
         raise ValueError(msg)
+    order = run["ensemble_member"].to_numpy().reshape(-1, members)
+    if (order != np.arange(members)).any():
+        msg = "the members of a case are not contiguous and sorted 0 to 50"
+        raise ValueError(msg)
     member_quantiles = np.sort(raw, axis=1).reshape(-1, members, len(common.LEVELS))
     keys = run.select(*RUN_KEYS).unique(maintain_order=True)
     return keys.hstack(
@@ -217,7 +229,13 @@ def fit_b2(*, row: dict, context: Context) -> pl.DataFrame:
     names = child_columns(ids=[*primaries, *generators])
     capacity = row["effective_capacity_mw"]
     rows = base_inputs(row=row, arrays=context.arrays[row["site"]], frame=context.train)
-    rows = rows.join(context.oof.select(*RUN_KEYS, *names), on=list(RUN_KEYS), how="left")
+    rows = rows.join(
+        context.oof.select(*RUN_KEYS, *names),
+        on=list(RUN_KEYS),
+        how="left",
+        validate="m:1",
+        maintain_order="left",
+    )
     rows = rows.filter(pl.col("power").is_finite() & pl.all_horizontal(pl.col(names).is_not_null()))
     design = np.column_stack([np.ones(rows.height), rows.select(names).to_numpy()])
     coefficients, *_ = np.linalg.lstsq(
@@ -237,7 +255,11 @@ def fit_b2(*, row: dict, context: Context) -> pl.DataFrame:
     for path in context.val_files:
         run = validation_run(path=path, row=row, context=context)
         run = run.join(
-            context.val_children.select(*MEMBER_KEYS, *names), on=list(MEMBER_KEYS), how="left"
+            context.val_children.select(*MEMBER_KEYS, *names),
+            on=list(MEMBER_KEYS),
+            how="left",
+            validate="m:1",
+            maintain_order="left",
         )
         value = coefficients[0] + run.select(names).to_numpy() @ coefficients[1:]
         band = np.array(
@@ -252,7 +274,7 @@ def fit_b2(*, row: dict, context: Context) -> pl.DataFrame:
 
 
 ARMS_FOR: Final[dict[str, tuple[str, ...]]] = {
-    "BSP": ("b0", "b1", "o", "b2", "b3"),
+    "BSP": ("b0", "o", "b1", "b2", "b3"),
     "GSP": ("b0", "b1", "b3", "b4"),
 }
 

@@ -66,6 +66,9 @@ def load_arms() -> dict[str, pl.DataFrame]:
     arms = {}
     for arm in FITTED_ARMS:
         paths = sorted(ARMS_DIR.glob(f"{arm}_seed*.parquet"))
+        if not paths:
+            print(f"arm {arm} not fitted; skipped", flush=True)
+            continue
         if len(paths) != len(common.SEEDS):
             msg = f"arm {arm} has {len(paths)} seed files, expected {len(common.SEEDS)}"
             raise FileNotFoundError(msg)
@@ -79,14 +82,7 @@ def load_arms() -> dict[str, pl.DataFrame]:
         experiment_id=13, name="climatology", row_set_id=common.ROW_SET_ID
     )
     arms["n1"] = stored_n1.select(*KEYS, "seed", *common.LEVEL_COLUMNS)
-    arms["climatology"] = pl.concat(
-        [
-            stored_clim.select(*KEYS, *common.LEVEL_COLUMNS).with_columns(
-                seed=pl.lit(seed).cast(pl.Int8)
-            )
-            for seed in common.SEEDS
-        ]
-    )
+    arms["climatology"] = stored_clim.select(*KEYS, "seed", *common.LEVEL_COLUMNS)
     return arms
 
 
@@ -106,18 +102,20 @@ def actual_table(*, series: pl.DataFrame, power: dict[str, np.ndarray]) -> pl.Da
         pieces.append(
             keys.with_columns(
                 actual=pl.Series(common.take(values=power[row["site"]], index=index)),
-                site=pl.lit(row["site"]),
+                label=pl.lit(row["site"]),
             )
         )
-    return pl.concat(pieces).filter(pl.col("actual").is_finite())
+    return pl.concat(pieces).filter(pl.col("actual").is_finite() & (pl.col("valid_time") < HOLDOUT))
 
 
 def prepare(*, arms: dict[str, pl.DataFrame], cases: pl.DataFrame) -> dict[str, pl.DataFrame]:
     """Restrict every arm to the series and cases it shares with all others, and add losses."""
     shared = cases
+    for frame in arms.values():
+        shared = shared.join(frame.select(*KEYS).unique(), on=KEYS, how="semi")
     out = {}
     for name, frame in arms.items():
-        kept = frame.join(shared.select(*KEYS, "site", "actual"), on=KEYS, how="inner").sort(
+        kept = frame.join(shared.select(*KEYS, "label", "actual"), on=KEYS, how="inner").sort(
             *KEYS, "seed"
         )
         quantiles = np.sort(kept.select(common.LEVEL_COLUMNS).to_numpy(), axis=1)
@@ -138,18 +136,18 @@ def prepare(*, arms: dict[str, pl.DataFrame], cases: pl.DataFrame) -> dict[str, 
             pl.col("quantile_score", "median_error", "signed_error").cast(pl.Float64)
         )
     counts = {
-        (name, site): frame.filter(pl.col("site") == site).height
+        (name, site): frame.filter(pl.col("label") == site).height
         for name, frame in out.items()
-        for site in cases["site"].unique()
+        for site in cases["label"].unique()
     }
     return out | {
-        "_counts": pl.DataFrame([{"arm": a, "site": s, "rows": n} for (a, s), n in counts.items()])
+        "_counts": pl.DataFrame([{"arm": a, "label": s, "rows": n} for (a, s), n in counts.items()])
     }
 
 
 def in_scope(*, frame: pl.DataFrame, scope: str, site: str) -> pl.DataFrame:
     """Return a series' rows in a lead scope (all leads, or one lead band)."""
-    frame = frame.filter(pl.col("site") == site)
+    frame = frame.filter(pl.col("label") == site)
     if scope == "all leads":
         return frame
     low, high = next((lo, hi) for name, lo, hi in common.LEAD_BANDS if name == scope)
@@ -170,7 +168,9 @@ def contrast(
     """Return one paired contrast's estimate, interval, and month agreement."""
     losses = experiment_store.losses_for_bootstrap(
         arm_losses={
-            name: in_scope(frame=arms[name], scope=scope, site=site).join(
+            name: in_scope(frame=arms[name], scope=scope, site=site)
+            .drop("label")
+            .join(
                 in_scope(frame=arms[other], scope=scope, site=site).select(*KEYS, "seed"),
                 on=[*KEYS, "seed"],
                 how="semi",
@@ -230,7 +230,7 @@ def main() -> None:
     counts = prepared.pop("_counts")
     counts.write_parquet(RESULTS_DIR / "cases.parquet")
     arms = dict(prepared)
-    for arm in FITTED_ARMS:
+    for arm in (a for a in FITTED_ARMS if a in raw):
         try:
             experiment_store.write_predictions(
                 experiment_id=common.EXPERIMENT_ID,
@@ -243,12 +243,14 @@ def main() -> None:
             continue
     absolute = []
     for name, frame in arms.items():
-        for site in sorted(frame["site"].unique()):
+        for site in sorted(frame["label"].unique()):
             for scope in SCOPES:
                 part = in_scope(frame=frame, scope=scope, site=site)
                 if part.is_empty():
                     continue
-                losses = experiment_store.losses_for_bootstrap(arm_losses={name: part})
+                losses = experiment_store.losses_for_bootstrap(
+                    arm_losses={name: part.drop("label")}
+                )
                 for metric in ("quantile_score", "median_error"):
                     interval = bootstrap.bootstrap_absolute(losses=losses, arm=name, metric=metric)
                     absolute.append(
