@@ -134,6 +134,30 @@ PyTorch fit, and the SciPy fit gives point values only.
 | E | 17.6 | 35.0 (26.1 to 42.8) | 180.3 (175.1 to 185.9) | 16.4 (15.8 to 17.1) | 14.7 (13.5 to 15.6) | 1.12 (1.06 to 1.21) | 34.9 | 16.1 | 15.8 |
 | F | 6.0 | 20.7 (19.3 to 22.1) | 179.9 (177.2 to 182.3) | 7.4 (7.3 to 7.4) | 5.9 (5.7 to 6.0) | 1.26 (1.23 to 1.29) | 22.0 | 7.2 | 5.7 |
 
+**Comparison with NGED's Embedded Capacity Register (ECR), by anonymous farm label.** We matched
+each farm to ECR rows only where the farm's name equals the ECR's customer name or customer site
+exactly (ignoring case and punctuation) and the licence area agrees, with no fuzzy matching. The
+PyTorch DC capacity is compared with the ECR's already connected registered capacity, and the
+PyTorch AC capacity with the ECR's maximum export capacity.
+
+| Farm | ECR match | ECR status | ECR registered capacity (MW) | ECR maximum export capacity (MW) | Fitted DC over registered | Fitted AC over export |
+|---|---|---|---|---|---|---|
+| A | no match | | | | | |
+| B | no match | | | | | |
+| C | no match | | | | | |
+| D | no match | | | | | |
+| E | one row | Connected | 18.7 | 17.9 | 0.88 (0.84 to 0.91) | 0.82 (0.76 to 0.87) |
+| F | no match | | | | | |
+
+**Only farm E matched, and its fitted capacities are 12% (DC) and 18% (AC) below the ECR.** The
+fitted DC capacity interval (15.8 to 17.1 MW) excludes the registered 18.7 MW, so the interval does
+not cover the register. Farm E's effective capacity of 17.6 MW is about 98% of the export capacity, which
+means the metered peaks sit at the export limit. The fitted AC capacity of 14.7 MW is below that
+observed peak, so the physics model does not reach the metered peaks, which may explain the
+shortfall; we did not test this. The effective capacity therefore tracks the ECR export capacity and
+the fitted values do not. The other five farms are named differently in the ECR from the metadata,
+so their comparison is empty.
+
 ## Synthetic test (result)
 
 ![Synthetic recovery](figure_3.svg)
