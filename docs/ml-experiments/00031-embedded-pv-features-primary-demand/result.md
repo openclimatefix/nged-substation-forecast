@@ -31,11 +31,13 @@ decision_rule: >-
   physics shape or a date fingerprint. The verdict is `supported` when at least one arm is "port",
   `small gain` when none is but at least one is "small gain", `refuted` when no arm is "port" or
   "small gain" and every null interval has a half-width under 0.05 (so a gain of that size is
-  excluded), and `inconclusive` otherwise. The prediction (0 to -0.15 all-lead) mostly sits below the
+  excluded), and `inconclusive` otherwise. The prediction (0 to -0.15 all-lead) mostly sits below
+  the
   bars, so `small gain` is the expected verdict. A verdict never rests on a breakdown. The mean
   absolute error of the median decides nothing, nor do A7 and the no-fit baseline.
 benchmark: >-
-  B0, the 00019 stack (N1 with the 14-day correction and the 1.15 spread factor); also `manual_heuristic`,
+  B0, the 00019 stack (N1 with the 14-day correction and the 1.15 spread factor); also
+  `manual_heuristic`,
   `climatology`, and N1 (stored, 00013)
 row_set_id: fold_a_every5d_v1
 metric: >-
@@ -69,23 +71,31 @@ a data source (the ECR). Plan, code, and write-up each get one Sonnet review.
 - **Followed:** compare against N1 with the 14-day correction and the 00019 stack, not N1 alone
   (00030); keep `colsample` at 1.0; report absolute scores beside contrasts; guard against one
   substation setting the pooled figure (00007).
-- **Departed from:** 00030's weekly mean and median lags are not in B0, because 00030 has not merged;
+- **Departed from:** 00030's weekly mean and median lags are not in B0, because 00030 has not
+merged;
   a follow-up can add them to every arm.
 
 ## Method
 
-**Capacity enters as a trailing estimate that changes over time, or as a linear offset.** N1 fits one
-model per series, so a per-series constant gives the trees nothing. Every feature is computed at each
+**Capacity enters as a trailing estimate that changes over time, or as a linear offset.** N1 fits
+one
+model per series, so a per-series constant gives the trees nothing. Every feature is computed at
+each
 forecast origin from power and irradiance observed up to 48 hours before the origin, so the same
 function serves training rows and validation rows.
 
 - **Per-unit PV, `p_unit`:** AC output of a generic fleet per MW of AC capacity
   (`studies.pv_physics.plant_power_mw`, tilt 35 degrees, azimuth 180 degrees, DC 1.15 MW, AC 1.0 MW,
-  times a 0.86 system derate; untuned). Fitted constants (the shrinkage weights and prior variance) use training origins only, which are those before 2025-07-01; validation origins run from 2025-07-01 to 2026-06-30. At lag times the irradiance is CAMS GHI at the substation's
+  times a 0.86 system derate; untuned). Fitted constants (the shrinkage weights and prior variance)
+  use training origins only, which are those before 2025-07-01; validation origins run from
+  2025-07-01 to 2026-06-30. At lag times the irradiance is CAMS GHI at the substation's
   location, which ECMWF publishes with a delay of at most 2 days (an ECMWF notice of February 2026
-  says "up to yesterday"; older pages say 2 days), so it exists before the 48-hour cut-off. The latency was not measured; if it exceeds 48 hours, the features would need the ENS analysis proxy, and the write-up says so. At valid
+  says "up to yesterday"; older pages say 2 days), so it exists before the 48-hour cut-off. The
+  latency was not measured; if it exceeds 48 hours, the features would need the ENS analysis proxy,
+  and the write-up says so. At valid
   times the irradiance is the ENS member's `shortwave`.
-- **Floor:** the ECR rows on the `Register Part 1 50kW - <1MW` sheet whose `Primary` name matches the
+- **Floor:** the ECR rows on the `Register Part 1 50kW - <1MW` sheet whose `Primary` name matches
+the
   substation exactly after `studies.name_matching.normalise` (no fuzzy matching), plus any `>=1MW`
   solar row whose customer name matches no metered generator. The decision per row is printed by the
   script. The Primaries are "Disaggregated Demand", so metered generation is already subtracted. The
@@ -126,7 +136,9 @@ the 14-day correction and the 1.15 spread factor, as B0 does.
 | A6 | Shuffled control of A3: `c` permuted across origin dates within series and calendar month, with F6 and F7 recomputed from the shuffled `c`; F8 keeps the true floor | 3 |
 | A7 | Oracle at the 2 GSPs: B0 plus PV_Live at the valid time | 1 |
 
-A5 tests a sunshine-shaped correction of the median's remaining error, not capacity: the residuals come from runs whose forecasts already contain some PV signal. A4 reuses B0 on the 8 non-directional Primaries, which fold when PV exceeds demand.
+A5 tests a sunshine-shaped correction of the median's remaining error, not capacity: the residuals
+come from runs whose forecasts already contain some PV signal. A4 reuses B0 on the 8 non-directional
+Primaries, which fold when PV exceeds demand.
 
 Plus a no-fit baseline: `manual_heuristic` on gross demand minus `c * p_unit_ENS(valid)`.
 
