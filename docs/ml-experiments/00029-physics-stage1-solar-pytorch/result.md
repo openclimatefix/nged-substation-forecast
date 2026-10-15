@@ -1,7 +1,7 @@
 ---
 id: "00029"
 slug: physics-stage1-solar-pytorch
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 6 metered solar farms, replacing the XGBoost stage 1 with a differentiable PyTorch physics
@@ -37,27 +37,112 @@ row_set_id: fold_a_tuesdays_v1
 metric: >-
   CRPS estimated from 9 quantile levels, points of capacity (power over effective capacity, times
   100), solar farms only, by lead band
-verdict: null
-best_arm: null
-headline: null
-lessons: null
-advice: []
+verdict: refuted
+best_arm: >-
+  `base` and `torch_hybrid` tie at 5.03 points of capacity; no physics arm scores lower than the
+  XGBoost stage 1
+headline: >-
+  C1, PyTorch physics stage 1 minus the XGBoost stage 1: +0.079 (98.75% interval +0.029 to
+  +0.135), worse. C2, hybrid minus the XGBoost stage 1: -0.000 (-0.015 to +0.018), level.
+lessons: >-
+  A fitted physics model gave a member-average point forecast as accurate as the XGBoost stage 1
+  (7.5 against 7.6 points of mean absolute error) and a quantile score 0.08 points worse. Adding
+  the physics output to the XGBoost weather columns changed nothing detectable. The PyTorch model
+  with priors and the SciPy fit gave the same score (C3, -0.005).
+advice:
+  - >-
+    Do not replace the solar XGBoost stage 1 with fitted PV physics: the best physics arm scored
+    0.08 points of CRPS worse (C1, C4).
+  - >-
+    Do not add fitted PV physics output to the solar stage 1 XGBoost columns: the change was 0.000
+    with an interval of -0.015 to +0.018 (C2).
+  - >-
+    Use a SciPy fit rather than the PyTorch model if physics is wanted for orientation and
+    capacity: the two scored the same (C3) and the SciPy fit is simpler.
+  - >-
+    Test recovery of fitted orientation with a data-generating chain different from the fitted
+    one, because the same-chain test hid a 6.2 degree tilt bias (synthetic test, figure 3).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00029-physics-stage1-solar-pytorch/
-pull_request: null
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1236
 ---
 
 # Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?
 
-**Status: planned.** This page is proposal P31 in the [research plan](../research-plan.md). The
-write-up replaces this text when the experiment finishes. CRPS is the continuous ranked probability
-score, ENS the ECMWF ensemble, ERA5 the ECMWF reanalysis, and CAMS the Copernicus Atmosphere
+**Verdict: refuted.** No physics arm lowered the continuous ranked probability score (CRPS) of the
+XGBoost stage 1, and the PyTorch physics stage 1 alone scored 0.079 points of capacity worse (98.75%
+interval +0.029 to +0.135).
+
+This page is proposal P31 in the [research plan](../research-plan.md). ENS the ECMWF ensemble, ERA5
+the ECMWF reanalysis, and CAMS the Copernicus Atmosphere
 Monitoring Service's satellite irradiance estimate. Farms appear only under anonymous labels A to F.
 
 ## Survey of the earlier PV fits (step 1)
 
-*Filled in at write-up.*
+**The best fitted PV model in the earlier studies was a five-parameter physical model with free
+orientation, and it still trailed XGBoost.** The [beam-diffuse
+study](../../studies/beam-diffuse-split.md) fitted tilt, azimuth, capacity, an inverter limit, and a
+temperature coefficient per farm with a Powell optimiser. On CAMS irradiance it scored 6.28% of P99
+output against 5.24% for XGBoost, and an XGBoost calibration that saw the weather closed most of the
+gap. The [solar BMU study](../../studies/solar-bmu-disaggregation.md) found that a free orientation
+held out better than a fixed or tracking plant, and recovered simulated plants' tilt with a +9.6
+degree bias. **Chosen:** the SciPy free-orientation fit (`studies.pv_fit`) as the `scipy` arm, and
+for the PyTorch model the ideas the differentiable-physics page proposes: priors on tilt, azimuth,
+DC capacity, and the AC-to-DC ratio, a smooth clip, and a posterior for intervals. The SciPy model
+is the strongest earlier fit, so it is the fair comparison for the new model.
+
+## Results
+
+![CRPS by lead band](figure_1.svg)
+
+![Planned contrasts](figure_2.svg)
+
+- **Absolute CRPS, all leads (points of capacity):** XGBoost stage 1 5.026 (95% interval 3.729 to
+  6.494), hybrid 5.026, PyTorch physics 5.105, SciPy physics 5.110, climatology 5.629. Seed spread
+  is at most 0.001.
+- **C1 PyTorch physics minus XGBoost:** +0.079 (+0.029 to +0.135). **C2 hybrid minus XGBoost:**
+  -0.000 (-0.015 to +0.018). **C3 PyTorch minus SciPy:** -0.005 (-0.020 to +0.010). **C4 SciPy minus
+  XGBoost:** +0.084 (+0.029 to +0.148). C1 and C2 both have lower bounds above -0.05, so the
+  decision rule gives refuted.
+- **Stage 1 alone:** the member-average physics power has a mean absolute error of 7.44 points
+  (SciPy) and 7.53 (PyTorch), against 7.64 for experiment 00012's XGBoost stage 1a on the same rows.
+  The physics point forecast is as good, and the gap in CRPS comes from the spread the XGBoost layer
+  builds on one physics column.
+- **Coverage of the 5% to 95% band:** SciPy 96.6%, PyTorch 96.5%, hybrid 94.8%, XGBoost 94.7%.
+- **Fitted parameters** (labels A to F; the metadata holds no tilt or azimuth): PyTorch tilts are
+  18.0 to 25.2 degrees for five farms and 35.0 (interval 26.1 to 42.8) for farm E, azimuths are
+  within 1.3 degrees of due south, DC capacity 0.93 to 1.22 and AC limit 0.84 to 1.00 of effective
+  capacity. SciPy values are within 3 degrees of tilt and 0.07 of capacity of those. The tilts and
+  azimuths agree with the beam-diffuse study's 14 to 27 degrees and within 5 degrees of south.
+
+## Synthetic test (result)
+
+![Synthetic recovery](figure_3.svg)
+
+- **Same physics, 36 on-prior plants:** tilt bias +0.11 degrees, azimuth -0.03, DC capacity -0.001,
+  and 90% interval coverage of 92%, 100%, 97%. AC limit coverage 86%, DC:AC ratio 89%. This passes
+  the pre-registered coverage rule (at least 80% for DC, AC, and ratio). Twelve off-prior plants
+  (tilt 5 or 60, azimuth 110 or 250) give tilt bias -0.05 and azimuth bias +0.76 degrees.
+- **Different chain (Hay-Davies sky):** tilt bias +6.2 degrees (+3.8 off-prior), 0% tilt coverage,
+  DC capacity bias +0.041 (8% coverage). The intervals reflect noise and not the mismatch of the
+  physics, so they are overconfident under mismatch.
+
+## Failures and limits
+
+- **6 farms, one validation year:** gains under about 0.1 points cannot be resolved.
+- **The synthetic noise is additive and homoscedastic,** and the different-chain version changes
+  only the sky-diffuse term. The likelihood is a tempered pseudo-Huber and not a normalised
+  likelihood, so posterior widths are approximate.
+- **No post hoc tweak was run.**
+
+## Lessons
+
+- **Fitted PV physics is a competitive point forecast and a poor replacement for the XGBoost
+  stage 1 in the quantile pipeline.** The XGBoost stage 1 sees ENS irradiance, temperature, and
+  cloud-related columns that the physics model does not.
+- **The orientation and capacity the PyTorch model recovers are plausible** and agree with the SciPy
+  fit, so the physics is useful for interpretation and for checking a farm's metadata.
 
 ## Arms
 
