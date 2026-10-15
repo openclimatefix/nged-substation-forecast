@@ -278,7 +278,7 @@ def contrast(
         "scope": scope,
         "metric": metric,
         "level": level,
-        "difference": float(paired["difference"].mean()),
+        "difference": float(paired["difference"].to_numpy().mean()),
         "lower": lower,
         "upper": upper,
         "months_negative": int((by_month["difference"] < 0).sum()),
@@ -346,9 +346,9 @@ def main() -> None:
                     "arm": name,
                     "scope": scope,
                     "metric": "coverage",
-                    "value": float(part["covered_90"].mean()),
-                    "coverage_80": float(part["covered_80"].mean()),
-                    "bias": float(part["signed_error"].mean()),
+                    "value": float(part["covered_90"].to_numpy().mean()),
+                    "coverage_80": float(part["covered_80"].to_numpy().mean()),
+                    "bias": float(part["signed_error"].to_numpy().mean()),
                 }
             )
     pl.DataFrame(absolute, strict=False).write_parquet(RESULTS_DIR / "absolute.parquet")
