@@ -114,12 +114,25 @@ model.
   PyTorch physics, and the rows may differ. The cause of the CRPS gap was not isolated; a possible
   cause is the spread that the XGBoost layer builds from one physics column.
 - **Coverage of the 5% to 95% band:** SciPy 96.6%, PyTorch 96.5%, hybrid 94.8%, XGBoost 94.7%.
-- **Fitted parameters** (labels A to F; the metadata holds no tilt or azimuth): PyTorch tilts are
-  18.0 to 25.2 degrees for five farms and 35.0 (interval 26.1 to 42.8) for farm E, azimuths are
-  within 1.3 degrees of due south, DC capacity 0.93 to 1.22 and AC limit 0.84 to 1.00 of effective
-  capacity. SciPy values are within 3 degrees of tilt and 0.07 of capacity of those. Five of the six
+- **Fitted parameters:** the table below gives every fitted parameter. Five of the six PyTorch
   tilts fall in the beam-diffuse study's 14 to 27 degrees, and farm E is higher; every azimuth is
-  within 5 degrees of south, as in that study.
+  within 5 degrees of south, as in that study. SciPy values are within 3 degrees of tilt of the
+  PyTorch values for five farms, and within 0.07 of capacity.
+
+**Fitted parameters, by anonymous farm label.** The metadata holds no tilt or azimuth, so both are
+inferred. The fit works in fractions of each farm's effective capacity, the 99th percentile of its
+absolute power over the history, which is not the farm's registered capacity. The MW values are
+those fractions times the effective capacity in MW. Intervals are 90% posterior intervals from the
+PyTorch fit, and the SciPy fit gives point values only.
+
+| Farm | Effective capacity (MW) | PyTorch tilt (degrees) | PyTorch azimuth (degrees) | PyTorch DC capacity (MW) | PyTorch AC capacity (MW) | PyTorch DC:AC ratio | SciPy tilt (degrees) | SciPy DC (MW) | SciPy AC (MW) |
+|---|---|---|---|---|---|---|---|---|---|
+| A | 6.0 | 25.2 (23.0 to 27.2) | 180.2 (177.6 to 182.9) | 6.8 (6.7 to 6.9) | 5.9 (5.6 to 6.1) | 1.15 (1.11 to 1.20) | 26.5 | 6.6 | 5.8 |
+| B | 7.8 | 20.9 (19.3 to 22.4) | 180.1 (177.5 to 182.6) | 8.9 (8.8 to 9.0) | 7.6 (7.3 to 7.9) | 1.17 (1.13 to 1.22) | 22.2 | 8.7 | 7.5 |
+| C | 7.9 | 18.0 (16.6 to 19.4) | 179.3 (176.3 to 181.9) | 9.4 (9.3 to 9.5) | 7.7 (7.5 to 7.9) | 1.22 (1.18 to 1.25) | 19.1 | 9.2 | 7.6 |
+| D | 1.2 | 24.2 (21.2 to 27.3) | 178.7 (175.3 to 182.0) | 1.4 (1.4 to 1.5) | 1.0 (1.0 to 1.1) | 1.42 (1.36 to 1.47) | 26.7 | 1.4 | 1.0 |
+| E | 17.6 | 35.0 (26.1 to 42.8) | 180.3 (175.1 to 185.9) | 16.4 (15.8 to 17.1) | 14.7 (13.5 to 15.6) | 1.12 (1.06 to 1.21) | 34.9 | 16.1 | 15.8 |
+| F | 6.0 | 20.7 (19.3 to 22.1) | 179.9 (177.2 to 182.3) | 7.4 (7.3 to 7.4) | 5.9 (5.7 to 6.0) | 1.26 (1.23 to 1.29) | 22.0 | 7.2 | 5.7 |
 
 ## Synthetic test (result)
 
