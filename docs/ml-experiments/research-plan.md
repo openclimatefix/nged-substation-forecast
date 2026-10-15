@@ -19,7 +19,6 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | Nothing | Proposed; experiment 00018 found lag anomalies add little to raw lagged power for demand |
 
 ## Deferred until the first results are in
 
@@ -178,17 +177,3 @@ the maintainer's approval of the cost. The issue also ties autonomous use of the
 scorer-protection work in issue 958. Every experiment since 00003 scores the same year on the same
 16 series, so choices tuned there overfit it, and an earlier fold is the remedy. For demand, a
 longer training history has hurt so far, so the backfill is valuable first as validation data.
-
-### P18: lagged power and summaries of recent power for solar and wind
-
-**Generators depend on weather more than demand does, so lags may help less.** The experiment
-repeats the 00005 comparison for solar and wind farms: no lags, lagged power in the stage 2
-calibrator, and lag anomalies built from the sources serving has (as experiment 00018 did for
-demand). It also repeats experiment 00008, which tested summaries of recent power (the minimum,
-mean, and maximum of the latest 24 hours and of the latest day on the same weekday) for demand: raw
-lags against summaries against both. Lagged power can also carry curtailment and capacity that the
-weather does not explain. The planned contrast is the lagged calibrator against the lag-free
-calibrated stage 1, per technology.
-
-**Resolution limit.** With 9 generator series, a lag effect smaller than about 0.3 points of
-capacity will not be resolved, so the result should be read per technology.

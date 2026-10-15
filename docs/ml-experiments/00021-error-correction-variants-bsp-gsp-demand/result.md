@@ -76,7 +76,8 @@ code: ml-experiments/00021-error-correction-variants-bsp-gsp-demand/
 
 # Experiment 21: which error correction works best, and does it help BSP and GSP demand?
 
-**Verdict: inconclusive for bulk supply points (BSP) and grid supply points (GSP), and the 14-day additive correction stays the best variant.**
+**Verdict: inconclusive for bulk supply points (BSP) and grid supply points (GSP), and the 14-day
+additive correction stays the best variant.**
 N1 is the single-stage quantile model trained on the ECMWF ensemble (ENS) control member. The
 correction does not lower the BSP and GSP quantile score: C1 is +0.36 points of capacity (99.375%
 interval -0.19 to +0.98) on 4 series. It does lower the Primary score with power 2 days old: C3 is
