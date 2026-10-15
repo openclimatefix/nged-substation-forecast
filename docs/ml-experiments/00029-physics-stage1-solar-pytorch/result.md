@@ -10,7 +10,12 @@ hypothesis: >-
   quantile XGBoost stage 2, gives a lower continuous ranked probability score (CRPS) than the pooled
   XGBoost mixture of experiment 00020.
 prediction: >-
-  Neither physics-only arm (`scipy`, `torch`) lowers the CRPS: C1 is between +0.1 and +0.5 points of capacity (the beam-diffuse study found a fitted physical model 1.05 points of P99 output behind XGBoost on CAMS in mean absolute error, and a calibration layer closed most of that gap). The hybrid is level with `base`, within 0.05 points. The expected verdict is refuted or inconclusive. On the same-physics synthetic plants the tilt bias is under 3 degrees, and on the different-chain plants it is under 10 degrees, as the solar BMU study found 9.6.
+  Neither physics-only arm (`scipy`, `torch`) lowers the CRPS: C1 is between +0.1 and +0.5 points of
+  capacity (the beam-diffuse study found a fitted physical model 1.05 points of P99 output behind
+  XGBoost on CAMS in mean absolute error, and a calibration layer closed most of that gap). The
+  hybrid is level with `base`, within 0.05 points. The expected verdict is refuted or inconclusive.
+  On the same-physics synthetic plants the tilt bias is under 3 degrees, and on the different-chain
+  plants it is under 10 degrees, as the solar BMU study found 9.6.
 decision_rule: >-
   Four planned contrasts on mean CRPS over all leads (arm minus comparison, points of capacity),
   read at 98.75% (a 5% level with a Bonferroni correction across four, two-sided), resampling whole
@@ -18,7 +23,13 @@ decision_rule: >-
   `base`, C3 `torch` minus `scipy`, C4 `scipy` minus `base`. The threshold for a gain is 0.05
   points, because the change adds a fitted physics model and its refit to the pipeline. Supported
   when C1 or C2 has an interval wholly below zero and an estimate of at most -0.05. Refuted when
-  the lower bounds of C1 and C2 are both above -0.05. Inconclusive otherwise. C3 and C4 are descriptive. The raw physics point forecast's mean absolute error (member average) is reported beside `base` as a descriptive stage 1 only comparison. The synthetic test reports, for each parameter, the bias and the share of 36 synthetic plants whose 90% posterior interval covers the truth. It passes when the same-physics coverage is at least 80% for DC capacity, AC capacity, and the AC-to-DC ratio; tilt and azimuth are judged on bias, because the two are near-degenerate at low tilt.
+  the lower bounds of C1 and C2 are both above -0.05. Inconclusive otherwise. C3 and C4 are
+  descriptive. The raw physics point forecast's mean absolute error (member average) is reported
+  beside `base` as a descriptive stage 1 only comparison. The synthetic test reports, for each
+  parameter, the bias and the share of 36 synthetic plants whose 90% posterior interval covers the
+  truth. It passes when the same-physics coverage is at least 80% for DC capacity, AC capacity, and
+  the AC-to-DC ratio; tilt and azimuth are judged on bias, because the two are near-degenerate at
+  low tilt.
 benchmark: >-
   `base`: the pooled ERA5-trained XGBoost mixture of experiment 00020 (read from its stored
   predictions, 5.03 to 5.05 points for solar), and a month-by-half-hour climatology row.
@@ -60,17 +71,29 @@ Monitoring Service's satellite irradiance estimate. Farms appear only under anon
 
 **Fitting.** Physics parameters are fitted once per farm to metered power at rows before
 2025-06-17, using CAMS shortwave and ERA5 temperature (CAMS exists for only part of the history,
-so rows without it are left out). Prior means and widths come from general knowledge about Great Britain's plants (`studies.pv_fit.LOOSE_PRIORS`), not from any fit to these farms. The stage 2 layer trains on physics power driven by ERA5
-shortwave (`base`'s weather source), and is applied to ENS members' shortwave. CAMS arrives about 1 day late and ERA5 about 5 days, but neither is read at forecast time (the arms read ENS shortwave and ENS temperature), because no arm uses a lag.
+so rows without it are left out). Prior means and widths come from general knowledge about Great
+Britain's plants (`studies.pv_fit.LOOSE_PRIORS`), not from any fit to these farms. The stage 2 layer
+trains on physics power driven by ERA5
+shortwave (`base`'s weather source), and is applied to ENS members' shortwave. CAMS arrives about 1
+day late and ERA5 about 5 days, but neither is read at forecast time (the arms read ENS shortwave
+and ENS temperature), because no arm uses a lag.
 
-**PyTorch PV model.** The AC limit is the DC capacity times the AC-to-DC ratio (below 1). The model applies an Erbs split of global into beam and diffuse, isotropic-sky transposition onto a
+**PyTorch PV model.** The AC limit is the DC capacity times the AC-to-DC ratio (below 1). The model
+applies an Erbs split of global into beam and diffuse, isotropic-sky transposition onto a
 plane of fitted tilt and azimuth, a temperature derate, a DC capacity (a multiple of effective
 capacity), and a soft clip at DC capacity over an AC-to-DC ratio. Parameters have normal priors
 and a mean-field normal posterior fitted by stochastic variational inference (Adam, GPU).
 
 ## Synthetic test (step 2)
 
-Thirty-six synthetic plants (6 farm coordinates times 6 parameter draws: tilt 10 to 45 degrees, azimuth 150 to 210 degrees, DC capacity 0.9 to 1.3, AC-to-DC ratio 0.7 to 1.0) are driven by the real training irradiance and temperature of their coordinates, each with its own random two-year window and noise draw (autocorrelated noise, 4% of capacity). Two versions run: **same physics** (the PyTorch PV model's own chain), and **different chain** (the Hay-Davies sky from `pvlib` in place of the isotropic sky, so the fit cannot reproduce the data exactly). The write-up gives each parameter's bias and 90% interval coverage, each plant's clipping share, and the fit's mean absolute error.
+Thirty-six synthetic plants (6 farm coordinates times 6 parameter draws: tilt 10 to 45 degrees,
+azimuth 150 to 210 degrees, DC capacity 0.9 to 1.3, AC-to-DC ratio 0.7 to 1.0) are driven by the
+real training irradiance and temperature of their coordinates, each with its own random two-year
+window and noise draw (autocorrelated noise, 4% of capacity). Two versions run: **same physics**
+(the PyTorch PV model's own chain), and **different chain** (the Hay-Davies sky from `pvlib` in
+place of the isotropic sky, so the fit cannot reproduce the data exactly). The write-up gives each
+parameter's bias and 90% interval coverage, each plant's clipping share, and the fit's mean absolute
+error.
 
 ## Checks before the contrasts are read
 
