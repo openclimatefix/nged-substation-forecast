@@ -81,13 +81,10 @@ def figure_1() -> alt.TopLevelMixin:
     )
     bars = base.mark_rule(color=ocf.DATA_BLUE).encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=GREY).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
-    margin = (
-        alt.Chart(pl.DataFrame({"x": [0.3]}))
-        .mark_rule(  # ty: ignore[unresolved-attribute]
-            color=ocf.BRAND_ORANGE, strokeDash=[4, 3]
-        )
-        .encode(x="x:Q")
+    dashed = alt.Chart(pl.DataFrame({"x": [0.3]})).mark_rule(
+        color=ocf.BRAND_ORANGE, strokeDash=[4, 3]
     )
+    margin = dashed.encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     return alt.layer(zero, margin, bars, points).properties(
         width=PLOT_WIDTH,
         height=300,

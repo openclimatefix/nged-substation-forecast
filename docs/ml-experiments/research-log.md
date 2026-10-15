@@ -24,6 +24,7 @@ the maintainer to confirm.
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
 | [00030](00030-lagged-power-feature-sets-primary-demand/result.md) | Add the mean and median of the 6 weekly power analogues to N1 for Primary demand, with the 14-day correction | Post hoc arm; 0.05 points below N1 with the correction (-0.08 to -0.02), 0.03 below the 00019 stack with an interval touching zero; the annual analogues hurt |
+| [00024](00024-pooling-groupings-demand-xgboost/result.md) | Train one XGBoost model per substation type (or per size band), with the series identifier as a categorical column, instead of one per series | Costs 0.15 points on Primary demand after the error correction and saves 16 of 20 models; needs the series identifier, and the test covered 20 series |
 
 ## The experiments so far
 
@@ -57,6 +58,7 @@ the maintainer to confirm.
 | [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
 | [00029](00029-physics-stage1-solar-pytorch/result.md) | Does a differentiable PyTorch physics stage 1, fed into the XGBoost stage 2, beat the XGBoost stage 1 for the 6 solar farms? | Refuted: the physics stage 1 scores 0.079 points worse | Not for production | 2026-10-15 |
 | [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
+| [00024](00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost demand model without losing skill against one model per series? | Supported: 3 or 4 pooled models cost 0.15 points; one model for all series costs 0.29 | Candidate | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -708,3 +710,22 @@ at the target time (row set `fold_a_every5d_v1`).
   [PR #1235 (Experiment 28: does a GSP solar forecast help the stage 2 demand forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1235).
 
 ![Contrasts](00028-pvlive-forecast-in-stage2-gsp-demand/figure_1.svg)
+
+### 00024: which groupings of substations can share one XGBoost model
+
+**Training one XGBoost model per substation type, or per size band, costs 0.15 points of capacity
+against one model per substation, and one model across all substations costs 0.29.** The experiment
+refitted 00019's model on 20 demand series (8 Primary substations that meter in MW, 8 in MVA, 2 BSP,
+2 GSP) with every grouping, on 73 forecast runs with ENS weather.
+
+- **Headline result:** by type with the series identifier minus per series, Primary quantile score
+  over all leads: +0.15 points (99.44% interval +0.03 to +0.26); all series in one model: +0.29
+  (+0.19 to +0.42). Absolute Primary scores: per series 5.32, by type 5.47, all series 5.61.
+- **Finding for later experiments:** the series identifier is essential. Without it the by-type
+  pool loses a further 0.82 points and the all-series pool 0.85. A random grouping of 5 series scores
+  within 0.06 points of the by-type grouping, so the number of models matters more than which series
+  share one.
+- **Write-up and pull request:** [result](00024-pooling-groupings-demand-xgboost/result.md),
+  [PR #1230 (Experiment 24: which groupings of substations can share one XGBoost model (plan))](https://github.com/openclimatefix/nged-substation-forecast/pull/1230).
+
+![The nine planned contrasts](00024-pooling-groupings-demand-xgboost/figure_1.svg)
