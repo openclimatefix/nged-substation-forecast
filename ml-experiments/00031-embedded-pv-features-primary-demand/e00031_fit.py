@@ -190,6 +190,7 @@ def add_arm_columns(*, frame: pl.DataFrame, inputs: SiteInputs, arm: ArmType) ->
         maintain_order="left",
     )
     if arm == "a7":
+        assert inputs.live is not None
         index = np.asarray(common.grid_index(times=joined["valid_time"]))
         return joined.with_columns(
             pv_live_share=pl.Series(common.take(values=inputs.live, index=index))

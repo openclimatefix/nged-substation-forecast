@@ -72,7 +72,9 @@ def capacity_estimates(*, features: pl.DataFrame, register: pl.DataFrame) -> pl.
             (
                 (training["cap_slope_28d"] - training["register_share"]) ** 2
                 - training["cap_slope_se"] ** 2
-            ).mean()
+            )
+            .to_numpy()
+            .mean()
         ),
         MIN_PRIOR_VARIANCE,
     )

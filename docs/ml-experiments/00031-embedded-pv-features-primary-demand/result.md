@@ -7,8 +7,8 @@ hypothesis: >-
   For the 16 Primary substation demand series, giving the single-stage ENS-trained quantile model N1
   trailing estimates of each substation's embedded (unmetered) solar capacity, built from the
   Embedded Capacity Register (ECR) as a prior for Primaries and a floor for BSP and GSP series, plus
-  an amount learned from recent power and irradiance, lowers the quantile score on sunny days, and a linear PV offset or a
-  sunshine-shaped correction does so more reliably than extra tree columns.
+  an amount learned from recent power and irradiance, lowers the quantile score on sunny days, and
+  a linear PV offset or a sunshine-shaped correction does so more reliably than extra tree columns.
 prediction: >-
   All-lead Primary gains against the 00019 stack of 0 to -0.15 points of capacity, concentrated in
   daylight with a clear-sky index of 0.7 or more from April to September (-0.3 to -1.0 there) at

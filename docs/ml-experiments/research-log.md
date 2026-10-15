@@ -59,6 +59,7 @@ the maintainer to confirm.
 | [00029](00029-physics-stage1-solar-pytorch/result.md) | Does a differentiable PyTorch physics stage 1, fed into the XGBoost stage 2, beat the XGBoost stage 1 for the 6 solar farms? | Refuted: the physics stage 1 scores 0.079 points worse | Not for production | 2026-10-15 |
 | [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
 | [00024](00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost demand model without losing skill against one model per series? | Supported: 3 or 4 pooled models cost 0.15 points; one model for all series costs 0.29 | Candidate | 2026-10-15 |
+| [00031](00031-embedded-pv-features-primary-demand/result.md) | Do trailing estimates of embedded solar capacity, as tree columns, a linear offset, or a sunshine-shaped correction, lower the Primary demand quantile score? | Inconclusive | Not for production | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -288,6 +289,27 @@ passed its output to a per-farm XGBoost quantile layer (row set `fold_a_tuesdays
   farms?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1236).
 
 ![Contrasts](00029-physics-stage1-solar-pytorch/figure_2.svg)
+
+### 00031: embedded solar capacity features for Primary demand
+
+**None of the capacity features lowered the all-lead quantile score of Primary demand forecasts.**
+The arms gave N1 trailing estimates of each substation's embedded solar capacity (from recent power,
+irradiance, and the Embedded Capacity Register) as columns, a linear offset, or a sunshine-shaped
+correction (row set `fold_a_every5d_v1`, 16 Primary substations).
+
+- **Headline result:** quantile score, in points of capacity, against the 00019 stack without its
+  half-life. Register-based PV products (A3) +0.006 (99.17% interval -0.022 to +0.033); the shaped
+  correction (A5) +0.016 (-0.069 to +0.100); the capacity statistics as columns +0.167 (+0.091 to
+  +0.243), a loss in all 12 months.
+- **Finding for later experiments:** the shaped correction lowers the score by 0.28 in sunny summer
+  daylight (-0.43 to -0.15) and raises it by 0.68 under heavy cloud, because ENS irradiance is
+  biased against CAMS; calibrate ENS to CAMS first. True PV_Live generation lowers the score by 0.82
+  at the 2 GSPs (-1.06 to -0.55).
+- **Cut for time:** the no-fit physics baseline and the post hoc tweak were not run.
+- **Write-up and pull request:** [result](00031-embedded-pv-features-primary-demand/result.md),
+  [PR #1239 (Experiment 31: do embedded-solar capacity features lower the error of Primary demand forecasts?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1239).
+
+![Contrasts](00031-embedded-pv-features-primary-demand/figure_1.svg)
 
 ### What the experiments taught us so far
 

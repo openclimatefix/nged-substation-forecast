@@ -542,9 +542,9 @@ def _absolute(*, scored: dict[str, pl.DataFrame]) -> pl.DataFrame:
                     continue
                 row: dict[str, float | str] = {"arm": name, "group": group, "subset": subset}
                 for metric in ("quantile_score", "median_error"):
-                    row[metric] = float(part[metric].mean())
-                row["bias"] = float(part["signed_error"].mean())
-                row["coverage_90"] = float(part["covered_90"].mean())
+                    row[metric] = float(part[metric].to_numpy().mean())
+                row["bias"] = float(part["signed_error"].to_numpy().mean())
+                row["coverage_90"] = float(part["covered_90"].to_numpy().mean())
                 row["rows"] = part.height
                 rows.append(row)
     return pl.DataFrame(rows)
@@ -552,7 +552,7 @@ def _absolute(*, scored: dict[str, pl.DataFrame]) -> pl.DataFrame:
 
 def _contrasts(*, scored: dict[str, pl.DataFrame]) -> pl.DataFrame:
     """Return the planned contrasts, the exploratory ones, and the breakdowns."""
-    rows = [
+    rows: list[dict[str, object]] = [
         {
             "label": label,
             "planned": label in PLANNED,
