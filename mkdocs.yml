@@ -163,10 +163,12 @@ nav:
       - "Do the candidate changes for solar and wind add up to a better pooled mixture?": ml-experiments/00020-solar-wind-stack-cams-stage0-spread-margin/result.md
       - "Does the recent-error correction help BSP and GSP demand, and which variant works best?": ml-experiments/00021-error-correction-variants-bsp-gsp-demand/result.md
       - "Does recent observed power help solar and wind forecasts?": ml-experiments/00023-lagged-power-and-error-correction-solar-wind/result.md
+      - "Which groupings of substations can share one XGBoost model?": ml-experiments/00024-pooling-groupings-demand-xgboost/result.md
       - "Does a recent effective-capacity feature lower the solar and wind forecast error?": ml-experiments/00026-capacity-features-solar-wind/result.md
       - "How much would Primary substation demand gain from ERA5 weather in place of ENS weather?": ml-experiments/00022-era5-weather-ceiling-primary-demand/result.md
       - "Does the change in the intra-day price help a stage 1 demand model explain power?": ml-experiments/00025-price-change-features-stage1-demand/result.md
       - "Does PV_Live at the lag times lower the stage 2 quantile score of GSP demand?": ml-experiments/00027-pvlive-lags-in-stage2-gsp-demand/result.md
+      - "Which lagged power columns lower the error of Primary substation demand forecasts?": ml-experiments/00030-lagged-power-feature-sets-primary-demand/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
