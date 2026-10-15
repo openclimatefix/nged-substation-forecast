@@ -10,6 +10,7 @@ the lead bands.
     uv run python ml-experiments/00033-*/e00033_stats.py
 """
 
+import sys
 from pathlib import Path
 from typing import Final
 
@@ -46,6 +47,8 @@ SCOPES: Final[tuple[tuple[str, float, float], ...]] = (
 )
 N_RESAMPLES_DECISIVE: Final[int] = 20_000
 N_RESAMPLES: Final[int] = 20_000
+INTERIM: bool = False
+"""Set by `--interim`: skip contrasts whose arms are not yet fitted."""
 GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP", "solar", "wind")
 
 # id: (family, group(s), treatment, reference)
@@ -90,7 +93,14 @@ SEED0_ONLY: Final[frozenset[str]] = frozenset({"C11", "C12"})
 
 def read_arm(*, groups: tuple[str, ...], arm: str) -> pl.DataFrame:
     """Return one arm's per-case metrics for one or more groups."""
-    return pl.concat([pl.read_parquet(METRICS_DIR / group / f"{arm}.parquet") for group in groups])
+    return pl.concat(
+        [
+            pl.read_parquet(METRICS_DIR / group / f"{arm}.parquet").with_columns(
+                pl.col("seed").cast(pl.Int32)
+            )
+            for group in groups
+        ]
+    )
 
 
 def in_scope(*, frame: pl.DataFrame, low: float, high: float) -> pl.DataFrame:
@@ -126,7 +136,7 @@ def contrast(
     )
     frames = {arm: f.join(both, on=list(common.KEYS), how="semi") for arm, f in frames.items()}
     planned_level = 100.0 * (1.0 - 0.05 / sizes[family])
-    rows = []
+    rows: list[dict[str, object]] = []
     for scope, low, high in SCOPES:
         scoped = {arm: in_scope(frame=f, low=low, high=high) for arm, f in frames.items()}
         losses = experiment_store.losses_for_bootstrap(arm_losses=scoped)
@@ -174,7 +184,11 @@ def absolute_rows() -> list[dict[str, object]]:
         for path in sorted((METRICS_DIR / group).glob("*.parquet")):
             if path.stem == "shared_keys":
                 continue
-            frame = pl.read_parquet(path).filter(pl.col("shared"))
+            frame = (
+                pl.read_parquet(path)
+                .filter(pl.col("shared"))
+                .with_columns(pl.col("seed").cast(pl.Int32))
+            )
             for scope, low, high in SCOPES:
                 part = in_scope(frame=frame, low=low, high=high)
                 row: dict[str, object] = {
@@ -183,7 +197,7 @@ def absolute_rows() -> list[dict[str, object]]:
                     "scope": scope,
                     "cases": part.height // max(1, part["seed"].n_unique()),
                     "seeds": part["seed"].n_unique(),
-                    **{m: float(part[m].mean()) for m in MEAN_METRICS},
+                    **{m: float(part[m].to_numpy().mean()) for m in MEAN_METRICS},
                 }
                 losses = experiment_store.losses_for_bootstrap(arm_losses={path.stem: part})
                 for metric in INTERVAL_METRICS:
@@ -199,13 +213,24 @@ def absolute_rows() -> list[dict[str, object]]:
 
 def main() -> None:
     """Write the absolute and contrast tables."""
+    global INTERIM  # noqa: PLW0603
+    INTERIM = "--interim" in sys.argv
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(absolute_rows()).write_parquet(RESULTS_DIR / "absolute.parquet")
     sizes = family_sizes()
     rows = []
+    skipped = []
     for contrast_id, spec in CONTRASTS.items():
-        rows += contrast(contrast_id=contrast_id, spec=spec, sizes=sizes)
+        try:
+            rows += contrast(contrast_id=contrast_id, spec=spec, sizes=sizes)
+        except FileNotFoundError as error:
+            skipped.append(contrast_id)
+            print(f"{contrast_id} skipped: {error.filename}", flush=True)
+            continue
         print(f"{contrast_id} done", flush=True)
+    if skipped and not INTERIM:
+        msg = f"contrasts {skipped} lack an arm; fit and assemble it, or pass --interim"
+        raise FileNotFoundError(msg)
     result = pl.DataFrame(rows)
     result.write_parquet(RESULTS_DIR / "contrasts.parquet")
     with pl.Config(tbl_rows=200, tbl_cols=12, fmt_str_lengths=40):

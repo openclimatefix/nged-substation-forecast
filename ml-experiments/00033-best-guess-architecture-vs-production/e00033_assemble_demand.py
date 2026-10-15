@@ -95,6 +95,7 @@ def main() -> None:
     ).sort(*common.KEYS, "seed")
     mine = (
         pl.read_parquet(common.ARMS_DIR / "n1_cs.parquet")
+        .filter(pl.col("valid_time") < common.HOLDOUT)
         .select(*common.KEYS, "seed", *common.LEVEL_COLUMNS)
         .sort(*common.KEYS, "seed")
     )

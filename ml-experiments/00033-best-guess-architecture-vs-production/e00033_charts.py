@@ -2,7 +2,7 @@
 
 1. Quantile score of every headline arm per family (the headline chart).
 2. The three decisive contrasts: best guess minus production.
-3. Tail metrics: twCRPS and Brier score at `historical_p99`, and the 0.95 quantile's exceedance.
+3. Calibration of the 0.95 quantile: the share of cases above it.
 4. Quantile score by lead band for the best guess and the baselines.
 5. The notable ideas against their reference arms.
 6. The weather ceiling: the ERA5 (or CAMS) arm minus its reference, over all leads and by lead band.
@@ -48,6 +48,7 @@ HEADLINE: Final[dict[str, dict[str, tuple[str, str]]]] = {
         "climatology": ("climatology", "climatology"),
         "a7_c": ("Weekly analogues + correction", "Notable idea"),
         "type_id_cs": ("One model per type + correction + spread", "Notable idea"),
+        "monthly": ("Monthly retraining, no correction", "Notable idea"),
         "monthly_c": ("Monthly retraining + correction", "Notable idea"),
     },
     "BSP": {
@@ -140,7 +141,7 @@ def _headline_data(*, metric: str) -> pl.DataFrame:
     return pl.concat(pieces)
 
 
-def _panel(*, data: pl.DataFrame, group: str, x_title: str) -> alt.TopLevelMixin:
+def _panel(*, data: pl.DataFrame, group: str, x_title: str) -> alt.LayerChart | alt.FacetChart:
     part = data.filter(pl.col("group") == group).sort("order")
     base = alt.Chart(part).encode(
         y=alt.Y("label:N", sort=part["label"].to_list(), title=None, axis=alt.Axis(labelLimit=260))
@@ -169,11 +170,14 @@ def figure_headline() -> alt.TopLevelMixin:
         alt.vconcat(*panels)
         .properties(
             title=_title(
-                text="The best guess scores lowest, or level with the lowest, in every family",
+                text="Production has the highest quantile score in every family",
                 lines=[
                     "Quantile score (the CRPS estimate, in points of capacity; 1 point is 1% of "
                     "the series' effective capacity) over all leads. " + SCOPE,
-                    "Dot: mean over three seeds. Line: 95% interval from re-drawing whole months.",
+                    (
+                        "Dot: mean over the seeds each arm has (three; monthly retraining has "
+                        "one). Line: 95% interval from re-drawing whole months."
+                    ),
                 ],
             )
         )
@@ -209,8 +213,8 @@ def figure_decisive() -> alt.TopLevelMixin:
     bars = base.mark_rule(color=ocf.BRAND_ORANGE).encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
     ticks = (
         alt.Chart(thresholds)
-        .mark_tick(color="#444444", thickness=2, size=30)  # ty: ignore[unresolved-attribute]
-        .encode(x="x:Q", y=alt.Y("label:N", sort=list(labels.values())))
+        .mark_tick(color="#444444", thickness=2, size=30)
+        .encode(x="x:Q", y=alt.Y("label:N", sort=list(labels.values())))  # ty: ignore[unresolved-attribute]
     )
     return alt.layer(_zero_rule(), ticks, bars, points).properties(
         width=PLOT_WIDTH,
@@ -231,31 +235,20 @@ def figure_decisive() -> alt.TopLevelMixin:
 
 
 def figure_tail() -> alt.TopLevelMixin:
-    """Tail metrics for the Primary, solar, and wind headline arms."""
-    pieces = []
-    for metric, title in (
-        ("tw_p99", "twCRPS above historical_p99 (points of capacity; smaller is better)"),
-        ("brier_p99", "Brier score at historical_p99 (smaller is better)"),
-        ("ex95", "Share of cases above the 0.95 quantile (aim: 0.05)"),
-    ):
-        data = _headline_data(metric=metric).filter(
-            pl.col("group").is_in(["Primary", "solar", "wind"])
-        )
-        panels = [_panel(data=data, group=g, x_title=title) for g in ("Primary", "solar", "wind")]
-        pieces.append(alt.vconcat(*panels))
+    """The exceedance share of the 0.95 quantile for the Primary, solar, and wind arms."""
+    data = _headline_data(metric="ex95").filter(pl.col("group").is_in(["Primary", "solar", "wind"]))
+    panels = [
+        _panel(data=data, group=g, x_title="Share of cases above the 0.95 quantile (aim: 0.05)")
+        for g in ("Primary", "solar", "wind")
+    ]
     return (
-        alt.vconcat(*pieces)
+        alt.vconcat(*panels)
         .properties(
             title=_title(
-                text="Tail skill and calibration at the 99th-percentile threshold",
+                text="Production's 0.95 quantile is exceeded in 3 to 5 cases in 10, not 1 in 20",
                 lines=[
-                    (
-                        "historical_p99 is each series' 99th percentile of power over capacity "
-                        "in its history. The Brier score uses an exponential tail beyond the "
-                        "0.95 quantile, so it mainly measures that assumption; read it with the "
-                        "exceedance share."
-                    ),
-                    SCOPE,
+                    "Share of validation cases in which the observed power exceeds the arm's 0.95 "
+                    "quantile; the aim is 0.05. " + SCOPE,
                 ],
             )
         )
@@ -316,7 +309,7 @@ def figure_bands(*, groups: tuple[str, ...] = ("Primary", "solar", "wind")) -> a
         alt.vconcat(*panels)
         .properties(
             title=_title(
-                text="Production's score is worst at every lead; the best guess is best or level",
+                text="Quantile score by lead band",
                 lines=[
                     "Quantile score by lead band, mean over three seeds; smaller is better. "
                     + SCOPE
@@ -363,7 +356,7 @@ def figure_notable() -> alt.TopLevelMixin:
         width=PLOT_WIDTH,
         height=230,
         title=_title(
-            text="The notable ideas move the score by less than the interval, except as noted",
+            text="The notable ideas against their reference arms",
             lines=[
                 "Each row is a notable idea minus its reference arm on the quantile score over all "
                 "leads. Dot: estimate. Line: 95% interval from re-drawing whole months and seeds; "

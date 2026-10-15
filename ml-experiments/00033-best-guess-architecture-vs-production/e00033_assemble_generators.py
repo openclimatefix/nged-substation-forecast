@@ -203,7 +203,7 @@ def main() -> None:
         missing = int(joined[LEVEL_COLUMNS[0]].null_count())
         frame = demand.repeat_seeds(frame=joined.select(*base_columns, *LEVEL_COLUMNS, "members"))
         write(name=name, frame=frame)
-        fewest = int(joined["members"].min())
+        fewest = int(joined["members"].to_numpy().min())
         print(
             f"{name}: {frame.height:,} rows, {missing} cases without a stored forecast, "
             f"fewest members {fewest}",

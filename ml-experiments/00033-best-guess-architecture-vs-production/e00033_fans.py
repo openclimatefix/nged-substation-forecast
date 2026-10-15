@@ -123,7 +123,9 @@ def load_window(*, group: str, arm: str, key: dict) -> pl.DataFrame:
     )
 
 
-def panel(*, data: pl.DataFrame, colour: str, label: str, y_title: str) -> alt.TopLevelMixin:
+def panel(
+    *, data: pl.DataFrame, colour: str, label: str, y_title: str
+) -> alt.LayerChart | alt.FacetChart:
     """Return one fan: 5%-95% and 25%-75% bands, the median, and the observation."""
     scale = 100.0
     scaled = data.with_columns(

@@ -255,8 +255,20 @@ def predict_series(
 ) -> dict[str, pl.DataFrame]:
     """Return every arm's table for one series and one run.
 
+    Args:
+        part: The run's ENS rows for the series, sorted by case and member.
+        technology: `solar` or `wind`.
+        models: The series' fitted models by name (`n1`, and `base`, `cams`, or `margin`).
+        era5: The series' ERA5 (and CAMS) rows at every valid time.
+        power: The series' observed power over capacity on the dense grid.
+        cases: The scored cases, used to restrict the single-input arms.
+
+    Returns:
+        Each arm's keys and nine quantile columns for the run.
+
     Raises:
         ValueError: If ERA5 lacks a valid time of the run.
+        TypeError: If a model is not of the expected kind.
     """
     at_valid = part.select("valid_time").join(era5, on="valid_time", how="left")
     if at_valid[ERA5_COLUMNS[technology][0]].null_count():
@@ -265,6 +277,9 @@ def predict_series(
     n1_part = add_lags(frame=part, power=power)
     n1_columns = [*CORE_COLUMNS[technology], *N1_EXTRA]
     n1_model = models["n1"]
+    if not isinstance(n1_model, xgb.Booster):
+        msg = "the N1 model must be a booster"
+        raise TypeError(msg)
     raw = n1_model.predict(
         xgb.DMatrix(n1_part.select([pl.col(c).cast(pl.Float32) for c in n1_columns]).to_numpy())
     )
@@ -279,6 +294,9 @@ def predict_series(
     one_input = keys.join(era5, on="valid_time", how="left", maintain_order="left")
     if technology == "solar":
         base, cams = models["base"], models["cams"]
+        if not isinstance(base, FittedQuantiles) or not isinstance(cams, FittedQuantiles):
+            msg = "the ERA5 models must be FittedQuantiles"
+            raise TypeError(msg)
         out["pw_era5"] = _quantile_frame(keys=keys, quantiles=base.predict(frame=one_input))
         out["pw_cams"] = _quantile_frame(
             keys=keys,
@@ -299,6 +317,9 @@ def predict_series(
             out[arm] = pooled_mixture(part=swapped, member_quantiles=model.predict(frame=swapped))
     else:
         margin = models["margin"]
+        if not isinstance(margin, FittedQuantiles):
+            msg = "the wind model must be FittedQuantiles"
+            raise TypeError(msg)
         out["pw_era5"] = _quantile_frame(keys=keys, quantiles=margin.predict(frame=one_input))
         swapped = part.drop("wind_speed_100m").join(
             era5.select("valid_time", "wind_speed_100m"),
