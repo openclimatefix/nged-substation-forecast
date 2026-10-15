@@ -155,8 +155,9 @@ the correction, clipped to 0 to 1, and sorted.
   mixture reproduces experiment 00002 (solar 5.03 against 5.05, wind 11.11 against 11.11).
 - **C1, lagged power in the calibrator (decides).** Solar -0.012 (-0.122 to +0.088), wind +0.012
   (-0.090 to +0.146): inconclusive, because the interval cannot rule out a gain of 0.05 or a loss of
-  0.1. By lead band the point estimate is positive (worse) in the first two lead bands, under 3 days, for both technologies, so
-  the lags did not help at the short leads where recent power should matter most.
+  0.1. By lead band the point estimate is positive (worse) in the first two lead bands, under 3
+  days, for both technologies, so the lags did not help at the short leads where recent power should
+  matter most.
 - **C2 and C3, summaries.** Summaries alone: solar +0.023 (-0.122 to +0.143), wind +0.115 (-0.051
   to +0.307). Adding them to the lagged calibrator: solar +0.015 (-0.057 to +0.063), wind +0.098
   (+0.009 to +0.213), so for wind they made the calibrator worse.
@@ -199,5 +200,5 @@ the correction, clipped to 0 to 1, and sorted.
 
 - **Weather explains these farms' output well enough that recent power adds nothing detectable
   at leads from 0 to 15 days,** unlike Primary substation demand in experiment 00005.
-- **A correction built from the mean error assumes a symmetric error.** The assumption held for Primary demand
-  in experiments 00017 and 00019 and does not hold for a farm's output.
+- **A correction built from the mean error assumes a symmetric error.** The assumption held for
+  Primary demand in experiments 00017 and 00019 and does not hold for a farm's output.
