@@ -94,14 +94,19 @@ function serves training rows and validation rows.
   latency was not measured; if it exceeds 48 hours, the features would need the ENS analysis proxy,
   and the write-up says so. At valid
   times the irradiance is the ENS member's `shortwave`.
-- **Floor:** the ECR rows on the `Register Part 1 50kW - <1MW` sheet whose `Primary` name matches
-the
-  substation exactly after `studies.name_matching.normalise` (no fuzzy matching), plus any `>=1MW`
-  solar row whose customer name matches no metered generator. The decision per row is printed by the
-  script. The Primaries are "Disaggregated Demand", so metered generation is already subtracted. The
-  floor is zero where no row matches. The August 2026 snapshot is used at every date, a small
-  look-ahead that can only inflate the ECR arms. BSP and GSP series have no floor (data-only
-  estimates) and are descriptive.
+- **The ECR enters differently by series type (maintainer refinement, 2026-10-15).** A Primary
+  series is "Disaggregated Demand": NGED has already subtracted its metered generators, so the ECR
+  rows with their own meter are not in the series. The ECR is therefore only a prior for a Primary,
+  never a floor. The prior is the ECR solar capacity of the rows that have no meter of their own:
+  every row on the `Register Part 1 50kW - <1MW` sheet, plus any `>=1MW` solar row whose customer
+  name matches no metered generator in the metadata table. The `Primary` name must match exactly
+  after `studies.name_matching.normalise` (no fuzzy matching), and the prior is zero where no row
+  matches. A BSP or GSP series is "Raw Flow": the metered generators below it are not subtracted,
+  so the ECR solar capacity of every row below the substation (by `bulk_supply_point` or
+  `grid_supply_point` name, using `Substations.csv` for the hierarchy) is a floor on the PV in the
+  series. The decision per ECR row is printed by the script. The August 2026 snapshot is used at
+  every date, a small look-ahead that can only inflate the ECR arms. BSP and GSP series are
+  descriptive.
 - **Features, 28-day windows ending at the origin minus 48 hours, daylight half-hours (sun above 15
   degrees):**
     - F1 `cap_slope_28d`: minus the slope of power on `p_unit`, with fixed effects for local hour by
@@ -110,11 +115,13 @@ the
       minus cloudy days (at most 0.3), matched by hour and day type, over the matching difference
       in mean `p_unit`, sign flipped.
     - F3 `cap_change_yoy`: F1 minus F1 for the window 364 days earlier.
-    - F4 `unreg_cap`: `max(0, c_fit - floor)`, where `c_fit` is F1 shrunk towards its trailing
-      365-day mean by inverse-variance weights fitted on training origins only.
-    - F5 `cap_total`: `c = floor + u` (data only: `c_fit`).
+    - F4 `unreg_cap`: `c - e`, where `e` is the ECR capacity of the series (prior or floor, above)
+      and `c` is the capacity estimate. For a Primary, `c` is `c_fit` (F1) pulled towards `e` by
+      inverse-variance weights, with the prior variance fitted on training origins only, and
+      clipped at zero; it may fall below `e`. For a BSP or GSP, `c = max(c_fit, e)`.
+    - F5 `cap_total`: `c`. In the data-only variant `c = c_fit`, clipped at zero, and `e` is unused.
     - F6 `pv_hat`: `c * p_unit_ENS(valid)`. F7 `lag_origin_gross`: N1's `lag_origin` plus
-      `c * p_unit_CAMS(lag time)`. F8 `pv_floor_hat`: `floor * p_unit_ENS(valid)`.
+      `c * p_unit_CAMS(lag time)`. F8 `pv_ecr_hat`: `e * p_unit_ENS(valid)`.
 - **Known-answer checks before real data:** (a) inject `-c(t) * p_unit_CAMS(t)` with `c` rising
   linearly from 0 to 20% of capacity into two directional Primaries and check that F1, F2, and F4
   recover `c(t)` within one standard error; (b) at the two GSPs compare `c` with PV_Live's installed
@@ -130,10 +137,10 @@ the 14-day correction and the 1.15 spread factor, as B0 does.
 | B0 | The 00019 stack | 0 |
 | A1 | Capacity statistics F1, F2, F3 | 3 |
 | A2 | Data-only PV products F6, F7 (`c = c_fit`) | 2 |
-| A3 | PV products with the ECR floor: F6, F7, F8 | 3 |
-| A4 | Linear offset: `base_margin = -c * p_unit_ENS(valid)`, `c = floor + u`; directional Primaries only | 0 |
+| A3 | PV products with the ECR (prior or floor by series type): F6, F7, F8 | 3 |
+| A4 | Linear offset: `base_margin = -c * p_unit_ENS(valid)`, `c` with the ECR as above; directional Primaries only | 0 |
 | A5 | The flat 14-day mean replaced by `a + b * p_unit` fitted on the same residuals; `b = 0` with fewer than 3 distinct sunny origin-run dates (daily clear-sky index at least 0.7) in the window, and `b` not sign-clipped; no refit | 0 |
-| A6 | Shuffled control of A3: `c` permuted across origin dates within series and calendar month, with F6 and F7 recomputed from the shuffled `c`; F8 keeps the true floor | 3 |
+| A6 | Shuffled control of A3: `c` permuted across origin dates within series and calendar month, with F6 and F7 recomputed from the shuffled `c`; F8 keeps the true `e` | 3 |
 | A7 | Oracle at the 2 GSPs: B0 plus PV_Live at the valid time | 1 |
 
 A5 tests a sunshine-shaped correction of the median's remaining error, not capacity: the residuals
@@ -158,12 +165,14 @@ Primary first (16 series), absolute scores beside contrasts. BSP (2) and GSP (2)
 never averaged into the Primary figure. Breakdowns, all exploratory at 95%: clear-sky-index bins at
 the valid time (night, under 0.3, 0.3 to 0.7, at least 0.7); sunny against cloudy days; April to
 September against October to March; lead bands 0 to 48 h, 3 to 6 d, 7 to 15 d; per substation
-ordered by registered floor over capacity, split by directional MW and non-directional MVA; the
+ordered by ECR capacity over effective capacity, split by directional MW and non-directional MVA;
+the
 pooled contrast without the series of largest B0 error and without D8, D12, and D22. The clear-sky
 index is used to bin only, never as an input.
 
 ## Limits to expect
 
 One validation year gives 12 month blocks, so a 0.05-point effect may be undetectable. The ECR
-floor is wrong in both directions at Primaries (metered rows, future connections). The ENS forecast
+prior is wrong in both directions at Primaries (an unmetered row may be missing or unregistered, and
+the snapshot includes future connections). The ENS forecast
 irradiance is biased against CAMS, so a capacity estimated on CAMS mis-scales when applied to ENS.
