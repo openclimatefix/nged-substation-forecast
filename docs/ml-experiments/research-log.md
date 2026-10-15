@@ -25,6 +25,7 @@ the maintainer to confirm.
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
 | [00030](00030-lagged-power-feature-sets-primary-demand/result.md) | Add the mean and median of the 6 weekly power analogues to N1 for Primary demand, with the 14-day correction | Post hoc arm; 0.05 points below N1 with the correction (-0.08 to -0.02), 0.03 below the 00019 stack with an interval touching zero; the annual analogues hurt |
 | [00024](00024-pooling-groupings-demand-xgboost/result.md) | Train one XGBoost model per substation type (or per size band), with the series identifier as a categorical column, instead of one per series | Costs 0.15 points on Primary demand after the error correction and saves 16 of 20 models; needs the series identifier, and the test covered 20 series |
+| [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
 
 ## The experiments so far
 
@@ -61,6 +62,7 @@ the maintainer to confirm.
 | [00024](00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost demand model without losing skill against one model per series? | Supported: 3 or 4 pooled models cost 0.15 points; one model for all series costs 0.29 | Candidate | 2026-10-15 |
 | [00031](00031-embedded-pv-features-primary-demand/result.md) | Do trailing estimates of embedded solar capacity, as tree columns, a linear offset, or a sunshine-shaped correction, lower the Primary demand quantile score? | Inconclusive | Not for production | 2026-10-15 |
 | [00032](00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints of each substation improve a by-type pooled demand model, and carry a substation held out of the pool? | Inconclusive: no fingerprint helped | Not for production | 2026-10-15 |
+| [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted average of the quantiles of already-scored models beat the best single model for Primary demand, solar, and wind? | Supported for Primary demand (-0.10 points); null for solar and wind | Candidate (Primary demand) | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -773,3 +775,23 @@ the lower limits of the four warm contrasts C1 to C4 are all below zero (-0.002 
   [PR #1241 (Experiment 32: do substation fingerprints improve a pooled demand model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1241).
 
 ![The eight planned contrasts](00032-substation-fingerprints-pooled-demand/figure_1.svg)
+
+### 00035: a lead-weighted blend of quantiles from stored models
+
+**Averaging the quantiles of three stored Primary demand models lowered the quantile score by 0.10
+points; solar and wind gains were too small to resolve.** The experiment refitted nothing. It
+averaged each quantile level of two or three stored models per technology, with weights chosen
+only on earlier months, and scored the result on the cases of experiment 33. The verdict is
+supported, on Primary demand alone.
+
+- **Headline result:** the lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack
+  minus the monthly-retrained N1, Primary quantile score over all leads: -0.097 points (98.33%
+  interval -0.187 to -0.026; absolute 5.025 against 5.122). Solar -0.039 (-0.115 to +0.031) and
+  wind -0.074 (-0.194 to +0.055) are null.
+- **Finding for later experiments:** one fixed weight vector scores as well as weights per lead
+  band (+0.005, -0.008 to +0.023 for Primary demand), and the 14-day correction belongs inside each
+  member, not after the blend (+0.048 worse after, +0.008 to +0.101).
+- **Write-up and pull request:** [result](00035-lead-weighted-quantile-blend-of-stored-models/result.md),
+  [PR #1244 (Experiment 35: does a lead-weighted blend of quantiles beat the best single model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1244).
+
+![Blends minus the best single member](00035-lead-weighted-quantile-blend-of-stored-models/figure_1.svg)

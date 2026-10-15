@@ -1,7 +1,7 @@
 ---
 id: "00035"
 slug: lead-weighted-quantile-blend-of-stored-models
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For Primary substation demand, solar farms, and wind farms, averaging the quantiles of two or
@@ -49,132 +49,106 @@ row_set_id:
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over nine levels, the estimate of the
   CRPS), in points of capacity; MAE of the median; coverage of the 5% to 95% band
-advice: []
-production_status: not-for-production
+verdict: supported
+best_arm: >-
+  Primary demand: the lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack, 5.025
+  points against 5.122 for the best member (difference -0.097, 98.33% interval -0.187 to -0.026).
+  Solar (-0.039, -0.115 to +0.031) and wind (-0.074, -0.194 to +0.055) are null.
+lessons: >-
+  Averaging quantiles helps Primary demand by about 0.1 points, and one fixed weight vector does as
+  well as weights per lead band. Solar and wind gains are too small to resolve on 3 to 6 farms.
+  Applying the 14-day correction after the blend is worse than inside the members.
+advice:
+  - >-
+    Use one weight vector, not weights per lead band, if a blend is ported: the two scored the same
+    for Primary demand (+0.005, -0.008 to +0.023) and for wind and solar (C2, C3, simpler-arm
+    contrasts).
+  - >-
+    Apply the 14-day correction inside each member before a blend, not to the blend afterwards,
+    which scored 0.048 points worse for Primary demand (correction-placement contrast).
+  - >-
+    Expect no gain from blending N1 with `a7` for BSP and GSP, where the lead-band blend minus the
+    better member was -0.014 (-0.083 to +0.060) over 4 series (descriptive contrast).
+  - >-
+    Test a wind blend on more than 3 farms before deciding, because the short-lead gain of -0.36
+    (-0.81 to +0.02) cannot be told from zero on 3 series (per-band contrast).
+production_status: candidate
 adopted_in: none
 code: ml-experiments/00035-lead-weighted-quantile-blend-of-stored-models/
 ---
 
 # Experiment 35: does a lead-weighted blend of quantiles beat the best single model?
 
-**This page is the plan, committed before any code runs.** The results replace the sections below
-when the experiment finishes. The experiment is CPU post-processing of stored predictions. It
-starts no fit and needs no GPU.
+**Primary demand gains 0.10 points from blending; solar and wind gain too little to resolve.**
+The lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack scores 5.025 points of
+capacity against 5.122 for the best member (difference -0.097, 98.33% interval -0.187 to -0.026),
+so the outcome for Primary demand is "port" (threshold 0.05). Solar is -0.039 (-0.115 to +0.031)
+and wind is -0.074 (-0.194 to +0.055), both "null". The stop rule did not fire anywhere (corner
+cells: Primary 0 of 60, solar 6, wind 7), so the verdict is `supported`, on Primary demand alone.
+Intervals resample whole months, and for Primary demand one seed, so they say nothing about
+other substations or about wind farms beyond the three scored.
 
-## Size
+![Blends minus the best single member over all leads](figure_1.svg)
 
-**Medium.** The five `plan-issue` triggers, in order:
+## Absolute scores
 
-1. **What gets stored:** one private prediction set per blend arm under `data/ml-experiments/`; no
-   Delta table and no production artefact.
-2. **Production serving path:** not touched by the experiment. A port would add a blend stage that
-   serves two or three models per technology (see "Porting cost").
-3. **Degradation rule:** not touched. A port would need a rule for a missing member, which the
-   plan leaves to a release plan.
-4. **More than one defensible design:** yes. The weight grid, the selection window, the objective,
-   and the order of correction and blend can each be set differently; the plan fixes one of each
-   and runs the simpler alternatives as arms.
-5. **Spans code whose callers could not be named without searching:** no. The scripts are new, read
-   stored tables, and call `studies.bootstrap` and `studies.experiment_store`.
+**The quantile score (points of capacity, smaller is better) of every arm, over the cases that
+experiment 33's final shared case sets hold.** Primary demand has 768,073 cases, solar 527,025,
+wind 321,138, and BSP and GSP 592,950. The in-sample arm chooses its weights on all 12 months
+and is an optimistic bound.
 
-Reviews: one Sonnet plan review, one Sonnet code review for leakage (a month never chooses its
-own weight), and one Sonnet write-up review.
+| Technology | Members | Equal | One weight | Lead bands | In sample |
+|---|---|---|---|---|---|
+| Primary demand | monthly 5.122, `a7_cs` 5.268, stack 5.318 | 5.059 | 5.020 | **5.025** | 5.008 |
+| Solar | N1 5.113, best guess 5.035 | 4.978 | 4.986 | **4.996** | 4.973 |
+| Wind | N1 11.359, best guess 11.042 | 10.965 | 10.941 | **10.969** | 10.907 |
+| BSP and GSP (descriptive) | N1 13.665, `a7` 13.658 | 13.621 | 13.643 | 13.644 | 13.621 |
 
-## Members and rows
+## Contrasts
 
-**Members are stored predictions from experiments 19, 20, 30, and 33; no model is refitted.**
-The `a7_cs` member adds seven weekly-analogue power columns to N1 (experiment 30).
-All tables are read from experiment 33's work folder, where they sit beside the observed power on
-one set of keys.
+- **Weights per lead band are no better than one weight.** The lead-band blend minus the one-weight
+  blend is +0.005 (-0.008 to +0.023) for Primary demand, +0.009 (-0.005 to +0.028) for solar, and
+  +0.028 (-0.019 to +0.082) for wind. The equal-weights blend beats the best member by -0.063 for
+  Primary demand (-0.279 to +0.091), so equal weights are not resolved.
+- **Primary demand gains at every lead band, wind at short leads.** The lead-band blend minus the
+  best member for Primary demand is -0.17 at 0 to 24 h (-0.35 to -0.03) and -0.08 at 10 days or
+  more (-0.20 to -0.00). Wind is -0.36 at 0 to 24 h (-0.81 to +0.02) and +0.05 at 2 to 6 days
+  (-0.12 to +0.25).
+- **The correction belongs inside the members.** The blend with the correction applied afterwards
+  scores 5.208 against 5.160 with the correction inside the members (+0.048, 95% interval +0.008 to
+  +0.101; the contrast favours the inside arm, because that arm's weights were chosen on it).
+- **Against the stack of experiment 19, the Primary blend is -0.293** (-0.447 to -0.140, 95%). The
+  monthly-retrained N1 alone is 0.196 below the stack on the same cases (5.122 against 5.318).
 
-| Technology | Rows | Members |
-|---|---|---|
-| Primary demand (16 series) | `fold_a_every5d_v1`, 73 runs, seed 0 | `monthly` (N1 retrained on the first of each month, no correction), `a7_cs` (weekly-analogue columns, correction, spread 1.15), `n1_cs` (the 00019 stack) |
-| Solar (6 farms) | `fold_a_tuesdays_v1`, 53 runs, 3 seeds | N1 for generators; the ERA5-trained mixture with spread factor (00020 `base-spread`) |
-| Wind (3 farms) | `fold_a_tuesdays_v1`, 53 runs, 3 seeds | N1 for generators; the ERA5-trained mixture with power-curve margin and spread factor (00020 `full`) |
-| BSP and GSP (4 series) | `fold_a_every5d_v1`, 3 seeds | `n1` and `a7`, both without correction |
+![Lead-band blend minus best member by lead band](figure_2.svg)
 
-Primary demand uses seed 0 only because `monthly` has one seed, so `a7_cs` and `n1_cs` are filtered
-to seed 0 and the intervals resample months only. For solar, wind, and BSP and GSP, seed s of each
-member is blended with seed s of the others, the weights are chosen on the pooled seeds, and the
-bootstrap resamples months and seeds.
-Stored quantiles and observations are fractions of effective capacity; every score is multiplied
-by 100 to give points of capacity, and the 14-day correction works in the same units. The rows
-scored are the cases that every member of a technology holds with finite quantiles
-and a finite observation, and the page states the count dropped. No valid time on or after
-2026-07-01 is scored.
+## Chosen weights
 
-## Method
-
-**Each blend averages each quantile level across members (Vincentisation), then sorts the nine
-quantiles.** Averaging quantiles per level keeps the blend's spread between the members' spreads,
-where averaging probabilities would widen it.
-
-- **Lead bands:** left-closed intervals of the lead `valid_time - power_fcst_init_time` in hours,
-  [0, 24), [24, 48), [48, 144), [144, 240), and [240, infinity), computed for every table; the
-  stored `band` column is ignored.
-- **Weights:** one weight per member and lead band, on the grid 0, 0.25, 0.5, 0.75, 1 with weights
-  summing to 1 (15 vectors for three members, 5 for two). The vector with the lowest mean quantile
-  score on the selection cases is chosen; a tie goes to the vector nearest equal weights.
-- **Rolling origin:** the weights for runs initialised in month m use only cases whose run was
-  initialised before month m and whose valid time is before the first day of month m, so every
-  observation used is known when month m begins. The scoring month is the run's initialisation
-  month, as in `experiment_store.losses_for_bootstrap`. July 2025 has no history, so it uses equal
-  weights, and it counts as no corner cell.
-- **Selection pools** all series of a technology. The page reports the chosen weights and the
-  number of selection cases per month and band, since long-lead bands have few cases in early
-  months; a cell is not given equal weights for being thin, and the noise is accepted. Selection
-  and scoring alike exclude valid times on or after 2026-07-01.
-- **Simpler arms:** equal weights always; one global weight vector per technology chosen by the same
-  rolling rule on all leads pooled. An in-sample arm (weights chosen on all 12 months, per band)
-  is reported as an optimistic bound and decides nothing.
-- **Correction placement (Primary demand only):** arm D3 blends `monthly_cs`, `a7_cs`, and `n1_cs`
-  (the correction applied inside each member, "before"), with weights chosen as above on D3's own
-  scores (members carry the `_cs` suffix: correction and spread 1.15). Arm D2 applies D3's weight
-  table to `monthly`, `a7`, and `n1` without correction,
-  then applies the 14-day correction and the 1.15 spread factor to the blend ("after"). The
-  correction uses only blend medians of earlier runs, each under its own rolling weights, over
-  half-hours observed before the run's origin. Because D3's weights were chosen on corrected
-  members, the contrast favours D3 and is descriptive. The correction code is copied from experiment
-  19. The
-  headline arm D1 blends `monthly` (no correction, no spread factor), `a7_cs`, and `n1_cs`,
-  because the proposal names those members; D1 is not the "before" arm of the contrast.
-
-## Planned contrasts
-
-**Only C1 to C3 decide the verdict.** All contrasts use the quantile score over all leads.
-
-1. **Decisive (3, 98.33%):** C1, D1 minus the best single Primary member; C2, the solar blend minus
-   the best single solar member; C3, the wind blend minus the best single wind member.
-2. **Exploratory, each family read at 5% divided by its size (families: member contrasts, 6;
-   blend-versus-simpler-arm contrasts, 6; correction placement, 1; per lead band, 15):** the
-   equal-weights arm and the
-   global-weight arm minus the best single member (technology by technology); the rolling blend
-   minus the equal-weights arm and minus the global-weight arm; D2 minus D3 (correction placement);
-   and per lead band, the rolling blend minus the best single member of that band.
-3. **BSP and GSP:** the same contrasts, descriptive, pooled over 4 series.
-
-**Intervals** resample whole months (and the three seeds where present) with
-`studies.bootstrap.bootstrap_difference_at_level`. Intervals resample months, not series, so with
-three wind farms they understate between-farm uncertainty.
+**The weights favour the more recent or the better-scored member and drift little.** Mean chosen
+weights over the 11 months with history, by lead band from 0 to 24 h to 10 days or more: Primary
+demand gives the monthly-retrained N1 0.61 to 0.70, `a7_cs` 0.30 to 0.39, and the stack 0.00 to
+0.05. Wind gives N1 0.68 and 0.61 under 2 days and 0.20 to 0.30 beyond. Solar is between 0.30 and
+0.57 for N1. No band chose a corner cell often enough to trigger the stop rule.
 
 ## Porting cost
 
-**The page states the cost of serving each blend.** The count of models served per run and per
-technology, whether a member needs monthly retraining (the retrained N1 does), and the chosen
-weight table's size (5 bands by 3 weights) are reported. The result does not decide a port; a
-release plan does.
+**A blend serves one more model per technology, and for Primary demand two more.** Wind and solar
+would serve N1 beside the ERA5-trained mixture, which is a second training source and a second
+feature pipeline. Primary demand would serve the monthly-retrained N1 (a refit each month for 16
+series), `a7_cs` (seven weekly-analogue columns), and the stack, and a fixed weight vector of three
+numbers suffices. The experiment does not decide a port; a release plan does.
 
-## Anonymisation
+## Failures and limits
 
-**Per-farm results use the anonymised labels** of `studies.anonymise` (solar A to F, wind W1 to
-W3); no page names a generator or gives its identifier.
+- **One validation year and one seed for Primary demand.** The retrained N1 has seed 0 only.
+- **Selection history is short.** Months 2 to 12 choose weights on 1 to 11 months, July 2025 uses
+  equal weights, and the long-lead bands start with few cases.
+- **The Primary member scores come from experiment 33's stored tables**, which that experiment may
+  still be re-scoring; the case sets read here carry that experiment's `shared_keys` as of
+  2026-10-15.
+- **BSP and GSP are 4 series** and the result is descriptive.
 
-## Advice followed and departed from
+## Lessons for later experiments
 
-The plan follows the earlier advice to state the spread factor's purpose (it lowers coverage error,
-not the CRPS, in 00020) and to report per-series spread by anonymised label, and 00019 and 00021
-(the 14-day correction does not help BSP and GSP, so those members carry none). It departs from the
-skill's Opus plan and code reviews: the maintainer asked for Sonnet reviewers on this experiment to
-save credits. Experiment 33's interim
-result, that the correction hurts monthly-retrained N1, motivates the placement contrast.
+**See `advice` in the front matter.** In short: blend with one fixed weight vector, correct inside
+the members, and test wind on more farms.

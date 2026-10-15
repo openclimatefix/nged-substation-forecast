@@ -11,7 +11,7 @@ m and whose valid time is before the first day of month m.
 import itertools
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -39,7 +39,8 @@ LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
 )
 GRID_STEP: Final[int] = 4
 """Weights are multiples of 1/4."""
-KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time", "seed")
+CASE_KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
+KEYS: Final[tuple[str, ...]] = (*CASE_KEYS, "seed")
 CORRECTION_DAYS: Final[int] = 14
 MIN_CORRECTION_DAYS: Final[int] = 3
 NEWEST_AGE: Final[int] = 7
@@ -49,7 +50,7 @@ STEPS_PER_DAY: Final[int] = 48
 # Each technology: group label, arm folder, list of member (name, stored file) pairs.
 DEMAND_ARMS: Final = SOURCE_DIR / "arms"
 GENERATOR_ARMS: Final = SOURCE_DIR / "generator_tables"
-TECHNOLOGIES: Final[dict[str, dict[str, object]]] = {
+TECHNOLOGIES: Final[dict[str, dict[str, Any]]] = {
     "Primary": {
         "kind": "demand",
         "members": {"monthly": "monthly", "a7_cs": "a7_cs", "n1_cs": "n1_cs"},
@@ -113,8 +114,9 @@ def load_members(
     """Return the shared cases and each member's (cases, 9) quantile array.
 
     Cases are those every member holds with finite quantiles and a finite observation, with a valid
-    time before the held-out period. For demand, `group` keeps one substation type (or "BSP+GSP").
-    Rows are sorted by the keys so all members line up.
+    time before the held-out period, and that are in experiment 33's shared case set for the group.
+    For demand, `group` keeps one substation type (or "BSP+GSP"). Rows are sorted by the keys so
+    all members line up.
     """
     tables = {name: _read(kind=kind, file=file, technology=group) for name, file in members.items()}
     names = list(tables)
@@ -134,17 +136,25 @@ def load_members(
         keys = t.select(*KEYS)
         shared = keys if shared is None else shared.join(keys, on=list(KEYS), how="inner")
     assert shared is not None
-    shared = shared.unique().sort(*KEYS)
+    shared_keys = pl.concat(
+        [
+            pl.read_parquet(SOURCE_DIR / "metrics" / g / "shared_keys.parquet")
+            for g in group.split("+")
+        ]
+    ).unique()
+    shared = shared.join(shared_keys, on=list(CASE_KEYS), how="semi").unique().sort(*KEYS)
     base = shared.join(
         tables[names[0]].select(*KEYS, "actual"), on=list(KEYS), how="left", validate="1:1"
     ).sort(*KEYS)
-    arrays = {
-        name: shared.join(tables[name], on=list(KEYS), how="left", validate="1:1")
-        .sort(*KEYS)
-        .select(LEVEL_COLUMNS)
-        .to_numpy()
+    joined = {
+        name: shared.join(tables[name], on=list(KEYS), how="left", validate="1:1").sort(*KEYS)
         for name in names
     }
+    for name in names:
+        if not np.array_equal(joined[name]["actual"].to_numpy(), base["actual"].to_numpy()):
+            msg = f"member {name} holds a different observation from {names[0]} on some case"
+            raise ValueError(msg)
+    arrays = {name: joined[name].select(LEVEL_COLUMNS).to_numpy() for name in names}
     base = base.with_columns(
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
         / 60.0,
@@ -333,10 +343,10 @@ def write_arm(*, folder: Path, name: str, cases: pl.DataFrame, quantiles: np.nda
     ).write_parquet(folder / f"{name}.parquet")
 
 
-def run_technology(*, label: str, spec: dict[str, object], groups: pl.DataFrame) -> None:
+def run_technology(*, label: str, spec: dict[str, Any], groups: pl.DataFrame) -> None:
     """Choose weights and write every arm for one technology."""
     kind = str(spec["kind"])
-    members = dict(spec["members"])  # type: ignore[arg-type]
+    members = dict(spec["members"])
     cases, arrays = load_members(
         kind=kind, members=members, groups=groups if kind == "demand" else None, group=label
     )
