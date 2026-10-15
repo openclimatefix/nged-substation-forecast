@@ -1,7 +1,7 @@
 ---
 id: "00028"
 slug: pvlive-forecast-in-stage2-gsp-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For the two grid supply points (GSPs) Walpole and Bicker Fen, giving the stage 2 calibrator a
@@ -39,9 +39,90 @@ metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity,
   and mean absolute error of the median; for the solar forecast, mean absolute error of the
   ensemble mean and quantile score, in points of PV_Live's own capacity
+verdict: inconclusive
+best_arm: >-
+  B1, the stage 2 calibrator with the solar forecast (quantile score 18.91 over all leads against
+  19.04 for B0); its interval includes zero.
+headline: >-
+  C1, solar forecast minus no solar forecast, over all leads: -0.14 points of capacity (95%
+  interval -0.34 to +0.04). The true PV_Live value, C2: -0.50 (-0.91 to -0.12), almost all of it at
+  leads of 7 to 15 days.
+lessons: >-
+  The solar forecast beat a month-by-half-hour climatology up to day 6 (mean absolute error 5.0 to
+  7.0 points of PV_Live capacity against 8.8 to 9.5) and tied it at 7 to 15 days. Its mean was too
+  high by 1.8 to 3.0 points at every lead band. Stage 2 gained from the true value only at long
+  leads.
+advice:
+  - >-
+    Do not add a solar forecast to the stage 2 calibrator for GSP demand on this evidence, because
+    C1 was -0.14 with an interval of -0.34 to +0.04, above the -0.30 bar.
+  - >-
+    Remove the bias of the ERA5-trained solar model on ENS members before reusing it, because its
+    member mean was 1.8 to 3.0 points of PV_Live capacity too high at every lead band (solar
+    forecast table).
+  - >-
+    Read the gain from the true PV_Live value as a long-lead effect, because C2 was -0.71 (-1.14 to
+    -0.30) at 7 to 15 days and +0.01 (-0.52 to +0.45) up to 48 hours.
+production_status: not-for-production
+adopted_in: none
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1235
+code: ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/
 ---
 
 # Does a forecast of the GSP's PV_Live solar generation help the stage 2 demand forecast?
+
+**Verdict: inconclusive.** Giving the stage 2 calibrator a forecast of the grid supply point's
+(GSP's) solar generation lowered the quantile score by 0.14 points of capacity, below the 0.30 bar,
+and the interval includes zero. C1 (solar forecast minus no solar forecast, all leads) is -0.14 (95%
+interval -0.34 to +0.04), and up to 48 hours it is +0.04 (-0.32 to +0.31). The true PV_Live value at
+the target time, an oracle, lowered the score by 0.50 (C2, -0.91 to -0.12), and the whole gain is at
+leads of 7 to 15 days. Scores are in points of capacity (1% of the series' effective capacity) on 73
+forecast runs, one every 5 days, July 2025 to June 2026, with ENS weather, for Walpole and Bicker
+Fen. Attribution: Sheffield Solar PV_Live, CC BY 4.0.
+
+![Stage 2 arms with a solar forecast and with the true value, against none](figure_1.svg)
+
+## Results
+
+| Arm | Quantile score, all leads | Up to 48 h | 7 to 15 d vs B0 (95%) |
+|---|---|---|---|
+| B0, no solar column | 19.04 | 15.21 | |
+| B1, solar forecast | 18.91 | 15.25 | -0.21 (-0.40 to -0.05, exploratory) |
+| B2, true PV_Live (oracle) | 18.54 | 15.22 | -0.71 (-1.14 to -0.30, exploratory) |
+
+- **B1 is worse than the oracle B2** by +0.36 over all leads (+0.12 to +0.61, exploratory), and the
+  difference is at 7 to 15 days (+0.50, +0.22 to +0.79).
+- **The gain from the solar forecast is at Walpole.** Each GSP alone, exploratory: C1 at Walpole is
+  -0.28 (-0.54 to -0.04) and at Bicker Fen +0.02 (-0.16 to +0.16). The plan guessed the larger gain
+  would be at Bicker Fen.
+- **Cases scored:** 50,498 per seed at Walpole and 46,178 at Bicker Fen, those with a PV_Live value
+  at the target time.
+
+## The solar forecast's own score
+
+![The solar forecast's error against a climatology](figure_2.svg)
+
+On daytime half-hours of the validation runs, the member mean's mean absolute error was 4.95 to 5.24
+points of PV_Live capacity in the first 24 hours, 5.9 to 6.0 at 1 to 2 days, 6.8 to 7.0 at 3 to 6
+days, and 9.0 to 9.2 at 7 to 15 days. The month-by-half-hour climatology scored 8.8 to 9.5 in every
+band, so the forecast beats it up to day 6 and ties it after. The member mean was too high by +1.75
+to +3.01 points in every band and both GSPs, so the ERA5-trained model is biased on ENS weather. The
+calibration-period error by chain quarter ran from 7.1 to 9.2 points, with no quarter standing out.
+
+## Predictions against outcomes
+
+- **Met:** C1 was predicted at -0.15 (plausible 0 to -0.5) and was -0.14.
+- **Met:** C2 was predicted at -0.5 (-0.1 to -1.5) and was -0.50.
+- **Missed:** a larger gain at Bicker Fen; the solar forecast helped at Walpole only (exploratory).
+
+## Limits
+
+- **Two series.** The intervals resample months and seeds, not series, so the result describes
+  Walpole and Bicker Fen only.
+- **The oracle gain is at long leads, where the target value is far from the origin,** and B2 has
+  one added column against two for B1, so B1 minus B2 is not a clean comparison.
+- **PV_Live is fully revised,** and the scores are against revised values.
+- **The delta at lag times uses ERA5 weather,** so every arm is a ceiling for the lagged inputs.
 
 ## Plan, written before any code ran
 
