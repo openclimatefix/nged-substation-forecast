@@ -50,6 +50,7 @@ the maintainer to confirm.
 | [00021](00021-error-correction-variants-bsp-gsp-demand/result.md) | Does the recent-error correction help BSP and GSP demand, and which variant works best? | Inconclusive for BSP and GSP; the 14-day additive form is the best variant | Not for production | 2026-10-15 |
 | [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
 | [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
+| [00026](00026-capacity-features-solar-wind/result.md) | Does a feature stating each solar or wind farm's recent effective capacity lower the CRPS of the pooled mixture? | Inconclusive: no detectable gain | Not for production | Not yet merged |
 | [00027](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
 | [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
 | [00029](00029-physics-stage1-solar-pytorch/result.md) | Does a differentiable PyTorch physics stage 1, fed into the XGBoost stage 2, beat the XGBoost stage 1 for the 6 solar farms? | Refuted: the physics stage 1 scores 0.079 points worse | Not for production | 2026-10-15 |
@@ -628,6 +629,25 @@ its own mean error over the previous 14 days (row set `fold_a_tuesdays_v1`).
   [PR #1229 (Experiment 23: does recent observed power help solar and wind forecasts?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1229).
 
 ![Contrasts](00023-lagged-power-and-error-correction-solar-wind/figure_1.svg)
+
+### 00026: effective-capacity features for solar and wind
+
+**A trailing effective-capacity feature did not lower the CRPS detectably for solar or wind.** The
+experiment added the 99th percentile of a farm's power at the 10% of steps with the most CAMS
+irradiance (solar) or ERA5 100 m wind (wind) over the last 28 days, read with a 5-day cutoff, to the
+stage 1a quantile models of 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** single feature minus no feature, solar -0.018 (98.75% interval -0.162 to
+  +0.096), wind +0.013 (-0.054 to +0.101).
+- **Finding for later experiments:** solar farm E gained 0.235 points and its shuffled copy only
+  0.034, while solar farm A and wind farm W3 lost. The wind power-over-wind-cubed feature gained
+  0.061 (-0.107 to -0.025) beyond the single feature, an exploratory contrast.
+- **Write-up and pull request:**
+  [result](00026-capacity-features-solar-wind/result.md),
+  [PR #1233 (Experiment 26: does a recent effective-capacity feature
+  lower the solar and wind forecast error?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1233).
+
+![Contrasts](00026-capacity-features-solar-wind/figure_1.svg)
 
 ### 00027: PV_Live at the lag times for GSP demand
 

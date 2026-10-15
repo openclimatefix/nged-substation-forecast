@@ -19,7 +19,6 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [P30](#p30-effective-capacity-features-for-solar-and-wind) | Does a feature stating each solar or wind farm's recent effective capacity, from its power at the steps with the most irradiance or wind over the last 28 days, lower the pooled mixture's CRPS? | 3 | Nothing | Experiment 00026 planned; result.md committed before any code |
 
 ## Deferred until the first results are in
 
@@ -122,15 +121,6 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
-
-### P30: effective-capacity features for solar and wind
-
-**Planned as [experiment 00026](00026-capacity-features-solar-wind/result.md).** The maintainer
-proposed giving the solar and wind XGBoost models a feature that states each farm's effective
-capacity over the last weeks, from its power at the steps with the most irradiance (solar) or wind
-(wind). The prior [effective-capacity study](../studies/forecasts/effective-capacity.md) used nine capacity
-estimators as a divisor and found no detectable gain over static capacity, so a small effect is
-expected.
 
 ### P11: ensemble statistics as inputs
 

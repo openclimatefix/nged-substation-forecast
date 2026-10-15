@@ -40,6 +40,15 @@ REPRODUCTION_TOLERANCE: Final[float] = 0.05
 def read_mixture(*, cases: pl.DataFrame, technology: str, arm: str, seed: int) -> np.ndarray:
     """Return an arm's mixture quantiles for a technology's cases, in `cases` order.
 
+    Args:
+        cases: The technology's validation cases.
+        technology: `solar` or `wind`.
+        arm: The arm whose mixtures to read.
+        seed: The fitting seed.
+
+    Returns:
+        Array of shape (cases, 9) of mixture quantiles, a fraction of capacity.
+
     Raises:
         ValueError: If a case has no mixture.
     """

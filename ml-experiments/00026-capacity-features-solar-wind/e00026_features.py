@@ -179,8 +179,17 @@ def daily_table(
     )
 
 
-def check_no_lookahead(*, technology: str, power, other, zenith, cutoff: int) -> None:  # noqa: ANN001
+def check_no_lookahead(
+    *, technology: str, power: np.ndarray, other: np.ndarray, zenith: np.ndarray, cutoff: int
+) -> None:
     """Raise if the table row for any cutoff day up to `cutoff` changes when later data is removed.
+
+    Args:
+        technology: `solar` or `wind`.
+        power: Cleaned power over effective capacity on the half-hourly grid.
+        other: CAMS shortwave (solar) or ERA5 100 m wind speed (wind) on the same grid.
+        zenith: Solar zenith in degrees on the same grid.
+        cutoff: The last cutoff day whose row must be unchanged.
 
     Raises:
         ValueError: If a row up to `cutoff` depends on data at or after day `cutoff`.
@@ -276,8 +285,15 @@ def shuffled_table(*, table: np.ndarray, seed: int, last_source_day: int) -> np.
     return out
 
 
-def series_grids(*, analysis: pl.DataFrame, series: int, technology: str):  # noqa: ANN201
+def series_grids(
+    *, analysis: pl.DataFrame, series: int, technology: str
+) -> tuple[np.ndarray, np.ndarray]:
     """Return the weather and zenith of one series on the half-hourly grid from `FEATURE_START`.
+
+    Args:
+        analysis: The ERA5 and CAMS analysis table of every series.
+        series: The `time_series_id` to read.
+        technology: `solar` or `wind`.
 
     Returns:
         `other` (CAMS shortwave or ERA5 100 m wind speed) and `zenith`, float32 arrays of

@@ -1,7 +1,7 @@
 ---
 id: "00026"
 slug: capacity-features-solar-wind
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 6 solar farms and 3 wind farms, giving each farm's stage 1a quantile model a feature that
@@ -42,12 +42,47 @@ row_set_id: fold_a_tuesdays_v1
 metric: >-
   CRPS estimated from 9 quantile levels, points of capacity (power over effective capacity, times
   100); coverage of the 5% to 95% band by lead band
+verdict: inconclusive
+best_arm: >-
+  A0, the production recipe, for the decisive contrast: 5.03 points of capacity for solar and 11.05
+  for wind. No arm beat A0 by an interval that excludes zero.
+headline: >-
+  C1, the single 28-day feature minus no feature: solar -0.018 (98.75% interval -0.162 to +0.096),
+  wind +0.013 (-0.054 to +0.101). C2, minus its shuffled copy: solar -0.041 (-0.324 to +0.131), wind
+  +0.010 (-0.099 to +0.137).
+lessons: >-
+  A recent effective-capacity feature did not lower the CRPS detectably for either technology, and
+  the intervals cannot rule out a gain of 0.03 (solar) or a loss of 0.1. One solar farm (E) gained
+  0.235 points and the shuffled copy did not, but two other farms lost. The wind
+  power-over-wind-cubed feature added -0.061 (-0.107 to -0.025) to the single feature, an
+  exploratory contrast.
+advice:
+  - >-
+    Do not port the top-decile effective-capacity feature to solar or wind on this evidence: C1 was
+    -0.018 (solar) and +0.013 (wind), with intervals 0.26 and 0.16 points wide (C1).
+  - >-
+    Test the wind power-over-wind-cubed feature (75th percentile of power over speed cubed, 3 to 8
+    m/s, 28 days) again on its own, since it lowered the wind CRPS by 0.061 (-0.107 to -0.025)
+    beyond the single feature (C5, exploratory).
+  - >-
+    Judge a capacity feature on the farms with a known loss of capacity: solar farm E gained 0.235
+    points from the single feature and its shuffled copy only 0.034, while farm A and wind farm W3
+    lost (per-farm figure).
+  - >-
+    Shuffle a slowly varying feature across years within the same calendar month when building a
+    control, so the control keeps the seasonal marginal (design, C2).
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00026-capacity-features-solar-wind/
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1233
 ---
 
 # Does a recent effective-capacity feature lower the solar and wind forecast error?
 
-**Status: planned.** This is proposal P30 of the [research plan](../research-plan.md). ENS is the
+**Verdict: inconclusive.** A feature stating each farm's recent effective capacity moved the
+continuous ranked probability score (CRPS) by -0.018 points of capacity for solar and +0.013 for
+wind, and the intervals include both no effect and the 0.03-point threshold. This is proposal P30 of
+the [research plan](../research-plan.md). The farms are 6 solar farms and 3 wind farms. ENS is the
 European Centre for Medium-Range Weather Forecasts ensemble, ERA5 its reanalysis of past weather,
 and CAMS the Copernicus Atmosphere Monitoring Service's satellite irradiance estimate.
 
@@ -177,3 +212,54 @@ expected to concentrate in the few months with a loss of capacity), .
 - **The cutoff of 5 days applies to power as well as weather,** a deliberate simplification that
   dilutes a signal about a recent loss.
 - **The prior study found few real losses of capacity,** so little can be learned from most months.
+
+## Results
+
+![Contrasts](figure_1.svg)
+
+- **Absolute CRPS, all leads (points of capacity).** Solar: A0 5.026, A2 5.008, A3 5.012, A4 4.990,
+  A5 4.991, A6 5.057, A7 5.049, climatology 5.629. Wind: A0 11.053, A2 11.066, A3 11.015, A4 11.005,
+  A5 11.091, A6 11.072, A7 11.056, climatology 13.029. The seed spread is at most 0.034. A0
+  reproduces experiment 00020 (solar 5.03, wind 11.05).
+- **C1, the single feature minus no feature (decides).** Solar -0.018 (-0.162 to +0.096), wind
+  +0.013 (-0.054 to +0.101): inconclusive for both, because each interval holds zero and a gain
+  of 0.03.
+- **C2, the single feature minus its shuffled copy (gates C1).** Solar -0.041 (-0.324 to +0.131),
+  wind +0.010 (-0.099 to +0.137). The shuffled solar copy A7 is 0.023 worse than A0, so the shuffle
+  hurt a little, but no interval excludes zero.
+- **C3 to C6 (descriptive).** Three features minus their shuffled copies: solar -0.045 (-0.314 to
+  +0.134), wind -0.057 (-0.195 to +0.066). Three features minus one: solar +0.005, wind -0.052
+  (-0.110 to +0.004). Shape feature added to the single feature: solar -0.017 (-0.188 to +0.085),
+  wind -0.061 (-0.107 to -0.025), the only interval wholly below zero. Last-year feature added:
+  solar -0.016, wind +0.024.
+- **Per farm.** The single feature changed the CRPS of solar farm E by -0.235 points and of wind
+  farm W1 by -0.044, and raised it for solar farm A by +0.085 and wind farm W3 by +0.113. The
+  shuffled copy changed farm E by -0.034, so the gain at farm E is not a column-count effect.
+
+![Per-farm differences](figure_2.svg)
+
+- **Coverage.** The 5% to 95% band of every feature arm covers 0.3 to 3.0 points less than A0's
+  (solar 93.1% to 95.0%, wind 87.4% to 92.6%, against 94.3% to 95.3% and 89.4% to 93.7%).
+- **Null shares over the validation year.** The solar 7-day feature is null on average 24% of
+  days (44% at worst farm, in winter); every other feature is null under 2% of days.
+- **Prediction against result.** The solar single-feature effect (-0.02) matched the estimate. The
+  wind effect (-0.03) came out at +0.01. The shuffled copy was predicted to move the CRPS by under
+  0.02 and moved solar by +0.023.
+
+## Failures and limits
+
+- **The sample resolves about 0.15 points for solar and 0.1 for wind.** The decisive intervals are
+  0.26 (solar) and 0.16 (wind) points wide, so a gain of the predicted size is not resolved.
+- **Intervals resample months, not farms.** The per-farm figure shows the spread between farms is
+  larger than the contrast.
+- **The wind shape feature's gain is exploratory.** C5 is one of 12 contrasts and sits outside the
+  4 that set the interval level.
+- **No post hoc tweak was run.**
+
+## Lessons
+
+- **A trailing capacity feature is not worth its serving step on this evidence.** The two decisive
+  contrasts straddle zero, and the farm that gained most is one of six.
+- **The cubic power-to-speed feature is worth a separate test for wind.** It is the only feature
+  with an interval wholly below zero, and it needs no weather product beyond the wind speed already
+  used.
