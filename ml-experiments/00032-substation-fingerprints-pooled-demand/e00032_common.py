@@ -565,8 +565,10 @@ def training_fingerprint(*, power: np.ndarray, days: int | None = None) -> np.nd
     day = good & (slot >= DAY_SLOTS.start) & (slot < DAY_SLOTS.stop)
     night = good & (slot >= NIGHT_SLOTS.start) & (slot < NIGHT_SLOTS.stop)
     profile = np.array(
-        [np.nanmean(values[good & (slot == k)]) if (good & (slot == k)).any() else np.nan
-         for k in range(STEPS_PER_DAY)]
+        [
+            np.nanmean(values[good & (slot == k)]) if (good & (slot == k)).any() else np.nan
+            for k in range(STEPS_PER_DAY)
+        ]
     )
     return np.array(
         [

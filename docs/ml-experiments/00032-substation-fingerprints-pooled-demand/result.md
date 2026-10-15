@@ -22,25 +22,25 @@ prediction: >-
 decision_rule: >-
   Eight planned contrasts on the quantile score over all leads of the full stack (14-day error
   correction and spread factor 1.15), read at 99.375% (Bonferroni across eight), whole validation
-  months and seeds resampled. C1 to C5 use the 16 Primary series and three seeds. C1 is A2 minus
-  A1, C2 is A3 minus A1, C3 is A4 minus A1, C4 is A5 minus A1, C5 is A6 minus A1. C6 is
-  A6 minus A0 (does a fingerprint beat dropping the identifier). C7 and C8 use the 8 held-out
-  Primary substations and seed 0: C7 is the held-out model with training-window statistics minus
-  the held-out model with no fingerprint, C8 is the one with training-window and recent-window
-  statistics minus the one with no fingerprint. Recent-window statistics need a rolling
-  recomputation at every forecast origin in training and serving, a new pipeline step, so a column
-  set that includes them is worth porting only when its interval lies wholly below -0.10 points. A
-  static column set (location or training-window statistics) costs one table per retrain, and is
-  worth porting at any interval wholly below zero. C5 non-inferior means an upper limit of at most
-  +0.15 points: the fingerprint can replace the identifier. Verdict: supported when C3 or C4 lies wholly below -0.10, or when both C7 and C8 lie wholly below
-  zero. C1 and C2 are reported but decide the verdict only through a static-column port: they
-  count as a static gain only when wholly below -0.05. Refuted when C1 to C4, C7, and C8 are all
-  wholly at or above zero. Inconclusive otherwise. C5 and C6 decide no verdict. C7 and C8 use one
-  seed, so their intervals resample months only and are weaker than C1 to C5. Contrasts on BSP and
-  GSP, the uncorrected arms (including C7 and C8 without the correction, to show whether the
-  correction absorbs the cold-start effect), and the fingerprint columns S in the cold-start pool
-  (K1) are exploratory at 95%. The report also gives the share of the A1-minus-per-series gap
-  closed by A4 and A5, descriptively and without a test.
+  months and seeds resampled. C1 to C5 use the 16 Primary series and three seeds. C1 is A2 minus A1,
+  C2 is A3 minus A1, C3 is A4 minus A1, C4 is A5 minus A1, C5 is A6 minus A1. C6 is A6 minus A0
+  (does a fingerprint beat dropping the identifier). C7 and C8 use the 8 held-out Primary
+  substations and seed 0: C7 is the held-out model with training-window statistics minus the held-
+  out model with no fingerprint, C8 is the one with training-window and recent-window statistics
+  minus the one with no fingerprint. Recent-window statistics need a rolling recomputation at every
+  forecast origin in training and serving, a new pipeline step, so a column set that includes them
+  is worth porting only when its interval lies wholly below -0.10 points. A static column set
+  (location or training-window statistics) costs one table per retrain, and is worth porting at any
+  interval wholly below zero. C5 non-inferior means an upper limit of at most +0.15 points: the
+  fingerprint can replace the identifier. Verdict: supported when C3 or C4 lies wholly below -0.10,
+  or when both C7 and C8 lie wholly below zero. C1 and C2 are reported but decide the verdict only
+  through a static-column port: they count as a static gain only when wholly below -0.05. Refuted
+  when C1 to C4, C7, and C8 are all wholly at or above zero. Inconclusive otherwise. C5 and C6
+  decide no verdict. C7 and C8 use one seed, so their intervals resample months only and are weaker
+  than C1 to C5. Contrasts on BSP and GSP, the uncorrected arms (including C7 and C8 without the
+  correction, to show whether the correction absorbs the cold-start effect), and the fingerprint
+  columns S in the cold-start pool (K1) are exploratory at 95%. The report also gives the share of
+  the A1-minus-per-series gap closed by A4 and A5, descriptively and without a test.
 benchmark: >-
   The by-type pooled model with the series identifier (A1, experiment 00024, 5.47 on Primary), the
   by-type model without it, per-series models (5.32), `manual_heuristic`, and `climatology`.
@@ -75,7 +75,8 @@ it, and carry a held-out substation.
 - **Degradation rule:** not touched.
 - **Defensible designs:** more than one (which statistics, which window, which held-out series), so
   the columns and the held-out series are fixed below before any fit.
-- **Callers:** the scripts copy 00024's fit and scoring, which the author can name without searching.
+- **Callers:** the scripts copy 00024's fit and scoring, which the author can name without
+  searching.
 
 Size: complex. One Sonnet review of the plan, one of the code (leakage, the origin-minus-2-days
 bound, the fit stopping at 2025-06-30, the held-out series absent from training), and one of the
@@ -95,10 +96,10 @@ lets A0 and A1 reuse 00024's stored predictions (same code, same seeds).
 
 - **Static (S):** latitude and longitude.
 - **Training window (T):** over valid times 2024-04-01 to 2025-06-30, the mean, standard deviation,
-  5th and 95th percentiles, the mean over 10:00 to 16:00 UTC minus the mean over 00:00 to 05:00
-  UTC, the weekend mean minus the weekday mean, and the half-hour of the daily peak of the mean
-  daily profile. Seven columns, fixed at 2025-06-30 for the whole validation year, so their staleness is part
-  of the test.
+  5th and 95th percentiles, the mean over 10:00 to 16:00 UTC minus the mean over 00:00 to 05:00 UTC,
+  the weekend mean minus the weekday mean, and the half-hour of the daily peak of the mean daily
+  profile. Seven columns, fixed at 2025-06-30 for the whole validation year, so their staleness is
+  part of the test.
 - **Recent window (R):** over the 14 days ending at the forecast origin minus 2 days, the mean,
   the standard deviation, and the daytime-minus-night mean (as in T). Three columns, recomputed
   for every forecast origin in training and in validation; missing when fewer than 3 days hold
@@ -117,11 +118,11 @@ lets A0 and A1 reuse 00024's stored predictions (same code, same seeds).
 | A6 | T, no identifier |
 
 **Cold start (seed 0).** Eight Primary series are held out in turn, 4 from the Primary-MW pool and
-4 from the Primary-MVA pool (every second series by site label, fixed now). For each held-out
-series the by-type pool is refitted without it and forecasts it with no identifier. The held-out
-series' fingerprint comes from its own training-window and recent-window rows, which models a new
-substation with 4 weeks of telemetry: the held-out series' T uses only the 28 days ending
-2025-06-30, and the pool never sees its target. The pool's other series keep the full-window T. Cold-start arms: K0 (no
+4 from the Primary-MVA pool (every second series by site number: sites 5, 10, 14, and 16, and sites 2, 4, 12, and 21). For each held-out series
+the by-type pool is refitted without it and forecasts it with no identifier. The held-out series'
+fingerprint comes from its own training-window and recent-window rows, which models a new substation
+with 4 weeks of telemetry: the held-out series' T uses only the 28 days ending 2025-06-30, and the
+pool never sees its target. The pool's other series keep the full-window T. Cold-start arms: K0 (no
 fingerprint), K1 (S), K2 (T), K3 (T and R).
 
 **Cost.** Fit seconds are recorded per model; the work is capped near 2 hours of GPU time.
