@@ -48,6 +48,7 @@ the maintainer to confirm.
 | [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies nearly all of it | Candidate | Not yet merged |
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Do the candidate changes for solar and wind (CAMS-trained stage 1a, a stage 0 quantile mapping, a power-curve base margin, a spread factor) add up to a lower CRPS than the pooled ERA5-trained mixture? | Partly supported: wind gains 0.071 points, solar does not | Candidate (wind) | Not yet merged |
 | [00021](00021-error-correction-variants-bsp-gsp-demand/result.md) | Does the recent-error correction help BSP and GSP demand, and which variant works best? | Inconclusive for BSP and GSP; the 14-day additive form is the best variant | Not for production | 2026-10-15 |
+| [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
 | [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -204,6 +205,27 @@ plain 14-day additive form.** The experiment post-processed N1's stored forecast
 
 ![The eight planned contrasts](00021-error-correction-variants-bsp-gsp-demand/figure_1.svg)
 
+### 00022: the weather ceiling for Primary demand
+
+**ERA5 weather in place of ENS weather at serving time lowered the Primary demand quantile score by
+only 0.10 points, so better weather products have little to offer Primary demand.** The experiment
+used experiment 19's full stack on the 16 Primary substations and 73 forecast runs. ERA5 arrives
+about 5 days late, so the arm is a ceiling and no serving system could use it.
+
+- **Headline result:** the all-variable ERA5 arm minus the ENS arm was -0.10 points of capacity over
+  all leads (99.38% interval -0.16 to -0.04); the ENS arm scored 5.32 and the ERA5 arm 5.22.
+- **By variable:** shortwave radiation alone gave -0.08 (-0.13 to -0.04); temperature gave -0.01
+  (-0.04 to +0.01).
+- **By lead:** the gain was -0.08 at 3 to 6 days and -0.15 at 11 to 15 days, and ERA5 was slightly
+  worse (+0.03) under 24 hours.
+- **Finding for later experiments:** if a second weather product is tried for Primary demand, test
+  its shortwave radiation first.
+- **Write-up and pull request:** [result](00022-era5-weather-ceiling-primary-demand/result.md), [PR
+  #1227 (Experiment 22: how much would Primary demand gain from ERA5 weather in place of ENS
+  weather?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1227).
+
+![Each ERA5 arm minus the ENS arm](00022-era5-weather-ceiling-primary-demand/figure_1.svg)
+
 ### What the experiments taught us so far
 
 - **A 14-day error correction put N1 below `manual_heuristic` for Primary demand.** The correction
@@ -213,6 +235,9 @@ plain 14-day additive form.** The experiment post-processed N1's stored forecast
   yet use it for BSP and GSP.** It scored the same with 2-day-old power as with 3.5-hour-old power,
   a 7-day window and a ratio form were worse, and on 4 BSP and GSP series it did not lower the
   quantile score (00021).
+- **A weather product as accurate as ERA5 would lower the Primary demand score by 1.9%.** ERA5 weather
+  in place of ENS weather lowered the quantile score by 0.10 points, nearly all from shortwave
+  radiation and none up to 2 days ahead (00022).
 - **Check for calendar memorisation.** When the same valid time repeats across many ENS runs, a model
   with calendar columns can memorise it. Give each experiment a climatology row, and group folds by
   valid time.

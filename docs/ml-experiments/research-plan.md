@@ -27,7 +27,6 @@ model.** Each keeps its section below, and a result may promote it.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 5 | Knowing what the production model will look like | Deferred; its size depends on the shape of the model |
 | [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | Nothing | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, and experiment 00018 found the staged chain level with N1 for demand |
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | Nothing | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
@@ -122,12 +121,6 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
-
-### P9: the demand weather ceiling
-
-**The experiment sizes how much skill demand gains from better weather.** The experiment gives N1
-ERA5 in place of ENS weather at serving time, by lead. A small gap means weather-source work (P15,
-P16) has low priority for demand.
 
 ### P11: ensemble statistics as inputs
 

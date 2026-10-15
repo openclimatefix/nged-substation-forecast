@@ -163,6 +163,7 @@ nav:
       - "Do the candidate changes for solar and wind add up to a better pooled mixture?": ml-experiments/00020-solar-wind-stack-cams-stage0-spread-margin/result.md
       - "Does the recent-error correction help BSP and GSP demand, and which variant works best?": ml-experiments/00021-error-correction-variants-bsp-gsp-demand/result.md
       - "Does recent observed power help solar and wind forecasts?": ml-experiments/00023-lagged-power-and-error-correction-solar-wind/result.md
+      - "How much would Primary substation demand gain from ERA5 weather in place of ENS weather?": ml-experiments/00022-era5-weather-ceiling-primary-demand/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
