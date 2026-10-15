@@ -8,6 +8,7 @@ columns older than one day (`e00027_common.pv_inputs`):
 - `a1`: PV_Live level over the series' effective capacity.
 - `a2`: PV_Live share of its own capacity.
 - `a3`: the delta at each position plus the PV_Live level.
+- `a3m` (post hoc): the delta at each position minus the PV_Live level.
 
 Output: `work/calibrated/<arm>.parquet` with the validation keys, `seed`, the 9 quantile columns,
 and `actual`, skipped if it exists.
@@ -25,7 +26,7 @@ import polars as pl
 import xgboost as xgb
 
 OUT_DIR: Final[Path] = common.WORK_DIR / "calibrated"
-ARMS: Final[tuple[str, ...]] = ("a0", "a1", "a2", "a3")
+ARMS: Final[tuple[str, ...]] = ("a0", "a1", "a2", "a3", "a3m")
 
 
 def _stats(*, split: str, series_ids: list[int]) -> pl.DataFrame:

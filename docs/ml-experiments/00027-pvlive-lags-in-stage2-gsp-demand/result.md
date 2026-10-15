@@ -1,7 +1,7 @@
 ---
 id: "00027"
 slug: pvlive-lags-in-stage2-gsp-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For the two grid supply points (GSPs) Walpole and Bicker Fen, giving the stage 2 calibrator
@@ -34,9 +34,96 @@ row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity,
   and mean absolute error of the median
+verdict: refuted
+best_arm: >-
+  A0, the stage 2 calibrator without PV_Live (quantile score 19.04 over all leads); no PV_Live arm
+  differed from it by more than 0.08 points.
+headline: >-
+  C3, delta plus PV_Live minus no PV_Live, over all leads: -0.03 points of capacity (98.33%
+  interval -0.13 to +0.09). The best contrast was C1, PV_Live level: -0.08 (-0.26 to +0.08).
+lessons: >-
+  A gain of 0.3 points or more from PV_Live at the lag times is excluded for these 2 GSPs. PV_Live
+  at the valid time helps the stage 1a point forecast at Bicker Fen (-1.28 points of mean absolute
+  error, -1.90 to -0.67) and not at Walpole (-0.03, -0.27 to +0.23).
+advice:
+  - >-
+    Do not add PV_Live at the lag times to the stage 2 calibrator for GSP demand, because no arm
+    lowered the quantile score by 0.3 points or more (C1 to C3, upper bounds of all leads -0.26 to
+    +0.09).
+  - >-
+    Test PV_Live at the valid time as a stage 1 input only where an observed or forecast PV_Live
+    value exists at forecast time, because it lowered stage 1a's point error at Bicker Fen by
+    1.28 points but not at Walpole (S1).
+production_status: not-for-production
+adopted_in: none
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1234
+code: ml-experiments/00027-pvlive-lags-in-stage2-gsp-demand/
 ---
 
 # Does PV_Live at the lag times help the stage 2 forecast of GSP demand?
+
+**Verdict: refuted for the 2 GSPs, Walpole and Bicker Fen.** Giving the stage 2 calibrator
+Sheffield Solar's PV_Live estimate at the lag times lowered the quantile score by at most 0.08
+points of capacity, and every interval includes zero. The best planned contrast, C1 (PV_Live level
+minus no PV_Live, all leads), is -0.08 (98.33% interval -0.26 to +0.08). The three intervals all
+lie above -0.30, so a gain of the planned size is excluded for these 2 series, and the intervals
+say nothing about other GSPs. Scores are on 73 forecast runs, one every 5 days, July 2025 to June
+2026, with ENS weather, in points of capacity (1% of the series' effective capacity).
+Attribution: Sheffield Solar PV_Live, CC BY 4.0.
+
+![Stage 2 arms with PV_Live minus the arm without](figure_1.svg)
+
+## Results
+
+| Arm | Quantile score, all leads | Up to 48 h | C, all leads (98.33%) |
+|---|---|---|---|
+| A0, no PV_Live | 19.04 | 15.21 | |
+| A1, PV_Live level | 18.97 | 15.24 | C1 -0.08 (-0.26 to +0.08) |
+| A2, PV_Live share | 18.98 | 15.28 | C2 -0.06 (-0.22 to +0.09) |
+| A3, delta plus PV_Live | 19.01 | 15.21 | C3 -0.03 (-0.13 to +0.09) |
+| A3m, delta minus PV_Live (post hoc) | 18.99 | 15.19 | -0.05 (-0.17 to +0.03, 95%) |
+| Day-type climatology | 24.40 | 24.51 | |
+
+- **A0 reproduces experiment 00005's `l3` arm** for these 2 GSPs exactly (difference 0.000).
+- **No series, lead band, or season shows a gain that the intervals separate from zero.** The
+  largest nominal gain is at midday in March to May and September to November (A3 minus A0, -0.44
+  over 31,365 rows; exploratory, no interval), and December to February is nominally worse (+0.08
+  to +0.09).
+- **The sign check failed.** On summer middays the delta correlates with PV_Live at +0.45 at Bicker
+  Fen and -0.26 at Walpole, and the delta plus PV_Live correlates at +0.85 and +0.20. Adding PV_Live
+  did not remove the solar part of the delta, so A3 did not separate solar from other demand as the
+  plan assumed. The post hoc arm A3m (subtracting PV_Live) scored the same as A0 (-0.05, -0.17 to
+  +0.03), so the sign does not explain the null result.
+- **PV_Live was usable for most positions.** The 24-hour lag is never usable under the 1-day
+  settling delay, the 48-hour lag only for leads under 1 day, and the 168-hour lag up to 6 days.
+  The same-time-of-day and same-time-of-week positions are always usable.
+
+## S1: stage 1a with PV_Live at the valid time (exploratory)
+
+![Stage 1a point error with PV_Live at the valid time minus without](figure_2.svg)
+
+Adding PV_Live's level at the valid time lowered stage 1a's mean absolute error at observed ERA5
+weather at Bicker Fen, by 1.28 points over all valid times (95% interval -1.90 to -0.67) and 2.57
+points in daylight (-3.58 to -1.31), and not at Walpole (-0.03, -0.27 to +0.23; daylight +0.04,
+-0.41 to +0.53). The valid-time value is not known at the forecast origin, so this does not show a
+gain for the forecast.
+
+## Predictions against outcomes
+
+- **Missed:** the plan predicted a 0.5-point gain from the adjusted delta; C3 was -0.03.
+- **Met:** the plan expected a wide interval; the 98.33% intervals are 0.2 to 0.35 points wide.
+
+## Limits
+
+- **Two series.** The intervals resample months and seeds, not series, so the result describes
+  Walpole and Bicker Fen only.
+- **PV_Live is fully revised.** The download holds the latest estimate, and its `updated_at`
+  column is the bulk download time. The 1-day settling delay is an assumption, so every arm is a
+  ceiling for PV_Live as well as for ERA5 at the lag times.
+- **The delta uses ERA5 weather at the lag times**, which arrives about 5 days late. The comparison
+  across arms is unaffected, because every arm shares the delta.
+- **The calibrator is fitted on 15 months** of runs every third day, which may be too little for it
+  to learn a subtraction (A1 and A2) from raw columns.
 
 ## Plan, written before any code ran
 

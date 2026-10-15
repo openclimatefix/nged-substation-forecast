@@ -306,7 +306,8 @@ def pv_inputs(
     """Return an arm's PV_Live columns for each case, from PV_Live values older than a day.
 
     Args:
-        arm: `a1` (level), `a2` (share of capacity), or `a3` (delta plus level).
+        arm: `a1` (level), `a2` (share of capacity), `a3` (delta plus level), or
+            `a3m` (delta minus level; post hoc).
         pv_level: PV_Live generation over the series' effective capacity on the grid.
         pv_share: PV_Live generation as a share of PV_Live's own capacity on the grid.
         residual: Observed power minus stage 1a at ERA5 weather, over capacity, on the grid.
@@ -335,6 +336,8 @@ def pv_inputs(
         values = np.where(usable, pv_share[index], np.nan)
     elif arm == "a3":
         values = np.where(usable, residual[index] + level, np.nan)
+    elif arm == "a3m":
+        values = np.where(usable, residual[index] - level, np.nan)
     else:
         msg = f"unknown arm {arm}"
         raise ValueError(msg)
