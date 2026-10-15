@@ -22,6 +22,7 @@ the maintainer to confirm.
 | [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Train the stage 1a demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day error correction | The correction needs live power 2 days old, and every gain is on ERA5 weather |
 | [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Add a 14-day error correction and a spread factor of 1.15 to the single-stage ENS-trained quantile model N1 for Primary demand | The correction supplies nearly all of the gain (-0.99); it is tested on forecasts 5 days apart and on a model that is never retrained |
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
+| [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
 
 ## The experiments so far
 
@@ -45,6 +46,7 @@ the maintainer to confirm.
 | [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
 | [00018](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
 | [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies nearly all of it | Candidate | Not yet merged |
+| [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Do the candidate changes for solar and wind (CAMS-trained stage 1a, a stage 0 quantile mapping, a power-curve base margin, a spread factor) add up to a lower CRPS than the pooled ERA5-trained mixture? | Partly supported: wind gains 0.071 points, solar does not | Candidate (wind) | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -202,6 +204,10 @@ later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesda
   to +0.59), and -0.29 over the half terms (-0.68 to +0.07), and Both was not 0.2 points better than
   a calendar shifted by 17 days (00011). The arm with the full history and the COVID indicator
   scored 0.26 points higher on the whole year than the base arm.
+- **A change that helps the point forecast of solar or wind need not help the pooled mixture's
+  CRPS.** CAMS-trained solar lowered the member-average error by 0.14 points (00012) and the
+  mixture's CRPS by 0.009 (00020), and a stage 0 mapping widened the member spread by a quarter. A
+  power-curve base margin lowered the wind CRPS by 0.055 (00020).
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -276,6 +282,28 @@ Primary substations and the 73 runs of `fold_a_every5d_v1`.
   baselines)](https://github.com/openclimatefix/nged-substation-forecast/pull/1218).
 
 ![The five planned contrasts](00013-primary-demand-against-stored-baselines/figure_2.svg)
+
+### 00020: stacking the candidate changes for solar and wind
+
+**For wind, a power-curve base margin and a spread factor together lower the pooled mixture's CRPS
+by 0.071 points of capacity, and the base margin carries the gain; for solar, nothing helped.** The
+experiment stacked a CAMS-trained stage 1a, a stage 0 quantile mapping, the base margin (wind only),
+and the spread factor against the production recipe's pooled ERA5-trained mixture, and dropped each
+component in turn, for 6 solar farms and 3 wind farms (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** wind full stack minus recipe, -0.071 (99.58% interval -0.133 to -0.014); solar
+  full stack minus the production recipe, +0.035 (-0.075 to +0.116).
+- **Components:** the wind base margin alone gives -0.055 (-0.110 to -0.007). For solar, CAMS-trained
+  gives -0.009, stage 0 +0.036, and the spread factor +0.006, each with an interval that includes
+  zero.
+- **Finding for later experiments:** the stage 0 quantile mapping widens the member spread by about a
+  quarter and leaves monthly ratios to CAMS from 0.83 to 1.10, and it did not lower the solar CRPS
+  in this experiment.
+- **Write-up and pull request:** [result](00020-solar-wind-stack-cams-stage0-spread-margin/result.md),
+  [PR #1226 (Experiment 20: do the candidate changes for solar and wind add up to a better pooled
+  mixture?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1226).
+
+![Planned contrasts](00020-solar-wind-stack-cams-stage0-spread-margin/figure_1.svg)
 
 ### 00018: the staged chain against the single-stage model for Primary demand
 
