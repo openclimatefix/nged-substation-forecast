@@ -164,6 +164,7 @@ nav:
       - "Does the recent-error correction help BSP and GSP demand, and which variant works best?": ml-experiments/00021-error-correction-variants-bsp-gsp-demand/result.md
       - "Does recent observed power help solar and wind forecasts?": ml-experiments/00023-lagged-power-and-error-correction-solar-wind/result.md
       - "How much would Primary substation demand gain from ERA5 weather in place of ENS weather?": ml-experiments/00022-era5-weather-ceiling-primary-demand/result.md
+      - "Does PV_Live at the lag times lower the stage 2 quantile score of GSP demand?": ml-experiments/00027-pvlive-lags-in-stage2-gsp-demand/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
