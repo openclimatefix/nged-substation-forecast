@@ -5,7 +5,9 @@ status: planned
 size: medium
 hypothesis: >-
   For Primary substation demand, solar farms, and wind farms, averaging the quantiles of two or
-  three forecast models that experiments 19, 20, 30, and 33 already scored (N1 is the ENS-trained single-stage XGBoost model, and the stack is N1 with the 14-day correction and a spread factor of 1.15), with one weight per
+  three forecast models that experiments 19, 20, 30, and 33 already scored (N1 is the ENS-trained
+  single-stage XGBoost model, and the stack is N1 with the 14-day correction and a spread factor of
+  1.15), with one weight per
   lead band chosen only on earlier months, lowers the quantile score below the best single member
   by more than the threshold set for each technology (0.05 points of capacity for Primary demand
   and solar, 0.10 for wind).
@@ -24,11 +26,13 @@ decision_rule: >-
   when the stop rule fires (below), "port" when the interval is wholly below zero and the estimate
   is at or below minus the threshold, "small gain" when the interval is wholly below zero and the
   estimate is above minus the threshold, "harm" when the interval is wholly above zero, and "null"
-  otherwise. The stop rule is evaluated first, and when it fires the outcome is "no combination" whatever the
+  otherwise. The stop rule is evaluated first, and when it fires the outcome is "no combination"
+  whatever the
   interval shows. A cell is one scored month and one lead band, and it is a corner cell
   when the chosen weights put all the weight on one member; the stop rule fires when at least
   10/12 (83.3%) of a technology's 60 cells are corner cells, the denominator being 60 for every
-  technology and July 2025's five cells counting as no corner cell. The verdict is `supported` when at
+  technology and July 2025's five cells counting as no corner cell. The verdict is `supported` when
+  at
   least one technology is "port", `small gain` when none is but one is "small gain", `refuted` when
   every technology is "no combination" or "harm", and `inconclusive` otherwise. Thresholds
   are 0.05 points for Primary demand and solar, where the prediction is 0.03 to 0.10 and a gain
@@ -95,7 +99,8 @@ to seed 0 and the intervals resample months only. For solar, wind, and BSP and G
 member is blended with seed s of the others, the weights are chosen on the pooled seeds, and the
 bootstrap resamples months and seeds.
 Stored quantiles and observations are fractions of effective capacity; every score is multiplied
-by 100 to give points of capacity, and the 14-day correction works in the same units. The rows scored are the cases that every member of a technology holds with finite quantiles
+by 100 to give points of capacity, and the 14-day correction works in the same units. The rows
+scored are the cases that every member of a technology holds with finite quantiles
 and a finite observation, and the page states the count dropped. No valid time on or after
 2026-07-01 is scored.
 
@@ -125,11 +130,13 @@ where averaging probabilities would widen it.
   is reported as an optimistic bound and decides nothing.
 - **Correction placement (Primary demand only):** arm D3 blends `monthly_cs`, `a7_cs`, and `n1_cs`
   (the correction applied inside each member, "before"), with weights chosen as above on D3's own
-  scores (members carry the `_cs` suffix: correction and spread 1.15). Arm D2 applies D3's weight table to `monthly`, `a7`, and `n1` without correction,
+  scores (members carry the `_cs` suffix: correction and spread 1.15). Arm D2 applies D3's weight
+  table to `monthly`, `a7`, and `n1` without correction,
   then applies the 14-day correction and the 1.15 spread factor to the blend ("after"). The
   correction uses only blend medians of earlier runs, each under its own rolling weights, over
   half-hours observed before the run's origin. Because D3's weights were chosen on corrected
-  members, the contrast favours D3 and is descriptive. The correction code is copied from experiment 19. The
+  members, the contrast favours D3 and is descriptive. The correction code is copied from experiment
+  19. The
   headline arm D1 blends `monthly` (no correction, no spread factor), `a7_cs`, and `n1_cs`,
   because the proposal names those members; D1 is not the "before" arm of the contrast.
 
@@ -140,7 +147,8 @@ where averaging probabilities would widen it.
 1. **Decisive (3, 98.33%):** C1, D1 minus the best single Primary member; C2, the solar blend minus
    the best single solar member; C3, the wind blend minus the best single wind member.
 2. **Exploratory, each family read at 5% divided by its size (families: member contrasts, 6;
-   blend-versus-simpler-arm contrasts, 6; correction placement, 1; per lead band, 15):** the equal-weights arm and the
+   blend-versus-simpler-arm contrasts, 6; correction placement, 1; per lead band, 15):** the
+   equal-weights arm and the
    global-weight arm minus the best single member (technology by technology); the rolling blend
    minus the equal-weights arm and minus the global-weight arm; D2 minus D3 (correction placement);
    and per lead band, the rolling blend minus the best single member of that band.
