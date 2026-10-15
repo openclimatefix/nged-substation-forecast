@@ -51,6 +51,9 @@ the maintainer to confirm.
 | [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
 | [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
 | [00027](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
+| [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
+| [00029](00029-physics-stage1-solar-pytorch/result.md) | Does a differentiable PyTorch physics stage 1, fed into the XGBoost stage 2, beat the XGBoost stage 1 for the 6 solar farms? | Refuted: the physics stage 1 scores 0.079 points worse | Not for production | 2026-10-15 |
+| [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -226,6 +229,51 @@ about 5 days late, so the arm is a ceiling and no serving system could use it.
   weather?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1227).
 
 ![Each ERA5 arm minus the ENS arm](00022-era5-weather-ceiling-primary-demand/figure_1.svg)
+
+### 00025: price-change features for stage 1 demand
+
+**Adding the change in the half-hourly price to the price level lowered the Primary demand error by
+only 0.04 to 0.05 points, and national demand and wind scored 0.22 and 0.40 points below the price
+change arm.** The experiment
+trained the ERA5 stage 1 model with the price at the target half-hour and its changes over 1, 2, 4,
+and 12 half-hours. The price is known only after the half-hour, so no score is a forecast skill.
+
+- **Headline result:** changes minus level only was -0.037 points of capacity (97.5% interval
+  -0.056 to -0.018) in the selection year and -0.050 (-0.083 to -0.018) in the confirmation year;
+  changes minus other-week changes was -0.039 and -0.047. The pre-registered threshold was 0.1.
+- **Comparison arms:** national demand and wind scored 0.22 and 0.40 points below the price change
+  arm, and the price level alone was 0.10 worse than no price in the confirmation year (the
+  interval includes zero).
+- **BSP and GSP:** the four series show no consistent sign.
+- **Finding for later experiments:** try national demand and wind before any price column, and keep
+  a control with the real price level and other-week changes.
+- **Write-up and pull request:** [result](00025-price-change-features-stage1-demand/result.md), [PR
+  #1231 (Experiment 25: does the change in the intra-day price help a stage 1 demand model explain
+  power?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1231).
+
+![Primary contrasts with 97.5% intervals](00025-price-change-features-stage1-demand/figure_1.svg)
+
+### 00029: a differentiable physics stage 1 for the solar farms
+
+**Fitted PV physics did not beat the XGBoost stage 1 for the 6 solar farms, and added nothing when
+given to it as a column.** The experiment fitted a PyTorch PV model with priors on tilt, azimuth, DC
+capacity, and the AC-to-DC ratio to each farm's metered power, ran it on every ENS member, and
+passed its output to a per-farm XGBoost quantile layer (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** the PyTorch physics stage 1 minus the XGBoost stage 1 is +0.079 points of
+  capacity (98.75% interval +0.029 to +0.135), and the hybrid (physics plus the nine weather
+  columns) is -0.000 (-0.015 to +0.018). The XGBoost stage 1 scores 5.026.
+- **Finding for later experiments:** the physics point forecast is as accurate as the XGBoost
+  stage 1a (member-average mean absolute error 7.53 against 7.64), so physics is a candidate for
+  interpretation and checks of a farm's orientation, not for the quantile pipeline. The fitted
+  tilts (18 to 35 degrees) and azimuths (within 1.3 degrees of south) are plausible. A synthetic
+  test recovers parameters well only when the data come from the fitted chain: a different sky
+  model gave a +6.2 degree tilt bias.
+- **Write-up and pull request:** [result](00029-physics-stage1-solar-pytorch/result.md), [PR #1236
+  (Experiment 29: does a differentiable physics stage 1 beat the XGBoost stage 1 for solar
+  farms?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1236).
+
+![Contrasts](00029-physics-stage1-solar-pytorch/figure_2.svg)
 
 ### What the experiments taught us so far
 
@@ -572,3 +620,21 @@ lagged delta (row set `fold_a_every5d_v1`).
   [PR #1234 (Experiment 27: does PV_Live at the lag times help the stage 2 forecast of GSP demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1234).
 
 ![Contrasts](00027-pvlive-lags-in-stage2-gsp-demand/figure_1.svg)
+
+### 00028: a solar forecast for the GSPs in the stage 2 calibrator
+
+**A forecast of each grid supply point's (GSP's) PV_Live solar generation did not clearly lower the
+stage 2 quantile score for Walpole and Bicker Fen.** A simple XGBoost model, trained on ERA5 weather
+and applied to the 51 ENS members, gave the calibrator the member mean and spread of the solar share
+at the target time (row set `fold_a_every5d_v1`).
+
+- **Headline result:** solar forecast minus none over all leads -0.14 (95% interval -0.34 to
+  +0.04), and the true PV_Live value as an oracle -0.50 (-0.91 to -0.12), mostly at leads of 7 to
+  15 days.
+- **Finding for later experiments:** the solar forecast beat a climatology up to day 6 (mean
+  absolute error 5.0 to 7.0 points of PV_Live capacity against 8.8 to 9.5), and its member mean was
+  too high by 1.8 to 3.0 points at every lead band.
+- **Write-up and pull request:** [result](00028-pvlive-forecast-in-stage2-gsp-demand/result.md),
+  [PR #1235 (Experiment 28: does a GSP solar forecast help the stage 2 demand forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1235).
+
+![Contrasts](00028-pvlive-forecast-in-stage2-gsp-demand/figure_1.svg)
