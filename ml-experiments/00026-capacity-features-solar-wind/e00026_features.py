@@ -28,8 +28,6 @@ MIN_OBSERVED_SHARE: Final[float] = 0.5
 MAX_ZENITH_DEGREES: Final[float] = 85.0
 CAMS_FLOOR_W_M2: Final[float] = 200.0
 WIND_CUBE_RANGE_M_S: Final[tuple[float, float]] = (3.0, 8.0)
-TRAINING_LEAD_HOURS: Final[np.ndarray] = np.arange(0, 361, 3)
-"""The leads a training row's origin is drawn from, uniformly."""
 
 FEATURE_NAMES: Final[dict[str, tuple[str, ...]]] = {
     "solar": (
@@ -54,14 +52,22 @@ ARM_FEATURES: Final[dict[str, tuple[int, ...]]] = {
     "a4": (0, 3),
     "a5": (0, 4),
     "a6": (0, 1, 2),
+    "a7": (0,),
 }
-"""Each arm's columns as indices into `FEATURE_NAMES`; `a6` reads them from the shuffled table."""
+"""Each arm's columns as indices into `FEATURE_NAMES`; `a6` and `a7` read them from the shuffled
+table."""
 
 
 def day_index(*, times: np.ndarray) -> np.ndarray:
     """Return the index of the UTC day containing each `datetime64` time, from `FEATURE_START`."""
     start = np.datetime64(FEATURE_START.replace(tzinfo=None), "us")
     return np.floor((times.astype("datetime64[us]") - start) / np.timedelta64(1, "D")).astype(int)
+
+
+def step_index(*, times: np.ndarray) -> np.ndarray:
+    """Return the index on the half-hourly grid of each `datetime64` time."""
+    start = np.datetime64(FEATURE_START.replace(tzinfo=None), "us")
+    return np.floor((times.astype("datetime64[us]") - start) / np.timedelta64(30, "m")).astype(int)
 
 
 def _window(*, power: np.ndarray, other: np.ndarray, zenith: np.ndarray, c: int, days: int):  # noqa: ANN202
@@ -96,7 +102,9 @@ def _top_decile_p99(*, power: np.ndarray, rank: np.ndarray, keep: np.ndarray) ->
 def _p995(*, power: np.ndarray) -> float:
     """Return the 99.5th percentile of the observed power, or NaN if under half is observed."""
     seen = power[np.isfinite(power)]
-    return float(np.quantile(seen, 0.995)) if seen.size >= MIN_OBSERVED_SHARE * power.size else np.nan
+    if seen.size < MIN_OBSERVED_SHARE * power.size:
+        return np.nan
+    return float(np.quantile(seen, 0.995))
 
 
 def _ratio_quantile(*, ratio: np.ndarray, keep: np.ndarray, level: float) -> float:
@@ -205,18 +213,29 @@ def cutoff_rows(*, table: np.ndarray, origins: np.ndarray) -> np.ndarray:
     return out
 
 
-def training_origins(*, valid: np.ndarray, seed: int) -> np.ndarray:
-    """Return an origin for each training row: its valid time minus a seeded uniform lead."""
-    leads = np.random.default_rng(seed).choice(TRAINING_LEAD_HOURS, size=valid.size)
-    return valid.astype("datetime64[us]") - leads.astype("timedelta64[h]").astype("timedelta64[us]")
+def training_origins(*, valid: np.ndarray, leads_hours: np.ndarray, seed: int) -> np.ndarray:
+    """Return an origin for each training row: its valid time minus a seeded draw from the leads.
+
+    Args:
+        valid: `datetime64` valid times of the training rows.
+        leads_hours: The validation frames' leads in hours, which the draw copies.
+        seed: Seed of the draw.
+
+    Returns:
+        `datetime64[us]` origins.
+    """
+    leads = np.random.default_rng(seed).choice(leads_hours, size=valid.size)
+    micros = (leads * 3_600_000_000).astype("int64").astype("timedelta64[us]")
+    return valid.astype("datetime64[us]") - micros
 
 
 def shuffled_table(*, table: np.ndarray, seed: int, last_source_day: int) -> np.ndarray:
-    """Return the table with whole calendar months permuted among the months before the end.
+    """Return the table with whole calendar months permuted among the same calendar month.
 
-    Every day takes the row of the day at the same day of month in its month's replacement month.
-    Replacement months come only from days before `last_source_day`, so no day after it feeds a
-    training row. Days in months after the last source month take a random source month.
+    Every June is replaced by a June of another year, and a day takes the row of the day at the same
+    day of month in its replacement month. Sources come only from months that end on or before
+    `last_source_day`, so no day after it feeds a training row. A month after the last source month
+    takes a random source month of the same calendar month.
 
     Args:
         table: A series' feature table.
@@ -225,17 +244,28 @@ def shuffled_table(*, table: np.ndarray, seed: int, last_source_day: int) -> np.
 
     Returns:
         A table of the same shape.
+
+    Raises:
+        ValueError: If a calendar month has no source month.
     """
     days = np.datetime64(FEATURE_START.replace(tzinfo=None), "D") + np.arange(table.shape[0])
     months = days.astype("datetime64[M]")
     starts = np.flatnonzero(np.r_[True, months[1:] != months[:-1]])
     lengths = np.diff(np.r_[starts, table.shape[0]])
-    usable = np.flatnonzero(starts + lengths <= last_source_day)
+    calendar = months[starts].astype(int) % 12
+    usable = starts + lengths <= last_source_day
     generator = np.random.default_rng(seed)
     replacement = np.empty(starts.size, dtype=int)
-    replacement[usable] = generator.permutation(usable)
-    others = np.setdiff1d(np.arange(starts.size), usable)
-    replacement[others] = generator.choice(usable, size=others.size)
+    for month in range(12):
+        same = np.flatnonzero(calendar == month)
+        sources = same[usable[same]]
+        if sources.size == 0:
+            msg = f"calendar month {month + 1} has no source month"
+            raise ValueError(msg)
+        inside = same[usable[same]]
+        replacement[inside] = generator.permutation(inside)
+        outside = same[~usable[same]]
+        replacement[outside] = generator.choice(sources, size=outside.size)
     out = np.empty_like(table)
     for m in range(starts.size):
         source = replacement[m]
@@ -255,9 +285,7 @@ def series_grids(*, analysis: pl.DataFrame, series: int, technology: str):  # no
     part = analysis.filter(pl.col("time_series_id") == series).select(
         "valid_time", column, "solar_zenith"
     )
-    index = day_index(times=part["valid_time"].to_numpy()) * STEPS_PER_DAY
-    half = (part["valid_time"].dt.minute().to_numpy() // 30).astype(int)
-    position = index + half
+    position = step_index(times=part["valid_time"].to_numpy())
     inside = (position >= 0) & (position < N_STEPS)
     other = np.full(N_STEPS, np.nan, dtype=np.float32)
     zenith = np.full(N_STEPS, np.nan, dtype=np.float32)

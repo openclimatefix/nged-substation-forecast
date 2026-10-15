@@ -14,6 +14,7 @@ from typing import Final, Literal
 
 import numpy as np
 import polars as pl
+from e00026_features import FEATURE_END, FEATURE_START, N_STEPS, step_index
 from studies.anonymise import LABEL_PERMUTATION_SEED, SITE_LABELS
 from studies.power import scan_power
 from studies.pv_dataset import pv_sites, wind_sites
@@ -29,8 +30,8 @@ CASE_ORDER: Final[tuple[str, ...]] = ("power_fcst_init_time", "time_series_id", 
 
 TechnologyType = Literal["solar", "wind"]
 TECHNOLOGIES: Final[tuple[TechnologyType, ...]] = ("solar", "wind")
-ArmType = Literal["a0", "a2", "a3", "a4", "a5", "a6"]
-ARMS: Final[tuple[ArmType, ...]] = ("a0", "a2", "a3", "a4", "a5", "a6")
+ArmType = Literal["a0", "a2", "a3", "a4", "a5", "a6", "a7"]
+ARMS: Final[tuple[ArmType, ...]] = ("a0", "a2", "a3", "a4", "a5", "a6", "a7")
 PILOT_DIR: Final[Path] = PER_STUDY_DIR / "stage1_pilot"
 ANALYSIS_PATH: Final[Path] = PILOT_DIR / "inputs" / "analysis_features.parquet"
 ENS_TRAIN_PATH: Final[Path] = PILOT_DIR / "inputs" / "ens_features" / "train.parquet"
@@ -77,6 +78,8 @@ LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("7 to 10 days", 168.0, 264.0),
     ("11 to 15 days", 264.0, 10_000.0),
 )
+
+
 def band_names(*, lead_hours: np.ndarray) -> np.ndarray:
     """Return the lead band name of each lead in hours."""
     names = np.full(lead_hours.shape, "none", dtype=object)
@@ -160,7 +163,7 @@ XGBOOST_PARAMETERS: Final[dict[str, object]] = {
     "colsample_bytree": 1.0,
     "tree_method": "hist",
     "device": "cuda",
-    "nthread": 10,
+    "nthread": 6,
 }
 """Experiment 00002's multi-quantile settings with the thread count of this experiment's slot."""
 N_ROUNDS: Final[int] = 500
@@ -172,6 +175,7 @@ SETTLING_LEVEL_FRACTION: Final[float] = 0.05
 SETTLING_RUN_HALF_HOURS: Final[int] = 48
 SETTLING_WEEKS: Final[int] = 6
 """The `new_meter_settling` rule, applied as the stage 1 pilot applied it."""
+
 
 def site_table() -> pl.DataFrame:
     """Return the nine generator series with anonymous label, technology, and capacity.
@@ -300,3 +304,59 @@ def validation_cases() -> pl.DataFrame:
         .sort(*CASE_ORDER)
     )
     return cases.with_columns(band=pl.Series(band_names(lead_hours=cases["lead_hours"].to_numpy())))
+
+
+def power_grids(*, sites: pl.DataFrame) -> dict[int, np.ndarray]:
+    """Return each series' cleaned power over capacity on the feature grid, NaN where not usable.
+
+    The grid is half-hourly from 2019-09-01 to 2026-07-01 UTC. Rows before each series' settling
+    cutoff are dropped, as the stage 1 pilot did.
+
+    Args:
+        sites: `site_table()`.
+
+    Returns:
+        Each `time_series_id`'s float32 array of `N_STEPS` values.
+    """
+    power = (
+        scan_power()
+        .filter(
+            pl.col("time_series_id").is_in(sites["time_series_id"].to_list()),
+            pl.col("time") >= FEATURE_START,
+            pl.col("time") < FEATURE_END,
+        )
+        .select("time_series_id", pl.col("time").alias("valid_time"), "power")
+        .collect()
+        .join(sites.select("time_series_id", "effective_capacity_mw"), on="time_series_id")
+        .sort("time_series_id", "valid_time")
+    )
+    live = (
+        pl.col("power").abs() > SETTLING_LEVEL_FRACTION * pl.col("effective_capacity_mw")
+    ).fill_null(value=False)
+    run_end = (
+        live.cast(pl.Int32).rolling_sum(window_size=SETTLING_RUN_HALF_HOURS).over("time_series_id")
+        == SETTLING_RUN_HALF_HOURS
+    )
+    cutoffs = (
+        power.filter(run_end)
+        .group_by("time_series_id")
+        .agg(
+            cutoff=pl.col("valid_time")
+            .min()
+            .dt.offset_by(f"-{SETTLING_RUN_HALF_HOURS * 30 - 30}m")
+            .dt.offset_by(f"{SETTLING_WEEKS}w")
+        )
+    )
+    kept = (
+        power.join(cutoffs, on="time_series_id", how="left")
+        .filter(pl.col("cutoff").is_null() | (pl.col("valid_time") >= pl.col("cutoff")))
+        .filter(pl.col("power").is_finite())
+    )
+    out: dict[int, np.ndarray] = {}
+    for series_id, part in kept.partition_by("time_series_id", as_dict=True).items():
+        grid = np.full(N_STEPS, np.nan, dtype=np.float32)
+        capacity = float(part["effective_capacity_mw"][0])
+        position = step_index(times=part["valid_time"].to_numpy())
+        grid[position] = (part["power"].to_numpy() / capacity).astype(np.float32)
+        out[int(series_id[0])] = grid
+    return out
