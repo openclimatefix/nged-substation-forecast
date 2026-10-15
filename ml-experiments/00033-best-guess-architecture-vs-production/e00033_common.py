@@ -78,9 +78,9 @@ ATOM_MASSES: Final[np.ndarray] = np.diff(
 LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("0-24 h", 0.0, 24.0),
     ("1-2 d", 24.0, 48.0),
-    ("3-6 d", 48.0, 144.0),
-    ("7-10 d", 144.0, 240.0),
-    ("11-15 d", 240.0, 10_000.0),
+    ("2-6 d", 48.0, 144.0),
+    ("6-10 d", 144.0, 240.0),
+    ("10+ d", 240.0, 10_000.0),
 )
 
 DERIVED: Final[tuple[str, ...]] = (
@@ -307,7 +307,7 @@ def derived_columns(*, valid_time: pl.Series, latitude: float, longitude: float)
         }
     )
     return (
-        frame.join(holiday_gaps(), on="date", how="left", validate="m:1")
+        frame.join(holiday_gaps(), on="date", how="left", validate="m:1", maintain_order="left")
         .select(DERIVED)
         .cast(dict.fromkeys(DERIVED, pl.Float32))
     )
@@ -329,7 +329,7 @@ def with_derived(*, frame: pl.DataFrame, latitude: float, longitude: float) -> p
         valid_time=times
     )
     return frame.drop(DERIVED, strict=False).join(
-        table, on="valid_time", how="left", validate="m:1"
+        table, on="valid_time", how="left", validate="m:1", maintain_order="left"
     )
 
 
@@ -523,8 +523,12 @@ def corrections_for(*, frame: pl.DataFrame, power: np.ndarray) -> pl.DataFrame:
         newest = origin - NEWEST_AGE
         window = np.arange(newest - WINDOW + 1, newest + 1)
         used = ~np.isnan(median[window]) & ~np.isnan(power[window])
-        if (source[window][used] > window[used]).any():
-            msg = "a past forecast comes from a run that began after its half-hour or at the origin"
+        if (
+            window.max() >= origin
+            or (source[window][used] > window[used]).any()
+            or (source[window][used] >= origin).any()
+        ):
+            msg = "a past forecast or observation is not older than the forecast origin"
             raise ValueError(msg)
         count = int(used.sum())
         residual = power[window][used].astype(np.float64) - median[window][used]
@@ -705,5 +709,8 @@ def case_metrics(
         out[f"brier_{name}"] = (probability - (actual > threshold)) ** 2
         out[f"hit_{name}"] = ((probability >= 0.5) & (actual > threshold)).astype(np.float64)
         out[f"alarm_{name}"] = (probability >= 0.5).astype(np.float64)
+        out[f"false_alarm_{name}"] = ((probability >= 0.5) & ~(actual > threshold)).astype(
+            np.float64
+        )
         out[f"event_{name}"] = (actual > threshold).astype(np.float64)
     return out

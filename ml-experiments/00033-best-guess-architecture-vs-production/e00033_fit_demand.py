@@ -1,7 +1,9 @@
 """Fit the demand arms of experiment 00033 that no earlier experiment stored.
 
-Three arms, each written as the 51-member (or single-input) mixture's nine quantiles per case:
+Four arms, each written as the 51-member (or single-input) mixture's nine quantiles per case:
 
+- `n1_refit`: N1 (half-life 2 years, trained on the ENS control member) refitted with this code, the
+  reference for the ERA5-retrained arm. All 20 series, seeds 0 to 2.
 - `era5_retrained`: N1 (half-life 2 years) retrained on ERA5 weather at the valid times of the ENS
   control-member training rows, and fed ERA5 at the valid time (one input, so the forecast is the
   model's nine quantiles). All 20 series, seeds 0 to 2.
@@ -273,11 +275,40 @@ def fill_after_power(
     return pl.concat(pieces)
 
 
+def arm_matrix(
+    *, arm: str, rows: pl.DataFrame, row: dict, site: common.SeriesArrays
+) -> tuple[xgb.DMatrix, np.ndarray | None]:
+    """Return an arm's training matrix, and the CAMS array its prediction needs (if any)."""
+    if arm == "cams_shortwave":
+        matrix = train_matrix(
+            rows=rows,
+            row=row,
+            anchor=common.LAST_TRAINING_VALID,
+            half_life_days=common.SHORT_HALF_LIFE_DAYS,
+        )
+        return matrix, cams_array(site=row["site"])
+    if arm == "era5_retrained":
+        index = np.asarray(common.grid_index(times=rows["valid_time"]))
+        names = common.feature_columns(calendar=True)
+        rows = rows.with_columns(
+            *[pl.Series(c, site.features[index, names.index(c)]) for c in WEATHER]
+        )
+    matrix = train_matrix(
+        rows=rows,
+        row=row,
+        anchor=common.LAST_TRAINING_VALID,
+        half_life_days=common.RECENCY_HALF_LIFE_DAYS,
+    )
+    return matrix, None
+
+
 def main() -> None:
     """Fit and write the requested arms."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke", action="store_true", help="two series, one seed, scratch folder")
-    parser.add_argument("--only", choices=("era5_retrained", "cams_shortwave", "monthly"))
+    parser.add_argument(
+        "--only", choices=("n1_refit", "era5_retrained", "cams_shortwave", "monthly")
+    )
     args = parser.parse_args()
     series = common.series_table()
     if args.smoke:
@@ -286,7 +317,7 @@ def main() -> None:
     train = pl.read_parquet(common.ENS_TRAIN_PATH)
     seeds = common.SEEDS[:1] if args.smoke else common.SEEDS
     out = ARMS_DIR.with_name("arms_smoke") if args.smoke else ARMS_DIR
-    for arm in ("era5_retrained", "cams_shortwave"):
+    for arm in ("n1_refit", "era5_retrained", "cams_shortwave"):
         if args.only not in (None, arm):
             continue
         for seed in seeds:
@@ -301,29 +332,18 @@ def main() -> None:
                     frame=train.filter(pl.col("valid_time") <= common.LAST_TRAINING_VALID),
                     arrays=site,
                 )
-                if arm == "era5_retrained":
-                    index = np.asarray(common.grid_index(times=rows["valid_time"]))
-                    names = common.feature_columns(calendar=True)
-                    rows = rows.with_columns(
-                        *[pl.Series(c, site.features[index, names.index(c)]) for c in WEATHER]
-                    )
-                    matrix = train_matrix(
-                        rows=rows,
-                        row=row,
-                        anchor=common.LAST_TRAINING_VALID,
-                        half_life_days=common.RECENCY_HALF_LIFE_DAYS,
-                    )
-                    cams = None
-                else:
-                    matrix = train_matrix(
-                        rows=rows,
-                        row=row,
-                        anchor=common.LAST_TRAINING_VALID,
-                        half_life_days=common.SHORT_HALF_LIFE_DAYS,
-                    )
-                    cams = cams_array(site=row["site"])
+                matrix, cams = arm_matrix(arm=arm, rows=rows, row=row, site=site)
                 model = fit(matrix=matrix, seed=seed)
-                pieces.append(predict_single(row=row, arrays=site, model=model, cams=cams))
+                if arm == "n1_refit":
+                    pieces.append(
+                        predict_members(
+                            row=row,
+                            arrays=site,
+                            models={datetime(2000, 1, 1, tzinfo=UTC): model},
+                        )
+                    )
+                else:
+                    pieces.append(predict_single(row=row, arrays=site, model=model, cams=cams))
                 print(
                     f"{arm} seed {seed} {row['site']}: {time.monotonic() - started:.0f} s",
                     flush=True,

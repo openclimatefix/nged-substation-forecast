@@ -32,9 +32,11 @@ MEAN_METRICS: Final[tuple[str, ...]] = (
     "cov90",
     "hit_p99",
     "alarm_p99",
+    "false_alarm_p99",
     "event_p99",
     "hit_p95",
     "alarm_p95",
+    "false_alarm_p95",
     "event_p95",
 )
 INTERVAL_METRICS: Final[tuple[str, ...]] = ("qs", "mae", "tw_p99", "tw_p95")
@@ -43,7 +45,7 @@ SCOPES: Final[tuple[tuple[str, float, float], ...]] = (
     *common.LEAD_BANDS,
 )
 N_RESAMPLES_DECISIVE: Final[int] = 20_000
-N_RESAMPLES: Final[int] = 4_000
+N_RESAMPLES: Final[int] = 20_000
 GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP", "solar", "wind")
 
 # id: (family, group(s), treatment, reference)
@@ -74,26 +76,21 @@ CONTRASTS: Final[dict[str, tuple[str, tuple[str, ...], str, str]]] = {
     "C24": ("generators", ("wind",), "capacity_a4", "capacity_a0"),
     "C25": ("generators", ("solar",), "physics_hybrid", "bg_base"),
     "C26": ("generators", ("solar",), "physics_scipy", "bg_base"),
-    "C27": ("weather ceiling", ("Primary",), "w22_era5_all_cs", "w22_ens_cs"),
+    "C27": ("weather ceiling", ("Primary",), "w22_era5_all_c", "w22_ens_c"),
     "C28": ("weather ceiling", ("solar",), "pw_era5_spread", "bg_base_spread"),
+    "C28b": ("weather ceiling", ("solar",), "pw_cams_spread", "cams_spread"),
     "C29": ("weather ceiling", ("wind",), "pw_era5_spread", "bg_full"),
-    "C30": ("weather ceiling", ("Primary",), "era5_retrained_cs", "n1_cs"),
-    "C31": ("weather ceiling", ("Primary",), "cams_shortwave_cs", "w22_ens_cs"),
+    "C30": ("weather ceiling", ("Primary",), "era5_retrained_c", "n1_refit_c"),
+    "C31": ("weather ceiling", ("Primary",), "cams_shortwave_c", "w22_ens_c"),
+    "C31b": ("weather ceiling", ("Primary",), "cams_shortwave_c", "w22_era5_all_c"),
     "C32": ("weather ceiling", ("BSP", "GSP"), "w22_era5_all", "w22_ens"),
 }
 SEED0_ONLY: Final[frozenset[str]] = frozenset({"C11", "C12"})
 
 
 def read_arm(*, groups: tuple[str, ...], arm: str) -> pl.DataFrame:
-    """Return one arm's per-case metrics for one or more groups, with the series group."""
-    return pl.concat(
-        [
-            pl.read_parquet(METRICS_DIR / group / f"{arm}.parquet").with_columns(
-                group=pl.lit(group)
-            )
-            for group in groups
-        ]
-    )
+    """Return one arm's per-case metrics for one or more groups."""
+    return pl.concat([pl.read_parquet(METRICS_DIR / group / f"{arm}.parquet") for group in groups])
 
 
 def in_scope(*, frame: pl.DataFrame, low: float, high: float) -> pl.DataFrame:
@@ -115,10 +112,19 @@ def contrast(
     """Return one contrast's rows: every metric over all leads, the quantile score per band."""
     family, groups, treatment, reference = spec
     frames = {arm: read_arm(groups=groups, arm=arm) for arm in (treatment, reference)}
-    seeds = set.intersection(*(set(f["seed"].unique().to_list()) for f in frames.values()))
-    if contrast_id in SEED0_ONLY:
-        seeds = {0}
+    seeds = {0} if contrast_id in SEED0_ONLY else set(common.SEEDS)
+    for arm, frame in frames.items():
+        if not seeds <= set(frame["seed"].unique().to_list()):
+            msg = f"{contrast_id}: arm {arm} lacks some of the seeds {sorted(seeds)}"
+            raise ValueError(msg)
     frames = {arm: f.filter(pl.col("seed").is_in(sorted(seeds))) for arm, f in frames.items()}
+    both = (
+        frames[treatment]
+        .select(*common.KEYS)
+        .unique()
+        .join(frames[reference].select(*common.KEYS).unique(), on=list(common.KEYS), how="inner")
+    )
+    frames = {arm: f.join(both, on=list(common.KEYS), how="semi") for arm, f in frames.items()}
     planned_level = 100.0 * (1.0 - 0.05 / sizes[family])
     rows = []
     for scope, low, high in SCOPES:
@@ -168,7 +174,7 @@ def absolute_rows() -> list[dict[str, object]]:
         for path in sorted((METRICS_DIR / group).glob("*.parquet")):
             if path.stem == "shared_keys":
                 continue
-            frame = pl.read_parquet(path)
+            frame = pl.read_parquet(path).filter(pl.col("shared"))
             for scope, low, high in SCOPES:
                 part = in_scope(frame=frame, low=low, high=high)
                 row: dict[str, object] = {

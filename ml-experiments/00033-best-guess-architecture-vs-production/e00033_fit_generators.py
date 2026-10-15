@@ -276,7 +276,7 @@ def predict_series(
     )
     if keys.is_empty():
         return out
-    one_input = keys.join(era5, on="valid_time", how="left")
+    one_input = keys.join(era5, on="valid_time", how="left", maintain_order="left")
     if technology == "solar":
         base, cams = models["base"], models["cams"]
         out["pw_era5"] = _quantile_frame(keys=keys, quantiles=base.predict(frame=one_input))
@@ -291,14 +291,20 @@ def predict_series(
             ("pw_sw_cams", cams, "shortwave_cams"),
         ):
             swapped = part.drop("shortwave").join(
-                era5.select("valid_time", shortwave=source), on="valid_time", how="left"
+                era5.select("valid_time", shortwave=source),
+                on="valid_time",
+                how="left",
+                maintain_order="left",
             )
             out[arm] = pooled_mixture(part=swapped, member_quantiles=model.predict(frame=swapped))
     else:
         margin = models["margin"]
         out["pw_era5"] = _quantile_frame(keys=keys, quantiles=margin.predict(frame=one_input))
         swapped = part.drop("wind_speed_100m").join(
-            era5.select("valid_time", "wind_speed_100m"), on="valid_time", how="left"
+            era5.select("valid_time", "wind_speed_100m"),
+            on="valid_time",
+            how="left",
+            maintain_order="left",
         )
         out["pw_ws100"] = pooled_mixture(
             part=swapped, member_quantiles=margin.predict(frame=swapped)

@@ -1,9 +1,10 @@
-"""Compute every per-case metric of every arm of experiment 00033 on its family's shared cases.
+"""Compute every per-case metric of every arm of experiment 00033.
 
 Arms come from `work/arms/` (demand, one table per arm) and `work/generator_tables/` (solar and
-wind). Each family (Primary, BSP, GSP, solar, wind) is scored on the cases that every arm of the
-family holds with finite quantiles and a finite observation, before 2026-07-01. The thresholds are
-each series' `historical_p99` and `historical_p95` (fractions of capacity).
+wind). Each arm's table holds every case it has with finite quantiles and a finite observation
+before 2026-07-01. The `shared` column marks the cases that every arm of the family holds; the
+absolute scores use those, and each contrast uses the cases its own two arms share. The thresholds
+are each series' `historical_p99` and `historical_p95` (fractions of capacity).
 
 Output: `work/metrics/<group>/<arm>.parquet` with the run keys, `seed`, `lead_hours`, the metrics
 of `case_metrics`, and `work/metrics/shared_counts.parquet` (cases kept and dropped per group).
@@ -24,17 +25,8 @@ METRICS_DIR: Final[Path] = common.WORK_DIR / "metrics"
 TABLES_DIR: Final[Path] = common.WORK_DIR / "generator_tables"
 DEMAND_GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
 GENERATOR_GROUPS: Final[tuple[str, ...]] = ("solar", "wind")
-PRIMARY_ONLY: Final[tuple[str, ...]] = ("monthly",)
-SOLAR_ONLY: Final[tuple[str, ...]] = (
-    "cams_spread",
-    "cams_plain",
-    "physics_scipy",
-    "physics_hybrid",
-    "pw_cams",
-    "pw_sw_era5",
-    "pw_sw_cams",
-)
-WIND_ONLY: Final[tuple[str, ...]] = ("bg_margin", "capacity_a4", "capacity_a0", "pw_ws100")
+SHARED_FLOOR: Final[float] = 0.9
+"""Each group must keep at least this share of its largest arm's cases."""
 FINITE: Final = pl.all_horizontal(pl.col(*common.LEVEL_COLUMNS).is_finite())
 
 
@@ -75,20 +67,6 @@ def load_generator(*, name: str) -> pl.DataFrame:
     )
 
 
-def arms_for_group(*, group: str, names: list[str]) -> list[str]:
-    """Return the arms that exist for a group."""
-    if group in GENERATOR_GROUPS:
-        keep = []
-        for name in names:
-            if name in SOLAR_ONLY and group != "solar":
-                continue
-            if name in WIND_ONLY and group != "wind":
-                continue
-            keep.append(name)
-        return keep
-    return [n for n in names if n not in PRIMARY_ONLY or group == "Primary"]
-
-
 def main() -> None:
     """Write every arm's metrics for every group."""
     series = common.series_table()
@@ -110,17 +88,23 @@ def main() -> None:
     counts = []
     for group in (*DEMAND_GROUPS, *GENERATOR_GROUPS):
         is_demand = group in DEMAND_GROUPS
-        names = arms_for_group(group=group, names=demand_names if is_demand else generator_names)
+        available = demand_names if is_demand else generator_names
         keys: pl.DataFrame | None = None
         sizes = {}
-        for name in names:
+        for name in available:
             frame = (
                 load_demand(name=name, groups=groups) if is_demand else load_generator(name=name)
             )
             cases = frame.filter(pl.col("group") == group).select(*common.KEYS).unique()
+            if cases.is_empty():
+                continue
             sizes[name] = cases.height
             keys = cases if keys is None else keys.join(cases, on=list(common.KEYS), how="inner")
-        assert keys is not None
+        names = list(sizes)
+        if keys is None or keys.is_empty() or keys.height < SHARED_FLOOR * max(sizes.values()):
+            shared = 0 if keys is None else keys.height
+            msg = f"{group}: {shared} shared cases fall below the floor; arm sizes {sizes}"
+            raise ValueError(msg)
         out = METRICS_DIR / group
         out.mkdir(parents=True, exist_ok=True)
         keys.write_parquet(out / "shared_keys.parquet")
@@ -128,10 +112,17 @@ def main() -> None:
             frame = (
                 load_demand(name=name, groups=groups) if is_demand else load_generator(name=name)
             )
-            kept = frame.filter(pl.col("group") == group).join(
-                keys, on=list(common.KEYS), how="semi"
+            kept = (
+                frame.filter(pl.col("group") == group)
+                .join(
+                    keys.with_columns(shared=pl.lit(value=True)),
+                    on=list(common.KEYS),
+                    how="left",
+                    maintain_order="left",
+                )
+                .with_columns(pl.col("shared").fill_null(value=False))
+                .sort(*common.KEYS, "seed")
             )
-            kept = kept.sort(*common.KEYS, "seed")
             quantiles = np.sort(
                 kept.select(common.LEVEL_COLUMNS).to_numpy().astype(np.float64), axis=1
             )
@@ -145,6 +136,7 @@ def main() -> None:
             table = kept.select(
                 *common.KEYS,
                 "seed",
+                "shared",
                 lead_hours=(
                     (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
                     / 60.0

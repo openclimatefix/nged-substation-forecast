@@ -39,6 +39,8 @@ RAW_FITS: Final[dict[str, tuple[Path, str]]] = {
     },
 }
 STORED: Final[tuple[str, ...]] = ("production", "manual_heuristic", "climatology")
+NEW_FITS: Final[tuple[str, ...]] = ("n1_refit", "era5_retrained", "cams_shortwave", "monthly")
+"""Arms fitted by `e00033_fit_demand.py`; `monthly` holds seed 0 only."""
 
 
 def main() -> None:
@@ -51,6 +53,21 @@ def main() -> None:
         name: common.read_seeded(folder=folder, name=file)
         for name, (folder, file) in RAW_FITS.items()
     }
+    for name in NEW_FITS:
+        seeds = sorted(
+            int(p.stem.rsplit("seed", 1)[1]) for p in common.ARMS_DIR.glob(f"{name}_seed*.parquet")
+        )
+        if not seeds:
+            print(f"{name}: not fitted yet, skipped", flush=True)
+            continue
+        raw[name] = pl.concat(
+            [
+                pl.read_parquet(common.ARMS_DIR / f"{name}_seed{s}.parquet").select(
+                    *common.KEYS, "seed", *common.LEVEL_COLUMNS
+                )
+                for s in seeds
+            ]
+        ).with_columns(pl.col("seed").cast(pl.Int8))
     for name in STORED:
         stored = pl.read_parquet(common.ARMS_DIR_00013 / f"{name}.parquet").select(
             *common.KEYS, *common.LEVEL_COLUMNS
@@ -82,6 +99,9 @@ def main() -> None:
         .sort(*common.KEYS, "seed")
     )
     both = check.join(mine, on=[*common.KEYS, "seed"], suffix="_mine")
+    if both.height != check.height or both.height != mine.height:
+        msg = "the rebuilt best guess and 00019's stored set hold different cases"
+        raise ValueError(msg)
     worst = max(
         float(np.abs((both[c] - both[f"{c}_mine"]).to_numpy()).max()) for c in common.LEVEL_COLUMNS
     )

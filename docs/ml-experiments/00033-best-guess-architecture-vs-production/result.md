@@ -100,26 +100,27 @@ lacks a Tuesday run, the arm is scored on the cases all arms hold, and `result.m
 of dropped cases.
 
 **N1 for generators uses the 00013 recipe with no calendar columns.** The recipe, applied to each
-generator, is one XGBoost model per farm with the nine-level quantile loss, trained on the ENS control
-member of every daily run with valid times from 2024-04-01 to 2025-06-30, recency weights with a
-half-life of 2 years anchored at 2025-06-30, the technology's common columns (nine for solar, six
-for wind), `lead_hours`, and three power lags from the forecast origin (newest usable observation at
-origin minus 3.5 hours, latest earlier same half-hour, latest earlier same weekday and half-hour).
-The calendar columns are left out, because experiment 1 found calendar columns let an ENS-trained
-generator model memorise valid times (+3.40 wind, +1.13 solar). The 51 member forecasts are pooled
-as in 00013. No correction is applied to N1 for generators.
+generator, is one XGBoost model per farm with the nine-level quantile loss, trained on the ENS
+control member of every daily run with valid times from 2024-04-01 to 2025-06-30, recency weights
+with a half-life of 2 years anchored at 2025-06-30, the technology's common columns (nine for solar,
+six for wind), `lead_hours`, and three power lags from the forecast origin (newest usable
+observation at origin minus 3.5 hours, latest earlier same half-hour, latest earlier same weekday
+and half-hour). The calendar columns are left out, because experiment 1 found calendar columns let
+an ENS-trained generator model memorise valid times (+3.40 wind, +1.13 solar). The 51 member
+forecasts are pooled as in 00013. No correction is applied to N1 for generators.
 
 **Monthly retraining refits each Primary substation's N1 model on the first day of each month.**
 The refits run from 2025-07 to 2026-06 with a half-life of 0.5 years anchored at the refit date,
 on the ENS control member of every daily run (the NWP store holds a daily run from 2024-04-01) with
 valid times at least 3.5 hours before the refit. A run is forecast by the latest refit on or before
-its origin, so the refit is chosen by origin and not by valid time. The 2025-07-01 refit equals the
-half-life-0.5-year fit trained to 2025-06-30. The 14-day correction history spans a change of model
-at each month boundary, and the page says so. The arm is reported with and without the correction.
-Building control-member features for the daily runs after 2025-06-30 is new code; if that costs
-more than about 2 hours, the arm falls back to the 73 validation runs' control members and the page
-says so. The arm uses seed 0 only (about 1 hour for 16 series by 12 refits), so it is contrasted
-with the seed-0 rows of the reference arms, and its interval resamples months only.
+its origin, so the refit is chosen by origin and not by valid time. The 2025-07-01 refit is close to
+the half-life-0.5-year fit trained to 2025-06-30 but stops 3 hours earlier. The 14-day correction
+history spans a change of model at each month boundary, and the page says so. The arm is reported
+with and without the correction. Building control-member features for the daily runs after
+2025-06-30 is new code; if that costs more than about 2 hours, the arm falls back to the 73
+validation runs' control members and the page says so. The arm uses seed 0 only (about 1 hour for 16
+series by 12 refits), so it is contrasted with the seed-0 rows of the reference arms, and its
+interval resamples months only.
 
 ## Perfect-weather arms
 
@@ -135,7 +136,10 @@ serving system could use either at the target time. The page labels every perfec
   with and without the correction, and the correction and spread factor are applied here wherever
   00022's stored set lacks them. Two variants are new fits: `shortwave` from CAMS at the series'
   own location with ERA5 for the other six columns, and the model retrained on ERA5 over the same
-  2024-04 to 2025-06 window and fed ERA5. For BSP and GSP the arms are N1 without correction.
+  2024-04 to 2025-06 window and fed ERA5. For BSP and GSP the arms are N1 without correction. The
+  contrasts use the forms with correction but without the spread factor, because the factor of 1.15
+  was tuned for 51-member mixtures and a single input has a narrower band; the forms with the spread
+  factor are reported as exploratory.
 - **Solar:** the ERA5-trained model of the best guess is fed ERA5 at the valid time (one input per
   valid time, so the forecast is the model's 9 quantiles); a CAMS-trained variant is fed CAMS
   `shortwave` with ERA5 for the other eight columns. Single-variable swap: `shortwave` only.
@@ -144,7 +148,7 @@ serving system could use either at the target time. The page labels every perfec
 - **Spread factor:** for solar and wind, each perfect-weather arm is reported with and without the
   best guess's spread factor, refitted monthly on the arm's own earlier cases as 00020 did. A
   single-input band is narrower than a pooled mixture, so the unrefitted factor may mislead.
-- **Lead bands:** 0 to 24 h, 1 to 2 d, 3 to 6 d, 7 to 10 d, 11 to 15 d. For solar and wind the
+- **Lead bands:** 0 to 24 h, 1 to 2 d, 2 to 6 d, 6 to 10 d, 10 days or more. For solar and wind the
   perfect-weather arm does not depend on lead, so the by-lead gap is the best guess's degradation.
 - **Weather available at forecast time:** neither ERA5 nor CAMS is available at forecast time.
   Lagged power uses the observation at least 3.5 hours old, as in 00013; no other lag-time weather
@@ -174,14 +178,14 @@ at the 9 levels, as 00013 took them.
   `historical_p99` most cases lie in the upper tail, so the Brier score there mainly measures the
   tail assumption. The page therefore also reports the Brier score at `historical_p95`, which is
   interpolated, and the hit rate and false-alarm count at the threshold for the 1-to-2-day and
-  3-to-6-day bands. The twCRPS ignores all mass above `q95`.
+  2-to-6-day bands. The twCRPS ignores all mass above `q95`.
 - **Exceedance rates of the 0.90 and 0.95 quantiles:** the share of cases where the observation
   exceeds that quantile; the aim is 10% and 5%. The rates need no model of the tail, but they are
   calibration checks and not tail-skill rankings. The page reports each stored arm's member count;
   cases of `manual_heuristic` with fewer than 13 members are flagged, and its rates are read against
   a finite-ensemble reference.
 - **Thresholds and the flexibility use case:** NGED buys flexibility ahead of an expected
-  constraint, so the exceedance metrics are also reported for leads of 1 to 2 days and 3 to 6 days,
+  constraint, so the exceedance metrics are also reported for leads of 1 to 2 days and 2 to 6 days,
   the horizons at which procurement decisions are made. Metrics are never ranked on half-hours
   chosen by the observed load.
 - **Absolute scores for every arm** are reported, not only contrasts. BSP, GSP, solar, and wind are
@@ -208,10 +212,13 @@ contrast count, so a reader sees which intervals survive a correction within the
    `manual_heuristic`, and `climatology`; C23, solar notable 4 minus the best guess; C24, wind
    notable 5 (A4) minus A0; C25, solar `torch-hybrid` minus 00020 `base`; C26, solar `scipy` minus
    00020 `base`.
-5. **Weather ceiling (6):** C27, the all-variable ERA5 arm minus 00022 `ens` for Primary demand
-   (with correction); C28 and C29, the ERA5 (solar: and CAMS) arm minus the best guess for solar and
-   wind; C30, the demand arm retrained on ERA5 minus its ENS counterpart; C31, the CAMS-shortwave
-   demand arm minus `ens`; C32, the BSP and GSP all-variable ERA5 arm minus N1.
+5. **Weather ceiling (8):** all with correction where the arm is demand. C27, the all-variable ERA5
+   arm minus 00022 `ens` (both N1H) for Primary demand; C28, the ERA5 arm minus the best guess for
+   solar, and C28b, the CAMS-shortwave arm minus the CAMS-trained arm; C29, the ERA5 arm minus the
+   best guess for wind; C30, the demand arm retrained on ERA5 minus N1 refitted here on ENS; C31,
+   the CAMS-shortwave demand arm minus 00022 `ens`, and C31b, the same arm minus 00022 `era5_all`,
+   which isolates CAMS against ERA5 shortwave; C32, the BSP and GSP all-variable ERA5 arm minus
+   00022 `ens`, without correction.
 
 **Several contrasts are expected to be inconclusive.** Notable 1 (-0.05 in 00030), notable 4
 (-0.009, -0.127 to +0.072 in 00020), and notable 5 (-0.048 in 00026) will not resolve at a share of
@@ -246,8 +253,9 @@ are exploratory.
 
 - **Leakage checks.** Every refit stops at its stated training end; lags and the correction use
   observations at least 3.5 hours before the origin; ERA5 and CAMS values are those of the valid
-  time only and are used in the perfect-weather arms alone; the thresholds use training-year data.
-  A reviewer checks the monthly-retraining code for leakage.
+  time only and are used in the perfect-weather arms alone; the thresholds are fixed scoring
+  constants from each series' history to 2026-06-30, which no model sees. A reviewer checks the
+  monthly-retraining code for leakage.
 - **Reproduction checks.** The reused demand arms must reproduce 00019's stored scores to 3 decimal
   places on 00019's exact case set when rescored with this experiment's scorer; each family is then
   scored on its own case intersection and the page reports the dropped counts, and the refitted N1
@@ -255,7 +263,7 @@ are exploratory.
 - **Weather source at lag times.** No arm uses weather at lag times; only the power lags read the
   past, and they read observed power available at the forecast origin.
 - **Compute.** About 3 hours in total on slots A and B (22 cores, one fit at a time on the GPU):
-  generator N1 (9 series x 3 seeds, minutes); demand perfect-weather fits (N1 refit, 20 series x 3
+  generator N1 (9 series x 3 seeds, minutes); demand fits (N1 refit, 20 series x 3
   seeds, about 20 minutes, and the ERA5-retrained variant, about 20 minutes); monthly retraining
   (about 1 hour, seed 0, plus the feature build); generator perfect-weather predictions (minutes).
   If the fits would run more than 5 hours in total, the plan proposes a reduction to the manager

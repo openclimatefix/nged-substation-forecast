@@ -116,7 +116,7 @@ MIN_FIT_CASES: Final[int] = 5_000
 TRIVIAL_LEVEL: Final[float] = 0.01
 """A case is trivial when the uncorrected 95% quantile is at most this fraction of capacity."""
 TARGET_COVERAGE: Final[float] = 0.90
-SPREAD_GRID: Final[np.ndarray] = np.round(np.arange(0.60, 1.601, 0.05), 2)
+SPREAD_GRID: Final[np.ndarray] = np.round(np.arange(0.60, 2.001, 0.05), 2)
 
 
 def band_names(*, lead_hours: np.ndarray) -> np.ndarray:
