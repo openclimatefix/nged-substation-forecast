@@ -1,7 +1,7 @@
 ---
 id: "00025"
 slug: price-change-features-stage1-demand
-status: planned
+status: done
 size: complex
 hypothesis: >-
   Giving the ERA5-trained stage 1 demand model the change in the intra-day price over the last
@@ -32,23 +32,117 @@ benchmark: >-
 row_set_id: era5_val_2024_07_to_2025_06_v1
 metric: >-
   mean absolute error of the median, points of capacity (power over effective capacity, times 100)
-verdict: null
-best_arm: null
-headline: null
-lessons: null
-advice: []
+verdict: small gain
+best_arm: >-
+  Among the price arms, PRICE_SHAPE (6.866 selection year, 6.648 confirmation year, Primary). No
+  price arm beat NATIONAL (6.652 and 6.268), and in the confirmation year no price arm beat BASE
+  (6.616).
+headline: >-
+  On Primary substations, adding price changes to the price level lowered the error by 0.037 points
+  of capacity in the selection year (97.5% interval -0.056 to -0.018) and 0.050 in the confirmation
+  year (-0.083 to -0.018). Against changes taken from another week the gain was 0.039 (-0.070 to
+  -0.015) and 0.047 (-0.086 to -0.006).
+lessons: >-
+  The price changes carry a real but tiny signal, about 0.04 to 0.05 points against the price
+  level, well under the 0.1 threshold. National demand and wind, with no price, lowered the Primary
+  error by 0.28 and 0.35 points against BASE, and by 0.22 and 0.40 against the price change arm.
+  The price level alone was 0.10 worse than BASE in the confirmation year, with an interval that
+  includes zero.
+advice:
+  - >-
+    Do not add Market Index Data price columns to the Primary stage 1 demand model, because price
+    changes gained only 0.04 to 0.05 points over the level and the price arms did no better than BASE
+    in the confirmation year (C1, C5).
+  - >-
+    Try national demand and wind at the target half-hour as stage 1 inputs for Primary substations
+    before any price column, because they scored 0.22 and 0.40 points below the price change arm,
+    and below it at all four BSP and GSP series in the confirmation year (C3).
+  - >-
+    Keep a control with the real price level and other-week changes in any price-change test,
+    because the level's effect is as large as the changes' gain but too uncertain to sign (C2, C5).
+  - >-
+    Do not read the price-change gain on the largest price-move days as established, because the
+    error was 0.10 worse in the selection year and 0.25 better in the confirmation year (C7).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00025-price-change-features-stage1-demand/
-pull_request: null
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1231
 ---
 
 # Does the change in the intra-day price help a stage 1 demand model explain power?
 
-**Status: planned.** This page is committed before any code runs. Follows
-[experiment 15](../00015-same-time-price-stage1-demand/result.md), which found that the price level
-at the target half-hour mostly acted as a week-level proxy, and
-[experiment 10](../00010-elexon-price-lags-stage1a-demand/result.md).
+**Verdict: small gain, and too small to use.** On Primary substations, price changes beat the price
+level alone and beat other-week changes in both years, with intervals wholly below zero, but by 0.04
+to 0.05 points of capacity against the pre-registered 0.1. The system price gained 0.05 to 0.08 over
+the level. National demand and wind, with no price, scored 0.22 and 0.40 points below the price
+change arm. Follows [experiment 15](../00015-same-time-price-stage1-demand/result.md).
+
+**Absolute scores, Primary substations** (mean absolute error of the median, points of capacity, 3
+seeds, 13 series in the selection year and 14 in the confirmation year):
+
+| Arm | Selection | Confirmation |
+| --- | --- | --- |
+| BASE | 6.933 | 6.616 |
+| PRICE_LEVEL | 6.905 | 6.715 |
+| PRICE_CHANGE | 6.868 | 6.665 |
+| PRICE_SHAPE | 6.866 | 6.648 |
+| SHUFFLED_CHANGE | 6.907 | 6.712 |
+| SHUFFLED_SHAPE | 6.934 | 6.719 |
+| NATIONAL | 6.652 | 6.268 |
+| SYSTEM | 6.828 | 6.669 |
+| CLIMATOLOGY | 8.527 | 8.928 |
+
+![Primary contrasts with 97.5% intervals](figure_1.svg)
+
+![Primary error change by time of day](figure_2.svg)
+
+![Absolute error of each arm](figure_3.svg)
+
+## What the contrasts say
+
+- **C1, changes against level only (verdict):** -0.037 (-0.056 to -0.018) in the selection year and
+  -0.050 (-0.083 to -0.018) in the confirmation year. 11 of 12 months are below zero in each year.
+- **C2, changes against other-week changes (verdict):** -0.039 (-0.070 to -0.015) and -0.047 (-0.086
+  to -0.006). Both estimates miss the -0.1 threshold, and both intervals lie wholly above -0.1, so a
+  gain of 0.1 points is ruled out. The rule's "refuted" and "small gain" clauses both apply and it
+  states no precedence. The verdict is `small gain`, because the skill reserves that label for an
+  interval that excludes zero in the predicted direction below the threshold. Both pre-registered
+  predictions missed: the gain of 0.15 to 0.4 points did not appear, and PRICE_CHANGE did worse than
+  NATIONAL.
+- **C3, changes against national demand and wind:** +0.216 (+0.020 to +0.468) and +0.397 (+0.167 to
+  +0.633). National demand and wind are better in both years.
+- **C4, shape against changes:** -0.002 (-0.043 to +0.040) and -0.017 (-0.063 to +0.024). The extra
+  shape columns add nothing to the changes. Shape against other-week shape is -0.068 (-0.125 to
+  -0.009) and -0.071 (-0.138 to -0.024).
+- **C5, level against no price:** -0.028 (-0.159 to +0.112) and +0.099 (-0.047 to +0.248). Both
+  intervals include zero, so the level alone shows no help. In the confirmation year PRICE_CHANGE
+  (6.665) is still above BASE (6.616).
+- **C6, system price against level only:** -0.077 (-0.105 to -0.048) and -0.046 (-0.078 to -0.018),
+  as large as or larger than the price change gain.
+- **C7, by time of day:** in the selection year there is no gain from 00:00 to 08:00, and the 16:00
+  to 20:00 block (-0.031, interval -0.069 to +0.009) is smaller than the 08:00 to 16:00 and 20:00 to
+  24:00 blocks (-0.056 to -0.064). The prediction of a peak at 16:00 to 20:00 did not hold. On the
+  days with the top 5% largest half-hourly price move, C1 is +0.100 (-0.046 to +0.312) in the
+  selection year and -0.251 (-0.332 to -0.189) in the confirmation year, so the day-level result did
+  not repeat.
+- **BSP and GSP, four series, each read alone:** no consistent sign. C1 in the confirmation year is
+  -0.114 (-0.214 to -0.025) at B2 and +0.938 (+0.141 to +1.902) at G1, and the other two intervals
+  include zero. NATIONAL beats PRICE_CHANGE at all four series in the confirmation year.
+
+## Failures and limits
+
+- **Some series have too little history,** so 13 of the 16 Primary series were fitted in the
+  selection year and 14 in the confirmation year. All 2 BSP and 2 GSP series were fitted in both
+  years.
+- **Nine days of system price are missing at the source** (47 of 48 periods); the experiment treats
+  them as missing. Market Index Data holds exact duplicate rows, which are harmless.
+- **The shuffle shifts in UTC,** so the weekday and half-hour match is off by one local hour in the
+  weeks around a clock change.
+- **Market Index Data is a proxy for the intra-day price.** The tick-by-tick intraday price that
+  jumps after an interconnector trip is paid for and was not tested, so this result does not rule
+  out an effect of that price.
+- **The model uses the price at the target half-hour,** so no score is a forecast skill.
+- **Reviews:** Sonnet plan and code reviews, triaged on the pull request. No Opus review was run.
 
 ## Design
 
@@ -96,8 +190,8 @@ and joined to the 2025-09 to 2026-09 pull already on disk. Market Index Data is 
 intra-day price: it is an index of short-term trading, published after the period, and it is not
 the tick-by-tick intraday price in which an interconnector trip shows. The tick price is paid for
 and is not used. Weather is ERA5, which arrives about 5 days late, so no arm can run at forecast
-time. The system price is a second, free signal of fault stress. A SYSTEM gain is not causal, because the
-system price partly reflects the demand that the substations carry.
+time. The system price is a second, free signal of fault stress. A SYSTEM gain is not causal,
+because the system price partly reflects the demand that the substations carry.
 
 ## Planned contrasts
 

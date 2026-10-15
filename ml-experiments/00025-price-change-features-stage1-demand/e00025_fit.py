@@ -139,7 +139,8 @@ def add_shuffled_columns(*, frame: pl.DataFrame, seed: int, train_end: datetime)
         "start", *dict.fromkeys((*CHANGE_SHUFFLED, *SHAPE_SHUFFLED))
     )
     origin = frame["start"].min()
-    n_weeks = int((frame["start"].max() - origin).total_seconds() // (7 * 86400)) + 2
+    span_days = frame.select((pl.col("start").max() - pl.col("start").min()).dt.total_days()).item()
+    n_weeks = int(span_days) // 7 + 2
     offsets = np.random.default_rng(SHUFFLE_SEED_BASE + seed).choice(
         np.array(SHUFFLE_WEEKS), size=n_weeks
     )

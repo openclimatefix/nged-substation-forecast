@@ -140,7 +140,6 @@ def day_rank(column: str) -> pl.Expr:
 
 def derive(series: pl.DataFrame) -> pl.DataFrame:
     """Add every derived column to the dense grid, using values at or before each half-hour."""
-    window = {"window_size": DAY, "min_samples": MIN_WINDOW_SAMPLES}
     with_changes = series.with_columns(
         price_now=pl.col("price"),
         ssp_now=pl.col("ssp"),
@@ -153,8 +152,10 @@ def derive(series: pl.DataFrame) -> pl.DataFrame:
         demand_d1=pl.col("demand") - pl.col("demand").shift(1),
         wind_d1=pl.col("wind") - pl.col("wind").shift(1),
         demand_d4=pl.col("demand") - pl.col("demand").shift(4),
-        price_day_mean=pl.col("price").rolling_mean(**window),
-        price_day_std=pl.col("price").rolling_std(**window),
+        price_day_mean=pl.col("price").rolling_mean(
+            window_size=DAY, min_samples=MIN_WINDOW_SAMPLES
+        ),
+        price_day_std=pl.col("price").rolling_std(window_size=DAY, min_samples=MIN_WINDOW_SAMPLES),
         price_six_hour_range=(
             pl.col("price").rolling_max(window_size=SIX_HOURS, min_samples=SIX_HOURS // 2)
             - pl.col("price").rolling_min(window_size=SIX_HOURS, min_samples=SIX_HOURS // 2)
