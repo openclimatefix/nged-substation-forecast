@@ -66,11 +66,11 @@ code: ml-experiments/00027-pvlive-lags-in-stage2-gsp-demand/
 **Verdict: refuted for the two GSPs, Walpole and Bicker Fen.** Giving the stage 2 calibrator
 Sheffield Solar's PV_Live estimate at the lag times lowered the quantile score by at most 0.08
 points of capacity, and every interval includes zero. The best planned contrast, C1 (PV_Live level
-minus no PV_Live, all leads), is -0.08 (98.33% interval -0.26 to +0.08). The three intervals all
-lie above -0.30, so a gain of 0.3 points or more (the decision threshold) is excluded at 98.33%
-for these two series, and the intervals say nothing about other GSPs. Scores are on 73 forecast runs, one every 5 days, July
-2025 to June 2026, with ENS weather, in points of capacity (1% of the series' effective capacity).
-Attribution: Sheffield Solar PV_Live, CC BY 4.0.
+minus no PV_Live, all leads), is -0.08 (98.33% interval -0.26 to +0.08). The three intervals all lie
+above -0.30, so a gain of 0.3 points or more (the decision threshold) is excluded at 98.33% for
+these two series, and the intervals say nothing about other GSPs. Scores are on 73 forecast runs,
+one every 5 days, July 2025 to June 2026, with ENS weather, in points of capacity (1% of the series'
+effective capacity). Attribution: Sheffield Solar PV_Live, CC BY 4.0.
 
 ![Stage 2 arms with PV_Live minus the arm without](figure_1.svg)
 
