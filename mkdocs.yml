@@ -161,6 +161,7 @@ nav:
       - "Does the staged chain beat the single-stage model for Primary substation demand?": ml-experiments/00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md
       - "Does stacking small gains beat manual_heuristic for Primary substation demand?": ml-experiments/00019-primary-demand-stack-vs-manual-heuristic/result.md
       - "Do the candidate changes for solar and wind add up to a better pooled mixture?": ml-experiments/00020-solar-wind-stack-cams-stage0-spread-margin/result.md
+      - "Does the recent-error correction help BSP and GSP demand, and which variant works best?": ml-experiments/00021-error-correction-variants-bsp-gsp-demand/result.md
       - "Does recent observed power help solar and wind forecasts?": ml-experiments/00023-lagged-power-and-error-correction-solar-wind/result.md
   - Live service:
       - Overview: live_service/index.md
