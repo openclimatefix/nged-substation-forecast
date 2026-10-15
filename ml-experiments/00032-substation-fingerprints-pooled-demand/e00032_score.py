@@ -15,6 +15,7 @@ Output under `work/results/`: `absolute.parquet`, `per_series.parquet`, `contras
     uv run python ml-experiments/00032-substation-fingerprints-pooled-demand/e00032_score.py
 """
 
+import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -38,7 +39,7 @@ NEWEST_AGE: Final[int] = int(common.TELEMETRY_DELAY / common.STEP) + 1
 WINDOW: Final[int] = common.CORRECTION_DAYS * common.STEPS_PER_DAY
 MIN_COUNT: Final[int] = common.MIN_CORRECTION_DAYS * common.STEPS_PER_DAY
 WARM: Final[tuple[str, ...]] = tuple(common.WARM_ARMS)
-COLD: Final[tuple[str, ...]] = tuple(common.COLD_ARMS)
+COLD: Final[tuple[str, ...]] = (*common.COLD_ARMS, *common.POSTHOC_COLD)
 FIT_ARMS: Final[tuple[str, ...]] = (*WARM, *COLD)
 COLD_SEEDS: Final[tuple[int, ...]] = (0,)
 STACK_SUFFIX: Final[str] = "_stack"
@@ -81,6 +82,15 @@ PLANNED: Final[dict[str, tuple[str, str, str]]] = {
 }
 EXPLORATORY_PAIRS: Final[dict[str, tuple[str, str]]] = {
     "held-out, static minus none (K1)": ("cold_static", "cold_none"),
+    "held-out, recent only minus none (post hoc)": ("cold_recent", "cold_none"),
+    "held-out, training (whole window) minus none (post hoc)": (
+        "cold_train_fullwindow",
+        "cold_none",
+    ),
+    "held-out, training (whole window) and recent minus none (post hoc)": (
+        "cold_train_recent_fullwindow",
+        "cold_none",
+    ),
     "held-out, none minus ID (cost of being new: the ID model saw the series)": (
         "cold_none",
         "type_id",
@@ -388,8 +398,11 @@ def score_table(
     return absolute, per_series, contrasts, rows
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Build and score every arm and write the tables."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cold-only", action="store_true", help="rescore the cold table only")
+    cold_only = parser.parse_args().cold_only
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     series = common.series_table()
     cases = _actual_table(series=series)
@@ -410,12 +423,15 @@ def main() -> None:
             raise ValueError(msg)
     corrected, tables = {}, []
     for name, fit in fits.items():
+        if cold_only and name not in (*COLD, "type_id", "type_noid"):
+            continue
         corrected[name], table = with_corrections(base=fit, series=series)
         tables.append(table.with_columns(fit=pl.lit(name)))
-    pl.concat(tables).write_parquet(RESULTS_DIR / "corrections.parquet")
+    if not cold_only:
+        pl.concat(tables).write_parquet(RESULTS_DIR / "corrections.parquet")
     raw: dict[str, pl.DataFrame] = dict(fits)
-    for name in FIT_ARMS:
-        raw[f"{name}{STACK_SUFFIX}"] = stack(frame=corrected[name])
+    for name, frame in corrected.items():
+        raw[f"{name}{STACK_SUFFIX}"] = stack(frame=frame)
     for name in STORED_ARMS:
         stored = pl.read_parquet(common.ARMS_DIR_00013 / f"{name}.parquet").select(
             *KEYS, *common.LEVEL_COLUMNS
@@ -423,7 +439,7 @@ def main() -> None:
         raw[name] = pl.concat(
             [stored.with_columns(seed=pl.lit(seed).cast(pl.Int8)) for seed in common.SEEDS]
         )
-    for name in (*common.NEW_WARM_ARMS, *COLD):
+    for name in (*(() if cold_only else common.NEW_WARM_ARMS), *COLD):
         for variant in (name, f"{name}{STACK_SUFFIX}"):
             try:
                 experiment_store.write_predictions(
@@ -439,12 +455,10 @@ def main() -> None:
                 continue
             except ValueError as error:
                 print(f"predictions of {variant} not stored: {error}")
-    warm_names = [*WARM, *(f"{n}{STACK_SUFFIX}" for n in WARM), *STORED_ARMS]
+    warm_names = [*(f"{n}{STACK_SUFFIX}" for n in WARM), *STORED_ARMS]
     cold_names = [
         *COLD,
         *(f"{n}{STACK_SUFFIX}" for n in COLD),
-        "type_id",
-        "type_noid",
         "type_id_stack",
         "type_noid_stack",
         *STORED_ARMS,
@@ -459,17 +473,6 @@ def main() -> None:
         for label, (t, r) in EXPLORATORY_PAIRS.items()
         if not label.startswith("held-out")
         for group in ("Primary (16)", "All (20)", "BSP and GSP (4)")
-    }
-    warm_exploratory |= {
-        f"raw {label}, {group}": (t, r, group)
-        for label, (t, r) in {
-            "C1": ("id_static", "type_id"),
-            "C2": ("id_train", "type_id"),
-            "C3": ("id_recent", "type_id"),
-            "C4": ("id_train_recent", "type_id"),
-            "C5": ("train_noid", "type_id"),
-        }.items()
-        for group in ("Primary (16)",)
     }
     warm_exploratory |= {
         f"{arm} stack minus manual_heuristic, {group}": (
@@ -492,11 +495,15 @@ def main() -> None:
             "C8": ("cold_train_recent", "cold_none"),
         }.items()
     }
-    warm_out = score_table(
-        raw={n: raw[n] for n in warm_names},
-        cases=cases,
-        planned=suffix(warm_planned),
-        exploratory=warm_exploratory,
+    warm_out = (
+        ([], [], [], {})
+        if cold_only
+        else score_table(
+            raw={n: raw[n] for n in warm_names},
+            cases=cases,
+            planned=suffix(warm_planned),
+            exploratory=warm_exploratory,
+        )
     )
     held_cases = cases.filter(pl.col("time_series_id").is_in(held_ids))
     cold_raw = {
@@ -516,18 +523,25 @@ def main() -> None:
         ("per_series", warm_per_series, cold_per_series),
         ("contrasts", warm_contrasts, cold_contrasts),
     ):
-        pl.DataFrame(
+        path = RESULTS_DIR / f"{file}.parquet"
+        frame = pl.DataFrame(
             [
                 *({**r, "table": "warm"} for r in warm_part),
                 *({**r, "table": "cold"} for r in cold_part),
             ],
             strict=False,
             infer_schema_length=None,
-        ).write_parquet(RESULTS_DIR / f"{file}.parquet")
+        )
+        if cold_only:
+            frame = pl.concat(
+                [pl.read_parquet(path).filter(pl.col("table") == "warm"), frame],
+                how="diagonal_relaxed",
+            )
+        frame.write_parquet(path)
     runs = tables[0].filter(pl.col("seed") == 0)
     print(
         "rows per seed (warm, cold):",
-        next(iter(warm_rows.values())),
+        next(iter(warm_rows.values()), None),
         next(iter(cold_rows.values())),
     )
     print(

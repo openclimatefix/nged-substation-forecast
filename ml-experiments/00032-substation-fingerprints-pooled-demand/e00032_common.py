@@ -532,6 +532,7 @@ COLD_ARMS: Final[dict[str, str]] = {
     "cold_static": "S",
     "cold_train": "T",
     "cold_train_recent": "TR",
+    "cold_recent": "R",
 }
 """Each cold-start arm's fingerprint blocks; none uses the identifier."""
 COLD_FINGERPRINT_DAYS: Final[int] = 28
@@ -671,3 +672,11 @@ def group_labels(*, series: pl.DataFrame, grouping: str) -> dict[str, str]:
         else f"Primary-{row['units']}"
         for row in series.iter_rows(named=True)
     }
+
+
+POSTHOC_COLD: Final[dict[str, tuple[str, str]]] = {
+    "cold_train_fullwindow": ("cold_train", "T"),
+    "cold_train_recent_fullwindow": ("cold_train_recent", "TR"),
+}
+"""Post hoc cold-start arms: the booster of the named arm, with the held-out series' training-window
+statistics taken over the whole training window instead of its last 28 days."""

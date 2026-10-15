@@ -322,6 +322,10 @@ def run_predict(
             for arm in common.NEW_WARM_ARMS
         },
         **{arm: (kinds, False, True, list(COLD_SEEDS)) for arm, kinds in common.COLD_ARMS.items()},
+        **{
+            arm: (kinds, False, True, list(COLD_SEEDS))
+            for arm, (_, kinds) in common.POSTHOC_COLD.items()
+        },
     }
     todo = [
         (arm, seed)
@@ -341,7 +345,7 @@ def run_predict(
             booster.load_model(
                 model_path(
                     models_dir=work_dir / "models",
-                    arm=arm,
+                    arm=common.POSTHOC_COLD[arm][0] if arm in common.POSTHOC_COLD else arm,
                     group=site if cold else group_of[site],
                     seed=seed,
                 )
@@ -375,7 +379,11 @@ def run_predict(
                     [
                         matrix,
                         fingerprint(
-                            kinds=kinds, row=row, power=arrays[site].power, origin=origin, cold=cold
+                            kinds=kinds,
+                            row=row,
+                            power=arrays[site].power,
+                            origin=origin,
+                            cold=arm in common.COLD_ARMS,
                         ),
                     ]
                 )
