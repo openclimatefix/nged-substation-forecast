@@ -20,6 +20,7 @@ sooner.
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | Nothing | Proposed; experiment 00018 found lag anomalies add little to raw lagged power for demand |
+| 00022 | How much better would the Primary demand forecast be with ERA5 in place of ENS weather at serving time, by lead band and weather variable? | 5 | Nothing | Planned; running ([`result.md`](00022-era5-weather-ceiling-primary-demand/result.md)) |
 
 ## Deferred until the first results are in
 
@@ -28,7 +29,6 @@ model.** Each keeps its section below, and a result may promote it.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [P9](#p9-the-demand-weather-ceiling) | How much better would the demand forecast be with ERA5 in place of ENS weather at serving time? | 5 | Knowing what the production model will look like | Deferred; its size depends on the shape of the model |
 | [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | Nothing | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, and experiment 00018 found the staged chain level with N1 for demand |
 | [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | Nothing | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
