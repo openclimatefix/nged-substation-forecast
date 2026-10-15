@@ -14,21 +14,24 @@ prediction: >-
   +0.03 to -0.10) and by 0.03 for wind (+0.03 to -0.12). The effect is small because the prior study
   of nine capacity estimators found no detectable gain over static capacity, and only 3 of 106
   plant-months held a real loss of capacity. Extra windows, a shape feature, and the same window a
-  year earlier each move the CRPS by less than 0.03 beyond the single feature. The shuffled-feature
-  control moves the CRPS by less than 0.02.
+  year earlier each move the CRPS by less than 0.03 beyond the single feature. The shuffled copy A7
+  moves the CRPS by less than 0.02. A slowly varying daily feature can also act as a date
+  fingerprint that lets depth-6 trees memorise period-specific residuals; C2 is the check for that.
 decision_rule: >-
   Contrasts are per-technology CRPS differences (arm minus comparison), averaged over three seeds,
-  with whole months resampled at 99.5% (a 5% level with a Bonferroni correction across the 10
-  planned contrasts, two-sided). Only C1 (A2 minus A0) decides the verdict. The threshold is 0.05
-  points of capacity, because the feature adds a serving step that reads 28 days of observed power
-  and past weather. C1 is a gain when its interval lies wholly below zero and its estimate is at
-  most -0.05; a small gain when the interval lies wholly below zero and the estimate is above -0.05;
-  refuted when the lower bound is above -0.05 and the interval does not lie wholly below zero; and
+  with whole months resampled at 98.75% (a 5% level with a Bonferroni correction across the 4
+  decisive contrasts, C1 and C2 for each technology, two-sided; the other contrasts are descriptive
+  and read at the same level). C1 (A2 minus A0) decides the verdict. The threshold is 0.03 points
+  of capacity, about 0.6% of the solar CRPS, because the feature adds only a daily table of values
+  computed from 28 days of observed power and past weather, a smaller serving step than a new model
+  or data source. C1 is a gain when its interval lies wholly below zero and its estimate is at
+  most -0.03; a small gain when the interval lies wholly below zero and the estimate is above -0.03;
+  refuted when the lower bound is above -0.03 and the interval does not lie wholly below zero; and
   inconclusive otherwise. The overall verdict is supported when both technologies are a gain,
   partly supported when one is a gain, small gain when none is a gain and at least one is a small
   gain, refuted when both are refuted, and inconclusive otherwise. A gain counts as real
-  information only when the shuffled control A6 does not itself lower the CRPS below A0 by an
-  interval wholly below zero; otherwise the technology's verdict is inconclusive.
+  information only when C2 (A2 minus the shuffled copy A7) is also wholly below zero; otherwise the
+  technology's verdict is inconclusive.
 benchmark: >-
   A0, the production recipe for each technology refitted here: the ERA5-trained pooled mixture for
   solar (experiment 00020's `base`) and the same with the power-curve base margin for wind
@@ -60,8 +63,12 @@ and CAMS the Copernicus Atmosphere Monitoring Service's satellite irradiance est
 - **Code whose callers cannot be named without searching:** no. The scripts copy the patterns of
   experiments 00020 and 00023.
 
-The size is complex: Sonnet writes the plan, one Sonnet reviewer reviews the plan and one the code
-(the budget rules allow Sonnet in place of Opus), and one Sonnet reviewer reviews the write-up.
+The size is complex. One Sonnet reviewer reviewed the plan, and its findings (a season-preserving
+shuffle, a matched shuffled copy of the single feature, a Bonferroni family of the 4 decisive
+contrasts, a threshold of 0.03, and a training lead drawn from the validation leads) are applied.
+The reviewer's rescaling design was rejected, because it tests a correction and not a feature. One
+Sonnet reviewer reviews the code and one the write-up (Sonnet in place of Opus, as the credit
+budget requires).
 
 ## Which earlier advice this plan follows
 
@@ -92,11 +99,11 @@ the daily table of features for a series, and a unit test truncates all inputs a
 asserts that the features do not change.
 
 **Training rows have no forecast origin.** The ERA5-trained model sees one row per valid time. Each
-training row gets a lead drawn uniformly at random (seeded) from 0 to 360 hours in 3-hour steps, its
-origin is the valid time minus that lead, and its features are the daily table's row for that
-origin's cutoff day. A serving row uses its real origin, so the feature is as stale in training as
-in serving. The effective capacity used to normalise power is the whole-record 99th percentile that
-every arm already uses, so it is the same in all arms.
+training row gets a lead drawn at random (seeded) from the leads of the validation frames, its
+origin is the valid time minus that lead (the validation origin is `power_fcst_init_time`), and its
+features are the daily table's row for that origin's cutoff day. A serving row uses its real origin,
+so the feature is as stale in training as in serving. The effective capacity used to normalise power
+is the whole-record 99th percentile that every arm already uses, so it is the same in all arms.
 
 **Weather that ranks the steps.** CAMS shortwave at the farm for solar, and ERA5 100 m wind speed
 for wind. Both are past weather read at a cutoff 5 days old, so training and serving read the same
@@ -115,13 +122,15 @@ product and nothing is late at forecast time.
 | `power_to_wind3_q75_28d` | wind | 75th percentile of power divided by the cube of speed, over steps with speed from 3 to 8 m/s, 28 days |
 | `p995_last_year` | wind | `p995_28d` for the window centred 365 days before the cutoff day |
 
-A feature that needs a window before 2019-09 is null; the same null pattern occurs in training and
-serving.
+A feature that needs a window before 2019-09 is null, so the 90-day and last-year features are null
+for the first 90 and 365 days of training and never null at serving; the model sees nulls only early
+in training.
 
 **A static capacity control is not included.** The design brief proposed one, but each series has
 its own model, so a per-series constant column carries no information.
 
-**Arms.** Equal column counts are not possible, so the shuffled control A6 carries A3's columns.
+**Arms.** Equal column counts are not possible, so each shuffled control carries the columns of the
+arm it matches.
 
 | Arm | Extra columns |
 |---|---|
@@ -130,32 +139,38 @@ its own model, so a per-series constant column carries no information.
 | A3 | `top_decile_28d`, `top_decile_7d`, `top_decile_90d` (solar); `top_decile_28d`, `p995_28d`, `p995_90d` (wind) |
 | A4 | A2 + `power_to_cams_q90_28d` (solar) or `power_to_wind3_q75_28d` (wind) |
 | A5 | A2 + the last-year feature |
-| A6 | A3's columns, with the daily table shuffled in blocks of calendar months within each series |
+| A6 | A3's columns, from the shuffled table |
+| A7 | A2's column, from the shuffled table |
 
-The shuffle permutes whole calendar months among the months before 2025-06, and a day takes its
-month's replacement day by day of month, so the link to the date breaks and the marginal remains.
-Validation days take blocks from the training months, so no validation power enters a training row.
+The shuffle permutes, within each series, whole calendar months among the same calendar month of
+other years before 2025-06 (every June among Junes), and a day takes its month's replacement day by
+day of month. The seasonal marginal remains, so a control that gains must be gaining from season
+and not from capacity. Months from 2025-06 on take a random same-calendar-month source before
+2025-06, so no validation power enters a training row.
 
 ## Planned contrasts
 
-Each contrast is the arm named first minus the arm named second, per technology (10 in all).
+Each contrast is the arm named first minus the arm named second, per technology (12 in all).
 
 | Id | Contrast | What it tests |
 |---|---|---|
 | C1 | A2 - A0 (decides) | does a trailing capacity feature help |
-| C2 | A3 - A6 | does real information beat the same number of shuffled columns |
-| C3 | A3 - A2 | do several windows help |
-| C4 | A4 - A2 | does a shape feature add |
-| C5 | A5 - A2 | does the same window a year earlier add |
+| C2 | A2 - A7 (gates C1) | does the feature beat a season-preserving shuffle of itself |
+| C3 | A3 - A6 | do several windows beat the same number of shuffled columns |
+| C4 | A3 - A2 | do several windows help |
+| C5 | A4 - A2 | does a second kind of statistic add (exploratory: it differs in kind from the top-decile feature) |
+| C6 | A5 - A2 | does the same window a year earlier add (exploratory: a seasonal reference) |
 
 The write-up reports each arm's absolute CRPS, the climatology row, a per-farm breakdown (gains are
-expected to concentrate in the few months with a loss of capacity), and the rank agreement of the
-CAMS and ERA5 rankings with the ENS-time ones on the overlap if the forecast-time proxy is later
-needed.
+expected to concentrate in the few months with a loss of capacity), .
 
 ## Limits stated in advance
 
 - **The sample resolves about 0.1 points for solar.** Experiment 00020's solar paired intervals were
-  0.19 to 0.30 points wide, so the threshold of 0.05 is below what 6 farms resolve unless a feature
+  0.19 to 0.30 points wide, so the threshold of 0.03 is below what 6 farms resolve unless a feature
   effect is concentrated.
+- **The intervals resample initialisation months, not farms,** so the true uncertainty is larger than
+  reported.
+- **The cutoff of 5 days applies to power as well as weather,** a deliberate simplification that
+  dilutes a signal about a recent loss.
 - **The prior study found few real losses of capacity,** so little can be learned from most months.
