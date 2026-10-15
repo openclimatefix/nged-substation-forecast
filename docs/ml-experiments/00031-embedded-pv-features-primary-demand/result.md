@@ -53,28 +53,29 @@ headline: >-
   to +0.100). C1, A1 (capacity statistics) minus B0: +0.167 (+0.091 to +0.243), a loss in all 12
   months.
 lessons: >-
-  The capacity estimates do not lower the all-lead score of Primary demand forecasts. The shaped
-  correction lowers the score by 0.28 points in sunny summer daylight (95% interval -0.43 to -0.15)
-  and raises it by 0.68 under heavy cloud (+0.37 to +1.04), so the two cancel. At the 2 GSPs, adding
-  PV_Live's true generation lowers the score by 0.82 (-1.06 to -0.55), which bounds what a perfect
-  PV forecast could give.
+  The capacity estimates do not lower the all-lead score of Primary demand forecasts. In 95%
+  breakdowns, which decide nothing, the shaped correction lowers the score by 0.37 in sunny daylight
+  (-0.51 to -0.25) and raises it by 0.68 under heavy cloud (+0.37 to +1.04), so the two cancel. At
+  the 2 GSPs, adding PV_Live's true generation lowers the score by 0.82 (-1.06 to -0.55), which
+  bounds what a perfect PV forecast could give.
 advice:
   - >-
     Do not add the capacity statistics (cap_slope_28d, sunny_minus_cloudy_28d, cap_change_yoy) as
-    columns to N1, because they raised the quantile score by 0.17 in every month (C1).
+    columns to N1, because they raised the quantile score by 0.17 in all 12 months (C1).
   - >-
-    Do not add PV products built from the register to N1, because the shuffled control scored 0.018
-    better than A3 (C6) and A3 itself is level with B0 (C3).
+    Do not add PV products built from the register to N1, because A3 is level with B0 (C3) and not
+    distinguishable from the shuffled control (C6, -0.002 to +0.033).
   - >-
     Calibrate ENS irradiance to CAMS before applying a fitted PV slope to ENS forecasts, because the
-    shaped correction gains 0.28 in sunny summer daylight and loses 0.68 under heavy cloud (figure 2).
+    shaped correction lowers the score by 0.37 in sunny daylight and raises it by 0.68 under heavy
+    cloud, and ENS irradiance may be biased against CAMS (figure 2; untested here).
   - >-
-    Test the shaped correction only for forecasts under 48 hours, where it lowered the score by 0.07
-    (-0.13 to -0.02), and judge it against a second validation year (C5, 0-48 h).
+    Compare any gain at leads under 48 hours with a shuffled control, because A5's gain there (-0.07)
+    is no larger than A6's (-0.05), and both are post hoc 95% breakdowns (figure 2).
   - >-
-    Treat the register as a weak prior at Primaries: the median data estimate of PV capacity was 0.33
-    of effective capacity against a register median of 0.08, so the register adds little (feature
-    table).
+    Treat the register as a weak prior at Primaries: the median data estimate of PV capacity was
+    about 0.33 of effective capacity against a register median of 0.08, so the register adds little
+    there (feature table).
 production_status: not-for-production
 adopted_in: none
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1239
@@ -111,22 +112,29 @@ are losses (intervals wholly above zero), A3 is a null with a half-width of 0.03
 nulls with half-widths of 0.07 and 0.08, wider than the 0.05 that would have excluded a gain of that
 size, so the verdict is inconclusive and not refuted.
 
-**The shaped correction trades gains in sunny hours for losses in cloudy ones.** A5 lowers the score
-by 0.28 in April to September at a clear-sky index of 0.7 or more (95% interval -0.43 to -0.15; B0
-scores 5.63 there) and by 0.07 at leads under 48 hours (-0.13 to -0.02). It raises the score by 0.68
-at a clear-sky index under 0.3 (+0.37 to +1.04) and by 0.41 between 0.3 and 0.7. The slope of the
-14-day residuals on PV output was fitted in 1,380 of 1,460 series-runs and averaged -0.11 over all
-runs, so the substations hold PV that N1 under-allows for. The ENS irradiance forecast is biased against
-CAMS, which the slope was fitted on, so the correction is too large on cloudy forecasts.
+**The shaped correction trades gains in sunny hours for losses in cloudy ones.** These are 95%
+breakdowns, which decide nothing. A5 lowers the score by 0.37 in daylight at a clear-sky index of
+0.7 or more over the year (-0.51 to -0.25), and by 0.28 in April to September at that index (-0.43
+to -0.15; B0 scores 5.63 there). It raises the score by 0.68 at a clear-sky index under 0.3 (+0.37
+to +1.04) and by 0.41 between 0.3 and 0.7. Over April to September as a whole A5 is level with B0
+(+0.004). At leads under 48 hours A5 lowers the score by 0.07 (-0.13 to -0.02), but the shuffled
+control A6 lowers it by 0.05 (-0.08 to -0.02), so that gain is not specific to the shaped
+correction. The slope of the 14-day residuals on PV output was fitted in 1,380 of 1,460 series-runs
+(20 series times 73 runs, including the BSPs and GSPs) and averaged -0.11 over all runs, so the
+substations hold PV that N1 under-allows for. One possible explanation of the cloudy-hour losses,
+untested here, is that the ENS irradiance forecast is biased against the CAMS irradiance the slope
+was fitted on, which would make the correction too large on cloudy forecasts.
 
 ![Each arm's gain over B0 by sky condition, season, and lead](figure_2.svg)
 
-**The register adds little.** The median data estimate of PV capacity at a Primary was 0.33 of
-effective capacity against a register median of 0.08, so the weights favour the data estimate. A3
-minus A2 is -0.030 (-0.061 to -0.007), but A3 does not beat the shuffled control (C6), so the
-register's gain is not evidence of capacity information. The estimator recovered an injected
-capacity ramp in the known-answer check (F1's error under 0.001 share of capacity on 2 directional
-Primaries, within one standard error at every origin).
+**The register adds little at Primaries.** The median data estimate of PV capacity at a Primary was
+about 0.33 of effective capacity (0.35 data only, 0.33 with the register, on validation origins)
+against a register median of 0.08, so the weights favour the data estimate. A3 minus A2 is -0.030
+(-0.061 to -0.007, 10 of 12 months negative), so the register improves on the data-only arm, but A3
+is not distinguishable from the shuffled control (C6), so the gain is not evidence of capacity
+information. The estimator recovered an injected capacity ramp in the known-answer check (F1's
+error under 0.0011 share of capacity on 2 directional Primaries, measured after subtracting each
+series' un-injected F1, against a standard error of about 0.05).
 
 **At the 2 GSPs, true PV_Live generation lowers the score by 0.82.** B0 scores 19.95 and the oracle
 A7 19.13 (A7 minus B0 -0.82, 95% interval -1.06 to -0.55; 12 of 12 months). The 2 BSPs and 2 GSPs

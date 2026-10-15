@@ -301,10 +301,10 @@ correction (row set `fold_a_every5d_v1`, 16 Primary substations).
   half-life. Register-based PV products (A3) +0.006 (99.17% interval -0.022 to +0.033); the shaped
   correction (A5) +0.016 (-0.069 to +0.100); the capacity statistics as columns +0.167 (+0.091 to
   +0.243), a loss in all 12 months.
-- **Finding for later experiments:** the shaped correction lowers the score by 0.28 in sunny summer
-  daylight (-0.43 to -0.15) and raises it by 0.68 under heavy cloud, because ENS irradiance is
-  biased against CAMS; calibrate ENS to CAMS first. True PV_Live generation lowers the score by 0.82
-  at the 2 GSPs (-1.06 to -0.55).
+- **Finding for later experiments:** in 95% breakdowns the shaped correction lowers the score by
+  0.37 in sunny daylight (-0.51 to -0.25) and raises it by 0.68 under heavy cloud; a possible cause,
+  untested, is ENS irradiance that is biased against CAMS, so calibrate ENS to CAMS first. True
+  PV_Live generation lowers the score by 0.82 at the 2 GSPs (-1.06 to -0.55).
 - **Cut for time:** the no-fit physics baseline and the post hoc tweak were not run.
 - **Write-up and pull request:** [result](00031-embedded-pv-features-primary-demand/result.md),
   [PR #1239 (Experiment 31: do embedded-solar capacity features lower the error of Primary demand forecasts?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1239).
