@@ -19,6 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
+| [P24](#p24-pooling-groupings-for-one-xgboost-model) | Which groupings of substations can share one XGBoost model without losing skill against one model per substation? | 1 | Nothing | Planned as [experiment 00024](00024-pooling-groupings-demand-xgboost/result.md); fits pending |
 
 ## Deferred until the first results are in
 
@@ -170,3 +171,13 @@ the maintainer's approval of the cost. The issue also ties autonomous use of the
 scorer-protection work in issue 958. Every experiment since 00003 scores the same year on the same
 16 series, so choices tuned there overfit it, and an earlier fold is the remedy. For demand, a
 longer training history has hurt so far, so the backfill is valuable first as validation data.
+
+### P24: pooling groupings for one XGBoost model
+
+**Training one XGBoost model per substation may not scale to 2,500 series.** The planned experiment
+compares one model per series, one per substation type (BSP, GSP, Primary in MW, Primary in MVA),
+one per size band, and one across all series, each with and without the series identifier as a
+categorical column, and reports the number of models and the fit time. The winning grouping feeds
+the substation-fingerprint follow-up.
+
+**Resolution limit.** BSP and GSP have 2 series each, so the verdict rests on the 16 Primary series.
