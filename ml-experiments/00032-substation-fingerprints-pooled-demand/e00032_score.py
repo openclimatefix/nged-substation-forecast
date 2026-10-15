@@ -1,17 +1,18 @@
-"""Build experiment 00024's stacked arms from the pooled fits, score them, and write the tables.
+"""Build experiment 00032's stacked arms from the fits, score them, and write the tables.
 
-Each fit arm (`e00032_fit.py`) gets 00019's stack on its quantiles: a 14-day error correction (the
-mean of observed minus median forecast over the 14 days ending at the newest usable observation,
-00013's 3.5-hour delay, each past half-hour taking the forecast of the latest earlier validation
-run)
-and a spread factor of 1.15 about the corrected median. Scores are on the cases all arms hold, in
-points of capacity; intervals resample whole validation months and the three seeds. The nine planned
-contrasts are read at 99.44% over all leads; every other contrast is exploratory (95%).
+Each arm gets 00019's stack on its quantiles: a 14-day error correction (the mean of observed
+minus median forecast over the 14 days ending at the newest usable observation, 00013's 3.5-hour
+delay, each past half-hour taking the forecast of the latest earlier validation run) and a spread
+factor of 1.15 about the corrected median. Scores are on the cases all arms of a table hold, in
+points of capacity. The warm table holds the 7 arms on 20 series and three seeds; the cold-start
+table holds the 4 cold-start arms, the warm arms with and without the identifier, and the two
+stored baselines on the 8 held-out series and seed 0. The eight planned contrasts are read at
+99.375% over all leads; every other contrast is exploratory (95%).
 
 Output under `work/results/`: `absolute.parquet`, `per_series.parquet`, `contrasts.parquet`,
-`corrections.parquet`, and the prediction sets under `data/ml-experiments/00024-.../predictions/`.
+`corrections.parquet`, and the prediction sets under `data/ml-experiments/00032-.../predictions/`.
 
-    uv run python ml-experiments/00024-pooling-groupings-demand-xgboost/e00032_score.py
+    uv run python ml-experiments/00032-substation-fingerprints-pooled-demand/e00032_score.py
 """
 
 from datetime import UTC, datetime
@@ -25,6 +26,7 @@ import polars as pl
 from studies import bootstrap, experiment_store
 
 ARMS_DIR: Final[Path] = common.WORK_DIR / "arms"
+ARMS_DIR_00024: Final[Path] = common.ARMS_DIR_00024
 RESULTS_DIR: Final[Path] = common.WORK_DIR / "results"
 HOLDOUT: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time"]
@@ -35,9 +37,12 @@ NEWEST_AGE: Final[int] = int(common.TELEMETRY_DELAY / common.STEP) + 1
 """Half-hours between the origin and the newest usable observation (00013's 3.5 hours)."""
 WINDOW: Final[int] = common.CORRECTION_DAYS * common.STEPS_PER_DAY
 MIN_COUNT: Final[int] = common.MIN_CORRECTION_DAYS * common.STEPS_PER_DAY
-FIT_ARMS: Final[tuple[str, ...]] = tuple(common.ARMS)
+WARM: Final[tuple[str, ...]] = tuple(common.WARM_ARMS)
+COLD: Final[tuple[str, ...]] = tuple(common.COLD_ARMS)
+FIT_ARMS: Final[tuple[str, ...]] = (*WARM, *COLD)
+COLD_SEEDS: Final[tuple[int, ...]] = (0,)
 STACK_SUFFIX: Final[str] = "_stack"
-PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 9.0)
+PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 8.0)
 N_RESAMPLES: Final[int] = 20_000
 DEFAULT_RESAMPLES: Final[int] = 2_000
 SCOPES: Final[tuple[str, ...]] = ("all leads", "up to 48 h", "3 d or more")
@@ -50,27 +55,39 @@ GROUPS: Final[dict[str, tuple[str, ...]]] = {
     "BSP and GSP (4)": BSP_GSP,
     "Primary-MW (8)": ("Primary-MW",),
     "Primary-MVA (8)": ("Primary-MVA",),
-    "BSP (2)": ("BSP",),
-    "GSP (2)": ("GSP",),
+    "Held-out (8)": PRIMARY,
 }
 PLANNED: Final[dict[str, tuple[str, str, str]]] = {
-    "C1 (primary): by type with ID minus per series": ("type_id", "own", "Primary (16)"),
-    "C2: all with ID minus per series": ("all_id", "own", "Primary (16)"),
-    "C3: size bands with ID minus per series": ("size_id", "own", "Primary (16)"),
-    "C4: by type with ID minus all with ID": ("type_id", "all_id", "All (20)"),
-    "C5: by type without ID minus per series": ("type_noid", "own", "Primary (16)"),
-    "C6: all without ID minus per series": ("all_noid", "own", "Primary (16)"),
-    "C7: by type without ID minus by type with ID": ("type_noid", "type_id", "Primary (16)"),
-    "C8: all without ID minus all with ID": ("all_noid", "all_id", "All (20)"),
-    "C9: by type with ID minus random groups with ID": ("type_id", "random_id", "All (20)"),
+    "C1: ID and static minus ID": ("id_static", "type_id", "Primary (16)"),
+    "C2: ID and training-window minus ID": ("id_train", "type_id", "Primary (16)"),
+    "C3: ID and recent-window minus ID": ("id_recent", "type_id", "Primary (16)"),
+    "C4: ID, training-window, and recent-window minus ID": (
+        "id_train_recent",
+        "type_id",
+        "Primary (16)",
+    ),
+    "C5: training-window without ID minus ID": ("train_noid", "type_id", "Primary (16)"),
+    "C6: training-window without ID minus no fingerprint, no ID": (
+        "train_noid",
+        "type_noid",
+        "Primary (16)",
+    ),
+    "C7: held-out, training-window minus none": ("cold_train", "cold_none", "Held-out (8)"),
+    "C8: held-out, training and recent minus none": (
+        "cold_train_recent",
+        "cold_none",
+        "Held-out (8)",
+    ),
 }
 EXPLORATORY_PAIRS: Final[dict[str, tuple[str, str]]] = {
-    "by type with ID minus per series": ("type_id", "own"),
-    "all with ID minus per series": ("all_id", "own"),
-    "size bands with ID minus per series": ("size_id", "own"),
-    "random groups with ID minus per series": ("random_id", "own"),
-    "by type without ID minus per series": ("type_noid", "own"),
-    "all without ID minus per series": ("all_noid", "own"),
+    "held-out, static minus none (K1)": ("cold_static", "cold_none"),
+    "held-out, none minus ID (cost of being new: the ID model saw the series)": (
+        "cold_none",
+        "type_id",
+    ),
+    "held-out, training and recent minus ID": ("cold_train_recent", "type_id"),
+    "no ID minus ID": ("type_noid", "type_id"),
+    "ID and recent minus ID and training": ("id_recent", "id_train"),
 }
 
 
@@ -172,11 +189,11 @@ def stack(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def load_fit(*, name: str) -> pl.DataFrame:
-    """Return a fit's three seeds, keyed by series, run, valid time, and seed."""
-    paths = sorted(ARMS_DIR.glob(f"{name}_seed*.parquet"))
-    if [p.name for p in paths] != [f"{name}_seed{s}.parquet" for s in common.SEEDS]:
-        msg = f"fit {name} does not hold exactly seeds {common.SEEDS}"
+def load_fit(*, name: str, seeds: tuple[int, ...], directory: Path = ARMS_DIR) -> pl.DataFrame:
+    """Return a fit's seeds, keyed by series, run, valid time, and seed."""
+    paths = sorted(directory.glob(f"{name}_seed*.parquet"))
+    if [p.name for p in paths] != [f"{name}_seed{s}.parquet" for s in seeds]:
+        msg = f"fit {name} does not hold exactly seeds {seeds}"
         raise ValueError(msg)
     return pl.concat([pl.read_parquet(p) for p in paths]).sort(*KEYS, "seed")
 
@@ -296,27 +313,14 @@ def contrast(
     }
 
 
-def main() -> None:
-    """Build and score every arm and write the tables."""
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    series = common.series_table()
-    cases = _actual_table(series=series)
-    fits = {name: load_fit(name=name) for name in FIT_ARMS}
-    corrected, tables = {}, []
-    for name, fit in fits.items():
-        corrected[name], table = with_corrections(base=fit, series=series)
-        tables.append(table.with_columns(fit=pl.lit(name)))
-    pl.concat(tables).write_parquet(RESULTS_DIR / "corrections.parquet")
-    raw: dict[str, pl.DataFrame] = dict(fits)
-    for name in FIT_ARMS:
-        raw[f"{name}{STACK_SUFFIX}"] = stack(frame=corrected[name])
-    for name in STORED_ARMS:
-        stored = pl.read_parquet(common.ARMS_DIR_00013 / f"{name}.parquet").select(
-            *KEYS, *common.LEVEL_COLUMNS
-        )
-        raw[name] = pl.concat(
-            [stored.with_columns(seed=pl.lit(seed).cast(pl.Int8)) for seed in common.SEEDS]
-        )
+def score_table(
+    *,
+    raw: dict[str, pl.DataFrame],
+    cases: pl.DataFrame,
+    planned: dict[str, tuple[str, str, str]],
+    exploratory: dict[str, tuple[str, str, str]],
+) -> tuple[list[dict], list[dict], list[dict], dict[str, int]]:
+    """Score one table of arms and return its absolute, per-series, and contrast rows."""
     full = {
         name: frame.select(*KEYS, "seed", *common.LEVEL_COLUMNS).join(
             cases, on=KEYS, how="inner", validate="m:1"
@@ -328,24 +332,15 @@ def main() -> None:
     if len(set(rows.values())) != 1:
         msg = f"arms hold different numbers of shared cases per seed: {rows}"
         raise ValueError(msg)
-    for name in (*FIT_ARMS, *(f"{n}{STACK_SUFFIX}" for n in FIT_ARMS)):
-        try:
-            experiment_store.write_predictions(
-                experiment_id=common.EXPERIMENT_ID,
-                name=name,
-                frame=raw[name]
-                .select(*KEYS, "seed", *common.LEVEL_COLUMNS)
-                .filter(pl.col("valid_time") < HOLDOUT),
-                kind="quantiles",
-                row_set_id=common.ROW_SET_ID,
-            )
-        except FileExistsError:
-            continue
     absolute, per_series = [], []
     for name, frame in arms.items():
         for scope in SCOPES:
             for group in GROUPS:
+                if group == "Held-out (8)" and "cold_none" not in arms:
+                    continue
                 part = _scope(frame=frame, scope=scope, group=group)
+                if part.is_empty():
+                    continue
                 losses = experiment_store.losses_for_bootstrap(arm_losses={name: part})
                 for metric in ("quantile_score", "median_error"):
                     interval = bootstrap.bootstrap_absolute(losses=losses, arm=name, metric=metric)
@@ -370,39 +365,10 @@ def main() -> None:
                 losses=losses, arm=name, metric="quantile_score"
             )
             per_series.append({"arm": name, "site": site, "group": part["group"][0], **interval})
-    pl.DataFrame(absolute, strict=False).write_parquet(RESULTS_DIR / "absolute.parquet")
-    pl.DataFrame(per_series, strict=False).write_parquet(RESULTS_DIR / "per_series.parquet")
-    suffixed = {
-        label: (f"{t}{STACK_SUFFIX}", f"{r}{STACK_SUFFIX}", g)
-        for label, (t, r, g) in PLANNED.items()
-    }
-    exploratory = {
-        f"{label}, {group}": (f"{t}{STACK_SUFFIX}", f"{r}{STACK_SUFFIX}", group)
-        for label, (t, r) in EXPLORATORY_PAIRS.items()
-        for group in GROUPS
-    }
-    exploratory.update(
-        {
-            f"raw {label}, {group}": (t, r, group)
-            for label, (t, r) in EXPLORATORY_PAIRS.items()
-            for group in ("Primary (16)", "All (20)")
-        }
-    )
-    exploratory.update(
-        {
-            f"{arm} stack minus manual_heuristic, {group}": (
-                f"{arm}{STACK_SUFFIX}",
-                "manual_heuristic",
-                group,
-            )
-            for arm in FIT_ARMS
-            for group in ("Primary (16)", "All (20)")
-        }
-    )
     contrasts = [
         {
             "label": label,
-            "planned": label in suffixed,
+            "planned": label in planned,
             **contrast(
                 arms=arms,
                 treatment=treatment,
@@ -410,20 +376,162 @@ def main() -> None:
                 group=group,
                 scope=scope,
                 metric=metric,
-                level=PLANNED_LEVEL if label in suffixed and scope == "all leads" else 95.0,
-                decisive=label in suffixed and scope == "all leads",
+                level=PLANNED_LEVEL if label in planned and scope == "all leads" else 95.0,
+                decisive=label in planned and scope == "all leads",
             ),
             "group": group,
         }
-        for label, (treatment, reference, group) in {**suffixed, **exploratory}.items()
+        for label, (treatment, reference, group) in {**planned, **exploratory}.items()
         for scope in SCOPES
         for metric in ("quantile_score", "median_error")
     ]
-    pl.DataFrame(contrasts).write_parquet(RESULTS_DIR / "contrasts.parquet")
+    return absolute, per_series, contrasts, rows
+
+
+def main() -> None:
+    """Build and score every arm and write the tables."""
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    series = common.series_table()
+    cases = _actual_table(series=series)
+    held_ids = series.filter(pl.col("site").is_in(common.HELD_OUT))["time_series_id"].to_list()
+    fits = {
+        name: load_fit(
+            name=name,
+            seeds=common.SEEDS,
+            directory=ARMS_DIR_00024 if name in ("type_id", "type_noid") else ARMS_DIR,
+        )
+        for name in WARM
+    }
+    fits |= {name: load_fit(name=name, seeds=COLD_SEEDS) for name in COLD}
+    reference_keys = fits["type_id"].select(KEYS).unique().sort(KEYS)
+    for name in WARM:
+        if not fits[name].select(KEYS).unique().sort(KEYS).equals(reference_keys):
+            msg = f"arm {name} does not hold the same series, runs, and valid times as type_id"
+            raise ValueError(msg)
+    corrected, tables = {}, []
+    for name, fit in fits.items():
+        corrected[name], table = with_corrections(base=fit, series=series)
+        tables.append(table.with_columns(fit=pl.lit(name)))
+    pl.concat(tables).write_parquet(RESULTS_DIR / "corrections.parquet")
+    raw: dict[str, pl.DataFrame] = dict(fits)
+    for name in FIT_ARMS:
+        raw[f"{name}{STACK_SUFFIX}"] = stack(frame=corrected[name])
+    for name in STORED_ARMS:
+        stored = pl.read_parquet(common.ARMS_DIR_00013 / f"{name}.parquet").select(
+            *KEYS, *common.LEVEL_COLUMNS
+        )
+        raw[name] = pl.concat(
+            [stored.with_columns(seed=pl.lit(seed).cast(pl.Int8)) for seed in common.SEEDS]
+        )
+    for name in (*common.NEW_WARM_ARMS, *COLD):
+        for variant in (name, f"{name}{STACK_SUFFIX}"):
+            try:
+                experiment_store.write_predictions(
+                    experiment_id=common.EXPERIMENT_ID,
+                    name=variant,
+                    frame=raw[variant]
+                    .select(*KEYS, "seed", *common.LEVEL_COLUMNS)
+                    .filter(pl.col("valid_time") < HOLDOUT),
+                    kind="quantiles",
+                    row_set_id=common.ROW_SET_ID,
+                )
+            except FileExistsError:
+                continue
+            except ValueError as error:
+                print(f"predictions of {variant} not stored: {error}")
+    warm_names = [*WARM, *(f"{n}{STACK_SUFFIX}" for n in WARM), *STORED_ARMS]
+    cold_names = [
+        *COLD,
+        *(f"{n}{STACK_SUFFIX}" for n in COLD),
+        "type_id",
+        "type_noid",
+        "type_id_stack",
+        "type_noid_stack",
+        *STORED_ARMS,
+    ]
+    warm_planned = {k: v for k, v in PLANNED.items() if v[2] != "Held-out (8)"}
+    cold_planned = {k: v for k, v in PLANNED.items() if v[2] == "Held-out (8)"}
+    suffix = lambda d: {  # noqa: E731
+        k: (f"{t}{STACK_SUFFIX}", f"{r}{STACK_SUFFIX}", g) for k, (t, r, g) in d.items()
+    }
+    warm_exploratory = {
+        f"{label}, {group}": (f"{t}{STACK_SUFFIX}", f"{r}{STACK_SUFFIX}", group)
+        for label, (t, r) in EXPLORATORY_PAIRS.items()
+        if not label.startswith("held-out")
+        for group in ("Primary (16)", "All (20)", "BSP and GSP (4)")
+    }
+    warm_exploratory |= {
+        f"raw {label}, {group}": (t, r, group)
+        for label, (t, r) in {
+            "C1": ("id_static", "type_id"),
+            "C2": ("id_train", "type_id"),
+            "C3": ("id_recent", "type_id"),
+            "C4": ("id_train_recent", "type_id"),
+            "C5": ("train_noid", "type_id"),
+        }.items()
+        for group in ("Primary (16)",)
+    }
+    warm_exploratory |= {
+        f"{arm} stack minus manual_heuristic, {group}": (
+            f"{arm}{STACK_SUFFIX}",
+            "manual_heuristic",
+            group,
+        )
+        for arm in WARM
+        for group in ("Primary (16)",)
+    }
+    cold_exploratory = {
+        f"{label}": (f"{t}{STACK_SUFFIX}", f"{r}{STACK_SUFFIX}", "Held-out (8)")
+        for label, (t, r) in EXPLORATORY_PAIRS.items()
+        if label.startswith("held-out")
+    }
+    cold_exploratory |= {
+        f"raw {label}": (t, r, "Held-out (8)")
+        for label, (t, r) in {
+            "C7": ("cold_train", "cold_none"),
+            "C8": ("cold_train_recent", "cold_none"),
+        }.items()
+    }
+    warm_out = score_table(
+        raw={n: raw[n] for n in warm_names},
+        cases=cases,
+        planned=suffix(warm_planned),
+        exploratory=warm_exploratory,
+    )
+    held_cases = cases.filter(pl.col("time_series_id").is_in(held_ids))
+    cold_raw = {
+        n: raw[n].filter(pl.col("time_series_id").is_in(held_ids) & (pl.col("seed") == 0))
+        for n in cold_names
+    }
+    cold_out = score_table(
+        raw=cold_raw,
+        cases=held_cases,
+        planned=suffix(cold_planned),
+        exploratory=cold_exploratory,
+    )
+    warm_absolute, warm_per_series, warm_contrasts, warm_rows = warm_out
+    cold_absolute, cold_per_series, cold_contrasts, cold_rows = cold_out
+    for file, warm_part, cold_part in (
+        ("absolute", warm_absolute, cold_absolute),
+        ("per_series", warm_per_series, cold_per_series),
+        ("contrasts", warm_contrasts, cold_contrasts),
+    ):
+        pl.DataFrame(
+            [
+                *({**r, "table": "warm"} for r in warm_part),
+                *({**r, "table": "cold"} for r in cold_part),
+            ],
+            strict=False,
+            infer_schema_length=None,
+        ).write_parquet(RESULTS_DIR / f"{file}.parquet")
     runs = tables[0].filter(pl.col("seed") == 0)
-    print("rows per seed:", rows[next(iter(rows))])
     print(
-        "runs with no correction (seed 0, all series):",
+        "rows per seed (warm, cold):",
+        next(iter(warm_rows.values())),
+        next(iter(cold_rows.values())),
+    )
+    print(
+        "runs with no correction (seed 0, first fit):",
         int((runs["history_count"] < MIN_COUNT).sum()),
         "of",
         runs.height,

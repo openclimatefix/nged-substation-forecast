@@ -96,10 +96,10 @@ lets A0 and A1 reuse 00024's stored predictions (same code, same seeds).
 
 - **Static (S):** latitude and longitude.
 - **Training window (T):** over valid times 2024-04-01 to 2025-06-30, the mean, standard deviation,
-  5th and 95th percentiles, the mean over 10:00 to 16:00 UTC minus the mean over 00:00 to 05:00 UTC,
-  the weekend mean minus the weekday mean, and the half-hour of the daily peak of the mean daily
-  profile. Seven columns, fixed at 2025-06-30 for the whole validation year, so their staleness is
-  part of the test.
+  5th and 95th percentiles, the mean over the period-ending stamps 10:00 to 15:30 UTC minus the mean
+  over the stamps 00:00 to 04:30 UTC, the weekend mean minus the weekday mean, and the half-hour of
+  the daily peak of the mean daily profile. Seven columns, fixed at 2025-06-30 for the whole
+  validation year, so their staleness is part of the test.
 - **Recent window (R):** over the 14 days ending at the forecast origin minus 2 days, the mean,
   the standard deviation, and the daytime-minus-night mean (as in T). Three columns, recomputed
   for every forecast origin in training and in validation; missing when fewer than 3 days hold
@@ -117,13 +117,13 @@ lets A0 and A1 reuse 00024's stored predictions (same code, same seeds).
 | A5 | identifier, T, and R |
 | A6 | T, no identifier |
 
-**Cold start (seed 0).** Eight Primary series are held out in turn, 4 from the Primary-MW pool and
-4 from the Primary-MVA pool (every second series by site number: sites 5, 10, 14, and 16, and sites 2, 4, 12, and 21). For each held-out series
-the by-type pool is refitted without it and forecasts it with no identifier. The held-out series'
-fingerprint comes from its own training-window and recent-window rows, which models a new substation
-with 4 weeks of telemetry: the held-out series' T uses only the 28 days ending 2025-06-30, and the
-pool never sees its target. The pool's other series keep the full-window T. Cold-start arms: K0 (no
-fingerprint), K1 (S), K2 (T), K3 (T and R).
+**Cold start (seed 0).** Eight Primary series are held out in turn, 4 from the Primary-MW pool and 4
+from the Primary-MVA pool (Primary-MW sites 5, 10, 14, and 16; Primary-MVA sites 2, 4, 12, and 21).
+For each held-out series the by-type pool is refitted without it and forecasts it with no
+identifier. The held-out series' fingerprint comes from its own training-window and recent-window
+rows, which models a new substation with 4 weeks of telemetry: the held-out series' T uses only the
+28 days ending 2025-06-30, and the pool never sees its target. The pool's other series keep the
+full-window T. Cold-start arms: K0 (no fingerprint), K1 (S), K2 (T), K3 (T and R).
 
 **Cost.** Fit seconds are recorded per model; the work is capped near 2 hours of GPU time.
 

@@ -647,3 +647,27 @@ def fingerprint_matrix(
     if "R" in kinds:
         parts.append(recent)
     return np.hstack(parts).astype(np.float32) if parts else np.empty((cases, 0), np.float32)
+
+
+def group_labels(*, series: pl.DataFrame, grouping: str) -> dict[str, str]:
+    """Return the by-type model group of each site: BSP, GSP, Primary-MW, or Primary-MVA.
+
+    Args:
+        series: `series_table()`.
+        grouping: Must be `"type"`.
+
+    Returns:
+        Each site label's group name; sites with the same name share one model.
+
+    Raises:
+        ValueError: If the grouping is not `"type"`.
+    """
+    if grouping != "type":
+        msg = f"unknown grouping {grouping!r}"
+        raise ValueError(msg)
+    return {
+        row["site"]: row["substation_type"]
+        if row["substation_type"] != "Primary"
+        else f"Primary-{row['units']}"
+        for row in series.iter_rows(named=True)
+    }
