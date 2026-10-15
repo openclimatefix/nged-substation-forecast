@@ -50,6 +50,7 @@ the maintainer to confirm.
 | [00021](00021-error-correction-variants-bsp-gsp-demand/result.md) | Does the recent-error correction help BSP and GSP demand, and which variant works best? | Inconclusive for BSP and GSP; the 14-day additive form is the best variant | Not for production | 2026-10-15 |
 | [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
 | [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
+| [00027](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -552,3 +553,22 @@ its own mean error over the previous 14 days (row set `fold_a_tuesdays_v1`).
   [PR #1229 (Experiment 23: does recent observed power help solar and wind forecasts?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1229).
 
 ![Contrasts](00023-lagged-power-and-error-correction-solar-wind/figure_1.svg)
+
+### 00027: PV_Live at the lag times for GSP demand
+
+**PV_Live at the lag times did not help the stage 2 calibrator for the two grid supply points
+(GSPs), Walpole and Bicker Fen.** The experiment gave the calibrator PV_Live's estimate of the GSP's
+solar generation at the lag times, as a level, as a share of PV_Live's capacity, and added to the
+lagged delta (row set `fold_a_every5d_v1`).
+
+- **Headline result:** the quantile score of the arm with PV_Live minus the arm without, over all
+  leads: delta plus PV_Live -0.03 (98.33% interval -0.13 to +0.09), PV_Live level -0.08 (-0.26 to
+  +0.08), PV_Live share -0.06 (-0.22 to +0.09). The arm without PV_Live scores 19.04.
+- **Finding for later experiments:** PV_Live at the valid time lowered stage 1a's point error at
+  Bicker Fen by 1.28 points (-1.90 to -0.67) and not at Walpole (-0.03, -0.27 to +0.23), so a PV_Live
+  forecast as a stage 1 input is the open question (exploratory; the valid-time value is not known
+  at the forecast origin).
+- **Write-up and pull request:** [result](00027-pvlive-lags-in-stage2-gsp-demand/result.md),
+  [PR #1234 (Experiment 27: does PV_Live at the lag times help the stage 2 forecast of GSP demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1234).
+
+![Contrasts](00027-pvlive-lags-in-stage2-gsp-demand/figure_1.svg)
