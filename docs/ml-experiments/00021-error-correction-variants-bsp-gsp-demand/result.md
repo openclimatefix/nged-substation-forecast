@@ -52,6 +52,9 @@ code: ml-experiments/00021-error-correction-variants-bsp-gsp-demand/
 - **Callers:** the scripts copy 00019's `corrections_for` and scoring, which the author could name
   without searching.
 
+**Selection.** C4 to C8 test five variants at threshold 0, so replacing A14 by the best qualifying
+variant carries a selection effect that only the Bonferroni correction covers.
+
 Size: medium. No model is fitted, because every arm post-processes the stored predictions of N1
 from experiment 00013, which covers all 20 series. One Sonnet review of the plan, one of the code
 (leakage and the delay), and one of the write-up.
@@ -72,11 +75,11 @@ days of paired history gets no correction.
 - **A14:** add the mean error over a 14-day window to every quantile (00019's correction, with the
   delay changed from 3.5 hours to 2 days).
 - **A7, A28:** the same with a 7-day and a 28-day window.
-- **M14:** multiply every quantile by the ratio of the window's mean observed power to its mean
+- **M14 (Primary substations only, where power stays positive):** multiply every quantile by the ratio of the window's mean observed power to its mean
   forecast median, clipped to 0.5 to 2.0; no correction when the mean median is under 0.01 of
   capacity.
-- **H14:** add, to each valid time, the mean error of the window's half-hours with the same UTC
-  half-hour of day; a cell with fewer than 3 pairs gets the window's overall mean error.
+- **H14:** add, to each valid time, the mean error of the window's half-hours with the same
+  Europe/London half-hour of day; a cell with fewer than 3 pairs gets the window's overall mean error.
 - **R14:** the 14-day mean error with weights `0.5 ** (age_days / 3.5)`, age counted back from the
   window's end, so the newest days weigh most.
 - **A14-fast:** A14 with 00019's 3.5-hour delay, to measure what the 2-day delay costs
@@ -84,8 +87,13 @@ days of paired history gets no correction.
 - **References:** N1, `manual_heuristic`, `climatology`, all uncorrected. A stored arm has no seed,
   so it is repeated once per seed.
 
-**Delay.** A run at origin `T` uses only power observed up to `T - 2 days`, as the brief for this
-experiment requires. This is stricter than 00013's lags, which use power 3.5 hours old.
+**Delay.** A run at origin `T` uses only power stamped at or before `T` minus 2 days and a
+half-hour (97 half-hours), so the correction needs power that is 2 days old. The run's code asserts
+this bound. The delay is much longer than the 3.5 hours of 00013's lags.
+
+**Lead mismatch.** Each past half-hour's error is measured against the forecast of the run with the
+latest origin at or before that half-hour, so the correction measures errors at leads of 0 to 5
+days, and applies the result at leads up to 15 days. A bias that grows with lead is under-corrected.
 
 **Bias** is the mean signed error of the median, reported by arm and by group (Primary, BSP, GSP),
 beside the quantile score and the mean absolute error of the median.
