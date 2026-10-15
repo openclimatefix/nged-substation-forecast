@@ -177,4 +177,3 @@ the maintainer's approval of the cost. The issue also ties autonomous use of the
 scorer-protection work in issue 958. Every experiment since 00003 scores the same year on the same
 16 series, so choices tuned there overfit it, and an earlier fold is the remedy. For demand, a
 longer training history has hurt so far, so the backfill is valuable first as validation data.
-
