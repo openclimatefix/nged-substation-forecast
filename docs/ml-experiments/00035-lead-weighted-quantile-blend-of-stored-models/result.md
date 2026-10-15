@@ -5,7 +5,7 @@ status: planned
 size: medium
 hypothesis: >-
   For Primary substation demand, solar farms, and wind farms, averaging the quantiles of two or
-  three forecast models that experiments 19, 20, 30, and 33 already scored, with one weight per
+  three forecast models that experiments 19, 20, 30, and 33 already scored (N1 is the ENS-trained single-stage XGBoost model, and the stack is N1 with the 14-day correction and a spread factor of 1.15), with one weight per
   lead band chosen only on earlier months, lowers the quantile score below the best single member
   by more than the threshold set for each technology (0.05 points of capacity for Primary demand
   and solar, 0.10 for wind).
@@ -24,12 +24,17 @@ decision_rule: >-
   when the stop rule fires (below), "port" when the interval is wholly below zero and the estimate
   is at or below minus the threshold, "small gain" when the interval is wholly below zero and the
   estimate is above minus the threshold, "harm" when the interval is wholly above zero, and "null"
-  otherwise. The stop rule: a cell is one scored month and one lead band, and it is a corner cell
+  otherwise. The stop rule is evaluated first, and when it fires the outcome is "no combination" whatever the
+  interval shows. A cell is one scored month and one lead band, and it is a corner cell
   when the chosen weights put all the weight on one member; the stop rule fires when at least
-  10/12 (83.3%) of a technology's 60 cells are corner cells. The verdict is `supported` when at
+  10/12 (83.3%) of a technology's 60 cells are corner cells, the denominator being 60 for every
+  technology and July 2025's five cells counting as no corner cell. The verdict is `supported` when at
   least one technology is "port", `small gain` when none is but one is "small gain", `refuted` when
-  every technology is "no combination" or "harm", and `inconclusive` otherwise. Thresholds are
-  the effort of serving a second model per technology. BSP and GSP, the equal-weights and
+  every technology is "no combination" or "harm", and `inconclusive` otherwise. Thresholds
+  are 0.05 points for Primary demand and solar, where the prediction is 0.03 to 0.10 and a gain
+  under 0.05 does not justify serving a second XGBoost model, and 0.10 for wind, where N1's
+  short-lead gain makes a larger effect likely and the blend adds a second model with a different
+  training source. BSP and GSP, the equal-weights and
   single-global-weight arms, and the correction-placement contrast decide nothing.
 benchmark: >-
   The best single member of each technology on the same rows; also the equal-weights blend and the
@@ -73,7 +78,8 @@ own weight), and one Sonnet write-up review.
 
 ## Members and rows
 
-**Members are stored predictions from experiments 19, 20, 24, 30, and 33; no model is refitted.**
+**Members are stored predictions from experiments 19, 20, 30, and 33; no model is refitted.**
+The `a7_cs` member adds seven weekly-analogue power columns to N1 (experiment 30).
 All tables are read from experiment 33's work folder, where they sit beside the observed power on
 one set of keys.
 
@@ -84,8 +90,12 @@ one set of keys.
 | Wind (3 farms) | `fold_a_tuesdays_v1`, 53 runs, 3 seeds | N1 for generators; the ERA5-trained mixture with power-curve margin and spread factor (00020 `full`) |
 | BSP and GSP (4 series) | `fold_a_every5d_v1`, 3 seeds | `n1` and `a7`, both without correction |
 
-Primary demand uses seed 0 only because `monthly` has one seed, so its intervals resample months
-only. The rows scored are the cases that every member of a technology holds with finite quantiles
+Primary demand uses seed 0 only because `monthly` has one seed, so `a7_cs` and `n1_cs` are filtered
+to seed 0 and the intervals resample months only. For solar, wind, and BSP and GSP, seed s of each
+member is blended with seed s of the others, the weights are chosen on the pooled seeds, and the
+bootstrap resamples months and seeds.
+Stored quantiles and observations are fractions of effective capacity; every score is multiplied
+by 100 to give points of capacity, and the 14-day correction works in the same units. The rows scored are the cases that every member of a technology holds with finite quantiles
 and a finite observation, and the page states the count dropped. No valid time on or after
 2026-07-01 is scored.
 
@@ -95,7 +105,9 @@ and a finite observation, and the page states the count dropped. No valid time o
 quantiles.** Averaging quantiles per level keeps the blend's spread between the members' spreads,
 where averaging probabilities would widen it.
 
-- **Lead bands:** 0 to 24 h, 1 to 2 d, 2 to 6 d, 6 to 10 d, and 10 d or more, as in experiment 33.
+- **Lead bands:** left-closed intervals of the lead `valid_time - power_fcst_init_time` in hours,
+  [0, 24), [24, 48), [48, 144), [144, 240), and [240, infinity), computed for every table; the
+  stored `band` column is ignored.
 - **Weights:** one weight per member and lead band, on the grid 0, 0.25, 0.5, 0.75, 1 with weights
   summing to 1 (15 vectors for three members, 5 for two). The vector with the lowest mean quantile
   score on the selection cases is chosen; a tie goes to the vector nearest equal weights.
@@ -104,17 +116,22 @@ where averaging probabilities would widen it.
   observation used is known when month m begins. The scoring month is the run's initialisation
   month, as in `experiment_store.losses_for_bootstrap`. July 2025 has no history, so it uses equal
   weights, and it counts as no corner cell.
-- **Selection pools** all series of a technology; the page reports the chosen weights per month
-  and band.
+- **Selection pools** all series of a technology. The page reports the chosen weights and the
+  number of selection cases per month and band, since long-lead bands have few cases in early
+  months; a cell is not given equal weights for being thin, and the noise is accepted. Selection
+  and scoring alike exclude valid times on or after 2026-07-01.
 - **Simpler arms:** equal weights always; one global weight vector per technology chosen by the same
   rolling rule on all leads pooled. An in-sample arm (weights chosen on all 12 months, per band)
   is reported as an optimistic bound and decides nothing.
 - **Correction placement (Primary demand only):** arm D3 blends `monthly_cs`, `a7_cs`, and `n1_cs`
   (the correction applied inside each member, "before"), with weights chosen as above on D3's own
-  scores. Arm D2 applies D3's weight table to `monthly`, `a7`, and `n1` without correction,
-  then applies the 14-day correction, computed from the blend's own median history, and the 1.15
-  spread factor to the blend ("after"). The correction code is copied from experiment 19. The
-  headline arm D1 blends `monthly`, `a7_cs`, and `n1_cs`, as the proposal states.
+  scores (members carry the `_cs` suffix: correction and spread 1.15). Arm D2 applies D3's weight table to `monthly`, `a7`, and `n1` without correction,
+  then applies the 14-day correction and the 1.15 spread factor to the blend ("after"). The
+  correction uses only blend medians of earlier runs, each under its own rolling weights, over
+  half-hours observed before the run's origin. Because D3's weights were chosen on corrected
+  members, the contrast favours D3 and is descriptive. The correction code is copied from experiment 19. The
+  headline arm D1 blends `monthly` (no correction, no spread factor), `a7_cs`, and `n1_cs`,
+  because the proposal names those members; D1 is not the "before" arm of the contrast.
 
 ## Planned contrasts
 
@@ -122,7 +139,8 @@ where averaging probabilities would widen it.
 
 1. **Decisive (3, 98.33%):** C1, D1 minus the best single Primary member; C2, the solar blend minus
    the best single solar member; C3, the wind blend minus the best single wind member.
-2. **Exploratory, each family read at 5% divided by its size:** the equal-weights arm and the
+2. **Exploratory, each family read at 5% divided by its size (families: member contrasts, 6;
+   blend-versus-simpler-arm contrasts, 6; correction placement, 1; per lead band, 15):** the equal-weights arm and the
    global-weight arm minus the best single member (technology by technology); the rolling blend
    minus the equal-weights arm and minus the global-weight arm; D2 minus D3 (correction placement);
    and per lead band, the rolling blend minus the best single member of that band.
@@ -146,6 +164,9 @@ W3); no page names a generator or gives its identifier.
 
 ## Advice followed and departed from
 
-The plan follows 00020 (the generator best guesses) and 00019 and 00021 (the 14-day correction does
-not help BSP and GSP, so those members carry none). It departs from none. Experiment 33's interim
+The plan follows the earlier advice to state the spread factor's purpose (it lowers coverage error,
+not the CRPS, in 00020) and to report per-series spread by anonymised label, and 00019 and 00021
+(the 14-day correction does not help BSP and GSP, so those members carry none). It departs from the
+skill's Opus plan and code reviews: the maintainer asked for Sonnet reviewers on this experiment to
+save credits. Experiment 33's interim
 result, that the correction hurts monthly-retrained N1, motivates the placement contrast.
