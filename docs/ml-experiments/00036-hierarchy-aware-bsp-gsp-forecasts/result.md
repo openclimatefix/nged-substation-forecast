@@ -12,21 +12,24 @@ prediction: >-
   metered generators beneath (B1) lowers the quantile score over all leads by 0.5 to 1.5 points of
   capacity, and a regression of the BSP on the same forecasts (B2) lands within 0.5 of B1. At each
   GSP, the ERA5-trained N1 applied to the 51 ENS members (B3) lowers the score by 0.5 to 1.5, with
-  the gain largest beyond day 2, and regional wind and solar forecasts as columns (B4) lower it by
-  0.2 to 0.8. The oracle that gives B1 the observed values of the series beneath (O) scores below B1
-  at both BSPs.
+  the gain largest beyond day 2, and regional wind and solar forecasts as columns (B4) lower the GSP
+  score by 0.2 to 0.8. The oracle that gives B1 the observed values of the series beneath the BSP
+  (O) scores below B1 at both BSPs.
 decision_rule: >-
   Six confirmatory contrasts, each on the quantile score over all leads of one series, read at
   99.17% (Bonferroni across six): B1 minus B0 at Boston and at Skegness, B3 minus B0 at Walpole and
-  at Bicker Fen, and B4 minus B0 at Walpole and at Bicker Fen. Months and seeds are resampled. A
-  family of two contrasts (BSP B1, GSP B3, GSP B4) is supported when both intervals lie wholly below
-  zero and both estimates are at most -0.5, because a gain below 0.5 does not justify porting a
-  model that reads other models' forecasts; it is refuted when both lower bounds exceed -0.5; it is
-  a small gain when both intervals lie wholly below zero but an estimate exceeds -0.5; it is mixed
-  when only one series passes; otherwise it is inconclusive. The experiment is supported when all
-  three families are supported, partly supported when one or two are, refuted when all three are
-  refuted, and inconclusive otherwise. Stop rule, fixed before any fit: if O minus B0 is above -0.5
-  at both BSPs, B1 and B2 are not fitted and the BSP family is refuted. Every other contrast is
+  at Bicker Fen, and B4 minus B0 at Walpole and at Bicker Fen. Months and seeds are resampled. There
+  are three families of two contrasts each (BSP B1, GSP B3, GSP B4). Each family takes the first
+  verdict that applies, in this order. Supported: both intervals lie wholly below zero and both
+  point estimates are at most -0.5, because a gain below 0.5 does not justify porting a BSP XGBoost
+  model that reads other models' forecasts. Small gain: both intervals lie wholly below zero.
+  Refuted: both lower bounds exceed -0.5. Mixed: exactly one series has an interval wholly below
+  zero. Inconclusive: none of these. Small gain and mixed count as not supported. The experiment is
+  supported when all three families are supported, partly supported when one or two are, refuted
+  when all three are refuted, and inconclusive otherwise. Stop rule, fixed before any fit of B1 or
+  B2: if the point estimate of O minus B0 is above -0.5 at both BSPs, and the share of filled
+  children in O is below 20% at both, B1 and B2 are not fitted and the BSP family is refuted. If a
+  fill share is 20% or more, the stop rule does not apply and B1 is fitted. Every other contrast is
   exploratory. The four series cannot speak for other BSPs or GSPs.
 benchmark: >-
   B0, N1 refitted by this experiment's code on the same rows, checked against experiment 13's
@@ -77,9 +80,9 @@ generator to a BSP and a GSP. The series are:
 
 The 16 Primary substations of the earlier demand experiments are exactly the Primaries beneath these
 two BSPs. Solar farm C does not appear in the hierarchy file and is left out. Four series beneath
-Boston have no forecast (a biofuel generator, a battery, a landfill-gas solar site, and one other
-generator), so their flows stay in the residual. Every generator beneath Skegness has a forecast. Generator
-names and identifiers never appear on the published page.
+Boston have no forecast (a biofuel generator, a battery, a solar site, and a generator of another
+type), so their flows stay in the residual. Every generator beneath Skegness has a forecast.
+Generator names and identifiers never appear on the published page.
 
 ## Arms
 
@@ -92,32 +95,36 @@ BSP or a GSP, because experiment 21 found it unproven there.
 
 - **B0:** N1 refitted by this experiment's code. The fit is checked against experiment 13's stored
   `n1`, and the check is printed.
-- **B1, bottom-up columns:** B0 plus two columns in MW at the valid time. The first is the sum over
-  the Primary substations beneath of the pooled median of experiment 13's `n1` (no correction, no
-  spread factor). The second is the sum over the metered generators beneath of the pooled median of
-  experiment 20's best-guess recipe (ERA5-trained, with the power-curve margin for wind). The
-  spread factor leaves the median unchanged, so it is not applied. At a GSP, B1 holds the
-  generator column only, as the proposal for this experiment specifies. A BSP variant **B1g** has
-  the generator column alone and is exploratory.
+- **B1, bottom-up columns:** B0 plus two columns in MW at the valid time. The Primary column is the
+  sum over the Primary substations beneath of the median of experiment 13's N1 (no correction, no
+  spread factor). The generator column is the sum over the metered generators beneath of the median
+  of experiment 20's best-guess recipe (ERA5-trained, with the power-curve margin for wind). The
+  spread factor leaves a median unchanged, so it is not applied. Each ENS member's row of the BSP or
+  GSP XGBoost model receives the medians of the same member's child forecasts, so the pooled
+  forecast keeps N1's member-by-member structure. At a GSP, B1 holds the generator column only, as
+  the proposal for this experiment specifies.
 - **B2, bottom-up sum (BSPs only):** a least-squares regression of the observed BSP power on an
-  intercept and the median forecast of each child, fitted on the training rows. The quantiles are
-  the regression's median plus the empirical residual quantiles of the training rows, taken per lead
-  band. Nothing else enters B2.
+  intercept and the median forecast of each child, fitted on the training rows. The regression is
+  applied to each member's child medians, and the member forecasts are pooled as in B0. Each
+  member's quantiles are its regression value plus the empirical residual quantiles of the training
+  rows, taken per lead band. Nothing else enters B2.
 - **B3, perfect prognosis:** N1 trained on ERA5 at the valid times of the same training rows (same
-  window, half-life, lags, and `lead_hours`), applied to each of the 51 ENS members and pooled. Its
-  ceiling twin **B3c** feeds the same model ERA5 at the valid time instead of ENS (one input per
-  case, so the forecast is the model's nine quantiles). All four series.
+  window, half-life, lags, and `lead_hours`), applied to each of the 51 ENS members and pooled. All
+  four series.
 - **B4, regional proxies (GSPs only):** B0 plus two columns computed from the GSP's own ENS cell.
-  The first is a generic wind power curve (0 below 3 m/s, a cubic ramp to 1 at 12 m/s, 1 to 25 m/s,
-  0 above) applied to the ENS 100 m wind speed of each member. The second is experiment 28's
-  PV_Live solar share (an ERA5-trained XGBoost model of PV_Live's share of its own capacity, applied
-  to the ENS members and averaged), with the additive offset between the control-member forecast
-  and PV_Live removed, fitted per GSP and lead band on training-period daylight rows. Experiment 28
-  found the member mean 1.8 to 3.0 points of PV_Live capacity too high. Attribution: Sheffield
-  Solar PV_Live, CC BY 4.0.
+  The wind column is a generic wind power curve (0 below 3 m/s, a cubic ramp to 1 at 12 m/s, 1 to 25
+  m/s, 0 above) applied to the ENS 100 m wind speed of each member. The solar column is experiment
+  28's PV_Live solar share (an ERA5-trained XGBoost model of PV_Live's share of its own capacity),
+  computed for each member's own weather. Training rows use experiment 28's five forward-chain
+  models, whose quarters match the five blocks below and which never saw the quarter they score,
+  applied to the control member of every daily run. Validation rows use the final model. The bias
+  correction the proposal named is dropped: with the training column and the validation column both
+  computed per member, a constant offset only shifts tree splits. Experiment 28 found the member
+  mean 1.8 to 3.0 points of PV_Live capacity too high, and the page reports this as a limit.
+  Attribution: Sheffield Solar PV_Live, CC BY 4.0.
 - **O, oracle (BSPs only):** B1 with the observed values of the children at the valid time, and the
-  child's forecast median where the observation is missing. The page reports the share of filled
-  children per BSP.
+  same member's child forecast median where the observation is missing (in training rows, the cross-
+  fitted column). The page prints the share of filled children per BSP before the stop rule is read.
 
 A month-by-half-hour climatology row (`ClimatologyForecaster`) is scored for reference, repeated
 once per seed.
@@ -138,17 +145,22 @@ The experiment cross-fits the training columns in time instead:
 - **Generators.** Each generator's ERA5-trained model of experiment 20 is refitted five times per
   seed with the block left out, and applied to the control-member ENS rows of the block. The
   validation columns use the full models (training to 2025-06-17), pooled over the 51 members.
-- **Validation columns** for Primaries are read from experiment 13's stored `n1`. The validation
-  columns for generators need ENS rows at the generator cells for the 73 runs, which are not stored
-  (the pilot stored Tuesday runs only), so this experiment extracts them from the ENS archive with
-  the same upsampling that `demand_build_ens.py` uses, and checks the refitted models against
-  experiment 20's stored predictions on the runs the two row sets share.
+- **Validation columns** for Primaries come from a sixth, full-window N1 fit per Primary and seed,
+  applied member by member (experiment 13's stored `n1` holds pooled quantiles only, so it serves as
+  a check). The validation columns for generators need ENS rows at the generator cells for the 73
+  runs, which are not stored (the pilot stored Tuesday runs only). This experiment extracts them
+  from the ENS archive with the same upsampling that `demand_build_ens.py` uses, and checks the
+  refitted models against experiment 20's stored predictions on the runs the two row sets share.
+  The generator full models train to 2025-06-17 and N1 to 2025-06-30, a difference inherited from
+  experiments 20 and 13.
 - **Same child sets everywhere.** B2's coefficients, B1's columns, and the oracle all use the same
   children.
 
-**A training column is a control-member median and a validation column is a 51-member pooled
-median.** Their errors differ, because pooling lowers the error of the median. This mismatch is
-shared by B1, B2, and the oracle, and the page reports it as a limit.
+**Training columns come from the control member and validation columns from each member.** The
+BSP or GSP XGBoost model trains on one child forecast per row (the control member's) and receives
+one per ENS member at validation, so it sees the same kind of column in both. The ensemble spread of
+the children is therefore part of what the model receives at validation and not in training, and
+the page reports it as a limit.
 
 ## Scoring
 
@@ -169,7 +181,7 @@ B2 minus B1, O minus B0, and the lead-band contrasts are exploratory.
 - **Degradation rule:** not touched. A missing child forecast would need a degradation rule at
   porting time, and that rule is outside this experiment.
 - **Defensible designs:** more than one (the child columns, the cross-fitting scheme, the regression
-  in B2, the filling rule of the oracle). Each is fixed above.
+  in B2, and the filling rule of the oracle). Each is fixed above.
 - **Callers:** the scripts copy experiment 13's N1 fit, experiment 20's generator fit, experiment
   28's PV_Live loader and solar model, and experiment 33's ENS extraction. The author could name
   each without searching.
@@ -188,8 +200,8 @@ Sonnet runs the code and writes up, and Sonnet reviews the write-up.
 
 ## Past weather
 
-B3c, the ceiling twin, feeds ERA5 at the valid time, and ERA5 arrives about 5 days late, so no
-serving system could run it. B3, B1, B2, B4, and every child forecast use ENS weather only. The lag
+B3, B1, B2, B4, and every child forecast use ENS weather only, so all are deployable as far as
+weather goes (ERA5 arrives about 5 days late and is used only at training times). The lag
 features use observed power from the forecast origin, as in experiment 13. B4's PV_Live model trains
 on ERA5 weather and PV_Live's revised values, both of which exist at training time.
 
