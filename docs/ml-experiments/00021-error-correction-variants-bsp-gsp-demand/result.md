@@ -106,7 +106,8 @@ forecast is too low).
 ## Findings
 
 - **A bias correction cannot help where N1 has no bias.** N1's two BSP series have a mean error of
-  +0.01 points, so the correction only adds noise to those series (E2, +0.16, -0.09 to +0.39). The two GSP
+  +0.01 points, so the correction only adds noise to those series
+  (E2, +0.16, -0.09 to +0.39). The two GSP
   series are biased low by 5.2 points, the correction removes 3.2 of that, and the quantile score
   still rises (E3, +0.56, -0.29 to +1.45). The 4 series leave intervals too wide to separate the two
   types.
@@ -117,7 +118,8 @@ forecast is too low).
 - **A 7-day window is worse (C4, +0.19, +0.11 to +0.28) and a 28-day window is level or slightly
   better (C5, -0.07, -0.15 to +0.01).** No window qualifies to replace 14 days under the decision
   rule. A longer window is worth testing with monthly retraining in place.
-- **The multiplicative form is much worse (C6, +2.28, +0.50 to +5.46).** Its mean error of the median is
+- **The multiplicative form is much worse (C6, +2.28, +0.50 to +5.46).**
+  Its mean error of the median is
   -3.4 points against -0.5 for the additive form.
 - **A per-half-hour shift (C7, +0.02, -0.04 to +0.06) and recency weights (C8, +0.04, -0.00 to +0.09)
   change nothing.**
