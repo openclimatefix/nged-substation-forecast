@@ -14,6 +14,7 @@ the prediction sets under `data/ml-experiments/00030-.../predictions/`.
     uv run python ml-experiments/00030-lagged-power-feature-sets-primary-demand/e00030_score.py
 """
 
+import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -35,8 +36,8 @@ NEWEST_AGE: Final[int] = int(common.TELEMETRY_DELAY / common.STEP) + 1
 """Half-hours between the origin and the newest usable observation (00013's 3.5 hours)."""
 WINDOW: Final[int] = common.CORRECTION_DAYS * common.STEPS_PER_DAY
 MIN_COUNT: Final[int] = common.MIN_CORRECTION_DAYS * common.STEPS_PER_DAY
-FIT_ARMS: Final[tuple[str, ...]] = ("a0", "a1", "a2", "a3", "a4", "a5", "a6")
-"""A0 is 00013's N1; A6, the exploratory residual-lag arm, is skipped when it was not fitted."""
+FIT_ARMS: Final[tuple[str, ...]] = ("a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7")
+"""A0 is 00013's N1; A6, the residual-lag arm, was not run; A7 is post hoc."""
 STACK: Final[str] = "stack"
 PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 8.0)
 N_RESAMPLES: Final[int] = 20_000
@@ -64,6 +65,12 @@ EXPLORATORY: Final[dict[str, tuple[str, str]]] = {
     "E9: A6 minus A2": ("a6", "a2"),
     "E10: A6 with the correction minus A2 with the correction": ("a6_c", "a2_c"),
     "E11: A0 minus climatology": ("a0", "climatology"),
+    "E12: A3 with the correction minus A0 with the correction": ("a3_c", "a0_c"),
+    "E13: A3 with the correction minus the 00019 stack": ("a3_c", STACK),
+    "E14 (post hoc): A7 minus A0": ("a7", "a0"),
+    "E15 (post hoc): A7 with the correction minus A0 with the correction": ("a7_c", "a0_c"),
+    "E16 (post hoc): A7 with the correction minus the 00019 stack": ("a7_c", STACK),
+    "E17 (post hoc): A7 minus A1": ("a7", "a1"),
 }
 
 
@@ -167,17 +174,21 @@ def stack(*, frame: pl.DataFrame, correct: bool, spread: bool) -> pl.DataFrame:
     )
 
 
-def load_fit(*, name: str) -> pl.DataFrame:
+def load_fit(*, name: str, seeds: tuple[int, ...]) -> pl.DataFrame:
     """Return a fit's three seeds, keyed by series, run, valid time, and seed."""
     folder, stem = {
         "a0": (common.ARMS_DIR_00013, "n1"),
         "n1h": (common.ARMS_DIR_00019, "n1h"),
     }.get(name, (ARMS_DIR, name))
     paths = sorted(folder.glob(f"{stem}_seed*.parquet"))
-    if [p.name for p in paths] != [f"{stem}_seed{s}.parquet" for s in common.SEEDS]:
-        msg = f"fit {name} does not hold exactly seeds {common.SEEDS}"
+    if [p.name for p in paths if int(p.stem[-1]) in seeds] != [
+        f"{stem}_seed{s}.parquet" for s in seeds
+    ]:
+        msg = f"fit {name} does not hold exactly seeds {seeds}"
         raise ValueError(msg)
-    return pl.concat([pl.read_parquet(p) for p in paths]).sort(*KEYS, "seed")
+    return pl.concat([pl.read_parquet(p) for p in paths if int(p.stem[-1]) in seeds]).sort(
+        *KEYS, "seed"
+    )
 
 
 def pinball(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndarray:
@@ -290,18 +301,29 @@ def contrast(
     }
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seeds", type=int, nargs="+", default=list(common.SEEDS))
+    parser.add_argument("--arms", nargs="+", default=list(FIT_ARMS))
+    parser.add_argument("--tag", default="results")
+    return parser.parse_args()
+
+
 def main() -> None:
-    """Build and score every arm and write the tables."""
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    """Build and score the requested arms and seeds and write the tables."""
+    args = _parse_args()
+    seeds = tuple(args.seeds)
+    results_dir = RESULTS_DIR.with_name(args.tag)
+    results_dir.mkdir(parents=True, exist_ok=True)
     series = common.series_table()
     cases = _actual_table(series=series)
-    names = [n for n in FIT_ARMS if n != "a6" or (ARMS_DIR / "a6_seed0.parquet").exists()]
-    fits = {name: load_fit(name=name) for name in (*names, "n1h")}
+    names = [n for n in FIT_ARMS if n in args.arms]
+    fits = {name: load_fit(name=name, seeds=seeds) for name in (*names, "n1h")}
     corrected, tables = {}, []
     for name, fit in fits.items():
         corrected[name], table = with_corrections(base=fit, series=series)
         tables.append(table.with_columns(fit=pl.lit(name)))
-    pl.concat(tables).write_parquet(RESULTS_DIR / "corrections.parquet")
+    pl.concat(tables).write_parquet(results_dir / "corrections.parquet")
     raw: dict[str, pl.DataFrame] = {}
     for name in names:
         raw[name] = fits[name]
@@ -312,7 +334,7 @@ def main() -> None:
             *KEYS, *common.LEVEL_COLUMNS
         )
         raw[name] = pl.concat(
-            [stored.with_columns(seed=pl.lit(seed).cast(pl.Int8)) for seed in common.SEEDS]
+            [stored.with_columns(seed=pl.lit(seed).cast(pl.Int8)) for seed in seeds]
         )
     full = {
         name: frame.select(*KEYS, "seed", *common.LEVEL_COLUMNS).join(
@@ -326,7 +348,7 @@ def main() -> None:
         msg = f"arms hold different numbers of shared cases per seed: {rows}"
         raise ValueError(msg)
     for name in (*names, *(f"{n}_c" for n in names), STACK):
-        if name == "a0":
+        if name == "a0" or len(seeds) != len(common.SEEDS):
             continue
         try:
             experiment_store.write_predictions(
@@ -358,7 +380,7 @@ def main() -> None:
                     "bias": float(part["signed_error"].to_numpy().mean()),
                 }
             )
-    pl.DataFrame(absolute, strict=False).write_parquet(RESULTS_DIR / "absolute.parquet")
+    pl.DataFrame(absolute, strict=False).write_parquet(results_dir / "absolute.parquet")
     contrasts = [
         {
             "label": label,
@@ -379,7 +401,7 @@ def main() -> None:
         for metric in ("quantile_score", "median_error")
     ]
     result = pl.DataFrame(contrasts)
-    result.write_parquet(RESULTS_DIR / "contrasts.parquet")
+    result.write_parquet(results_dir / "contrasts.parquet")
     runs = tables[0].filter(pl.col("seed") == 0)
     print("rows per seed:", rows[next(iter(rows))])
     print(

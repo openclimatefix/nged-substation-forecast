@@ -1,7 +1,7 @@
 ---
 id: "00030"
 slug: lagged-power-feature-sets-primary-demand
-status: planned
+status: done
 size: simple
 hypothesis: >-
   For the 16 Primary substation demand series, giving the single-stage ENS-trained quantile model N1
@@ -35,14 +35,101 @@ benchmark: >-
 row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity
-production_status: not-for-production
+verdict: inconclusive
+best_arm: >-
+  A7 (post hoc: N1 plus the mean and median of the 6 weekly analogues) with the 14-day correction,
+  5.29 points of capacity; without the correction A1 (N1 plus the 6 weekly analogues), 6.03
+headline: >-
+  C3, all 13 lags minus N1 (seed 0 only): -0.01 points of capacity on the quantile score (99.375%
+  interval -0.45 to +0.43). C1, the 6 weekly analogues minus N1 (3 seeds): -0.30 (-0.63 to -0.02).
+  C2, the 7 annual analogues on top of the weekly ones (seed 0): +0.29 (+0.13 to +0.49), a loss.
+lessons: >-
+  The 6 weekly analogues lower N1's quantile score by 0.30 points, but the 14-day error correction
+  removes the gain: with it, N1 scores 5.34 and A1 5.43. The 7 annual analogues raise the score by
+  0.29 points. The mean and median of the weekly analogues, added post hoc, lower the score by 0.05
+  points with the correction (-0.08 to -0.02) and score 0.03 below the 00019 stack (-0.06 to +0.00).
+advice:
+  - >-
+    Do not add the 49 to 55 week analogues as separate columns to an N1-style model trained on 15
+    months, because they raised the quantile score by 0.29 points (C2).
+  - >-
+    Add the weekly analogues, or their mean and median, to N1 only together with the 14-day error
+    correction, and judge them against N1 with the correction, because the correction removes the
+    0.30-point gain of the raw weekly columns (C1, E2).
+  - >-
+    Compare any new lag set against N1 with the correction (5.34) and the 00019 stack (5.32), not
+    against N1 alone (6.33), because the correction alone closes most of the gap (E7).
+  - >-
+    Test a mean and a median of the weekly analogues on a second validation year before porting
+    them, because the 0.05-point gain is post hoc and its interval against the 00019 stack touches
+    zero (E15, E16).
+production_status: candidate
 adopted_in: none
 code: ml-experiments/00030-lagged-power-feature-sets-primary-demand/
 ---
 
 # Which lagged power columns lower the error of Primary substation demand forecasts?
 
-**Status: planned.** This page is the plan, committed before any code runs.
+**Verdict: inconclusive.** Giving N1 all 13 lags of `manual_heuristic` as separate columns does not
+lower its quantile score: C3 is -0.01 points of capacity (99.375% interval -0.45 to +0.43). The 6
+weekly analogues alone lower the score by 0.30 (C1, -0.63 to -0.02), the 7 annual analogues raise it
+by 0.29 (C2), and the 14-day error correction then removes the weekly gain. A post hoc arm, N1 plus
+the mean and median of the weekly analogues, scores 0.05 below N1 with the correction (-0.08 to
+-0.02), the lowest score of any arm. A point is 1% of the series' effective capacity.
+
+![Quantile score of each arm, without and with the correction](figure_1.svg)
+
+## What the arms score
+
+Every arm is scored on the same cases of the 16 Primary substations, on the 73 runs of
+`fold_a_every5d_v1`. Intervals resample whole months and seeds.
+
+| Arm | Quantile score | With 14-day correction | Median error | With correction |
+|---|---|---|---|---|
+| A0: N1, 3 lags | 6.33 | 5.34 | 8.45 | 7.34 |
+| A1: plus 6 weekly lags | 6.03 | 5.43 | 8.14 | 7.44 |
+| A3: 3 summaries of the 13 lags | 6.48 | 5.31 | 8.64 | 7.27 |
+| A7 (post hoc): weekly mean and median | 6.22 | 5.29 | 8.30 | 7.27 |
+| 00019 stack | | 5.32 | | 7.35 |
+| `manual_heuristic` | 5.89 | | 8.23 | |
+| `climatology` | 7.46 | | 10.33 | |
+
+A2 (all 13 lags), A4 (recent values), and A5 (same-day-type analogues) were fitted for seed 0 only,
+and score 6.32, 6.30, and 6.25 without the correction and 5.53, 5.54, and 5.48 with it, against 6.33
+and 5.34 for A0.
+
+![Contrasts against N1](figure_2.svg)
+
+## Contrasts
+
+The planned contrasts are read at 99.375%. Only C1 has 3 seeds; C2 to C8 use seed 0 only, so their
+intervals resample months and not seeds.
+
+- **C1, A1 minus A0:** -0.30 (-0.63 to -0.02). Gain without the correction; with it, A1 scores 0.09
+  above A0 (E2, +0.01 to +0.18).
+- **C2, A2 minus A1:** +0.29 (+0.13 to +0.49). The annual analogues lose.
+- **C3, A2 minus A0 (primary):** -0.01 (-0.45 to +0.43). Not a gain.
+- **C4, A3 minus A2:** +0.17 (-0.11 to +0.46). Summaries do no better than columns.
+- **C5, A4 minus A2:** -0.01 (-0.05 to +0.03). Recent values add nothing.
+- **C6, A5 minus A2:** -0.06 (-0.10 to -0.03). A gain, but small.
+- **C7, A2 minus `manual_heuristic`:** +0.43 (-0.00 to +0.93).
+- **C8, A2 minus A0, both with the correction:** +0.19 (+0.09 to +0.30). The annual and weekly
+  columns hurt once the correction is applied.
+
+Exploratory: A3 with the correction scores 0.03 below A0 with it (E12, -0.08 to +0.02); A7 with it
+scores 0.05 below (E15, -0.08 to -0.02) and 0.03 below the 00019 stack (E16, -0.06 to +0.00).
+
+## Cuts, post hoc, and limits
+
+- **Cut for time:** A2, A4, and A5 have seed 0 only; A6, the residual lag, was not run. The gain
+  threshold for A6 therefore stays untested.
+- **Post hoc:** A7 was added after seeing that the annual columns hurt. Its contrasts (E14 to E17)
+  are not pre-registered.
+- **Untested explanation:** the 7 annual columns are highly correlated and N1 trains on only 15
+  months, so the model may fit the year-ago level; no arm tested this.
+- **One validation year and 16 series:** every interval resamples the months of that one year.
+
+## Plan, written before any code ran
 
 ## Plan: sizing
 
@@ -64,8 +151,10 @@ forecast origin (00013); report the interval over validation months (00013). It 
 
 Each arm is N1 (00013: the 00006 columns, the lead in hours, recency half-life 2 years, 500 rounds,
 the 9-level quantile loss, trained on the ENS control member from 2024-04-01 to 2025-06-30)
-with a different lag block. `colsample_bytree` and `colsample_bynode` are 1.0 in every arm, so a wider
-arm has no subsampling advantage. Every lag is read from the observed power of the same series on the
+with a different lag block. `colsample_bytree` and `colsample_bynode` are 1.0 in every arm, so a
+wider
+arm has no subsampling advantage. Every lag is read from the observed power of the same series on
+the
 dense half-hourly grid and is null (NaN) when its grid index is later than the newest usable
 observation, 3.5 hours before the forecast origin (00021's and 00013's telemetry delay). No lag
 column looks past that index, in training or in validation.

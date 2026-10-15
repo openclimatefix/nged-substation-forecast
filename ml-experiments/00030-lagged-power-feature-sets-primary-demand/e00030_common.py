@@ -127,9 +127,9 @@ QUANTILE_PARAMETERS: Final[dict[str, object]] = {
     **XGBOOST_PARAMETERS,
     "objective": "reg:quantileerror",
     "quantile_alpha": LEVELS,
-    "nthread": 6,
+    "nthread": 4,
 }
-"""N1's parameters: 00003's, with the 9-level quantile loss and slot E's 6 cores."""
+"""N1's parameters: 00003's, with the 9-level quantile loss and 4 cores a worker."""
 RECENCY_HALF_LIFE_DAYS: Final[float] = 2 * 365.25
 SHORT_HALF_LIFE_DAYS: Final[float] = 0.5 * 365.25
 """N1H's half-life, from experiment 00017."""
@@ -496,8 +496,9 @@ ARM_LAG_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
     "a3": (*LAG_COLUMNS, *SUMMARY_COLUMNS),
     "a4": (*LAG_COLUMNS, *WEEKLY_COLUMNS, *ANNUAL_COLUMNS, *RECENT_COLUMNS),
     "a5": (*LAG_COLUMNS, *WEEKLY_COLUMNS, *ANNUAL_COLUMNS, *DAY_TYPE_COLUMNS),
+    "a7": (*LAG_COLUMNS, "weekly_mean", "weekly_median"),
 }
-"""Each arm's lag columns, in matrix order; A0 is 00013's stored N1 fit."""
+"""Each arm's lag columns, in matrix order; A0 is 00013's stored N1 fit, A7 is post hoc."""
 
 
 def day_type_grid() -> np.ndarray:
