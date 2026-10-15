@@ -173,6 +173,7 @@ nav:
       - "Do substation fingerprints improve a pooled demand model?": ml-experiments/00032-substation-fingerprints-pooled-demand/result.md
       - "Does the best-guess architecture beat production, N1, and manual_heuristic?": ml-experiments/00033-best-guess-architecture-vs-production/result.md
       - "Do logged switching closures show up in the telemetry, and does a neighbour-balance detector beat a plain one?": ml-experiments/00037-switching-first-look/result.md
+      - "Is detecting a switching event worth anything to the forecast?": ml-experiments/00038-switching-mask-value/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
