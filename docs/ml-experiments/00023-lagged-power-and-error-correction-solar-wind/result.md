@@ -116,10 +116,10 @@ half-hour it spans, as in experiment 00019.
 **Calibrators.** One multi-quantile XGBoost model (9 levels, depth 4, 300 rounds, the settings of
 experiment 00005) per technology, seed, and arm, trained on the ENS control member's rows with
 out-of-fold stage 1a quantiles from 2024-07 to 2025-06 (the calibration table of experiment 00002),
-with the observed power over effective capacity as the target. It takes the member's 9 stage 1a
-quantiles, the lead in hours, and the recent-power columns of its arm. The calibrator has no
-calendar column. The calibrator is applied to each of the 51 members, and the calibrated quantiles are pooled into a mixture as in
-experiment 00020.
+with the observed power over effective capacity as the target. The calibrator takes the member's 9
+stage 1a quantiles, the lead in hours, and the recent-power columns of its arm. The calibrator has no
+calendar column. The calibrator is applied to each of the 51 members, and the calibrated quantiles
+are pooled into a mixture as in experiment 00020.
 
 **Recent-power columns.** Lagged power is the newest usable value, the value at the valid time's
 half-hour on the latest earlier usable day, and the same on the latest earlier usable week
