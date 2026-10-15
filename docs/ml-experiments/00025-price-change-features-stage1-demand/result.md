@@ -11,20 +11,21 @@ hypothesis: >-
   price moves, not only to its level.
 prediction: >-
   For Primary substations, PRICE_CHANGE lowers the mean absolute error of the median against
-  PRICE_LEVEL by 0.15 to 0.4 points of capacity, the gain is largest from 16:00 to 20:00 local and on
-  the days with the largest absolute half-hourly price change, and PRICE_CHANGE does no worse than
-  NATIONAL. BSP and GSP substations show a smaller gain, if any.
+  PRICE_LEVEL by 0.15 to 0.4 points of capacity. Exploratory, with no pass or fail rule: the gain is
+  largest from 16:00 to 20:00 local and on the days with the largest absolute half-hourly price
+  change, and PRICE_CHANGE does no worse than NATIONAL.
 decision_rule: >-
   Verdict contrasts, Primary substations only: C1 (PRICE_CHANGE - PRICE_LEVEL) and C2 (PRICE_CHANGE
   - SHUFFLED_CHANGE). Supported if both have a point estimate of at most -0.1 points and a 97.5%
   month-resampled interval (95% familywise, Bonferroni across two) that excludes zero in the
   selection year, and in the confirmation year, scored once, both intervals also exclude zero with
-  the same sign. Small gain if the intervals exclude zero in both years but a point estimate is
-  above -0.1. Refuted if the C1 interval lies wholly above -0.1 in both years. Otherwise
-  inconclusive. The threshold of 0.1 points (about 1% of the Primary error) is set by the cost of a
-  live Market Index Data feed in the pipeline that uses this model; the model needs the price at the
-  target half-hour, so it cannot run as a forecast. C3 to C7 and the BSP and GSP results are
-  descriptive.
+  the same sign, both at 97.5%. Small gain if both intervals lie wholly below zero in both years but
+  a point estimate is above -0.1. Refuted if the C1 interval lies wholly above -0.1 in both years. Otherwise
+  inconclusive. The threshold of 0.1 points is about 1% of the Primary error and is a judgement: the
+  model would need a live Market Index Data feed, which adds a data source to the pipeline that uses
+  it. Experiment 00015's selection-year C2 interval was about 0.2 points wide, so a true gain of 0.15
+  points or more should separate from zero, and a gain under 0.1 should not. C3 to C7 and the BSP and
+  GSP results are descriptive.
 benchmark: >-
   Arm BASE (experiment 00006's Primary input set, recency half-life 0.5 years), arm PRICE_LEVEL (the
   experiment 00015 arm), the other-week controls, and a month-by-half-hour climatology row.
@@ -68,21 +69,25 @@ steps and are not part of stage 1, so they are left out.
 | PRICE_LEVEL | `price_now`: Market Index Data (`APXMIDP`) at the target half-hour |
 | PRICE_CHANGE | `price_now`, and `d1`, `d2`, `d4`, `d12`: price(t) minus price(t-k half-hours) |
 | PRICE_SHAPE | `price_now`, price minus its trailing 24-hour mean, rank within the trailing 24 hours, half-hours since the last spike (price above the trailing-24-hour mean plus 2 standard deviations, capped at 48), and the 6-hour range |
-| SHUFFLED_CHANGE | PRICE_CHANGE's five columns read at another week's same weekday and half-hour |
-| SHUFFLED_SHAPE | PRICE_SHAPE's five columns read at another week's same weekday and half-hour |
-| NATIONAL | GB demand and wind at t, their `d1`, and demand's `d4` (6 columns) |
+| SHUFFLED_CHANGE | the real `price_now`, and `d1`, `d2`, `d4`, `d12` read at another week's same weekday and half-hour |
+| SHUFFLED_SHAPE | the real `price_now`, and PRICE_SHAPE's other four columns read at another week's same weekday and half-hour |
+| NATIONAL | GB demand and wind at t, their `d1`, and demand's `d4` (5 columns) |
 | SYSTEM (descriptive) | `price_now`, the system price, the net imbalance volume, and the one-half-hour changes of both |
 | CLIMATOLOGY | not a fit: month-by-half-hour median of the fold's training window |
 
 **Rolling columns use only the past.** The rolling mean, standard deviation, rank, and range are
-trailing windows that end at t. The report checks that no column changes when the future rows are
-removed from the price series.
+trailing windows that end at t. `check_no_lookahead` in `e00025_inputs.py` removes the future rows of
+the series and fails if any added column changes. The report prints the share of rows with each
+added column missing, for every arm, because the real and shuffled columns have different gaps and
+XGBoost can learn from a gap. No row is dropped for a missing column. The join uses the half-hour's
+start, `valid_time` minus 30 minutes, and the script asserts that `valid_time` is the period end.
 
-**A shuffled arm takes the real derived columns from the shifted time.** The shift is 1 to 4 weeks
-either way, drawn per week with a fixed seed, so the arm keeps the week's price level and the
-calendar structure and loses the match to the target half-hour. A training row whose shifted time
-would fall after the training end shifts backwards instead, so no price from the purge or validation
-weeks enters training.
+**A shuffled arm keeps the real price level and takes the changes from another week.** The shift is
+1 to 4 weeks either way, drawn per week and per seed, so the arm keeps the week's price level and
+the calendar structure and loses the match between the changes and the target half-hour. Keeping
+the real `price_now` makes C2 isolate the change columns. A training row whose shifted time would
+fall after the training end shifts backwards instead, so no price from the purge or validation
+weeks enters training; a row with no source on either side gets missing values.
 
 **Prices.** Market Index Data is the experiment 10 pull, 2019 to 2026, with a zero volume treated as
 missing. The system price (single price since 2015) and the net imbalance volume come from Elexon
@@ -91,7 +96,8 @@ and joined to the 2025-09 to 2026-09 pull already on disk. Market Index Data is 
 intra-day price: it is an index of short-term trading, published after the period, and it is not
 the tick-by-tick intraday price in which an interconnector trip shows. The tick price is paid for
 and is not used. Weather is ERA5, which arrives about 5 days late, so no arm can run at forecast
-time. The system price is a second, free signal of fault stress.
+time. The system price is a second, free signal of fault stress. A SYSTEM gain is not causal, because the
+system price partly reflects the demand that the substations carry.
 
 ## Planned contrasts
 
@@ -108,7 +114,8 @@ separately and never pooled.
 - **C6:** SYSTEM - PRICE_LEVEL.
 - **C7:** C1 by 4-hour block of local time, in the 16:00 to 20:00 peak, and on the days with the top
   5% absolute half-hourly price change.
-- **BSP and GSP:** C1 to C6 for each type, labelled provisional because each type has two series.
+- **BSP and GSP:** C1 to C6 for each of the 4 series separately, with no type-level interval,
+  because each type has two series. The page makes no claim comparing these types with Primary.
 
 ## Sizing
 
