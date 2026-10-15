@@ -60,6 +60,7 @@ the maintainer to confirm.
 | [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
 | [00024](00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost demand model without losing skill against one model per series? | Supported: 3 or 4 pooled models cost 0.15 points; one model for all series costs 0.29 | Candidate | 2026-10-15 |
 | [00031](00031-embedded-pv-features-primary-demand/result.md) | Do trailing estimates of embedded solar capacity, as tree columns, a linear offset, or a sunshine-shaped correction, lower the Primary demand quantile score? | Inconclusive | Not for production | 2026-10-15 |
+| [00032](00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints of each substation improve a by-type pooled demand model, and carry a substation held out of the pool? | Inconclusive: no fingerprint helped | Not for production | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -751,3 +752,24 @@ refitted 00019's model on 20 demand series (8 Primary substations that meter in 
   [PR #1230 (Experiment 24: which groupings of substations can share one XGBoost model (plan))](https://github.com/openclimatefix/nged-substation-forecast/pull/1230).
 
 ![The nine planned contrasts](00024-pooling-groupings-demand-xgboost/figure_1.svg)
+
+### 00032: fingerprints of each substation in a pooled demand model
+
+**Adding location, training-window statistics, or recent-window statistics to the by-type pooled
+model changed the Primary quantile score by at most 0.02 points, and the fingerprints made a
+substation held out of the pool worse.** The experiment added three fingerprint blocks to 00024's
+by-type pool with the series identifier, and refitted each pool without one of 8 Primary
+substations to forecast it as a new substation. The pre-registered verdict is inconclusive, because
+the lower limits of the four warm contrasts C1 to C4 are all below zero (-0.002 to -0.049).
+
+- **Headline result:** identifier and both fingerprints minus identifier alone, Primary quantile
+  score over all leads: +0.02 points (99.375% interval -0.05 to +0.10; absolute 5.49 against 5.47).
+  Held-out substation with training-window statistics minus no fingerprint: +1.39 (+0.99 to +1.91).
+- **Finding for later experiments:** training-window statistics replace the identifier for series
+  seen in training (+0.01 points, upper limit +0.02), but a pool of 7 other series learns them as 7
+  identifiers, so they do not carry a new substation. Post hoc, recent-window statistics alone
+  lowered the held-out score by 0.23 points (-0.29 to -0.16, 95%, one seed).
+- **Write-up and pull request:** [result](00032-substation-fingerprints-pooled-demand/result.md),
+  [PR #1241 (Experiment 32: do substation fingerprints improve a pooled demand model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1241).
+
+![The eight planned contrasts](00032-substation-fingerprints-pooled-demand/figure_1.svg)

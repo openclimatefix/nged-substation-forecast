@@ -169,6 +169,7 @@ nav:
       - "Does the change in the intra-day price help a stage 1 demand model explain power?": ml-experiments/00025-price-change-features-stage1-demand/result.md
       - "Does PV_Live at the lag times lower the stage 2 quantile score of GSP demand?": ml-experiments/00027-pvlive-lags-in-stage2-gsp-demand/result.md
       - "Which lagged power columns lower the error of Primary substation demand forecasts?": ml-experiments/00030-lagged-power-feature-sets-primary-demand/result.md
+      - "Do substation fingerprints improve a pooled demand model?": ml-experiments/00032-substation-fingerprints-pooled-demand/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
