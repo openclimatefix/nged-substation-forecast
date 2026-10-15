@@ -90,11 +90,11 @@ excluding zero is not a finding.
 
 ![All seven columns, by lead band](figure_2.svg)
 
-**The all-variable ERA5 arm helps only from 3 days ahead.** The gain by lead band is -0.075 at 3 to 6 days (95% interval
--0.112 to -0.039), -0.130 at 7 to 10 days (-0.192 to -0.070) and -0.147 at 11 to 15 days (-0.216 to
--0.078). It is +0.028 at 0 to 24 hours (+0.005 to +0.047) and +0.002 at 1 to 2 days (-0.036 to
-+0.038), so ERA5 is not better than ENS inside 2 days. The ENS arm scores 4.50 at 0 to 24 hours and
-5.75 at 11 to 15 days. The band intervals are not corrected for five bands.
+**The all-variable ERA5 arm helps only from 3 days ahead.** The gain by lead band is -0.075 at 3 to
+6 days (95% interval -0.112 to -0.039), -0.130 at 7 to 10 days (-0.192 to -0.070) and -0.147 at 11
+to 15 days (-0.216 to -0.078). It is +0.028 at 0 to 24 hours (+0.005 to +0.047) and +0.002 at 1 to 2
+days (-0.036 to +0.038), so ERA5 is not better than ENS inside 2 days. The ENS arm scores 4.50 at 0
+to 24 hours and 5.75 at 11 to 15 days. The band intervals are not corrected for five bands.
 
 ## Limits
 

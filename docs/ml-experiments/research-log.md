@@ -47,7 +47,9 @@ the maintainer to confirm.
 | [00018](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
 | [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies nearly all of it | Candidate | Not yet merged |
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Do the candidate changes for solar and wind (CAMS-trained stage 1a, a stage 0 quantile mapping, a power-curve base margin, a spread factor) add up to a lower CRPS than the pooled ERA5-trained mixture? | Partly supported: wind gains 0.071 points, solar does not | Candidate (wind) | Not yet merged |
+| [00021](00021-error-correction-variants-bsp-gsp-demand/result.md) | Does the recent-error correction help BSP and GSP demand, and which variant works best? | Inconclusive for BSP and GSP; the 14-day additive form is the best variant | Not for production | 2026-10-15 |
 | [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
+| [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -181,6 +183,28 @@ later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesda
 
 ![Planned contrasts](00012-solar-wind-stage1a-inputs-cams-and-training-start/figure_2.svg)
 
+### 00021: the error correction on BSP and GSP demand, and its variants
+
+**The 14-day error correction did not lower the BSP and GSP quantile score, and no variant beat the
+plain 14-day additive form.** The experiment post-processed N1's stored forecasts with power that is
+2 days old, on 73 forecast runs with ENS weather.
+
+- **Headline result:** the correction minus N1 on the 4 BSP and GSP series was +0.36 points of
+  capacity over all leads (99.375% interval -0.19 to +0.98). On the 16 Primary substations it was
+  -0.99 (-1.82 to -0.18), the same as with power 3.5 hours old.
+- **Absolute scores (all leads, BSP and GSP):** N1 13.66, corrected 14.02, `manual_heuristic` 14.70,
+  `climatology` 15.11.
+- **Variants (Primary, minus the 14-day additive form):** 7-day window +0.19, 28-day window -0.07
+  (-0.15 to +0.01), multiplicative +2.28, per-half-hour +0.02, recency-weighted +0.04.
+- **Finding for later experiments:** N1's BSP series have no bias (+0.01), so a bias correction has
+  nothing to remove there; the GSP series are biased low by 5.2 points, the correction removes 3.2,
+  and the score still does not improve.
+- **Write-up and pull request:** [result](00021-error-correction-variants-bsp-gsp-demand/result.md),
+  [PR #1228 (Experiment 21: which error correction works best, and does it help BSP and GSP
+  demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1228).
+
+![The eight planned contrasts](00021-error-correction-variants-bsp-gsp-demand/figure_1.svg)
+
 ### 00022: the weather ceiling for Primary demand
 
 **ERA5 weather in place of ENS weather at serving time lowered the Primary demand quantile score by
@@ -207,6 +231,10 @@ about 5 days late, so the arm is a ceiling and no serving system could use it.
 - **A 14-day error correction put N1 below `manual_heuristic` for Primary demand.** The correction
   lowered the quantile score by 0.99 points on N1, a model frozen at its training end, and the 0.5-year
   half-life added nothing to that frozen model (00019).
+- **Use the 14-day additive error correction for Primary demand, with power 2 days old, and do not
+  yet use it for BSP and GSP.** It scored the same with 2-day-old power as with 3.5-hour-old power,
+  a 7-day window and a ratio form were worse, and on 4 BSP and GSP series it did not lower the
+  quantile score (00021).
 - **A weather product as accurate as ERA5 would lower the Primary demand score by 1.9%.** ERA5 weather
   in place of ENS weather lowered the quantile score by 0.10 points, nearly all from shortwave
   radiation and none up to 2 days ahead (00022).
@@ -505,3 +533,22 @@ on 17 series (18 in the confirmation year), scored at observed values.
   model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1220).
 
 ![Pooled contrasts with 97.5% intervals](00015-same-time-price-stage1-demand/figure_1.svg)
+
+### 00023: recent observed power for solar and wind
+
+**Recent power did not help the stage 2 calibrator for solar or wind, and a 14-day correction built
+from the mean error made the forecast worse.** The experiment gave the calibrator lagged power and
+summaries of the latest day for 6 solar farms and 3 wind farms, and shifted the pooled mixture by
+its own mean error over the previous 14 days (row set `fold_a_tuesdays_v1`).
+
+- **Headline result:** lagged power added to the calibrator, solar -0.012 (99.58% interval -0.122 to
+  +0.088), wind +0.012 (-0.090 to +0.146). The 14-day correction on the mixture, solar +0.437
+  (+0.215 to +0.664), wind +0.413 (-0.003 to +0.924).
+- **Finding for later experiments:** a calibrator trained on the ENS control member alone scored 0.27
+  (solar) and 0.31 (wind) points worse than the pooled mixture before any lag was added. Shifting by
+  the median error (post hoc) instead of the mean error moved the CRPS by +0.010 (solar) and -0.064
+  (wind), both with intervals that include zero.
+- **Write-up and pull request:** [result](00023-lagged-power-and-error-correction-solar-wind/result.md),
+  [PR #1229 (Experiment 23: does recent observed power help solar and wind forecasts?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1229).
+
+![Contrasts](00023-lagged-power-and-error-correction-solar-wind/figure_1.svg)
