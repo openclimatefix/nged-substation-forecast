@@ -23,6 +23,7 @@ the maintainer to confirm.
 | [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Add a 14-day error correction and a spread factor of 1.15 to the single-stage ENS-trained quantile model N1 for Primary demand | The correction supplies nearly all of the gain (-0.99); it is tested on forecasts 5 days apart and on a model that is never retrained |
 | [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
+| [00030](00030-lagged-power-feature-sets-primary-demand/result.md) | Add the mean and median of the 6 weekly power analogues to N1 for Primary demand, with the 14-day correction | Post hoc arm; 0.05 points below N1 with the correction (-0.08 to -0.02), 0.03 below the 00019 stack with an interval touching zero; the annual analogues hurt |
 
 ## The experiments so far
 
@@ -52,6 +53,7 @@ the maintainer to confirm.
 | [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
 | [00026](00026-capacity-features-solar-wind/result.md) | Does a feature stating each solar or wind farm's recent effective capacity lower the CRPS of the pooled mixture? | Inconclusive: no detectable gain | Not for production | Not yet merged |
 | [00027](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
+| [00030](00030-lagged-power-feature-sets-primary-demand/result.md) | Which lagged power columns, up to all 13 lags of `manual_heuristic`, lower the quantile score of Primary demand in N1? | Inconclusive: the weekly analogues help alone and the annual ones hurt; with the correction the best arm gains 0.05 | Candidate (post hoc arm) | 2026-10-15 |
 | [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
 | [00029](00029-physics-stage1-solar-pytorch/result.md) | Does a differentiable PyTorch physics stage 1, fed into the XGBoost stage 2, beat the XGBoost stage 1 for the 6 solar farms? | Refuted: the physics stage 1 scores 0.079 points worse | Not for production | 2026-10-15 |
 | [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
@@ -669,6 +671,25 @@ lagged delta (row set `fold_a_every5d_v1`).
   [PR #1234 (Experiment 27: does PV_Live at the lag times help the stage 2 forecast of GSP demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1234).
 
 ![Contrasts](00027-pvlive-lags-in-stage2-gsp-demand/figure_1.svg)
+
+### 00030: lagged power columns for Primary demand
+
+**Adding all 13 lags of `manual_heuristic` to N1 did not lower its quantile score, because the 7
+annual analogues hurt and the 14-day correction removes the gain of the 6 weekly ones.** N1 is the
+single-stage model; arms added weekly analogues, annual analogues, summaries, recent values, and
+same-day-type analogues (row set `fold_a_every5d_v1`, 16 Primary substations).
+
+- **Headline result:** quantile score, in points of capacity. C3, all 13 lags minus N1, -0.01
+  (99.375% interval -0.45 to +0.43, seed 0). The weekly analogues alone, -0.30 (-0.63 to -0.02, 3
+  seeds); the annual analogues on top, +0.29 (+0.13 to +0.49). With the correction N1 scores 5.34,
+  and a post hoc arm with the weekly mean and median scores 5.29 (-0.05 against N1, -0.08 to -0.02).
+- **Finding for later experiments:** judge every lag set against N1 with the correction (5.34) and
+  the 00019 stack (5.32), not N1 alone (6.33).
+- **Cut for time:** 3 seeds for 4 arms only, and the residual-lag arm was not run.
+- **Write-up and pull request:** [result](00030-lagged-power-feature-sets-primary-demand/result.md),
+  [PR #1237 (Experiment 30: which lagged power columns lower the error of Primary substation demand forecasts)](https://github.com/openclimatefix/nged-substation-forecast/pull/1237).
+
+![Quantile score by arm](00030-lagged-power-feature-sets-primary-demand/figure_1.svg)
 
 ### 00028: a solar forecast for the GSPs in the stage 2 calibrator
 
