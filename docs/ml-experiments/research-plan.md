@@ -18,6 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with the price level, lower the stage 1 demand model's error for Primary, BSP, and GSP substations, beyond the price level and an other-week price? | 1 | Nothing | Planned, slot A |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 
 ## Deferred until the first results are in
