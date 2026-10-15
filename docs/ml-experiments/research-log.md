@@ -52,6 +52,7 @@ the maintainer to confirm.
 | [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
 | [00027](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
 | [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
+| [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -227,6 +228,29 @@ about 5 days late, so the arm is a ceiling and no serving system could use it.
   weather?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1227).
 
 ![Each ERA5 arm minus the ENS arm](00022-era5-weather-ceiling-primary-demand/figure_1.svg)
+
+### 00025: price-change features for stage 1 demand
+
+**Adding the change in the half-hourly price to the price level lowered the Primary demand error by
+only 0.04 to 0.05 points, and national demand and wind scored 0.22 and 0.40 points below the price
+change arm.** The experiment
+trained the ERA5 stage 1 model with the price at the target half-hour and its changes over 1, 2, 4,
+and 12 half-hours. The price is known only after the half-hour, so no score is a forecast skill.
+
+- **Headline result:** changes minus level only was -0.037 points of capacity (97.5% interval
+  -0.056 to -0.018) in the selection year and -0.050 (-0.083 to -0.018) in the confirmation year;
+  changes minus other-week changes was -0.039 and -0.047. The pre-registered threshold was 0.1.
+- **Comparison arms:** national demand and wind scored 0.22 and 0.40 points below the price change
+  arm, and the price level alone was 0.10 worse than no price in the confirmation year (the
+  interval includes zero).
+- **BSP and GSP:** the four series show no consistent sign.
+- **Finding for later experiments:** try national demand and wind before any price column, and keep
+  a control with the real price level and other-week changes.
+- **Write-up and pull request:** [result](00025-price-change-features-stage1-demand/result.md), [PR
+  #1231 (Experiment 25: does the change in the intra-day price help a stage 1 demand model explain
+  power?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1231).
+
+![Primary contrasts with 97.5% intervals](00025-price-change-features-stage1-demand/figure_1.svg)
 
 ### What the experiments taught us so far
 
