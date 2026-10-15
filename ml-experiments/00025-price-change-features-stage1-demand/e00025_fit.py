@@ -129,7 +129,7 @@ def christmas_window() -> pl.Expr:
 
 
 def add_shuffled_columns(*, frame: pl.DataFrame, seed: int, train_end: datetime) -> pl.DataFrame:
-    """Add `shuf_*` columns read at another week's same weekday and half-hour.
+    """Add `shuf_*` columns read at another week's same weekday and half-hour (in UTC).
 
     Offsets are drawn per week and per seed. A training row whose shifted start is at or after
     `train_end` is shifted the other way, so no price from the purge or validation weeks enters
@@ -153,10 +153,15 @@ def add_shuffled_columns(*, frame: pl.DataFrame, seed: int, train_end: datetime)
     shifted = shifted.with_columns(
         source=pl.col("start") + pl.duration(days=7 * pl.col("offset"))
     ).with_columns(
-        source=pl.when((pl.col("start") < train_end) & (pl.col("source") >= train_end))
+        source=pl.when(
+            (pl.col("start") < train_end) & (pl.col("source") + inputs.HALF_HOUR > train_end)
+        )
         .then(pl.col("start") - pl.duration(days=7 * pl.col("offset")))
         .otherwise(pl.col("source"))
     )
+    training_sources = shifted.filter(pl.col("start") < train_end)["source"]
+    if (training_sources + inputs.HALF_HOUR > train_end).any():
+        raise AssertionError("a training row reads a price from after the training end")
     renamed = series.rename({c: SHUFFLE_PREFIX + c for c in series.columns if c != "start"})
     return shifted.join(
         renamed.rename({"start": "source"}), on="source", how="left", validate="m:1"
@@ -214,7 +219,7 @@ def main() -> None:
     """Run every series and seed of one fold in parallel processes, one thread per fit."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fold", choices=sorted(FOLDS), required=True)
-    parser.add_argument("--seeds", type=int, nargs="+", default=[0])
+    parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     parser.add_argument("--workers", type=int, default=12)
     args = parser.parse_args()
     series = pl.read_parquet(inputs.EXPERIMENT_00006_DIR / "series.parquet")["time_series_id"]

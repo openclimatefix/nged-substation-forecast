@@ -189,7 +189,7 @@ def check_no_lookahead(series: pl.DataFrame) -> None:
     truncated = derive(series.head(cut))
     for column in DERIVED_COLUMNS:
         left, right = full[column], truncated[column]
-        same = ((left == right) | (left.is_null() & right.is_null())).all()
+        same = left.eq_missing(right).all()
         if not same:
             raise AssertionError(f"{column} changes when future rows are removed")
 
@@ -197,6 +197,9 @@ def check_no_lookahead(series: pl.DataFrame) -> None:
 def build_features(series: pl.DataFrame) -> pl.DataFrame:
     """Return experiment 00006's feature table with the derived columns joined at `start`."""
     features = pl.read_parquet(EXPERIMENT_00006_DIR / "features.parquet")
+    off_grid = features.filter(pl.col("valid_time").dt.minute().is_in([0, 30]).not_()).height
+    if off_grid:
+        raise AssertionError(f"{off_grid} valid_time values are not on a half-hour boundary")
     return features.with_columns(start=pl.col("valid_time") - HALF_HOUR).join(
         series.select("start", *DERIVED_COLUMNS), on="start", how="left", validate="m:1"
     )
