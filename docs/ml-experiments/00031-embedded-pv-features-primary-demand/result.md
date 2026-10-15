@@ -98,8 +98,10 @@ function serves training rows and validation rows.
   series is "Disaggregated Demand": NGED has already subtracted its metered generators, so the ECR
   rows with their own meter are not in the series. The ECR is therefore only a prior for a Primary,
   never a floor. The prior is the ECR solar capacity of the rows that have no meter of their own:
-  every row on the `Register Part 1 50kW - <1MW` sheet, plus any `>=1MW` solar row whose customer
-  name matches no metered generator in the metadata table. The `Primary` name must match exactly
+  every connected solar row on the `Register Part 1 50kW - <1MW` sheet. The rows of 1 MW or more
+  are assumed to be metered, because the metadata table lists none of the larger solar farms under a
+  Primary, and NGED's list of meters is not available to confirm it. The `Primary` name must match
+  exactly
   after `studies.name_matching.normalise` (no fuzzy matching), and the prior is zero where no row
   matches. A BSP or GSP series is "Raw Flow": the metered generators below it are not subtracted,
   so the ECR solar capacity of every row below the substation (by `bulk_supply_point` or
@@ -120,8 +122,10 @@ function serves training rows and validation rows.
       inverse-variance weights, with the prior variance fitted on training origins only, and
       clipped at zero; it may fall below `e`. For a BSP or GSP, `c = max(c_fit, e)`.
     - F5 `cap_total`: `c`. In the data-only variant `c = c_fit`, clipped at zero, and `e` is unused.
-    - F6 `pv_hat`: `c * p_unit_ENS(valid)`. F7 `lag_origin_gross`: N1's `lag_origin` plus
-      `c * p_unit_CAMS(lag time)`. F8 `pv_ecr_hat`: `e * p_unit_ENS(valid)`.
+    - F6 `pv_hat`: `c * p_unit_ENS(valid)`. F7 `lag_gross_2d`: the power at the latest earlier time
+    with the
+      valid time's half-hour of day that is at least 48 hours before the origin, plus
+      `c * p_unit_CAMS(that time)`. F8 `pv_ecr_hat`: `e * p_unit_ENS(valid)`.
 - **Known-answer checks before real data:** (a) inject `-c(t) * p_unit_CAMS(t)` with `c` rising
   linearly from 0 to 20% of capacity into two directional Primaries and check that F1, F2, and F4
   recover `c(t)` within one standard error; (b) at the two GSPs compare `c` with PV_Live's installed
