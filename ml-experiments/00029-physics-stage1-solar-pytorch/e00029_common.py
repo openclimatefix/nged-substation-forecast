@@ -151,13 +151,17 @@ def crps_estimate(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndarray:
     return 2.0 * (pinball * ATOM_MASSES).sum(axis=1)
 
 
+def covered(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndarray:
+    """Return whether the observed power lies in the 5% to 95% band, per case."""
+    return (actual >= quantiles[:, LOWER_INDEX]) & (actual <= quantiles[:, UPPER_INDEX])
+
+
 def site_table() -> pl.DataFrame:
-    """Return the nine generator series with anonymous label, technology, and capacity.
+    """Return the 6 solar farms with anonymous label, coordinates, and capacity.
 
     Returns:
-        One row per series with `time_series_id`, `site` (A to F, W1 to W3), `technology`,
-        `latitude`, `longitude`, and `effective_capacity_mw`. The coordinates never leave this
-        process.
+        One row per farm with `time_series_id`, `site` (A to F), `latitude`, `longitude`, and
+        `effective_capacity_mw`, sorted by `site`. The coordinates never leave this process.
 
     Raises:
         ValueError: If the anonymisation helper's labels have changed.
@@ -166,20 +170,10 @@ def site_table() -> pl.DataFrame:
         "time_series_id", "effective_capacity_mw"
     )
     solar = pv_sites().select("time_series_id", "site", "latitude", "longitude")
-    wind = wind_sites().select("time_series_id", "site", "latitude", "longitude")
     if set(solar["site"].to_list()) != set(SITE_LABELS) or LABEL_PERMUTATION_SEED != 784:
         msg = "the anonymisation helper's solar labels have changed"
         raise ValueError(msg)
-    return (
-        pl.concat(
-            [
-                solar.with_columns(technology=pl.lit("solar")),
-                wind.with_columns(technology=pl.lit("wind")),
-            ]
-        )
-        .join(capacity, on="time_series_id", how="left", validate="1:1")
-        .sort("technology", "site")
-    )
+    return solar.join(capacity, on="time_series_id", how="left", validate="1:1").sort("site")
 
 
 def observed_training_power(*, sites: pl.DataFrame) -> pl.DataFrame:
@@ -242,7 +236,7 @@ def validation_cases() -> pl.DataFrame:
         pl.read_parquet(SCORES_DIR / "rows_seed0.parquet")
         .filter(pl.col("arm") == "b_mixture_full")
         .select(*KEY_COLUMNS, "lead_hours", "actual_norm")
-        .join(technology_table(), on="time_series_id", how="left", validate="m:1")
+        .filter(pl.col("time_series_id").is_in(site_table()["time_series_id"].to_list()))
         .sort(*CASE_ORDER)
     )
     return cases.with_columns(band=pl.Series(band_names(lead_hours=cases["lead_hours"].to_numpy())))
