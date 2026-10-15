@@ -50,8 +50,8 @@ headline: >-
 lessons: >-
   The solar forecast beat a month-by-half-hour climatology up to day 6 (mean absolute error 5.0 to
   7.0 points of PV_Live capacity against 8.8 to 9.5) and tied it at 7 to 15 days. Its mean was too
-  high by 1.8 to 3.0 points at every lead band. Stage 2 gained from the true value only at long
-  leads.
+  high by 1.8 to 3.0 points at every lead band. Stage 2 gained from the true value mainly at 7
+  to 15 days, with an uncertain gain of -0.31 (-0.71 to +0.07) at 3 to 6 days.
 advice:
   - >-
     Do not add a solar forecast to the stage 2 calibrator for GSP demand on this evidence, because
@@ -72,13 +72,14 @@ code: ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/
 # Does a forecast of the GSP's PV_Live solar generation help the stage 2 demand forecast?
 
 **Verdict: inconclusive.** Giving the stage 2 calibrator a forecast of the grid supply point's
-(GSP's) solar generation lowered the quantile score by 0.14 points of capacity, below the 0.30 bar,
-and the interval includes zero. C1 (solar forecast minus no solar forecast, all leads) is -0.14 (95%
-interval -0.34 to +0.04), and up to 48 hours it is +0.04 (-0.32 to +0.31). The true PV_Live value at
-the target time, an oracle, lowered the score by 0.50 (C2, -0.91 to -0.12), and the whole gain is at
-leads of 7 to 15 days. Scores are in points of capacity (1% of the series' effective capacity) on 73
-forecast runs, one every 5 days, July 2025 to June 2026, with ENS weather, for Walpole and Bicker
-Fen. Attribution: Sheffield Solar PV_Live, CC BY 4.0.
+(GSP's) solar generation lowered the quantile score by 0.14 points of capacity, short of the
+0.30-point bar, and the interval includes zero. C1 (solar forecast minus no solar forecast, all
+leads) is -0.14 (95% interval -0.34 to +0.04), and up to 48 hours it is +0.04 (-0.32 to +0.31). The
+true PV_Live value at the target time, an oracle, lowered the score by 0.50 (C2, -0.91 to -0.12),
+and most of the gain is at leads of 7 to 15 days (-0.71), with 3 to 6 days at -0.31 (-0.71 to
++0.07). Scores are in points of capacity (1% of the series' effective capacity) on 73 forecast runs,
+one every 5 days, July 2025 to June 2026, with ENS weather, for Walpole and Bicker Fen. Attribution:
+Sheffield Solar PV_Live, CC BY 4.0.
 
 ![Stage 2 arms with a solar forecast and with the true value, against none](figure_1.svg)
 
@@ -107,7 +108,8 @@ points of PV_Live capacity in the first 24 hours, 5.9 to 6.0 at 1 to 2 days, 6.8
 days, and 9.0 to 9.2 at 7 to 15 days. The month-by-half-hour climatology scored 8.8 to 9.5 in every
 band, so the forecast beats it up to day 6 and ties it after. The member mean was too high by +1.75
 to +3.01 points in every band and both GSPs, so the ERA5-trained model is biased on ENS weather. The
-calibration-period error by chain quarter ran from 7.1 to 9.2 points, with no quarter standing out.
+calibration-period error by chain quarter ran from 7.1 to 9.2 points, with the latest quarter lowest
+at 7.1 to 7.4 and the other quarters from 8.4 to 9.2.
 
 ## Predictions against outcomes
 
@@ -121,6 +123,9 @@ calibration-period error by chain quarter ran from 7.1 to 9.2 points, with no qu
   Walpole and Bicker Fen only.
 - **The oracle gain is at long leads, where the target value is far from the origin,** and B2 has
   one added column against two for B1, so B1 minus B2 is not a clean comparison.
+- **The solar forecast's daytime mask uses the observed PV_Live value** (above 1% of capacity),
+  which conditions on the outcome. A mask on the sun's position moved the mean bias by less than
+  0.15 points and the mean absolute error by less than 0.2.
 - **PV_Live is fully revised,** and the scores are against revised values.
 - **The delta at lag times uses ERA5 weather,** so every arm is a ceiling for the lagged inputs.
 
@@ -129,11 +134,13 @@ calibration-period error by chain quarter ran from 7.1 to 9.2 points, with no qu
 ### Plan: sizing
 
 - **Stored data:** prediction sets and the solar forecast's statistics, under
-  `data/ml-experiments/`; no production table changes. - **Production serving path:** not touched. -
-  **Degradation rule:** not touched. A missing solar forecast would be a missing input. -
-  **Defensible designs:** more than one (the solar model's inputs and the summary given to stage 2).
-  Both are fixed below. - **Callers:** the scripts copy experiment 00005's archive reader and
-  calibrator and experiment 00027's PV_Live loader, which the author could name without searching.
+  `data/ml-experiments/`; no production table changes.
+- **Production serving path:** not touched.
+- **Degradation rule:** not touched. A missing solar forecast would be a missing input.
+- **Defensible designs:** more than one (the solar model's inputs and the summary given to stage
+  2). Both are fixed below.
+- **Callers:** the scripts copy experiment 00005's archive reader and calibrator and experiment
+  00027's PV_Live loader, which the author could name without searching.
 
 Size: medium. One Sonnet review of the plan, one of the code, and one of the write-up.
 

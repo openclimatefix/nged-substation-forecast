@@ -58,12 +58,14 @@ def _with_solar_forecast(*, frame: pl.DataFrame, split: str) -> pl.DataFrame:
         pv_mean="mean",
         pv_std="std",
     )
-    return frame.join(
+    joined = frame.join(
         forecast,
         on=["time_series_id", "power_fcst_init_time", "valid_time", "seed"],
         how="left",
         validate="1:1",
     )
+    assert joined["pv_mean"].is_not_null().all(), "a case has no solar forecast"
+    return joined
 
 
 def matrix(

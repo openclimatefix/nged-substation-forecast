@@ -51,7 +51,7 @@ the maintainer to confirm.
 | [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
 | [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
 | [00027](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
-| [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the 2 GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
+| [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -582,8 +582,8 @@ and applied to the 51 ENS members, gave the calibrator the member mean and sprea
 at the target time (row set `fold_a_every5d_v1`).
 
 - **Headline result:** solar forecast minus none over all leads -0.14 (95% interval -0.34 to
-  +0.04), and the true PV_Live value as an oracle -0.50 (-0.91 to -0.12), almost all at leads of 7
-  to 15 days.
+  +0.04), and the true PV_Live value as an oracle -0.50 (-0.91 to -0.12), mostly at leads of 7 to
+  15 days.
 - **Finding for later experiments:** the solar forecast beat a climatology up to day 6 (mean
   absolute error 5.0 to 7.0 points of PV_Live capacity against 8.8 to 9.5), and its member mean was
   too high by 1.8 to 3.0 points at every lead band.

@@ -2,7 +2,7 @@
 
 For each GSP and seed, one XGBoost model forecasts PV_Live's share of its own capacity from ERA5
 weather at the valid time and the sun's position (`e00028_common.PV_FEATURES`). A final model trains
-on valid times from 2023-09 to before 2025-06-17. Five forward-chain models, one per quarter from
+on valid times from 2019-09 to before 2025-06-17. Five forward-chain models, one per quarter from
 2024-04, train on valid times that end 15 days before the quarter starts. Each ENS run is passed
 through the model of its valid times (the chain for calibration runs, the final model for the
 validation runs), member by member, and summarised by the member mean, the member standard
@@ -208,6 +208,7 @@ def run_statistics(
     ordered = frame.sort("valid_time", "ensemble_member")
     steps = ordered["valid_time"].unique(maintain_order=True)
     count = steps.len()
+    assert ordered.height == count * len(members), "every valid time needs every member"
     sun = sun_columns(
         valid_time=ordered["valid_time"], latitude=coordinates[0], longitude=coordinates[1]
     )
