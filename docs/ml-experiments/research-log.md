@@ -25,6 +25,7 @@ the maintainer to confirm.
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
 | [00030](00030-lagged-power-feature-sets-primary-demand/result.md) | Add the mean and median of the 6 weekly power analogues to N1 for Primary demand, with the 14-day correction | Post hoc arm; 0.05 points below N1 with the correction (-0.08 to -0.02), 0.03 below the 00019 stack with an interval touching zero; the annual analogues hurt |
 | [00024](00024-pooling-groupings-demand-xgboost/result.md) | Train one XGBoost model per substation type (or per size band), with the series identifier as a categorical column, instead of one per series | Costs 0.15 points on Primary demand after the error correction and saves 16 of 20 models; needs the series identifier, and the test covered 20 series |
+| [00033](00033-best-guess-architecture-vs-production/result.md) | Replace the production recipe with the best guess: N1 with the 14-day correction and spread factor 1.15 for Primary demand, N1 for BSP and GSP demand, ERA5-trained mixtures for solar and wind | The comparison that ranks the candidates against production; monthly retraining without the correction scored 5.12 on one seed and needs a three-seed test |
 | [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
 
 ## The experiments so far
@@ -62,6 +63,7 @@ the maintainer to confirm.
 | [00024](00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost demand model without losing skill against one model per series? | Supported: 3 or 4 pooled models cost 0.15 points; one model for all series costs 0.29 | Candidate | 2026-10-15 |
 | [00031](00031-embedded-pv-features-primary-demand/result.md) | Do trailing estimates of embedded solar capacity, as tree columns, a linear offset, or a sunshine-shaped correction, lower the Primary demand quantile score? | Inconclusive | Not for production | 2026-10-15 |
 | [00032](00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints of each substation improve a by-type pooled demand model, and carry a substation held out of the pool? | Inconclusive: no fingerprint helped | Not for production | 2026-10-15 |
+| [00033](00033-best-guess-architecture-vs-production/result.md) | Does the best-guess architecture beat production, N1, and `manual_heuristic` on the quantile score, twCRPS, and exceedance metrics, and how much would perfect weather add? | Supported: 4.89, 3.81, and 6.27 points below production | Candidate | 2026-10-15 |
 | [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted average of the quantiles of already-scored models beat the best single model for Primary demand, solar, and wind? | Supported for Primary demand (-0.10 points); null for solar and wind | Candidate (Primary demand) | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -776,6 +778,29 @@ the lower limits of the four warm contrasts C1 to C4 are all below zero (-0.002 
   [PR #1241 (Experiment 32: do substation fingerprints improve a pooled demand model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1241).
 
 ![The eight planned contrasts](00032-substation-fingerprints-pooled-demand/figure_1.svg)
+
+### 00033: the best-guess architecture against production, N1, and `manual_heuristic`
+
+**The best guess lowered the quantile score below production's by 4.89 points of capacity for
+Primary demand (98.33% interval -5.66 to -4.06), 3.81 for solar (-5.07 to -2.64), and 6.27 for wind
+(-7.65 to -5.28).** The experiment compared the architecture that experiments 1 to 32 point to with
+the stored production forecast, N1, `manual_heuristic`, `climatology`, six notable ideas, and an
+ERA5-weather ceiling, on the quantile score, MAE of the median, twCRPS and Brier score at
+`historical_p99`, and the exceedance rates of the 0.90 and 0.95 quantiles. The pre-registered
+verdict is supported.
+
+- **Headline result:** Primary demand scores 5.32 against 9.52 for production, 5.89 for
+  `manual_heuristic`, and 6.33 for N1. Production's 5% to 95% band covers 10% to 20% of cases, and
+  the 14-day correction accounts for 1.38 of the 4.89-point Primary gap.
+- **Finding for later experiments:** monthly retraining without the correction scored 5.12 on one
+  seed, below the best guess's 5.32 on the same seed, and the correction did not add to it, with the
+  cause untested. The twCRPS at `historical_p99` mostly does not separate the arms; solar and wind
+  N1 came within 0.1 and 0.3 points of the ERA5-trained best guess. Better weather would lower the
+  wind score by 5.46 and the Primary demand score by 0.11.
+- **Write-up and pull request:** [result](00033-best-guess-architecture-vs-production/result.md),
+  [PR #1242 (Experiment 33: best-guess architecture against production, N1, and manual_heuristic)](https://github.com/openclimatefix/nged-substation-forecast/pull/1242).
+
+![The three decisive contrasts](00033-best-guess-architecture-vs-production/figure_2_decisive.svg)
 
 ### 00035: a lead-weighted blend of quantiles from stored models
 
