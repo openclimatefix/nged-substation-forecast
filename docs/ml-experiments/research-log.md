@@ -47,6 +47,7 @@ the maintainer to confirm.
 | [00018](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
 | [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies nearly all of it | Candidate | Not yet merged |
 | [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Do the candidate changes for solar and wind (CAMS-trained stage 1a, a stage 0 quantile mapping, a power-curve base margin, a spread factor) add up to a lower CRPS than the pooled ERA5-trained mixture? | Partly supported: wind gains 0.071 points, solar does not | Candidate (wind) | Not yet merged |
+| [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -180,11 +181,35 @@ later training starts, on 6 solar farms and 3 wind farms (row set `fold_a_tuesda
 
 ![Planned contrasts](00012-solar-wind-stage1a-inputs-cams-and-training-start/figure_2.svg)
 
+### 00022: the weather ceiling for Primary demand
+
+**ERA5 weather in place of ENS weather at serving time lowered the Primary demand quantile score by
+only 0.10 points, so better weather products have little to offer Primary demand.** The experiment
+used experiment 19's full stack on the 16 Primary substations and 73 forecast runs. ERA5 arrives
+about 5 days late, so the arm is a ceiling and no serving system could use it.
+
+- **Headline result:** the all-variable ERA5 arm minus the ENS arm was -0.10 points of capacity over
+  all leads (99.38% interval -0.16 to -0.04); the ENS arm scored 5.32 and the ERA5 arm 5.22.
+- **By variable:** shortwave radiation alone gave -0.08 (-0.13 to -0.04); temperature gave -0.01
+  (-0.04 to +0.01).
+- **By lead:** the gain was -0.08 at 3 to 6 days and -0.15 at 11 to 15 days, and ERA5 was slightly
+  worse (+0.03) under 24 hours.
+- **Finding for later experiments:** if a second weather product is tried for Primary demand, test
+  its shortwave radiation first.
+- **Write-up and pull request:** [result](00022-era5-weather-ceiling-primary-demand/result.md), [PR
+  #1227 (Experiment 22: how much would Primary demand gain from ERA5 weather in place of ENS
+  weather?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1227).
+
+![Each ERA5 arm minus the ENS arm](00022-era5-weather-ceiling-primary-demand/figure_1.svg)
+
 ### What the experiments taught us so far
 
 - **A 14-day error correction put N1 below `manual_heuristic` for Primary demand.** The correction
   lowered the quantile score by 0.99 points on N1, a model frozen at its training end, and the 0.5-year
   half-life added nothing to that frozen model (00019).
+- **A perfect-quality weather product would lower the Primary demand score by 1.9%.** ERA5 weather
+  in place of ENS weather lowered the quantile score by 0.10 points, nearly all from shortwave
+  radiation and none up to 2 days ahead (00022).
 - **Check for calendar memorisation.** When the same valid time repeats across many ENS runs, a model
   with calendar columns can memorise it. Give each experiment a climatology row, and group folds by
   valid time.

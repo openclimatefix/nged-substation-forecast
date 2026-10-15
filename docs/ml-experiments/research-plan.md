@@ -20,7 +20,6 @@ sooner.
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [P18](#p18-lagged-power-and-summaries-of-recent-power-for-solar-and-wind) | Does lagged power in the stage 2 calibrator, or a summary of recent power as tested for demand in 00008, help solar and wind farms, as lagged power helps Primary substations in 00005? | 3 | Nothing | Proposed; experiment 00018 found lag anomalies add little to raw lagged power for demand |
-| 00022 | How much better would the Primary demand forecast be with ERA5 in place of ENS weather at serving time, by lead band and weather variable? | 5 | Nothing | Planned; running ([`result.md`](00022-era5-weather-ceiling-primary-demand/result.md)) |
 
 ## Deferred until the first results are in
 
@@ -123,12 +122,6 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
-
-### P9: the demand weather ceiling
-
-**The experiment sizes how much skill demand gains from better weather.** The experiment gives N1
-ERA5 in place of ENS weather at serving time, by lead. A small gap means weather-source work (P15,
-P16) has low priority for demand.
 
 ### P11: ensemble statistics as inputs
 
