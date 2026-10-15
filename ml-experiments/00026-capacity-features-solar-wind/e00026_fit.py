@@ -49,8 +49,8 @@ from e00026_common import XGBOOST_PARAMETERS as PARAMETERS
 
 TABLE_DIR: Final[Path] = WORK_DIR / "tables"
 MIXTURE_DIR: Final[Path] = WORK_DIR / "mixture"
-CHECK_CUTOFF_DAY: Final[int] = 1_500
-"""The cutoff day of the no-lookahead check, in mid-2023."""
+CHECK_CUTOFF_DAYS: Final[tuple[int, ...]] = (1_500, 2_200)
+"""The cutoff days of the no-lookahead check: mid-2023, and inside the validation year."""
 CAP_COLUMNS: Final[tuple[str, ...]] = tuple(f"cap_{i}" for i in range(5))
 
 
@@ -173,13 +173,10 @@ def feature_tables(*, sites: pl.DataFrame, analysis: pl.DataFrame) -> dict[int, 
             analysis=analysis, series=series, technology=technology
         )
         power = grids[series][: features.N_STEPS]
-        features.check_no_lookahead(
-            technology=technology,
-            power=power,
-            other=other,
-            zenith=zenith,
-            cutoff=CHECK_CUTOFF_DAY,
-        )
+        for cutoff in CHECK_CUTOFF_DAYS:
+            features.check_no_lookahead(
+                technology=technology, power=power, other=other, zenith=zenith, cutoff=cutoff
+            )
         out[series] = features.daily_table(
             technology=technology, power=power, other=other, zenith=zenith
         )
@@ -206,9 +203,15 @@ def with_capacity(
 
 
 def validation_leads(*, files: list[Path]) -> np.ndarray:
-    """Return the distinct leads in hours of the validation frames."""
-    frame = pl.read_parquet(files[0]).select(
-        lead=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
+    """Return the distinct leads in hours over all the validation frames."""
+    frame = pl.concat(
+        [
+            pl.read_parquet(path, columns=["valid_time", "power_fcst_init_time"]).select(
+                lead=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
+                / 60.0
+            )
+            for path in files
+        ]
     )
     return np.sort(frame["lead"].unique().to_numpy())
 

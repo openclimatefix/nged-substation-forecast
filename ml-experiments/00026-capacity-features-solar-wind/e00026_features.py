@@ -232,7 +232,8 @@ def training_origins(*, valid: np.ndarray, leads_hours: np.ndarray, seed: int) -
 def shuffled_table(*, table: np.ndarray, seed: int, last_source_day: int) -> np.ndarray:
     """Return the table with whole calendar months permuted among the same calendar month.
 
-    Every June is replaced by a June of another year, and a day takes the row of the day at the same
+    Every June is replaced by a June of another year (a cyclic shift of the years, so no month keeps
+    its own values), and a day takes the row of the day at the same
     day of month in its replacement month. Sources come only from months that end on or before
     `last_source_day`, so no day after it feeds a training row. A month after the last source month
     takes a random source month of the same calendar month.
@@ -263,7 +264,8 @@ def shuffled_table(*, table: np.ndarray, seed: int, last_source_day: int) -> np.
             msg = f"calendar month {month + 1} has no source month"
             raise ValueError(msg)
         inside = same[usable[same]]
-        replacement[inside] = generator.permutation(inside)
+        shift = int(generator.integers(1, inside.size)) if inside.size > 1 else 0
+        replacement[inside] = np.roll(inside, shift)
         outside = same[~usable[same]]
         replacement[outside] = generator.choice(sources, size=outside.size)
     out = np.empty_like(table)

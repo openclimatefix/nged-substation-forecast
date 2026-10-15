@@ -71,6 +71,9 @@ ATOM_MASSES: Final[np.ndarray] = np.diff(
 FINE_LEVELS: Final[np.ndarray] = np.arange(1, 200) / 200
 """The 199 levels on which each mixture's quantile function is stored."""
 
+TRIVIAL_LEVEL: Final[float] = 0.01
+"""A case is trivial when the A0 95% quantile is at most this fraction of capacity."""
+
 LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("0 to 24 h", 0.0, 24.0),
     ("1 to 2 days", 24.0, 72.0),

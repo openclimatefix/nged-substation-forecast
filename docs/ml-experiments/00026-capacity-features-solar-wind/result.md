@@ -109,7 +109,10 @@ is the whole-record 99th percentile that every arm already uses, so it is the sa
 for wind. Both are past weather read at a cutoff 5 days old, so training and serving read the same
 product and nothing is late at forecast time.
 
-**Features.** All are null where a window has fewer than 20 usable steps; XGBoost handles nulls.
+**Features.** A top-decile feature is null when its window has fewer than 100 usable steps or its
+top decile holds fewer than 10. A ratio feature is null under 10 usable steps. A percentile of all
+power is null when under half the window's steps are observed. XGBoost handles nulls, and the
+write-up reports each feature's null share by month.
 
 | Name | Technology | Definition |
 |---|---|---|
