@@ -93,6 +93,7 @@ the maintainer to confirm.
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
 | [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
 | [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as an upper limit: -0.198 (-0.316 to -0.069) points of capacity against a 0.15 target; the UKV data are a research archive, not the live feed | Not for production | 2026-10-16 |
+| [00063 - SW2-10 joint fit, v2 in miniature](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) | Does one linear fit per Primary, holding a weather baseline without radiation, embedded solar capacity times the CAMS sunshine shape, and a share term per labelled transfer, beat the frozen v1 baseline outside switching, and recover injected solar and transfers? | Inconclusive: C1 is -0.322 points of capacity (-0.437 to -0.207) at 5 Primaries, close to the 0.35-point threshold, but both injection gates failed for reasons of test design | Not for production | Pending |
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -1467,6 +1468,36 @@ service could get.
 - **Write-up:** [result](00054-product-trained-xgboost-wind-farms/result.md).
 
 ![Contrasts between the arms](00054-product-trained-xgboost-wind-farms/figure_1.svg)
+
+### 00063: does a linear joint fit of baseline, solar, and transfers beat the Flexpectation v1 baseline? (SW2-10)
+
+**In hindsight, the solar part of a joint fit lowers the error of a Primary substation's median
+forecast by about a third of a point, but the tests that check whether each part comes out at the
+right size could not be passed.** "In hindsight" means the weather and sunshine inputs are estimates
+of the past that do not exist at forecast time. The verdict is `inconclusive`. We fitted one linear
+model per substation: a weather baseline without radiation inputs, plus the embedded-solar capacity
+times the CAMS (Copernicus Atmosphere Monitoring Service) sunshine shape, plus a share of the
+donor's power for each labelled switching job. We compared it with the Flexpectation v1 baseline
+outside switching, at 5 Primaries, and then added known solar-farm output and known transfers to
+check what the fit recovered.
+
+- **Headline result:** C1, the joint fit's mean absolute error minus the Flexpectation v1
+  baseline's, is -0.322 points of capacity (-0.437 to -0.207), against a threshold of 0.35. The
+  sunshine is a past estimate and the capacity is fitted on the same power, so the figure is a
+  ceiling.
+- **Finding for later experiments:** the injection gates could not be passed, because of the test
+  design. CAMS sunshine matches a real solar farm's anomaly with a slope of 0.65 to 0.87, so the
+  0.76 recovery of an injected capacity reflects how well CAMS sunshine matches a real farm, and the
+  fit's own regressor shape is recovered at exactly 1.000. A placebo transfer share has a 95th
+  percentile of 0.63 for donors under 3 MW at 6 to 12 hours and 0.14 for donors over 5 MW, so a gate
+  of 0.10 needs a scale set by donor size. The plan's filter on observed weeks left 2 event-Primary
+  pairs, and 7 once events were allowed in any week.
+- **A next experiment could:** keep the positive control, scale the share gate by donor size, use
+  intervals of 24 hours or longer, allow events in unobserved weeks, and cover all 8 Primaries.
+- **Write-up and pull request:** [result](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md),
+  [PR #1292](https://github.com/openclimatefix/nged-substation-forecast/pull/1292).
+
+![C1 by Primary, with the two pooled intervals](00063-sw2-10-linear-joint-fit-v2-in-miniature/figure_2.svg)
 
 ### 00057: does UKV, learned from its own history, help the solar-farm forecast?
 
