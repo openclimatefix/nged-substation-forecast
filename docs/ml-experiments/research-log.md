@@ -1104,16 +1104,17 @@ scale error. The members of the European Centre for Medium-Range Weather Forecas
 
 ### 00052: do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?
 
-**We asked whether averaging the wind best guess with the same ERA5-trained model fed ICON-EU's and
-IFS 0.25 degree's forecast wind lowers the quantile score at 1 to 2 days ahead for the 3 metered
-wind farms.** The average scored 0.055 points of capacity better at lead days 1 and 2 (95% interval
--0.200 to +0.072), against a threshold of 0.15, so the verdict is `inconclusive`. Over all leads it
-scored 0.018 worse (-0.020 to +0.054).
+**We asked whether averaging the wind best guess with the same ERA5-trained wind-power model fed
+ICON-EU's and IFS 0.25 degree's forecast wind lowers the quantile score at 1 to 2 days ahead.** The
+test covered the three metered wind farms. The average scored 0.055 points of capacity better at
+lead days 1 and 2 (95% interval -0.200 to +0.072), against a threshold of 0.15, so the verdict is
+`inconclusive`. Over all leads it scored 0.018 worse (-0.020 to +0.054).
 
-- **Finding for later experiments:** the blend is worse at lead days 3 to 6 (+0.122, +0.028 to
-  +0.221) and may help at day 0 (-0.197, -0.460 to +0.051), and one farm gains 0.233 at days 1 and
-  2 while another loses 0.151. A placebo that shuffles the product forecasts scores worse than the
-  best guess (+0.343), so the small gain is not an averaging artefact.
+- **Finding for later experiments:** the blend scored worse at lead days 3 to 6 (+0.122; 95%
+  interval +0.028 to +0.221), and its day 0 contrast is unresolved (-0.197; -0.460 to +0.051). One
+  farm scored -0.233 (-0.447 to -0.035) at days 1 and 2 and another +0.151 (+0.028 to +0.287); both
+  reads are exploratory. A placebo that shuffles the product forecasts scored worse than the best
+  guess (+0.343), so averaging with an uninformative forecast does not by itself lower the score.
 - **Write-up:** [result](00052-more-nwp-products-for-wind-farms/result.md).
 
 ![Each blend minus the best guess](00052-more-nwp-products-for-wind-farms/figure_1.svg)
