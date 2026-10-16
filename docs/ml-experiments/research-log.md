@@ -1047,27 +1047,32 @@ or more of the receiving load lasting over 24 hours.
 
 ### 00045: a weekly series of embedded solar capacity
 
-**A weekly capacity series did not follow injected changes better than a capacity held constant
-within each season-year, and no single pair of penalty settings was both quiet on noise and able to
-follow a real fall, so the verdict is refuted.** The experiment added the recorded output of real
+**No single pair of penalty settings for a weekly capacity series was both quiet on noise and able
+to follow a real fall, so the verdict is refuted; for SW2-10, use one capacity per season-year and
+read it as a range.** The experiment added the recorded output of real
 solar farms to the demand of the 8 Primary substations metered in MW, in known steps, ramps, and
 temporary falls, and measured how far each method's weekly capacity lay from the known amount. The
 plan's literal clause order also reads inconclusive, because its detection clause was evaluated on a
-degenerate pair; the page says why refuted applies.
+degenerate pair; the page says why refuted applies. On the semi-synthetic baseline, which favours
+the season-year constant by construction, no weekly fit beat the constant. On the real series plus
+injection, every weekly fit beat it on ramps and steps (0.012 to 0.017 against 0.020).
 
 - **Headline result:** the median path error on ramps and steps (the mean gap between the fitted and
-  the true weekly capacity, as a share of the true mean capacity) is 0.027 for the season-year
-  constant, 0.040 for the frozen asymmetric fit, and 0.159 for a weekly fit with no penalty. The
-  frozen fit gives a median of 0.66 false steps of 10% per Primary-year on a constant capacity
-  (limit 0.5, worst Primary 1.43 against 1.0) and recovers 0.000 of a 30% fall lasting 26 weeks.
-  The relative change in path error against the season-year constant is +0.400 (95% interval
-  -0.078 to +0.773).
+  the true weekly capacity, as a share of the true mean capacity, on the semi-synthetic baseline) is
+  0.027 for the season-year constant, 0.040 for the frozen asymmetric fit, and 0.159 for a weekly
+  fit with no penalty. The frozen fit gives a median of 0.66 false steps of 10% per Primary-year on
+  a constant capacity (limit 0.5, worst Primary 1.43 against 1.0) and recovers 0.000 of a 30% fall
+  lasting 26 weeks. The relative change in path error against the season-year constant (C2) is
+  +0.400. On the plan's main interval, which resamples the 8 Primaries only, the 95% interval is
+  +0.029 to +0.634, so its lower limit above 0 is a second route to refuted. The two-way interval,
+  which also resamples farm-seeds, is -0.078 to +0.773.
 - **Finding for later experiments:** a pair chosen after the scoring run (a=2, r=10) recovers 0.576
-  of the fall but gives a median of 1.22 false steps. The smallest step detected in 80% of
-  injections is above 25% of capacity at all 8 Primaries in both seasons, the latest week of a
-  real-time estimate has 3.63 times the path error of the final fit, and the 90% intervals cover
-  0.620 of non-step weeks and 0.347 of step weeks. The recommended series for SW2-10 is the
-  season-year constant.
+  of the fall but gives a median of 1.22 false steps. The smallest step that the frozen pair detects
+  in 80% of injections is above 25% of capacity at all 8 Primaries in both seasons. The free weekly
+  fit reaches 80% at 5% steps at 3 of the 8 Primaries from April to September, with a median of 11.6
+  false steps per Primary-year. The latest week of a real-time estimate has 3.63 times the path
+  error of the final fit, and the 90% intervals cover 0.620 of non-step weeks and 0.347 of step
+  weeks. The recommended series for SW2-10 is the season-year constant.
 - **Process finding:** the first tuning attempt used a baseline that had removed the weekly noise
   and was redone, and the constant-path unit was redefined after its results were seen; both
   attempts are in the write-up.
