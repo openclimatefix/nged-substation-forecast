@@ -172,6 +172,7 @@ nav:
       - "Which lagged power columns lower the error of Primary substation demand forecasts?": ml-experiments/00030-lagged-power-feature-sets-primary-demand/result.md
       - "Does a lead-weighted blend of quantiles beat the best single model?": ml-experiments/00035-lead-weighted-quantile-blend-of-stored-models/result.md
       - "Do substation fingerprints improve a pooled demand model?": ml-experiments/00032-substation-fingerprints-pooled-demand/result.md
+      - "How often should the demand model be retrained, and which cheap proxy stands in for it?": ml-experiments/00034-retraining-cadence-and-cheap-proxies-demand/result.md
       - "Do forecasts of the series beneath a BSP or GSP lower its error?": ml-experiments/00036-hierarchy-aware-bsp-gsp-forecasts/result.md
       - "Does the best-guess architecture beat production, N1, and manual_heuristic?": ml-experiments/00033-best-guess-architecture-vs-production/result.md
       - "Do logged switching closures show up in the telemetry, and does a neighbour-balance detector beat a plain one?": ml-experiments/00037-switching-first-look/result.md
@@ -180,6 +181,8 @@ nav:
       - "How far can the capacity fitted to embedded solar be trusted?": ml-experiments/00040-pv-capacity-error-bars/result.md
       - "Can a labeller pass a known-answer gate on switching events?": ml-experiments/00041-sw2-0a-labeller-gate/result.md
       - "Which logged switching jobs show up in the power readings?": ml-experiments/00041-sw2-0a-labeller-gate/labelled-set.md
+      - "How well do the two existing switching detectors find transfers?": ml-experiments/00043-sw2-1-detector-scoreboard/result.md
+      - "How much do labelled switching events hurt the best guess?": ml-experiments/00044-sw2-2-switching-share-of-best-guess-score/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md

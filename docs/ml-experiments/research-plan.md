@@ -18,8 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
-| [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
@@ -158,24 +156,6 @@ line therefore starts by building a reference set independent of the detectors.
 
 The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
 
-#### SW2-1: a fixed scoreboard and an injection harness
-
-**Score D0 and D1 from experiment 00037 on a scoreboard that every later detector experiment
-reuses.** An event counts as found only when both its onset and its end match, each at the
-detector's causal `known_from` stamp, because experiment 00038 found the end of a detected interval
-to be where the damage happens. The tolerances and bands are proposals for the plan to confirm: an
-onset within 2 hours and an end within 6 hours, duration bands of 6 to 24 hours, 1 to 3 days, and
-over 3 days, and size bands of moved load under 10%, 10% to 25%, and 25% or more of the receiving
-load. The injection harness follows experiment 00038's, with 1 to 3 receivers and durations drawn
-from the confirmed closures, and adds a moved share that drifts during the event. Tuning uses odd
-months and injections; even months score.
-
-#### SW2-2: how much the visible events hurt the best guess
-
-**Measure the share of experiment 00033's best guess's quantile score and tail score that falls in
-labelled switching half-hours, and in half-hours whose lagged power falls inside a labelled event.**
-The measurement needs no new fit, and it sets how much a detector could lower the forecast error.
-
 #### SW2-3: the label-exclusion ceiling
 
 **Train the lagless XGBoost model with labelled switching excluded from the target, without
@@ -186,8 +166,9 @@ NRA forecast.
 
 #### SW2-4 to SW2-9: detector iterations
 
-**Each iteration tests one change to the detector against the SW2-1 scoreboard, tuned on injections
-and odd months, scored on even months.** The order below is a proposal, by expected gain per hour of
+**Each iteration tests one change to the detector against the
+[experiment 43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd
+months, scored on even months.** The order below is a proposal, by expected gain per hour of
 work, for the plan of each iteration to confirm:
 
 - **SW2-4:** a better residual, from the best lagless model available live, refitted with a robust
@@ -199,8 +180,14 @@ work, for the plan of each iteration to confirm:
 - **SW2-7:** a shape-aware step, which models the moved load as a share of the donor's expected
   profile, not as a constant MW shift. Experiment 00037 found the step changing by more than a
   factor of 2 within 8 of 26 confirmed closures of 6 hours or more.
-- **SW2-8:** node balance, which tests whether the sum of the neighbourhood's residuals stays flat
-  while single substations step, with a subset-sum over neighbours for a split.
+- **SW2-8:** a single-series detector first, with neighbour balance as a sense check, not a gate.
+  Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's
+  confidence and names the receiver, a same-sign step on the neighbours vetoes the alarm as a
+  common-mode weather or calendar miss, and an alarm with no metered neighbour keeps its
+  single-series confidence. Experiment 00043 found the neighbour-balance detector D1, which uses
+  the neighbour test as a gate, finding almost none of the injected transfers without a metered
+  receiver. The sum of the neighbourhood's residuals and a subset-sum over neighbours for a split
+  feed the confidence score.
 - **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
   series and hour of day fitted to the residual.
 

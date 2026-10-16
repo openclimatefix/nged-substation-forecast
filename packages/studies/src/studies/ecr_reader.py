@@ -3,8 +3,8 @@
 The workbook's generation and storage rows sit in two sheets, `Register Part 1 50kW - <1MW` and
 `Register Part 1 - ≥1MW`, with a banner on the first row and the column headings on the second. The
 file is written with inline strings, so the standard library's XML reader is enough and the project
-needs no spreadsheet dependency. Every cell is read as text; `read_ecr` types the columns the census
-uses.
+needs no spreadsheet dependency. Every cell is read as text; `read_ecr` names the columns it returns
+and types the numeric ones.
 """
 
 import re
@@ -14,6 +14,7 @@ from typing import Final
 from xml.etree import ElementTree
 
 import polars as pl
+
 from studies.sources import REPO_DATA_DIR
 
 ECR_PATH: Final[Path] = REPO_DATA_DIR.parent / "literature" / "NGED" / "NGED ECR AUG 2026.xlsx"
@@ -68,7 +69,7 @@ COLUMN_NAMES: Final[dict[str, str]] = {
     "Reference": "reference",
     "Last Updated": "last_updated",
 }
-"""The ECR headings the census uses, after whitespace is collapsed, and the names it gives them."""
+"""The ECR headings `read_ecr` returns, after whitespace is collapsed, and their names there."""
 
 NUMERIC_COLUMNS: Final[tuple[str, ...]] = (
     "easting",
