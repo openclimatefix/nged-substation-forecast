@@ -173,6 +173,7 @@ nav:
       - "Does a lead-weighted blend of quantiles beat the best single model?": ml-experiments/00035-lead-weighted-quantile-blend-of-stored-models/result.md
       - "Do substation fingerprints improve a pooled demand model?": ml-experiments/00032-substation-fingerprints-pooled-demand/result.md
       - "How often should the demand model be retrained, and which cheap proxy stands in for it?": ml-experiments/00034-retraining-cadence-and-cheap-proxies-demand/result.md
+      - "Which Primary demand components still improve the score under monthly retraining?": ml-experiments/00049-vp1-screening-reference-under-p-roll-demand/result.md
       - "Does a second weather forecast give a better forecast of the solar anomaly than ENS?": ml-experiments/00050-second-weather-forecast-for-solar-anomaly/result.md
       - "Do forecasts of the series beneath a BSP or GSP lower its error?": ml-experiments/00036-hierarchy-aware-bsp-gsp-forecasts/result.md
       - "Does the best-guess architecture beat production, N1, and manual_heuristic?": ml-experiments/00033-best-guess-architecture-vs-production/result.md

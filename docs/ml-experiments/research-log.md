@@ -27,6 +27,7 @@ the maintainer to confirm.
 | [00024 - Pooled demand models, part 1](00024-pooling-groupings-demand-xgboost/result.md) | Train one XGBoost model per substation type (or per size band), with the series identifier as a categorical column, instead of one per series | Costs 0.15 points on Primary demand after the error correction and saves 16 of 20 models; needs the series identifier, and the test covered 20 series |
 | [00033 - Best guess against production](00033-best-guess-architecture-vs-production/result.md) | Replace the production recipe with the best guess: N1 with the 14-day correction and spread factor 1.15 for Primary demand, N1 for BSP and GSP demand, ERA5-trained mixtures for solar and wind | The comparison that ranks the candidates against production; monthly retraining without the correction scored 5.12 on one seed and needs a three-seed test |
 | [00035 - Quantile blend of stored models](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
+| [00049 - Screening reference under monthly retraining](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Serve an average of the quantiles of five XGBoost models for Primary demand (weekly refits, monthly refits, the weekly-analogue model, the pooled model, the stack) | Lowers the quantile score by 0.08 points (-0.14 to -0.02) against the weekly-retrained N1 on one validation year; needs five models; the spread factor and the fingerprints do not change the score |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction | Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again |
 
 ## The experiments so far
@@ -71,6 +72,7 @@ the maintainer to confirm.
 | [00038 - Switching event detector, part 2](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | 2026-10-16 |
 | [00039 - PV disaggregation, part 1](00039-pv-disaggregation-cams-injection/result.md) | Can a CAMS-driven fit separate embedded solar from Primary substation demand, recovering injected solar-farm output within 25% and passing four checks on the real series? | Partly supported: recovery passes (0.854, 0.815 to 0.866), real checks pass at 6 of 8 Primaries | Not for production | 2026-10-16 |
 | [00040 - PV disaggregation, part 2](00040-pv-capacity-error-bars/result.md) | Can a cross-arm misfit test detect a cloud-driven demand load that biases the capacity fitted to embedded solar, and how many directional Primaries are free of one in 2025/26? | Partly supported: calibrated (median capacity over truth 0.992, 0.951 to 1.032), but a day-long cloud load is flagged in only 0.35 of draws at 25% of capacity, so the verdict is `underpowered` | Not for production | 2026-10-16 |
+| [00049 - Screening reference under monthly retraining](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Under monthly retraining on a rolling 12 months, does a re-tuned spread factor, a blend of retrained models, a drop-one of each adopted input, or substation fingerprints change the Primary demand score? | Supported for the blend (-0.08 points); spread factor and fingerprints no effect; Christmas column and half-life unresolved; COVID indicator untestable | Candidate (blend) | 2026-10-16 |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | How does the Primary demand score change from frozen to daily retraining, with and without the 14-day correction, and which cheap proxy ranks arms like full monthly retraining? | Inconclusive at the planned level: monthly minus the stack -0.20 points (95% interval -0.38 to -0.01); weekly -0.07 lower again | Candidate | 2026-10-16 |
 | [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
@@ -844,6 +846,28 @@ supported, on Primary demand alone.
   [PR #1244 (Experiment 35: does a lead-weighted blend of quantiles beat the best single model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1244).
 
 ![Blends minus the best single member](00035-lead-weighted-quantile-blend-of-stored-models/figure_1.svg)
+
+### 00049: which Primary demand components still improve the score under monthly retraining
+
+**Averaging the quantiles of five XGBoost models lowered the Primary demand quantile score by 0.08
+points once the models were retrained, and no other contrast had an interval excluding zero.**
+Stage 0 re-used stored predictions, and stage 1 refitted P-roll, the cheap stand-in for monthly
+refitting. The verdict is supported, on the blend alone.
+
+- **Headline result:** the blend minus the best single model (weekly refits), Primary quantile score
+  over all leads: -0.076 points (99.17% interval -0.135 to -0.023; absolute 4.968 against 5.044).
+  The spread factor chosen on earlier months minus the fixed 1.15 is -0.0001 (-0.012 to +0.018).
+  Adding substation fingerprints (recent-window statistics) to the pooled model is +0.009 (-0.037 to
+  +0.050).
+- **Finding for later experiments:** the 12-month window of P-roll holds no lockdown days, so it
+  cannot test the COVID indicator. The Christmas column and the half-life are unresolved on one
+  winter. P-roll scores 5.150 (quantile score, in points of capacity) and is the screening reference
+  row.
+- **Write-up and pull request:**
+  [result](00049-vp1-screening-reference-under-p-roll-demand/result.md),
+  [PR #1271 (Experiment 49: which Primary demand components still improve the score under monthly retraining?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1271).
+
+![The six pre-registered contrasts](00049-vp1-screening-reference-under-p-roll-demand/figure_1.svg)
 
 ### 00036: forecasts of the series beneath a BSP or GSP
 
