@@ -1,7 +1,6 @@
 """Paths, the half-hour grid, the residual panel, and the logged and labelled events.
 
-A copy of experiment 43's harness module, with this experiment's private folder and the paths of
-the stored inputs added.
+A copy of experiment 43's harness module, with this experiment's private folder.
 """
 
 from __future__ import annotations
@@ -14,19 +13,12 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00055-sw2-4-better-residual-switching-detector"
+WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00055-sw2-8-neighbour-veto-single-series-detector"
+)
 """Private tables; never committed."""
 EXPERIMENT_43_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00043-sw2-1-detector-scoreboard"
 """Experiment 43's stored events, alarm tables, and event results, which this experiment re-uses."""
-FITS_17_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00017-training-window-and-retraining-rule-drift-demand" / "fits"
-)
-FEATURES_PATH: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00006-stage1a-demand-input-feature-sweep"
-    / "inputs"
-    / "features.parquet"
-)
 PANEL_PATH: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00037-switching-first-look" / "panel.parquet"
 LOGGED_PATH: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00037-switching-first-look" / "intervals.parquet"

@@ -11,25 +11,27 @@ hypothesis: >-
 prediction: >-
   Experiment 43's D0 24-hour alarms are the benchmark. At a veto of 2.0 noise units the veto removes
   14 of the 80 unexplained odd-month alarms (18%) and 16 of the 137 alarms that a logged closure
-  explains. The matched 24-hour threshold falls by 0.05 to 0.25 from 4.00, so the gain through the
+  explains. The matched 24-hour threshold falls by 0.05 to 0.20 from 4.00, so the gain through the
   threshold is small. C1 (24-hour window, injected transfers of 25% to 40% of the receiving load
-  lasting over 1 day, starting in even months) rises by 0.00 to 0.04 from about 0.35, with a point
-  value near +0.02. The veto removes the alarm that found fewer than 10% of the transfers the
-  benchmark finds. Of the alarms on the real residual, the confirmed tier (an opposite neighbour
+  lasting over 1 day, starting in even months) rises by 0.00 to 0.02 from about 0.35, with a point
+  value near +0.01. Experiment 47 saw the odd-month share found change by -0.019 when its threshold
+  rose by 0.22, which puts the gain from a fall of 0.05 to 0.20 near +0.005 to +0.015. The veto
+  removes the alarm that found fewer than 10% of the transfers the benchmark finds. Of the alarms on the real residual, the confirmed tier (an opposite neighbour
   step that balances the alarm's step) is explained by a logged closure more often than the
   unconfirmed tier.
 decision_rule: >-
-  The headline is C1, D2 minus D0 in the share of injected transfers found, paired by transfer, on
+  The headline is C1, D2 minus D0M in the share of injected transfers found, paired by transfer, on
   the 24-hour window and the headline band, over transfers that start in even months, read at 98.75%
   (Bonferroni across C1 to C4) from 20,000 resamples of whole calendar months. D2's veto strength and
   threshold are chosen on odd months and on the injected transfers that start in odd months, never
   on even months. `supported` when the C1 interval lies wholly above zero, the C1 point value is
-  at least +0.02, and D2's even-month unexplained-alarm count is no more than 10% above D0's.
-  `refuted` when the upper end of the C1 interval lies below +0.02. `inconclusive` otherwise. C2 to
+  at least +0.01, and D2's even-month unexplained-alarm count is no more than 10% above D0's.
+  `refuted` when the upper end of the C1 interval lies below +0.01. `inconclusive` otherwise. C2 to
   C4 and the real-event counts are reported without changing the verdict.
 benchmark: >-
-  D0 at experiment 43's thresholds (4-hour window 6.0, 24-hour window 4.0) through experiment 43's
-  harness, whose 600 injected transfers and outcomes the harness check must reproduce; D1 at its
+  D0M, D0 with its threshold chosen by the search D2 uses and no veto (so that neither detector
+  gets a threshold step the other was not offered); D0 at experiment 43's thresholds (4-hour window
+  6.0, 24-hour window 4.0) through experiment 43's harness, whose 600 injected transfers and outcomes the harness check must reproduce; D1 at its
   experiment 43 thresholds for reference; and a detector that raises no alarm.
 row_set_id: >-
   none (this experiment scores detector alarms against injected and labelled transfers, as
@@ -78,6 +80,10 @@ unexplained-alarm count on odd months equals D0's, and the lower threshold finds
 - **Detector D2.** D0's alarms, annotated by the neighbour check above. The interval builder runs on
   the alarm series only (partners are not masked), so the headline contrast differs from D0 only by
   which alarms exist. The partners are used only to score receiver naming (C4 below is not this).
+- **Ceiling check first.** Before drawing the larger sets, D0M alone (veto switched off, threshold
+  matched as below) scores experiment 43's headline-band transfers that start in odd months. If D0M
+  does not gain on D0 at experiment 43's threshold, no veto can pass the bar, and the write-up says
+  so. The check reads odd months only and decides nothing.
 - **Tuning on odd months.** The veto strength is chosen from 1.5, 2.0, and 3.0 noise units, and for
   each the threshold is the lowest on a 0.05 grid whose odd-month unexplained-alarm count does not
   exceed D0's (80 at the 24-hour window, 120 at the 4-hour window). The choice maximises the share of
@@ -89,18 +95,32 @@ unexplained-alarm count on odd months equals D0's, and the lower threshold finds
   A further 1,000 headline-band transfers are drawn with the same generator and a new seed, which
   gives about 500 to 600 in even months against experiment 47's 89. A third set of 300 headline-band
   transfers is drawn with the onset within 1 day of a bank holiday in England outside Christmas and
-  New Year, where a calendar miss is most likely and a wrong veto most costly. Every set is
-  quiet on every series it uses (no logged closure within 7 days, no alarm of experiment 43's four
-  settings within 2 days), as in experiment 43.
+  New Year, where a calendar miss is most likely and a wrong veto most costly. The original and extra sets are
+  quiet on every series they use (no logged closure within 7 days, no alarm of experiment 43's four
+  settings within 2 days), as in experiment 43. That mask removes the onsets where a series had a
+  weather or calendar miss, so it understates how often a wrong veto happens. The holiday set
+  therefore uses logged closures only, and the write-up counts the holiday onsets that the alarm
+  part of the mask would have rejected.
+
+## Veto details
+
+- **Opposite step:** a neighbour counts as stepping the opposite way only above 2.0 noise units, so
+  an opposite step of 1.9 does not block a veto.
+- **Neighbours with no data:** a neighbour whose step window is all missing counts as a neighbour
+  but cannot step, so a substation with two neighbours, one of them missing, cannot be vetoed.
+- **Receiver naming:** a confirmed alarm names the transfer's other metered series, which is the
+  donor when the alarm is on a receiver.
+- **Reported beside the tiers:** the share of vetoed alarms that a logged closure explains, and
+  the veto counts by substation (substation 7 has one neighbour, so one same-sign step vetoes it).
 
 ## Planned contrasts
 
 | Contrast | Detector, window | Transfers | Reads |
 |---|---|---|---|
-| C1 | D2 minus D0, 24 h | headline band, even months, all sets except the holiday set | the verdict |
-| C2 | D2 minus D0, 4 h | same | reported |
-| C3 | D2 minus D0, 24 h | C1's transfers that have a metered receiver | reported |
-| C4 | D2 minus D0, 24 h | C1's transfers that have no metered receiver | reported |
+| C1 | D2 minus D0M, 24 h | headline band, even months, all sets except the holiday set | the verdict |
+| C2 | D2 minus D0M, 4 h | same | reported |
+| C3 | D2 minus D0M, 24 h | C1's transfers that have a metered receiver | reported |
+| C4 | D2 minus D0M, 24 h | C1's transfers that have no metered receiver | reported |
 
 Also reported: the holiday set as counts (transfers D0 finds, D2 finds, and D2 loses to a veto); the
 odd-month and even-month unexplained-alarm counts; the precision bounds and event F1 as in

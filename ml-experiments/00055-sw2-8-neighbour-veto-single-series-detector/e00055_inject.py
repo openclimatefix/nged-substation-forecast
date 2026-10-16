@@ -13,6 +13,7 @@ and sheet sides come from the real logged operations.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Final
@@ -114,8 +115,16 @@ def draw_events(
     power: dict[int, np.ndarray],
     seed: int,
     sheets: pl.DataFrame | None = None,
+    headline_only: int | None = None,
+    first_id: int = 0,
+    onset_ok: Callable[[int], bool] | None = None,
 ) -> list[Event]:
-    """Draw 600 events, stratified by size and duration band, each quiet on every series it uses."""
+    """Draw 600 events, stratified by size and duration band, each quiet on every series it uses.
+
+    With `headline_only`, draw that many events in the headline band and none in the other bands.
+    `first_id` numbers the events from that id, and `onset_ok` rejects an event whose onset stamp
+    it returns False for. The default arguments reproduce experiment 43's draw exactly.
+    """
     rng = np.random.default_rng(seed)
     sheets = sheets if sheets is not None else operations()
     wanted = {
@@ -125,6 +134,8 @@ def draw_events(
         for size in SIZE_BANDS
         for duration in DURATION_BANDS
     }
+    if headline_only is not None:
+        wanted = {HEADLINE_BAND: headline_only}
     events: list[Event] = []
     for (size, duration), count in wanted.items():
         hours_low, hours_high = DURATION_BANDS[duration]
@@ -132,7 +143,13 @@ def draw_events(
         made = 0
         while made < count:
             event = _try_event(
-                pool=pool, size=size, duration=duration, quiet=quiet, rng=rng, event_id=len(events)
+                pool=pool,
+                size=size,
+                duration=duration,
+                quiet=quiet,
+                rng=rng,
+                event_id=first_id + len(events),
+                onset_ok=onset_ok,
             )
             if event is not None:
                 events.append(event)
@@ -148,6 +165,7 @@ def _try_event(
     quiet: dict[int, np.ndarray],
     rng: np.random.Generator,
     event_id: int,
+    onset_ok: Callable[[int], bool] | None = None,
 ) -> Event | None:
     row = pool.row(int(rng.integers(0, pool.height)), named=True)
     sides = [int(s) for s in (row["side_a"], row["side_b"]) if s is not None and s in ADJACENCY]
@@ -163,6 +181,8 @@ def _try_event(
     weights = rng.dirichlet(np.ones(n_weights)) if n_weights else np.array([])
     length = max(4, int(row["hours"] * 2))
     onset = int(rng.integers(14 * BLOCK, GRID_LENGTH - length - BLOCK))
+    if onset_ok is not None and not onset_ok(onset):
+        return None
     series = (donor, *receivers)
     span = slice(max(onset - QUIET_STAMPS, 0), onset + length + QUIET_STAMPS)
     if any(quiet[s][span].any() for s in series):
