@@ -173,8 +173,9 @@ NRA forecast.
 
 #### SW2-4 to SW2-9: detector iterations
 
-**Each iteration tests one change to the detector against the [experiment 43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections
-and odd months, scored on even months.** The order below is a proposal, by expected gain per hour of
+**Each iteration tests one change to the detector against the
+[experiment 43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd
+months, scored on even months.** The order below is a proposal, by expected gain per hour of
 work, for the plan of each iteration to confirm:
 
 - **SW2-4:** a better residual, from the best lagless model available live, refitted with a robust
