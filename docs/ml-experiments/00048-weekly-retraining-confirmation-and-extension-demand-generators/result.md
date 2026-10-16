@@ -58,7 +58,7 @@ best_arm: >-
   Weekly retraining without the correction: 5.44 points of capacity for the 16 Primary substations,
   against 5.64 for the stack, 5.57 for monthly retraining, and 6.26 for `manual_heuristic`.
 headline: >-
-  C1, weekly retraining minus the stack: -0.20 points (99.44% interval -0.40 to -0.04). C3, weekly
+  C1, weekly retraining minus the stack: -0.20 points (99.44% interval -0.40 to -0.035). C3, weekly
   minus monthly retraining: -0.13 (-0.24 to -0.03). The 7-day correction on the weekly model
   raised the score by 0.16 (-0.06 to +0.36), unresolved.
 lessons: >-
@@ -69,8 +69,9 @@ lessons: >-
   monthly retraining changed the score by under 0.05 points.
 advice:
   - >-
-    Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction for them
-    (C1, C3, C7).
+    Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction for them,
+    once a second validation year confirms it; the Primary gain rests on 12 months and on 3 series
+    (C1, C3, C7, and the limits section).
   - >-
     Do not retrain solar and wind stage 1a models for accuracy: monthly retraining moved the solar
     score by -0.04 and the wind score by +0.01 points (C8s, C8w).
@@ -103,9 +104,10 @@ better.
 **On 16 Primary substations, weekly refitting scored 5.44 and the earlier best setup scored 5.64.**
 The earlier setup, called the stack below, is a model fitted once with a correction built from its
 own errors over the last 14 days. The 0.20-point gap is wholly below zero at the strict level we
-fixed in advance. Weekly refitting also beat monthly refitting (5.57) by 0.13 points. Neither the
-7-day nor the 14-day error correction helped a weekly-refitted model, although neither was shown to
-hurt it at the strict level. At the 2 bulk supply point (BSP) and 2 grid supply point (GSP)
+fixed in advance, but the gap is fragile: it crosses zero with a t-interval over the 12 months or
+without one substation (see the limits). Weekly refitting also beat monthly refitting (5.57) by
+0.13 points. Neither the 7-day nor the 14-day error correction helped a weekly-refitted model,
+although neither was shown to hurt it at the strict level. At the 2 bulk supply point (BSP) and 2 grid supply point (GSP)
 substations, which sit above the Primary substations, weekly refitting scored 0.66 points below the
 stack, more than we predicted. For 6 solar farms and 3 wind farms, refitting the weather-to-power
 model monthly changed the score by 0.04 points or less, so this experiment found no accuracy reason
@@ -124,7 +126,7 @@ seed 0. The decision rule is in the front matter, and C1 to C8w are the contrast
 as planned" below explains the choices.
 
 **Weekly refitting beat the stack at the 99.44% level we fixed in advance.** C1, weekly minus the
-stack, is -0.20 points (99.44% interval -0.40 to -0.04), so the interval lies wholly below zero. The
+stack, is -0.20 points (99.44% interval -0.40 to -0.035), so the interval lies wholly below zero. The
 threshold was zero: any gain was enough, because refitting replaces the correction step at the
 price of one scheduled job. C3, weekly minus monthly refitting, is -0.13 (-0.24 to -0.03). C2,
 monthly minus the stack, is -0.08 (-0.33 to +0.19). Experiment 34 found monthly refitting better
@@ -229,6 +231,17 @@ found the same sign.
 - **The weather inputs are deployable.** All arms use ENS weather forecasts, and the generator arms
   train on ERA5 only up to 5 days before each refit date.
 
+- **The C1 and C3 intervals depend on the interval method.** Both exclude zero under the month
+  bootstrap we fixed in advance. A t-interval over the 12 monthly mean differences does not exclude
+  zero for either: C1 is -0.43 to +0.04 and C3 is -0.26 to +0.02. Ten of the 12 months favour weekly
+  refitting for C1; September and March do not.
+- **Three Primary series carry most of the C1 gain.** Without D8, C1 is -0.14 (99.44% interval
+  -0.34 to +0.04); without D8 and D12 it is -0.11 (-0.31 to +0.08); without D8, D12, and D5 it is
+  -0.08 (-0.24 to +0.10). D15 goes the other way (+0.34, figure 4). The weekly gain is not
+  established as a gain across all 16 Primary substations.
+- **The July warm-up does not explain the result.** Dropping the runs before 16 July leaves C1 at
+  -0.20 (99.44% interval -0.40 to -0.02).
+
 ## What remains untested
 
 **Does weekly refitting still beat the stack on a validation year the project has not scored?** The
@@ -293,8 +306,8 @@ code review (Sonnet), one write-up check (Sonnet), one prose review (Sonnet), an
 (Opus).
 
 **Earlier advice followed.** Retrain monthly in the Primary stage 1 model and drop the correction
-(00034); screen on P-roll (00034, used here only as a descriptive arm); read with the 99.375%
-interval, because months set the width (00034). Departures: none.
+(00034); screen on P-roll (00034, used here only as a descriptive arm); read the contrasts with a
+Bonferroni-level interval, because months set the width (00034). Departures: none.
 
 **Plan review (Opus), triaged.** Accepted: state that the correction reads forecasts as issued and
 nothing before 2025-07-01; predict a smaller Primary gap because the daily stack's correction is
@@ -302,3 +315,18 @@ fresher; set C3's threshold to zero; split C8 into solar and wind and make "no c
 the interval; name which frozen reference C7 uses; report each series; limit the reproduction check
 to arms without a correction; add the generator frame builder, the disk and memory budget, and the
 spread-factor rule. Rejected: none.
+
+**Code review (Sonnet), triaged.** No leakage found. Accepted: run `--check` on the frames, cap threads
+through environment variables, split the frozen fit across workers, and note the correction's July
+warm-up and the generator spread factor's first months. Rejected: relabelling C6 and C7 in the report
+script, because the page states the rule for each.
+
+**Write-up check and prose review (Sonnet), triaged.** Accepted: the absolute scores now use the
+cases the contrasts use (the baselines had shrunk the shared case set, so the table and C1 had
+disagreed), the prediction list, the lead-band claim, the reproduction counts, and the opening's
+undefined terms. Rejected: moving this section to the pull request, because the plan review is a
+record of what changed the design.
+
+**Result review (Opus), triaged.** No leakage and no scoring mismatch; the verdict stands. Accepted:
+the limits on the interval method and on D8, D12, and D5, the 99.44% level, and the upper bound of
+C1 (-0.035). Rejected: none.

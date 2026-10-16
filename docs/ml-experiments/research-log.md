@@ -1668,8 +1668,9 @@ scores by 0.04 points or less.
   +0.36, worse, unresolved).
 - **Finding for later experiments:** at the 2 BSP and 2 GSP substations weekly retraining gained
   0.66 points over the stack (-1.23 to -0.27), more than predicted, on 4 series. The 7-day
-  correction window was 0.09 worse than the 14-day window. The 292 runs share their months with
-  experiment 34's 73, so a second validation year is the open test.
+  correction window was 0.09 worse than the 14-day window. The Primary gain is fragile: it rests on
+  12 months, three series carry most of it (without D8 the interval includes zero), and the 292
+  runs share their months with experiment 34's 73, so a second validation year is the open test.
 - **Write-up and pull request:** [result](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md),
   [PR #1269 (Experiment 48: does weekly retraining still win on the runs experiment 34 left out?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1269).
 
