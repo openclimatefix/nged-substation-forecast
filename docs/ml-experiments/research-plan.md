@@ -24,6 +24,7 @@ sooner.
 | [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b | Proposed |
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
+| [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 
 ## Deferred until the first results are in
@@ -251,6 +252,25 @@ work, for the plan of each iteration to confirm:
   while single substations step, with a subset-sum over neighbours for a split.
 - **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
   series and hour of day fitted to the residual.
+
+#### SW2-10: v2 in miniature, a linear joint fit
+
+**Fit one linear model per trial Primary that holds a weather baseline, embedded solar, and the
+labelled transfers together, and score it against the frozen v1 baseline.** The model is net demand
+equals the baseline, minus a capacity times a PV shape, plus, for each labelled transfer k, a share
+times the donor's net power over transfer k's interval. With the intervals given, the fit is
+linear. The result tells the project whether to start the v2 differentiable-physics work sooner.
+
+- **The baseline term** is SW2-3's lagless XGBoost model, trained with labelled switching excluded.
+- **The transfer intervals** come from SW2-0b, or from the logged closures padded by 24 hours if
+  the labels are not ready.
+- **The capacity and the PV shape** come from the PV-disaggregation line: experiment 00040's
+  six-arm capacity with its bound, experiment 00039's capacity as a cross-check, and experiment
+  00039's CAMS unit PV shape. A weekly capacity series replaces the experiment 00040 capacity if
+  the PV line's weekly-capacity experiment runs. The 8 Primaries metered only in MVA are excluded.
+- **Scoring** is on held-out months outside switching against the v1 baseline, and on experiment
+  00039's injection harness extended with injected transfers that carry the donor's PV, where the
+  true capacity and the true shares are known.
 
 ### P11: ensemble statistics as inputs
 
