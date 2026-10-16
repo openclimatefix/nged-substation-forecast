@@ -18,8 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-0a](#sw2-0a-an-agent-labeller-gated-on-known-answers) | Does an agent labeller, built on log-timed features that use no forecasting model, pass a pre-registered gate on injected transfers and placebo windows, and does Sonnet beat a rules-only labeller on the same features? | 1 | Nothing | Planned as experiment [41](00041-sw2-0a-labeller-gate/result.md) |
-| [SW2-0b](#sw2-0b-the-labelled-reference-set) | Which logged closures since 2022 are visible in the telemetry, with what onset, end, receivers, and MW moved? | 1 | SW2-0a passing its gate | Proposed |
+| [SW2-0b](#sw2-0b-the-labelled-reference-set) | Which logged closures since 2022 are visible in the telemetry, with what onset, end, receivers, and MW moved? | 1 | SW2-0a (done: experiment 41), and the maintainer seeing its token cost | Proposed |
 | [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b | Proposed |
 | [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b | Proposed |
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b | Proposed |
@@ -152,47 +151,6 @@ detectors use, so a detector that shares the residual's blind spots is flattered
 line therefore starts by building a reference set independent of the detectors.
 
 The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
-
-#### SW2-0a: an agent labeller gated on known answers
-
-**Build a labeller from log-timed features that use no forecasting model, gate it on injected
-transfers and placebo windows, and use its labels only if it passes.** The labeller sees one card
-per logged switching operation, with closures that overlap in time and share a substation grouped so
-that a split across 1 to 3 receivers is visible.
-
-- **The deciding features need the log and hindsight, which a live detector never has.** They are
-  measured on raw power against the median of the same half-hour and day-type over the 4 weeks
-  before and the 4 weeks after, excluding logged intervals. The deciding features are the step at
-  the logged close on each side, the reverse step at the logged open, the transfer against the
-  common mode of donor and receiver, how well the moved load follows the donor's daily shape, the
-  step in the sum over the neighbourhood, and the share of the 16 series that step the same way at
-  the same stamp.
-- **A hindsight XGBoost model adds weather-adjusted evidence only.** The hindsight XGBoost model
-  uses experiment 00006's 13 input columns, the inputs of experiment 00017's `H0.5`, with a quantile
-  loss at q10, q50, and q90, cross-fitted leaving out one month at a time from 2019-09 to 2026-06,
-  with every logged closure padded by 24 hours left out of training. The cross-fit is about 864 fits
-  on 2 cores. The logs give the exclusion directly, so the line runs no train, detect, retrain loop
-  for the labeller.
-- **A rules-only labeller is built and gated first.** A Sonnet labeller then reads the features, and
-  a plot where a closure lasts a day or more or the features disagree. A second Sonnet labeller
-  relabels the cards the first calls visible or low-confidence, plus a quarter of the rest, and Opus
-  settles only the disagreements. Sonnet is kept only if its event-level F1 beats the rules'.
-- **Hidden sentinels in every batch.** About a fifth of the cards are placebo windows (a real
-  operation's substations and clock time shifted into a quiet week) or injected transfers.
-- **The gate, on 300 fresh known-answer cards scored once:** 5% or fewer placebo cards called
-  visible, recall of 0.8 or more on injected transfers of 25% or more of the receiving load lasting
-  6 hours or more, onset within 1 hour on 90% of found injections, end within the larger of 2 hours
-  and 10% of the duration on 80%, and agreement between the two labellers of 0.7 or more in Cohen's
-  kappa. In any size and duration band where the labeller's recall on injections is under 0.8, a
-  "not visible" label cannot be trusted, and later scoring treats that band as neither a hit nor a
-  miss.
-- **Each visible event carries a rough magnitude.** The moved load is not constant during an
-  event, so the labeller gives the median MW moved over the event with a 10th-to-90th percentile
-  range, from the donor's and receivers' excess over the reference. Python divides that median by
-  the donor's usual range, the 99th minus the 1st percentile of the donor's half-hourly power over
-  the 365 days before the event with logged closures left out, a robust stand-in for maximum minus
-  minimum. The gate's check on magnitude is a median relative error of 25% or less on injected
-  transfers.
 
 #### SW2-0b: the labelled reference set
 

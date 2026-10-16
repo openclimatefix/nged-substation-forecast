@@ -70,6 +70,7 @@ the maintainer to confirm.
 | [00038 - Switching event detector, part 2](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | 2026-10-16 |
 | [00039 - PV disaggregation, part 1](00039-pv-disaggregation-cams-injection/result.md) | Can a CAMS-driven fit separate embedded solar from Primary substation demand, recovering injected solar-farm output within 25% and passing four checks on the real series? | Partly supported: recovery passes (0.854, 0.815 to 0.866), real checks pass at 6 of 8 Primaries | Not for production | 2026-10-16 |
 | [00040 - PV disaggregation, part 2](00040-pv-capacity-error-bars/result.md) | Can a cross-arm misfit test detect a cloud-driven demand load that biases the capacity fitted to embedded solar, and how many directional Primaries are free of one in 2025/26? | Partly supported: calibrated (median capacity over truth 0.992, 0.951 to 1.032), but a day-long cloud load is flagged in only 0.35 of draws at 25% of capacity, so the verdict is `underpowered` | Not for production | 2026-10-16 |
+| [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -936,3 +937,25 @@ directional Primary substations.
   [PR #1249 (Experiment 40: how far can the capacity fitted to embedded solar be trusted?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1249).
 
 ![Capacity per Primary in 2025/26 with its interval and bound](00040-pv-capacity-error-bars/figure_01.svg)
+
+### 00041: a labeller for logged switching events, gated on known answers
+
+**A Sonnet labeller called no placebo card visible but found 0.74 of large, long injected
+transfers (25 of 34; 0.57 to 0.85), under the 0.80 bar, so the verdict is partly supported.** On
+300 known-answer cards it called 0 of 120 placebo cards visible (95% interval 0.00 to 0.03). Where
+a metered receiver exists the recall is 0.89 (46 of 52; 0.77 to 0.95), and where only the donor
+steps it is 0.60. A rules-only labeller on the same features reaches 0.65 with 3 of 120 placebo
+cards visible. The receivers-named bar was waived by the maintainer after the rules-only results.
+
+- **Finding for later experiments:** Sonnet reaches 0.80 only for transfers of 25% or more of the
+  receiving load lasting over 1 day, so detector scoring treats every other band as don't-care.
+- **Process finding:** the first test set's injected cards differed from placebo cards in the
+  minute of the log time, the sheet's sides, and the clock time, and a reviewer caught it; the
+  gate was rerun on a rebuilt set. SW2-0b needs the same check on real cards against sentinels.
+- **Cost:** 14.9 million subagent tokens for 1,156 card labellings, about 12,900 per card, with no
+  Opus run.
+- **Agreement:** the two Sonnet labellers agree with kappa 0.79.
+- **Write-up and pull request:** [result](00041-sw2-0a-labeller-gate/result.md),
+  [PR #1253 (Experiment 41: SW2-0a switching-event labeller and its known-answer gate (plan))](https://github.com/openclimatefix/nged-substation-forecast/pull/1253).
+
+![Recall of injected transfers by size and duration band](00041-sw2-0a-labeller-gate/figure_2_recall_by_band.svg)
