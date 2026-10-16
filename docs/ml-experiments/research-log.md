@@ -76,7 +76,7 @@ the maintainer to confirm.
 | [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
-| [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-17 |
+| [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1048,16 +1048,19 @@ or more of the receiving load lasting over 24 hours.
 
 ### 00048: weekly retraining of the demand model, checked on the runs experiment 34 left out
 
-**Refitting the Primary demand model weekly, with no error correction, scored 5.04 points of
-capacity on 292 daily forecast runs that experiment 34 had not scored, 0.20 below the best earlier
-setup.** The experiment refitted N1 weekly and monthly for the 16 Primary and 4 larger substations,
-and monthly for 6 solar and 3 wind farms, on a different set of runs from experiment 34's. The
-verdict is supported. The 7-day and the 14-day correction did not help a refitted model, and monthly
-retraining changed solar and wind scores by 0.04 points or less.
+**Refitting the Primary demand model weekly, with no error correction, scored 0.20 points of
+capacity below the best setup tested earlier (5.44 against 5.64) on 292 daily forecast runs that
+experiment 34 had not scored.** Scores are the quantile score in percentage points of capacity, and
+the earlier setup, called the stack, is a model fitted once with a 14-day error correction. The
+experiment refitted the XGBoost demand model (N1) weekly and monthly for 16 Primary substations and
+for 2 bulk supply point (BSP) and 2 grid supply point (GSP) substations. It refitted the weather-to-
+power model monthly for 6 solar and 3 wind farms. The verdict is supported. A 7-day or 14-day error
+correction was not shown to help a refitted model, and monthly refitting changed solar and wind
+scores by 0.04 points or less.
 
 - **Headline result:** weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly
   minus monthly -0.13 (-0.24 to -0.03); the 7-day correction on the weekly model +0.16 (-0.06 to
-  +0.36).
+  +0.36, worse, unresolved).
 - **Finding for later experiments:** at the 2 BSP and 2 GSP substations weekly retraining gained
   0.66 points over the stack (-1.23 to -0.27), more than predicted, on 4 series. The 7-day
   correction window was 0.09 worse than the 14-day window. The 292 runs share their months with

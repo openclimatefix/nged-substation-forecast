@@ -371,10 +371,19 @@ def compute_contrasts(*, smoke: bool) -> None:
     )
 
 
+BASELINE_ARMS: Final[frozenset[str]] = frozenset({"manual_heuristic", "climatology"})
+
+
 def common_keys(*, group: str, smoke: bool) -> pl.DataFrame:
-    """Return the cases of the gap runs that every arm holding the group shares."""
+    """Return the cases of the gap runs that every forecasting-model arm holding the group shares.
+
+    The baselines are left out of the intersection because they hold fewer cases, and including them
+    would score the model arms on a smaller set than the planned contrasts use.
+    """
     keys: pl.DataFrame | None = None
     for path in sorted(_metrics_dir(smoke=smoke).glob("*.parquet")):
+        if path.stem in BASELINE_ARMS:
+            continue
         frame = read_arm(arm=path.stem, groups=(group,), smoke=smoke)
         if frame is None:
             continue

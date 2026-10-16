@@ -55,8 +55,8 @@ metric: >-
   are reported and decide nothing
 verdict: supported
 best_arm: >-
-  Weekly retraining without the correction: 5.04 points of capacity for the 16 Primary substations,
-  against 5.28 for the stack, 5.11 for monthly retraining, and 5.89 for `manual_heuristic`.
+  Weekly retraining without the correction: 5.44 points of capacity for the 16 Primary substations,
+  against 5.64 for the stack, 5.57 for monthly retraining, and 6.26 for `manual_heuristic`.
 headline: >-
   C1, weekly retraining minus the stack: -0.20 points (99.44% interval -0.40 to -0.04). C3, weekly
   minus monthly retraining: -0.13 (-0.24 to -0.03). The 7-day correction on the weekly model
@@ -90,125 +90,150 @@ code: ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-g
 
 # Experiment 48: does weekly retraining still win on the runs experiment 34 left out?
 
-**We asked whether a forecast of a substation's electricity demand improves when the forecasting
-model is refitted every week on the newest data, and whether the same refitting helps at larger
-substations and at solar and wind farms.** The take-home message is that weekly refitting is worth
-adopting for demand forecasts. On 292 daily forecast runs that experiment 34 had not scored, a
-weekly refit with no error correction scored 5.04 points of capacity on 16 Primary substations,
-which is 0.20 points better than the best earlier setup (a model fitted once, plus a correction
-built from its own errors over the last 14 days, scoring 5.28). The result rules out two reasons for
-keeping the older setup: weekly refitting beat monthly refitting by 0.13 points, and no error
-correction (7 or 14 days) helped a refitted model. At the 2 bulk supply point (BSP) and 2 grid supply
-point (GSP) substations, weekly refitting gained 0.66 points over the same older setup, more than we
-predicted. For solar and wind farms, refitting the weather-to-power model monthly changed the score
-by 0.04 points or less, so refitting does not need to be extended to generation. The next experiment
-should check, on a second validation year, that the weekly gain is not particular to this year.
-The verdict is **supported**.
+**Refitting the demand forecasting model every week scored better than the best setup tested
+earlier, on forecast runs the earlier experiment had not scored.** We asked whether an XGBoost model
+that forecasts a substation's electricity demand improves when it is refitted (retrained from
+scratch) every week on the newest data. An earlier experiment (experiment 34) had scored only 73
+forecast runs, 5 days apart. Here we scored the other 292 daily runs of the same year, July 2025 to
+June 2026, where each run is one day's ECMWF ensemble weather forecast (ENS) used to forecast about
+14.6 days of demand. The error is the quantile score, which rewards a forecast that is both close
+and honest about its uncertainty, in percentage points of the substation's capacity; smaller is
+better.
 
-**Terms used below.** The quantile score rewards a forecast that is both close and honest about its
-uncertainty, in percentage points of the substation's capacity (smaller is better). The stack is the
-older setup just described, with a spread factor of 1.15 that widens its uncertainty. Frozen means
-fitted once, on data up to the end of June 2025. Every arm other than the stack uses the spread
-factor, and uses no correction unless its name says so. ENS is the ECMWF ensemble weather forecast,
-and the model is the one-model-per-substation XGBoost recipe of experiment 13 (N1), trained on the
-ENS control member. Scores are means over the cases that every arm of a group holds, on seed 0.
+**On 16 Primary substations, weekly refitting scored 5.44 and the earlier best setup scored 5.64.**
+The earlier setup, called the stack below, is a model fitted once with a correction built from its
+own errors over the last 14 days. The 0.20-point gap is wholly below zero at the strict level we
+fixed in advance. Weekly refitting also beat monthly refitting (5.57) by 0.13 points. Neither the
+7-day nor the 14-day error correction helped a weekly-refitted model, although neither was shown to
+hurt it at the strict level. At the 2 bulk supply point (BSP) and 2 grid supply point (GSP)
+substations, which sit above the Primary substations, weekly refitting scored 0.66 points below the
+stack, more than we predicted. For 6 solar farms and 3 wind farms, refitting the weather-to-power
+model monthly changed the score by 0.04 points or less, so this experiment found no accuracy reason
+to refit generation models. The verdict is **supported**, and the open test is a second validation
+year, because the 292 runs share their months and weather with the 73 that experiment 34 scored.
 
-**Weekly refitting beat the stack at the 99.44% level the plan set.** C1, weekly minus the stack, is
--0.20 points (99.44% interval -0.40 to -0.04), so the interval lies wholly below zero. The threshold
-was zero, because refitting replaces the correction step and adds one scheduled job. C3, weekly
-minus monthly, is -0.13 (-0.24 to -0.03). Monthly minus the stack (C2) is -0.08 (-0.33 to +0.19) and
-unresolved, so the 5-day-row finding of experiment 34 for monthly refitting did not repeat on daily
-runs at this level of confidence. The scores are mean quantile scores over all leads.
+**Terms used below.** The stack uses a spread factor of 1.15 that widens its forecast uncertainty;
+every other arm uses the spread factor too, and uses no correction unless its name says so. Frozen
+means fitted once, on data up to the end of June 2025. N1 is the one-model-per-substation XGBoost
+recipe of experiment 13, trained on the ENS control member. A case is one forecast of one series at
+one valid time from one run. Lead is the time between the forecast origin and the valid time. P-roll
+is a monthly refit on the latest 12 months of data only. The weather-to-power model for solar and
+wind is the ERA5-trained stage 1a model, where ERA5 is a weather reanalysis that arrives about 5
+days late. Scores are means over the cases that every forecasting-model arm of a group holds, on
+seed 0. The decision rule is in the front matter, and C1 to C8w are the contrasts it lists; "Design
+as planned" below explains the choices.
+
+**Weekly refitting beat the stack at the 99.44% level we fixed in advance.** C1, weekly minus the
+stack, is -0.20 points (99.44% interval -0.40 to -0.04), so the interval lies wholly below zero. The
+threshold was zero: any gain was enough, because refitting replaces the correction step at the
+price of one scheduled job. C3, weekly minus monthly refitting, is -0.13 (-0.24 to -0.03). C2,
+monthly minus the stack, is -0.08 (-0.33 to +0.19). Experiment 34 found monthly refitting better
+than the stack on its 5-day runs, and this experiment did not resolve that gain on daily runs.
 
 ![Planned contrasts](figure_1.svg)
 
 | Arm | Primary (16) | BSP (2) | GSP (2) | Solar farms (6) | Wind farms (3) |
 |---|---|---|---|---|---|
-| Stack: frozen, 14-day correction | 5.28 | 8.09 | 19.75 | | |
-| Frozen, no correction | 6.28 | 7.99 | 19.46 | 5.02 | 10.99 |
-| Monthly refits | 5.11 | 7.90 | 18.94 | 4.97 | 10.99 |
-| Weekly refits | **5.04** | **7.84** | **18.66** | | |
-| Weekly, 14-day correction | 5.16 | 7.96 | 19.17 | | |
-| Weekly, 7-day correction | 5.22 | | | | |
-| Monthly, 12-month window (P-roll) | 5.15 | | | | |
-| `manual_heuristic` | 5.89 | 8.84 | 20.82 | 5.79 | 14.09 |
+| Stack: frozen, 14-day correction | 5.64 | 8.09 | 19.74 | | |
+| Frozen, no correction | 7.09 | 7.99 | 19.46 | 5.02 | 10.98 |
+| Monthly refits | 5.57 | 7.89 | 18.94 | 4.97 | 10.99 |
+| Weekly refits | **5.44** | **7.84** | **18.66** | | |
+| Weekly, 14-day correction | 5.52 | 7.95 | 19.17 | | |
+| Weekly, 7-day correction | 5.60 | | | | |
+| P-roll | 5.59 | | | | |
+| `manual_heuristic` | 6.26 | 8.84 | 20.82 | 5.79 | 14.09 |
 | `climatology` | 7.48 | | | | |
 
-The 95% interval on each score, over months, is about plus or minus 0.4 points for Primary
-substations; the contrasts are paired and much tighter. The 73 runs of experiment 34 were forecast
-again from the same refits. For the Primary arms without a correction they matched experiment 34's
-stored scores to 0.001 or better. For the BSP and GSP arms the differences were 0.0002 to 0.006
-points, so 4 of the 6 BSP and GSP rows lie outside the 0.001 tolerance the plan set. The cause is the
-graphics-card fits, which are not bit-for-bit repeatable; the differences are small against the
-contrasts reported below.
+Each cell is a mean quantile score in points of capacity, and a blank cell means the arm was not
+run for that group. Scores are on the cases that every forecasting-model arm of the group holds
+(3,199,243 Primary cases), so differences between cells equal the paired contrasts. `manual_heuristic`
+and `climatology` hold slightly fewer cases (3,197,611 and 3,049,925 for Primary), and the solar and
+wind rows hold the weather-to-power model without a correction. The 95% interval on each Primary
+score, over months, is about plus or minus 0.3 points; the contrasts are paired and much tighter.
 
-**An error correction did not help a model that is refitted weekly.** C4, a 7-day correction on the
-weekly model, raised the score by 0.16 (-0.06 to +0.36). C5, a 14-day correction, raised it by 0.08
-(-0.13 to +0.27). C6 puts the 7-day window 0.09 above the 14-day window (+0.02 to +0.17), so the
-shorter window was worse, the opposite of what the plan predicted. Neither C4 nor C5 is resolved
-alone. The correction does help the frozen model: it lowers the frozen score by 1.45 points (95%
-interval -1.87 to -0.98), so the correction is still the right step for a model that is not
-refitted.
+**The reproduction check passed for Primary and narrowly failed for BSP and GSP.** We forecast the
+73 runs of experiment 34 again from the same refits. For the Primary arms without a correction, the
+scores matched experiment 34's stored seed-0 scores to 0.001 or better. For the BSP and GSP arms the
+differences were 0.0002 to 0.006 points, and 4 of those 6 rows lie outside the 0.001 tolerance. The
+probable cause is that graphics-card fits are not bit-for-bit repeatable. The differences are small
+against the contrasts reported here.
 
-**Weekly refitting gained more at the BSP and GSP substations than the plan predicted, but on 4
-series.** C7, weekly minus the stack, is -0.66 (-1.23 to -0.27), against a predicted range of -0.1
-to -0.5. Each of the 4 series scored lower under weekly refitting, and the intervals on the two GSP
-series are wide (figure 4). A correction on the weekly model costs 0.31 points here (95% interval
-+0.06 to +0.60).
+**An error correction was not shown to help a model that is refitted weekly.** C4, a 7-day
+correction on the weekly model, raised the score by 0.16 points, which is worse (99.44% interval
+-0.06 to +0.36). C5, a 14-day correction, raised it by 0.08 (-0.13 to +0.27). Neither interval
+excludes zero. C6 shows that the 7-day window scored 0.09 points worse than the 14-day window
+(+0.02 to +0.17), the opposite of what we predicted. The correction did help the frozen model in
+this experiment: it lowered the frozen score by 1.45 points (95% interval -1.87 to -0.98).
 
-**Monthly refitting changed the solar and wind scores by 0.04 points or less.** C8s for the 6 solar
-farms is -0.04 (99.44% interval -0.16 to -0.00), a change by the plan's rule because the interval
-excludes zero by a hair, and inside the 0.05 no-change band. C8w for the 3 wind farms is +0.01
-(-0.00 to +0.02), inside the band. One solar farm (label E) gained 0.26 points (95% interval -0.72 to
--0.00); the other 5 moved by 0.02 or less. The prediction of no change rests on the training-start
-result of experiment 12, not on a retraining measurement, and these two intervals are the first
-retraining measurement for generation.
+**Weekly refitting gained more at the BSP and GSP substations than predicted, on 4 series.** C7,
+weekly minus the stack, is -0.66 (-1.23 to -0.27), against a predicted range of -0.1 to -0.5. Each
+of the 4 series scored lower under weekly refitting, but the interval for D13 alone includes zero
+(figure 4). Weekly minus the frozen model without a correction is -0.47 (95% interval -0.87 to
+-0.11). A correction on the weekly model raises the score by 0.31 points, which is worse (95%
+interval +0.06 to +0.60).
+
+**Monthly refitting changed the pooled solar score by 0.04 points, and the pooled wind score by
+0.01.** C8s for the 6 solar farms is -0.044 (99.44% interval -0.158 to -0.003). By the rule we set,
+that is a change, because the interval excludes zero, although the point estimate lies inside the
+plus-or-minus-0.05 band. C8w for the 3 wind farms is +0.007 (-0.001 to +0.014), inside the band.
+
+**One solar farm drives most of the solar change.** Farm E improved by 0.26 points (95% interval
+-0.72 to -0.00); the other 5 solar farms moved by 0.02 points or less. One wind farm (W2) scored
+0.03 points worse (+0.006 to +0.045). We predicted no change from the training-start result of
+experiment 12, and these intervals are the first retraining measurement for generation in this
+project's experiments.
 
 ![Absolute quantile score of every arm](figure_2.svg)
 
 ![Quantile score by lead band](figure_3.svg)
 
-**Refitting helped at every lead time, most of all in the first two days.** On Primary substations
-weekly refitting scored 4.18 against 4.41 for the stack in the first 24 hours, and 5.50 against 5.76
-beyond 10 days (figure 3).
+**The weekly gain over the stack is about the same at every lead time.** C1 is -0.21 in the first
+24 hours and -0.20 beyond 10 days (figure 3). The gain of weekly over monthly refitting is larger
+at short leads (-0.19 in the first 24 hours, -0.12 beyond 10 days), and the BSP and GSP gain is
+larger early (-0.90 in the first 24 hours, -0.62 beyond 10 days).
 
 ![Each series on its own](figure_4.svg)
 
-**The rolling 12-month window stayed a good stand-in for monthly refitting.** P-roll scored 5.15
-against 5.11 for monthly refitting, a difference of +0.03 (95% interval +0.01 to +0.04), with the
-same sign pattern as experiment 34.
+**Refitting monthly on a rolling 12-month window (P-roll) scored 0.03 points worse than monthly
+refitting on all the data.** The difference is +0.028 (95% interval +0.014 to +0.039). Experiment 34
+found the same sign.
 
 ## Predictions
 
-- **Held:** weekly minus the stack in the range -0.10 to -0.30 (-0.20); monthly 0.05 to 0.10 behind
-  weekly (0.08); monthly solar and wind within 0.05 (-0.04 and +0.01).
-- **Missed:** the 7-day correction adding less than the 14-day correction (it added more); BSP and
-  GSP weekly minus the stack in -0.1 to -0.5 (-0.66).
+- **Held:** weekly minus the stack in the range -0.10 to -0.30 (-0.20); monthly solar and wind
+  within 0.05 as point estimates (-0.04 and +0.01, though the solar interval excludes zero); the 7-day
+  and 14-day corrections adding +0.05 to +0.30 (+0.16 and +0.08).
+- **Missed:** monthly 0.05 to 0.10 behind weekly (C3 is 0.13); the 7-day correction adding less than
+  the 14-day correction (it added more); BSP and GSP weekly minus the stack in -0.1 to -0.5 (-0.66).
+  The BSP and GSP prediction in the front matter reads "weekly minus frozen", and C7 uses the stack
+  as the reference; weekly minus the frozen model with no correction is -0.47 and inside the range.
 
 ## Failures and limits
 
-- **No fit failed.** The frozen model's first single-job run showed no output for 37 minutes and was
-  restarted as 5 workers; no result came from the abandoned run.
+- **No refit failed after the restart.** The frozen model's first run, one job for all series,
+  showed no output for 37 minutes and was restarted as 5 workers; no result came from the abandoned run.
 - **The 292 runs share their months and weather with the 73 of experiment 34.** Each run spans about
   14.6 days, so the 73 runs already cover every valid time of the year, and the interval is set by 12
-  months. The result guards against the choice of origins and of seeds, not against an unusual year.
-- **The first 3 days of July 2025 have no correction history,** so the stack and the corrected arms
-  carry no correction there; no correction reads a forecast before 2025-07-01.
-- **The generator spread factor is fitted on cases before each month's first run.** July 2025 and
-  the first wind months have too few earlier cases, so both generator arms are left unscaled there.
+  months. The result guards against the choice of origins, not against an unusual year. Seeds were not
+  varied (seed 0 only); experiment 34 found that seeds narrow its contrasts by under 0.01.
+- **The correction has no history for the first days of July 2025,** so the stack and the corrected
+  arms carry no correction there; the correction reads no forecast issued before 2025-07-01.
+- **The generator spread factor is fitted on cases before each month's first run.** July 2025 and the
+  first wind months have too few earlier cases, so both generator arms are left unscaled there.
 - **Pooled intervals resample months only,** so they say nothing about other series. The BSP and GSP
   contrast rests on 4 series, solar on 6, and wind on 3.
-- **Seed 0 only.** Experiment 34 found that seeds narrow its contrasts by under 0.01.
-- **Reproduction tolerance missed on the GPU-fitted BSP and GSP arms** (0.002 to 0.006 points).
-- **All arms use ENS weather forecasts, with no weather estimate from after the forecast origin.**
-  The generator arms train on ERA5 up to 5 days before each refit date, the delay with which ERA5
-  arrives.
+- **The reproduction tolerance was missed on the BSP and GSP arms** (0.003 to 0.006 points on 4 rows).
+- **Absolute scores differ from experiment 34's,** because the two experiments score different runs
+  (stack 5.64 here, 5.32 there); only the paired contrasts compare across them. The stack's
+  correction also reads forecasts from the last day here and from 5 days back in experiment 34.
+- **The weather inputs are deployable.** All arms use ENS weather forecasts, and the generator arms
+  train on ERA5 only up to 5 days before each refit date.
 
-## What the next experiment should answer
+## What remains untested
 
-**Does weekly retraining still beat the stack on a validation year the project has not scored?**
-The ENS backfill from Source Cooperative gives a second year to score. The 7-day correction window
-and solar and wind retraining are answered at the resolution of this experiment.
+**Does weekly refitting still beat the stack on a validation year the project has not scored?** The
+ENS backfill from Source Cooperative gives a second year to score. Experiment 48 answers the 7-day
+correction window and solar and wind refitting at the resolution of its intervals.
 
 ## Design as planned
 
