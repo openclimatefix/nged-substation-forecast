@@ -30,6 +30,13 @@ regions or climates, so a result may not hold elsewhere.
   active network management against each other and against the telemetry, and finds the setpoint
   history the one to build on.
 
+- [Embedded solar behind six Lincolnshire Primary substations is 2.5 to 4.5 MW, and grew 7% to
+  16% a year](embedded-pv-capacity.md)
+  — a season-year table of the embedded-solar capacity behind each directional Primary substation in
+  the trial area, built from stored fits with no refit, with the sampling, farm-to-rooftop, and
+  undetected-demand error terms kept separate. Kirton gets no capacity because its demand responds to
+  cloud in a way solar cannot explain.
+
 - [How many Balancing Mechanism Units in Great Britain are solar?](solar-bmu-census.md) — a census
   of the BMUs whose settled output follows the sun, found because no field in the BMU register says
   which units are solar. The study finds 12 single-site solar BMUs at 11 sites, 8 of those sites with
