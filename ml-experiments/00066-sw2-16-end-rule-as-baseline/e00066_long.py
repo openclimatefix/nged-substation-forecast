@@ -1,8 +1,8 @@
-"""The long set: injected transfers that last 14 to 60 days, drawn like experiment 58's.
+"""The long set: injected transfers that last 15.6 to 60 days, drawn like experiment 58's.
 
 Experiment 58's injected transfers last 30 days at most, and only 17 of its 1,160 headline-band
 transfers last over 14 days, so they cannot tell a cap of 14 days from a cap of 30 or 60. The long
-set draws its durations from the labelled real operations that last 14 to 60 days, in the headline
+set draws its durations from the labelled real operations that last 15.6 to 60 days, in the headline
 size band, with the quietness rules of `draw_events`.
 """
 
@@ -19,14 +19,14 @@ LONG_EVENTS: Final[int] = 400
 FIRST_ID: Final[int] = 5000
 SEED_LONG: Final[int] = 7700
 """Seed of the draw; batch `i` is injected with `SEED_LONG + 1000 + i`."""
-LONG_BAND: Final[str] = "14 to 60 d"
-MIN_DAYS: Final[int] = 14
+LONG_BAND: Final[str] = "15.6 to 60 d"
+MIN_DAYS: Final[float] = 15.6
 MAX_DAYS: Final[int] = 60
 MAX_ATTEMPTS: Final[int] = 400_000
 
 
 def long_operations() -> pl.DataFrame:
-    """The labelled real operations lasting 14 to 60 days: sheet sides and duration in hours."""
+    """The labelled real operations lasting 15.6 to 60 days: sheet sides and duration in hours."""
     return (
         pl.read_parquet(LABELLED_PATH)
         .filter(pl.col("kind") == "real_operation")
@@ -39,7 +39,7 @@ def long_operations() -> pl.DataFrame:
 
 
 def draw_long_events(*, quiet: dict[int, np.ndarray]) -> list[Event]:
-    """Draw `LONG_EVENTS` headline-size transfers lasting 14 to 60 days, quiet on every series."""
+    """Draw `LONG_EVENTS` headline-size transfers lasting 15.6 to 60 days, quiet on every series."""
     pool = long_operations()
     rng = np.random.default_rng(SEED_LONG)
     events: list[Event] = []

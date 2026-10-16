@@ -6,42 +6,47 @@ size: medium
 hypothesis: >-
   Experiment 61's end rule (each alarm interval ends at the strongest opposite step within a cap of
   14 days) can be improved by a longer cap, a shorter step window, or both. A cap of 30 or 60 days
-  finds more of the MW moved by transfers that last over 14 days, at no loss on shorter transfers.
+  finds more of the MW moved by transfers that last over 14 days, with a loss of at most 0.01 on the shorter transfers of experiment 58.
   The 4-hour step window finds more of the moved MW than the 24-hour window at the same number of
   unexplained alarms. The winning window and cap then become the benchmark for every later
   switching-detector experiment.
 prediction: >-
   Pooled over the shapes S2, S3, and S4, in MW-weighted recall (the share of the moved MW that sits
-  in found transfers). On a new set of transfers lasting 14 to 60 days (the long set), the 24-hour
-  window with a 30-day cap gains +0.25 to +0.45 over the 14-day cap (C1), because the 14-day cap
-  cannot end a transfer more than about 15.5 days long within tolerance, and the 60-day cap gains
-  +0.30 to +0.50 (C2), the extra +0.00 to +0.15 over the 30-day cap coming from the roughly 1 in 6
-  long transfers that last over 30 days. On experiment 58's 620 transfers, of which 17 of 1,160
-  headline-band transfers last over 14 days and none over 30, the 30-day cap changes recall by
-  +0.00 to +0.01 (C3) and the 60-day cap by -0.03 to +0.01 (C4), since a 60-day cap can choose a
-  later and larger opposite step that belongs to another event. The 4-hour window with 80
+  in found transfers). On a new set of transfers lasting 15.6 to 60 days (the long set), the 24-hour
+  window with a 30-day cap gains +0.30 to +0.55 over the 14-day cap (C1), because the 14-day cap
+  cannot end a transfer longer than 15.6 days within tolerance, and the 60-day cap gains
+  +0.40 to +0.65 (C2), the extra +0.00 to +0.20 over the 30-day cap coming from the roughly 1 in 5
+  long transfers that last over 30 days. On experiment 58's 620 transfers, a no-harm check rather
+  than evidence of a gain, of which 17 of 1,160 headline-band transfers (all months) last over 14
+  days and none over 30, the 30-day cap changes recall by -0.01 to +0.01 (C3) and the 60-day cap
+  by -0.03 to +0.01 (C4), since a longer cap can choose a later and larger opposite step that
+  belongs to another event. The 4-hour window with 80
   unexplained alarms changes recall by -0.15 to 0.00 against the 24-hour window (C5), because the
   4-hour step is noisier for the slow steps of a transfer that follows a daily profile. The 24-hour
   window with a 30-day cap is therefore the expected winner.
 decision_rule: >-
   Five planned contrasts, read at 99% (Bonferroni across C1 to C5) from 20,000 resamples of whole
   calendar months, each the paired difference in MW-weighted recall pooled with equal weight over
-  S2, S3, and S4, on transfers that start in even months. C1 and C2 are on the long set (300
-  injected transfers of 25% to 40% of the receiving load lasting 14 to 60 days, drawn from the 29
-  labelled real operations that last that long), and C3 and C4 are on experiment 58's 620
+  S2, S3, and S4, on transfers that start in even months. C1 and C2 are on the long set (400
+  injected transfers of 25% to 40% of the receiving load lasting 15.6 to 60 days, with durations
+  from the 26 labelled real operations that last that long), and C3 and C4 are on experiment 58's 620
   headline-band transfers. C1 is the 24-hour window with a 30-day cap minus the same window with a
   14-day cap, C2 is a 60-day cap minus the 14-day cap, C3 and C4 are C1 and C2 on the 620
   transfers, and C5 is the 4-hour window (threshold matched to 80 unexplained alarms on odd months)
   with a 14-day cap minus the 24-hour window with a 14-day cap, on the 620 transfers. The
   benchmark is the 24-hour window with a 14-day cap (PE of experiment 61). The window changes
   to 4 hours when the C5 interval lies wholly above zero and its point value is at least +0.01.
-  A cap of c days replaces 14 at the chosen window when the interval of its contrast on the long
-  set (C1 or C2, or the same contrast at the 4-hour window, descriptive) lies wholly above zero,
-  its point value on the long set is at least +0.01, and its point value on the 620 transfers (C3
-  or C4) is no lower than -0.01. When both caps pass, the 60-day cap is used only if its recall on
-  the long set exceeds the 30-day cap's by at least +0.01. The verdict is `supported` when the
-  window or the cap changes, `refuted` when neither changes and every one of the five intervals
-  has its upper end below +0.01, and `inconclusive` otherwise. The threshold of +0.01 is the cost
+  A cap of c days replaces 14 when the interval of its contrast on the long set (C1 or C2) lies
+  strictly above zero, its point value on the long set is at least +0.01, and its point value on
+  the 620 transfers (C3 or C4) is at least -0.01. The caps are always chosen from the 24-hour
+  contrasts C1 to C4. If the window changes to 4 hours, the cap carried forward is the one chosen at
+  24 hours, and the write-up says it was not tested at 4 hours; the 4-hour cap contrasts are
+  reported without a verdict. When both caps pass, the 60-day cap is used only if its recall on the
+  long set exceeds the 30-day cap's by at least +0.01 (a comparison of point values). The verdict
+  is `supported` when the window or the cap changes. It is `refuted` when neither changes and the
+  upper ends of the C1, C2, and C5 intervals are all below +0.01, so that no change could be worth
+  the cost (C3 and C4 only guard against loss and do not enter this test). Every other outcome,
+  including a cap that passes on the long set and fails the guard, is `inconclusive`. The threshold of +0.01 is the cost
   of the longer hindsight a cap implies (a cap of 60 days means the last 60 days before a
   forecast cannot be masked) and of switching to the 4-hour windowed statistic; setting a cap
   costs nothing else to port.
@@ -94,19 +99,35 @@ Twelve arms in all: three alarm settings, each with D0M and three caps.
   S3, and S4 are the shapes no detector assumes and form the headline. Only 17 of the 1,160
   headline-band transfers last over 14 days and none last over 30, so these 620 cannot tell the
   caps apart.
-- **The long set** is 300 new injected transfers of 25% to 40% of the receiving load, lasting 14
-  to 60 days, drawn from the 29 labelled real operations that last that long, with the same
-  quietness rules as experiment 58's. A fixed seed draws it.
+- **The long set** is 400 new injected transfers of 25% to 40% of the receiving load, lasting 15.6
+  to 60 days, with the same quietness rules as experiment 58's (no logged closure within 7 days
+  and no experiment 43 alarm within 2 days, on every series the transfer touches). A fixed seed,
+  chosen before any result is read, draws it. Each transfer takes its duration and its pair of
+  substations from one of the 26 labelled real operations that last 15.6 to 60 days (5 of the 26
+  last over 30 days, so about 1 in 5 of the long set does), and its onset is drawn uniformly. A
+  transfer counts as an even-month transfer by the month of its onset. The lower limit of 15.6
+  days is 14 days divided by 0.9: a shorter transfer has its end within the 10% tolerance of the
+  latest end a 14-day cap allows, so every cap repairs it and it cannot separate the caps. The
+  long set is injected in all five shapes and scored like the 620.
 - **The labelled real transfers** over 1 day (35 transfers, 24 with no D0M alarm at the start) are
-  scored as in experiment 61, split by duration at 14 days.
+  scored as in experiment 61 and reported as counts only, with no interval. The long set takes its
+  durations and substation pairs from the same labelled operations, so the real transfers and the
+  long set are not independent evidence.
 
 ## Scores
 
 Print for every arm, even months and odd months: MW-weighted recall by shape, the share of the
-moved MW missed, unweighted recall, recall by donor step in noise units split by metered
+moved MW missed (split into MW with no alarm at the start and MW whose start is found but whose
+end is wrong), unweighted recall, recall by donor step in noise units split by metered
 receiver (the standard table of the switching line), recall by duration, and the count of
 transfers whose start is found but whose end is wrong. The window and the cap are chosen on the
-decision rule above from even months, as the contrasts are, and odd-month tables only describe.
+decision rule above from even months, as the contrasts are. Because that choice selects among the
+arms on the even months, the chosen setting's recall is also reported on odd months, which the
+selection does not bias. The end rule's 1.5 noise units and the alarm thresholds (4.0, 6.0) are
+inherited from experiments 43 and 61 and are not retuned. The 4-hour threshold that matches 80
+alarms is searched on odd months only. D0M and the three end rules at one alarm setting share
+their alarms, so their alarm rate is equal by construction, and the two windows have the same rate
+at the 80-alarm setting.
 
 ## Sizing
 
@@ -115,7 +136,9 @@ decision rule above from even months, as the contrasts are, and odd-month tables
 - **Degradation rule:** not touched.
 - **More than one defensible design:** yes, a cap test needs transfers longer than 14 days, which
   experiment 58's set barely has, so the long set is a design choice.
-- **Callers that need searching:** none; the code is a copy of experiment 61's harness.
+- **Callers that need searching:** none; the code is a copy of experiment 61's harness, with three
+  changes: the end rule takes the cap as an argument, the threshold search takes a target alarm
+  count, and a new module draws the long set.
 
 The size is medium. A Sonnet agent reviews this plan, a Sonnet agent reviews the code, and two
 Sonnet agents review the write-up.
