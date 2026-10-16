@@ -14,6 +14,7 @@ from typing import Final
 import embedded_pv_inputs as inputs
 import numpy as np
 import polars as pl
+from scipy import stats
 
 from studies import pv_capacity_misfit as misfit
 
@@ -29,6 +30,7 @@ def real_shape_vectors(*, shape: str) -> dict[tuple[str, int], np.ndarray]:
 
 EARTH_RADIUS_KM: Final[float] = 6371.0
 MIN_DISTINCT_YEARS_PER_RESAMPLE: Final[int] = 3
+DAILY_OVER_C_REFERENCE: Final[float] = 0.92
 
 
 def status_of(
@@ -160,6 +162,18 @@ def build_rows(
     return table, pl.DataFrame(draw_rows)
 
 
+def linear_slope_per_year(*, years: np.ndarray, capacity: np.ndarray) -> float:
+    """Return the fitted growth in MW a year of a straight line through the capacities."""
+    return float(np.polyfit(years, capacity, 1)[0])
+
+
+def growth_ols_interval(*, years: np.ndarray, capacity: np.ndarray) -> tuple[float, float]:
+    """Return the 95% t interval of the annual growth rate from the log-linear least-squares fit."""
+    fit = stats.linregress(years, np.log(capacity))
+    half = stats.t.ppf(0.975, years.size - 2) * fit.stderr
+    return float(np.expm1(fit.slope - half)), float(np.expm1(fit.slope + half))
+
+
 def growth_per_year(*, years: np.ndarray, capacity: np.ndarray) -> float:
     """Return the fitted annual growth rate of a log-linear trend, as a fraction per year."""
     slope = np.polyfit(years, np.log(capacity), 1)[0]
@@ -216,6 +230,12 @@ def trend_rows(*, table: pl.DataFrame, draws: pl.DataFrame) -> pl.DataFrame:
                     "n_season_years": int(years.size),
                     "first_season_year": int(years[0]),
                     "growth_per_year": point,
+                    "mw_per_year": linear_slope_per_year(years=years, capacity=values),
+                    "growth_if_fixed_offset": growth_per_year(
+                        years=years, capacity=values - inputs.OFFSET_SHARE * values.mean()
+                    ),
+                    "ols_low": growth_ols_interval(years=years, capacity=values)[0],
+                    "ols_high": growth_ols_interval(years=years, capacity=values)[1],
                     "growth_without_last_year": growth_per_year(
                         years=years[:-1], capacity=values[:-1]
                     ),
@@ -275,8 +295,27 @@ def calibration_report() -> list[str]:
         )
         .sort("farm")
     )
+    detector = misfit.load_detector(
+        unit_vectors_path=inputs.UNIT_VECTORS_PATH,
+        real_vectors_path=inputs.REAL_VECTORS_PATH,
+        bootstrap_path=inputs.BOOTSTRAP_PATH,
+    )
+    baseline = []
+    for unit in detector.units:
+        ratios = detector.ratios(site=unit.site, excluded=frozenset({unit.farm}))
+        assert ratios is not None
+        capacity = float(misfit.capacity_and_misfit(vectors=unit.pv[None, :], ratios=ratios)[0][0])
+        daily = float(unit.pv[misfit.DAILY_FIT_INDEX] / ratios[misfit.DAILY_FIT_INDEX])
+        baseline.append({"farm": unit.farm, "daily_over_c": daily / capacity})
+    baseline_frame = pl.DataFrame(baseline)
+    per_farm_daily = (
+        baseline_frame.group_by("farm")
+        .agg(median_daily_over_c=pl.col("daily_over_c").median())
+        .sort("farm")
+    )
+    daily_over_c = baseline_frame["daily_over_c"]
     with pl.Config(tbl_rows=20, float_precision=3):
-        per_farm_text = str(per_farm)
+        per_farm_text = str(per_farm.join(per_farm_daily, on="farm"))
     return [
         "## Transfer from solar farms: C over truth on injected farm output (00040's `pure` rows)",
         "",
@@ -289,6 +328,15 @@ def calibration_report() -> list[str]:
         "```",
         per_farm_text,
         "```",
+        "",
+        "## Daily fit over C on injected farm output, noise-free (leave-own-farm-out ratios)",
+        "",
+        (
+            f"All {daily_over_c.len()} units: median {daily_over_c.median():.3f}, 10th to 90th "
+            f"percentile {daily_over_c.quantile(0.1):.3f} to "
+            f"{daily_over_c.quantile(0.9):.3f}; share below {DAILY_OVER_C_REFERENCE}: "
+            f"{(daily_over_c < DAILY_OVER_C_REFERENCE).sum() / daily_over_c.len():.3f}."
+        ),
         "",
     ]
 
@@ -371,6 +419,23 @@ def report(
         ),
         "",
     ]
+    lower = (pl.col("capacity_mw") - pl.col("capacity_low_mw")) / pl.col("capacity_mw")
+    upper = (pl.col("capacity_high_mw") - pl.col("capacity_mw")) / pl.col("capacity_mw")
+    widths = (
+        table.filter(pl.col("season_year") == inputs.LAST_SEASON_YEAR)
+        .filter(pl.col("status").is_in(["clean", "low-power"]))
+        .select("primary", below_share=lower, above_share=upper)
+        .sort("primary")
+    )
+    with pl.Config(tbl_rows=20, float_precision=3):
+        lines += [
+            "## 2025/26 sampling interval, share of C below and above the capacity",
+            "",
+            "```",
+            str(widths),
+            "```",
+            "",
+        ]
     unflagged = table.filter(pl.col("status").is_in(["clean", "low-power"]))
     ratio = unflagged["daily_over_six_arm"]
     kirton = table.filter(pl.col("site") == inputs.KIRTON)["daily_over_six_arm"]
@@ -397,6 +462,9 @@ def report(
             pl.col("bias_cross_arm").median().alias("bias_C"),
             pl.col("bias_daily_fit").median().alias("bias_daily_fit"),
             pl.len().alias("n_units"),
+        )
+        .with_columns(
+            daily_over_c_with_load=(1 + pl.col("bias_daily_fit")) / (1 + pl.col("bias_C"))
         )
         .sort("shape", "amplitude")
     )

@@ -306,8 +306,9 @@ def gap_figure(*, gaps: pl.DataFrame, number: int) -> alt.VConcatChart:
                 "per summer. Summer here is September 2025 and April to August 2026 for 2025/26."
             ),
             (
-                "Overcast days also differ from clear days in temperature and demand, so the gap is"
-                " more than the solar output alone. Each panel has its own y axis."
+                "Overcast days still carry some solar output and differ from clear days in "
+                "temperature, so the gap is not the solar output and can be larger or smaller. "
+                "Each panel has its own y axis."
             ),
         ],
         figure_planning=None,
@@ -367,12 +368,13 @@ def kirton_figure(*, pooled: pl.DataFrame, number: int) -> alt.VConcatChart:
             ),
             (
                 "Season-years 2020/21 to 2025/26 pooled, each weighted by its number of days. "
-                "Winter holds only November and February days, because the sun stays below 15 "
-                "degrees in December and January: at Kirton 30 clear and 33 overcast days, at "
-                "Donington 26 and 31. Summer holds 342 and 51 at Kirton, 319 and 52 at Donington. "
-                "Solar output is far lower in winter, so if solar alone caused the gap it would be "
-                "smaller in winter. A larger winter gap may be cold weather instead, so it is a "
-                "difference and not a proof."
+                "Winter holds only November and February days, because in December and January "
+                "the sun is above 15 degrees for too few half-hours to class a day: at Kirton 30 "
+                "clear and 33 overcast days, at Donington 26 and 31. Summer holds 342 and 51 at "
+                "Kirton, 319 and 52 at Donington. "
+                "Solar output alone would give a winter peak about 90% of the summer one (0.90 at "
+                "Kirton, 0.93 at Donington, from the CAMS-based unit output). Overcast and clear "
+                "winter days also differ in temperature, so the comparison does not show the cause."
             ),
         ],
         figure_planning=None,
@@ -713,9 +715,9 @@ def trend_figure(*, table: pl.DataFrame, trend: pl.DataFrame, number: int) -> al
             ),
             (
                 "Text in each panel: fitted growth per year, with the 95% interval from resampling "
-                "the season-years. Six points per line: the interval is wide and the line is a "
-                "summary, not a forecast. Kirton (no capacity given) and Wrangle T1 (too small) "
-                "are not shown."
+                "the season-years. Six or seven points per line: the interval is wide and the line "
+                "is a summary, not a forecast. Kirton (no capacity given) and Wrangle T1 (too "
+                "small) are not shown."
             ),
         ],
         figure_planning=None,

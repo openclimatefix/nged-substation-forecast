@@ -36,6 +36,7 @@ WIDE_COLUMNS: Final[tuple[str, ...]] = (
     "se_mw_clear",
     "se_mw_overcast",
     "gap_mw",
+    "gap_ci_half_mw",
 )
 SEASONS: Final[dict[str, tuple[int, ...]]] = {
     "summer": inputs.SUMMER_MONTHS,
@@ -141,6 +142,60 @@ def midday_gaps(*, classified: pl.DataFrame) -> pl.DataFrame:
         )
         .sort("site", "season_year", "sky_class")
     )
+
+
+def solar_shape_gaps(*, classified: pl.DataFrame, table: pl.DataFrame) -> tuple[pl.DataFrame, str]:
+    """Return what solar output alone would give for the clear-minus-overcast gap, and its report.
+
+    The unit output `u` is CAMS-based solar output per unit of capacity. For each Primary substation
+    in 2025/26, the table holds capacity C times the mean unit output over summer midday on clear
+    days minus overcast days. For Kirton and Donington, pooled over `POOL_FIRST_SEASON_YEAR` on,
+    the report holds the peak of the unit-output gap by half-hour in each season, which is
+    independent of capacity.
+    """
+    start, end = inputs.MIDDAY_HALF_HOURS
+    midday = (
+        classified.filter(
+            (pl.col("season") == "summer")
+            & (pl.col("season_year") == inputs.LAST_SEASON_YEAR)
+            & pl.col("half_hour").is_between(start, end - 1)
+        )
+        .group_by("site", "sky_class")
+        .agg(u_mean=pl.col("u").mean())
+        .pivot(on="sky_class", index="site", values="u_mean")
+        .with_columns(u_gap=pl.col("clear") - pl.col("overcast"))
+        .join(
+            table.filter(pl.col("season_year") == inputs.LAST_SEASON_YEAR).select(
+                "site", "capacity_mw"
+            ),
+            on="site",
+        )
+        .with_columns(solar_only_gap_mw=pl.col("u_gap") * pl.col("capacity_mw"))
+        .sort("site")
+    )
+    pooled = (
+        classified.filter(
+            pl.col("site").is_in([inputs.KIRTON, inputs.DONINGTON])
+            & (pl.col("season_year") >= POOL_FIRST_SEASON_YEAR)
+        )
+        .group_by("site", "season", "sky_class", "half_hour")
+        .agg(u_mean=pl.col("u").mean())
+        .pivot(on="sky_class", index=["site", "season", "half_hour"], values="u_mean")
+        .with_columns(u_gap=pl.col("clear") - pl.col("overcast"))
+        .group_by("site", "season")
+        .agg(peak_u_gap=pl.col("u_gap").max())
+        .pivot(on="season", index="site", values="peak_u_gap")
+        .with_columns(winter_over_summer=pl.col("winter") / pl.col("summer"))
+        .sort("site")
+    )
+    with pl.Config(float_precision=3, tbl_rows=20, tbl_cols=20, tbl_width_chars=200):
+        text = (
+            "## Solar output alone: clear minus overcast, summer midday 2025/26 (MW)\n\n```\n"
+            f"{midday.select('site', 'capacity_mw', 'u_gap', 'solar_only_gap_mw')}\n```\n\n"
+            "## Peak of the unit-output gap (per unit of capacity), pooled; winter over summer\n\n"
+            f"```\n{pooled}\n```\n"
+        )
+    return midday, text
 
 
 def pooled_gap_profile(*, profile: pl.DataFrame) -> pl.DataFrame:
@@ -271,9 +326,22 @@ def main() -> None:
         gaps.pivot(
             on="sky_class", index=["site", "season_year"], values=["mean_mw", "se_mw", "n_days"]
         )
-        .with_columns(gap_mw=pl.col("mean_mw_overcast") - pl.col("mean_mw_clear"))
+        .with_columns(
+            gap_mw=pl.col("mean_mw_overcast") - pl.col("mean_mw_clear"),
+            gap_ci_half_mw=pl.struct(
+                "n_days_clear", "n_days_overcast", "se_mw_clear", "se_mw_overcast"
+            ).map_elements(
+                lambda r: float(
+                    stats.t.ppf(0.975, min(r["n_days_clear"], r["n_days_overcast"]) - 1)
+                    * (r["se_mw_clear"] ** 2 + r["se_mw_overcast"] ** 2) ** 0.5
+                ),
+                return_dtype=pl.Float64,
+            ),
+        )
         .sort("site", "season_year")
     )
+    table = pl.read_parquet(inputs.TABLE_PATH)
+    _, solar_text = solar_shape_gaps(classified=classified, table=table)
     with pl.Config(tbl_rows=100, tbl_cols=30, tbl_width_chars=200, float_precision=3):
         wide_text = str(wide.select(list(WIDE_COLUMNS)))
         peaks_text = str(peaks)
@@ -328,7 +396,7 @@ def main() -> None:
         ),
         "",
     ]
-    text = "\n".join(lines)
+    text = "\n".join(lines) + "\n" + solar_text
     (inputs.STUDY_DIR / "raw_gaps_report.md").write_text(text)
     print(text)
 

@@ -80,3 +80,6 @@ PAGE_PATH: Final[Path] = Path("docs/studies/embedded-pv-capacity.md")
 CSV_PATH: Final[Path] = Path("docs/studies/assets/embedded_pv_capacity_table.csv")
 TABLE_START_MARKER: Final[str] = "<!-- capacity-table-start -->"
 TABLE_END_MARKER: Final[str] = "<!-- capacity-table-end -->"
+
+OFFSET_SHARE: Final[float] = 0.18
+"""A fixed load that raises the mean capacity by this share, from the day-long load at 0.25."""
