@@ -417,13 +417,19 @@ menu swapped between years in a season-year fit. Pooling the shapes across Prima
 prior, or fitting on clear days only, may identify them. A Primary's orientation mix would sharpen
 the explicit solar forecast in Arm B of PVDIS-5.
 
-**Add the ratio of DC to AC capacity if experiment 00051 (PVDIS-3b) finds inverter clipping.** Many
-GB rooftop systems have more panel capacity than inverter capacity, and a system like that produces
-a flat top at high irradiance. Experiment 00046's solar term over-corrected at sunny summer
-middays, at day+2 by 0.48 points against the best guess. Experiment 00051 tests whether a clipping
-knee explains that loss. If it does, PVDIS-6 fits a clipping level per Primary alongside the
-orientation mix, on clear days, starting from experiment 00051's knee. If it does not, PVDIS-6
-leaves the DC to AC ratio out.
+**Also try fitting the ratio of DC to AC capacity directly, as a cheap side-arm with a known-answer
+test first.** Many GB rooftop systems have more panel capacity than inverter capacity, and a system
+like that clips at high irradiance. Experiment 00051 (PVDIS-3b) found no clipping knee in the demand
+forecast's residual, but that test was indirect, and a too-large coefficient on the solar term
+dominated it. PVDIS-6 fits a clipping level inside the capacity fit itself, on clear days, by a
+search over a few candidate DC to AC ratios. A fleet of many systems with different ratios and
+orientations clips gradually rather than at one knee, so the ratio may well not be identified.
+
+- **Known answers first:** inject the output of the metered solar farms, whose DC to AC ratios
+  experiment 00029 fitted, and check that the search recovers each farm's ratio. If it does not,
+  drop the side-arm before touching the real series.
+- **On the real series:** report the fitted ratio per Primary with its interval, and whether the
+  clipped shape fits clear days better than the unclipped shape on held-out months.
 
 #### PVDIS-7: MW at the Primaries metered only in MVA
 
