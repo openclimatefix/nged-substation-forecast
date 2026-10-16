@@ -79,7 +79,7 @@ def load_cases() -> pl.DataFrame:
         )
         .pivot(on="arm", index=list(KEYS), values=["qs", "q50", "below05", "below95"])
     )
-    cases = rows.join(wide, on=list(KEYS), validate="1:1")
+    cases = rows.join(wide, on=list(KEYS), validate="1:1").sort(KEYS)
     local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
     month_day = local.dt.month() * 100 + local.dt.day()
     return cases.with_columns(
@@ -184,21 +184,33 @@ def out_of_fold(*, cases: pl.DataFrame) -> pl.DataFrame:
             hinge_prediction = intercept + c * np.maximum(0.0, csi_test - knee)
             line_prediction = b0 + b1 * csi_test
             coefficient_error = np.zeros(test.height)
+            train_after_b = np.zeros(train.height)
+            test_after_b = np.zeros(test.height)
             for _name, lo, hi in HOUR_BINS:
-                in_bin_train = train.filter(pl.col("hour").is_between(lo, hi - 1))
+                train_mask = ((train["hour"] >= lo) & (train["hour"] < hi)).to_numpy()
+                test_mask = ((test["hour"] >= lo) & (test["hour"] < hi)).to_numpy()
                 k = fit_coefficient(
-                    shift=in_bin_train["shift"].to_numpy(), r=in_bin_train["r"].to_numpy()
+                    shift=train["shift"].to_numpy()[train_mask], r=train["r"].to_numpy()[train_mask]
                 )
-                mask = ((test["hour"] >= lo) & (test["hour"] < hi)).to_numpy()
-                coefficient_error[mask] = np.abs(
-                    test["r"].to_numpy()[mask] + k * test["shift"].to_numpy()[mask]
+                train_after_b[train_mask] = (
+                    train["r"].to_numpy()[train_mask] + k * train["shift"].to_numpy()[train_mask]
                 )
+                test_after_b[test_mask] = (
+                    test["r"].to_numpy()[test_mask] + k * test["shift"].to_numpy()[test_mask]
+                )
+                coefficient_error[test_mask] = np.abs(test_after_b[test_mask])
+            # Post hoc: a hinge fitted to what the coefficient repair leaves behind.
+            knee_b, intercept_b, c_b = fit_hinge(
+                csi=train["clear_sky_index"].to_numpy(), e=train_after_b
+            )
+            after_b_prediction = intercept_b + c_b * np.maximum(0.0, csi_test - knee_b)
             pieces.append(
                 test.with_columns(
                     abs_unrepaired=pl.Series(np.abs(e_test)),
                     abs_hinge=pl.Series(np.abs(e_test - hinge_prediction)),
                     abs_line=pl.Series(np.abs(e_test - line_prediction)),
                     abs_coefficient=pl.Series(coefficient_error),
+                    abs_coefficient_hinge=pl.Series(np.abs(test_after_b - after_b_prediction)),
                     abs_d1l=pl.Series(np.abs(test["r"].to_numpy())),
                 )
             )
@@ -209,7 +221,7 @@ def slope_with_interval(
     *, cases: pl.DataFrame, rng: np.random.Generator
 ) -> tuple[float, float, float]:
     """Return the slope of `r` on `shift` with a 95% week-block interval."""
-    weeks = cases["week"].unique().to_numpy()
+    weeks = cases["week"].unique().sort().to_numpy()
     index_by_week = {week: np.flatnonzero(cases["week"].to_numpy() == week) for week in weeks}
     shift, r = cases["shift"].to_numpy(), cases["r"].to_numpy()
 
@@ -349,7 +361,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             part = cases.filter(pl.col("site") == site)
             csi, e = part["clear_sky_index"].to_numpy(), part["e"].to_numpy()
             knee, _intercept, c = fit_hinge(csi=csi, e=e)
-            weeks = part["week"].unique().to_numpy()
+            weeks = part["week"].unique().sort().to_numpy()
             index_by_week = {w: np.flatnonzero(part["week"].to_numpy() == w) for w in weeks}
             slopes_draw = []
             knees_draw = []
@@ -401,6 +413,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
                 ("L line - unrepaired", "abs_line", "abs_unrepaired"),
                 ("A hinge - L line", "abs_hinge", "abs_line"),
                 ("B coefficient - unrepaired", "abs_coefficient", "abs_unrepaired"),
+                ("post hoc: B then hinge - B", "abs_coefficient_hinge", "abs_coefficient"),
                 ("unrepaired oracle - d1l", "abs_unrepaired", "abs_d1l"),
             ):
                 mean, lower, upper, n_blocks = block_bootstrap(
@@ -499,7 +512,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         print(temperature)
         temperature.write_parquet(RESULTS_DIR / "temperature.parquet")
         sunny = banded.filter(pl.col("sky") == "sunny")
-        weeks = sunny["week"].unique().to_numpy()
+        weeks = sunny["week"].unique().sort().to_numpy()
         index_by_week = {w: np.flatnonzero(sunny["week"].to_numpy() == w) for w in weeks}
         temperature_c = sunny["temperature_2m"].to_numpy()
         e_c = sunny["e_centred"].to_numpy()

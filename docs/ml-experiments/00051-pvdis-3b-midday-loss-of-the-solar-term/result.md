@@ -64,72 +64,103 @@ metric: >-
 code: ml-experiments/00051-pvdis-3b-midday-loss-of-the-solar-term/
 verdict: partly supported
 best_arm: >-
-  Not applicable: the experiment compares repairs of one stored forecast and fits no new arm. The
-  repair that lowers the median's error most is a coefficient fitted per series and hour bin
-  (-0.991 points, -1.473 to -0.495), which a straight line in the clear-sky index matches.
+  Not applicable: the experiment compares repairs of one stored forecast and fits no new arm. Out of
+  fold, a hinge in the clear-sky index lowers the median's error most (-1.023 points, -1.526 to
+  -0.521), a coefficient fitted per series and hour bin comes next (-0.991, -1.473 to -0.495), and
+  a straight line comes last (-0.920, -1.382 to -0.437); the three are not distinguishable.
 headline: >-
-  At June-to-August midday the oracle shift's coefficient of 1 is too large: the residual of the
-  `d1l` median has a slope of -0.42 to -0.69 on it in every month and hour bin, and a fitted
-  coefficient lowers the median's error by 0.991 points (-1.473 to -0.495). A clipping knee is not
-  distinguished from a straight line (hinge minus line -0.103, -0.233 to +0.030). Noisy ENS members
-  add 0.129 points (0.057 to 0.212) to the ENS shift's score.
+  At June-to-August midday the oracle shift's coefficient of 1 is too large in effect: the residual
+  of the `d1l` median has a slope of -0.42 to -0.69 on it in every month and hour bin, and a fitted
+  coefficient lowers the median's error by 0.991 points (-1.473 to -0.495). The page does not
+  identify why. A hinge for inverter clipping is no better than a straight line (-0.103, -0.233 to
+  +0.030), and after the coefficient repair a hinge adds nothing (+0.003, -0.071 to +0.084, post
+  hoc). Noisy ENS members add 0.129 points (0.057 to 0.212) to the ENS shift's score.
 lessons: >-
-  The summer-midday loss is mostly a coefficient that is too large, and clipping cannot be told
-  apart from a straight line in this sample. The fitted coefficient of experiment 46 removes the
-  loss at day+2 (+0.004 against `d0`, -0.255 to +0.241, post hoc).
+  The fixed coefficient of 1 over-corrects at summer midday, on cloudy rows as well as sunny ones,
+  and the cause (overstated capacity, error in the CAMS sunshine, radiation already in `d1l`,
+  clipping, sunshine-dependent demand, or panel temperature) is not identified. The ensemble spread
+  also hurts. The fitted coefficient of experiment 46 removes the loss at day+2 (+0.004 against
+  `d0`, -0.255 to +0.241, post hoc).
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Fit the solar coefficient by hour of day and season in PVDIS-5, because the slope of the `d1l`
-    residual on the oracle shift is -0.42 in June and -0.69 in July at 09-12 UTC, and a fitted
-    coefficient lowers the median's out-of-fold error by 0.991 points (-1.473 to -0.495), (B,
-    repairs figure).
+    Fit the solar coefficient on the training window per lead band and season in PVDIS-5, because
+    the slope of the `d1l` residual on the oracle shift is between -0.42 and -0.69 in every month
+    and hour bin, and a fitted coefficient lowers the median's out-of-fold error by 0.991 points
+    (-1.473 to -0.495); hour-of-day dependence is untested, because the two hour bins differ by at
+    most 0.09 within a month (slopes table).
   - >-
-    Do not report a clipping knee or a DC:AC ratio from these rows, because a hinge beats a straight
-    line out of fold by only 0.103 points (-0.233 to +0.030) and the implied ratios (1.8 to 3.2)
-    are not credible for rooftop inverters (hinge table).
+    Do not report a clipping knee or a DC:AC ratio from these rows, because a hinge is lower than a
+    straight line out of fold by only 0.103 points (-0.233 to +0.030), a hinge after the
+    coefficient repair adds +0.003 (-0.071 to +0.084, post hoc), and the implied ratios of 1.8 to
+    3.2 are not credible for rooftop inverters (hinge table).
   - >-
-    Keep the member spread of the ENS shift but check the sunny 0.05-quantile coverage, because the
-    shift with member spread puts 0.010 to 0.027 of sunny actuals below the 0.05 quantile and the
-    ensemble-mean shift puts 0.039 to 0.086 there, against a target of 0.05 (coverage figure).
+    Test dropping the ENS member spread from the solar shift in PVDIS-5, because the shift built
+    from the ensemble mean alone scores 0.129 points (0.057 to 0.212) better at day+2 and day+3 and
+    puts 0.039 to 0.086 of sunny actuals below the 0.05 quantile (target 0.05), against 0.010 to
+    0.027 with the spread (coverage figure).
   - >-
-    Set PVDIS-5's non-inferiority margin to 0.10 points of capacity and judge it on the upper end
-    of a 95% interval from at least 25 weekly blocks, because 13 blocks gave an upper end of +0.110
-    for the fitted shift minus `d0` (post hoc, next section).
+    Test non-inferiority against `d0` with a margin that the PVDIS-5 plan confirms or halves after
+    a power calculation, because the margin of 0.10 points set here equals the whole 0.104-point
+    effect of `d0`'s radiation inputs on April-to-September rows, and 13 weeks gave an upper end of
+    +0.110 for the fitted shift minus `d0` (post hoc, last section).
+  - >-
+    Compare candidate causes with a test that separates them, such as the hinge after the
+    coefficient repair, because a hinge in the clear-sky index beats a straight line whenever the
+    shift is itself curved in that index, so the comparison of the two cannot tell clipping from a
+    too-large coefficient (what it could not show).
 ---
 
 # Experiment 51: why does the solar term lose at sunny summer middays?
 
-We asked why a correction for rooftop solar panels made a demand forecast worse around midday in
-summer. [Experiment 46](../00046-embedded-solar-share-of-primary-forecast-error/result.md) lowered
-each forecast of a Primary substation's power by the panels' capacity times how much sunnier the day
-was than average. At 09:00 to 15:00 UTC in June to August, two days ahead, the correction scored
-0.48 points worse than the same forecast without it, where a point is 1% of the substation's
-capacity. We tested three explanations on the forecasts that experiment 46 had already stored,
-without fitting a new forecast model: the panels' inverters cap their output on sunny days, the
-correction is simply too large, or the 51 ensemble members of the weather forecast add noise. The
-correction built from the true sunshine is too large: the actual power fell by only 0.4 to 0.7 of
-the amount the correction removed, at every month and time of day. A cap on the panels' output could
-not be told apart from that, and the noisy members explained a smaller part of the loss.
+We asked why a correction for rooftop solar panels made a forecast of a Primary substation's power
+worse around midday in summer. A Primary substation is a 33/11 kV or 66/11 kV substation in the
+electricity distribution network. [Experiment
+46](../00046-embedded-solar-share-of-primary-forecast-error/result.md) lowered each forecast by the
+panels' estimated capacity times how much sunnier the day was than the average for that month and
+half-hour. At 09:00 to 15:00 UTC in June to August, two days ahead, the corrected forecast had a
+quantile score (our probabilistic forecast error score, in points where 1 point is 1% of the
+substation's capacity) 0.48 points worse than the forecast that kept its own radiation inputs and
+had no correction. We tested three explanations on the forecasts experiment 46 had stored, without
+fitting a new weather-to-power model: the panels' inverters cap their output on sunny days, the
+correction is too large, or the 51 members of the European Centre for Medium-Range Weather
+Forecasts ensemble forecast (ENS) add noise. The correction built from the sunshine that actually
+occurred (the oracle shift) is too large: the actual power fell by only 0.4 to 0.7 of the amount
+the correction removed, in every month and time of day. A cap on output could not be told apart
+from that, and the ensemble members added a further 0.13 points.
 
-**The verdict is `partly supported`: a too-large coefficient explains the loss, clipping is not
-distinguished from it, and member noise adds a smaller part.** The decision rule was fixed in the
-plan before any result was read. The scripts were run once before the code review, with the same
-rule, and again after it; the review changed which series count as coastal and added checks, not
-the rule. All figures are for the 5 Primaries of experiment 46, June to August, valid 09:00 to
-15:00 UTC, 1 to 4 days ahead (3,575 forecast cases, each averaged over 3 seeds, in 13 weeks of
-forecast start). Intervals are 95%, from resampling whole weeks. The series are labelled D9, D10,
-D11, D14, and D16, as in experiment 46.
+**The verdict is `partly supported`: one leg of the hypothesis survives, and the other two do
+not.** The hypothesis said the loss comes mainly from a coefficient that is too large for the
+sunniest rows, which an inverter clips, and not from noisy ENS members. The coefficient is too large
+(cause b met). A clipping knee is not distinguished from a straight line (cause a not met). The
+members' noise adds to the loss (cause c met), so the "not noise" leg fails. The decision rule is in
+the front matter of this page, and the plan, which stated it, was committed before any result was
+read. The rule does not say why the coefficient is too large, and the page does not claim to know.
+
+| Prediction made in the plan | Result |
+|---|---|
+| Knee between 0.6 and 0.9 at 3 or more of the 5 series | Not met: 2 of 5 (D14 at 0.60 and D16 at 0.65) |
+| A clip lowers the median's error by 0.05 to 0.15 points | Not met: the hinge lowers it by 1.02 points, almost all through its intercept |
+| The ensemble-mean shift removes under a third of the ENS shift's excess over `d1l` | Not met: it removes 0.129 points of a 0.057-point gap |
+
+All figures are for 5 Primary substations (anonymised as D9, D10, D11, D14, and D16, as in
+experiment 46), June to August, valid 09:00 to 15:00 UTC, 1 to 3 days after the forecast origin.
+There are 3,575 forecast cases: each one is a Primary, a valid half-hour, and a forecast run, with
+its quantiles averaged over the 3 random seeds of the XGBoost fit. They come from 13 weeks of
+forecast start. Intervals are 95% bootstrap intervals from resampling whole weeks of forecast start.
+With so few weeks they are probably somewhat narrow.
 
 ## Raw data: the error left after the oracle shift
 
-**The oracle shift lowers the forecast too far on sunny rows, and by about the same amount at every
-lead day, hour, and Primary.** Let *e* be the actual power minus the forecast after the oracle shift
-(the shift built from the true sunshine), in points of capacity. A value of 0 means the shift was
-exactly right, and a positive value means the shift lowered the forecast too far. The mean of *e* is
-negative on cloudy rows (about -3 to -4 points), crosses 0 near a clear-sky index of 0.7, and
-reaches +5 to +8 points above 0.9. The grey dots are the cases, and the line is their mean.
+**The oracle shift is too large on cloudy rows as well as sunny ones, in every lead day, hour, and
+Primary.** Let *e* be the actual power minus the forecast after the oracle shift, in points of
+capacity. A value of 0 means the shift was exactly right, and a positive value means the shift
+lowered the forecast too far. The mean of *e* is negative on cloudy rows (about -3 to -4 points,
+where the shift raised the forecast too far), crosses 0 near a clear-sky index (CAMS irradiance over
+clear-sky irradiance) of 0.7, and reaches +5 to +7 points between 0.9 and 1.0. A negative value on
+cloudy rows points to a scale error, because a cap on output would not act there. The grey dots are
+a sample of the cases, and the line is the mean of all of them.
 
 ![Error after the oracle shift against the clear-sky index, by lead day](figure_1_by_lead_day.svg)
 
@@ -137,105 +168,138 @@ reaches +5 to +8 points above 0.9. The grey dots are the cases, and the line is 
 
 ![The same by Primary](figure_3_by_primary.svg)
 
-## Cause (b): the coefficient is too large
+## Cause b: the coefficient is too large
 
 **The actual power falls by 0.4 to 0.7 of what the oracle shift removes, so a coefficient of 1
 over-corrects.** A coefficient of 1 would give a slope of -1 of the `d1l` residual on the shift. The
-slope is between -0.42 and -0.69 in each of the 6 cells of month by hour bin (June -0.42 and -0.51,
-July -0.69 and -0.65, August -0.69 and -0.60), by lead day -0.61, -0.54, and -0.61, and by Primary
--0.52 to -0.81. In 4 of the 6 cells the interval lies wholly above -0.85, which meets the rule's
-count; the 2 August cells have lower ends of -1.03 and -1.12. A coefficient fitted per series and
-hour bin on half the weeks lowers the median's mean absolute error on the other half by 0.991
-points (-1.473 to -0.495), against the oracle shift with coefficient 1.
+slope is between -0.42 and -0.69 in each of the 6 cells of month by hour bin (09-12 then 12-15 UTC:
+June -0.42 and -0.51, July -0.69 and -0.65, August -0.69 and -0.60), by lead day -0.61, -0.54, and
+-0.61, and by Primary -0.52 to -0.81. In 4 of the 6 cells the interval lies wholly above -0.85,
+which meets the rule's count; the 2 August cells have lower ends of -1.03 and -1.12. Each cell holds
+only about 4 to 5 weeks of forecast start, so these intervals are the least reliable in the page.
+A coefficient fitted per series and hour bin on half the weeks lowers the median's mean absolute
+error on the other half by 0.991 points (-1.473 to -0.495), against the oracle shift with
+coefficient 1.
+
+**The slope below 1 has several possible causes that these data cannot separate.** The panels'
+estimated capacity may be too large. Error in the CAMS sunshine pulls the slope towards 0. The
+`d1l` forecast already absorbs part of the sunshine through its temperature and lagged-power
+inputs. Clipping flattens the response on sunny rows. Demand that rises with sunshine, such as
+cooling, offsets the panels' output. Panel temperature lowers the output on hot days. A coefficient
+fitted on CAMS is also not the one used in service, where the shift comes from ENS and is attenuated
+more at longer leads.
 
 ![The residual against the oracle shift](figure_4_residual_against_shift.svg)
 
-## Cause (a): a clipping knee is not distinguished from a straight line
+## Cause a: a clipping knee is not distinguished from a straight line
 
 **A hinge that is flat below a knee and rises above it fits no better than a straight line out of
-fold.** The hinge lowers the median's error against the unrepaired oracle by 1.023 points (-1.526 to
--0.521), but a straight line in the clear-sky index lowers it by 0.920 (-1.382 to -0.437). The
-hinge beats the line by 0.103 points (-0.233 to +0.030), and the rule needed an interval wholly
-below 0. Both lower the error through a free intercept, so the first number alone is not evidence of
-clipping. The hinge slope above the knee is positive at all 5 series, with intervals above 0, and
-the knees lie between a clear-sky index of 0.40 and 0.65 with wide intervals (0.4 to 0.78). At the
-knee, the unit output of the CAMS shape implies a DC:AC ratio of 1.8 to 3.2, which is not credible
-for rooftop inverters, whose ratios are usually under 1.5. Not reporting a per-Primary knee for
-PVDIS-6 is therefore the honest reading: these rows cannot place one.
+fold, and adds nothing after the coefficient repair.** The hinge lowers the median's error against
+the unrepaired oracle by 1.023 points (-1.526 to -0.521), but a straight line in the clear-sky index
+lowers it by 0.920 (-1.382 to -0.437). The hinge is lower than the line by 0.103 points (-0.233 to
++0.030), and the rule needed an interval wholly below 0. Both repairs lower the error mostly
+through a free intercept, so the 1.023 alone is not evidence of clipping. The comparison also could
+not separate the causes: the shift is itself S-shaped in the clear-sky index, so a hinge traces
+it even when the only fault is a scale error. A post hoc test is sharper: a hinge fitted to what
+the coefficient repair leaves behind changes the out-of-fold error by +0.003 points (-0.071 to
++0.084), so no knee remains once the scale is fixed.
+
+**The fitted knees do not look like clipping.** The slope above the knee is positive at all 5
+series, with intervals above 0, but the knees lie between a clear-sky index of 0.40 and 0.65 with
+wide intervals (0.40 to 0.78), and the knee of D9 sits at the lowest value the search allowed. The
+unit output of the CAMS shape at the knee implies a ratio of DC to AC capacity of 1.8 to 3.2, which
+is too high for rooftop inverters, whose ratios are usually below 1.5. The page therefore reports no
+per-Primary knee for PVDIS-6. The test could also not have found the effect the plan predicted: the
+interval on hinge minus line has a half-width of about 0.13 points, so an effect of 0.19 points
+would be needed for 80% power, and the plan predicted 0.05 to 0.15.
 
 | Series | Knee (clear-sky index) | Slope above the knee (points per unit index, 95% interval) | Implied DC:AC |
 |---|---|---|---|
-| D9 | 0.40 | 24.1 (19.7 to 32.6) | 3.2 |
-| D10 | 0.575 | 32.2 (18.2 to 58.8) | 2.1 |
-| D11 | 0.55 | 20.7 (15.5 to 33.5) | 2.2 |
-| D14 | 0.60 | 24.1 (17.5 to 45.5) | 2.0 |
-| D16 | 0.65 | 15.3 (9.7 to 25.5) | 1.8 |
+| D9 | 0.40 | 24.1 (19.6 to 32.9) | 3.2 |
+| D10 | 0.575 | 32.2 (18.7 to 55.1) | 2.1 |
+| D11 | 0.55 | 20.7 (15.6 to 33.2) | 2.2 |
+| D14 | 0.60 | 24.1 (17.4 to 45.7) | 2.0 |
+| D16 | 0.65 | 15.3 (9.8 to 24.4) | 1.8 |
 
 ![Out-of-fold repairs of the median](figure_5_repairs.svg)
 
-**The knee does not concentrate in the rows where a load would show, with one exception.** The
-sunshine-dependent loads at the coast (visitors, cooling, irrigation) would give a positive
-residual that grows with the clear-sky index, as a clipping knee does. 2 of the 5 Primaries are
-within 10 km of the open coast. The slope above each series' own knee is 24.1 at those 2 and 22.7 at
-the other 3, and 25.2 on term-time weekdays against 17.3 on school-holiday weeks and weekends (no
-intervals; point estimates only). The hinge beats the line by 0.161 points (-0.282 to -0.038, 10
-blocks) in holiday-and-weekend rows alone, which is the load signature, and by -0.081 (-0.253 to
-+0.097) on term-time weekdays. At fixed clear-sky index, the sunniest rows' error rises with 2 m
-temperature by 0.67 points per kelvin (0.21 to 1.16). Clipping depends on irradiance, and hot panels
-clip slightly less, so a rise with temperature points to a load or to a response the forecast does
-not model. This is a second contribution to the over-correction that the data cannot separate from
-the coefficient.
+## Splits for sunshine-dependent demand, and the temperature read
 
-## Cause (c): noisy ENS members add a smaller part
+**The splits do not show that the knee comes from demand that rises with sunshine, or that it does
+not.** Demand such as cooling or visitor load at coastal resorts rises with sunshine and would
+mimic a clipping knee. Two of the 5 Primaries are within 10 km of the open coast, so the coastal
+split compares 2 series with 3. The slope above each series' own knee is 24.1 at the 2 coastal
+series and 22.7 at the other 3. It is 25.2 on term-time weekdays and 17.3 on school-holiday weeks
+and weekends; these are point estimates with no intervals. The hinge is lower than the line by 0.161
+points (-0.282 to -0.038, 10 weekly blocks) in holiday-and-weekend rows, and by 0.081 points (-0.253
+to +0.097) on term-time weekdays. That is the only scope of the 7 read where the interval excludes 0,
+which chance would give about once in 7 scopes, and the holiday period (22 July to 31 August) also
+coincides with most of August, so it confounds holiday demand with the month.
 
-**The member spread adds 0.129 points to the ENS shift's score, and about 0.19 more comes from the
-shift's size.** The table gives the quantile score of the first arm minus the second, at day+2 and
-day+3 pooled (2,340 cases), with its interval.
+**At fixed clear-sky index, the sunniest rows' error rises with 2 m temperature, and demand is only
+one explanation.** The rise is 0.67 points per kelvin (0.21 to 1.15), from the mean of *e* in
+three temperature bands within each series and 0.1-wide index bin (-2.27, -0.17, and +2.49 points
+in the coolest, middle, and warmest band). Demand that rises with heat could cause it. So could
+panel temperature: output falls by about 0.4% per kelvin, so a shift that ignores cell temperature
+over-states the panels' output on hot days. This page did not check whether the CAMS unit output
+models cell temperature. Hot rows also cluster in few weeks (8 weekly blocks in the warmest sunny
+band), and `d1l` already takes temperature as an input.
+
+## Cause c: noisy ENS members add to the loss
+
+**The member spread adds 0.129 points to the ENS shift's score at day+2 and day+3, which is under
+half of the 0.324-point loss against `d0`.** The table gives the quantile score of the first arm
+minus the second, at day+2 and day+3 pooled (2,340 cases), with its interval. Cause c is met as the
+rule is written, because the interval of the third row lies wholly above 0 and 0.129 exceeds half of
+the 0.057 in the second row. That test is weak: the second row's interval spans zero, so almost any
+positive spread effect would pass it.
 
 | Contrast (negative favours the first arm) | Difference (95% interval) |
 |---|---|
 | ENS shift minus `d0` (experiment 46's C6) | +0.324 (-0.144 to +0.761) |
-| ENS shift minus `d1l` (C3) | +0.057 (-0.495 to +0.570) |
+| ENS shift minus `d1l` (experiment 46's C3) | +0.057 (-0.495 to +0.570) |
 | ENS shift minus ensemble-mean shift (cause c) | +0.129 (+0.057 to +0.212) |
 | Ensemble-mean shift minus `d1l` | -0.072 (-0.625 to +0.441) |
 | Fitted-coefficient ENS shift minus ENS shift (post hoc) | -0.435 (-0.689 to -0.139) |
 | Fitted-coefficient ENS shift minus `d0` (post hoc) | -0.111 (-0.348 to +0.110) |
 
-The loss that prompted the experiment reproduces: C6 is +0.477 (+0.057 to +0.842) at day+2 and
-+0.172 (-0.580 to +0.807) at day+3, the figures of experiment 46. Over the two days pooled, the
-interval of C6 includes 0 when 13 weeks are resampled, so the loss is small and uncertain here. The
-fitted-coefficient shift of experiment 46, fitted on the training window, removes it: it scores
-+0.004 (-0.255 to +0.241) against `d0` at day+2 (post hoc). The oracle shift over-covers the sunny
-lower tail too, so member noise cannot be its only source.
+The loss that prompted the experiment reproduces: experiment 46's C6 is +0.477 (+0.057 to +0.842) at
+day+2 and +0.172 (-0.580 to +0.807) at day+3. Over the two days pooled, the interval of C6 includes 0
+when 13 weeks are resampled, so the loss is small and uncertain here. The fitted-coefficient shift of
+experiment 46, fitted on its training window, removes the loss: it scores +0.004 (-0.255 to +0.241)
+against `d0` at day+2 (post hoc, with a wide interval). The oracle shift puts too few sunny actuals
+below the 0.05 quantile as well (0.002 to 0.015, against 0.05), so member noise cannot be the only
+source of the over-wide lower tail.
 
 ![Share of sunny actuals below the 0.05 quantile](figure_6_coverage.svg)
 
 ## What it could not show
 
-- **The hinge test has little power.** Its interval has 13 blocks, a straight line is a good
-  approximation over most of the range, and the knees are not pinned down.
-- **The out-of-fold folds are weeks of the valid time.** One forecast run spans up to 4 valid days
-  and can fall into both folds, which mildly favours every repair. The intervals resample fixed fits,
-  so they are somewhat narrow.
-- **The slope may be attenuated by error in the CAMS sunshine.** Error in the shift pulls the
-  slope towards 0, so some of the "too-large coefficient" may be the difference between CAMS and
-  the real sunshine. A coefficient fitted on CAMS has the same property, which is the one that
-  matters for use.
-- **The coastal flag rests on a coarse coastline** (7 points, a 10 km threshold), and 2 of 5
-  Primaries qualify.
-- **Both loads and clipping may be present.** The data support a coefficient below 1; they do not
-  exclude a smaller clipping effect on top of it.
+- **The hinge test has little power.** Its half-width of 0.13 points is larger than the effect the
+  plan predicted, and a hinge in the clear-sky index mimics a scale error.
+- **The folds are weeks of the valid time.** One forecast run spans up to 3 valid middays and can
+  fall into both folds, which mildly favours every repair. The intervals resample fixed fits, so
+  they are somewhat narrow, and the intercept of the hinge and the line favours both against the
+  coefficient repair, which has none.
+- **Hour of day and month are untested as causes.** The 2 hour bins differ by at most 0.09 within a
+  month, and the month differences come from one summer.
+- **The coastal flag rests on a coarse coastline** (7 coastline points and a 10 km threshold), and 2
+  of 5 Primaries qualify.
+- **The experiment cannot say which of the six causes of a slope below 1 is at work.** Several can
+  act together.
 
 ## What the next experiment should answer
 
-**PVDIS-5 should fit the solar coefficient by hour and season, test non-inferiority against `d0` with
-a margin of 0.10 points of capacity, and not report a clipping knee.** The margin is set in the
-plan: 0.10 points is about 2% of `d0`'s 4.62 and about the amount (0.104) by which `d0`'s radiation
-inputs improved on `d1l`, so a solar term worse than `d0` by more would give back the gain the
-radiation inputs brought. Non-inferiority means the upper end of the 95% interval of (solar term
-minus `d0`) lies below +0.10. The fitted shift's upper end here is +0.110 over 13 weeks at summer
-midday day+2 and day+3 (post hoc), so the margin cannot yet be declared met; PVDIS-5 should resample
-at least 25 weeks of forecast start (April to September) and repeat the test for 0 to 48 hours
-separately. A per-Primary clipping knee needs a different design: rows at or near the inverter's
-rated output, such as the clearest days at midday, with the load splits repeated on more than two
-coastal series.
+**PVDIS-5 should fit the solar coefficient per lead band and season on the ENS shift, test
+non-inferiority against `d0`, and report no clipping knee.** The margin of 0.10 points of capacity
+was set in the plan: it is about 2% of `d0`'s 4.62, and close to the 0.104 points by which `d0`'s
+radiation inputs improved on `d1l` over April to September. A margin as large as the whole effect
+of the radiation inputs is generous. On these summer-midday rows the gap between `d1l` and `d0` is
+about 0.27 points. PVDIS-5's plan should confirm 0.10 or halve it to 0.05 after a power calculation.
+Non-inferiority means the upper end of the 95% interval of (solar term minus `d0`) lies below the
+margin. The fitted shift's upper end here is +0.110 over 13 weeks at day+2 and day+3 (post hoc), and
+the half-width of about 0.23 would fall to about 0.16 with 25 weeks, so a pass at 0.10 needs a true
+difference below about -0.06. PVDIS-5 should resample at least 25 weeks of forecast start (April to
+September) and repeat the test for 0 to 48 hours separately. A per-Primary clipping knee needs a
+different design: rows at or near the inverters' rated output, such as the clearest days at midday,
+a hinge fitted after the coefficient repair, and more than two coastal series.

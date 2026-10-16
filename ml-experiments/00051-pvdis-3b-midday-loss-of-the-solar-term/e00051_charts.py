@@ -100,11 +100,11 @@ def figure_by_lead_day(*, cases: pl.DataFrame) -> alt.TopLevelMixin:
         )
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="The oracle shift over-corrects the sunniest rows at every lead day",
+            text="The oracle shift is too large, on cloudy and sunny rows, at every lead day",
             lines=[
                 "Grey dots: a random sample of 400 of the about 1,200 forecast cases in each "
                 "panel, each averaged over 3 seeds. Orange line: mean of all the panel's cases in "
-                "bins of 0.1 clear-sky index. Above 0 the shift lowered the forecast too far. "
+                "bins of 0.1 clear-sky index. Above 0 the shift lowered the forecast too far; below 0 it raised it too far. "
                 + SCOPE
             ],
         )
@@ -133,7 +133,7 @@ def figure_by_hour(*, cases: pl.DataFrame) -> alt.TopLevelMixin:
             width=PLOT_WIDTH,
             height=240,
             title=_title(
-                text="The over-correction does not depend on the hour of the day",
+                text="The error after the oracle shift looks alike at every hour of the day",
                 lines=[
                     "Mean in bins of 0.1 clear-sky index, for three groups of valid hours. If "
                     "clipping drove the over-correction, the hours around solar noon (11-13 UTC) "
