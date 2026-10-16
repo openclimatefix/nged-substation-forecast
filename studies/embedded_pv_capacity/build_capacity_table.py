@@ -517,7 +517,7 @@ def markdown_table(*, table: pl.DataFrame) -> str:
     lines = [
         (
             "| Primary substation | Status | Capacity C (MW) | 95% interval (MW) "
-            "| Bound B (strength) | Daily fit over C |"
+            "| Bound B (strength) | Daily fit divided by C |"
         ),
         "|---|---|---|---|---|---|",
     ]
