@@ -18,6 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [SW2-6](#sw2-4-to-sw2-9-detector-iterations) | Does a detector that pairs an onset step with its opposite return step, using a prior on duration from the labelled set, find more of the MW moved by transfers than the best single-window detector (D0M) at the same alarm rate? | 1 | Nothing | Planned: [experiment 61](00061-sw2-6-paired-step-intervals/result.md) |
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
 | [SW2-13](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does one detector that combines the step evidence of several windows (4 hours, 24 hours, and others) find more transfers than the best single window at the same alarm rate? | 2 | Nothing | Proposed; run next beside SW2-7 |
 | [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | SW2-13 and SW2-8b (experiment 58) | Proposed |
@@ -169,8 +170,9 @@ confirm:
 
 - **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
   XGBoost model without the detected intervals.
-- **SW2-6:** paired-step intervals, which find the onset and its opposite return step as one
-  interval with an end, with a prior on duration from the labelled set.
+- **SW2-6 (planned, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** paired-step
+  intervals, which find the onset and its opposite return step as one interval with an end, with a
+  prior on duration from the labelled set.
 - **SW2-7 (done, [experiment 60](00060-sw2-7-profile-weighted-step-detector/result.md)):** a
   step statistic that weights each half-hour by the expected power found the same transfers as the
   constant step on five injection shapes, so the step's shape does not limit the 24-hour detector.
