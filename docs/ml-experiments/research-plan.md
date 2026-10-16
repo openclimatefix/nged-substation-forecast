@@ -18,7 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
@@ -156,12 +155,6 @@ detectors use, so a detector that shares the residual's blind spots is flattered
 line therefore starts by building a reference set independent of the detectors.
 
 The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
-
-#### SW2-2: how much the visible events hurt the best guess
-
-**Measure the share of experiment 00033's best guess's quantile score and tail score that falls in
-labelled switching half-hours, and in half-hours whose lagged power falls inside a labelled event.**
-The measurement needs no new fit, and it sets how much a detector could lower the forecast error.
 
 #### SW2-3: the label-exclusion ceiling
 
