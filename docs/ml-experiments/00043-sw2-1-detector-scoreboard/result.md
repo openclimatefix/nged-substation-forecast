@@ -15,7 +15,7 @@ decision_rule: >-
   The headline is event F1 on the 25%-or-more, over-1-day band of injected transfers, at the 24-hour
   window. `supported` when D1 minus D0 is at least +0.10 with a 95% interval above 0 (resampling
   whole calendar months). `refuted` when the difference interval lies below +0.05. `inconclusive`
-  otherwise. Real labelled events are counted and reported without a verdict, because only 4 meet
+  otherwise. Real labelled events are counted and reported without a verdict, because only 14 meet
   the size and length condition.
 benchmark: >-
   The single-series detector D0 at the same window, and a detector that raises no alarm.
@@ -149,19 +149,23 @@ at the 4-hour window (0.05 and 0.08) and about the same at 24 hours (0.11 and 0.
 
 ## Real labelled events
 
-**Only 4 labelled real transfers meet the size and length condition, so the real-event result is a
-count and carries no verdict.** The 4 are 2 conserved (two substations step in opposite
-directions) and 2 one-sided (only one substation steps; one of them was called conserved and is
-reclassified because a substation's readings are mostly missing). The 24-hour D1 finds 1 of the 2
-conserved, with the start found for both, and none of the one-sided.
+**Only 14 labelled real transfers meet the size and length condition, so the real-event result is a
+count and carries no verdict.** The share of the receiving load is recomputed here as the median
+moved MW over the named metered receivers' usual power in the 28 days before the event, the
+definition experiment 44 uses, because the stored share is missing for most events. The 14 events
+(25% or more of the receiving load, over 1 day) are 6 conserved (two substations step in opposite
+directions) and 8 one-sided (only one substation steps, or a conserved call reclassified because a
+substation's readings are mostly missing). Found events: the 4-hour D0 finds 0 of 14, the 4-hour D1
+2, the 24-hour D0 1, and the 24-hour D1 3 (1 of 6 conserved and 1 of 8 one-sided for the 4-hour D1;
+2 of 6 and 1 of 8 for the 24-hour D1). Starts alone are found for 1, 5, 6, and 4 of the 14.
 
 **A second set, chosen after seeing that count, is the 35 visible operations lasting over 1 day.**
 Of the 35, the 4-hour D0 finds 1, the 4-hour D1 finds 3, the 24-hour D0 finds 2, and the 24-hour D1
 finds 5 (starts alone: 2, 6, 11, and 9). Of the 10 conserved, the 24-hour D1 finds 3 and the
-24-hour D0 finds 1. Of the 35, 4 have a share of the receiving load of 25% or more (the one band
-where the labeller finds 0.83 of injected transfers), 5 have a known share under 25%, and 26 have
-an unknown share. This recall measures a detector against what the labeller could see, not
-against all real switching.
+24-hour D0 finds 1. Of the 35, 14 have a share of the receiving load of 25% or more (the one band
+where the labeller finds 0.83 of injected transfers), 11 have a share under 25%, and 10 have no
+named metered receiver and so no share. This recall measures a detector against what the labeller
+could see, not against all real switching.
 
 ## Limits
 

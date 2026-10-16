@@ -71,8 +71,12 @@ operations are 440 not visible and 31 that cannot be assessed because power read
   donor's usual range (its 99th minus its 1st percentile over the previous year).
 - **Length:** of the 66 visible operations, 16 last 2 to 6 hours, 15 last 6 to 24 hours, and 35 last
   over 1 day.
-- **Share of receiving load:** this can be computed for 16 of them, because the labellers named a
-  metered receiver for only those 16: 2 under 10%, 6 from 10% to 25%, and 8 of 25% or more.
+- **Share of receiving load (known defect):** the stored `moved_share_of_receiver` column is missing
+  for most events, because the labeller wrote series ids as text (such as "13") and the share
+  calculation compares them with whole numbers. Of the 35 visible operations lasting over 1 day,
+  recomputing the share as in [experiment 44](../00044-sw2-2-switching-share-of-best-guess-score/result.md)
+  gives 14 of 25% or more of the receiving load, 11 under 25%, and 10 with no named metered receiver.
+  Use experiment 44's `load_events` for any share.
 - **Edge cards:** 5 of 42 are visible (1 at the start of a long closure, 4 at the end), and 16
   cannot be assessed.
 - **Short closures:** 2 of 50 closures under 2 hours are visible and 10 cannot be assessed. The gate

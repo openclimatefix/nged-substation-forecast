@@ -126,7 +126,12 @@ def _baseline(*, panel: dict, scales: dict) -> dict:
     return {"summary": pl.DataFrame(rows), "results": results}
 
 
-def _real_events() -> pl.DataFrame:
+def _usual_load(*, power: dict[int, np.ndarray], series: int, onset: int) -> float:
+    """Mean absolute power of a series in the 28 days before `onset`, as in experiment 44."""
+    return float(np.nanmean(np.abs(power[series][max(onset - 28 * 48, 0) : onset])))
+
+
+def _real_events(*, power: dict[int, np.ndarray]) -> pl.DataFrame:
     """The labelled real transfers (not hidden cards): stamps, series, and conditions."""
     frame = (
         pl.read_parquet(LABELLED_PATH)
@@ -137,7 +142,6 @@ def _real_events() -> pl.DataFrame:
         )
         .with_columns(
             hours=(pl.col("logged_open_utc") - pl.col("logged_close_utc")).dt.total_minutes() / 60,
-            share=pl.col("moved_share_of_receiver").fill_nan(None),
         )
     )
     rows = []
@@ -152,22 +156,27 @@ def _real_events() -> pl.DataFrame:
         )
         # a conserved call that rests on a mostly missing side is treated as one-sided
         visibility = "one_sided" if row["max_side_missing_share"] > 0.5 else row["visibility"]
+        onset = stamp_of(when=row["onset_utc"])
+        metered = sorted(set(receivers) & set(power))
+        load = sum(_usual_load(power=power, series=r, onset=onset) for r in metered)
+        moved = row["moved_mw_p50"]
+        share = moved / load if metered and moved is not None and load > 0 else None
         rows.append(
             {
                 "card_id": row["card_id"],
                 "visibility": visibility,
-                "onset": stamp_of(when=row["onset_utc"]),
+                "onset": onset,
                 "end": stamp_of(when=row["end_utc"]) + 1,
                 "hours": row["hours"],
-                "share": row["share"],
+                "share": share,
                 "series": ",".join(map(str, series)),
             }
         )
     return pl.DataFrame(rows)
 
 
-def _score_real(*, baseline: dict) -> pl.DataFrame:
-    real = _real_events()
+def _score_real(*, baseline: dict, power: dict[int, np.ndarray]) -> pl.DataFrame:
+    real = _real_events(power=power)
     rows = []
     for (name, variant), (_, intervals) in baseline["results"].items():
         grouped = by_series(intervals=intervals)
@@ -233,7 +242,9 @@ def main() -> None:
     ) as pool:
         rows = [r for part in pool.map(_score_batch, list(enumerate(groups))) for r in part]
     pl.DataFrame(rows).write_parquet(WORK_DIR / "event_results.parquet")
-    _score_real(baseline=baseline).write_parquet(WORK_DIR / "real_results.parquet")
+    _score_real(baseline=baseline, power=panel["power"]).write_parquet(
+        WORK_DIR / "real_results.parquet"
+    )
     _alarm_sample().write_parquet(WORK_DIR / "alarm_sample.parquet")
     print("done", len(rows), "event rows")
 
