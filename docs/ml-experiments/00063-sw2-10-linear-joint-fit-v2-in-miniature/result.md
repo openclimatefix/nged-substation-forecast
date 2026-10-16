@@ -60,9 +60,9 @@ metric: >-
 verdict: inconclusive
 best_arm: >-
   The joint fit with the season-year constant capacity and a fitted scale (c1): a mean absolute error
-  of 5.484 points of capacity (5.233 to 5.740) against 5.807 (5.577 to 6.038) for the frozen v1
-  baseline, so C1 is -0.322 points (-0.437 to -0.207), at 5 Primaries, with oracle sunshine and
-  in-sample capacity.
+  of 5.484 points of capacity (5.233 to 5.740) against 5.807 (5.577 to 6.038) for the frozen
+  Flexpectation v1 baseline, so C1 is -0.322 points (-0.437 to -0.207), at 5 Primaries, with oracle
+  sunshine and in-sample capacity.
 headline: >-
   C1 is -0.322 points of capacity (-0.437 to -0.207), close to the 0.35-point threshold, but the S1
   and S2 gates failed for reasons of test design, so the verdict is inconclusive.
@@ -70,11 +70,11 @@ lessons: >-
   The solar term lowers the error in hindsight by about a third of a point, with sunshine from a past
   estimate and a capacity fitted on the same power, so the figure is a ceiling. The injection gates
   could not be passed: CAMS sunshine matches a real solar farm's anomaly with a slope of 0.65 to
-  0.87, which makes the 0.15 gate on recovered capacity unreachable, and no combination of donor
-  size and interval length gave a placebo share whose 95th percentile fell to the 0.10 gate. The
-  labelled-transfer terms were barely exercised, because the plan's filter on observed weeks left 2
-  event-Primary pairs. The experiment cannot yet say whether Flexpectation v2's split into baseline,
-  solar, and transfers costs accuracy.
+  0.87, so agreement with CAMS sunshine, not the fit, sets the ceiling on recovered capacity, and no
+  combination of donor size and interval length gave a placebo share whose 95th percentile fell to
+  the 0.10 gate. The labelled-transfer terms were barely exercised, because the plan's filter on
+  observed weeks left 2 event-Primary pairs. The experiment cannot yet say whether Flexpectation
+  v2's split into baseline, solar, and transfers costs accuracy.
 advice:
   - >-
     Judge a recovered solar capacity against the slope of the real farm's anomaly on the CAMS anomaly
@@ -83,11 +83,10 @@ advice:
   - >-
     Scale the transfer-share gate by the donor's size and the interval's length: the placebo 95th
     percentile of the absolute share is 0.63 for donors under 3 MW at 6 to 12 hours and 0.14 for
-    donors over 5 MW at 6 to 12 hours, so no cell met 0.10 (S2 placebo table).
+    donors over 5 MW at 6 to 12 hours (S2 placebo table).
   - >-
-    Test transfer shares on intervals of 24 hours or longer and on donors of 5 MW or more, where the
-    placebo 95th percentile is lowest (0.13), and add an intercept only after checking that the
-    placebo spread does not grow (S2 placebo table).
+    Scale a share gate by donor size and use longer intervals, because no cell of the placebo table
+    reaches 0.10 and the lowest is 0.118 (donors of 3 to 5 MW, 24 to 72 hours) (S2 placebo table).
   - >-
     Let the rows of a labelled event lie in weeks marked unobserved: the plan's filter left 2
     event-Primary pairs to fit, and allowing them gives 7 (R1 and the events-in-any-week run).
@@ -100,42 +99,55 @@ advice:
     shared-month bootstrap).
   - >-
     Do not read the transfer terms from C4, which is exactly 0 because the transfer terms are zero
-    when scoring; score them by S2 and R1 only (C4).
+    when scoring; score them by S2 and R1 only in this experiment (C4).
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1292
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/
 ---
 
-# Experiment 63: does a linear joint fit of baseline, solar, and transfers beat the v1 baseline?
+# Experiment 63: does a linear joint fit of baseline, solar, and transfers beat the Flexpectation v1 baseline?
 
-**We asked whether one small fit can explain the power a substation draws as three separate parts:
-ordinary weather-driven demand, the output of solar panels behind the meter, and load moved onto the
-substation from a neighbour during a switching job.** We built the fit for the 5 substations with
-enough data, and compared its forecast of the median power, in hindsight, with the Flexpectation v1
-forecast, which treats the power as one total. A point below is 1% of a substation's capacity. The
-solar part lowered the average error by 0.32 points. We then added known amounts of solar-farm
-output and of transferred load to the metered power and checked how much the fit found again. Those
-checks could not be passed, and the reason lay in how the checks were designed.
+**We asked whether one small fit can explain the power a Primary substation draws as three separate
+parts: ordinary weather-driven demand, the output of solar panels behind the meter, and load moved
+onto the substation from a neighbour during a switching job.** A Primary substation is a 33/11 kV
+substation. We built the fit for the 5 of the 8 Primaries metered in MW that have enough data,
+because 2 are excluded for the quality of their solar-capacity estimate and 1 has under a year of
+usable data. Flexpectation v1 is NGED's production forecast, built on one XGBoost model that
+forecasts the metered total. We compared the fit's median forecast with the Flexpectation v1
+forecast outside switching, in hindsight. "In hindsight" means the weather and sunshine inputs are
+estimates of the past that do not exist at forecast time, so the gain we measure is a ceiling.
 
-**The solar term does what it should in hindsight (C1 -0.32 points, close to the 0.35 threshold,
-with oracle sunshine and in-sample capacity, a ceiling), but the injection tests that would show the
-fit recovers the true pieces could not be passed for reasons of the test design (CAMS sunshine
-matches a real farm's output with slope 0.76; 6-to-12-hour windows with small donors cannot pin a
-share to 0.10), and the labelled-transfer terms were barely exercised (the "unobserved" weeks remove
-most events; 2 event-Primary pairs were fitted). So the experiment cannot yet say whether
-Flexpectation v2's split into baseline, solar, and transfers costs accuracy. The next experiment
-should keep the fit's own regressor shape as a positive control, scale the share gate by donor size,
-use intervals of 24 hours or longer, allow events in unobserved weeks, and cover all 8 Primaries.**
+The error measure is the mean absolute error of the median forecast, in points. One point is 1% of a
+Primary's capacity. The Flexpectation v1 baseline scores 5.807 points, and 0.35 points is the
+smallest gain we judged worth adding the fit to the serving path. The sunshine shape is the unit
+solar output estimated from CAMS (the Copernicus Atmosphere Monitoring Service). The solar part of
+the fit lowered the error by 0.32 points. We then added known amounts of solar-farm output and of
+transferred load to the metered power and checked how much of each the fit found again. Those checks
+could not be passed, and the reason lay in how the checks were designed.
 
-**Verdict: inconclusive.** The pre-registered rule tests `refuted` first: C1 is not wholly above
-zero. The rule then tests the gates: S1 and S2 both failed, and C1 is not wholly above zero, so the
-verdict is `inconclusive`. C1 is -0.322 points (-0.437 to -0.207) over 48,795 half-hours at 5
-Primaries, in 112 series-months. Its 95% interval holds values on both sides of the -0.35 threshold,
-so the rule would have given `inconclusive` even with both gates passed. Every number below comes
-from `work/report.txt`, `work/charts_report.txt`, and the sensitivity reports printed by the
-committed scripts. Items marked "post hoc" were added after the first run, on the code review's
-findings, and never change the verdict.
+**We learned that, in hindsight, the solar part of the fit lowers the error by about a third of a
+point, close to the 0.35-point threshold. We did not learn whether the fit recovers the true size of
+each part, because the injection checks failed for reasons of test design: CAMS sunshine matches a
+real solar farm's output with a slope of only 0.76, and a share of 0.10 cannot be pinned down in
+windows of 6 to 12 hours at small donors; the transfer terms were barely exercised, with 2 pairs of
+event and Primary fitted. The next experiment should keep the fit's own regressor shape as a
+positive control, scale the share gate by donor size, use intervals of 24 hours or longer, allow
+events in unobserved weeks, and cover all 8 Primaries.**
+
+**Verdict: inconclusive.** The pre-registered rule tests `refuted` first: C1, the paired error
+difference above, is not wholly above zero. The rule then tests the gates: S1 and S2 both failed, and
+C1 is not wholly above zero, so the verdict is `inconclusive`. C1 is -0.322 points (-0.437 to
+-0.207) over 48,795 half-hours at 5 Primaries, in 112 series-months. C1's 95% interval lies wholly
+below zero but not wholly below -0.35, so with both gates passed the rule would have given `small
+gain`. Every number below comes from `work/report.txt`, `work/charts_report.txt`, and the
+sensitivity reports printed by the committed scripts. Items marked "post hoc" were added after the
+first run, and never change the verdict.
+
+**Prediction against outcome.** C1 was predicted at -0.2 points (-0.6 to 0.0) and came out at
+-0.322, inside the range. S1 was predicted to recover 0.80 to 0.95 of an injected capacity and
+recovered 0.759, below the range. S2 was predicted to have a median absolute share error of 0.02 to
+0.06 and had 0.055, inside the range. The placebo share was not predicted.
 
 ## The raw series
 
@@ -143,20 +155,20 @@ findings, and never change the verdict.
 The figure shows Trusthorpe over the April to September week with the largest mean absolute solar
 term, which starts at the end of April 2026. The residual is metered power minus the baseline
 without radiation inputs. The fitted solar term is the joint fit's addition to that baseline. The
-third line is what the radiation inputs add to the frozen v1 baseline.
+third line is what the radiation inputs add to the frozen Flexpectation v1 baseline.
 
 ![One week at one Primary: residual, fitted solar term, and the radiation inputs' contribution](figure_1.svg)
 
 ## Absolute scores of every arm
 
-**The joint fit scores 5.484 points of capacity against 5.807 for the frozen v1 baseline, and
-removing radiation without a solar term scores 6.662.** The table gives each arm's mean absolute
-error of the median over all 48,795 scored daylight half-hours, in points of capacity, with a 95%
-interval from re-drawing whole calendar months within each Primary.
+**The joint fit scores 5.484 points of capacity against 5.807 for the frozen Flexpectation v1
+baseline, and removing radiation without a solar term scores 6.662.** The table gives each arm's
+mean absolute error of the median over all 48,795 scored daylight half-hours, in points of capacity,
+with a 95% interval from re-drawing whole calendar months within each Primary.
 
 | Arm | What it is | Mean absolute error, all daylight | April to September | October to March |
 |---|---|---|---|---|
-| v1 | Frozen v1 baseline, with radiation inputs | 5.807 (5.577 to 6.038) | 5.762 (5.491 to 6.035) | 5.937 (5.621 to 6.253) |
+| v1 | Flexpectation v1 baseline (frozen), with radiation inputs | 5.807 (5.577 to 6.038) | 5.762 (5.491 to 6.035) | 5.937 (5.621 to 6.253) |
 | control | Baseline without radiation inputs | 6.662 (6.379 to 6.961) | 6.480 (6.160 to 6.822) | 7.194 (6.789 to 7.590) |
 | c1 | Joint fit, season-year constant capacity, fitted scale | 5.484 (5.233 to 5.740) | 5.511 (5.215 to 5.807) | 5.407 (5.052 to 5.809) |
 | c2 | Joint fit with the scale fixed at 1 | 6.840 (6.583 to 7.103) | 6.893 (6.604 to 7.189) | 6.685 (6.240 to 7.209) |
@@ -172,8 +184,8 @@ first arm has the smaller error.
 
 | Contrast | All daylight | April to September | October to March |
 |---|---|---|---|
-| C1: c1 minus v1 (decides the verdict) | -0.322 (-0.437 to -0.207) | -0.251 (-0.383 to -0.118) | -0.530 (-0.731 to -0.306) |
-| control minus v1 (radiation removed, no solar term) | +0.855 (+0.711 to +1.007) | +0.718 (+0.557 to +0.888) | +1.257 (+1.017 to +1.499) |
+| C1: c1 minus the Flexpectation v1 baseline (decides the verdict) | -0.322 (-0.437 to -0.207) | -0.251 (-0.383 to -0.118) | -0.530 (-0.731 to -0.306) |
+| control minus the Flexpectation v1 baseline (radiation removed, no solar term) | +0.855 (+0.711 to +1.007) | +0.718 (+0.557 to +0.888) | +1.257 (+1.017 to +1.499) |
 | c1 minus control (what the solar term buys) | -1.177 (-1.375 to -0.986) | -0.970 (-1.181 to -0.761) | -1.787 (-2.125 to -1.441) |
 | C2: c2 minus c1 (scale fixed at 1 minus fitted scale) | +1.356 (+1.196 to +1.508) | +1.382 (+1.185 to +1.569) | +1.278 (+1.077 to +1.486) |
 | C3: c3 minus c1 (weekly capacity minus season-year constant) | -0.006 (-0.025 to +0.011) | -0.013 (-0.037 to +0.009) | +0.013 (-0.005 to +0.030) |
@@ -184,19 +196,20 @@ first arm has the smaller error.
   inputs alone costs 0.855 points, and the solar term then recovers 1.177 points.
 - **The fitted scale is about 0.5, not 1.** Its median over the 112 held-out months is 0.497 (10th
   to 90th percentile 0.471 to 0.517), and it is positive in every month. Fixing it at 1 costs 1.356
-  points (C2). The scale falls below 1 because CAMS sunshine and the sun over the substation differ
-  (the slope of a real farm's anomaly on the CAMS anomaly is 0.65 to 0.87), and because the
-  baseline without radiation still holds temperature, dew point, solar zenith, and hour, which
-  carry some of the solar dip.
+  points (C2). One untested conjecture is that the scale falls below 1 because CAMS sunshine and the
+  sun over the substation differ (the slope of a real farm's anomaly on the CAMS anomaly is 0.65 to
+  0.87), and because the baseline without radiation still holds temperature, dew point, solar
+  zenith, and hour, which carry some of the solar dip.
 - **The capacity leak is small.** The previous season-year's constant, which the held-out months
   never helped set, gives C1 -0.357 (-0.480 to -0.231) on the same 41,477 half-hours where in-sample
   capacity gives -0.360 (-0.480 to -0.239) (C5).
 - **C4 is exactly 0 by construction.** The transfer terms are zero outside switching, and the scored
-  half-hours lie outside switching, so C4 cannot measure the transfer terms. S2 and R1 are their
-  only tests.
+  half-hours lie outside switching, so C4 cannot measure the transfer terms. S2 and R1 are the
+  only tests of the transfer terms in this experiment.
 - **A weekly capacity changes nothing.** C3 is -0.006 (-0.025 to +0.011).
 - **The pinball loss at the 10th and 90th quantiles agrees.** The joint fit lowers it by 0.086
-  (-0.124 to -0.049) at q10 and 0.062 (-0.102 to -0.025) at q90 against v1.
+  (-0.124 to -0.049) at q10 and 0.062 (-0.102 to -0.025) at q90 against the Flexpectation v1
+  baseline.
 
 **The joint fit lowers the error at all 5 Primaries in the point estimates, but the interval of 1
 Primary includes zero.** The rows below come from `charts_report.txt`; each interval re-draws whole
@@ -224,17 +237,19 @@ April to September is -0.251 (-0.384 to -0.112), and October to March is -0.530 
 **The fit recovered 0.759 of an injected solar farm's capacity (10th to 90th percentile 0.675 to
 0.840), so the gate of 0.15 on the miss failed (median miss 0.241).** The injection added the
 output of each of 6 real solar farms, labelled A to F as in experiment 00045, at 10%, 25%, and 50%
-of a substation's capacity, at 6 substations (108 injections). The ratio is the same at every
-injection size (0.759 at each) and in both halves of the year (0.761 in April to September, 0.752
-in October to March).
+of a substation's capacity, at 6 substations (108 injections). The ratio is 0.761 in April to
+September and 0.752 in October to March. Post hoc, it is the same at every injection size (0.759 at
+each).
 
-**The ratio is the agreement between a real farm and the CAMS sunshine shape, and no fit using that
-shape can do better.** Post hoc, the least-squares slope of each farm's anomaly (its output minus
-its mean at the same month and half-hour of the day) on the CAMS anomaly is 0.65 to 0.87 across
-farms and substations, with correlations of 0.64 to 0.89. Its median is 0.765 over all farms and
-substations, and it matches the S1 ratio farm by farm (farm A 0.703 against 0.691, farm B 0.791
-against 0.805, farm C 0.766 against 0.770, farm D 0.806 against 0.804, farm E 0.724 against 0.705,
-farm F 0.772 against 0.810). The gate of 0.15 therefore could not be met by construction.
+**The ratio is the agreement between a real farm and the CAMS sunshine shape, and no fit that uses the
+CAMS anomaly as its regressor can do better.** Post hoc, the least-squares slope of each farm's
+anomaly (its output minus its mean at the same month and half-hour of the day) on the CAMS anomaly
+is 0.65 to 0.87 across farms and substations, with correlations of 0.64 to 0.89. The median slope is
+0.765 over all farms and substations, and it matches the S1 ratio farm by farm (farm A 0.703 against
+0.691, farm B 0.791 against 0.805, farm C 0.766 against 0.770, farm D 0.806 against 0.804, farm E
+0.724 against 0.705, farm F 0.772 against 0.810). The median miss of 0.241 fails the gate, and the
+farm slopes (0.65 to 0.87)
+show that agreement with CAMS sunshine, not the fit, sets the ceiling.
 
 **The positive control passes exactly.** Post hoc, the fit's own regressor shape (capacity times
 the CAMS anomaly) was injected at 10%, 25%, and 50% at the same 6 substations, in all three season
@@ -250,15 +265,16 @@ code recovers what it should.
 0.05, and the 95th percentile of the placebo share was 0.304 against 0.10, so both S2 gates
 failed.** The test added a donor's real power, times a share of 0.1, 0.25, or 0.5, to a substation
 over 6, 12, 24, or 72 hours, 240 intervals in all, and 240 placebo intervals with a true share of
-zero, at 6 substations. The error is 0.071 from April to September and 0.052 from October to March;
-by share it is 0.051 at 0.1, 0.055 at 0.25, and 0.077 at 0.5.
+zero, at 6 substations. The error is 0.071 from April to September and 0.052 from October to March.
+Post hoc, by share it is 0.051 at 0.1, 0.055 at 0.25, and 0.077 at 0.5, and the breakdown by
+duration is in `work/report.txt`.
 
-**Post hoc, the placebo share is large for small donors and short intervals, because the baseline's
-half-hourly residual of about 0.5 MW is divided by a small donor power.** A donor of 1.2 MW
+**Post hoc, the placebo share is large for small donors and short intervals.** A donor of 1.2 MW
 mean absolute power (Wrangle T1) gives a median absolute placebo share of 0.176, and donors of 7.0
 and 7.1 MW (Mount Bridge Boston and Horncastle) give 0.025 and 0.047. The 95th percentile falls from
 0.582 for donors under 3 MW to 0.158 for donors of 3 to 5 MW and 0.137 for donors over 5 MW, and
-from 0.407 at 6 hours to 0.159 at 72 hours. No cell of donor size and interval length reaches 0.10:
+the 95th percentile of the placebo share by interval length is 0.407 at 6 hours, 0.289 at 12 hours,
+0.312 at 24 hours, and 0.159 at 72 hours. No cell of donor size and interval length reaches 0.10:
 the lowest is 0.118 (donors of 3 to 5 MW, 24 to 72 hours).
 
 | Donor size (mean absolute power) | Interval length | Placebo intervals | Median absolute share | 95th percentile |
@@ -270,22 +286,24 @@ the lowest is 0.118 (donors of 3 to 5 MW, 24 to 72 hours).
 | Over 5 MW | 6 to 12 hours | 46 | 0.047 | 0.141 |
 | Over 5 MW | 24 to 72 hours | 45 | 0.037 | 0.132 |
 
-**An intercept would make the placebo spread worse, and the 0.10 gate cannot be met at 6 to 12 hours
-with small donors.** The code review's check found that adding an intercept increases the spread.
-The injected transfers show the same pattern: the median absolute share error is 0.179 for donors
-under 3 MW at 6 to 12 hours and 0.031 for donors over 5 MW at 6 to 12 hours.
+**The 0.10 gate cannot be met at 6 to 12 hours with small donors.** The injected transfers show the
+same pattern: the median absolute share error is 0.179 for donors under 3 MW at 6 to 12 hours and
+0.031 for donors over 5 MW at 6 to 12 hours.
 
 ![Recovered share on placebo intervals, by donor, sorted by the donor's mean power](figure_4.svg)
 
-## R1: only 2 real events could be fitted
+## R1: only 2 event-Primary pairs could be fitted
 
-**R1 fitted 2 event-Primary pairs, so it says nothing about the transfer terms.** Of 73 real
+**R1 fitted 2 event-Primary pairs, so it says nothing about the transfer terms.** An event-Primary
+pair is one Primary's side of one labelled event. Of 73 real
 labelled events, 37 had a side that is not one of the 8 Primaries metered in MW, 14 named no donor,
 and the status filter and the observed-weeks filter removed most of the rest. At the 2 pairs fitted,
 the share of the residual's variance explained inside the event has a median of 0.027, against a
-median of 0.158 on 22 placebo windows of equal length and a 95th percentile of 0.538. Neither pair
-exceeds its own placebo 95th percentile (0 of 2, against a chance of 0.1), and the mean rank of the
-event among its placebos is 0.150, where 0.5 means no effect.
+median of 0.158 on 22 placebo windows of equal length (20 for one pair and 2 for the other, because
+the plan shifts each event by whole weeks into periods outside every logged closure and only 2 windows
+were found for the second pair; the report prints no further reason) and a 95th percentile of
+0.538. Neither pair exceeds its own placebo 95th percentile (0 of 2, against a chance of 0.1), and
+the mean rank of the event among its placebos is 0.150, where 0.5 means no effect.
 
 ## Sensitivity runs (post hoc)
 
@@ -322,8 +340,8 @@ a variance explained of 0.978, and a 13-half-hour event with a share of -0.718, 
   `studies.bootstrap`. One seed only, so no interval here covers fitting-seed variation.
 - **The baseline for each training month was fitted by a model that saw the held-out month.** The
   baseline for month m is fitted without month m, but the residuals of the other months, on which
-  the scale is fitted, come from models that included month m. The effect is tiny, and the v1 arm
-  has the same property.
+  the scale is fitted, come from models that included month m. The effect is tiny, and the
+  Flexpectation v1 arm has the same property.
 - **The month bootstrap re-draws months within each Primary.** The plan pooled the Primaries after
   resampling within each. The post hoc shared-month bootstrap above draws the same months for all
   Primaries.
@@ -459,7 +477,7 @@ Sonnet reviewer could not check against the printed report.
 - **Compute.** The XGBoost refits (about 400 quick fits) run in 4 workers of 1 thread each in slot
   E; the linear fits are negligible. Each fit writes its own file atomically.
 
-## Departures to report
+## Departures planned
 
 The page will say plainly that C1 uses oracle sunshine, that the fit is in hindsight, and that the
 only test of the transfer terms outside the injection harness is the descriptive R1.

@@ -1375,26 +1375,29 @@ service could get.
 
 ![Contrasts between the arms](00054-product-trained-xgboost-wind-farms/figure_1.svg)
 
-### 00063: does a linear joint fit of baseline, solar, and transfers beat the v1 baseline? (SW2-10)
+### 00063: does a linear joint fit of baseline, solar, and transfers beat the Flexpectation v1 baseline? (SW2-10)
 
 **In hindsight, the solar part of a joint fit lowers the error of a Primary substation's median
-forecast by about a third of a point, but the tests that check each part comes out at the right size
-could not be passed, so the verdict is `inconclusive`.** We fitted one linear model per substation:
-a weather baseline without radiation inputs, plus the embedded-solar capacity times the CAMS
-sunshine shape, plus a share of the donor's power for each labelled switching job. We compared it
-with the Flexpectation v1 baseline outside switching, at 5 Primaries, and then added known solar-farm
-output and known transfers to check what the fit recovered.
+forecast by about a third of a point, but the tests that check whether each part comes out at the
+right size could not be passed.** "In hindsight" means the weather and sunshine inputs are estimates
+of the past that do not exist at forecast time. The verdict is `inconclusive`. We fitted one linear
+model per substation: a weather baseline without radiation inputs, plus the embedded-solar capacity
+times the CAMS (Copernicus Atmosphere Monitoring Service) sunshine shape, plus a share of the
+donor's power for each labelled switching job. We compared it with the Flexpectation v1 baseline
+outside switching, at 5 Primaries, and then added known solar-farm output and known transfers to
+check what the fit recovered.
 
-- **Headline result:** C1, the joint fit's mean absolute error minus the v1 baseline's, is -0.322
-  points of capacity (-0.437 to -0.207), against a threshold of 0.35. The sunshine is a past
-  estimate and the capacity is fitted on the same power, so the figure is a ceiling.
-- **Finding for later experiments:** the injection gates were out of reach by design. CAMS sunshine
-  matches a real solar farm's anomaly with a slope of 0.65 to 0.87, so recovery of 0.76 of an
-  injected capacity is the best that shape allows, and the fit's own regressor shape is recovered at
-  exactly 1.000. A placebo transfer share has a 95th percentile of 0.63 for donors under 3 MW at 6
-  to 12 hours and 0.14 for donors over 5 MW, so a gate of 0.10 needs a scale set by donor size. The
-  plan's filter on observed weeks left 2 event-Primary pairs, and 7 once events were allowed in any
-  week.
+- **Headline result:** C1, the joint fit's mean absolute error minus the Flexpectation v1
+  baseline's, is -0.322 points of capacity (-0.437 to -0.207), against a threshold of 0.35. The
+  sunshine is a past estimate and the capacity is fitted on the same power, so the figure is a
+  ceiling.
+- **Finding for later experiments:** the injection gates could not be passed, because of the test
+  design. CAMS sunshine matches a real solar farm's anomaly with a slope of 0.65 to 0.87, so the
+  0.76 recovery of an injected capacity reflects how well CAMS sunshine matches a real farm, and the
+  fit's own regressor shape is recovered at exactly 1.000. A placebo transfer share has a 95th
+  percentile of 0.63 for donors under 3 MW at 6 to 12 hours and 0.14 for donors over 5 MW, so a gate
+  of 0.10 needs a scale set by donor size. The plan's filter on observed weeks left 2 event-Primary
+  pairs, and 7 once events were allowed in any week.
 - **A next experiment could:** keep the positive control, scale the share gate by donor size, use
   intervals of 24 hours or longer, allow events in unobserved weeks, and cover all 8 Primaries.
 - **Write-up and pull request:** [result](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md),
