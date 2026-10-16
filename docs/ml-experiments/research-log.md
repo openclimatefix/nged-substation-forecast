@@ -1635,6 +1635,7 @@ date. At leads under 48 hours the gain is -0.272 (-0.420 to -0.145).
   [PR #1294](https://github.com/openclimatefix/nged-substation-forecast/pull/1294).
 
 ![Quantile score of each arm, and the planned contrasts](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/figure_1_headline.svg)
+
 ### 00063: does a linear joint fit of baseline, solar, and transfers beat the Flexpectation v1 baseline? (SW2-10)
 
 **In hindsight, the solar part of a joint fit lowers the error of a Primary substation's median
