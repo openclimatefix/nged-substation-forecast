@@ -110,8 +110,9 @@ merges it when the session cannot.** The conditions are: the diff touches only `
 `docs/ml-experiments/`, and the experiment's line in `mkdocs.yml`; the reviews are done and triaged;
 `ci` is green; the research log is updated; no `data/` or `.env` file is in the diff; no closing
 keyword appears in the PR body or the commit messages; the branch contains `main`; and the merge is
-a merge commit and never a squash (`gh pr merge --merge`, without `--delete-branch`). Read the PR body and the commit messages for a closing keyword before merging,
-because `closingIssuesReferences` is empty until the merge lands.
+a merge commit and never a squash (`gh pr merge --merge`, without `--delete-branch`). Read the PR
+body and the commit messages for a closing keyword before merging, because
+`closingIssuesReferences` is empty until the merge lands.
 
 - **A diff outside those paths, such as a change under `src/` or `packages/`, stops at a reviewed PR
   for the maintainer.** Tell a session
