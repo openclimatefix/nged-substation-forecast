@@ -18,16 +18,16 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
-| [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
-| [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
-| [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
+| [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
+| [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
+| [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series |
 | [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-4 (PVDIS-3 is done: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md)) | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations) | Can the share of east-, south-, and west-facing solar behind each Primary be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
+| [PVDIS-8](#pvdis-8-a-second-weather-forecast-for-the-solar-anomaly) | Does a second weather forecast, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | 2 | The maintainer's word to the ML experiment manager | Proposed; can run beside PVDIS-4, and PVDIS-5 uses its anomaly if it beats ENS |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
 ## Deferred until the first results are in
@@ -157,36 +157,11 @@ line therefore starts by building a reference set independent of the detectors.
 
 The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
 
-#### SW2-1: a fixed scoreboard and an injection harness
-
-**Score D0 and D1 from experiment 00037 on a scoreboard that every later detector experiment
-reuses.** An event counts as found only when both its onset and its end match, each at the
-detector's causal `known_from` stamp, because experiment 00038 found the end of a detected interval
-to be where the damage happens. The tolerances and bands are proposals for the plan to confirm: an
-onset within 2 hours and an end within 6 hours, duration bands of 6 to 24 hours, 1 to 3 days, and
-over 3 days, and size bands of moved load under 10%, 10% to 25%, and 25% or more of the receiving
-load. The injection harness follows experiment 00038's, with 1 to 3 receivers and durations drawn
-from the confirmed closures, and adds a moved share that drifts during the event. Tuning uses odd
-months and injections; even months score.
-
-#### SW2-2: how much the visible events hurt the best guess
-
-**Measure the share of experiment 00033's best guess's quantile score and tail score that falls in
-labelled switching half-hours, and in half-hours whose lagged power falls inside a labelled event.**
-The measurement needs no new fit, and it sets how much a detector could lower the forecast error.
-
-#### SW2-3: the label-exclusion ceiling
-
-**Train the lagless XGBoost model with labelled switching excluded from the target, without
-exclusion, and with a random exclusion of equal volume, and score all three outside switching.**
-SW2-3 is the label-exclusion family on the roadmap page. The labelled-against-random gap is the most
-a detector could gain by cleaning the training target. The same gap is the first evidence for the
-NRA forecast.
-
 #### SW2-4 to SW2-9: detector iterations
 
-**Each iteration tests one change to the detector against the SW2-1 scoreboard, tuned on injections
-and odd months, scored on even months.** The order below is a proposal, by expected gain per hour of
+**Each iteration tests one change to the detector against the
+[experiment 43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd
+months, scored on even months.** The order below is a proposal, by expected gain per hour of
 work, for the plan of each iteration to confirm:
 
 - **SW2-4:** a better residual, from the best lagless model available live, refitted with a robust
@@ -198,8 +173,14 @@ work, for the plan of each iteration to confirm:
 - **SW2-7:** a shape-aware step, which models the moved load as a share of the donor's expected
   profile, not as a constant MW shift. Experiment 00037 found the step changing by more than a
   factor of 2 within 8 of 26 confirmed closures of 6 hours or more.
-- **SW2-8:** node balance, which tests whether the sum of the neighbourhood's residuals stays flat
-  while single substations step, with a subset-sum over neighbours for a split.
+- **SW2-8:** a single-series detector first, with neighbour balance as a sense check, not a gate.
+  Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's
+  confidence and names the receiver, a same-sign step on the neighbours vetoes the alarm as a
+  common-mode weather or calendar miss, and an alarm with no metered neighbour keeps its
+  single-series confidence. Experiment 00043 found the neighbour-balance detector D1, which uses
+  the neighbour test as a gate, finding almost none of the injected transfers without a metered
+  receiver. The sum of the neighbourhood's residuals and a subset-sum over neighbours for a split
+  feed the confidence score.
 - **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
   series and hour of day fitted to the residual.
 
@@ -211,7 +192,8 @@ equals the baseline, minus a capacity times a PV shape, plus, for each labelled 
 times the donor's net power over transfer k's interval. With the intervals given, the fit is
 linear. The result tells the project whether to start the v2 differentiable-physics work sooner.
 
-- **The baseline term** is SW2-3's lagless XGBoost model, trained with labelled switching excluded.
+- **The baseline term** is a lagless XGBoost model fitted inside SW2-10, trained with labelled
+  switching excluded.
 - **The transfer intervals** come from SW2-0b, or from the logged closures padded by 24 hours if
   the labels are not ready.
 - **The capacity and the PV shape** come from the PV-disaggregation line: experiment 00040's
@@ -221,6 +203,36 @@ linear. The result tells the project whether to start the v2 differentiable-phys
 - **Scoring** is on held-out months outside switching against the v1 baseline, and on experiment
   00039's injection harness extended with injected transfers that carry the donor's PV, where the
   true capacity and the true shares are known.
+
+#### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
+
+**Retrain the best-guess architecture so that it never learns to predict an abnormal running
+arrangement, and pick the v1 NRA candidate from three arms.** SW2-11 uses experiment 00041's
+labelled switching, and SW2-12 repeats the experiment with the detector's labels, which is what
+Flexpectation v2 will have. The gap between the two runs is the skill lost without a labelled set.
+
+- **The architecture** is the winner of RT2 (experiment 00048). Weekly retraining without the
+  error correction is the leading candidate. If the winner keeps an error correction, the
+  correction's history leaves out switching half-hours and looks back far enough to hold 14
+  unmasked days, and the write-up reports the unmasked days per window and how often the fallback
+  to the last full correction fired.
+- **The arms:** the plain architecture with nothing removed; the NRA arm, with logged switching
+  removed from the training targets; and the NRA arm plus, for each lagged power input, the signed
+  MW moved by any switching event at that lag. A fourth arm replaces each lag by the lag minus that
+  MW, because a tree model cannot easily subtract one column from another.
+- **The labels in SW2-11** are experiment 00041's visible events, conserved or one-sided, which
+  two Sonnet labellers and an Opus adjudicator found in the telemetry at NGED's logged times. The
+  target mask removes each event's interval from the training targets of its donor and receivers,
+  and the magnitudes are the events' labelled MW moved.
+- **The labels in SW2-12** come from the best detector after SW2-8.
+- **Scoring** uses the same rows in every arm and in both runs: half-hours outside NGED's logged
+  closures and outside the labelled events, where the metered target is the NRA target. A
+  secondary metered view scores every half-hour and decides nothing.
+- **Threshold.** The target mask needs a detector at training time only, so the NRA arm is adopted
+  when its interval does not show it worse than the plain arm. The magnitude arms need a detector
+  on the serving path, so they need a gain whose interval excludes zero. Experiment 00044 bounded a
+  perfect detector's gain at 0.34% of the best guess's quantile score under the NRA view, so the
+  gains are expected to be small.
 
 ### PVDIS: separating embedded solar from Primary demand
 
@@ -416,6 +428,30 @@ through zero, because reactive power then dominates the reading. The known-answe
 absolute value of the MW readings at the 8 Primaries metered in MW and scores the recovered sign
 and capacity against the real ones. A fit that passes that test is then applied to the 8 MVA
 Primaries. NGED would like MW at every Primary, and accepts that the result is research.
+
+#### PVDIS-8: a second weather forecast for the solar anomaly
+
+**Test whether a second weather forecast, alone or blended with ENS, forecasts the solar anomaly
+better than ENS, because experiment 00046 found that the irradiance forecast, not the capacity,
+limits the gain.** In experiment 00046, a shift built from CAMS at the valid time, an oracle, lowered
+the daylight quantile score of the demand forecast without radiation inputs by 0.97 points
+(-1.43 to -0.60), about 20% of that forecast's score. The same shift built from ENS lowered it by
+only 0.056, because the ENS anomaly's correlation with the CAMS anomaly falls from 0.80 in the first
+day to 0.28 at 6 to 10 days.
+
+- **The anomaly is scored first, with no demand fit:** its correlation and calibration slope against
+  the CAMS anomaly, by lead band, at the Primaries metered in MW, on experiment 00046's rows. The
+  arms are ENS alone, the second product alone, and a blend of the two, with the blend's weights
+  fitted on the training window only.
+- **Then the demand contrasts are repeated:** experiment 00046's C3 and C6, with the best of the
+  three anomalies and experiment 00046's lead-dependent coefficient.
+- **The product is chosen on four checks:** a forecast archive covering the training window and the
+  validation year (July 2025 to June 2026), availability at the time production runs, the
+  resolution and step length of its shortwave field, and the same product in training and in
+  serving. The CEDA UKV archive differs statistically from the live UKV, so a fit trained on one
+  is never served on the other. Candidates include the products in P15 and those Dynamical.org
+  serves. A product already on disk comes first, and any download follows the `data-download`
+  skill.
 
 #### PVDIS-T: the capacity table, a study
 

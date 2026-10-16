@@ -217,3 +217,13 @@ labeller on half of them about 5 million more.
 
 Code: `ml-experiments/00041-sw2-0a-labeller-gate/`. Numbers above are printed by `e00041_report.py`,
 `e00041_kappa.py`, `e00041_diagnose.py`, and `e00041_checks.py`.
+
+## Known defect in the labelled set
+
+**The labelled set's `moved_share_of_receiver` column is missing for most events.** The labeller
+wrote donor and receiver series ids as text, and the calculation that turns the moved MW into a
+share of the receiving load compares them with whole numbers, so the share is empty for any event
+whose receivers are text. Counts of events by share band in the [labelled-set
+page](labelled-set.md) were corrected for events lasting over 1 day; use
+[experiment 44's](../00044-sw2-2-switching-share-of-best-guess-score/result.md) `load_events` for
+every other use.
