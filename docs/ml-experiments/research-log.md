@@ -1174,13 +1174,15 @@ experiment cannot resolve a gain below about 0.04.
 **Much of the gap in recall between injected transfers with and without a metered receiver comes
 from the injected step being too small for the detector to see, and a stronger neighbour veto adds
 almost nothing.** Of the 274 transfers without a metered receiver, 211 step by less than the alarm
-threshold of 4.0 noise units, against 40 of the 346 with one. Matched on the largest step the gap
+threshold of 4.0 noise units, against 40 of the 346 with one. Matched on the largest step of the
+donor and metered receivers, the gap
 falls from 0.33 to -0.002 (98.33% interval -0.166 to +0.119), and matched on the donor's step alone
 it is +0.161 (+0.013 to +0.322), so step size explains between about half and all of it. A veto of
 1.0 noise units finds 0.368 against 0.355 without a veto (+0.013, 0.000 to +0.029).
 
 - **Finding for later experiments:** of the 306 transfers with a metered receiver that step by 4.0
-  noise units or more, 134 are still missed. SW2-7, the shape-aware detector, matches the injection
+  noise units or more, 134 are still missed. SW2-7, the planned detector that models the moved load as
+  a share of the donor's daily profile, matches the injection
   shape, so it needs scoring on transfers injected with a different shape, on the 14 and 35 labelled
   real transfers, and by bins of step in noise units.
 - **Write-up and pull request:** [the full result page](00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md),

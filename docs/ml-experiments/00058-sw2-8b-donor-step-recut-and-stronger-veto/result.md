@@ -84,17 +84,19 @@ code: ml-experiments/00058-sw2-8b-donor-step-recut-and-stronger-veto/
 
 **Much of the gap in recall between injected load transfers with and without a metered receiver
 comes from the injected step being too small for the detector to see, and a stronger neighbour veto
-adds almost nothing.** We asked two questions about a detector that raises an alarm when one Primary
-substation's residual (measured minus predicted power) steps up or down over 24 hours. First,
-experiment 55 found 0.50 of the injected transfers that have a metered receiver and 0.17 of those
-without one. We re-cut the shares found by the size of the injected step, measured in noise units
-(the typical size of the 24-hour step statistic on a quiet day), to see whether the gap is a
-property of the detector or of how we built the injected transfers. Second, we made the neighbour
-veto, which removes an alarm when at least two neighbouring substations stepped the same way,
-stronger than the 1.5 noise units of experiment 55. Step size explains at least half the gap, and
-perhaps all of it: 211 of the 274 transfers without a metered receiver step by less than the alarm
-threshold of 4.0 noise units. The stronger veto raised the share of transfers found by +0.013
-(98.33% interval 0.000 to +0.029), which is no better than experiment 55's +0.008.
+adds almost nothing.** We tested a detector that raises an alarm when the 24-hour average of one
+Primary substation's residual (measured minus predicted power) steps up or down. To test it, we
+injected known load transfers: a donor substation loses load, and receiver substations gain it. A
+receiver is metered when its own power is measured. The detector found 0.50 of the injected
+transfers that have a metered receiver and 0.17 of those without one. We re-cut the share found by
+the size of the injected step, in noise units (multiples of the usual size of the 24-hour step
+statistic on a quiet day), to see whether the gap belongs to the detector or to how we built the
+transfers. We also made the neighbour veto stronger: the veto removes an alarm when at least two
+neighbouring substations stepped the same way, and its strength is the size of step, in noise units,
+that counts. Step size explains at least half of the gap, and between about half and all of it:
+211 of the 274 transfers without a metered receiver step by less than the alarm threshold of 4.0
+noise units. The stronger veto raised the share found by +0.013 (98.33% interval 0.000 to +0.029,
+resampling whole calendar months), against +0.008 in experiment 55.
 
 ![Share found by step size](figure_1_recall_by_step.svg)
 
@@ -112,13 +114,13 @@ and start in even months.
 | C2, D2 at veto 1.0 minus D0M, share found | +0.013 (0.000 to +0.029) | Inconclusive: needs an interval wholly above zero |
 | C3, the same, transfers with no metered receiver (274) | +0.037 (+0.011 to +0.055) | Reported only |
 
-D0M is D0 at experiment 43's thresholds (4-hour window 6.0, 24-hour window 4.0); experiment 55
-showed the threshold search returns them. D2 is D0 with the neighbour veto. Odd months chose a veto
-of 1.0 noise units, but the odd-month shares found were 0.306 at 1.0, 0.302 at 1.25, and 0.304 at
-1.5, a spread of two transfers, so the choice is close to arbitrary, and the selection is not
-reflected in the C2 interval. The matched 24-hour thresholds were 3.55, 3.65, and 3.70, and the
-even-month unexplained 24-hour alarms were 63 for D2 against 80 for D0M. The veto lost 6 transfers
-that D0M finds and gained 14.
+D0 is the detector without the veto. D0M is D0 at experiment 43's thresholds (4-hour window 6.0,
+24-hour window 4.0); experiment 55 showed the threshold search returns them. D2 is D0 with the
+neighbour veto. C1 to C3 are the three planned contrasts. Odd months chose a veto of 1.0 noise
+units, but the odd-month shares found were 0.306 at 1.0, 0.302 at 1.25, and 0.304 at 1.5, so the
+choice is close to arbitrary, and the selection is not reflected in the C2 interval. The matched
+24-hour thresholds were 3.55, 3.65, and 3.70, and the even-month unexplained 24-hour alarms were 63
+for D2 against 80 for D0M. The veto lost 6 of the transfers D0M finds and gained 14 that D0M misses.
 
 ![Step size of each group of injected transfers](figure_2_step_distribution.svg)
 
@@ -134,23 +136,23 @@ metered receiver and 3.3 without one. In the four equal-count bins of the range 
 transfers per bin against 71, 84, 82, and 37 for the unmetered group, so the matched comparison
 rests mostly on the top bin (26 of 53 against 16 of 37).
 
-**The conclusion holds less firmly when the groups are matched on the donor's step alone, and the
-two readings bracket the answer.** A transfer with a metered receiver also has a chance to alarm on
-the receiver, so the pre-registered match uses the largest step over the donor and the metered
-receivers. That maximum is larger than the donor's step for a transfer with a metered receiver,
-which may favour that group, so the donor-only match is the better-matched check. Matched on the
-donor alone the gap is +0.161, which is just under half of 0.33, and its interval (+0.013 to +0.322)
-lies on both sides of 0.165. A logistic regression of found on the logarithm of the step and on a
-metered-receiver flag gives a metered coefficient of +0.26 on the largest step and +0.81 on the
-donor step (a coefficient of +0.81 is a 2.2 times higher odds of being found, at equal donor step).
+**The conclusion holds less firmly when the groups are matched on the donor's step alone.** A
+transfer with a metered receiver also has a chance to alarm on the receiver, so the pre-registered
+match uses the largest step over the donor and the metered receivers. That largest step can exceed
+the donor's step only for transfers with a metered receiver, which favours the metered group. The
+donor-only match is therefore the fairer check. Matched on the donor alone, the gap is +0.161, which
+is just under half of 0.33, and its interval (+0.013 to +0.322) lies on both sides of 0.165. A
+logistic regression of found on the logarithm of the step and on a metered-receiver flag gives a
+metered-receiver coefficient of +0.26 when matched on the largest step and +0.81 when matched on the
+donor's step. A coefficient of +0.81 is 2.2 times higher odds of being found at equal donor step.
 
 ## What held in the prediction and what did not
 
 - **Partly held: the gap shrank, but to zero, not to 0.05 to 0.15.** The pre-registered gap was
   -0.002 on the largest step.
-- **Not held: the odd months did not pick 1.25.** They picked 1.0 by 0.002 over 1.5, and the
-  even-month gain was +0.013, inside the predicted +0.01 to +0.03. The matched threshold fell to
-  3.55, inside the predicted 3.4 to 3.6.
+- **Not held: odd months picked 1.0, not 1.25.** Odd months picked 1.0 by 0.002 over 1.5.
+- **Held: the even-month gain was +0.013, inside the predicted +0.01 to +0.03.** The matched
+  threshold fell to 3.55, inside the predicted 3.4 to 3.6.
 
 ![Share found against veto strength](figure_3_veto_strength.svg)
 
@@ -160,18 +162,20 @@ donor step (a coefficient of +0.81 is a 2.2 times higher odds of being found, at
   the middle two bins, so the matched gap has a wide interval.
 - **The bin edges are fixed from the pooled transfers, not redrawn inside each resample.** The C1
   interval is therefore slightly narrow.
-- **Noise units are odd-month noise units, and the 620 even-month transfers were seen in experiment
-  55,** which is where 0.17 and 0.50 came from. The C1 design is informed by those data.
+- **We estimated the noise units from odd months, and the 620 even-month transfers were already
+  used in experiment 55,** which is where 0.17 and 0.50 came from. Those data informed the C1
+  design.
 - **19 of the 1,900 injected transfers move no MW,** because the donor's power is zero or missing
-  there (2 of the 620). They stay in every count.
-- **A veto of 1.0 or 1.25 noise units falls below the 2.0 that counts a neighbour as a partner.**
-  The loss of 6 transfers and gain of 14 shows no harm at these strengths.
+  there (2 of the 620 even-month transfers). They stay in every count.
+- **A veto of 1.0 or 1.25 noise units falls below the 2.0 noise units at which a neighbouring
+  substation counts as a partner.** The loss of 6 transfers and gain of 14 shows no harm at these
+  strengths.
 
 ## What the next experiment should answer
 
 **The next experiment should show why the detector misses about half of the transfers whose step is
 4.0 noise units or more.** Of the 306 transfers with a metered receiver that step by 4.0 or more,
-134 are missed, and the cause is not the step size. A shape-aware detector, SW2-7, models the moved
+134 are missed, and the cause is unknown. A shape-aware detector, SW2-7, models the moved
 load as a share of the donor's expected daily profile, which is how the injection builds a transfer,
 so its recall on the injected transfers would flatter it. Score SW2-7 on transfers injected with a
 different shape, such as a flat MW step or a profile reversed in time, on the 14 and 35 labelled
