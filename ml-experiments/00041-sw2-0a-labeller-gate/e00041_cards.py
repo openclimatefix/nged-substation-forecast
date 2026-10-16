@@ -6,6 +6,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Final
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import polars as pl
@@ -259,9 +260,7 @@ def render_card(*, spec: CardSpec, features: Features, panel: Panel, note: str =
     lines = [f"# Card {spec.card_id}", ""]
 
     def local(t: datetime) -> str:
-        return t.astimezone(__import__("zoneinfo").ZoneInfo("Europe/London")).strftime(
-            "%Y-%m-%d %H:%M"
-        )
+        return t.astimezone(ZoneInfo("Europe/London")).strftime("%Y-%m-%d %H:%M")
 
     lines += [
         (
