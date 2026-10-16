@@ -352,7 +352,7 @@ def score_events(
     state = {"panel": panel, "scales": scales, "thresholds": thresholds, "veto_z": veto_z}
     with ProcessPoolExecutor(
         N_WORKERS,
-        mp_context=multiprocessing.get_context("fork"),
+        mp_context=multiprocessing.get_context("spawn"),
         initializer=init_worker,
         initargs=(state,),
     ) as pool:
