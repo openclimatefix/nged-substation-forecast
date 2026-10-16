@@ -43,6 +43,9 @@ machine's 32 cores. The ledger at the time of writing books 40, which works only
 rarely run flat out together, so check `uptime` before starting a large fit. A ledger row holds the
 slot, the holder's session id, the GPU share, the cores, and the start date.
 
+- **Tell every session to run independent work in parallel inside its slot.** The `ml-experiment`
+  skill's "Use the compute the slot gives you" section says how. A session that fits many small
+  models one at a time leaves its cores and the GPU idle.
 - **A session stays inside its slot.** It sets `n_jobs` and `nthread` to its core quota, runs one GPU
   fit at a time, and asks the manager before exceeding either.
 - **A session releases its slot when its fits end, not when its PR merges.** It reports the release in
@@ -96,6 +99,9 @@ state with `gh pr view`, and the log files in the experiment's data folder.
 
 - **An idle session with no fit running and no new commit for 90 minutes gets one nudge.** If it
   stays idle, tell the maintainer in one line that it looks stalled.
+- **Compare each session's CPU and GPU use with its slot.** A fit that has run for an hour on a
+  fraction of its cores and almost no GPU is probably serial. Message the session to parallelise it,
+  and say so in `briefs/common.md` for the next sessions.
 - **Verify a number before relaying it.** One session's status line said a check failed at 8 of 8
   substations while its message said 1 of 8; the scored tables showed 1 of 8. Label every number that
   comes before the final scoring as interim.
