@@ -148,6 +148,25 @@ curated roll-up of the `advice` lists.
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
 
+## Use the compute the slot gives you
+
+**Run independent work in parallel, up to the slot's budget of cores and GPU memory.** Series,
+seeds, arms, folds, and refits that do not read each other's output can run side by side. A job that
+fits many small models, such as one per series or one tiny update per day, cannot keep a GPU or many
+cores busy one model at a time. Experiment 34 ran its daily warm-start fits for 16 series one after
+another, at about 2.7 of its 12 cores and almost no GPU, for 3.3 hours. Running 4 to 8 series at a
+time would have taken under an hour.
+
+- **Check utilisation in the first minutes of a long run.** Look at `uptime`, `nvidia-smi`, and the
+  job's own CPU use. If the job uses well under its quota and will run for more than about 30
+  minutes, split it into parallel workers before letting it run on.
+- **Stay inside the slot.** The worker count times the threads per worker stays at or below the
+  slot's cores, and the workers' GPU memory adds up to no more than the slot's share. Ask the
+  manager before exceeding either.
+- **Keep the results independent of the schedule.** Fix the seed of each job, write each job's output
+  to its own file, and write it atomically, so that a run in parallel gives the numbers a run in
+  series would, and a crashed worker is rerun without touching the others.
+
 ## Keep the research log current
 
 **Update `docs/ml-experiments/research-plan.md` in the PR that commits the `planned` `result.md`,
