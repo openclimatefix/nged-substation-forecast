@@ -24,7 +24,8 @@ decision_rule: >-
   they are wide when the events fall in a few months, and `inconclusive` is a likely result.
 benchmark: >-
   The same cases scored outside the flagged half-hours (the unflagged mean loss of the same series).
-row_set_id: fold_a_every5d_v1 (experiment 00033's 73 runs for the 16 Primary series, July 2025 to June 2026)
+row_set_id: >-
+  fold_a_every5d_v1 (experiment 00033's 73 runs for the 16 Primary series, July 2025 to June 2026)
 metric: >-
   Quantile score (points of capacity) and threshold-weighted CRPS at the P99 threshold (twCRPS), as
   `case_metrics` in experiment 00033 computes them, summed over cases and averaged over the 3 seeds.
