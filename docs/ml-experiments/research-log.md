@@ -81,6 +81,7 @@ the maintainer to confirm.
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
+| [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1192,3 +1193,30 @@ On 14 days of overlap with CAMS, the live MOGREPS-UK ensemble was also no better
 - **Write-up:** [result](00053-ukv-vs-ens-solar-anomaly/result.md).
 
 ![Correlation with the CAMS anomaly by lead band](00053-ukv-vs-ens-solar-anomaly/figure_2_correlation_by_band.svg)
+
+### 00056: does Flexpectation v1 need special handling for Primary substations metered only in MVA?
+
+**At sunny middays the best-guess forecast has 5.6 percentage points less skill at the 8 Primary
+substations metered only in MVA than at the 8 metered in MW, but the 95% interval (-5.0 to 14.6)
+includes zero, so the verdict is `inconclusive`.** The experiment found no evidence that Flexpectation
+v1 needs special handling, and could not rule out a loss of up to about 15 percentage points. An
+MVA meter records the magnitude of the power with no sign, so a substation whose net flow embedded
+solar pushes through zero loses the direction of flow. The experiment fitted nothing. It took
+the forecasts that experiment 33 stored for July 2025 to June 2026, and compared the quantile
+score of the best-guess forecast of Primary-substation demand with that of a simple rule-based
+forecast, `manual_heuristic`, at each group of 8. Skill is the percentage by which the best guess's
+quantile score is lower. At sunny middays (April to September, 10:00 to 13:30 UTC) the skill is 15.9%
+at the MW substations and 10.3% at the MVA substations.
+
+- **Finding for later experiments:** skill is lower at the MVA group all year (a gap of 10.5
+  percentage points, 2.1 to 17.5), not specifically at middays, and one MW substation with 31%
+  skill accounts for most of that gap (3.8 percentage points without it; checked after seeing the
+  results).
+- **Near-zero flow:** 1.5% of the MVA group's half-hours have power within 10% of capacity of
+  zero, against 2.5% of the MW group's, and the best guess's skill on them is 18.8% in the MVA
+  group against 46.1% in the MW group (gap 27.4 percentage points, -0.3 to 48.2). At sunny
+  middays, leaving those half-hours out cuts the gap from 5.6 to 2.0 percentage points.
+- **Write-up:** [result](00056-mva-only-primaries-skill-against-mw-primaries/result.md),
+  [PR #1284](https://github.com/openclimatefix/nged-substation-forecast/pull/1284).
+
+![Skill by unit group](00056-mva-only-primaries-skill-against-mw-primaries/figure_1_skill_by_unit.svg)
