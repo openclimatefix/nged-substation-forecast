@@ -239,3 +239,17 @@ P-roll and add a pooled reference refit; state the fingerprint cutoffs; name the
 the 768,073 shared cases; one weight vector per month throughout, and the first-month weights;
 remove the unreachable "small gain" for the spread factor and the unusable "refuted" verdict; fix
 prose faults. Rejected: none.
+
+**Number check (Sonnet), triaged.** Accepted: the reproduction tolerance is 0.0007, the factor
+range, grading prediction (a), the like-for-like comparison with experiment 35, the advice that
+credited a three-model blend nobody scored, the F1 advice limited to P-roll, the interval widths,
+and the research-log wording. Rejected: none.
+
+**Result review (Opus), triaged.** No leakage found, and the verdict follows the rule. Accepted: the
+stack member of B1 carries the correction (stated on the page), the lessons line about adding gains,
+the fingerprint block that duplicates the series identifier, and the weak reason in the D0 advice.
+Not run: a sensitivity check of B1 with an uncorrected stack, because no uncorrected stack arm is
+stored.
+
+**Prose review (Sonnet), triaged.** Accepted: a plain opening paragraph that defines every term, the
+split of the blend paragraph, and the rewording of unclear referents. Rejected: none.
