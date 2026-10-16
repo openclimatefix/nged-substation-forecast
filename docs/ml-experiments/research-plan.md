@@ -19,7 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
-| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | Nothing (experiments 58 and 59 are done) | Proposed |
+| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | Nothing (experiments 58, 59, and 61 are done) | Planned: [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md) |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
@@ -205,7 +205,7 @@ transfers whose shapes the detector does not assume (a constant MW, a share of t
 profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
 day.
 
-- **SW2-14, one combined score.** Add the single-series step evidence and the neighbour
+- **SW2-14, one combined score (planned as [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)).** Add the single-series step evidence and the neighbour
   opposite-step evidence into one score, so that strong evidence on either side can raise an alarm
   and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
   the two calibrated statistics, and a small logistic regression on both statistics plus topology
