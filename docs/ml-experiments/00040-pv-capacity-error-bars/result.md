@@ -66,7 +66,7 @@ advice:
     without a stated bound, because a day-long cloud load of 25% of capacity is flagged in only
     0.35 of draws and moves the capacity by about 20% (V2, bound B).
   - >-
-    Leave Wrangle T1 (capacity near 1 MW and noisy) out of any claim that a Primary is free of a
+    Leave Wrangle T1 (capacity about 1.4 MW and noisy) out of any claim that a Primary is free of a
     cloud load, because the misfit test flags no confound shape there above 0.29 of draws at 25% of
     capacity (figure 10).
   - >-
@@ -76,7 +76,7 @@ advice:
   - >-
     Use the evening cloud response (18:00 to 22:30, sun at least 10 degrees below the horizon) as a
     measured covariate in a next test of the bound, because it is a cloud response that cannot be
-    solar generation and it appears at several Primaries (figure 3).
+    solar generation and it appears at some Primaries (figure 3).
   - >-
     Report the amplitude grid with any bound B, because B takes the median error at the largest
     grid amplitude whose power is under 0.8 and so moves in steps of the grid (0.25 to 0.5 here).
@@ -84,15 +84,15 @@ advice:
 
 # Experiment 40: how far can the capacity fitted to embedded solar be trusted?
 
-**Verdict `underpowered`: the misfit test is calibrated and detects four of five cloud-driven loads at
-25% of the true capacity, but it detects a day-long cloud load in only 0.35 of draws, so the
+**Verdict `underpowered`: the misfit test is calibrated and detects four of five cloud-driven loads
+at 25% of the true capacity, but it detects a day-long cloud load in only 0.35 of draws, so the
 pre-registered power rule fails.** The test compares the capacity that six least-squares fits assign
 to the same series. Pure injected solar-farm output gives a median capacity over truth of 0.992 (95%
 interval 0.951 to 1.032) with a false-positive rate of 0.055. Kirton is the one directional Primary
-substation flagged in 2025/26, and the other seven are unflagged. The capacity at those seven carries
-a bound B of 0.18 to 0.71, and the test has almost no power at Wrangle T1, so the bound is wider than
-the 0.10 predicted. The aim is explanation and capacity estimation, not forecast skill. CAMS
-irradiance is the only weather input at the lag times and it arrives too late to drive a live
+substation flagged in 2025/26, and the other seven are unflagged. The capacity at those seven
+carries a bound B of 0.18 to 0.71, and the test has almost no power at Wrangle T1, so the bound is
+wider than the 0.10 predicted. The aim is explanation and capacity estimation, not forecast skill.
+CAMS irradiance is the only weather input at the lag times and it arrives too late to drive a live
 forecast, so the fits describe past data.
 
 ![Figure 1: capacity per Primary in 2025/26 with its interval and bound](figure_01.svg)
@@ -133,10 +133,9 @@ limit, the smallest grid amplitude with median power at least 0.8, is 0.1 for lo
 ![Figure 10: power at amplitude 0.25 per Primary](figure_10.svg)
 
 **A load that rises with sunshine escapes the test by construction.** Its shape is the solar shape,
-so every fit assigns it the same negative capacity. Its power is 0.12 at amplitude 0.1, 0.29 at 0.25,
-and 0.74 at 0.5, and the capacity it leaves undetected is 14%, 33%, and 64% too low. The amplitude is
-defined as the load's leakage into the half-hourly fit M1, and the capacity responds more strongly
-than M1 does because the recovery ratios are below 1.
+so every fit assigns it the same negative capacity. Its median power over units is 0.055 at
+amplitude 0.1, 0.175 at 0.25, and 0.74 at 0.5, and the capacity it leaves undetected is 14%, 33%,
+and 64% too low.
 
 ![Figure 15: detection power and bias for a load that rises with sunshine](figure_15.svg)
 
@@ -144,10 +143,9 @@ than M1 does because the recovery ratios are below 1.
 
 **Kirton is flagged in 6 of 7 season-years, and no other Primary is flagged in any.** Kirton's
 misfit is 0.075 and 0.098 in the two early flagged years and 0.20 to 0.31 from 2022/23, against
-thresholds of 0.07 to 0.12. Its six fits disagree by up to 2 MW in 2025/26.
-The test cannot flag Wrangle T1, whose threshold is 1.23 against a
-misfit of 0.25, so "unflagged" at Wrangle T1 means that the test has no power, and not that no load is
-present.
+thresholds of 0.07 to 0.12. The capacity of 2025/26 ranges from 1.2 to 4.4 MW across the library of
+confound shapes. The test cannot flag Wrangle T1, whose threshold is 1.23 against a misfit of 0.25,
+so "unflagged" at Wrangle T1 means that the test has no power, and not that no load is present.
 
 ![Figure 11: misfit against threshold per Primary-year](figure_11.svg)
 
@@ -163,26 +161,26 @@ present.
 | Wrangle T2 | 2.29 | 2.10 to 2.61 | 0.23 | unflagged |
 
 The capacity is the daily fit divided by its recovery ratio. The bound is the median error of the
-no-confound capacity at the largest grid amplitude whose power is under 0.8, taken as the largest over
-the five shapes no fit contains. At every unflagged Primary except Wrangle T1 the day-long load sets
-the bound, because the other four shapes are detected by amplitude 0.25. The bound moves in steps of
-the amplitude grid and is an approximation of the error, not an interval.
+no-confound capacity at the largest grid amplitude whose power is under 0.8, taken as the largest
+over the five shapes no fit contains. At every Primary the day-long load sets the bound. At Wrangle
+T1 the other four shapes are also undetected at amplitude 0.25. The bound moves in steps of the
+amplitude grid and is an approximation of the error, not an interval.
 
 ![Figure 12: capacity per Primary and season-year](figure_12.svg)
 
 ![Figure 13: the six fits at each Primary in 2025/26 against solar output alone](figure_13.svg)
 
 **On the continuity checks of experiment 39 the count does not move.** With the checks defined as in
-experiment 39, K1 to K4 pass at 7, 7, 6, and 7 of 8 Primaries in 2025/26 and all four pass at 6. With
-K1's second clause replaced by a capacity over standard error above 4, K1 passes at 8 of 8 and all four
-checks still pass at 6.
+experiment 39, K1 to K4 pass at 7, 7, 6, and 7 of 8 Primaries in 2025/26 and all four pass at 6.
+With K1's second clause replaced by a capacity over standard error above 4, K1 passes at 8 of 8 and
+all four checks still pass at 6.
 
 ## Raw data and the method
 
 **The raw data show a cloud response that solar generation cannot explain.** Overcast days raise
 Kirton's power more than Donington's in every half-hour, in winter too (figure 2). Kirton's midday
 power falls with irradiance in winter as well as summer (figure 4). Evening demand, after dark,
-rises with the day's cloud at several Primaries (figure 3).
+rises with the day's cloud at some Primaries (figure 3).
 
 ![Figure 2: overcast minus clear-sky power by half-hour, Kirton against Donington](figure_02.svg)
 
@@ -196,8 +194,8 @@ unequally.** The arms are M1 (calendar cells and temperature), M1L (plus a flat 
 M2h on April to September rows only. Every arm is linear, so the capacity fitted to a series plus a
 load is the sum of the two fitted alone. A unit's injected solar output and each of eight loads are
 therefore fitted once and added as vectors. The heat map shows each load's leakage per MW into each
-fit. The daily fit cannot carry a cloud term, because after the cell means are removed the daily sums
-of the solar shape and of the cloud response correlate at -0.986 to -0.977.
+fit. The daily fit cannot carry a cloud term, because after the cell means are removed the daily
+sums of the solar shape and of the cloud response correlate at -0.986 to -0.977.
 
 ![Figure 5: the eight loads and the solar shape through two days](figure_05.svg)
 
@@ -210,13 +208,13 @@ of injected solar output of true capacity 1 MW, fit `a` returns `R_a`, the media
 units of the other farms (leave-one-farm-out). For an arm vector `c`, the capacity under no
 confound is `C = (R . c) / (R . R)` and the misfit is `T = sqrt(mean((c - R * C)^2)) / C`. The
 noise is 200 resamples of whole 7-day blocks of each real Primary-year, minus their mean. The
-threshold of a Primary-year is the 95th percentile of `T` over the units of the other farms scaled to
-the real capacity, each with its own farm also left out of `R`. The real Primary-years use the ratios
-of all six farms. The injected loads are `flat`, `lowsun`, `winter`, `dayL`, `evening`, `threshold`,
-`mixture`, and `sunload`. The first and third are contained in some fits and are reported, not scored.
-The self-tests of linearity, exact recovery, a contained shape, the sign of `sunload`, and the
-false-positive rate of the threshold all passed, and the farm-point timestamp scan of experiment 39
-peaks at a shift of zero.
+threshold of a Primary-year is the 95th percentile of `T` over the units of the other farms scaled
+to the real capacity, each with its own farm also left out of `R`. The real Primary-years use the
+ratios of all six farms. The injected loads are `flat`, `lowsun`, `winter`, `dayL`, `evening`,
+`threshold`, `mixture`, and `sunload`. The first and third are contained in some fits and are
+reported, not scored. The self-tests of linearity, exact recovery, a contained shape, the sign of
+`sunload`, and the false-positive rate of the threshold all passed, and the farm-point timestamp
+scan of experiment 39 peaks at a shift of zero.
 
 **The orientation menu is not identified.** The east, south, and west capacities swap from one
 season-year to the next at the same Primary (figure 14), so the menu decides nothing.
@@ -239,10 +237,10 @@ season-year to the next at the same Primary (figure 14), so the menu decides not
 **The next experiment should ask whether the evening cloud response measures the daylight load
 that the six fits cannot detect.** The two loads that set the bound, a day-long cloud load and a
 load that rises with sunshine, are the loads the misfit test cannot see. Evening demand after dark
-responds to cloud at several Primaries (figure 3), and solar generation cannot cause that
+responds to cloud at some Primaries (figure 3), and solar generation cannot cause that
 response. An experiment could inject a known day-long load into the real series, estimate its
 amplitude from the evening rows alone, and test whether that amplitude predicts the bias of the
-capacity. The test is whether such a covariate narrows the bound at Spilsby, Horncastle, Mount Bridge
-Boston, Donington, and Wrangle T2 below 0.1. The fitting code lives in this experiment's folder and a
-later experiment, or the deliverable, could move it to `packages/studies`, which needs the
-maintainer's review.
+capacity. The test is whether such a covariate narrows the bound at Spilsby, Horncastle, Mount
+Bridge Boston, Donington, and Wrangle T2 below 0.1. The fitting code lives in this experiment's
+folder and a later experiment, or the deliverable, could move it to `packages/studies`, which needs
+the maintainer's review.

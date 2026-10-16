@@ -931,7 +931,7 @@ directional Primary substations.
   no power.
 - **Finding for later experiments:** the two loads that the misfit test cannot see, a day-long cloud
   load and a load that rises with sunshine, set the bound. Evening demand after dark responds to
-  cloud at several Primaries and offers a measurement of the first.
+  cloud at some Primaries and offers a measurement of the first.
 - **Write-up and pull request:** [result](00040-pv-capacity-error-bars/result.md),
   [PR #1249 (Experiment 40: how far can the capacity fitted to embedded solar be trusted?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1249).
 
