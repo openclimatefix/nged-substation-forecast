@@ -18,7 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
@@ -163,8 +162,9 @@ scored on even months, with recall weighted by the MW moved as the headline from
 The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
 confirm:
 
-- **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
-  XGBoost model without the detected intervals.
+- **SW2-5 (done, [experiment 68](00068-sw2-5-train-detect-retrain-loop/result.md)):** three rounds
+  of refitting the lagless XGBoost model without the detected intervals changed the share of the
+  moved MW found by +0.011 and the forecast error by -0.175%, and a random mask did as well.
 - **SW2-6 (done, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** pairing the
   onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
   the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
