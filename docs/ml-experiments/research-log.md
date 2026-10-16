@@ -73,6 +73,7 @@ the maintainer to confirm.
 | [00040 - PV disaggregation, part 2](00040-pv-capacity-error-bars/result.md) | Can a cross-arm misfit test detect a cloud-driven demand load that biases the capacity fitted to embedded solar, and how many directional Primaries are free of one in 2025/26? | Partly supported: calibrated (median capacity over truth 0.992, 0.951 to 1.032), but a day-long cloud load is flagged in only 0.35 of draws at 25% of capacity, so the verdict is `underpowered` | Not for production | 2026-10-16 |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | How does the Primary demand score change from frozen to daily retraining, with and without the 14-day correction, and which cheap proxy ranks arms like full monthly retraining? | Inconclusive at the planned level: monthly minus the stack -0.20 points (95% interval -0.38 to -0.01); weekly -0.07 lower again | Candidate | 2026-10-16 |
 | [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
+| [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -998,3 +999,27 @@ with mostly missing readings.
 - **Write-up:** [labelled set](00041-sw2-0a-labeller-gate/labelled-set.md).
 
 ![Final labels by card kind](00041-sw2-0a-labeller-gate/figure_4_labelled_counts.svg)
+
+### 00044: how much labelled switching events hurt the best guess
+
+**A perfect switching detector would lower experiment 33's best guess's quantile score for Primary
+demand by 0.42% (95% interval -0.47% to 1.96%), under the plan's 3% threshold, so the verdict is
+refuted.** The experiment fitted nothing. It split the best guess's scores for the 16 Primary
+substations from July 2025 to June 2026 by whether the target half-hour, or its lagged power (the
+earlier power readings the forecast takes as inputs), lies inside a labelled switching event of 25%
+or more of the receiving load lasting over 24 hours.
+
+- **Headline result:** flagged half-hours are 1.35% (0.04% to 3.22%) of the half-hours scored and
+  carry 3.4% (0.04% to 8.68%) of the summed quantile score, 2.5 times their share of half-hours.
+  Only 6 such events fall in the year, on 3 series, so the intervals are wide and say little about
+  the other 13 series.
+- **Sensitivity:** with every visible event, whatever its size or length, the quantile-score bound
+  is 2.35% (-0.22% to 5.73%). The flagged half-hours carry 55% (2% to 70%) of the tail score, which
+  rests on a few short events.
+- **Finding for later experiments:** the stored `moved_share_of_receiver` of the labelled set is
+  missing (NaN) for 62 of the 81 labelled events that touch a Primary series, partly from series
+  ids written as strings, so scores against it need the share recomputed.
+- **Write-up and pull request:** [result](00044-sw2-2-switching-share-of-best-guess-score/result.md),
+  [PR #1261](https://github.com/openclimatefix/nged-substation-forecast/pull/1261).
+
+![Shares of half-hours and of each score](00044-sw2-2-switching-share-of-best-guess-score/figure_2_shares.svg)
