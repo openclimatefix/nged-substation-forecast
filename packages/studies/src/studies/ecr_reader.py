@@ -14,6 +14,7 @@ from typing import Final
 from xml.etree import ElementTree
 
 import polars as pl
+
 from studies.sources import REPO_DATA_DIR
 
 ECR_PATH: Final[Path] = REPO_DATA_DIR.parent / "literature" / "NGED" / "NGED ECR AUG 2026.xlsx"
