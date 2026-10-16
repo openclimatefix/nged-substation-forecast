@@ -260,6 +260,12 @@ def undetected_bias(
     (the truth is 1 MW, so `pv` is its arm vector). The daily fit's bias is its leaked capacity
     over its recovery ratio.
 
+    Args:
+        ratios: The recovery ratios `R` of the Primary, seven values.
+        pv: The arm vector of the truth: normalised solar output of 1 MW.
+        leakage: The load's arm vector; its sign gives the direction of the bias.
+        amplitude: The load's M1 leakage, as a multiple of the true capacity.
+
     Returns:
         `(bias of C, bias of M1d / R)`, each as `estimate / truth - 1`.
     """
