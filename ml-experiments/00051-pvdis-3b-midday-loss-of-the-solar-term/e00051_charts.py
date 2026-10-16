@@ -104,8 +104,8 @@ def figure_by_lead_day(*, cases: pl.DataFrame) -> alt.TopLevelMixin:
             lines=[
                 "Grey dots: a random sample of 400 of the about 1,200 forecast cases in each "
                 "panel, each averaged over 3 seeds. Orange line: mean of all the panel's cases in "
-                "bins of 0.1 clear-sky index. Above 0 the shift lowered the forecast too far; below 0 it raised it too far. "
-                + SCOPE
+                "bins of 0.1 clear-sky index. Above 0 the shift lowered the forecast too far; below 0 it "
+                "raised it too far. " + SCOPE
             ],
         )
     )
