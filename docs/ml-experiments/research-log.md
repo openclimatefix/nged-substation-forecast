@@ -1176,7 +1176,8 @@ verdict is inconclusive.
 
 - **Finding for later experiments:** the veto removes 35% of the unexplained 24-hour alarms and 20%
   of the alarms a logged closure explains, a ratio of 1.8. It loses 2 of the 220 transfers found
-  without it and gains 7, raises the precision of the real alarms by about 3 points at 24 hours and 6 to 7 points at 4 hours,
+  without it and gains 7, raises the precision of the real alarms by about 3 points at 24 hours and
+  6 to 7 points at 4 hours,
   and loses 6 and gains 2 of 300 transfers that start near a bank holiday. The gain sits in the
   transfers with no metered receiver, which the veto detector finds at 0.19 against 0.50 for the
   transfers with a metered receiver.
