@@ -11,6 +11,13 @@ F, each divided by its own 99th percentile) is multiplied by the injected capaci
 Primary's mean capacity on the fitted rows. Rows where the farm has no output in daylight (a
 dropout or a dropped farm-week) leave both fits.
 
+**S1 positive control (post hoc).** The fit's own regressor shape, `C * a` (capacity times the
+anomaly of u), is injected at 10%, 25%, and 50%, and subtracted from the metered power. The fit is
+linear in that column, so the recovered share must equal the injected share to numerical precision.
+**S1 farm agreement (post hoc).** For each Primary and farm, the slope of the farm's anomaly (its
+normalised output minus its mean at the same calendar month and half-hour of the day) on the CAMS
+anomaly of u: how far a real farm's output follows the CAMS sunshine shape.
+
 **S2.** On each Primary, 40 intervals of 6, 12, 24, or 72 hours start at random outside every
 logged and labelled switching period, half in April to September. Each interval adds `beta` times
 the real net power of another MW-metered series (the donor, drawn at random among those with data)
@@ -24,6 +31,7 @@ rows, night included, join the fit.
 from __future__ import annotations
 
 import itertools
+import sys
 import time
 from typing import Final
 
@@ -104,6 +112,74 @@ def run_s1(*, design: fit.Design) -> pl.DataFrame:
                         "n_rows": int(used_1.sum()),
                     }
                 )
+    return pl.DataFrame(out)
+
+
+def run_s1_positive_control(*, design: fit.Design) -> pl.DataFrame:
+    """Inject the fit's own regressor shape and return the recovered share of what was injected."""
+    anomalies = fit.anomaly(design=design, exclude_month=None)
+    base_rows = fit.fit_rows_mask(design=design, capacity="const", include_transfer=True)
+    seasons = {
+        "all": np.ones(design.n_rows, dtype=bool),
+        "summer": design.summer,
+        "winter": ~design.summer,
+    }
+    out: list[dict[str, float | int | str]] = []
+    for season, season_rows in seasons.items():
+        rows = base_rows & season_rows
+        k0, _, _ = fit.fit_arm(
+            design=design,
+            anomalies=anomalies,
+            capacity="const",
+            include_transfer=True,
+            rows=rows,
+        )
+        for share in SHARES:
+            k1, _, used = fit.fit_arm(
+                design=design,
+                anomalies=anomalies,
+                capacity="const",
+                include_transfer=True,
+                rows=rows,
+                target=design.y - share * design.capacity["const"] * anomalies,
+            )
+            out.append(
+                {
+                    "series": design.series,
+                    "share": share,
+                    "season": season,
+                    "ratio": (k1 - k0) / share,
+                    "n_rows": int(used.sum()),
+                }
+            )
+    return pl.DataFrame(out)
+
+
+def run_s1_farm_agreement(*, design: fit.Design) -> pl.DataFrame:
+    """Return, per farm, how closely its anomaly follows the CAMS anomaly on the S1 fitted rows."""
+    anomalies = fit.anomaly(design=design, exclude_month=None)
+    base_rows = fit.fit_rows_mask(design=design, capacity="const", include_transfer=True)
+    out: list[dict[str, float | int | str]] = []
+    for farm in FARMS:
+        output = _farm_output(design=design, farm=farm)
+        farm_valid = np.isfinite(output) | ~design.daylight
+        unit = np.where(np.isfinite(output), output, 0.0)
+        rows = base_rows & farm_valid & np.isfinite(anomalies)
+        total = np.bincount(design.cell[rows], weights=unit[rows], minlength=fit.N_CELLS)
+        count = np.bincount(design.cell[rows], minlength=fit.N_CELLS)
+        cell_mean = total / np.maximum(count, 1)
+        farm_anomaly = unit[rows] - cell_mean[design.cell[rows]]
+        cams_anomaly = anomalies[rows]
+        slope = float(np.polyfit(cams_anomaly, farm_anomaly, deg=1)[0])
+        out.append(
+            {
+                "series": design.series,
+                "farm": farm,
+                "slope": slope,
+                "correlation": float(np.corrcoef(cams_anomaly, farm_anomaly)[0, 1]),
+                "n_rows": int(rows.sum()),
+            }
+        )
     return pl.DataFrame(out)
 
 
@@ -204,8 +280,30 @@ def run_s2(*, design: fit.Design) -> pl.DataFrame:
     return pl.DataFrame(out)
 
 
+def main_extras() -> None:
+    """Run the post hoc S1 positive control and farm agreement; write their two tables."""
+    common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    control_tables, agreement_tables = [], []
+    for series in common.SERIES_IDS:
+        design = fit.build_design(series=series)
+        if design is None:
+            continue
+        control_tables.append(run_s1_positive_control(design=design))
+        agreement_tables.append(run_s1_farm_agreement(design=design))
+        print(f"series {series}: positive control and farm agreement done", flush=True)
+    pl.concat(control_tables).write_parquet(common.RESULTS_DIR / "s1_positive_control.parquet")
+    pl.concat(agreement_tables).write_parquet(common.RESULTS_DIR / "s1_farm_agreement.parquet")
+
+
 def main() -> None:
-    """Run S1 and S2 for every allowed series and write `s1.parquet` and `s2.parquet`."""
+    """Run S1 and S2 for every allowed series and write `s1.parquet` and `s2.parquet`.
+
+    With the argument `--extras-only`, run only the post hoc S1 positive control and farm
+    agreement, which leaves `s1.parquet` and `s2.parquet` as they are.
+    """
+    if "--extras-only" in sys.argv[1:]:
+        main_extras()
+        return
     common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     s1_tables, s2_tables = [], []
     for series in common.SERIES_IDS:
@@ -218,6 +316,7 @@ def main() -> None:
         print(f"series {series}: S1 and S2 done in {time.time() - start:.0f} s", flush=True)
     pl.concat(s1_tables).write_parquet(common.RESULTS_DIR / "s1.parquet")
     pl.concat(s2_tables).write_parquet(common.RESULTS_DIR / "s2.parquet")
+    main_extras()
 
 
 if __name__ == "__main__":

@@ -93,6 +93,42 @@ def pooled_bootstrap(
     )
 
 
+def shared_month_bootstrap(
+    *, values: pl.DataFrame, n_resamples: int = N_RESAMPLES
+) -> tuple[float, float, float, int]:
+    """Return the pooled mean, its 95% interval, and the month count, drawing months jointly.
+
+    Post hoc. Each resample draws calendar months (with replacement) from the months any series
+    holds, and every series contributes its rows of the drawn months, so the series' weather
+    episodes stay together. A month a series lacks contributes nothing for that series.
+
+    Args:
+        values: Columns `month_id` and `value` (one row per scored half-hour).
+        n_resamples: How many resamples to draw.
+
+    Returns:
+        The pooled mean over all rows, the 2.5th and 97.5th percentiles of the resampled pooled
+        mean, and the number of distinct calendar months.
+    """
+    per_month = (
+        values.group_by("month_id").agg(total=pl.col("value").sum(), n=pl.len()).sort("month_id")
+    )
+    totals = per_month["total"].to_numpy()
+    counts = per_month["n"].to_numpy().astype(float)
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = np.zeros(n_resamples)
+    for start in range(0, n_resamples, CHUNK):
+        size = min(CHUNK, n_resamples - start)
+        drawn = generator.integers(0, totals.size, size=(size, totals.size))
+        resampled[start : start + size] = totals[drawn].sum(axis=1) / counts[drawn].sum(axis=1)
+    return (
+        _mean(values["value"]),
+        float(np.percentile(resampled, 2.5)),
+        float(np.percentile(resampled, 97.5)),
+        per_month.height,
+    )
+
+
 def _points(*, rows: pl.DataFrame, expression: pl.Expr, norms: dict[int, float]) -> pl.DataFrame:
     """Return `series`, `month_id`, and `value` = `expression` in points of capacity."""
     return rows.select(
@@ -221,6 +257,20 @@ def report_c(
                 c1_intervals[subset_name] = (mean, lo, hi)
     pl.DataFrame(contrast_rows).write_parquet(common.RESULTS_DIR / "contrasts.parquet")
 
+    print(
+        "\n== C1, POST HOC: SHARED-MONTH BOOTSTRAP (the same calendar months drawn for every "
+        "series jointly) =="
+    )
+    for subset_label, subset_name in SUBSETS.items():
+        sub = _subset(rows=rows, name=subset_name)
+        values = _points(
+            rows=sub,
+            expression=pl.col("abs_error_c1") - pl.col("abs_error_v1"),
+            norms=norms,
+        )
+        mean, lo, hi, n_months = shared_month_bootstrap(values=values)
+        print(f"  {subset_label:22s} {_fmt(mean, lo, hi)}  calendar months {n_months}")
+
     print("\n== C1 BY SERIES (points of capacity; v1 and c1 mean absolute error; no interval) ==")
     for series in sorted(rows["series"].unique().to_list()):
         sub = rows.filter(pl.col("series") == series)
@@ -314,7 +364,53 @@ def report_s1() -> bool:
     with pl.Config(tbl_rows=30, tbl_cols=20):
         print("by share:", by_share, "by series:", by_series, "by farm:", by_farm, sep="\n")
     s1.write_parquet(common.RESULTS_DIR / "s1_with_miss.parquet")
+    report_s1_post_hoc(s1_by_farm=by_farm)
     return holds
+
+
+def report_s1_post_hoc(*, s1_by_farm: pl.DataFrame) -> None:
+    """Print the post hoc S1 positive control and the farm-to-CAMS agreement."""
+    control_path = common.RESULTS_DIR / "s1_positive_control.parquet"
+    agreement_path = common.RESULTS_DIR / "s1_farm_agreement.parquet"
+    if not (control_path.exists() and agreement_path.exists()):
+        print("\n== S1, POST HOC: positive control and farm agreement not run for this folder ==")
+        return
+    control = pl.read_parquet(control_path)
+    print("\n== S1, POST HOC: POSITIVE CONTROL (inject C * anomaly(u), the fit's own regressor) ==")
+    print(
+        f"injections {control.height} (series x share x season); recovered / injected: min "
+        f"{control['ratio'].min():.12f}, max {control['ratio'].max():.12f}, largest "
+        f"|ratio - 1| {(control['ratio'] - 1.0).abs().max():.2e}"
+    )
+    for season in ("all", "summer", "winter"):
+        sub = control.filter(pl.col("season") == season)
+        print(f"  {season:7s} median ratio {sub['ratio'].median():.12f}, n {sub.height}")
+    agreement = pl.read_parquet(agreement_path)
+    print(
+        "\n== S1, POST HOC: AGREEMENT OF A REAL FARM'S ANOMALY WITH THE CAMS ANOMALY ==\n"
+        "slope of the farm's anomaly on the CAMS anomaly of u (least squares with intercept), "
+        "per Primary, summarised by farm, beside the S1 median recovered / injected ratio"
+    )
+    by_farm = (
+        agreement.group_by("farm")
+        .agg(
+            median_slope=pl.col("slope").median(),
+            min_slope=pl.col("slope").min(),
+            max_slope=pl.col("slope").max(),
+            min_correlation=pl.col("correlation").min(),
+            max_correlation=pl.col("correlation").max(),
+            n_primaries=pl.len(),
+        )
+        .join(s1_by_farm.select("farm", s1_median_ratio="median_ratio"), on="farm")
+        .sort("farm")
+    )
+    with pl.Config(tbl_rows=30, tbl_cols=20, tbl_width_chars=200):
+        print(by_farm)
+    print(
+        f"  all farms and Primaries: median slope {agreement['slope'].median():.3f}, slope range "
+        f"{agreement['slope'].min():.3f} to {agreement['slope'].max():.3f}, correlation range "
+        f"{agreement['correlation'].min():.3f} to {agreement['correlation'].max():.3f}"
+    )
 
 
 def report_s2() -> bool:
@@ -374,7 +470,103 @@ def report_s2() -> bool:
             f"median {sub.median():.4f}, n {sub.len()}"
         )
     s2.write_parquet(common.RESULTS_DIR / "s2_all.parquet")
+    report_s2_post_hoc(placebo=placebo_valid, injected=valid)
     return holds_median and holds_placebo
+
+
+DONOR_SIZE_BINS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("under 3 MW", 0.0, 3.0),
+    ("3 to 5 MW", 3.0, 5.0),
+    ("over 5 MW", 5.0, float("inf")),
+)
+"""Donor size classes by the donor's mean absolute power over the scoring window, MW."""
+DURATION_BINS: Final[tuple[tuple[str, int, int], ...]] = (
+    ("6 to 12 h", 6, 12),
+    ("24 to 72 h", 24, 72),
+)
+
+
+def donor_mean_power_mw() -> dict[int, float]:
+    """Return each series' mean absolute power in MW over the scoring window."""
+    wide = common.power_wide().filter(
+        pl.col("valid_time") >= common.WINDOW_START, pl.col("valid_time") < common.WINDOW_END
+    )
+    return {s: float(np.nanmean(wide[f"p{s}"].abs().to_numpy())) for s in common.SERIES_IDS}
+
+
+def _size_class(*, mean_power_mw: float) -> str:
+    return next(name for name, lo, hi in DONOR_SIZE_BINS if lo <= mean_power_mw < hi)
+
+
+def _spread(*, frame: pl.DataFrame, column: str) -> str:
+    """Return `median, 95th percentile, n` of the absolute value of `column`."""
+    values = frame[column].abs().to_numpy()
+    if values.size == 0:
+        return "n 0"
+    return (
+        f"median {np.median(values):.3f}, 95th percentile {np.percentile(values, 95):.3f}, "
+        f"n {values.size}"
+    )
+
+
+def report_s2_post_hoc(*, placebo: pl.DataFrame, injected: pl.DataFrame) -> None:
+    """Print the post hoc spread of S2's placebo share by donor size, by donor, and by duration."""
+    mean_power = donor_mean_power_mw()
+    norms = common.effective_capacity_mw()
+    print("\n== S2, POST HOC: PLACEBO |SHARE| BY DONOR SIZE AND DURATION ==")
+    print(
+        "donor size = the donor's mean absolute power over the scoring window (MW); gate: 95th "
+        f"percentile of |share| at most {S2_PLACEBO_GATE}"
+    )
+    for series in common.SERIES_IDS:
+        print(
+            f"  donor {series:3d} {common.SERIES_NAMES[series]:20s} mean |power| "
+            f"{mean_power[series]:5.2f} MW, effective capacity {norms[series]:6.2f} MW, "
+            f"class {_size_class(mean_power_mw=mean_power[series])}"
+        )
+    placebo = placebo.with_columns(
+        donor_mean_power_mw=pl.col("donor").replace_strict(mean_power, return_dtype=pl.Float64),
+        abs_share=pl.col("beta_hat").abs(),
+    ).with_columns(
+        donor_size=pl.col("donor_mean_power_mw").map_elements(
+            lambda value: _size_class(mean_power_mw=value), return_dtype=pl.String
+        )
+    )
+    print("placebo by donor:")
+    for donor in sorted(placebo["donor"].unique().to_list()):
+        sub = placebo.filter(pl.col("donor") == donor)
+        spread = _spread(frame=sub, column="abs_share")
+        print(f"  donor {donor:3d} ({mean_power[donor]:5.2f} MW): {spread}")
+    print("placebo by donor size:")
+    for name, _, _ in DONOR_SIZE_BINS:
+        sub = placebo.filter(pl.col("donor_size") == name)
+        print(f"  {name:11s}: {_spread(frame=sub, column='abs_share')}")
+    print("placebo by duration:")
+    for duration in sorted(placebo["duration_hours"].unique().to_list()):
+        sub = placebo.filter(pl.col("duration_hours") == duration)
+        print(f"  {duration:3d} h: {_spread(frame=sub, column='abs_share')}")
+    print("placebo by donor size and duration band:")
+    for size_name, _, _ in DONOR_SIZE_BINS:
+        for band_name, low, high in DURATION_BINS:
+            sub = placebo.filter(
+                pl.col("donor_size") == size_name, pl.col("duration_hours").is_between(low, high)
+            )
+            print(f"  {size_name:11s} {band_name:10s}: {_spread(frame=sub, column='abs_share')}")
+    injected = injected.with_columns(
+        donor_size=pl.col("donor")
+        .replace_strict(mean_power, return_dtype=pl.Float64)
+        .map_elements(lambda value: _size_class(mean_power_mw=value), return_dtype=pl.String),
+        abs_share_error=pl.col("error").abs(),
+    )
+    print("injected transfers: median and 95th percentile of the absolute share error:")
+    for size_name, _, _ in DONOR_SIZE_BINS:
+        for band_name, low, high in DURATION_BINS:
+            sub = injected.filter(
+                pl.col("donor_size") == size_name, pl.col("duration_hours").is_between(low, high)
+            )
+            print(
+                f"  {size_name:11s} {band_name:10s}: {_spread(frame=sub, column='abs_share_error')}"
+            )
 
 
 def report_r1() -> None:

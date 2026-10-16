@@ -22,7 +22,6 @@ sooner.
 | [SW2-13](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does one detector that combines the step evidence of several windows (4 hours, 24 hours, and others) find more transfers than the best single window at the same alarm rate? | 2 | Nothing | Proposed; run next beside SW2-7 |
 | [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | SW2-13 and SW2-8b (experiment 58) | Proposed |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
-| [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Planned: [experiment 00063](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md); the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
@@ -221,26 +220,6 @@ day.
   carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
   injections. The benchmark is the best sequential detector from SW2-13 or SW2-14.
 
-#### SW2-10: v2 in miniature, a linear joint fit
-
-**Fit one linear model per trial Primary that holds a weather baseline, embedded solar, and the
-labelled transfers together, and score it against the frozen v1 baseline.** The model is net demand
-equals the baseline, minus a capacity times a PV shape, plus, for each labelled transfer k, a share
-times the donor's net power over transfer k's interval. With the intervals given, the fit is
-linear. The result tells the project whether to start the v2 differentiable-physics work sooner.
-
-- **The baseline term** is a lagless XGBoost model fitted inside SW2-10, trained with labelled
-  switching excluded.
-- **The transfer intervals** come from SW2-0b, or from the logged closures padded by 24 hours if
-  the labels are not ready.
-- **The capacity and the PV shape** come from the PV-disaggregation line: experiment 00040's
-  six-arm capacity with its bound, experiment 00039's capacity as a cross-check, and experiment
-  00039's CAMS unit PV shape. A weekly capacity series replaces the experiment 00040 capacity if
-  the PV line's weekly-capacity experiment runs. The 8 Primaries metered only in MVA are excluded.
-- **Scoring** is on held-out months outside switching against the v1 baseline, and on experiment
-  00039's injection harness extended with injected transfers that carry the donor's PV, where the
-  true capacity and the true shares are known.
-
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 
 **Retrain the best-guess architecture so that it never learns to predict an abnormal running
@@ -432,8 +411,9 @@ Primaries. NGED would like MW at every Primary, and accepts that the result is r
 and replace it with PVDIS-4's weekly series once that part has run.** NGED's need is to improve on
 almost no information, so the season-year table is useful before the weekly series exists. The
 study reports C as the capacity, keeps sampling uncertainty separate from the named systematic
-scenarios, and carries each Primary's status from the earlier review. The SW2-10 joint fit reads the
-same capacities.
+scenarios, and carries each Primary's status from the earlier review. The joint fit of
+[experiment 00063](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) read the same
+capacities.
 
 ### P11: ensemble statistics as inputs
 
