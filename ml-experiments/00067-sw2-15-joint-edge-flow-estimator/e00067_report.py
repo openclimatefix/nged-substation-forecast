@@ -72,6 +72,7 @@ def population(*, out: Path) -> pl.DataFrame:
             ),
         ]
     ).pivot(on="setting", index=["event_id", "shape"], values="found")
+    found = found.filter(pl.col("shape").is_in(list(NON_MATCHING)))
     return (
         found.join(events, on="event_id", validate="m:1")
         .join(weight, on="event_id", validate="m:1")
@@ -167,9 +168,9 @@ def print_by_step(*, data: pl.DataFrame) -> None:
             print(f"{shape} {label:9s} " + "; ".join(cells))
 
 
-def print_real() -> None:
+def print_real(*, out: Path) -> None:
     """The labelled real transfers of more than 1 day found by each arm, by onset parity."""
-    mine = pl.read_parquet(WORK_DIR / "real_results.parquet")
+    mine = pl.read_parquet(out / "real_results.parquet")
     theirs = pl.read_parquet(EXPERIMENT_65_DIR / "real_results.parquet")
     real = pl.concat([theirs.filter(pl.col("setting").is_in(["D0M_PE", "LOGIT_SAME_PE"])), mine])
     real = real.filter(pl.col("hours") > 24)
@@ -247,7 +248,7 @@ def main() -> None:
     print(f"\nC1 EF-D0M: {fmt(*c1)} at level {LEVEL:.4f}")
     print(f"C2 EF-LOGIT_SAME (no verdict): {fmt(*c2)}")
     print_by_step(data=data)
-    print_real()
+    print_real(out=out)
     alarms = print_alarms(out=out)
     print_tuning(out=out)
     print(f"\nEXPERIMENT VERDICT: {verdict(c1=c1, alarms=alarms)}")

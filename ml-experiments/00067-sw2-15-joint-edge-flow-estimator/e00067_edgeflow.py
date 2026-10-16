@@ -8,8 +8,9 @@ metered only in MVA carry no direction, so their residual is explained by their 
 
 The fit minimises a Huber loss, plus a level penalty (flows and slacks are zero almost always), plus
 a fused penalty (each flow and each slack changes rarely, so it is piecewise constant). A group
-version that ties the changes at one Primary together solved 25 times slower, so it is not used. Nothing here
-reads a switching log. Run it with `uv run --with cvxpy`, since CVXPY is not a locked dependency.
+version that ties the changes at one Primary together solved 25 times slower, so it is not used.
+Nothing here reads a switching log. Run it with `uv run --with cvxpy`, since CVXPY is not a locked
+dependency.
 """
 
 from __future__ import annotations
@@ -21,8 +22,14 @@ from typing import Final
 import cvxpy as cp  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-from e00067_common import ADJACENCY, GRID_LENGTH, ML_EXPERIMENTS_DATA_DIR, SERIES_IDS, TUNING_MONTHS
-from e00067_common import stamp_months
+from e00067_common import (
+    ADJACENCY,
+    GRID_LENGTH,
+    ML_EXPERIMENTS_DATA_DIR,
+    SERIES_IDS,
+    TUNING_MONTHS,
+    stamp_months,
+)
 from e00067_intervals import Interval
 
 BIN: Final[int] = 2
@@ -132,8 +139,16 @@ class EdgeFlowProblem:
     so each solve builds its problem from numpy constants.
     """
 
-    def __init__(self, *, network: Network, sigma: np.ndarray, bins: int = WINDOW_BINS) -> None:
-        self.network, self.sigma, self.bins = network, sigma, bins
+    def __init__(
+        self,
+        *,
+        network: Network,
+        sigma: np.ndarray,
+        bins: int = WINDOW_BINS,
+        huber: float = HUBER_THRESHOLD,
+    ) -> None:
+        """Precompute the matrix that maps each flow, in noise units, onto its two nodes."""
+        self.network, self.sigma, self.bins, self.huber = network, sigma, bins, huber
         edge_sigma = np.array(
             [
                 np.sqrt(sigma[network.series.index(a)] * sigma[network.series.index(b)])
@@ -155,7 +170,7 @@ class EdgeFlowProblem:
             observed.astype(float), self._mixing @ flow + slack
         )
         objective = (
-            cp.sum(cp.huber(explained, HUBER_THRESHOLD))
+            cp.sum(cp.huber(explained, self.huber))
             + penalties.flow * cp.sum(cp.abs(flow))
             + penalties.slack * cp.sum(cp.abs(slack))
             + penalties.fused
@@ -200,9 +215,11 @@ def window_intervals(
         for start, stop in find_runs(values=flow[k]):
             step = float(np.mean(flow[k, start:stop]) * edge_sigma[k])
             onset, end = first_stamp + BIN * start, first_stamp + BIN * stop
-            for series in (a, b):
-                if network.directional[network.series.index(series)]:
-                    out.append(Interval(series, onset, end, end, a, "EF", "edge", step))
+            out.extend(
+                Interval(series, onset, end, end, a, "EF", "edge", step)
+                for series in (a, b)
+                if network.directional[network.series.index(series)]
+            )
     for i, series in enumerate(network.series):
         for start, stop in find_runs(values=slack[i]):
             step = float(np.mean(slack[i, start:stop]) * sigma[i])

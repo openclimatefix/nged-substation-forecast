@@ -47,6 +47,7 @@ from e00067_detect import (
 from e00067_detectors import refit_stamps
 from e00067_edgeflow import (
     BIN,
+    HUBER_THRESHOLD,
     WINDOW_BINS,
     EdgeFlowProblem,
     Penalties,
@@ -81,6 +82,8 @@ REFIT_PAD: Final[int] = BLOCK
 """A run that starts within 24 hours of a monthly refit of the residual model is dropped."""
 N_WORKERS: Final[int] = 4
 _STATE: dict = {}
+_RUN: dict = {"huber": HUBER_THRESHOLD}
+"""The Huber threshold of this run; `main` sets it from `--huber`."""
 
 
 def init_worker(state: dict) -> None:
@@ -88,7 +91,7 @@ def init_worker(state: dict) -> None:
     network = build_network()
     z = hourly_panel(residual=state["panel"]["residual"], network=network)
     state["network"], state["sigma"] = network, state["sigma"]
-    state["problem"] = EdgeFlowProblem(network=network, sigma=state["sigma"])
+    state["problem"] = EdgeFlowProblem(network=network, sigma=state["sigma"], huber=state["huber"])
     state["z_plain"] = z / state["sigma"][:, None]
     _STATE.update(state)
 
@@ -175,7 +178,12 @@ def make_state() -> dict:
     panel = load_panel()
     network = build_network()
     sigma = noise_scales(panel=hourly_panel(residual=panel["residual"], network=network))
-    return {"panel": panel, "sigma": sigma, "shares": fit_profile_shares(panel=panel)}
+    return {
+        "panel": panel,
+        "sigma": sigma,
+        "shares": fit_profile_shares(panel=panel),
+        "huber": _RUN["huber"],
+    }
 
 
 def event_groups(*, panel: dict) -> list[tuple[int, list[Event]]]:
@@ -262,8 +270,9 @@ def unexplained(*, table: pl.DataFrame) -> tuple[int, int]:
 
 
 def match_lambda(*, state: dict, fused_ratio: float, slack_multiplier: float) -> tuple[float, int]:
-    """The smallest `lambda` on a log scale whose odd-month unexplained count is at most `TARGET`."""
-    low, high = np.log(LAMBDA_RANGE[0]), np.log(LAMBDA_RANGE[1])
+    """The smallest `lambda`, on a log scale, with at most `TARGET` odd-month unexplained alarms."""
+    stretch = _RUN["huber"] / HUBER_THRESHOLD
+    low, high = np.log(LAMBDA_RANGE[0] * stretch), np.log(LAMBDA_RANGE[1] * stretch)
     best = (float(np.exp(high)), -1)
     for _ in range(BISECTION_STEPS):
         mid = 0.5 * (low + high)
@@ -303,8 +312,9 @@ def tune(*, out: Path) -> None:
     wanted = {i: [NON_MATCHING[i % 3]] for i in chosen}
     weights = stored_weights()
     cells = []
-    for ratio in FUSED_RATIOS:
-        for multiplier in SLACK_MULTIPLIERS:
+    wide = _RUN["huber"] != HUBER_THRESHOLD
+    for ratio in FUSED_RATIOS[1:] if wide else FUSED_RATIOS:
+        for multiplier in SLACK_MULTIPLIERS[:1] if wide else SLACK_MULTIPLIERS:
             print(f"cell fused ratio {ratio}, slack multiplier {multiplier}", flush=True)
             level, count = match_lambda(state=state, fused_ratio=ratio, slack_multiplier=multiplier)
             if count < 0:
@@ -342,12 +352,17 @@ def tune(*, out: Path) -> None:
         raise SystemExit("STOP: no cell reached the alarm target; widen LAMBDA_RANGE")
     best = max(cells, key=lambda c: (c["recall"], c.get("level", 0.0)))
     print(f"chosen: {best}")
-    (out / "tuning.json").write_text(json.dumps({"cells": cells, "chosen": best}))
+    (out / "tuning.json").write_text(
+        json.dumps({"cells": cells, "chosen": best, "huber": _RUN["huber"]})
+    )
 
 
 def chosen_penalties(*, out: Path) -> Penalties:
     """The penalties that `tune` chose."""
-    best = json.loads((out / "tuning.json").read_text())["chosen"]
+    tuning = json.loads((out / "tuning.json").read_text())
+    if tuning["huber"] != _RUN["huber"]:
+        raise SystemExit(f"STOP: tuned at Huber threshold {tuning['huber']}, not {_RUN['huber']}")
+    best = tuning["chosen"]
     return Penalties.from_knobs(
         level=best["level"],
         fused_ratio=best["fused_ratio"],
@@ -447,8 +462,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("stages", nargs="+", choices=("check", "tune", "score", "real"))
     parser.add_argument("--out", type=Path, default=WORK_DIR)
+    parser.add_argument("--huber", type=float, default=HUBER_THRESHOLD)
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    _RUN["huber"] = args.huber
     stages = {"check": check, "tune": tune, "score": score, "real": real}
     for stage in args.stages:
         stages[stage](out=args.out)
