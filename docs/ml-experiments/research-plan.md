@@ -24,6 +24,11 @@ sooner.
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
+| [PVDIS-3](#pvdis-3-how-much-forecast-error-comes-from-embedded-solar) | How much of the demand forecast's error does embedded solar explain, and does the XGBoost model already capture the solar it is given? | 2 | The maintainer's review of this plan | Proposed; part 3 of the PVDIS series |
+| [PVDIS-4](#pvdis-4-a-capacity-series-that-only-rises-with-error-bars) | Can a weekly capacity series with non-negative increments recover injected capacity ramps and steps, with calibrated error bars, on the 8 MW Primaries? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series; can run beside PVDIS-3 |
+| [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-3 and PVDIS-4 | Proposed |
+| [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations) | Can the share of east-, south-, and west-facing solar behind each Primary be identified? | 4 | PVDIS-4 | Proposed |
+| [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each MW Primary over time, with error bars and outside checks? | 3 | PVDIS-4 | Proposed; a study under `docs/studies/`, not an experiment |
 
 ## Deferred until the first results are in
 
@@ -216,6 +221,179 @@ linear. The result tells the project whether to start the v2 differentiable-phys
 - **Scoring** is on held-out months outside switching against the v1 baseline, and on experiment
   00039's injection harness extended with injected transfers that carry the donor's PV, where the
   true capacity and the true shares are known.
+
+### PVDIS: separating embedded solar from Primary demand
+
+**The PVDIS line estimates how much unmetered solar capacity sits behind each Primary substation, how
+that capacity changes over time, and whether an explicit solar term improves or explains the net
+demand forecast.** The line serves three purposes, and the second matters about as much as the
+first:
+
+- **Skill:** a lower error in the net demand forecast at each substation.
+- **Explanation:** a forecast that NGED can read as demand minus solar. A solar term that leaves the
+  error level but splits the forecast into parts an engineer recognises is still worth keeping, so
+  the forecast experiments below test non-inferiority as well as gain.
+- **Capacity:** a time series of unmetered solar capacity per Primary. NGED holds almost no
+  information on unmetered solar today, so an estimate with honest error bars is useful even when
+  the estimate is far from perfect.
+
+**The capacity estimate runs offline, weekly or monthly, and the production forecast only reads the
+latest capacity table.** Nothing in this line adds a fitting step to the serving path. A later step
+may also estimate the mix of panel tilts, panel azimuths, and ratios of DC to AC capacity behind each
+Primary, as the `UniversalSolarFleetNode` sketched in [differentiable
+physics](../techniques/differentiable-physics.md) does, so that the explicit solar forecast takes
+the right daily shape.
+
+**Experiments 00039 and 00040 are parts 1 and 2 of the series; the parts below follow the
+exploratory protocol in the `ml-experiment` skill.** Opus plans each part after reading the result
+of the part before, so the designs below are proposals that the planning step of each part may
+change. Experiment 00039 fitted one capacity per Primary per season-year, from a calendar and
+temperature demand term minus one CAMS-driven solar shape. On real solar-farm output injected into
+the real demand, the half-hourly fit recovered a median 0.773 (0.740 to 0.818) of the injected
+capacity, and a fit on daily sums recovered 0.854 (0.815 to 0.866). Experiment 00040 attached a
+bound on the capacity error of 0.18 to 0.23 at five Primaries, and found that a demand load which
+rises with sunshine cannot be told apart from solar.
+
+**The Opus review of experiment 00040 recommended stopping the series and publishing a static
+capacity table; the parts below continue the series because they answer questions that review did
+not consider.** The review's stop rule asked whether a further experiment could narrow the capacity
+bound, and found none that could. The parts below ask different questions: how capacity changes week
+by week, how much forecast error the solar causes, and whether an explicit solar term improves or
+explains the forecast. The same review found that experiment 00040's table paired the daily-fit
+capacity with a bound computed for the six-arm capacity C, and that the daily fit is about 2.6
+times more exposed to an undetected day-long load. The parts below therefore report C as the
+capacity, with the daily fit as a cross-check, unless the injections show otherwise.
+
+**Rules shared by every part:**
+
+- **Substations.** Only the 8 Primaries metered in MW. The 8 Primaries metered only in MVA fold
+  solar into the magnitude of the flow, and experiment 00039 fitted a negative capacity at Stickney in
+  every year. Wrangle T1 and Wrangle T2 share one service-area polygon in `TimeSeriesMetadata`, so any
+  comparison against an outside count of solar treats them as one area.
+- **Irradiance.** CAMS for past weather, because the [past-weather solar
+  study](../studies/past-weather/solar.md) found the CAMS solar estimate the most accurate of the
+  products it compared. ENS for forecasts, with the ENS irradiance calibrated against CAMS before a
+  capacity fitted on CAMS is applied to it, because experiment 00031 suspected an ENS bias of the
+  kind that cancelled its sunny-day gain under heavy cloud.
+- **Capacity used at forecast time is causal.** A part that feeds a capacity to a forecast uses the
+  capacity estimated from data before the forecast's training end, never the capacity fitted on the
+  scored period.
+- **Switching is masked.** The logged closures, padded by 24 hours, are removed from every capacity
+  fit until SW2-0b's labels exist. A transfer moves a share of the donor's net load, including the
+  donor's solar, so an unmasked transfer looks like a step in capacity.
+- **Known answers first.** Every capacity method is scored on experiment 00039's injection harness
+  before it touches the real series, and the harness gains injected capacity ramps, injected
+  capacity steps, and injected transfers that carry the donor's solar.
+- **Loads that track sunshine are a named confound.** Seaside visitor load at the coastal Primaries
+  (Skegness, Ingoldmells, Chapel St Leonards, and Trusthorpe), irrigation pumping, cooling of crop
+  stores, and air conditioning all rise on sunny days and bias the fitted capacity low. Daytime
+  domestic load falls on sunny days, as people go outside, and biases the fitted capacity high. Each
+  write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
+  weeks.
+
+#### PVDIS-3: how much forecast error comes from embedded solar
+
+**Measure, with no new forecasting method, how much of the demand forecast's error the embedded
+solar explains, and whether the XGBoost model already captures the solar it is given.** Experiment
+00009 found that CAMS improved the demand forecast by only 0.035 points of capacity. That small gain
+has two readings, which this part separates: either solar explains little of the error, or the
+XGBoost model does not use irradiance well enough for a better irradiance input to show.
+
+- **Arm D0** is experiment 00033's best guess, read from its stored predictions.
+- **Arm D1** retrains the same recipe with every irradiance input removed, so the model has no
+  direct route to solar. Lighting load is small now that most lighting is LED, so removing
+  irradiance should remove little true demand signal. Temperature stays in, because temperature is
+  demand; temperature correlates with sunshine in summer, so D1 still learns some solar indirectly,
+  and the write-up reports how much.
+- **The measurement** regresses each arm's residual, in daylight, on the causal capacity times the
+  CAMS unit solar shape at the valid time (the solar that actually happened), and D0's residual also
+  on the causal capacity times the gap between the CAMS shape and the ENS shape (the solar forecast
+  error). It reports the share of residual variance and of the quantile score explained, by lead
+  band, clear-sky-index bin, and Primary.
+- **Two add-back previews** cost one line each: D1's forecast minus the causal capacity times the
+  CAMS shape (a ceiling: a perfect solar forecast at Primaries, comparable with experiment 00031's
+  oracle of 0.82 points at the 2 GSPs), and D1's forecast minus the causal capacity times the
+  calibrated ENS shape (a realistic version).
+- **Proposed prediction**, for the plan to confirm: the solar term explains at least 30% of D1's
+  daylight residual variance in April to September, and the solar forecast error explains at most
+  10% of D0's. The plan sets the thresholds and their reasons.
+
+#### PVDIS-4: a capacity series that only rises, with error bars
+
+**Estimate capacity on a weekly grid, with non-negative weekly increments under an L1 penalty, so
+that weeks share information and the series steps only where the data demand a step.** Fitting a
+free capacity per week would be too noisy: the season-year standard error of about 1.2% of capacity
+implies roughly 7 to 8% per week. With the penalty, the weekly grid sets only where a step may fall,
+and the penalty, chosen on injected ramps and steps, sets how small a step the fit can detect. The
+part reports that detection limit per Primary. The plan chooses the observation model on the
+injections, including injected day-long loads: the six-arm fit behind C, or experiment 00039's fit
+on daily sums, which recovered more of the injected solar but is more exposed to a day-long load.
+
+- **Genuine falls are modelled as a separate, reversible deficit,** a non-negative weekly term with
+  its own, stronger L1 penalty, for inverter faults and solar sites switched off for weeks or months.
+  The capacity itself never falls. Active network management curtailment is not modelled, because
+  unmetered solar in GB is very rarely under active network management.
+- **The unconstrained weekly path is reported beside the constrained one,** so that a ratchet on an
+  unmasked transfer shows as a gap between the two.
+- **A probabilistic capacity comes from two sources, reported separately.** Sampling uncertainty
+  comes from a block bootstrap over days, refitting the whole series each time, which gives an
+  ensemble of capacity paths. Systematic uncertainty comes from a multiplicative factor drawn once
+  per path: the under-recovery of experiment 00039, about 10% for a rooftop fleet whose shape differs
+  from a solar farm's, and experiment 00040's bound on undetected demand loads. On the injections,
+  the 90% interval must contain the true capacity in about 90% of cases.
+- **Validation against outside counts of solar:**
+    - Steps in the series should fall near the connection dates that the Embedded Capacity Register
+      gives for new sites of 50 kW or more inside each Primary's polygon. The register code lives in
+      experiment 00031's folder, so it has to move to `packages/studies` first, as a reviewed
+      change.
+    - The estimate should be at or above the registered solar inside each polygon, because the
+      register omits sites under 50 kW.
+    - The count and area of solar mapped in OpenStreetMap inside each polygon, pulled fresh because a
+      lot of solar has been installed since the 2020 open dataset was published.
+    - The sum over the Primaries and metered solar farms under each GSP should sit at or below PV_Live's
+      installed capacity for that GSP.
+- **Proposed prediction**, for the plan to confirm: on the injections, the constrained series
+  recovers an injected step of 10% of capacity within 4 weeks of its true date, and its error at
+  each week is no larger than the season-year fit's.
+
+#### PVDIS-5: forecasting net demand as demand minus forecast solar
+
+**Compare three ways of using the estimated capacity in the demand forecast, against the best
+guess, and adopt a way that explains the forecast even where it does not improve the score.**
+
+- **Arm A, a solar feature:** the best guess plus a column of causal capacity times the calibrated
+  ENS solar shape. Experiment 00031 found its nearest arm level; the difference here is a capacity
+  that changes over time and a calibrated ENS.
+- **Arm B, add solar back:** train the XGBoost model on gross demand, the metered net demand plus the
+  causal capacity times the CAMS solar shape, with no irradiance inputs. At inference, subtract the
+  causal capacity times the solar forecast from each ENS member, so the forecast spread includes the
+  solar forecast's spread. Lagged gross demand needs CAMS at the lag time, and CAMS arrives with a
+  one-day delay, so the shortest lags use ENS instead. Run Arm B with the capacity divided by the
+  chosen estimator's recovery on the injections, and without that correction.
+- **Arm C, the simple baseline:** the best guess plus experiment 00039's trailing midday clear-minus-
+  overcast mean as a feature. Experiment 00031's capacity statistics, of the same kind, lost 0.167
+  points, so Arm C is the comparison arm, not a candidate.
+- **The decision rule tests both gain and non-inferiority.** An arm is a candidate when its interval
+  excludes zero in the right direction, and Arm B is also adoptable for explanation when its interval
+  lies inside a non-inferiority margin that the plan sets. Climatology and `manual_heuristic` rows
+  give the absolute scale.
+- **Waits for** PVDIS-3, whose result says how large a gain is possible, and PVDIS-4, which supplies
+  the capacity series.
+
+#### PVDIS-6: the mix of panel orientations
+
+**Estimate the share of east-, south-, and west-facing solar behind each Primary, and drop the step
+if the shares are not identified.** Experiment 00040 found that capacities on an east-south-west
+menu swapped between years in a season-year fit. Pooling the shapes across Primaries with a shared
+prior, or fitting on clear days only, may identify them. A Primary's orientation mix would sharpen
+the explicit solar forecast in Arm B of PVDIS-5.
+
+#### PVDIS-T: the capacity table, a study
+
+**Publish the capacity series, with its error bars and its outside checks, as a study under
+`docs/studies/`, once PVDIS-4 has run.** The study replaces the static capacity table that the Opus
+review of experiment 00040 proposed, and it keeps three uncertainty terms separate: sampling, the
+farm-to-rooftop transfer, and undetected demand loads. The SW2-10 joint fit reads the same series.
 
 ### P11: ensemble statistics as inputs
 
