@@ -13,8 +13,9 @@ prediction: >-
   hours 24 to 54 after the ENS run's 00 UTC (the UKV-CEDA blends study found -0.2 to -0.3 at lead
   days 1 and 2 for an ENS mean plus UKV winds). The UKV-alone arm scores worse than the ENS-only arm.
   Every arm scores worse than the ERA5-trained best guess, as the ERA5-trained wind model beat the
-  ENS-trained one by 1.70 points in experiment 1. The interval on three farms is likely wide, so
-  `inconclusive` is possible.
+  ENS-trained one by 1.70 points in experiment 1. Experiment 52's interval on the same farms had a
+  half-width of about 0.14 points at 95%, so a `supported` verdict (interval wholly below -0.15)
+  needs a point estimate near -0.30 or better, and `inconclusive` is possible.
 decision_rule: >-
   One decisive contrast, C1: the ENS-plus-UKV arm minus the ENS-only arm on the quantile score for
   cases with a valid time 24 to 54 hours after the 00 UTC start of the ENS run's date (lead day 1,
@@ -112,6 +113,9 @@ Office's published schedule, and does not measure when it publishes.
   runs on a version the models never saw in training.
 - **The cases are the same Tuesday runs and three farms as experiment 52's**, so the contrast is
   not a confirmation on fresh data.
+- **Arm B's pooled mixture may be too narrow.** Its spread comes only from the six ENS columns, so the
+  more the trees lean on UKV, the narrower the pooled mixture. No spread factor corrects this; the
+  report's coverage and above-0.95-quantile share show it.
 - **The scored cases cover lead day 1 and 6 hours of lead day 2 only**, because UKV stops at 54
   hours. A result at days 1 and 2 of ENS-based forecasts in other experiments is not comparable.
 
@@ -131,7 +135,8 @@ Office's published schedule, and does not measure when it publishes.
 
 - **Cases:** the half-hourly cases of experiment 33's stored `bg_full` table (three farms, three
   seeds, the Tuesday runs), restricted to valid times 24 to 54 hours after the 00 UTC start of the
-  ENS run's date. A case where UKV is absent is dropped from every arm.
+  ENS run's date. A case where UKV is absent is dropped from every arm, so C1 is scored on the
+  52 Tuesday runs that have a complete UKV run, not on all 53 stored runs.
 - **Training rows:** every 00 UTC run of 2024-04-01 to 2025-06-30 for which the UKV run is complete,
   per farm, using the ENS control member's half-hourly valid times 0 to 54 hours after the run's
   00 UTC. The `lead_hours`, lag, and recency-weight definitions are experiment 33's. Arms A, B, and
@@ -139,6 +144,13 @@ Office's published schedule, and does not measure when it publishes.
 - **Fits:** the nine-level quantile loss, `eta` 0.05, depth 6, 500 rounds, on the GPU, as in
   experiment 33; seeds 0, 1, and 2.
 - **Spread factor and blend:** none. Every arm is scored as the model outputs it.
+- **Missing values:** a case or training row with a non-finite value in any UKV column (the 925 hPa
+  speed is NaN where the level lies below the ground) is dropped from all three arms alike.
+- **Units and cells:** UKV-CEDA speeds are in m/s, as ENS's are. Each farm reads its nearest 2 km
+  cell (the three farms lie 0.9 to 1.1 km from one), by `studies.grid_sampling.nearest_cells`; the
+  store reader is copied from the study script that already reads it.
+- **Exploratory splits:** C1 is also read before and after UKV's upgrade of 2026-01-21, and without
+  the first validation month.
 - **Alignment assertion:** every run read has `init_time` at 00:00 on the ENS run's date.
 - **Scores reported:** the absolute quantile score of every arm per farm and per lead-day band (lead
   day 1 and the first 6 hours of lead day 2); the coverage of the 5% to 95% band; the share of cases
@@ -161,5 +173,6 @@ Office's published schedule, and does not measure when it publishes.
 ## Compute
 
 Slot E: 6 cores, GPU at most 12 GB. Each seed fits arms A, B, and C for three farms (9 fits), so 27
-fits in all, each on at most about 40,000 rows (455 runs times about 89 half-hourly valid times).
+fits in all, plus 9 for the placebo, each on about 40,000 rows (455 runs times about 89
+half-hourly valid times). The XGBoost thread count is set to 6.
 No download.
