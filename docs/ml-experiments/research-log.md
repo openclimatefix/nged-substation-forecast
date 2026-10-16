@@ -1234,14 +1234,15 @@ experiment cannot resolve a gain below about 0.04.
 
 ### 00062: does removing the residual's half-hour-to-half-hour memory help the switching detector? (SW2-9)
 
-**Filtering the residual's short memory out before the 24-hour step makes the switching detector find
-fewer load transfers, because the filter shrinks a day-long step faster than it shrinks the noise.**
-We added known load transfers to the power history and compared the detector on the unfiltered
-residual with the same detector on a residual filtered by a first-order autoregressive filter. The
-filtered detector found 0.34 to 0.37 of the moved MW and the unfiltered detector 0.44 to 0.47. The
-pooled change over the three shapes that the earlier harness did not use was -0.097 (98.33%
-interval -0.132 to -0.057), so the filtered detector misses 0.63 to 0.66 of the moved MW. At 4 hours
-the change was -0.145 (-0.209 to -0.097).
+**Filtering the residual's short memory out before the 24-hour step makes the switching detector
+find fewer load transfers, because the filter shrinks a day-long step faster than it shrinks the
+noise.** We added 620 known load transfers (power moved between substations for over 1 day) to the
+history of 16 Primary substations and compared the detector on the unfiltered residual with the same
+detector on a residual filtered by a first-order autoregressive filter. The filtered detector found
+0.34 to 0.37 of the moved megawatts (MW) and the unfiltered detector 0.44 to 0.47, a range over five
+daily shapes of transfer. The pooled change over the three shapes that experiment 60 added was
+-0.097 (98.33% interval -0.132 to -0.057), so the filtered detector misses 0.63 to 0.66 of the moved
+MW. At 4 hours the change was -0.145 (-0.209 to -0.097).
 
 - **Finding for later experiments:** the median fitted coefficient is 0.92, so a persistent step
   keeps about 8% of its size after filtering, while the noise of the 24-hour step keeps about 12%.
@@ -1251,7 +1252,7 @@ the change was -0.145 (-0.209 to -0.097).
   are not the filter's to fix. Work on the interval end (SW2-6) or the combination of windows
   (SW2-13) next.
 - **Write-up and pull request:** [the full result page](00062-sw2-9-whitened-residual-step-detector/result.md),
-  PR_LINK.
+  [PR #1293](https://github.com/openclimatefix/nged-substation-forecast/pull/1293).
 
 ![Change in MW-weighted recall by injection shape](00062-sw2-9-whitened-residual-step-detector/figure_1_gain_by_shape.svg)
 

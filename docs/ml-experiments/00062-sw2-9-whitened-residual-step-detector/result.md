@@ -31,8 +31,8 @@ decision_rule: >-
   least one non-matching shape has an interval wholly below zero. A C1 that passes while W0's
   alarm count is more than 10% above D0M's is `inconclusive`. `refuted` when the upper end of the C1
   interval lies below +0.02. `inconclusive` otherwise. The threshold is +0.02, not the +0.01 of
-  experiments 55, 58 and 60, because the filter adds 48 fitted coefficients per series to the
-  detector. The extra bar is a charge for that complexity; the experiment does not touch the
+  experiments 55, 58, and 60, because the filter adds 48 fitted coefficients per series to the
+  detector. The higher bar allows for that added complexity; the experiment does not touch the
   serving path. C2 is the same contrast at the 4-hour window,
   and C3 is the paired count of labelled real transfers of more than 1 day found by each detector;
   both are reported without changing the verdict. Each shape is also read alone at the same level;
@@ -62,11 +62,11 @@ lessons: >-
   persistent step to about 8% of its size (the median coefficient is 0.92) and shrinks the noise of
   the 24-hour step only to about 12% of its size, so the signal-to-noise ratio of a constant step
   falls to about two thirds of the unfiltered value. Removing the memory therefore removes signal
-  faster than noise, and no tuning of the filter can fix that for a step that lasts a day or more.
+  faster than noise, and a first-order filter cannot fix that for a step that lasts a day or more.
 advice:
   - >-
     Do not filter out the residual's half-hour-to-half-hour memory (first-order whitening) before the
-    24-hour step statistic; it lowers the share of moved MW found by 0.10 on every shape (C1).
+    24-hour step statistic; it lowers the share of moved MW found by 0.09 to 0.12 on every shape (C1).
   - >-
     Check the signal-to-noise ratio of a constant step against the raw detector before building any
     filter in front of the step statistic; the per-series pre-check predicted this result without
@@ -83,30 +83,35 @@ code: ml-experiments/00062-sw2-9-whitened-residual-step-detector/
 # Experiment 62: does removing the residual's half-hour-to-half-hour memory help the switching detector?
 
 **Filtering out the residual's short memory makes the switching detector find fewer load transfers,
-not more, because the filter removes a slow step faster than it removes noise.** A load transfer is
-a switching operation that moves part of one Primary substation's demand onto neighbouring
-substations. The detector raises an alarm when the 24-hour mean of a substation's residual (measured
-power minus the power the lagless XGBoost weather model predicted) differs from the mean of the
-previous 24 hours. We first subtracted from each half-hour's residual the part that the previous
-half-hour's residual predicts (a first-order autoregressive filter, fitted for each of the 16
-substations and each half-hour of the day), and then ran the same detector. We added known load
-transfers to the power history, and compared the share of the moved MW that each detector found, at
-about the same number of alarms that no logged line closure explains. The unfiltered detector (D0M)
-found 0.44 to 0.47 of the moved MW and the whitened detector (W0) found 0.34 to 0.37, so W0 misses
-0.63 to 0.66 of the moved MW against D0M's 0.53 to 0.56.
+not more, because the filter removes a day-long step faster than it removes noise.** A load transfer
+is a switching operation that moves part of one Primary substation's demand (a substation that
+feeds homes and businesses) onto neighbouring substations. The detector raises an alarm when the
+24-hour mean of a substation's residual differs from the mean of the previous 24 hours. The
+residual is the measured power minus the power predicted by an XGBoost model trained on weather
+forecasts and calendar features, with no recent power as input. Successive residuals are strongly
+alike. We therefore subtracted from each half-hour's residual the part that the previous
+half-hour's residual predicts (a first-order autoregressive filter, fitted separately for each of
+16 substations and each half-hour of the day), and ran the same detector on the result.
+
+We tested both detectors on 620 injected transfers, each a known amount of power moved from one
+substation to its neighbours for over 1 day. A transfer counts as found when an alarm's interval
+starts within 2 hours of the true start and ends within the larger of 6 hours and 10% of the true
+duration. Both detectors had about the same number of alarms that no logged line closure explains.
+The unfiltered detector (D0M) found 0.44 to 0.47 of the moved megawatts (MW), and the filtered
+detector (W0) found 0.34 to 0.37; each range spans five shapes of transfer through the day. W0
+therefore misses 0.63 to 0.66 of the moved MW, against 0.53 to 0.56 for D0M.
 
 ![Change in MW-weighted recall by shape](figure_1_gain_by_shape.svg)
 
 ## Verdict
 
-**Refuted, and the direction is the reverse of the prediction.** The upper end of the pooled
-interval, -0.057, lies far below the +0.02 the decision rule required, and the whole interval lies
-below zero. The table gives the change in MW-weighted recall, the share of the moved MW that sits in
-found transfers, of W0 over D0M. A transfer counts as found when an alarm's interval starts within 2
-hours of the true start and ends within the larger of 6 hours and 10% of the true duration. Each
-interval is 98.33%, a 95% interval widened for three planned contrasts, from 20,000 resamples of
-whole calendar months. The 620 transfers are 25% to 40% of the receiving load, last over 1 day, and
-start in even months.
+**Refuted, and the direction is the reverse of the prediction.** The three planned contrasts are C1,
+the verdict (24 hours); C2, the same contrast at 4 hours; and C3, the labelled real transfers. The
+upper end of the pooled interval, -0.057, lies far below the +0.02 the decision rule required, and
+the whole interval lies below zero. The table gives the change in MW-weighted recall, the share of
+the moved MW that sits in found transfers, of W0 over D0M. Each interval is 98.33%, a 95% interval
+widened for three planned contrasts, from 20,000 resamples of whole calendar months. The 620
+transfers start in even months, and move 25% to 40% of the receiving load.
 
 | Contrast | Result | Reading |
 |---|---|---|
@@ -133,9 +138,9 @@ transfer as S1. The unfiltered detector's recall, as a share of the moved MW, is
 to about 12%.** The residual is strongly persistent: the median fitted coefficient is 0.92, and the
 correlation of a residual with the previous half-hour's falls from 0.91 to -0.03 after filtering. A
 step that persists keeps its full size at one half-hour and then shrinks to 1 minus the coefficient
-of its size. The noise of the 24-hour step is dominated by slow wander in the residual, which the
-filter also shrinks, but by less. The table gives the per-series medians over the 16 substations
-(range in brackets), computed on the real residual of odd months with no injection.
+of its size. The filter also shrinks the noise of the 24-hour step, but by less; we did not
+decompose the noise further. The table gives the per-series medians over the 16 substations (range
+in brackets), computed on the real residual of odd months with no injection.
 
 | Quantity | Median (range over 16 substations) |
 |---|---|
@@ -149,22 +154,23 @@ filter also shrinks, but by less. The table gives the per-series medians over th
 | Correlation of the raw and whitened 24-hour steps | 0.81 (0.55 to 0.92) |
 
 The signal-to-noise ratio of a constant step, whitened relative to raw, is 1 minus the mean
-coefficient divided by the noise ratio in the table. It is below 1 for all 16 substations (0.52 to
-0.85, with most between 0.60 and 0.76). That figure predicts the result without any injection: a
+coefficient divided by the noise ratio in the table. For each substation the ratio is below 1 (0.52
+to 0.85, with most between 0.60 and 0.76). That figure predicts the result without any injection: a
 detector whose signal-to-noise ratio is two thirds of another's finds fewer transfers at the same
 alarm rate.
 
 ## Where the misses are
 
 **Filtering did not remove the interval-end misses and added misses at the start.** Among transfers
-whose donor step is 6 noise units or more (a noise unit being D0M's typical step on a quiet day),
-D0M finds 128 of 215 constant-MW transfers (S2), has the right start and a wrong end for 72, and has
-no alarm at the start of 15. W0 finds 113, has the right start and a wrong end for 56, and has no
-alarm at the start of 46. The wrong-end share stays near a quarter to a third, so the end estimate,
-which comes from the unfiltered residual in both detectors, remains the larger limit. W0 adds 31
-transfers with no alarm at the start.
+whose donor step is 6 noise units or more (the donor is the substation that loses the power, the
+receivers are the neighbours that gain it, and a noise unit is D0M's 24-hour step on a typical quiet
+day), D0M finds 128 of 215 constant-MW transfers (S2), has the right start and a wrong end for 72,
+and has no alarm at the start of 15. W0 finds 113, has the right start and a wrong end for 56, and
+has no alarm at the start of 46. The wrong-end share stays near a quarter to a third, so the end
+estimate, which comes from the unfiltered residual in both detectors, remains the larger limit. W0
+adds 31 transfers with no alarm at the start.
 
-The recall by donor step, split by whether any receiver is metered, shows the loss across all step
+The recall by donor step, split by whether any receiver is metered, shows the loss at most step
 sizes (shape S2, found by D0M | found by W0 out of the transfers in the bin, 24-hour window):
 
 | Donor step in noise units | Metered receiver | No metered receiver |
@@ -174,8 +180,9 @@ sizes (shape S2, found by D0M | found by W0 out of the transfers in the bin, 24-
 | 6 to 10 | 60 \| 51 of 100 | 2 \| 2 of 2 |
 | 10 or more | 66 \| 60 of 113 | no transfers |
 
-Below 2 noise units neither detector finds a transfer. The other shapes and the 4-hour window are
-in the printed report and show the same ordering.
+Below 2 noise units neither detector finds a transfer at 24 hours. The other shapes and the 4-hour
+window are in the output of `e00062_report.py` and also show W0 below D0M, with ties in a few small
+bins.
 
 ![Share of transfers found by donor step](figure_3_found_by_step.svg)
 
@@ -206,10 +213,11 @@ removes the half-hour memory removes the slow wander and the step together, and 
 24-hour mean is slow wander. The share of large-step transfers with the right start and a wrong end
 stays at about a quarter to a third, and filtering adds transfers with no alarm at the start. The
 next experiment on the switching detector should therefore change what happens after the alarm, with
-paired-step intervals that find the onset and the return step together (SW2-6), or the combination
-of several windows (SW2-13), not the residual that the alarm reads. A lag-48 filter, or a
-coefficient per series, was not run, and would shrink the step less, but the lag-48 correlation of
-0.54 is only half the lag-1 correlation of 0.91, so we do not expect it to change the verdict.
+paired-step intervals that find the onset and the return step together (SW2-6 in the research plan),
+or a combination of the 4-hour and 24-hour windows (SW2-13), not the residual that the alarm reads.
+A lag-48 filter, or a coefficient per series, was not run, and would shrink the step less, but the
+lag-48 correlation of 0.54 is only half the lag-1 correlation of 0.91, so we do not expect it to
+change the verdict.
 
 ## Post hoc and limits
 
@@ -218,7 +226,7 @@ coefficient per series, was not run, and would shrink the step less, but the lag
 - **The coefficients are not cleaned.** They were fitted from odd-month residuals without masking
   logged closures or labelled transfers, so a persistent real step can raise a coefficient towards
   the clip. The median share of coefficients at the clip is 0.14, and 0.50 for the worst substation.
-- **The alarm counts differ,** as the previous section says.
+- **The alarm counts differ,** as the section "What the matching of alarms did" says.
 - **The transfers are injected into a residual that a fixed lagless weather model produced.** The
-  residual does not reflect a model refitted on the injected period, as in experiments 43, 55, 58,
-  and 60.
+  residual does not reflect an XGBoost model refitted on the injected period, as in experiments 43,
+  55, 58, and 60.
