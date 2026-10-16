@@ -106,16 +106,28 @@ def product_array(*, cases: pl.DataFrame, product: str) -> np.ndarray:
 
 
 def placebo(*, cases: pl.DataFrame, array: np.ndarray) -> np.ndarray:
-    """Shuffle the product's rows among cases of one farm, seed, month, lead day, and hour."""
+    """Move each case's product row to another case of the same farm, seed, month, lead day, time.
+
+    Within a group of cases that share the valid time's hour and minute, the rows that hold a
+    product are cycled by one place in a random order, so no case keeps its own row.
+    """
     rng = np.random.default_rng(PLACEBO_SEED)
     groups = cases.select(
-        "seed", "time_series_id", "month", "lead_day", hour=pl.col("valid_time").dt.hour()
+        "seed",
+        "time_series_id",
+        "month",
+        "lead_day",
+        hour=pl.col("valid_time").dt.hour(),
+        minute=pl.col("valid_time").dt.minute(),
     ).with_row_index()
     out = array.copy()
-    for part in groups.partition_by("seed", "time_series_id", "month", "lead_day", "hour"):
+    for part in groups.partition_by(
+        "seed", "time_series_id", "month", "lead_day", "hour", "minute"
+    ):
         index = part["index"].to_numpy()
-        present = index[~np.isnan(array[index, 0])]
-        out[present] = array[rng.permutation(present)]
+        present = rng.permutation(index[~np.isnan(array[index, 0])])
+        if present.size > 1:
+            out[present] = array[np.roll(present, 1)]
     return out
 
 
@@ -166,7 +178,9 @@ def blend_with(
 ) -> np.ndarray:
     """Return the blend of the members under a weight table, per case."""
     keyed = cases.select("month", band=pl.col("band") if by_band else pl.lit(-1))
-    joined = keyed.join(table, on=["month", "band"], how="left", validate="m:1")
+    joined = keyed.join(
+        table, on=["month", "band"], how="left", validate="m:1", maintain_order="left"
+    )
     weights = joined.select([f"w{i}" for i in range(members.shape[0])]).to_numpy()
     if np.isnan(weights).any():
         msg = "a case has no weight row"

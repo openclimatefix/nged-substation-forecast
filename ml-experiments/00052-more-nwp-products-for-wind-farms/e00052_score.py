@@ -119,9 +119,9 @@ def absolute_table(*, arms: dict[str, pl.DataFrame], sites: dict[int, str]) -> l
             {
                 "arm": name,
                 "scope": "all",
-                "qs": float(frame["qs"].mean()),
-                "covered": float(frame["covered"].mean()),
-                "exceeds_95": float(frame["exceeds_95"].mean()),
+                "qs": float(frame["qs"].to_numpy().mean()),
+                "covered": float(frame["covered"].to_numpy().mean()),
+                "exceeds_95": float(frame["exceeds_95"].to_numpy().mean()),
                 "cases": frame.height,
             }
         )
@@ -132,9 +132,9 @@ def absolute_table(*, arms: dict[str, pl.DataFrame], sites: dict[int, str]) -> l
                     {
                         "arm": name,
                         "scope": label,
-                        "qs": float(part["qs"].mean()),
-                        "covered": float(part["covered"].mean()),
-                        "exceeds_95": float(part["exceeds_95"].mean()),
+                        "qs": float(part["qs"].to_numpy().mean()),
+                        "covered": float(part["covered"].to_numpy().mean()),
+                        "exceeds_95": float(part["exceeds_95"].to_numpy().mean()),
                         "cases": part.height,
                     }
                 )
@@ -144,9 +144,9 @@ def absolute_table(*, arms: dict[str, pl.DataFrame], sites: dict[int, str]) -> l
                 {
                     "arm": name,
                     "scope": label,
-                    "qs": float(part["qs"].mean()),
-                    "covered": float(part["covered"].mean()),
-                    "exceeds_95": float(part["exceeds_95"].mean()),
+                    "qs": float(part["qs"].to_numpy().mean()),
+                    "covered": float(part["covered"].to_numpy().mean()),
+                    "exceeds_95": float(part["exceeds_95"].to_numpy().mean()),
                     "cases": part.height,
                 }
             )
@@ -217,7 +217,7 @@ def main() -> None:
     print(f"C1 {out['c1']}\nC2 {out['c2']}")
     print("Absolute (all cases):")
     for row in out["absolute"]:
-        if row["scope"] in ("all", *BANDS):
+        if row["scope"] in ("all", *BANDS, *sites.values()):
             print(
                 f"  {row['arm']:<24}{row['scope']:<10}{row['qs']:.3f}"
                 f"  cover {row['covered']:.3f}  >q95 {row['exceeds_95']:.3f}"
@@ -229,6 +229,24 @@ def main() -> None:
             f"  {row['difference']:+.3f} [{row['lower']:+.3f}, {row['upper']:+.3f}]"
             f" n={row['cases']}"
         )
+    for name in ("weights_ens_icon_ifs", "weights_ens_icon_ifs_one"):
+        table = pl.DataFrame(out["weights"][name])
+        print(
+            name,
+            table.group_by("band").agg(pl.col("w0", "w1", "w2").mean()).sort("band").rows(),
+        )
+    spread = pl.DataFrame(out["spread"]["spread_ens_icon_ifs"])
+    print("spread factors (min, max, mean) by group:")
+    print(
+        spread.group_by("group")
+        .agg(
+            lo=pl.col("factor").min(),
+            hi=pl.col("factor").max(),
+            mean=pl.col("factor").mean(),
+        )
+        .rows()
+    )
+    print("product checks:", json.dumps(out["product_checks"]))
     print("Stop rule:")
     for p, row in out["stop_rule"].items():
         print(f"  {p}: {row['difference']:+.3f} dropped={row['dropped']}")

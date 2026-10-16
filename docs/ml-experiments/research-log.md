@@ -77,6 +77,7 @@ the maintainer to confirm.
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
+| [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1100,3 +1101,19 @@ scale error. The members of the European Centre for Medium-Range Weather Forecas
 - **Write-up:** [result](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md).
 
 ![Residual of the best guess against the oracle shift](00051-pvdis-3b-midday-loss-of-the-solar-term/figure_4_residual_against_shift.svg)
+
+### 00052: do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?
+
+**We asked whether averaging the wind best guess with the same ERA5-trained model fed ICON-EU's and
+IFS 0.25 degree's forecast wind lowers the quantile score at 1 to 2 days ahead for the 3 metered
+wind farms.** The average scored 0.055 points of capacity better at lead days 1 and 2 (95% interval
+-0.200 to +0.072), against a threshold of 0.15, so the verdict is `inconclusive`. Over all leads it
+scored 0.018 worse (-0.020 to +0.054).
+
+- **Finding for later experiments:** the blend is worse at lead days 3 to 6 (+0.122, +0.028 to
+  +0.221) and may help at day 0 (-0.197, -0.460 to +0.051), and one farm gains 0.233 at days 1 and
+  2 while another loses 0.151. A placebo that shuffles the product forecasts scores worse than the
+  best guess (+0.343), so the small gain is not an averaging artefact.
+- **Write-up:** [result](00052-more-nwp-products-for-wind-farms/result.md).
+
+![Each blend minus the best guess](00052-more-nwp-products-for-wind-farms/figure_1.svg)

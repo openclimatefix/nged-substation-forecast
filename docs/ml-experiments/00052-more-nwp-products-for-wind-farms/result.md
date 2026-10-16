@@ -1,7 +1,7 @@
 ---
 id: "00052"
 slug: more-nwp-products-for-wind-farms
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the 3 metered wind farms, averaging the quantiles of the experiment 33 wind best guess (the
@@ -30,6 +30,29 @@ row_set_id: fold_a_tuesdays_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over nine levels, the estimate of the
   CRPS), in points of capacity; coverage of the 5% to 95% band
+verdict: inconclusive
+best_arm: >-
+  None resolves. The primary blend scores 6.646 points of capacity at lead days 1 and 2 against
+  6.701 for the best guess (difference -0.055, 95% interval -0.200 to +0.072); the no-spread-factor
+  variant is -0.080 (-0.217 to +0.039, exploratory).
+lessons: >-
+  ICON-EU and IFS 0.25 degree add too little to the wind best guess to resolve a gain on 3 farms.
+  The point estimate at days 1 and 2 is a third of the 0.15-point threshold, the blend is worse at
+  days 3 to 6, and the farms disagree: one gains and one loses.
+advice:
+  - >-
+    Do not port an ICON-EU or IFS 0.25 degree blend for wind on this evidence: the lead days 1 and 2
+    contrast is -0.055 (-0.200 to +0.072) against a 0.15-point threshold, and over all leads it is
+    +0.018 (-0.020 to +0.054) (C1, C2).
+  - >-
+    Limit any extra-product blend for wind to lead days 0 to 2: at days 3 to 6 the primary blend
+    scores worse than the best guess by 0.122 (0.028 to 0.221), exploratory.
+  - >-
+    Test ICON-EU alone at lead day 0 on more than 3 farms: the blend gains 0.197 there (-0.460 to
+    +0.051) and ICON-EU alone 0.239 (-0.526 to +0.030), exploratory and unresolved.
+  - >-
+    Expect farms to disagree: at days 1 and 2 the primary blend gains 0.233 at one farm (0.035 to
+    0.447) and loses 0.151 at another (0.028 to 0.287), exploratory.
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00052-more-nwp-products-for-wind-farms/
@@ -37,106 +60,100 @@ code: ml-experiments/00052-more-nwp-products-for-wind-farms/
 
 # Experiment 52: do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?
 
-**Status: planned. No code has run.** We ask whether giving the wind-farm forecast two further
-weather forecasts, ICON-EU (the German weather service's European model) and IFS 0.25 degree (the
-European Centre's high-resolution forecast, whose ensemble ENS the best guess already uses), lowers
-its error one to two days ahead. The best guess feeds ENS's 51 members to a model trained on ERA5
-(an estimate of past weather). We feed the same trained model each extra forecast's wind, and
-average the resulting forecast ranges with the best guess's, using weights chosen on earlier months
-only. The data are on disk, so the experiment downloads nothing.
+We asked whether two further weather forecasts, ICON-EU (the German weather service's European
+model) and IFS 0.25 degree (the European Centre's high-resolution forecast), help the wind-farm
+forecast one to two days ahead. The current best guess feeds the 51 members of the European
+Centre's ensemble forecast (ENS) to a model trained on ERA5, an estimate of past weather. We fed the
+same trained model each extra forecast's wind, and averaged the resulting forecast ranges with the
+best guess's, using weights chosen only on earlier months. At 1 to 2 days the average scored 0.055
+points of capacity better than the best guess, but the 95% interval (-0.200 to +0.072) includes
+zero, so the experiment cannot say whether the extra forecasts help.
 
-## Sizing
+**Inconclusive: the primary blend minus the best guess is -0.055 points of capacity at lead days 1
+and 2 (95% interval -0.200 to +0.072; C1), against a threshold of -0.15.** C1 is the only contrast
+that decides the verdict. Over all leads the difference is +0.018 (-0.020 to +0.054; C2). The
+interval resamples whole months and the 3 seeds, so it describes these 3 farms and cannot speak for
+other farms. The prediction (-0.2 to -0.4 at days 1 and 2) was too large. A lead day counts
+calendar days from the date of the ENS run, so lead days 1 and 2 are the two days after the run's
+date.
 
-- **What gets stored:** private prediction tables under `data/ml-experiments/`; nothing in
-  production. Not a trigger.
-- **Serving path:** untouched by the experiment. A `supported` verdict would add two weather feeds
-  to the serving path, which the threshold prices.
-- **Degradation rule:** untouched. A product missing at serving time would drop out of the average,
-  as it does here beyond its horizon.
-- **Defensible designs:** more than one (a weighted average of quantiles, extra pooled mixture
-  atoms, product columns in a calibrator). The plan picks the first, because experiment 35 built and
-  tested it, and experiment 23 warned against a calibrator trained on controls alone.
-- **Callers:** the experiment copies experiment 33's and experiment 35's code, which it may not
-  import.
-- **Size: complex** (two triggers), so the plan gets one Opus review and the code a second Sonnet
-  review.
+![Each blend minus the best guess](figure_1.svg)
 
-## Coverage of the validation year (checked 2026-10-16)
+## Absolute scores
 
-| Product | Wind variables at the 3 farms | Validation year, July 2025 to June 2026 | Used |
-|---|---|---|---|
-| ICON-EU (Open-Meteo Previous Runs) | 10 m and 100 m speed and direction | All 8,760 hours at `previous_day1`; 98.9% at `previous_day2`; complete at days 3 and 4; no day 5 | Primary |
-| IFS 0.25 degree (same archive) | Same | All 8,760 hours at days 1 to 3 (archive holds to day 7) | Primary |
-| GFS (same archive) | Same | All 8,760 hours at lead days 1 to 3 | Exploratory |
-| AIFS Single (Dynamical.org) | `wind_u_10m`, `wind_v_10m`, `wind_u_100m`, `wind_v_100m` | From the 2025-02-24 06 UTC run; version change in 2026-05 inside the year (PVDIS-8) | Not used: needs its own row set; left to a later experiment |
-| GEFS and GFS native (Dynamical.org) | 10 m wind only | Whole year | Not used: no 100 m wind |
-| The nwp-archive (ICON-EU-EPS, ICON-D2-EPS, MOGREPS) | n/a | Starts 2026-10-06 (DWD) or later | Not used: no overlap with the year |
-| UKV | n/a | CEDA UKV differs statistically from the live feed | Not used |
+**The quantile score (twice the mean pinball loss over nine levels, in points of capacity; smaller
+is better) of the best guess and the primary blend.** Cases hold 3 farms and 3 seeds; the 95%
+coverage columns are the share of cases inside the 5% to 95% band.
 
-## Design
+| Scope | Best guess | Primary blend | Cases | Coverage, best guess | Coverage, blend |
+|---|---|---|---|---|---|
+| Lead day 0 | 6.722 | 6.525 | 13,695 | 0.902 | 0.903 |
+| Lead days 1 and 2 | 6.701 | 6.646 | 44,328 | 0.909 | 0.901 |
+| Lead days 3 to 6 | 9.702 | 9.824 | 88,716 | 0.909 | 0.917 |
+| Lead days 7 and later | 13.154 | 13.154 | 174,624 | 0.916 | 0.916 |
+| All leads | 11.037 | 11.054 | 321,363 | 0.912 | 0.914 |
 
-- **Cases:** experiment 33's 53 Tuesday ENS runs of `fold_a_tuesdays_v1` for the 3 wind farms, the
-  half-hourly cases its stored `bg_full` table holds, 3 seeds. Weights and spread factors for runs in
-  month m use only cases with a run in an earlier month and a valid time before the first day of m
-  (experiment 35's rolling origin). July 2025 has no history and uses equal weights and no extra
-  spread factor.
-- **Product forecast power:** for each seed, refit experiment 33's ERA5-trained wind model (`margin`
-  variant: nine quantiles with the power-curve base margin, trained on valid times before
-  2025-06-17). Feed it the product's 10 m and 100 m speed (converted from km/h to m/s) and the sine
-  and cosine of its direction, at the farm's grid point. The model gives nine quantiles per case.
-- **Lead day and availability:** the lead day d of a case is the number of calendar days from the
-  date of its ENS run (`nwp_init_time`, 00 UTC) to its valid time, not `lead_hours` // 24, because
-  experiment 33's `lead_hours` counts from `power_fcst_init_time` (09:00 UTC). A case reads
-  `previous_day(d+1)`. That selects a run initialised no later than 21:00 UTC (ICON-EU) or 18:00 UTC
-  (IFS, GFS) on the day before the ENS run, so it was published before the service reads ENS at
-  09:00 UTC. ICON-EU reaches d = 3 (`previous_day4`); IFS and GFS reach d = 6. A case beyond a
-  product's horizon, or with a null value, lacks that product.
-- **Half-hour valid times:** the archive is hourly. A case at :30 averages the speed and the u and v
-  components of the hour before and the hour after, then takes the direction from the averaged
-  components, as the ERA5 build does; both ends use the same `previous_day(d+1)` column, where d is
-  fixed by the case, so that the two ends never come from different runs.
-- **Blend:** the Vincent average (mean of each quantile level, then sorted) of `bg_full` and the
-  available product forecasts. The weights are on a 0.25 grid, chosen per lead-day band (day 0, days
-  1 to 2, days 3 to 6, days 7 and beyond) on earlier months to minimise the quantile score, and are
-  renormalised over the members a case has; the history for a band uses cases that have all the
-  primary arm's products. A rolling-origin spread factor (experiment 33's `fit_spread_factor`,
-  grid widened to 3.0) is then fitted on the blend per band on earlier months, because a
-  perfect-weather model fed one forecast gives a band that is too narrow. A factor at the grid edge
-  is reported. The arms are `ens+icon+ifs` (primary, fixed in advance), `ens+icon`, `ens+ifs`, and
-  `ens+gfs` (exploratory), each with one weight vector for all bands as a second option.
-- **Stop rule:** a product whose own spread-corrected forecast scores more than 1.0 points worse
-  than `bg_full` at lead days 1 to 2 on the first 6 months is dropped from the exploratory arms and
-  reported. A dropped product never leaves the primary arm, which is fixed in advance.
-- **Solar (descriptive, only if the wind pipeline finishes with time to spare):** the 6 solar farms
-  get the same blend, with the product's shortwave radiation replacing ERA5's in the single input
-  column. The matched-lead study found no solar gain at this lead, so solar decides nothing.
-- **Reports:** absolute scores of every arm per farm (`W1` to `W3`) and per lead band; coverage;
-  a climatology row from `ClimatologyForecaster`; the chosen weights.
+Per farm over all leads, the best guess scores 10.67, 12.38, and 10.06 (W1, W2, W3) and the
+primary blend 10.68, 12.36, and 10.13. From lead day 7 onwards no product exists, so the two arms are identical.
 
-## Controls and leakage checks
+## What else the numbers show
 
-- **Seed pairing:** the blend and `bg_full` use the same seeds; `losses_for_bootstrap` pairs them.
-- **Calendar columns:** the ERA5-trained models use no calendar columns, as in experiment 33.
-- **Past-weather caveat:** the ERA5-trained model is trained on ERA5 but fed forecast weather at
-  serving time. No ERA5 weather is read at lag times, so nothing here depends on ERA5's delay.
-- **Run availability:** a unit check asserts that for every case the selected run's initialisation
-  time plus the product's publication delay (4 hours for ICON-EU, 8 hours for IFS and GFS, upper
-  bounds taken from the providers' documentation) is no later than 09:00 UTC on the ENS run's date.
-- **Product levels:** the report prints each product's mean 100 m speed at the farms against ERA5's.
-  ICON-EU's 100 m wind is Open-Meteo's rescaling of its 120 m level.
-- **A placebo arm:** the blend of `bg_full` with a product's forecast shuffled among cases of the
-  same farm, month, and hour of day shows how much of any gain comes from averaging alone.
+- **The farms disagree at days 1 and 2 (exploratory).** The primary blend minus the best guess is
+  -0.087 (-0.330 to +0.156) at W1, -0.233 (-0.447 to -0.035) at W2, and +0.151 (+0.028 to +0.287)
+  at W3.
 
-## Advice followed
+  ![The primary blend minus the best guess, per farm](figure_2.svg)
 
-- Experiment 35: blend with one fixed weight vector if a blend is ported; test wind on more than 3
-  farms. This experiment runs both weight options and cannot add farms, so the interval is wide by
-  construction.
-- Experiment 33: grade wind on the 0.95 quantile's exceedance as well as the quantile score; the
-  report prints both. ERA5 weather would lower the wind score by 5.46, the headroom that motivates
-  this experiment.
+- **The blend does harm at lead days 3 to 6 and may help at day 0 (exploratory).** The primary blend
+  minus the best guess is +0.122 (+0.028 to +0.221) at days 3 to 6 and -0.197 (-0.460 to +0.051) at
+  day 0. At day 0, GFS (from the same archive) gains 0.229 (-0.371 to -0.090).
+- **No single extra product helps at days 1 and 2 (exploratory).** ICON-EU alone gives -0.053
+  (-0.199 to +0.079), IFS alone +0.071 (-0.034 to +0.185), and GFS alone -0.069 (-0.172 to +0.034).
+- **Each product alone is far worse than the best guess at days 1 and 2.** After a spread factor,
+  ICON-EU alone scores 2.469 points worse (the figure for IFS is 1.264 and for GFS 1.853). In the
+  first 6 months the stop rule (a product more than 1.0 points worse) fired for all three, which
+  the plan said would drop a product from the exploratory arms. The experiment ran those arms
+  anyway, so their rows stay, and the primary arm was fixed in advance.
+- **The weights stayed mostly on the best guess.** At days 1 and 2 the chosen weights averaged 0.72
+  for the best guess, 0.24 for ICON-EU, and 0.05 for IFS. One weight for all leads (-0.060 at days 1
+  and 2) did no better than weights per lead day.
+- **The extra spread factor did not help (exploratory).** Without it, the primary blend minus the
+  best guess is -0.080 (-0.217 to +0.039) at days 1 and 2 and -0.018 (-0.043 to +0.005) over all
+  leads. The factors ranged 1.0 to 1.25 for days 0 to 2 and 1.0 to 1.65 for days 3 and later.
+- **The placebo scores worse than the best guess.** Shuffling the product forecasts among cases of
+  the same farm, month, lead day, and time of day gives +0.343 (+0.061 to +0.762) at days 1 and 2,
+  so the blend's small gain does not come from averaging two correlated forecasts alone.
 
-## Compute
+## How the experiment was run, and where it departs from the plan
 
-Slot E: 6 cores, GPU at most 12 GB. Refits are 3 farms times 3 seeds of small quantile models on
-the GPU; the product tables are built on the CPU. Estimated 1 to 2 GPU hours, no download.
+- **Cases and benchmark:** the 53 Tuesday runs of experiment 33's wind best guess (`bg_full`), 3
+  farms and 3 seeds, scored on its stored half-hourly cases. A farm is labelled W1 to W3.
+- **Product forecast:** experiment 33's ERA5-trained wind model, refitted per seed on valid times
+  before 2025-06-17, fed each product's wind at the farm's grid point from Open-Meteo's Previous
+  Runs archive. A case at lead day d reads `previous_day(d+1)`, which the archive defines as a run
+  initialised at least that many days before the hour, so the run was initialised no later than
+  00 UTC on the ENS run's date. The experiment did not check that definition against the archive
+  itself; the matched-lead study checked it on GFS for 2 days. A case beyond a product's horizon
+  (ICON-EU after lead day 3) or with a missing value keeps the best guess.
+- **Blend:** the average of each quantile level, with weights on a grid of quarters chosen per lead
+  band on earlier months only, then a spread factor fitted on earlier cases. The plan said the
+  spread factor would be fitted per lead band; it was fitted for lead days 0 to 2 pooled and days 3
+  and later pooled, so that each fit has enough cases. A half-hour valid time takes its speed and
+  direction from the averaged u and v components of the two hours either side.
+- **Dropped from the plan:** the solar arm (the matched-lead study found no solar gain at this lead)
+  and AIFS (it needs its own rows because of its model-version changes). The climatology row was not
+  computed.
+- **Mean 100 m wind speed:** ICON-EU 8.90, IFS 7.56, and GFS 8.00 m/s at the cases each covers,
+  against 8.18 for ERA5 over the validation year. The case sets differ, so this flags a bias
+  without measuring it. ICON-EU's 100 m wind is Open-Meteo's rescaling of its 120 m level.
+- **Code:** `ml-experiments/00052-more-nwp-products-for-wind-farms/`. One Opus plan review and one
+  Sonnet code review found no leakage; the code review noted that the availability check in
+  `e00052_fit.py` cannot fire, because the lead rule already guarantees it, and that the first
+  placebo kept some real product information. The placebo was rebuilt.
+
+## What the next experiment should answer
+
+**Whether more than 3 farms would resolve the day 0 gain.** The day 0 contrasts lie closest to
+resolving (-0.197 for the blend, -0.239 for ICON-EU alone), the day 3 to 6 contrasts are harmful,
+and the farm-to-farm spread is as large as the pooled effect. A test of ICON-EU at lead day 0 needs
+more wind farms, which the 3 metered farms cannot supply.

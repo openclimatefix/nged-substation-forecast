@@ -15,6 +15,7 @@ quantile columns, and `work/product_checks.json`. Existing outputs are kept.
 import argparse
 import json
 import time
+from typing import Any
 
 import e00052_common as common
 import numpy as np
@@ -102,7 +103,9 @@ def product_features(*, product: str, cases: pl.DataFrame) -> pl.DataFrame:
             bearing.cos().alias(f"wind_dir_cos_{h}m"),
         ]
     out = joined.with_columns(columns)
-    # Availability: the selected run was initialised no later than the ENS run's 00 UTC.
+    # Availability: given the archive's definition of `previous_dayN` (a run initialised at least
+    # N x 24 h before the hour; checked on GFS by the matched-lead study), the selected run was
+    # initialised no later than the ENS run's 00 UTC.
     late = out.filter(
         pl.col("hour_end") - pl.duration(hours=24 * pl.col("previous_day"))
         > pl.col("power_fcst_init_time").dt.truncate("1d")
@@ -141,14 +144,14 @@ def main() -> None:
     sites = common.site_table()
     cases = cases_table(sites=sites)
     features = {p: product_features(product=p, cases=cases) for p in common.PRODUCTS}
-    checks = {
+    checks: dict[str, Any] = {
         p: {
             "cases": cases.height,
             "covered": f.height,
             "by_lead_day": {
                 int(d): int(n) for d, n in f.group_by("lead_day").len().sort("lead_day").iter_rows()
             },
-            "mean_wind_speed_100m_m_s": float(f["wind_speed_100m"].mean()),
+            "mean_wind_speed_100m_m_s": float(f["wind_speed_100m"].to_numpy().mean()),
         }
         for p, f in features.items()
     }
@@ -160,7 +163,9 @@ def main() -> None:
             pl.col("time_series_id").is_in(sites["time_series_id"].to_list())
             & (pl.col("valid_time") >= pl.datetime(2025, 7, 1, time_zone="UTC"))
             & (pl.col("valid_time") < pl.datetime(2026, 7, 1, time_zone="UTC"))
-        )["wind_speed_100m"].mean()
+        )["wind_speed_100m"]
+        .to_numpy()
+        .mean()
     )
     checks["era5_mean_wind_speed_100m_m_s_validation_year"] = era5_speed
     if not smoke:
