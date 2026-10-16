@@ -15,7 +15,7 @@
 
 Everything else (the clear-minus-overcast gap, the evening slope, the M1d seventh-arm re-score) is exploratory.
 
-**Table status rules.** `clean`: unflagged, power_dayL at 0.25 at least 0.5. `low-power`: unflagged with B_dayL above 0.45. `flagged`: T above tau. `left-out`: Wrangle T1 and the MVA Primaries. Thresholds are fixed here, before output, and reported with counts.
+**Table status rules.** `clean`: unflagged, and the day-long load is detected at least 80% of the time at 0.25 of the capacity (bound amplitude 0.25 or less). `low-power`: unflagged, with bound amplitude 0.5 or more. `flagged`: T above tau. `left-out`: Wrangle T1 and the MVA Primaries. Thresholds are fixed here, before output, and reported with counts.
 
 **Figures.** The nine of `pvdis3_decision.md` section 3, raw data first, plus the C versus M1d / R scatter.
 

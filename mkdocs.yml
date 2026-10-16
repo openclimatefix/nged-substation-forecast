@@ -100,6 +100,7 @@ nav:
   - Studies:
       - Overview: studies/index.md
       - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md
+      - "How much solar sits behind each Primary substation, and how far can the number be trusted?": studies/embedded-pv-capacity.md
       - "How many Balancing Mechanism Units in Great Britain are solar?": studies/solar-bmu-census.md
       - "Can solar be separated from an aggregate Balancing Mechanism Unit?": studies/solar-bmu-disaggregation.md
       - "Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?": studies/battery-pv-separation.md
