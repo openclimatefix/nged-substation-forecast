@@ -77,12 +77,20 @@ code: ml-experiments/00009-cams-trained-stage1a-vs-era5-trained-demand/
 
 # Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, for demand?
 
+We asked whether training a weather-to-power demand model on a satellite estimate of sunlight gives
+better forecasts than training it on a reanalysis estimate of sunlight. We trained one model on
+each, applied both to the same 51 weather forecasts, and compared their errors for the Primary
+substations (substations that step power down to the local distribution network). The model trained
+on the satellite estimate was better by only 0.035 points of capacity, far short of the 0.2 points
+we had predicted. A point of capacity is 1% of a series' effective capacity, roughly its usual
+maximum output.
+
 **This experiment is the second stage of P2 in the [research plan](../research-plan.md).**
 Experiment 00007 found that a fixed correction on CAMS irradiance removes 46.6% of the next year's
-daylight squared residual of the ERA5-trained stage 1a (98.33% interval 38.4% to 53.1%), that a
-fixed bias alone removes 39.1%, and that one substation sets the pooled figure (18.2% without it).
-The result was inconclusive. This experiment trains stage 1a on CAMS at the training times and
-scores it on ENS.
+daylight squared residual (the squared forecast error) of the ERA5-trained stage 1a (98.33% interval
+38.4% to 53.1%), that a fixed bias alone removes 39.1%, and that one substation sets the pooled
+figure (18.2% without it). The result was inconclusive. This experiment trains stage 1a on CAMS at
+the training times and scores it on ENS.
 
 ## Size
 

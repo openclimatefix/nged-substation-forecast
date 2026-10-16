@@ -76,9 +76,19 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?
 
-**Verdict: refuted, by the decision rule as pre-registered.** For the Primary substations, the
-return-to-work and school-term columns did not lower the error in the weeks after Christmas or at
-Easter. The half-term change of -0.29 points has an interval that includes zero.
+We asked whether telling a demand model when people return to work after New Year and when
+Lincolnshire's schools are in term lowers its error in the weeks after Christmas, around Easter, and
+in school half-terms. We added those calendar columns to a weather-to-power model and compared its
+error with the same model without them, over 20 series that lie within
+Lincolnshire. The columns did not lower the error in the weeks after Christmas or at Easter, and the
+half-term change has an interval that includes zero. The rule we set before the run calls this
+refuted, but the rule was worded more loosely than intended, and the intended reading rules out a
+gain only in January.
+
+**Verdict: refuted, by the decision rule as pre-registered.** For the Primary substations
+(substations that step power down to the local distribution network), the return-to-work and
+school-term columns did not lower the error in the weeks after Christmas or at Easter. The half-term
+change of -0.29 points has an interval that includes zero.
 
 **The refutation clause of the rule is looser than intended, and the intended reading gives
 "inconclusive".** The clause required the upper bounds of C1, C2, and C3 to exceed -0.25, -0.15, and

@@ -13,54 +13,63 @@ adopted.
 **These experiments are flagged `candidate` and are not yet adopted.** The flags are proposals for
 the maintainer to confirm.
 
-| Id | What would change in production | Note |
+| Experiment | What would change in production | Note |
 |---|---|---|
-| [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Train the weather-to-power model on ERA5 and apply it to ENS members | Needs the staged design, and helps only up to day 6 |
-| [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
-| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs | The Christmas column needs its 14-day window, a 2023 start needs a fresh year, and windchill can go |
-| [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Map the ENS shortwave onto CAMS (a stage 0 quantile mapping) before a CAMS-trained stage 1a reads it | The year's mean is corrected but individual months are up to 18.6% off, and the member spread widens by 27% |
-| [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Train the stage 1a demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day error correction | The correction needs live power 2 days old, and every gain is on ERA5 weather |
-| [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Add a 14-day error correction and a spread factor of 1.15 to the single-stage ENS-trained quantile model N1 for Primary demand | The correction supplies nearly all of the gain (-0.99); it is tested on forecasts 5 days apart and on a model that is never retrained |
-| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
-| [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
-| [00030](00030-lagged-power-feature-sets-primary-demand/result.md) | Add the mean and median of the 6 weekly power analogues to N1 for Primary demand, with the 14-day correction | Post hoc arm; 0.05 points below N1 with the correction (-0.08 to -0.02), 0.03 below the 00019 stack with an interval touching zero; the annual analogues hurt |
-| [00024](00024-pooling-groupings-demand-xgboost/result.md) | Train one XGBoost model per substation type (or per size band), with the series identifier as a categorical column, instead of one per series | Costs 0.15 points on Primary demand after the error correction and saves 16 of 20 models; needs the series identifier, and the test covered 20 series |
+| [00001 - ERA5-trained stage 1, solar and wind, part 1](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Train the weather-to-power model on ERA5 and apply it to ENS members | Needs the staged design, and helps only up to day 6 |
+| [00002 - Stage 2 calibrator for solar and wind](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Pool the ERA5-trained quantiles over the ENS members | Stage 2 itself did not help |
+| [00006 - Stage 1a demand inputs](00006-stage1a-demand-input-feature-sweep/result.md) | Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs | The Christmas column needs its 14-day window, a 2023 start needs a fresh year, and windchill can go |
+| [00014 - CAMS irradiance for demand, part 3](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Map the ENS shortwave onto CAMS (a stage 0 quantile mapping) before a CAMS-trained stage 1a reads it | The year's mean is corrected but individual months are up to 18.6% off, and the member spread widens by 27% |
+| [00017 - Retraining and error correction, part 1](00017-training-window-and-retraining-rule-drift-demand/result.md) | Train the stage 1a demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day error correction | The correction needs live power 2 days old, and every gain is on ERA5 weather |
+| [00019 - Retraining and error correction, part 2](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Add a 14-day error correction and a spread factor of 1.15 to the single-stage ENS-trained quantile model N1 for Primary demand | The correction supplies nearly all of the gain (-0.99); it is tested on forecasts 5 days apart and on a model that is never retrained |
+| [00016 - Mixture calibration, solar and wind](00016-pooled-mixture-calibration-solar-wind/result.md) | Scale the solar mixture's quantiles about the median by a factor near 0.95, refitted monthly | Fixes 94% to 95% coverage at no change in CRPS; wind needs a spread factor on two lead groups, a post hoc arm |
+| [00020 - Solar and wind stack](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Add a power-curve base margin to the wind stage 1a quantile model | Lowers the wind CRPS by 0.055 points (0.007 to 0.110); the stack of margin and spread factor gives 0.071; nothing detectably helped solar |
+| [00030 - Lagged power in demand, part 3](00030-lagged-power-feature-sets-primary-demand/result.md) | Add the mean and median of the 6 weekly power analogues to N1 for Primary demand, with the 14-day correction | Post hoc arm; 0.05 points below N1 with the correction (-0.08 to -0.02), 0.03 below the 00019 stack with an interval touching zero; the annual analogues hurt |
+| [00024 - Pooled demand models, part 1](00024-pooling-groupings-demand-xgboost/result.md) | Train one XGBoost model per substation type (or per size band), with the series identifier as a categorical column, instead of one per series | Costs 0.15 points on Primary demand after the error correction and saves 16 of 20 models; needs the series identifier, and the test covered 20 series |
+| [00033 - Best guess against production](00033-best-guess-architecture-vs-production/result.md) | Replace the production recipe with the best guess: N1 with the 14-day correction and spread factor 1.15 for Primary demand, N1 for BSP and GSP demand, ERA5-trained mixtures for solar and wind | The comparison that ranks the candidates against production; monthly retraining without the correction scored 5.12 on one seed and needs a three-seed test |
+| [00035 - Quantile blend of stored models](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
 
 ## The experiments so far
 
-| Id | Question | Verdict | Production status | Merged |
+| Experiment | Question | Verdict | Production status | Merged |
 |---|---|---|---|---|
-| [00001](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
-| [00002](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
-| [00003](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
-| [00005](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | 2026-10-14 |
-| [00006](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
-| [00007](00007-cams-static-correction-stage1a-residual/result.md) | Does a static CAMS correction fitted on one year remove most of the next year's daytime stage 1a residual? | Inconclusive | Not for production | 2026-10-14 |
-| [00008](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | 2026-10-14 |
-| [00009](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, when both are applied to ENS members? | Refuted: a gain of 0.035 points, not 0.2 | Not for production | 2026-10-14 |
-| [00010](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | 2026-10-14 |
-| [00011](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written (inconclusive as intended): no gain in any window | Not for production | 2026-10-14 |
-| [00012](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | Not yet merged |
-| [00013](00013-primary-demand-against-stored-baselines/result.md) | Where does Primary substation demand stand: does an upgraded ENS-trained quantile model (N1) beat `manual_heuristic`, and why does the production recipe lose to it? | Inconclusive: N1 is level with `manual_heuristic`; the production recipe trails it by 1.69 points | Not for production | 2026-10-14 |
-| [00014](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | Not yet merged |
-| [00017](00017-training-window-and-retraining-rule-drift-demand/result.md) | Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error? | Supported | Candidate | 2026-10-14 |
-| [00016](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
-| [00015](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
-| [00018](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
-| [00019](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies nearly all of it | Candidate | Not yet merged |
-| [00020](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Do the candidate changes for solar and wind (CAMS-trained stage 1a, a stage 0 quantile mapping, a power-curve base margin, a spread factor) add up to a lower CRPS than the pooled ERA5-trained mixture? | Partly supported: wind gains 0.071 points, solar does not | Candidate (wind) | Not yet merged |
-| [00021](00021-error-correction-variants-bsp-gsp-demand/result.md) | Does the recent-error correction help BSP and GSP demand, and which variant works best? | Inconclusive for BSP and GSP; the 14-day additive form is the best variant | Not for production | 2026-10-15 |
-| [00022](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
-| [00023](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | Not yet merged |
-| [00026](00026-capacity-features-solar-wind/result.md) | Does a feature stating each solar or wind farm's recent effective capacity lower the CRPS of the pooled mixture? | Inconclusive: no detectable gain | Not for production | Not yet merged |
-| [00027](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
-| [00030](00030-lagged-power-feature-sets-primary-demand/result.md) | Which lagged power columns, up to all 13 lags of `manual_heuristic`, lower the quantile score of Primary demand in N1? | Inconclusive: the weekly analogues help alone and the annual ones hurt; with the correction the best arm gains 0.05 | Candidate (post hoc arm) | 2026-10-15 |
-| [00028](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
-| [00029](00029-physics-stage1-solar-pytorch/result.md) | Does a differentiable PyTorch physics stage 1, fed into the XGBoost stage 2, beat the XGBoost stage 1 for the 6 solar farms? | Refuted: the physics stage 1 scores 0.079 points worse | Not for production | 2026-10-15 |
-| [00025](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
-| [00024](00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost demand model without losing skill against one model per series? | Supported: 3 or 4 pooled models cost 0.15 points; one model for all series costs 0.29 | Candidate | 2026-10-15 |
-| [00031](00031-embedded-pv-features-primary-demand/result.md) | Do trailing estimates of embedded solar capacity, as tree columns, a linear offset, or a sunshine-shaped correction, lower the Primary demand quantile score? | Inconclusive | Not for production | 2026-10-15 |
-| [00032](00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints of each substation improve a by-type pooled demand model, and carry a substation held out of the pool? | Inconclusive: no fingerprint helped | Not for production | 2026-10-15 |
+| [00001 - ERA5-trained stage 1, solar and wind, part 1](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
+| [00002 - Stage 2 calibrator for solar and wind](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
+| [00003 - ERA5-trained stage 1, demand, part 2](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
+| [00005 - Lagged power in demand, part 1](00005-lag-placement-stage1b-vs-stage2-demand/result.md) | Where should lagged power enter a two-stage demand forecast: stage 1b, stage 2, or both? | Refuted: stage 2 is better | Not for production | 2026-10-14 |
+| [00006 - Stage 1a demand inputs](00006-stage1a-demand-input-feature-sweep/result.md) | Which non-lag inputs are best for the ERA5-trained demand model (stage 1a)? | Partly supported | Candidate | 2026-10-14 |
+| [00007 - CAMS irradiance for demand, part 1](00007-cams-static-correction-stage1a-residual/result.md) | Does a static CAMS correction fitted on one year remove most of the next year's daytime stage 1a residual? | Inconclusive | Not for production | 2026-10-14 |
+| [00008 - Lagged power in demand, part 2](00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power (minimum, mean, and maximum of the last 24 hours and of the same weekday) help the stage 2 calibrator? | Inconclusive: no gain on top of raw lags | Not for production | 2026-10-14 |
+| [00009 - CAMS irradiance for demand, part 2](00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave, when both are applied to ENS members? | Refuted: a gain of 0.035 points, not 0.2 | Not for production | 2026-10-14 |
+| [00010 - Price features for demand, part 1](00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged electricity price lower the stage 1a demand error at substations with batteries? | Inconclusive | Not for production | 2026-10-14 |
+| [00011 - School-term columns for demand](00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do columns for the return to work after New Year and for Lincolnshire's school terms lower the stage 1a demand error after Christmas, at Easter, and in half-term holidays? | Refuted by the rule as written (inconclusive as intended): no gain in any window | Not for production | 2026-10-14 |
+| [00012 - Solar and wind inputs](00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md) | Which inputs and which training start work best for the solar and wind stage 1a model? | Inconclusive: no change reached the 0.15-point gain | Not for production | 2026-10-14 |
+| [00013 - Primary demand baselines](00013-primary-demand-against-stored-baselines/result.md) | Where does Primary substation demand stand: does an upgraded ENS-trained quantile model (N1) beat `manual_heuristic`, and why does the production recipe lose to it? | Inconclusive: N1 is level with `manual_heuristic`; the production recipe trails it by 1.69 points | Not for production | 2026-10-14 |
+| [00014 - CAMS irradiance for demand, part 3](00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model? | Inconclusive: a gain of 0.067 points, but monthly mismatches remain | Candidate | 2026-10-14 |
+| [00017 - Retraining and error correction, part 1](00017-training-window-and-retraining-rule-drift-demand/result.md) | Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error? | Supported | Candidate | 2026-10-14 |
+| [00016 - Mixture calibration, solar and wind](00016-pooled-mixture-calibration-solar-wind/result.md) | Does a correction bring the 5% to 95% band of the pooled mixture to 90% coverage for solar and wind? | Solar supported, wind refuted (a post hoc arm for wind reaches 90%) | Candidate | 2026-10-14 |
+| [00015 - Price features for demand, part 2](00015-same-time-price-stage1-demand/result.md) | Does the same-time electricity price help a stage 1 demand model explain power across all fitted series? | Inconclusive | Not for production | 2026-10-14 |
+| [00018 - Staged chain against N1](00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) | Does the staged chain, with lag anomalies from the weather sources serving has, beat N1 and `manual_heuristic` on Primary substation demand? | Inconclusive: the chain is level with N1 (+0.08) and trails `manual_heuristic` (+0.52) | Not for production | 2026-10-14 |
+| [00019 - Retraining and error correction, part 2](00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does stacking a 14-day error correction, a 0.5-year half-life, and a spread factor of 1.15 on N1 beat `manual_heuristic` for Primary substation demand? | Supported: the stack beats `manual_heuristic` (-0.56) and N1 (-1.00); the correction supplies nearly all of it | Candidate | 2026-10-15 |
+| [00020 - Solar and wind stack](00020-solar-wind-stack-cams-stage0-spread-margin/result.md) | Do the candidate changes for solar and wind (CAMS-trained stage 1a, a stage 0 quantile mapping, a power-curve base margin, a spread factor) add up to a lower CRPS than the pooled ERA5-trained mixture? | Partly supported: wind gains 0.071 points, solar does not | Candidate (wind) | 2026-10-14 |
+| [00021 - Retraining and error correction, part 3](00021-error-correction-variants-bsp-gsp-demand/result.md) | Does the recent-error correction help BSP and GSP demand, and which variant works best? | Inconclusive for BSP and GSP; the 14-day additive form is the best variant | Not for production | 2026-10-15 |
+| [00022 - Perfect-weather ceiling, demand](00022-era5-weather-ceiling-primary-demand/result.md) | How much would Primary demand gain from ERA5 weather in place of ENS weather at serving time, as a ceiling for better weather products? | Refuted: a gain of 0.10 points, not 0.3 | Not for production | 2026-10-15 |
+| [00023 - Retraining and error correction, part 4](00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent observed power in the stage 2 calibrator, or a 14-day error correction, lower the CRPS of solar and wind forecasts? | Inconclusive: no sign of a benefit | Not for production | 2026-10-15 |
+| [00026 - Capacity features, solar and wind](00026-capacity-features-solar-wind/result.md) | Does a feature stating each solar or wind farm's recent effective capacity lower the CRPS of the pooled mixture? | Inconclusive: no detectable gain | Not for production | 2026-10-15 |
+| [00027 - PV_Live for GSP demand, part 1](00027-pvlive-lags-in-stage2-gsp-demand/result.md) | Does Sheffield Solar's PV_Live estimate at the lag times lower the stage 2 quantile score of the 2 GSP demand series? | Refuted: gains of 0.3 points or more are excluded | Not for production | 2026-10-15 |
+| [00030 - Lagged power in demand, part 3](00030-lagged-power-feature-sets-primary-demand/result.md) | Which lagged power columns, up to all 13 lags of `manual_heuristic`, lower the quantile score of Primary demand in N1? | Inconclusive: the weekly analogues help alone and the annual ones hurt; with the correction the best arm gains 0.05 | Candidate (post hoc arm) | 2026-10-15 |
+| [00028 - PV_Live for GSP demand, part 2](00028-pvlive-forecast-in-stage2-gsp-demand/result.md) | Does a forecast of the GSP's PV_Live solar generation, fed into the stage 2 calibrator, lower the quantile score of the two GSP demand series? | Inconclusive: -0.14 points, interval -0.34 to +0.04 | Not for production | 2026-10-15 |
+| [00029 - Physics stage 1 for solar](00029-physics-stage1-solar-pytorch/result.md) | Does a differentiable PyTorch physics stage 1, fed into the XGBoost stage 2, beat the XGBoost stage 1 for the 6 solar farms? | Refuted: the physics stage 1 scores 0.079 points worse | Not for production | 2026-10-15 |
+| [00025 - Price features for demand, part 3](00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price, with its level, lower the stage 1 demand model's error for Primary substations beyond the level and an other-week price? | Small gain: 0.04 to 0.05 points, under the 0.1 threshold | Not for production | 2026-10-15 |
+| [00024 - Pooled demand models, part 1](00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost demand model without losing skill against one model per series? | Supported: 3 or 4 pooled models cost 0.15 points; one model for all series costs 0.29 | Candidate | 2026-10-15 |
+| [00031 - Embedded PV features for demand](00031-embedded-pv-features-primary-demand/result.md) | Do trailing estimates of embedded solar capacity, as tree columns, a linear offset, or a sunshine-shaped correction, lower the Primary demand quantile score? | Inconclusive | Not for production | 2026-10-15 |
+| [00032 - Pooled demand models, part 2](00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints of each substation improve a by-type pooled demand model, and carry a substation held out of the pool? | Inconclusive: no fingerprint helped | Not for production | 2026-10-15 |
+| [00033 - Best guess against production](00033-best-guess-architecture-vs-production/result.md) | Does the best-guess architecture beat production, N1, and `manual_heuristic` on the quantile score, twCRPS, and exceedance metrics, and how much would perfect weather add? | Supported: 4.89, 3.81, and 6.27 points below production | Candidate | 2026-10-15 |
+| [00035 - Quantile blend of stored models](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted average of the quantiles of already-scored models beat the best single model for Primary demand, solar, and wind? | Supported for Primary demand (-0.10 points); null for solar and wind | Candidate (Primary demand) | 2026-10-15 |
+| [00036 - BSP and GSP hierarchy](00036-hierarchy-aware-bsp-gsp-forecasts/result.md) | Do forecasts of the series beneath a BSP or GSP, and an ERA5-trained N1 applied to ENS members, lower the BSP and GSP quantile score? | Inconclusive: child forecasts and wind and solar columns gave no gain; the ERA5-trained N1 gained 0.36 to 0.40 points at the GSPs with intervals including zero | Not for production | 2026-10-16 |
+| [00037 - Switching event detector, part 1](00037-switching-first-look/result.md) | Does a neighbour-balance detector find logged switching in the telemetry at a lower false-alarm rate than a single-series detector? | Inconclusive: size-weighted recall 0.326 (0.093 to 0.579) against the 0.35 bar | Not for production | 2026-10-15 |
+| [00038 - Switching event detector, part 2](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | 2026-10-16 |
+| [00039 - PV disaggregation, part 1](00039-pv-disaggregation-cams-injection/result.md) | Can a CAMS-driven fit separate embedded solar from Primary substation demand, recovering injected solar-farm output within 25% and passing four checks on the real series? | Partly supported: recovery passes (0.854, 0.815 to 0.866), real checks pass at 6 of 8 Primaries | Not for production | 2026-10-16 |
+| [00040 - PV disaggregation, part 2](00040-pv-capacity-error-bars/result.md) | Can a cross-arm misfit test detect a cloud-driven demand load that biases the capacity fitted to embedded solar, and how many directional Primaries are free of one in 2025/26? | Partly supported: calibrated (median capacity over truth 0.992, 0.951 to 1.032), but a day-long cloud load is flagged in only 0.35 of draws at 25% of capacity, so the verdict is `underpowered` | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -745,7 +754,8 @@ refitted 00019's model on 20 demand series (8 Primary substations that meter in 
   over all leads: +0.15 points (99.44% interval +0.03 to +0.26); all series in one model: +0.29
   (+0.19 to +0.42). Absolute Primary scores: per series 5.32, by type 5.47, all series 5.61.
 - **Finding for later experiments:** the series identifier is essential. Without it the by-type
-  pool loses a further 0.82 points and the all-series pool 0.85. On the 16 Primary substations a random
+  pool loses a further 0.82 points and the all-series pool 0.85. On the 16 Primary substations a
+  random
   grouping scores the same as the by-type grouping (5.47 each), so the number of models matters
   more than which Primary substations share one.
 - **Write-up and pull request:** [result](00024-pooling-groupings-demand-xgboost/result.md),
@@ -773,3 +783,156 @@ the lower limits of the four warm contrasts C1 to C4 are all below zero (-0.002 
   [PR #1241 (Experiment 32: do substation fingerprints improve a pooled demand model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1241).
 
 ![The eight planned contrasts](00032-substation-fingerprints-pooled-demand/figure_1.svg)
+
+### 00033: the best-guess architecture against production, N1, and `manual_heuristic`
+
+**The best guess lowered the quantile score below production's by 4.89 points of capacity for
+Primary demand (98.33% interval -5.66 to -4.06), 3.81 for solar (-5.07 to -2.64), and 6.27 for wind
+(-7.65 to -5.28).** The experiment compared the architecture that experiments 1 to 32 point to with
+the stored production forecast, N1, `manual_heuristic`, `climatology`, six notable ideas, and an
+ERA5-weather ceiling, on the quantile score, MAE of the median, twCRPS and Brier score at
+`historical_p99`, and the exceedance rates of the 0.90 and 0.95 quantiles. The pre-registered
+verdict is supported.
+
+- **Headline result:** Primary demand scores 5.32 against 9.52 for production, 5.89 for
+  `manual_heuristic`, and 6.33 for N1. Production's 5% to 95% band covers 10% to 20% of cases, and
+  the 14-day correction accounts for 1.38 of the 4.89-point Primary gap.
+- **Finding for later experiments:** monthly retraining without the correction scored 5.12 on one
+  seed, below the best guess's 5.32 on the same seed, and the correction did not add to it, with the
+  cause untested. The twCRPS at `historical_p99` mostly does not separate the arms; solar and wind
+  N1 came within 0.1 and 0.3 points of the ERA5-trained best guess. Better weather would lower the
+  wind score by 5.46 and the Primary demand score by 0.11.
+- **Write-up and pull request:** [result](00033-best-guess-architecture-vs-production/result.md),
+  [PR #1242 (Experiment 33: best-guess architecture against production, N1, and manual_heuristic)](https://github.com/openclimatefix/nged-substation-forecast/pull/1242).
+
+![The three decisive contrasts](00033-best-guess-architecture-vs-production/figure_2_decisive.svg)
+
+### 00035: a lead-weighted blend of quantiles from stored models
+
+**Averaging the quantiles of three stored Primary demand models lowered the quantile score by 0.10
+points; solar and wind gains were too small to resolve.** The experiment refitted nothing. It
+averaged each quantile level of two or three stored models per technology, with weights chosen
+only on earlier months, and scored the result on the cases of experiment 33. The verdict is
+supported, on Primary demand alone.
+
+- **Headline result:** the lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack
+  minus the monthly-retrained N1 (the best single member, chosen with hindsight), Primary quantile
+  score over all leads: -0.097 points (98.33%
+  interval -0.187 to -0.026; absolute 5.025 against 5.122). Solar -0.039 (-0.115 to +0.031) and
+  wind -0.074 (-0.194 to +0.055) are null.
+- **Finding for later experiments:** one fixed weight vector scores as well as weights per lead
+  band (+0.005, -0.008 to +0.023 for Primary demand), and the blend scored 0.048 points worse when
+  the
+  14-day correction was applied afterwards instead of to each member first (+0.008 to +0.101, 95%).
+- **Write-up and pull request:**
+  [result](00035-lead-weighted-quantile-blend-of-stored-models/result.md),
+  [PR #1244 (Experiment 35: does a lead-weighted blend of quantiles beat the best single model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1244).
+
+![Blends minus the best single member](00035-lead-weighted-quantile-blend-of-stored-models/figure_1.svg)
+
+### 00036: forecasts of the series beneath a BSP or GSP
+
+**Adding forecasts of the series beneath a bulk supply point (BSP) did not lower its quantile
+score, and the ERA5-trained N1 gained 0.36 to 0.40 points of capacity at the grid supply points
+(GSPs) with intervals that include zero.** The experiment gave the N1 model of Boston, Skegness,
+Walpole, and Bicker Fen the summed median forecasts of the Primary substations and metered
+generators beneath, a regression on those forecasts, an N1 trained on ERA5, and wind and solar
+columns. The pre-registered verdict is inconclusive.
+
+- **Headline result:** B1 minus B0 over all leads is +0.04 (99.17% interval -0.18 to +0.25) at
+  Boston and +0.19 (-0.10 to +0.73) at Skegness, and B3 minus B0 is -0.36 (-1.60 to +0.43) at
+  Walpole and -0.40 (-1.84 to +0.97) at Bicker Fen. An oracle that sees the observed children scores
+  5.58 and 3.42 points below N1 at the two BSPs.
+- **Finding for later experiments:** the oracle's gain is not headroom for a forecast of the
+  children, because the forecast columns gained nothing. The ERA5-trained N1 gained 0.41 points
+  over all leads (95% interval 0.15 to 0.66, exploratory) at Boston, and 0.66 to 0.88 points up to
+  day 6.
+- **Write-up and pull request:** [result](00036-hierarchy-aware-bsp-gsp-forecasts/result.md),
+  [PR #1245 (Experiment 36: do forecasts of the series beneath a BSP or GSP lower its error?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1245).
+
+![The planned contrasts and B3 at the BSPs](00036-hierarchy-aware-bsp-gsp-forecasts/figure_1.svg)
+
+### 00037: logged switching in the telemetry
+
+**A detector that checks neighbouring substations recovered a third of the MW of the 18 visible
+validation transfers, but the verdict is inconclusive.** The experiment turned the NGED switching
+logs into 612 closures of 2 hours to 60 days, found that 37 of them show a visible step (about 6
+by chance), and scored two detectors that never read the logs against them, with thresholds set on
+odd months and recall measured on even months.
+
+- **Headline result:** the neighbour-balance detector D1 (4-hour window, threshold 4) reaches a
+  size-weighted recall of 0.326 (95% interval 0.093 to 0.579) at 0.38 unexplained alarms per
+  series-month, against 0.036 (0.000 to 0.131) for the single-series detector D0 at 0.14. Shifted
+  logs give 0.004. D1 misses the 0.35 bar and clears the 0.20 bar, so the verdict is inconclusive.
+- **Finding for later experiments:** at about 0.5 alarms per series-month D0 reaches 0.224 and D1
+  0.362, so the pre-registered grid overstated the gap. A 24-hour D0 reaches 0.276. The stack's
+  threshold-weighted score share in confirmed half-hours is 40%, but one 370-hour closure on series
+  18 holds nearly all of it.
+- **Write-up and pull request:** [result](00037-switching-first-look/result.md),
+  [PR #1246 (Experiment 37: do logged switching closures show up in the telemetry, and does a
+  neighbour-balance detector beat a plain one?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1246).
+
+![Validation recall against unexplained alarms](00037-switching-first-look/figure_1_headline.svg)
+
+### 00038: the value of detecting switching events
+
+**Leaving the half-hours that the neighbour-balance detector flags out of the stack's error
+correction raised the forecast's tail error, so the verdict is refuted.** The experiment masked
+detected intervals from the 14-day and 7-day corrections of the proxy stack (experiment 00017's
+ERA5-weather baseline) and of experiment 00019's real stack, and scored half-hours outside logged
+closures against an oracle mask from the logs and a random mask of equal volume.
+
+- **Headline result:** the primary contrast, D1 mask with a 7-day window against the plain 7-day
+  correction, is +57.1% (95% interval +0.4% to +133.5%) in threshold-weighted error at each series'
+  P99. The oracle mask lowers the 14-day error by 8.9% (-21.8% to +0.0%), and 95% of that gain
+  sits in January 2026, the month of the 17-18 closure. The random mask changes it by +0.1%.
+- **Finding for later experiments:** a post hoc revision of the interval builder gives -5.4%
+  (-15.1% to +1.5%), but raises the mean absolute error by 0.25 points, and 3 of 17 long closures
+  improve. The plain 7-day window beats the 14-day window by 5.2% (-10.8% to +0.0%) in the proxy
+  stack but loses by 8.5% (+2.4% to +10.7%) in the real stack.
+- **Write-up and pull request:** [result](00038-switching-mask-value/result.md),
+  [PR #1247 (Experiment 38: is detecting a switching event worth anything to the forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1247).
+
+![Per-event and aggregate change in the threshold-weighted error](00038-switching-mask-value/figure_1_headline.svg)
+
+### 00039: separating embedded solar from Primary substation demand
+
+**A fit of a calendar-plus-temperature demand term minus one CAMS-driven PV shape recovers injected
+solar-farm output to within 25%, and the real series pass four checks at 6 of 8 Primaries, so the
+pre-registered verdict is `recovers-but-confounded`.** The experiment injected the output of 6
+metered solar farms, scaled to 20% of each Primary's effective capacity, into the demand of the 8
+directional Primary substations (218 units), and ran four checks (placebo sky, season, cloud-demand
+term, day type) on the real series.
+
+- **Headline result:** the half-hourly fit recovers a median 0.773 of the injected capacity (95%
+  interval 0.740 to 0.818). The daily fit recovers 0.854 (0.815 to 0.866), which passes the
+  recovery rule. In 2025/26 Kirton fails the season and cloud-term checks, and Wrangle T1 fails
+  the placebo check by a hair, so the placebo check passes at 7 of 8 Primaries and all four at 6.
+- **Finding for later experiments:** injection cannot detect a demand confound, because a linear fit
+  returns the same increment on any demand. The fitted capacity is 0.9 to 3.2 MW per Primary
+  before dividing by the recovery ratio. The next experiment is PVDIS-2B, a richer demand model.
+- **Write-up and pull request:** [result](00039-pv-disaggregation-cams-injection/result.md),
+  [PR #1248 (Experiment 39: can a CAMS-driven fit separate embedded solar from Primary substation demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1248).
+
+![Median recovery ratio by model and irradiance point](00039-pv-disaggregation-cams-injection/figure_01.svg)
+
+### 00040: how far the capacity fitted to embedded solar can be trusted
+
+**A cross-arm misfit test is calibrated and detects four of five cloud-driven loads at 25% of the
+true capacity, but it detects a day-long cloud load in only 0.35 of draws, so the verdict is
+`underpowered`.** The test compares the capacity that six least-squares fits assign to the same
+series, using known injected solar-farm output and eight known loads in the real series of the 8
+directional Primary substations.
+
+- **Headline result:** pure injected solar output gives a median capacity over truth of 0.992 (95%
+  interval 0.951 to 1.032) and a false-positive rate of 0.055. Kirton is flagged in 6 of 7
+  season-years and no other Primary is flagged in any. The bound on the capacity at the other seven
+  is 0.18 to 0.23 at five, 0.47 at Trusthorpe, and 0.71 at Wrangle T1, where the test has almost
+  no power.
+- **Finding for later experiments:** the two loads that the misfit test cannot see, a day-long cloud
+  load and a load that rises with sunshine, set the bound. Evening demand after dark responds to
+  cloud at some Primaries and offers a measurement of the first.
+- **Write-up and pull request:** [result](00040-pv-capacity-error-bars/result.md),
+  [PR #1249 (Experiment 40: how far can the capacity fitted to embedded solar be trusted?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1249).
+
+![Capacity per Primary in 2025/26 with its interval and bound](00040-pv-capacity-error-bars/figure_01.svg)

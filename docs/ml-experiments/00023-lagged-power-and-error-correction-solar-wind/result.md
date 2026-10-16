@@ -74,6 +74,12 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Does recent observed power help solar and wind forecasts?
 
+We asked whether recent measured power helps forecasts of solar and wind farm output, as it helps
+forecasts of demand. We gave the second step of the forecast the power from earlier times and
+summaries of it, and separately applied a correction based on the previous 14 days of errors, for 6
+solar farms and 3 wind farms. Recent power changed the accuracy by less than about 0.1 points of
+capacity, and the 14-day correction made the forecast about 0.4 points worse.
+
 **Verdict: inconclusive, with no sign of a benefit.** Lagged power and summaries of recent power
 left the stage 2 calibrator's continuous ranked probability score (CRPS) unchanged for 6 solar farms
 and 3 wind farms, to within the resolution of about 0.1 points of capacity. The pre-registered
@@ -81,7 +87,8 @@ and 3 wind farms, to within the resolution of about 0.1 points of capacity. The 
 This is proposal P18 of the [research plan](../research-plan.md), with the 14-day correction of
 [experiment 00017](../00017-training-window-and-retraining-rule-drift-demand/result.md) and
 [experiment 00019](../00019-primary-demand-stack-vs-manual-heuristic/result.md) added. ENS is the
-European Centre for Medium-Range Weather Forecasts ensemble.
+European Centre for Medium-Range Weather Forecasts ensemble. The stage 2 calibrator is a second
+model that corrects the forecast quantiles that stage 1a produces.
 
 ## Size
 

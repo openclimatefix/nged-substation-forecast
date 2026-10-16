@@ -50,10 +50,12 @@ whose callers you could not name without searching.
 - **Simple** is a permutation of settings the pipeline already has (input-feature sets, a
   hyperparameter, a loss), with no new data and no new method. Write the plan section, implement,
   run, and write up. One Sonnet reviewer reads the code for leakage and for the fit stopping at the
-  fold's `train_end`, and one Sonnet reviewer checks the write-up against the printed report.
+  fold's `train_end`, one Sonnet reviewer checks the write-up against the printed report, and one
+  Sonnet reviewer runs the prose review that "The write-up" describes.
 - **Anything else** gets the full process: Sonnet writes the plan, Opus reviews the plan, the
   maintainer reviews the plan only if asked, Sonnet implements, Opus reviews the code, Sonnet runs
-  the code and writes up, Sonnet reviews the write-up.
+  the code and writes up, Sonnet reviews the write-up against the printed report, and a second
+  Sonnet reviewer runs the prose review that "The write-up" describes.
 
 Reuse `implement-issue` by reference for the mechanics: the worktree, the green-before-push set, one
 commit per review, and the triage rule (verify each finding, record each rejected one with its
@@ -146,6 +148,25 @@ curated roll-up of the `advice` lists.
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
 
+## Use the compute the slot gives you
+
+**Run independent work in parallel, up to the slot's budget of cores and GPU memory.** Series,
+seeds, arms, folds, and refits that do not read each other's output can run side by side. A job that
+fits many small models, such as one per series or one tiny update per day, cannot keep a GPU or many
+cores busy one model at a time. Experiment 34 ran its daily warm-start fits for 16 series one after
+another, at about 2.7 of its 12 cores and almost no GPU, for 3.3 hours. Running 4 to 8 series at a
+time would have taken under an hour.
+
+- **Check utilisation in the first minutes of a long run.** Look at `uptime`, `nvidia-smi`, and the
+  job's own CPU use. If the job uses well under its quota and will run for more than about 30
+  minutes, split it into parallel workers before letting it run on.
+- **Stay inside the slot.** The worker count times the threads per worker stays at or below the
+  slot's cores, and the workers' GPU memory adds up to no more than the slot's share. Ask the
+  manager before exceeding either.
+- **Keep the results independent of the schedule.** Fix the seed of each job, write each job's output
+  to its own file, and write it atomically, so that a run in parallel gives the numbers a run in
+  series would, and a crashed worker is rerun without touching the others.
+
 ## Keep the research log current
 
 **Update `docs/ml-experiments/research-plan.md` in the PR that commits the `planned` `result.md`,
@@ -159,6 +180,45 @@ to `result.md` and the PR, and one figure. An idea the maintainer has agreed to 
 folder yet goes in the table of `research-plan.md` marked "Proposed". An experiment that ends
 `invalid` or `failed` keeps its entry, and the entry says why. Write the entry for a reader who has
 not opened `result.md`.
+
+**The first column of each table in `research-log.md` states the topic, and the position in a series
+when the experiment belongs to one.** Write it as the id, a dash, a few words naming the topic, and
+the part number for an experiment in a series, such as "00037 - Switching event detector, part 1".
+Name every experiment in a series with the same topic words, so a reader can find the series by eye.
+
+## Exploratory series
+
+**When the question is exploratory, run a series of small experiments, each designed from the
+result of the one before.** A question is exploratory when no single hypothesis yet states what to
+test, such as "can switching events be found in the telemetry at all?" or "can embedded solar be
+separated from substation demand?". A series replaces one large pre-registered experiment, which
+would spend its whole budget before anything is learned. Every experiment in the series still has
+its own `result.md`, hypothesis, prediction, decision rule, and stop rule, and the series is one
+topic in the research log.
+
+The loop has two steps, repeated:
+
+1. **Opus plans one experiment, chosen to learn as much as possible about how to proceed.** Make the
+   first experiment fast to run. It may be data analysis with no model training, for example a look
+   at whether the events in a log are visible in the telemetry at all. It produces plenty of plots
+   of the data (load the `dataviz` skill, and show the raw data before any model output). A first
+   Sonnet agent implements the code, a second Sonnet agent reviews the code, a third Sonnet agent
+   runs the experiment, and a fourth Sonnet agent gathers the results into the write-up. Each agent
+   works from the files and never starts a sub-agent of its own.
+2. **Opus reads the results and decides what comes next.** The decision rule depends on how many
+   experiments the series has run and on what they found:
+    - **The results are positive.** Opus designs the next experiment, which builds on the finding,
+      and the loop repeats.
+    - **The results are inconclusive or negative, and the series has run only one experiment.** Do
+      not stop yet. Opus designs a second experiment that attacks the problem from a different angle,
+      such as a different signal, a different data source, or a different way of scoring.
+    - **The results are still negative after at least two experiments.** Stop the series. The last
+      write-up says what was tried, what the data showed, and what would have to change for another
+      attempt to be worth running.
+
+Each write-up in a series ends with a short "what the next experiment should answer" paragraph,
+written after Opus has read the results. The experiment's own session does not start that next
+experiment. The maintainer decides when each step runs, and may stop the series at any step.
 
 ## Small gains and stacking
 
@@ -191,15 +251,33 @@ exist until the release is cut. A later experiment that overturns an adopted res
 
 ## The write-up
 
-**Keep `result.md` to about a screen:** the verdict in one sentence, the winner with its interval,
-each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and the lessons
-for later experiments, which also become `advice`. **A published page never names a generator, gives
-its identifier, or shows its time series beside either.** Use the anonymised labels the `study`
-skill describes. Print every number the page quotes from a committed script, as the `study` skill
-requires. An experiment that plots feature importance follows the recipe in the `study` skill's
-"Design rules that keep a comparison fair".
+**Open `result.md` with a few plain sentences that say what question the experiment asked, how it
+went about answering the question, and what it concluded.** Write them for a reader who has not seen
+the experiment, the plan, or the research log. The opening uses no jargon: it names what was tested
+in ordinary words, says what each number is a number of, and leaves the arm names, the check names,
+the abbreviations, and the decision rule to later sections. Test every phrase by asking "what is
+this a share of?", "what was put into what?", and "what does this label stand for?". A sentence such
+as "injected solar-farm output is recovered to within 25%, but the real series pass the four checks
+at 6 of 8 Primaries" fails all three: it does not say what the output was injected into, what the
+25% is a share of, or what the four checks test. Write the same finding as, for example: "We asked
+whether the power a substation draws can be split into ordinary demand and the output of rooftop
+solar panels. We added the recorded output of a real solar farm to a substation's demand, and
+checked how much of it a fitting method could find again. The method found about 77% to 85% of it.
+At 2 of the 8 substations, other checks suggested the answer could not be trusted." The verdict word
+and its numbers follow in the next paragraph, with each term defined where it first appears.
+
+**Keep the rest of `result.md` to about a screen:** the verdict in one sentence, the winner with its
+interval, each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and
+the lessons for later experiments, which also become `advice`. **A published page never names a
+generator, gives its identifier, or shows its time series beside either.** Use the anonymised labels
+the `study` skill describes. Print every number the page quotes from a committed script, as the
+`study` skill requires. An experiment that plots feature importance follows the recipe in the
+`study` skill's "Design rules that keep a comparison fair".
 
 ## Running a night's experiments
+
+When several experiment sessions run at once, the `ml-experiment-manager` skill covers the queue, the
+compute slots, and the merging.
 
 The maintainer and Claude agree the next night's experiments by day, each as a committed `result.md`
 with status `planned`. The overnight session:
@@ -220,4 +298,10 @@ diff touches only `ml-experiments/`, `docs/ml-experiments/`, and the experiment'
 `mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged, and
 the research log is updated; and the checks pass (`ci` green, no closing keyword in the PR body or
 commit messages, no `data/` or `.env` file, the branch contains `main`, a merge commit and not a
-squash). A change to `packages/studies/` stops at a reviewed PR, as `implement-issue` does.
+squash). **Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and the research-log
+entry.** The agent receives the files and no account of the reasoning behind them, loads the
+`prose-review` skill, and reads the opening paragraph first. It reports every term, abbreviation, and
+number in the opening that a reader who has not seen the experiment could not parse, and then checks
+the rest of the page against the prose rules in `CLAUDE.md`. The experiment's session triages the
+findings, applies the valid ones, and records each rejected one with its reason. A change to
+`packages/studies/` stops at a reviewed PR, as `implement-issue` does.

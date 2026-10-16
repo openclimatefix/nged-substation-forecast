@@ -92,6 +92,13 @@ code: ml-experiments/00032-substation-fingerprints-pooled-demand/
 
 # Experiment 32: do substation fingerprints improve a pooled demand model?
 
+We asked whether giving one shared demand model a short numerical description of each substation,
+such as its location or its recent power statistics, improves forecasts for substations of the same
+type. We added each description to the shared model of experiment 00024, scored 16 Primary
+substations (substations that step power down to the local distribution network) over 73 forecast
+runs, and also scored a substation held out of training. No description helped by more than 0.02
+points of capacity, and the descriptions made the forecast worse for the held-out substation.
+
 **Inconclusive by the pre-registered rule, and no fingerprint helped: adding location,
 training-window statistics, or recent-window statistics to the by-type pooled model changed the
 Primary quantile score by at most 0.02 points of capacity, and the fingerprints made a held-out
@@ -104,9 +111,9 @@ identifier's fingerprints leaves the score at 5.47 to 5.50 (C1 to C4). The rule 
 below -0.10 or both cold-start contrasts below zero, and none happened. The rule's "refuted" needs
 C1 to C4, C7, and C8 all at or above zero, and the lower limits of C1 to C4 are all below zero
 (-0.002, -0.008, -0.047, and -0.049). The verdict is therefore "inconclusive", even though the data
-exclude a gain above 0.01 points for C1 and C2 and above 0.05 points for C3 and C4. In this page
-ENS is the ECMWF ensemble, BSP and GSP are bulk supply points and grid supply points, and Primary
-substations meter in MW or MVA.
+exclude a gain above 0.01 points for C1 and C2 and above 0.05 points for C3 and C4. In this page ENS
+is the ECMWF ensemble, BSP and GSP are bulk supply points and grid supply points, and Primary
+substations meter in MW (megawatts) or MVA (megavolt-amperes).
 
 ![The eight planned contrasts](figure_1.svg)
 
