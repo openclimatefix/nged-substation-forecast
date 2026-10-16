@@ -863,7 +863,8 @@ closures against an oracle mask from the logs and a random mask of equal volume.
   sits in January 2026, the month of the 17-18 closure. The random mask changes it by +0.1%.
 - **Finding for later experiments:** a post hoc revision of the interval builder gives -5.4%
   (-15.1% to +1.5%), but raises the mean absolute error by 0.25 points, and 3 of 17 long closures
-  improve. The plain 7-day window beats the 14-day window by 5.2% (-10.8% to +0.0%) on its own.
+  improve. The plain 7-day window beats the 14-day window by 5.2% (-10.8% to +0.0%) in the proxy
+  stack but loses by 8.5% (+2.4% to +10.7%) in the real stack.
 - **Write-up and pull request:** [result](00038-switching-mask-value/result.md),
   [PR #1247 (Experiment 38: is detecting a switching event worth anything to the forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1247).
 

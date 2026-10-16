@@ -50,25 +50,25 @@ lessons: >-
   The detector is not the bottleneck: the one closure that carries the tail was found by D1 under
   both interval builders, and the as-specified builder still raised the tail error 57% because its
   interval for the return step ran 60 days. Masking raises the mean absolute error on half-hours
-  with no logged switching by 0.16 to 0.25 points under every detected mask, because the 7-day and
+  with no logged switching by 0.12 to 0.36 points under every detected mask, because the 7-day and
   14-day windows already absorb most level shifts and a masked history cannot follow the shifts the
-  logs never recorded. Five of the 17 long closures have no threshold-weighted error to remove.
+  logs never recorded. Six of the 17 long closures have no threshold-weighted error to remove.
 advice:
   - >-
     Do not mask detected switching intervals from the error correction's history in production:
     the as-specified D1 mask raised the threshold-weighted error at P99 by 57% outside logged
     switching (primary contrast).
   - >-
-    Test a 7-day error-correction window against the 14-day window as its own stack experiment:
-    the plain 7-day window lowered the threshold-weighted error by 5.2% (-10.8% to +0.0%) and the
-    mean absolute error by 0.12 points (the plain7 against plain14 contrast).
+    Test a 7-day error-correction window against the 14-day window as its own stack experiment, and
+    expect it to be unsettled: the proxy stack gave -5.2% (-10.8% to +0.0%) in threshold-weighted
+    error, but the real stack gave +8.5% (+2.4% to +10.7%) (the plain7 against plain14 contrast).
   - >-
     Treat a detected interval's end as the hard part, not the alarm: an interval that ends on the
     first failing 24-hour block, or that starts at a return step, produced a 60-day mask (the
     interval-builder diagnosis).
   - >-
     Read any switching result as one closure: January 2026 holds 95% to 105% of every masking gain
-    in the proxy stack, and 5 of the 17 long confirmed closures have zero tail error to remove
+    in the proxy stack, and 6 of the 17 long confirmed closures have zero tail error to remove
     (per-event table).
   - >-
     Report the mean absolute error beside the tail score for any mask: the post hoc mask lowered
@@ -126,16 +126,17 @@ either side), the same for every arm.
 - **Per event, nothing improved under the as-specified builder.** Of the 17 confirmed closures of 24
   hours or more, `d1_mask7` improved 1, worsened 3, and left 13 unchanged (binomial p 0.94 with ties
   dropped; the plan's condition was 12 improved). The oracle improved 6 and worsened none. Of the 17
-  windows, 5 have zero threshold-weighted error in every arm, because the load never exceeded the
+  windows, 6 have zero threshold-weighted error in every arm, because the load never exceeded the
   series' P99 outside the closure.
 - **The cost of false alarms is large.** On the 417,213 quiet rows, more than 16 days from any logged
   closure or D1 alarm on that series, `d1_mask7` raises the mean absolute error by 0.125 points
   (the plan's bar was within +/-0.01) and the threshold-weighted error by 60.6%. A detected interval
   that overlaps no logged closure still removes real history: 75% of the 498 D1 intervals overlap no
   logged closure, and 1.0% reached the 60-day cap.
-- **The 7-day window beats the 14-day window, which the plan predicted.** `plain7` against `plain14`
-  is -5.2% (-10.8% to +0.0%) in tail error and -0.12 points in mean absolute error. The lead 144 to
-  192 hour band agrees on sign for every contrast (primary +49.8%, oracle -11.4%).
+- **In the proxy stack, the 7-day window beats the 14-day window, as the exploratory pilot
+  suggested.** `plain7` against `plain14` is -5.2% (-10.8% to +0.0%) in tail error and -0.12
+  points in mean absolute error; the real stack disagrees (Tier B below). The lead 144 to 192 hour
+  band agrees on sign for the primary (+49.8%) and oracle (-11.4%) contrasts.
 
 ## Post hoc: a revised interval builder
 
@@ -176,12 +177,15 @@ three are -4.8%, -6.8%, and -4.6%.
 
 ## Tier B: the real stack
 
-**The real stack agrees in sign with the proxy on every contrast.** Experiment 00019's `n1h` arms
-(three seeds, runs every 5 days from July 2025, 1,397,181 half-hours outside logged closures) give
-+68.4% (+0.1% to +221.5%) for `d1_mask7` against `plain7`, -21.2% (-34.6% to +5.1%) for the oracle
-against `plain14`, +0.4% (-0.3% to +1.4%) for the placebo, and -22.7% (-35.1% to +0.0%) for the revised
-`d1fx_mask7`. The nine-level quantile score moves by 4.3% (+0.1% to +8.7%) for `d1_mask7` and
-+0.03% for `d1fx_mask7`. Only 3 to 4 closures sit in the runs, so Tier B decides nothing alone.
+**The real stack agrees in sign with the proxy on the masking contrasts, and disagrees on the 7-day
+window.** Experiment 00019's `n1h` arms (three seeds, runs every 5 days from July 2025, 1,397,181
+half-hours outside logged closures) give +68.4% (+0.1% to +221.5%) for `d1_mask7` against `plain7`,
+-21.2% (-34.6% to +5.1%) for the oracle against `plain14`, +0.4% (-0.3% to +1.4%) for the placebo,
+and -22.7% (-35.1% to +0.0%) for the revised `d1fx_mask7`. The nine-level quantile score moves by
++4.3% (+0.1% to +8.7%) for `d1_mask7` and +0.03% for `d1fx_mask7`. For the 7-day window, the real
+stack gives `plain7` against `plain14` of +8.5% (+2.4% to +10.7%) in threshold-weighted score and
++2.8% in quantile score, the opposite sign to the proxy's -5.2%. Only 3 to 4 closures sit in the
+runs, so Tier B decides nothing alone.
 
 ![The real stack agrees with the proxy stack](figure_8_tier_b.svg)
 
@@ -244,12 +248,31 @@ data folder.
   The dominant closure was found in every variant. What failed is the interval's end, and then the
   cost of masking half-hours that the logs never recorded as switching.
 - **The gain a mask could deliver is one closure.** January 2026 holds 95% to 105% of every gain,
-  and removing it leaves 0.3% to 0.5%. The write-up of any further switching experiment should
-  report the result without that closure first.
-- **The cheapest improvement found is not about switching.** A 7-day window beats the 14-day
-  window on both error measures in this proxy stack (in-sample, one lead band at a time); it
-  belongs in its own stack experiment.
+  and removing it leaves between -0.5% and +0.3%. The write-up of any further switching
+  experiment should report the result without that closure first.
+- **The 7-day window is a separate question, and the two stacks disagree.** The 7-day window beat
+  the 14-day window in the proxy stack and lost to it in experiment 00019's real stack, so it
+  belongs in its own stack experiment and is not a finding of this one.
 
 ## Proposed next experiment
 
-*To be written by the result reviewer.*
+**Proposed: stop the switching line's forecasting purposes here, and run no SW1b-3 masking
+experiment.** The verdict is `refuted`, and the plan's stop rule says that ends purposes 1 and 2
+(lags in the forecasting model, and a normal-running-arrangement forecast in v1). The post hoc
+builder does not reopen the question. Its -5.4% (-15.1% to +1.5%) has an interval that includes
+zero, and becomes +0.3% once January 2026 is removed. The same mask
+raises the mean absolute error by 0.25 points outside logged closures. A further masking experiment
+would therefore be testing one closure of Primary substations 17 and 18, which no amount of tuning
+the interval builder can turn into a general result.
+
+**Proposed for purpose 3: offer NGED the detected-interval table as an unvalidated list.** The
+table is `q3_table_d1.parquet`, about 6 candidates a month across the 16 substations, and 75% of
+its intervals overlap no logged closure. The cheapest way to learn whether those unexplained
+intervals are real switching is to ask NGED to check a sample of them against their own records.
+That request is a decision for the maintainer to agree with NGED, not an experiment.
+
+**Proposed separately, outside this line: test the 7-day correction window on the real stack.**
+The proxy stack favours `plain7` over `plain14` (-5.2%, -10.8% to +0.0%), but the real stack in
+tier B disagrees: `plain7` raises the threshold-weighted error by 8.5% (+2.4% to +10.7%) and the
+quantile score by 2.8% outside logged closures. A stack experiment on the 7-day window should
+therefore be scored on experiment 00019's runs, not on the proxy alone.
