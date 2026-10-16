@@ -18,12 +18,10 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-4 (PVDIS-3 is done: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md)) | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations-and-the-dc-to-ac-ratio) | Can the share of east-, south-, and west-facing solar behind each Primary, and the ratio of DC to AC capacity, be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
@@ -163,8 +161,9 @@ scored on even months, with recall weighted by the MW moved as the headline from
 The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
 confirm:
 
-- **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
-  XGBoost model without the detected intervals.
+- **SW2-5 (done, [experiment 68](00068-sw2-5-train-detect-retrain-loop/result.md)):** three rounds
+  of refitting the lagless XGBoost model without the detected intervals changed the share of the
+  moved MW found by +0.011 and the forecast error by -0.175%, and a random mask did as well.
 - **SW2-6 (done, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** pairing the
   onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
   the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
@@ -256,7 +255,7 @@ first:
 - **Skill:** a lower error in the net demand forecast at each substation.
 - **Explanation:** a forecast that NGED can read as demand minus solar. A solar term that leaves the
   error level but splits the forecast into parts an engineer recognises is still worth keeping, so
-  PVDIS-5 tests non-inferiority as well as gain.
+  experiment 64 (PVDIS-5) tested non-inferiority as well as gain.
 - **Capacity:** a time series of unmetered solar capacity per Primary. NGED holds almost no
   information on unmetered solar today, so an estimate with honest error bars is useful even when
   the estimate is far from perfect.
@@ -286,10 +285,10 @@ goals changed.** That review judged the series against the questions it had then
 experiment could narrow the capacity bound, and whether capacity improves the forecast score. Four
 experiments (00007, 00009, 00022, and 00031) found small or no gains from solar inputs. The
 maintainer has since added two goals: a forecast that explains itself, and a capacity series that
-changes week by week for NGED. PVDIS-5 rests on the explanation goal and on what differs from those
-four experiments, not on a claim that the review missed the forecast question. The same review
-found that the daily fit is about 2.6 times more exposed than C to an undetected day-long load, so
-every part reports C as the capacity and keeps the daily fit as a cross-check.
+changes week by week for NGED. Experiment 64 (PVDIS-5) rested on the explanation goal and on what
+differs from those four experiments, not on a claim that the review missed the forecast question.
+The same review found that the daily fit is about 2.6 times more exposed than C to an undetected
+day-long load, so every part reports C as the capacity and keeps the daily fit as a cross-check.
 
 **Rules shared by every part:**
 
@@ -326,54 +325,13 @@ every part reports C as the capacity and keeps the daily fit as a cross-check.
   write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
   weeks.
 
-#### PVDIS-5: forecasting net demand as demand minus forecast solar
-
-**Compare two ways of using the capacity series in the demand forecast against the best guess, with
-a shuffled-capacity control for each, and adopt a way that explains the forecast where it matches
-the best guess's score.**
-
-- **Arm A, a solar feature:** experiment 00033's recipe plus a column of the capacity vintage times
-  the calibrated ENS solar shape. Experiment 00031's nearest arm, A2 (data-only solar products, with
-  a capacity refitted over a trailing 28-day window), lost 0.036 points (+0.002 to +0.074). What
-  differs here is the calibration of ENS against CAMS, the CAMS shape in place of a generic shape,
-  and a capacity series smoothed over many weeks.
-- **Arm B, add solar back:** train the XGBoost model on gross demand, the metered net demand plus the
-  capacity vintage times the CAMS solar shape, with no shortwave inputs. At inference, subtract the
-  capacity times each ENS member's solar from that member's gross quantiles, then pool the members
-  and apply the existing spread factor, in that order. Each lagged gross-demand input is built in
-  training exactly as serving would build it at that lead: from CAMS where CAMS's one-day delay
-  allows, and from ENS otherwise. The plan states whether the 14-day error correction acts on gross
-  or net residuals. Arm B reports the coverage of the 0.05 and 0.95 quantiles in sunny and in cloudy
-  daylight separately, because the spread of ENS leaves out the uncertainty in capacity.
-- **Controls:** each arm has a twin whose capacity values are shuffled between forecast dates
-  within each Primary and calendar month, as experiment 00031's A6 control did. In experiment
-  00031, the shuffled control gained as much at leads under 48 hours as the real arm did. A
-  climatology row and a `manual_heuristic` row give the absolute scale. Experiment 00039's trailing
-  clear-minus-overcast midday mean, as a feature, is a sanity row: experiment 00031's capacity
-  statistics of the same kind lost 0.167 points.
-- **The decision rule tests gain and non-inferiority.** An arm is a candidate when its interval
-  excludes zero in the right direction and the shuffled twin's does not. Arm B is also adoptable
-  for explanation when the upper end of its interval lies below a non-inferiority margin, which the
-  plan fixes with its reason (+0.1 points, about 2% of the best guess's score, is the starting
-  proposal).
-- **Power.** Experiment 00031's paired contrasts reached half-widths of 0.03 to 0.08 points over 16
-  Primaries, so about 0.05 to 0.11 is expected over the 8 metered in MW. The plan states which
-  effects that resolves.
-- **What [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md) (PVDIS-3)
-  changes.** The solar term built from ENS did not lower the error against the best guess over all
-  leads (C6 +0.048, -0.059 to +0.141), so the overall test is non-inferiority and explanation. A
-  gain test is only worth pre-registering for leads of 0 to 48 hours, where the ENS anomaly tracks
-  CAMS, with a lead-dependent coefficient fitted on the training window so that the term fades where
-  ENS has no skill.
-- **Waits for** PVDIS-4, which supplies the capacity vintages.
-
 #### PVDIS-6: the mix of panel orientations and the DC to AC ratio
 
 **Estimate the share of east-, south-, and west-facing solar behind each Primary, and drop the step
 if the shares are not identified.** Experiment 00040 found that capacities on an east-south-west
 menu swapped between years in a season-year fit. Pooling the shapes across Primaries with a shared
 prior, or fitting on clear days only, may identify them. A Primary's orientation mix would sharpen
-the explicit solar forecast in Arm B of PVDIS-5.
+the explicit solar forecast in arm `b` of [experiment 64](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md).
 
 **Also try fitting the ratio of DC to AC capacity directly, as a cheap side-arm with a known-answer
 test first.** Many GB rooftop systems have more panel capacity than inverter capacity, and a system
