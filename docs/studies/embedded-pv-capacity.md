@@ -335,4 +335,3 @@ uv run python studies/embedded_pv_capacity/capacity_charts.py
 
 The scripts print every number on this page into `report.md` and `raw_gaps_report.md` in
 `data/studies/per_study/embedded_pv_capacity/`.
-
