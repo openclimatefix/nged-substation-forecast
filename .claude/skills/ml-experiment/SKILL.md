@@ -240,6 +240,9 @@ requires. An experiment that plots feature importance follows the recipe in the 
 
 ## Running a night's experiments
 
+When several experiment sessions run at once, the `ml-experiment-manager` skill covers the queue, the
+compute slots, and the merging.
+
 The maintainer and Claude agree the next night's experiments by day, each as a committed `result.md`
 with status `planned`. The overnight session:
 
