@@ -182,6 +182,9 @@ def check() -> None:
         f"mean {difference.mean():.6f}"
     )
     print(f"mean absolute target {joined['target'].abs().mean():.4f}")
+    typical = float(np.mean(np.abs(joined["target"].to_numpy())))
+    if not float(np.max(difference.to_numpy())) <= 1e-3 * typical:
+        raise SystemExit("STOP: this script does not repeat experiment 17's model")
 
 
 def _run(time_series_id: int) -> str:

@@ -65,7 +65,7 @@ def load_offset_panel(*, panel: dict) -> dict[str, Arrays]:
         observed = frame["target"].to_numpy() * cap
         residual[stamps] = observed - expected[stamps]
         mismatch = np.nanmax(np.abs(observed - panel["power"][series][stamps]))
-        if mismatch > 1e-3:
+        if not np.isfinite(mismatch) or mismatch > 1e-3:
             raise ValueError(
                 f"series {series}: observed power differs from the panel by {mismatch}"
             )
@@ -102,7 +102,7 @@ def bridge_gaps(*, values: np.ndarray, shift: np.ndarray, refits: np.ndarray) ->
     for start, stop in zip(np.flatnonzero(edges == 1), np.flatnonzero(edges == -1), strict=True):
         if stop - start < MIN_GAP or start < WINDOW or stop + WINDOW > GRID_LENGTH:
             continue
-        if ((refits > start - WINDOW) & (refits <= stop + WINDOW)).any():
+        if ((refits > start - WINDOW) & (refits < stop + WINDOW)).any():
             continue
         before, after = values[start - WINDOW : start], values[stop : stop + WINDOW]
         if np.isfinite(before).mean() < MIN_PRESENT or np.isfinite(after).mean() < MIN_PRESENT:
