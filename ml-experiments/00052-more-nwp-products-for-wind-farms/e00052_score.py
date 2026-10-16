@@ -247,6 +247,28 @@ def main() -> None:
         .rows()
     )
     print("product checks:", json.dumps(out["product_checks"]))
+    day0 = [
+        e
+        for e in exploratory
+        if e["band"] == "day 0" and e["series"] is None and e["treatment"].startswith("ens_")
+    ]
+    excluding = [e["treatment"] for e in day0 if e["upper"] < 0 or e["lower"] > 0]
+    print(f"day 0 contrasts excluding zero: {len(excluding)} of {len(day0)}: {excluding}")
+    by_month = (
+        arms[primary]
+        .filter(pl.col("band") == PRIMARY_BAND)
+        .join(
+            arms["ens"].filter(pl.col("band") == PRIMARY_BAND).select(*KEYS, ens_qs="qs"),
+            on=list(KEYS),
+        )
+        .with_columns(month=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"))
+        .group_by("month")
+        .agg(difference=(pl.col("qs") - pl.col("ens_qs")).mean())
+        .sort("month")
+    )
+    print("primary minus best guess at lead days 1 and 2, by month:")
+    print(by_month.rows())
+    print("mean of the months after July:", float(by_month["difference"].to_numpy()[1:].mean()))
     print("Stop rule:")
     for p, row in out["stop_rule"].items():
         print(f"  {p}: {row['difference']:+.3f} dropped={row['dropped']}")

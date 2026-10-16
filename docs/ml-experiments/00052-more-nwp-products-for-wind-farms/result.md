@@ -36,23 +36,30 @@ best_arm: >-
   6.701 for the best guess (difference -0.055, 95% interval -0.200 to +0.072); the no-spread-factor
   variant is -0.080 (-0.217 to +0.039, exploratory).
 lessons: >-
-  ICON-EU and IFS 0.25 degree add too little to the wind best guess to resolve a gain on three farms.
-  The point estimate at days 1 and 2 is a third of the 0.15-point threshold, the blend is worse at
-  days 3 to 6, and the farms disagree: one gains and one loses.
+  ICON-EU and IFS 0.25 degree runs that are older than the ENS run add too little to the wind best
+  guess to resolve a gain on three farms. The point estimate at days 1 and 2 is a third of the
+  0.15-point threshold, one farm gains and one loses, and a spread factor fitted on earlier blends
+  made the blend worse at days 3 to 6, where the chosen weights equal the best guess.
 advice:
   - >-
-    Do not port an ICON-EU or IFS 0.25 degree blend for wind on this evidence: the lead days 1 and 2
-    contrast is -0.055 (-0.200 to +0.072) against a 0.15-point threshold, and over all leads it is
-    +0.018 (-0.020 to +0.054) (C1, C2).
+    Do not port an ICON-EU or IFS 0.25 degree blend for wind on this evidence, which fed runs about
+    half a day older than the ENS run: the lead days 1 and 2 contrast is -0.055 (-0.200 to +0.072)
+    against a 0.15-point threshold, and over all leads it is +0.018 (-0.020 to +0.054) (C1, C2).
   - >-
-    Limit any extra-product blend for wind to lead days 0 to 2: at days 3 to 6 the primary blend
-    scores worse than the best guess by 0.122 (0.028 to 0.221), exploratory.
+    Do not fit a spread factor on history blended under different weights: from August the days 3
+    to 6 blend equals the best guess, yet it scores +0.122 (+0.028 to +0.221) with the factor and
+    +0.005 (0.000 to +0.016) without (exploratory).
   - >-
-    Test ICON-EU alone at lead day 0 on more than three farms: the blend scores -0.197 there
-    (-0.460 to +0.051) and ICON-EU alone -0.239 (-0.526 to +0.030), exploratory and unresolved.
+    Rerun the test with the 00 UTC runs of ICON-EU and IFS from the ENS run's own date, which the
+    service could read at 09:00 UTC, and with a bias correction of each product's wind speed,
+    because this experiment fed runs about half a day older and uncorrected winds (methods).
+  - >-
+    Test the best guess averaged with ICON-EU or GFS at lead day 0 on more than three farms: eight of
+    the 16 day 0 blend contrasts exclude zero, among them -0.229 (-0.371 to -0.090) for GFS, but they
+    are many, correlated, and chosen after the fact (exploratory).
   - >-
     Expect farms to disagree: at days 1 and 2 the primary blend scores -0.233 (-0.447 to -0.035) at
-    one farm and +0.151 (+0.028 to +0.287) at another, exploratory.
+    W2 and +0.151 (+0.028 to +0.287) at W3, exploratory.
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00052-more-nwp-products-for-wind-farms/
@@ -84,11 +91,12 @@ speak for other farms. The prediction (-0.2 to -0.4 at days 1 and 2) was too lar
 
 ## Absolute scores
 
-**The blend scores 0.055 points better at lead days 1 and 2, 0.122 worse at days 3 to 6, and the same
-from day 7, where no product exists.** The quantile score is twice the mean pinball loss over nine
-quantile levels, in points of capacity (smaller is better). Coverage is the share of cases inside the
-5% to 95% band, which is nominally 0.90. The cases are three farms, three seeds, and the 53 Tuesday
-runs from July 2025 to June 2026.
+**The blend scores 0.055 points better at lead days 1 and 2, 0.122 worse at days 3 to 6 (because of
+the spread factor), and the same from day 7, where no product exists.** The quantile score is twice
+the mean pinball loss over nine quantile levels, in points of capacity (smaller is better). Coverage
+is the share of cases inside the 5% to 95% band, which is nominally 0.90. At lead days 1 and 2 the
+share of cases above the 0.95 quantile is 0.053 for the best guess and 0.056 for the blend. The
+cases are three farms, three seeds, and the 53 Tuesday runs from July 2025 to June 2026.
 
 | Scope | Best guess | Primary blend | Cases | Coverage, best guess | Coverage, blend |
 |---|---|---|---|---|---|
@@ -110,38 +118,54 @@ All reads in this section are exploratory.
 
   ![The primary blend minus the best guess, per farm](figure_2.svg)
 
-- **The blend scores worse at lead days 3 to 6, and its day 0 contrast is unresolved.** The primary
-  blend minus the best guess is +0.122 (+0.028 to +0.221) at days 3 to 6 and -0.197 (-0.460 to
-  +0.051) at day 0.
-- **At day 0, two arms exclude zero.** The best guess averaged with the US Global Forecast System
-  (GFS), also from the Open-Meteo archive, scores -0.229 (-0.371 to -0.090). The primary blend with
-  one weight for all leads scores -0.244 (-0.450 to -0.061).
-- **No single extra product helps at lead days 1 and 2.** ICON-EU alone gives -0.053 (-0.199 to
-  +0.079), IFS alone +0.071 (-0.034 to +0.185), and GFS alone -0.069 (-0.172 to +0.034).
-- **Each product alone is far worse than the best guess at lead days 1 and 2.** With a spread factor
-  (a multiplier that widens each quantile band about its median), ICON-EU alone scores 2.469 points
-  worse, IFS alone 1.264, and GFS alone 1.853.
+- **The blend scores worse at lead days 3 to 6 only because of the spread factor.** The primary
+  blend minus the best guess is +0.122 (+0.028 to +0.221) at days 3 to 6, and +0.005 (0.000 to
+  +0.016) without the spread factor. From August the chosen weights there are 1, 0, and 0, so the
+  blend equals the best guess, but the spread factor (1.65 in August, 1.35 in September, 1.2 in
+  October) was fitted on earlier months blended under other weights. At day 0 the contrast is
+  -0.197 (-0.460 to +0.051).
+- **At day 0, 8 of the 16 blend contrasts exclude zero.** They are all four with GFS, the two
+  one-weight arms with ICON-EU alone, and the two one-weight arms with ICON-EU and IFS. The best
+  guess averaged with the US Global Forecast System (GFS), also from the Open-Meteo archive, scores
+  -0.229 (-0.371 to -0.090). These reads are many, correlated, and chosen after the fact.
+- **No single extra product resolves a gain at lead days 1 and 2.** The best guess averaged with
+  ICON-EU only gives -0.053 (-0.199 to +0.079), with IFS only +0.071 (-0.034 to +0.185), and with GFS
+  only -0.069 (-0.172 to +0.034). The IFS arm with one weight is worse, +0.101 (+0.036 to +0.194).
+- **Each product's own forecast is far worse than the best guess at lead days 1 and 2.** With a
+  spread factor (a multiplier that widens each quantile band about its median), ICON-EU's own
+  forecast scores 2.469 points worse, IFS's 1.264, and GFS's 1.853. The wind-power model receives
+  raw product winds with no bias correction, so the gap may reflect that mismatch and not only the
+  ensemble's advantage; the experiment does not test which.
 
   Over the first 6 months, the plan's stop rule (drop any product more than 1.0 points worse) fired
   for all three products. The exploratory arms ran for all three products anyway, and the primary
   arm was fixed before the run.
 - **At lead days 1 and 2, the chosen weights stayed mostly on the best guess.** Averaged over the
-  scored months, lead day 1 gave 0.72 to the best guess, 0.24 to ICON-EU, and 0.05 to IFS, and lead
-  day 2 gave 0.94, 0.03, and 0.03. Day 0 gave 0.51, 0.34, and 0.15, and days 3 and later gave 0.33
-  each. One weight for all leads (-0.060, -0.200 to +0.065, at days 1 and 2) scored about the same as
-  weights per lead band (-0.055).
+  scored months, days 1 and 2 gave 0.72 to the best guess, 0.24 to ICON-EU, and 0.05 to IFS. Day 0
+  gave 0.51, 0.34, and 0.15. Days 3 to 6 gave 0.94, 0.03, and 0.03, which is 1, 0, and 0 in every
+  month from August; July, with no history, used equal weights. One weight for all leads (-0.060,
+  -0.200 to +0.065, at days 1 and 2) scored about the same as weights per lead band (-0.055).
 - **Widening the quantile bands with a spread factor did not help.** Without it, the primary blend
   minus the best guess is -0.080 (-0.217 to +0.039) at lead days 1 and 2 and -0.018 (-0.043 to
   +0.005) over all leads. The factors ranged 1.0 to 1.25 for days 0 to 2 and 1.0 to 1.65 for days 3
   and later.
-- **The placebo scores worse than the best guess.** The placebo shuffles the product forecasts among
-  cases of the same farm, month, lead day, and time of day. It scores +0.343 (+0.061 to +0.762) at
-  lead days 1 and 2, so averaging with an uninformative forecast does not by itself lower the score.
+- **The placebo passes: weight selection rejected the shuffled forecasts, and its positive score
+  comes from two other steps.** The placebo shuffles the product forecasts among cases of the same
+  farm, month, lead day, and time of day. In every month after July the chosen weights are 1, 0,
+  and 0, so the placebo equals the best guess apart from July (equal weights, no history) and the
+  spread step. It scores +0.343 (+0.061 to +0.762) at lead days 1 and 2.
 
 ## How the experiment was run, and where it departs from the plan
 
 - **Cases and benchmark:** the 53 Tuesday runs of experiment 33's wind best guess (`bg_full`), three
   farms and three seeds, scored on its stored half-hourly cases. The farms are labelled W1 to W3.
+- **Product age:** `previous_day(d+1)` selects runs about half a day older than the ENS run (0 to 24
+  hours older, depending on the hour of day). The service reads at 09:00 UTC, so the 00 UTC runs of
+  ICON-EU and IFS from the ENS run's own date would be available. The experiment therefore tests
+  deliberately aged products, which rules out lookahead and handicaps the products.
+- **July:** July 2025 has no earlier months, so it uses equal weights and no spread factor. At lead
+  days 1 and 2 the primary blend minus the best guess is +0.188 in July, against a mean of -0.070
+  over the other eleven monthly differences, and July's cases shape the factors of August onwards.
 - **Product forecast:** experiment 33's ERA5-trained wind-power model, refitted per seed on valid
   times before 2025-06-17, fed each product's wind at the farm's grid point from Open-Meteo's
   Previous Runs archive. A case at lead day d reads `previous_day(d+1)`, which the archive defines
@@ -167,8 +191,8 @@ All reads in this section are exploratory.
 
 ## What the next experiment should answer
 
-**Whether a day 0 gain exists, and which product supplies it.** The day 0 contrasts lie closest to
-resolving: GFS alone averaged with the best guess (-0.229) and the one-weight blend (-0.244) exclude
-zero, while ICON-EU alone (-0.239, -0.526 to +0.030) and the primary blend (-0.197) do not. The day 3
-to 6 contrasts are worse, and the spread between farms is as large as the pooled effect. A day 0
-test needs more wind farms than the three metered ones can supply.
+**Whether the products help when read at the service's own time.** The next experiment should feed
+the 00 UTC runs of ICON-EU and IFS from the ENS run's own date, correct each product's wind speed
+for bias, and fit the spread factor on blends made under the same weights. A day 0 test needs more
+wind farms than the three metered ones can supply, and the day 0 reads here (GFS in particular) were
+generated after the fact, so a confirmation must name them in advance.

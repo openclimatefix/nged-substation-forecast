@@ -1132,11 +1132,12 @@ test covered the three metered wind farms. The average scored 0.055 points of ca
 lead days 1 and 2 (95% interval -0.200 to +0.072), against a threshold of 0.15, so the verdict is
 `inconclusive`. Over all leads it scored 0.018 worse (-0.020 to +0.054).
 
-- **Finding for later experiments:** the blend scored worse at lead days 3 to 6 (+0.122; 95%
-  interval +0.028 to +0.221), and its day 0 contrast is unresolved (-0.197; -0.460 to +0.051). One
-  farm scored -0.233 (-0.447 to -0.035) at days 1 and 2 and another +0.151 (+0.028 to +0.287); both
-  reads are exploratory. A placebo that shuffles the product forecasts scored worse than the best
-  guess (+0.343), so averaging with an uninformative forecast does not by itself lower the score.
+- **Finding for later experiments:** the products fed were runs about half a day older than the ENS
+  run, with no bias correction. The blend scored worse at lead days 3 to 6 (+0.122; 95% interval
+  +0.028 to +0.221) only because of a spread factor fitted on earlier blends, since its weights
+  equal the best guess from August (+0.005 without the factor). One farm scored -0.233 (-0.447 to
+  -0.035) at days 1 and 2 and another +0.151 (+0.028 to +0.287); both reads are exploratory. The
+  placebo passed: weight selection rejected the shuffled forecasts.
 - **Write-up:** [result](00052-more-nwp-products-for-wind-farms/result.md).
 
 ![Each blend minus the best guess](00052-more-nwp-products-for-wind-farms/figure_1.svg)
