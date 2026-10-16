@@ -1167,22 +1167,22 @@ experiment cannot resolve a gain below about 0.04.
 
 ### 00055: does a neighbour veto help the single-series switching detector?
 
-**A neighbour veto makes the single-series detector slightly more precise but cannot make it find
-many more transfers: the most it adds is about 2 points of the share found, so the next gain has to
-come from the transfers that have no metered receiver.** With the veto the 24-hour threshold fell
-from 4.00 to 3.70 noise units at the same rate of unexplained alarms, and the detector found 0.363 of
-620 injected transfers against 0.355 without it (+0.008, 98.75% interval -0.003 to +0.022). The
-verdict is inconclusive.
+**A neighbour veto makes the single-series detector slightly more precise, and at the strengths
+tried it finds only about 1 point more of the injected transfers.** With the veto the 24-hour
+threshold fell from 4.00 to 3.70 noise units at the same rate of unexplained alarms, and the
+detector found 0.363 of 620 injected transfers against 0.355 without it (+0.008, 98.75% interval
+-0.003 to +0.022). The verdict is inconclusive, and a stronger veto than 1.5 noise units was not
+tried.
 
 - **Finding for later experiments:** the veto removes 35% of the unexplained 24-hour alarms and 20%
   of the alarms a logged closure explains, a ratio of 1.8. It loses 2 of the 220 transfers found
   without it and gains 7, raises the precision of the real alarms by about 3 points at 24 hours and
-  6 to 7 points at 4 hours,
-  and loses 6 and gains 2 of 300 transfers that start near a bank holiday. The gain sits in the
-  transfers with no metered receiver, which the veto detector finds at 0.19 against 0.50 for the
-  transfers with a metered receiver.
+  6 to 7 points at 4 hours, and loses 6 and gains 2 of 300 transfers that start near a bank
+  holiday. The gain sits in the transfers with no metered receiver, but those transfers have a
+  smaller injected step (median 16% of the donor's load against 55%), so the next experiment re-cuts
+  recall by step size first.
 - **Series status:** experiments 43, 47, and 55 found no detector change that raises recall by more
-  than about 2 points at the 24-hour window.
+  than about 1 point at the 24-hour window.
 - **Write-up and pull request:** [the full result page](00055-sw2-8-neighbour-veto-single-series-detector/result.md),
   [PR #1282](https://github.com/openclimatefix/nged-substation-forecast/pull/1282).
 

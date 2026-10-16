@@ -52,8 +52,9 @@ lessons: >-
   The veto is almost free: it loses 2 of the 220 transfers D0M finds and gains 7, raises the
   precision of the real alarms by about 3 points at 24 hours and 6 to 7 points at 4 hours, and the
   alarms that find a transfer with a metered receiver name the donor or a receiver in 88% of the
-  cases. In this population its gain is unlikely to exceed 0.022, because it removes only about a
-  third of the unexplained alarms and the threshold then falls by only 0.30. The veto removes 35% of
+  cases. At the strengths tried its gain is +0.008 (interval to +0.022), because it removes only about
+  a third of the unexplained alarms and the threshold then falls by only 0.30. A stronger veto was
+  not tried, and the odd-month gain rose with strength. The veto removes 35% of
   the unexplained 24-hour alarms and 20% of the alarms a logged closure explains (a ratio of 1.8,
   under the 2 that would make it useful). Of experiment 41's 148 labelled alarms, 5 of 79
   confirmed, 4 of 49 unconfirmed, and 0 of 20 vetoed were visible transfers, so the confirmed tier
@@ -61,11 +62,12 @@ lessons: >-
 advice:
   - >-
     Do not expect neighbour logic that only removes or re-ranks single-series alarms to lift the
-    share of transfers found by more than about 0.02 at the 24-hour window, in the 620 injected
-    transfers scored here (C1 interval).
+    share of transfers found by more than about 0.02 at the 24-hour window, at the veto strengths
+    1.5 to 3.0 (C1 interval); a stronger veto is untested.
   - >-
-    Work on the transfers with no metered receiver, which are 44% of the headline band and which D0
-    finds 0.17 of against 0.50 for the others, because they set the ceiling (C3 and C4).
+    Re-cut recall by the donor's step in noise units before building a new step statistic, because
+    the injected transfers with no metered receiver have a median donor step of 16% of the donor's
+    load against 55% for the others, so the 0.17 against 0.50 gap may be step size (limits).
   - >-
     Do not use the confirmed tier as a filter for training masks on this evidence: 5 of 79
     confirmed and 4 of 49 unconfirmed labelled alarms were visible transfers (tier figure).
@@ -80,19 +82,19 @@ code: ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/
 
 # Experiment 55: does a neighbour veto help the single-series switching detector?
 
-**A neighbour veto makes the single-series detector slightly more precise but cannot make it find
-many more transfers: the most it adds is about 2 points of the share found, so the next gain has to
-come from the transfers that have no metered receiver.** We kept every alarm of the single-series
-detector D0, which raises an alarm when the 24-hour mean of one Primary substation's residual
-(measured minus predicted power) steps up or down. We then removed the alarms that look like a
-weather or calendar miss, because at least two neighbouring Primary substations stepped the same
-way and none stepped the opposite way. With those alarms gone the threshold could fall from 4.00 to
-3.70 noise units at the same rate of unexplained alarms, and the detector found 0.363 of 620
+**A neighbour veto makes the single-series detector slightly more precise, and at the strengths
+tried it finds only about 1 point more of the injected transfers.** We kept every alarm of the
+single-series detector D0, which raises an alarm when the 24-hour mean of one Primary substation's
+residual (measured minus predicted power) steps up or down. We then removed the alarms that look
+like a weather or calendar miss, because at least two neighbouring Primary substations stepped the
+same way and none stepped the opposite way. With those alarms gone the threshold could fall from
+4.00 to 3.70 noise units at the same rate of unexplained alarms, and the detector found 0.363 of 620
 injected transfers against 0.355 without the veto (+0.008, 98.75% interval -0.003 to +0.022). The
-verdict is inconclusive. In the 620 injected transfers scored here, the veto's gain is unlikely to
-exceed 0.022, so refining the neighbour logic is unlikely to lift recall much. D2 denotes D0 with
-the veto, and the transfers with no metered receiver are 44% of the headline band, of which D0 finds
-0.17 and D2 finds 0.19. Those transfers are where the share found has room to rise.
+verdict is inconclusive. We tried veto strengths of 1.5, 2.0, and 3.0 noise units, and a stronger
+veto was not tried. D2 denotes D0 with the veto. The small gain came through the lower threshold,
+mostly in the transfers with no metered receiver, which are 44% of the headline band. D0 finds 0.17
+of those and D2 finds 0.19, against 0.50 for the others. The gap may come from step size, because
+the injection gives those transfers a smaller donor step (limits).
 
 ![The matched threshold falls from 4.00 to 3.70 with the veto](figure_1_operating_points.svg)
 
@@ -119,9 +121,9 @@ and misses 2 that D0M finds.
 | C4 | 24 h, no metered receiver (274) | 0.190 | 0.168 | +0.022 | +0.000 to +0.041 |
 
 **The gain sits in the transfers that have no metered receiver.** For those, the lower threshold
-finds 6 more of 274. For transfers with a metered receiver, the veto changes nothing (-0.003). D0
-finds 0.50 of the transfers with a metered receiver and 0.17 of those without, possibly because two
-substations stepping give two chances to raise an alarm.
+finds 6 more of 274. For transfers with a metered receiver, the veto changes nothing (-0.003). The
+lower end of C4 and the upper end of C3 sit at exactly zero because every changed transfer moved
+the same way, so read C4 as "at least 0". C1 rests on 9 changed transfers (7 gained, 2 lost).
 
 ## What held in the prediction and what did not
 
@@ -186,26 +188,42 @@ counts are 0 of 14 and 1 of 35 for both detectors. The real-transfer counts carr
 
 ## Limits
 
+- **The 0.17 against 0.50 gap mostly reflects the injection.** A transfer with no metered receiver
+  moves 25% to 40% of half the donor's load, a median step of 16% of the donor's load, while a
+  transfer with a metered receiver has a median step of 55% (interquartile range 26% to 80%). The
+  44% share of the band is a property of the sampler, and not a measure of the real electricity
+  network.
 - **The veto strength sits at the edge of the grid.** The strongest value, 1.5 noise units, won on
-  odd months.
+  odd months, where its gain over no veto was +0.030 (22 transfers gained, 6 lost) against +0.013 at
+  2.0 and 0.000 at 3.0. The even-month gain was +0.008, so the interval's upper end of +0.022 is not
+  a ceiling for a stronger veto.
+- **The pre-registered veto rate was checked on the alarms, not on the scored run.** The prediction
+  of 14 of 80 unexplained odd-month alarms vetoed at 2.0 noise units and threshold 4.00 comes from
+  `e00055_prerun.py`; the scored run reports the rates at the chosen strength and matched threshold.
+- **The 24-hour precision is a point value.** The sample of 148 labelled alarms had no visible
+  transfer among its 24-hour alarms, so the upper precision bound equals the lower. The 4-hour
+  bounds reuse D0's sampled visible rate for D2, although the veto changes which alarms survive.
 - **The injected transfers sit away from alarms.** Experiment 43's quiet mask keeps the original and
   new sets at least 2 days from an alarm of its four settings on every series, which understates how
   often a wrong veto happens. The holiday set drops that condition.
+- **Transfers injected in one batch could interact.** A batch keeps events apart only when they
+  share no series, so simultaneous transfers on adjacent substations could trigger or block a veto,
+  which affects D2 and not D0M. We did not measure this.
 - **D0M equals D0.** The matching search returned D0's thresholds, so comparing with D0M adds
-nothing beyond comparing with D0.
+  nothing beyond comparing with D0.
 - **The residual needs ERA5.** ERA5 (the ECMWF Reanalysis, version 5) arrives about 5 days after the
-event, so the detectors run retrospectively.
+  event, so the detectors run retrospectively.
 
 ## What the next experiment should answer
 
-**The next experiment should raise the share of transfers found among those with no metered
-receiver, which D0 finds at 0.17.** In this experiment, neighbour logic reaches only the transfers
-that a neighbour can see, and those are already found at 0.50. The shape-aware switching detector
-planned as SW2-7 models the moved load as a share of the donor's expected daily profile, which gives
-a single series a better step statistic than a constant shift. The plan for SW2-7 should score the
-C3 and C4 split first, take several hundred headline-band transfers in even months as here, and keep
-the veto of this experiment as an optional layer on top, since it costs 2 of 220 found transfers and
-raises precision.
+**The next experiment should show whether the missed transfers are steps too small to detect or
+detectable steps that the detector misses.** It re-cuts recall by the donor's step in noise units,
+split by metered receiver, and extends the veto grid to 1.0 and 1.25 noise units. Small missed steps
+would argue against a better step statistic. Detectable missed steps would argue for the
+shape-aware switching detector planned as SW2-7. SW2-7 models the moved load as a share of the
+donor's expected daily profile, which is also how the injection builds transfers, so its recall on
+injected transfers would flatter it. The plan for SW2-7 should therefore score transfers injected
+with a different shape, and the 14 and 35 labelled real transfers.
 
 Code: `ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/`, with every number
 printed by `e00055_report.py`.
