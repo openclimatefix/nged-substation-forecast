@@ -132,12 +132,18 @@ def masked_stamps(*, intervals: np.ndarray, train_end: datetime) -> np.ndarray:
 def with_injected_target(*, frame: pl.DataFrame, time_series_id: int) -> pl.DataFrame:
     """World B: add the injected MW, in units of capacity, to the training target."""
     delta = pl.read_parquet(WORLD_B_DELTA).filter(pl.col("series") == time_series_id)
-    capacity = frame["effective_capacity_mw"].median()
+    capacity = (
+        pl.scan_parquet(FEATURES_PATH)
+        .filter(pl.col("time_series_id") == time_series_id)
+        .select(pl.col("effective_capacity_mw").median())
+        .collect()
+        .item()
+    )
     return (
         frame.with_columns(
             stamp=((pl.col("valid_time") - GRID_START).dt.total_seconds() // 1800).cast(pl.Int64)
         )
-        .join(delta.select("stamp", "delta_mw"), on="stamp", how="left")
+        .join(delta.select("stamp", "delta_mw"), on="stamp", how="left", maintain_order="left")
         .with_columns(fitted_target=pl.col("target") + pl.col("delta_mw").fill_null(0.0) / capacity)
         .drop("stamp", "delta_mw")
     )

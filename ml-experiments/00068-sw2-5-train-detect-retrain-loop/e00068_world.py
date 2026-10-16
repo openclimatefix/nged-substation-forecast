@@ -72,9 +72,9 @@ def world_a_batches(*, power: dict[int, np.ndarray]) -> list[tuple[int, list[Eve
 
 
 def draw(*, power: dict[int, np.ndarray]) -> list[Event]:
-    """Draw `N_DRAWN` headline-band transfers whose onset is in an even month."""
+    """Draw `N_DRAWN` headline-band transfers, keeping those that lie within one even month."""
     months = stamp_months()
-    return draw_events(
+    drawn = draw_events(
         quiet=quiet_masks(),
         power=power,
         seed=SEED_B,
@@ -82,6 +82,7 @@ def draw(*, power: dict[int, np.ndarray]) -> list[Event]:
         first_id=FIRST_ID,
         onset_ok=lambda onset: bool(months[onset] % 2 == 0),
     )
+    return [e for e in drawn if months[e.end - 1] % 2 == 0 and months[e.end - 1] == months[e.onset]]
 
 
 def spread_out(*, events: list[Event]) -> list[Event]:

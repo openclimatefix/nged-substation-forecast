@@ -74,7 +74,7 @@ def loop() -> None:
     errors: list[pl.DataFrame] = []
     reals: list[pl.DataFrame] = []
     stats: dict[str, dict] = {}
-    reference = None
+    reference: dict[str, float] = {}
     for k in range(N_ROUNDS_LOOP + 1):
         for world in "AB":
             name = f"{world}_r{k}"
@@ -83,12 +83,19 @@ def loop() -> None:
             build_panel(name=name)
             following = f"{world}_r{k + 1}" if k < N_ROUNDS_LOOP else None
             stats[name] = detect_round(
-                name=name, next_name=following, reference_threshold=reference
+                name=name, next_name=following, reference_threshold=reference.get(world)
             )
-            if name == "A_r0":
-                reference = stats[name]["threshold"]
+            if k == 0:
+                reference[world] = stats[name]["threshold"]
             if world == "A":
                 results.append(score_world_a(name=name, batches=batches, scale0=zero))
+                if k > 0:
+                    fixed = score_world_a(
+                        name=name, batches=batches, scale0=zero, threshold=reference["A"]
+                    )
+                    results.append(
+                        fixed.with_columns(world=pl.lit("A_into_residual_round0_threshold"))
+                    )
                 errors.append(error_table(name=name))
                 reals.append(score_real_transfers(name=name))
             else:
@@ -98,7 +105,7 @@ def loop() -> None:
             fit_round(name="A_rc1")
             build_panel(name="A_rc1")
             stats["A_rc1"] = detect_round(
-                name="A_rc1", next_name=None, reference_threshold=reference
+                name="A_rc1", next_name=None, reference_threshold=reference["A"]
             )
             results.append(score_world_a(name="A_rc1", batches=batches, scale0=zero))
             errors.append(error_table(name="A_rc1"))

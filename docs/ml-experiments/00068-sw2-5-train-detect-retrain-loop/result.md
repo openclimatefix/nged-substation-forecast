@@ -34,8 +34,9 @@ decision_rule: >-
   of the C2 interval lies above -1.0%, which also covers a loop that makes either metric worse.
   `supported` when the C1 interval lies wholly above zero with a point value of at least +0.02, the
   C2 interval lies wholly below zero with a point value of at most -1.0%, and the even-month
-  unexplained-alarm count of every round is within 10% of round 0's. `partly supported` when exactly
-  one of the C1 condition and the C2 condition holds in full and the alarm-count condition holds.
+  unexplained-alarm count of world A in every round is within 10% of round 0's. `partly supported`
+  when exactly one of the C1 condition and the C2 condition holds in full and the alarm-count
+  condition holds.
   `small gain` when no earlier verdict applies and an interval excludes zero in the predicted
   direction. `inconclusive` otherwise, including every case where the alarm-count condition fails.
   Both thresholds, +0.02 and -1.0%, are judgements: the loop adds one detector run and one refit per
@@ -106,11 +107,17 @@ receiving load, over 1 day) from experiment 58's generator, with onsets in even 
 greedily to a set with no two transfers on one series within 1 day of each other. (Experiment 58's
 own 620 even-month transfers overlap too much on one series: only 103 of them fit.) Each
 transfer takes shape S2, S3, or S4 in turn, so the pooled recall covers the three shapes the
-detector does not assume. World B contains no injected transfers in odd months, so the odd-month
+detector does not assume. Drawn transfers that cross into an odd month are dropped, so world B has
+no injected transfer in an odd month, and the odd-month
 tuning is unaffected. The loop runs in world B on its own residuals and masks. World A with injected
 transfers added to the residual only (experiment 61's scoring, in which the model never saw them) is
 reported as a secondary result, because an injected transfer that is not in the training data cannot
 test the stated mechanism.
+
+**What the test reaches.** A refit for month `M` is trained before `M`, so a transfer that starts in
+`M` has never been in the training data of the model that forecasts it. The mask can raise that
+transfer's recall only through earlier transfers the model learned from, or through a transfer that
+runs past a month boundary. A null result therefore does not show that the mechanism is absent.
 
 **Control.** The random-mask control (RC) is round 1 with a mask of equal volume on each series: each
 detected interval of world A is moved to a random start in the same series and calendar month, with

@@ -187,6 +187,7 @@ def random_mask(*, source_name: str, name: str, seed: int = 7) -> None:
     for row in frame.iter_rows(named=True):
         taken[row["series"]][row["onset"] : row["end"]] = True
     rows = []
+    unmoved = 0
     for row in frame.iter_rows(named=True):
         length = row["end"] - row["onset"]
         month = year_months[row["onset"]]
@@ -200,10 +201,13 @@ def random_mask(*, source_name: str, name: str, seed: int = 7) -> None:
                     placed = (start, start + length)
                     taken[row["series"]][placed[0] : placed[1]] = True
                     break
+        if placed == (row["onset"], row["end"]):
+            unmoved += 1
         rows.append({"series": row["series"], "onset": placed[0], "end": placed[1]})
     out = round_dir(name=name)
     out.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(rows).write_parquet(out / "mask_intervals.parquet")
+    print(f"random mask: {unmoved} of {frame.height} intervals could not be moved", flush=True)
 
 
 def init_worker(state: dict) -> None:
