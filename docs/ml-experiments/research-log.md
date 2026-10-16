@@ -85,6 +85,7 @@ the maintainer to confirm.
 | [00059 - Switching event detector, part 6](00059-sw2-13-several-windows-in-one-detector/result.md) | Does one detector that combines the step statistic at windows of 4, 12, 24, and 48 hours find more injected transfers, by MW moved, than the best single window at the same unexplained-alarm count? | Refuted: the 24-hour window finds 0.473 of the moved MW and the maximum of four windows 0.423 (difference -0.050, 97.5% interval -0.094 to -0.022) | Not for production | 2026-10-16 |
 | [00060 - Switching event detector, part 6](00060-sw2-7-profile-weighted-step-detector/result.md) | Does a step statistic that weights each half-hour by the daily profile find more of the moved MW than the constant step, on injection shapes it does not assume? | Refuted: the pooled gain in the share of moved MW found is below 0.001 (98.33% interval -0.006 to +0.008) | Not for production | 2026-10-16 |
 | [00061 - Switching event detector, part 7](00061-sw2-6-paired-step-intervals/result.md) | Does scoring an onset step and its return step as one pair find more of the moved MW than the single-step detector? | Refuted: the paired score finds 0.13 less (98.33% interval -0.233 to -0.007); keeping the single-step alarms and taking the end from the strongest return step finds 0.19 more (+0.148 to +0.237) | Not for production | 2026-10-16 |
+| [00062 - Switching event detector, part 7](00062-sw2-9-whitened-residual-step-detector/result.md) | Does filtering out the residual's half-hour-to-half-hour memory raise the share of moved MW the 24-hour detector finds? | Refuted: the pooled change in the share of moved MW found is -0.097 (98.33% interval -0.132 to -0.057) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1254,6 +1255,30 @@ and moved only the end found 0.63 to 0.65 of the moved MW against 0.44 to 0.47, 
   [PR #1291](https://github.com/openclimatefix/nged-substation-forecast/pull/1291).
 
 ![Gain over D0M by arm and shape](00061-sw2-6-paired-step-intervals/figure_1_gain_by_arm.svg)
+
+### 00062: does removing the residual's half-hour-to-half-hour memory help the switching detector? (SW2-9)
+
+**Filtering the residual's short memory out before the 24-hour step makes the switching detector
+find fewer load transfers, because the filter shrinks a day-long step faster than it shrinks the
+noise.** We added 620 known load transfers (power moved between substations for over 1 day) to the
+history of 16 Primary substations and compared the detector on the unfiltered residual with the same
+detector on a residual filtered by a first-order autoregressive filter. The filtered detector found
+0.34 to 0.37 of the moved megawatts (MW) and the unfiltered detector 0.44 to 0.47, a range over five
+daily shapes of transfer. The pooled change over the three shapes that experiment 60 added was
+-0.097 (98.33% interval -0.132 to -0.057), so the filtered detector misses 0.63 to 0.66 of the moved
+MW. At 4 hours the change was -0.145 (-0.209 to -0.097).
+
+- **Finding for later experiments:** the median fitted coefficient is 0.92, so a persistent step
+  keeps about 8% of its size after filtering, while the noise of the 24-hour step keeps about 12%.
+  The signal-to-noise ratio of a constant step is therefore 0.52 to 0.85 of the unfiltered value for
+  all 16 substations, which predicts the result without injecting a transfer. The interval-end misses
+  (72 of 215 large-step constant-MW transfers for the unfiltered detector, 56 for the filtered one)
+  are not the filter's to fix. Work on the interval end (SW2-6) or the combination of windows
+  (SW2-13) next.
+- **Write-up and pull request:** [the full result page](00062-sw2-9-whitened-residual-step-detector/result.md),
+  [PR #1293](https://github.com/openclimatefix/nged-substation-forecast/pull/1293).
+
+![Change in MW-weighted recall by injection shape](00062-sw2-9-whitened-residual-step-detector/figure_1_gain_by_shape.svg)
 
 ### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
 
