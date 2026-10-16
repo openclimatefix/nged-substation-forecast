@@ -77,41 +77,41 @@ months.
 
 **W0 changes only the residual that the step statistic reads.** For series *s* and half-hour of day
 *h* (48 per day, in UTC), the coefficient is the least-squares slope of the residual at half-hour
-*t* (in slot *h*) on the residual at *t* − 1, through the origin, over odd-month pairs where both are
-present, clipped to 0 to 0.98. The whitened residual is *r*(*t*) minus the coefficient times
-*r*(*t* − 1), and is missing where either residual is missing. The coefficients are fitted once, from the
-uninjected residual of odd months only, and are not refitted for the even months. The fit does not
-mask logged closures or labelled transfers, so a persistent real step can push a coefficient
-towards the clip; the report counts the coefficients at the clip. An injected residual is whitened with the same
-coefficients. Every step after the filter is the same as in D0: the step is the mean over the next 24 hours minus
-the mean over the previous 24 hours, the noise scale is 1.4826 times the median absolute deviation
-over odd months (of the whitened step), alarms are local peaks, alarms next to a monthly refit are
-dropped, and intervals come from `build_intervals` run on the unfiltered relative residual. W0
-therefore differs from D0M only in which stamps raise an alarm. A whitened persistent step
-keeps its full size at the onset half-hour, so the 24-hour step still peaks at the onset and the
-2-hour onset tolerance is fair to both detectors. W0's threshold is the lowest on a
-0.05 grid whose odd-month count of alarms that no logged closure explains is at most D0M's
-(experiment 58's `tune_d2` with the veto switched off), for the 24-hour and the 4-hour window
+*t* (in slot *h*) on the residual at *t* − 1, through the origin, over odd-month pairs where both
+are present, clipped to 0 to 0.98. The whitened residual is *r*(*t*) minus the coefficient times
+*r*(*t* − 1), and is missing where either residual is missing. The coefficients are fitted once,
+from the uninjected residual of odd months only, and are not refitted for the even months. The fit
+does not mask logged closures or labelled transfers, so a persistent real step can push a
+coefficient towards the clip; the report counts the coefficients at the clip. An injected residual
+is whitened with the same coefficients. Every step after the filter is the same as in D0: the step
+is the mean over the next 24 hours minus the mean over the previous 24 hours, the noise scale is
+1.4826 times the median absolute deviation over odd months (of the whitened step), alarms are local
+peaks, alarms next to a monthly refit are dropped, and intervals come from `build_intervals` run on
+the unfiltered relative residual. W0 therefore differs from D0M only in which stamps raise an alarm.
+A whitened persistent step keeps its full size at the onset half-hour, so the 24-hour step still
+peaks at the onset and the 2-hour onset tolerance is fair to both detectors. W0's threshold is the
+lowest on a 0.05 grid whose odd-month count of alarms that no logged closure explains is at most
+D0M's (experiment 58's `tune_d2` with the veto switched off), for the 24-hour and the 4-hour window
 separately.
 
-**The transfers and the shapes are the ones experiment 60 used.** The 620 headline-band transfers of experiment 58 that
-start in even months (25% to 40% of the receiving load, over 1 day), each injected in five shapes:
-S1 a share of the donor's profile (the earlier experiments' harness), S2 a constant MW, S3 a share
-of each metered receiver's own profile, S4 a mix fitted to the labelled real transfers, and S5 the
-donor's profile 12 hours ahead. All shapes move the same mean MW per transfer as S1. The headline
-reads S2, S3 and S4, the shapes that experiments 43, 55 and 58 did not use. The harness check
-requires D0M under S1 to reproduce experiment 58 transfer by transfer.
+**The transfers and the shapes are the ones experiment 60 used.** The 620 headline-band transfers of
+experiment 58 that start in even months (25% to 40% of the receiving load, over 1 day), each
+injected in five shapes: S1 a share of the donor's profile (the earlier experiments' harness), S2 a
+constant MW, S3 a share of each metered receiver's own profile, S4 a mix fitted to the labelled real
+transfers, and S5 the donor's profile 12 hours ahead. All shapes move the same mean MW per transfer
+as S1. The headline reads S2, S3 and S4, the shapes that experiments 43, 55 and 58 did not use. The
+harness check requires D0M under S1 to reproduce experiment 58 transfer by transfer.
 
 **What we report.** For each shape and detector: MW-weighted recall with month-resampled intervals,
-unweighted recall, both detectors' odd-month and even-month alarm counts, and
-the recall by the donor's step in noise units (bins below 2, 2 to 4, 4 to 6, 6 to 10, 10 or more,
-in D0M's noise units for both detectors), split by whether any receiver is metered. For the
-labelled real transfers of more than 1 day, the paired counts found, with MW-weighted recall using
-the labelled median MW. Post hoc and labelled as such, per series: the lag-1 and lag-48 autocorrelation of the residual
-before and after filtering, the ratio of the whitened step's noise scale to the raw step's, the
-resulting signal-to-noise gain for a constant step, and the share of transfers with the right onset
-and the wrong end. These numbers predict the verdict without injecting anything, and the write-up
-says whether they did.
+unweighted recall, both detectors' odd-month and even-month alarm counts, and the recall by the
+donor's step in noise units (bins below 2, 2 to 4, 4 to 6, 6 to 10, 10 or more, in D0M's noise units
+for both detectors), split by whether any receiver is metered. For the labelled real transfers of
+more than 1 day, the paired counts found, with MW-weighted recall using the labelled median MW. Post
+hoc and labelled as such, per series: the lag-1 and lag-48 autocorrelation of the residual before
+and after filtering, the ratio of the whitened step's noise scale to the raw step's, the resulting
+signal-to-noise gain for a constant step, and the share of transfers with the right onset and the
+wrong end. These numbers predict the verdict without injecting anything, and the write-up says
+whether they did.
 
 ## Sizing
 
