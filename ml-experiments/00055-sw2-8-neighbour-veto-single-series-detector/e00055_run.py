@@ -29,12 +29,12 @@ from e00055_detect import (
     SEED_NEW,
     TARGET_COUNTS,
     VETO_ZS,
+    alarm_masks,
     detect_all,
     load,
     new_events,
     odd_unexplained,
     original_events,
-    quiet_masks,
     real_alarm_rows,
     real_events,
     score_events,
@@ -156,7 +156,7 @@ def event_sets(*, out: Path, power: dict) -> tuple[list, list, list, pl.DataFram
     """Draw the original, extra, and holiday sets; write the combined event table."""
     original = original_events(power=power)
     extra, holiday = new_events(power=power)
-    full = quiet_masks()
+    full = alarm_masks()
     pieces = []
     for name, events in (("original", original), ("extra", extra), ("holiday", holiday)):
         table = events_frame(events=events).with_columns(set=pl.lit(name))

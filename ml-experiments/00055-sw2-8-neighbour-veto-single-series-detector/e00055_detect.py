@@ -22,6 +22,7 @@ from e00055_common import (
     GRID_START,
     LABELLED_PATH,
     OPERATING_POINTS,
+    SERIES_IDS,
     TUNING_MONTHS,
     load_panel,
     near_log_masks,
@@ -111,17 +112,28 @@ def holiday_distance_by_stamp() -> np.ndarray:
     return nearest[np.searchsorted(unique, dates)]
 
 
-def quiet_masks() -> dict[int, np.ndarray]:
-    """Series-stamp masks that no injected transfer may touch, as in experiment 43.
+def log_masks() -> dict[int, np.ndarray]:
+    """Series-stamp masks within 7 days of a logged closure."""
+    return near_log_masks(pad_stamps=QUIET_STAMPS)
 
-    No logged closure within 7 days, and no alarm of experiment 43's four settings within 2 days.
-    """
-    quiet = near_log_masks(pad_stamps=QUIET_STAMPS)
+
+def alarm_masks() -> dict[int, np.ndarray]:
+    """Series-stamp masks within 2 days of an alarm of experiment 43's four settings."""
+    quiet = {s: np.zeros(GRID_LENGTH, dtype=bool) for s in SERIES_IDS}
     for name in OPERATING_POINTS:
         table = pl.read_parquet(EXPERIMENT_43_DIR / f"baseline_alarms_{name}.parquet")
         for series, stamp in table.select("series", "stamp").iter_rows():
             quiet[series][max(stamp - 2 * 48, 0) : stamp + 2 * 48] = True
     return quiet
+
+
+def quiet_masks() -> dict[int, np.ndarray]:
+    """Series-stamp masks that no injected transfer may touch, as in experiment 43.
+
+    No logged closure within 7 days, and no alarm of experiment 43's four settings within 2 days.
+    """
+    logged, alarmed = log_masks(), alarm_masks()
+    return {s: logged[s] | alarmed[s] for s in logged}
 
 
 def original_events(*, power: Arrays) -> list[Event]:
@@ -136,9 +148,8 @@ def original_events(*, power: Arrays) -> list[Event]:
 
 def new_events(*, power: Arrays) -> tuple[list[Event], list[Event]]:
     """Draw the extra headline-band set and the holiday set, with ids after experiment 43's 600."""
-    quiet = quiet_masks()
     extra = draw_events(
-        quiet=quiet, power=power, seed=SEED_NEW, headline_only=EXTRA_HEADLINE, first_id=1000
+        quiet=quiet_masks(), power=power, seed=SEED_NEW, headline_only=EXTRA_HEADLINE, first_id=1000
     )
     distance = holiday_distance_by_stamp()
 
@@ -146,7 +157,7 @@ def new_events(*, power: Arrays) -> tuple[list[Event], list[Event]]:
         return bool(abs(distance[onset]) <= 1)
 
     holiday = draw_events(
-        quiet=quiet,
+        quiet=log_masks(),
         power=power,
         seed=SEED_NEW + 1,
         headline_only=HOLIDAY_EVENTS,
@@ -257,7 +268,7 @@ def detect_all(
 def named_receiver(
     *, event: Event, intervals: dict[int, list[Interval]], table: pl.DataFrame
 ) -> bool | None:
-    """Whether a confirmed alarm that found the event also names one of its metered receivers.
+    """Whether a confirmed alarm that found the event also names another of its metered series.
 
     None when the event has no metered receiver or no interval found it.
     """
@@ -276,7 +287,7 @@ def named_receiver(
             if row.is_empty() or row["tier"].item() != "confirmed":
                 continue
             partners = {int(p.split(":")[0]) for p in row["partners"].item().split(";") if p}
-            if partners & set(event.receivers):
+            if partners & (set(event.series) - {interval.series}):
                 return True
     return False
 
@@ -346,7 +357,7 @@ def score_events(
         initargs=(state,),
     ) as pool:
         rows = [r for part in pool.map(score_batch, groups) for r in part]
-    return pl.DataFrame(rows)
+    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 def seeded_batches(*, events: list[Event], seed: int) -> list[tuple[int, list[Event]]]:
@@ -427,7 +438,7 @@ def real_events(*, power: Arrays) -> pl.DataFrame:
                 "series": ",".join(map(str, series)),
             }
         )
-    return pl.DataFrame(rows)
+    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 def score_real(*, results: RawResult, real: pl.DataFrame) -> pl.DataFrame:
@@ -449,4 +460,23 @@ def score_real(*, results: RawResult, real: pl.DataFrame) -> pl.DataFrame:
                     "end_error": match.end_error,
                 }
             )
-    return pl.DataFrame(rows)
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def neighbour_check_for_cards(*, cards: pl.DataFrame, veto_z: float) -> pl.DataFrame:
+    """Give each labelled alarm card the tier its alarm would receive.
+
+    `cards` has `detector` (an experiment 43 setting name), `stamp`, and `series`. The 24-hour
+    cards use the 24-hour neighbour steps and the 4-hour cards use the 4-hour ones.
+    """
+    panel, scales = load()
+    pieces = []
+    for window in (8, 48):
+        inputs = prepare(residuals=panel["residual"], window=window, scale=scales[window])
+        part = cards.filter(pl.col("detector").str.contains(f"_{window}_"))
+        table = part.select(
+            pl.col("series").cast(pl.Int64), pl.col("stamp").cast(pl.Int64), partners=pl.lit("")
+        )
+        tiers = neighbour_check(inputs=inputs, table=table, veto_z=veto_z)["tier"]
+        pieces.append(part.with_columns(tier=tiers))
+    return pl.concat(pieces)

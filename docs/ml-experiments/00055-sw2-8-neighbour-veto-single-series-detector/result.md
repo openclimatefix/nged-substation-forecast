@@ -25,7 +25,7 @@ decision_rule: >-
   (Bonferroni across C1 to C4) from 20,000 resamples of whole calendar months. D2's veto strength
   and threshold are chosen on odd months and on the injected transfers that start in odd months,
   never on even months. `supported` when the C1 interval lies wholly above zero, the C1 point value
-  is at least +0.01, and D2's even-month unexplained-alarm count is no more than 10% above D0's.
+  is at least +0.01, and D2's even-month unexplained-alarm count is no more than 10% above D0M's.
   `refuted` when the upper end of the C1 interval lies below +0.01. `inconclusive` otherwise. C2 to
   C4 and the real-event counts are reported without changing the verdict.
 benchmark: >-
