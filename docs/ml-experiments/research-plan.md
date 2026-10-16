@@ -18,7 +18,8 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
+| [00055](00055-sw2-8-neighbour-veto-single-series-detector/result.md) (SW2-8) | Does vetoing the single-series detector's alarms that the neighbours confirm as a common-mode miss let the threshold fall at the same rate of unexplained alarms, and find more injected transfers? | 3 | Nothing (SW2-4 done: experiment 47) | Planned |
+| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, a shape-aware step, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
@@ -170,7 +171,9 @@ work, for the plan of each iteration to confirm:
 - **SW2-7:** a shape-aware step, which models the moved load as a share of the donor's expected
   profile, not as a constant MW shift. Experiment 00037 found the step changing by more than a
   factor of 2 within 8 of 26 confirmed closures of 6 hours or more.
-- **SW2-8:** a single-series detector first, with neighbour balance as a sense check, not a gate.
+- **SW2-8:** planned as
+  [experiment 55](00055-sw2-8-neighbour-veto-single-series-detector/result.md), a single-series
+  detector first, with neighbour balance as a sense check, not a gate.
   Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's
   confidence and names the receiver, a same-sign step on the neighbours vetoes the alarm as a
   common-mode weather or calendar miss, and an alarm with no metered neighbour keeps its
