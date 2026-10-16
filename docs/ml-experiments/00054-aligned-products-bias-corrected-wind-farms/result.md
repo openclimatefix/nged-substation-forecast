@@ -16,18 +16,19 @@ prediction: >-
   the best guess's, and the unreliable days 3 to 6 reading of experiment 52 should disappear because
   the primary arm has no spread step.
 decision_rule: >-
-  One decisive contrast, C1: the primary blend minus the best guess on the quantile score for cases
-  whose valid time falls 1 or 2 calendar days after the date of the ENS run, read at 95% with whole
-  months and the three seeds resampled, 50,000 resamples. The interval is conditional on the three
-  farms. The threshold is 0.15 points, as in experiment 52, because the blend adds two weather feeds
-  and two pipeline steps to the serving path, and a smaller gain does not justify them. C1 is
-  `supported` when its interval lies wholly below -0.15, `small gain` when it lies wholly below zero
-  but not wholly below -0.15, `refuted` when it lies wholly above zero, and `inconclusive`
-  otherwise. `supported` also needs the primary blend's 5% to 95% coverage at lead days 1 and 2 to
-  be at least 0.87 (nominal 0.90), because averaging a wide ensemble mixture with narrow product
-  quantiles can under-cover; a blend below that is `small gain` at best. C2 (the same difference over all leads) is reported beside C1 and does not change the
-  verdict. Every other read (per product, per farm, per lead day, uncorrected, with the spread step)
-  is exploratory, labelled so, and read at 95%.
+  One decisive contrast, C1: the primary blend minus the best guess on the quantile score for
+  cases whose valid time falls 1 or 2 calendar days after the date of the ENS run, read at 95%
+  with whole months and the three seeds resampled, 50,000 resamples. The interval is conditional
+  on the three farms. The threshold is 0.15 points, as in experiment 52, because the blend adds
+  two weather feeds and two pipeline steps to the serving path, and a smaller gain does not
+  justify them. C1 is `supported` when its interval lies wholly below -0.15, `small gain` when it
+  lies wholly below zero but not wholly below -0.15, `refuted` when it lies wholly above zero, and
+  `inconclusive` otherwise. `supported` also needs the primary blend's 5% to 95% coverage at lead
+  days 1 and 2 to be at least 0.87 (nominal 0.90), because averaging a wide ensemble mixture with
+  narrow product quantiles can under-cover; a blend below that is `small gain` at best. C2 (the
+  same difference over all leads) is reported beside C1 and does not change the verdict. Every
+  other read (per product, per farm, per lead day, uncorrected, with the spread step) is
+  exploratory, labelled so, and read at 95%.
 benchmark: >-
   The experiment 33 wind best guess (`bg_full`) on the same cases.
 row_set_id: fold_a_tuesdays_v1
