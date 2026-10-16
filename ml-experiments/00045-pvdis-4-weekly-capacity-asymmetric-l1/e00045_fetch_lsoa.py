@@ -429,14 +429,19 @@ def desnz_publication_facts(*, path: Path) -> dict[str, str]:
         ),
         "",
     )
-    published = next((line for line in cover if "was published on" in line), "")
-    period = next((line for line in cover if "contains monthly data including" in line), "")
-    basis = next((line for line in cover if "Total Installed Capacity (TIC)" in line), "")
+    published = " ".join(next((line for line in cover if "was published on" in line), "").split())
+    period = " ".join(
+        next((line for line in cover if "contains monthly data including" in line), "").split()
+    )
+    basis_text = " ".join(next((line for line in cover if "(TIC)" in line), "").split())
+    basis = next(
+        (sentence for sentence in re.split(r"(?<=\.) ", basis_text) if "(TIC)" in sentence), ""
+    )
     return {
         "constituency_sheet_title": constituency_title,
-        "published": published.strip(),
-        "data_period": period.strip(),
-        "capacity_basis_sentence": basis.strip()[:600],
+        "published": published,
+        "data_period": period,
+        "capacity_basis_sentence": basis,
         "commentary_first_line": next((c for c in commentary if c.strip()), ""),
     }
 
