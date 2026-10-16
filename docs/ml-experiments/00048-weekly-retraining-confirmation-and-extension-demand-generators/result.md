@@ -105,14 +105,15 @@ better.
 The earlier setup, called the stack below, is a model fitted once with a correction built from its
 own errors over the last 14 days. The 0.20-point gap is wholly below zero at the strict level we
 fixed in advance, but the gap is fragile: it crosses zero with a t-interval over the 12 months or
-without one substation (see the limits). Weekly refitting also beat monthly refitting (5.57) by
-0.13 points. Neither the 7-day nor the 14-day error correction helped a weekly-refitted model,
-although neither was shown to hurt it at the strict level. At the 2 bulk supply point (BSP) and 2
-grid supply point (GSP) substations, which sit above the Primary substations, weekly refitting
-scored 0.66 points below the stack, more than we predicted. For 6 solar farms and 3 wind farms,
-refitting the weather-to-power model monthly changed the score by 0.04 points or less, so this
-experiment found no accuracy reason to refit generation models. The verdict is **supported**, and the open test is a second validation
-year, because the 292 runs share their months and weather with the 73 that experiment 34 scored.
+without one substation (see the limits). Weekly refitting also beat monthly refitting (5.57) by 0.13
+points. Neither the 7-day nor the 14-day error correction helped a weekly-refitted model, although
+neither was shown to hurt it at the strict level. At the 2 bulk supply point (BSP) and 2 grid supply
+point (GSP) substations, which sit above the Primary substations, weekly refitting scored 0.66
+points below the stack, more than we predicted. For 6 solar farms and 3 wind farms, refitting the
+weather-to-power model monthly changed the score by 0.04 points or less, so this experiment found no
+accuracy reason to refit generation models. The verdict is **supported**, and the open test is a
+second validation year, because the 292 runs share their months and weather with the 73 that
+experiment 34 scored.
 
 **Terms used below.** The stack uses a spread factor of 1.15 that widens its forecast uncertainty;
 every other arm uses the spread factor too, and uses no correction unless its name says so. Frozen
@@ -126,8 +127,8 @@ seed 0. The decision rule is in the front matter, and C1 to C8w are the contrast
 as planned" below explains the choices.
 
 **Weekly refitting beat the stack at the 99.44% level we fixed in advance.** C1, weekly minus the
-stack, is -0.20 points (99.44% interval -0.40 to -0.035), so the interval lies wholly below zero. The
-threshold was zero: any gain was enough, because refitting replaces the correction step at the
+stack, is -0.20 points (99.44% interval -0.40 to -0.035), so the interval lies wholly below zero.
+The threshold was zero: any gain was enough, because refitting replaces the correction step at the
 price of one scheduled job. C3, weekly minus monthly refitting, is -0.13 (-0.24 to -0.03). C2,
 monthly minus the stack, is -0.08 (-0.33 to +0.19). Experiment 34 found monthly refitting better
 than the stack on its 5-day runs, and this experiment did not resolve that gain on daily runs.
@@ -146,12 +147,13 @@ than the stack on its 5-day runs, and this experiment did not resolve that gain 
 | `manual_heuristic` | 6.26 | 8.84 | 20.82 | 5.79 | 14.09 |
 | `climatology` | 7.48 | | | | |
 
-Each cell is a mean quantile score in points of capacity, and a blank cell means the arm was not
-run for that group. Scores are on the cases that every forecasting-model arm of the group holds
-(3,199,243 Primary cases), so differences between cells equal the paired contrasts. `manual_heuristic`
-and `climatology` hold slightly fewer cases (3,197,611 and 3,049,925 for Primary), and the solar and
-wind rows hold the weather-to-power model without a correction. The 95% interval on each Primary
-score, over months, is about plus or minus 0.3 points; the contrasts are paired and much tighter.
+Each cell is a mean quantile score in points of capacity, and a blank cell means the arm was not run
+for that group. Scores are on the cases that every forecasting-model arm of the group holds
+(3,199,243 Primary cases), so differences between cells equal the paired contrasts.
+`manual_heuristic` and `climatology` hold slightly fewer cases (3,197,611 and 3,049,925 for
+Primary), and the solar and wind rows hold the weather-to-power model without a correction. The 95%
+interval on each Primary score, over months, is about plus or minus 0.3 points; the contrasts are
+paired and much tighter.
 
 **The reproduction check passed for Primary and narrowly failed for BSP and GSP.** We forecast the
 73 runs of experiment 34 again from the same refits. For the Primary arms without a correction, the
@@ -254,19 +256,21 @@ correction window and solar and wind refitting at the resolution of its interval
 best-guess stack with no correction; this experiment asks whether the gain holds on the other 292
 daily runs of the same year.** The 292 runs share their months and weather with the 73, so the test
 guards against the choice of origins and seeds, not against an unusual year. Experiment 34 also left
-three gaps: its correction read forecasts 5 days apart, retraining was not tried for BSP, GSP, solar,
-and wind beyond monthly BSP and GSP, and the 7-day correction was not tried on a retrained model.
+three gaps: its correction read forecasts 5 days apart, retraining was not tried for BSP, GSP,
+solar, and wind beyond monthly BSP and GSP, and the 7-day correction was not tried on a retrained
+model.
 
 **Rows.** The row set `fold_a_daily_gap_v1` holds the daily 00:00 UTC ENS runs from 2025-07-01 to
-2026-06-30 that `fold_a_every5d_v1` does not. All 365 daily runs exist in the ENS archive, so the set
-holds 292 runs, and the 73 of `fold_a_every5d_v1` are forecast again from the same refits as a
+2026-06-30 that `fold_a_every5d_v1` does not. All 365 daily runs exist in the ENS archive, so the
+set holds 292 runs, and the 73 of `fold_a_every5d_v1` are forecast again from the same refits as a
 reproduction check. Each run spans about 14.6 days, so the 73 runs already cover every valid time of
 the year: the 292 runs score the same observed demand at other origins and leads, and guard against
-the choice of origins, not against the outcome data. The demand frames use the same builder as `studies/stage1_pilot/demand_build_ens.py`
-(production's half-hourly upsampling, all 51 members, lags from the observed power). No experiment
-scores a valid time on or after 2026-07-01. The generators need frames for their 9 series over all
-365 runs and 51 members, built the same way for the generators' H3 cells and the technology's
-columns (experiment 33 holds only the 53 Tuesday runs).
+the choice of origins, not against the outcome data. The demand frames use the same builder as
+`studies/stage1_pilot/demand_build_ens.py` (production's half-hourly upsampling, all 51 members,
+lags from the observed power). No experiment scores a valid time on or after 2026-07-01. The
+generators need frames for their 9 series over all 365 runs and 51 members, built the same way for
+the generators' H3 cells and the technology's columns (experiment 33 holds only the 53 Tuesday
+runs).
 
 **Arms.**
 
@@ -290,12 +294,12 @@ columns (experiment 33 holds only the 53 Tuesday runs).
   measurement.
 - **Baselines:** `manual_heuristic` and `climatology` on the same 292 runs.
 
-**Resources.** About 5 to 7 GPU hours inside slot A (10 cores, at most 24 GB): weekly Primaries
-2.4, monthly 0.6, BSP and GSP weekly 0.6, generators 1 to 2, P-roll 0.2.
-The 292 new demand frames add about 8 GB of disk, and the generator frames some more; each
-worker loads the runs of one refit at a time, so memory stays inside 24 GB, and the fits run as
-parallel workers, one output file per refit written atomically, so a run resumes. The GPU is shared with
-other sessions, so the timings are not reproducible; the numbers are, because seeds are fixed per job.
+**Resources.** About 5 to 7 GPU hours inside slot A (10 cores, at most 24 GB): weekly Primaries 2.4,
+monthly 0.6, BSP and GSP weekly 0.6, generators 1 to 2, P-roll 0.2. The 292 new demand frames add
+about 8 GB of disk, and the generator frames some more; each worker loads the runs of one refit at a
+time, so memory stays inside 24 GB, and the fits run as parallel workers, one output file per refit
+written atomically, so a run resumes. The GPU is shared with other sessions, so the timings are not
+reproducible; the numbers are, because seeds are fixed per job.
 
 **Sizing, by the five triggers.** Stored: predictions under `data/`, private, nothing in production.
 Serving path: not touched. Degradation rule: not touched. More than one defensible design: no, the
@@ -311,15 +315,15 @@ Bonferroni-level interval, because months set the width (00034). Departures: non
 
 **Plan review (Opus), triaged.** Accepted: state that the correction reads forecasts as issued and
 nothing before 2025-07-01; predict a smaller Primary gap because the daily stack's correction is
-fresher; set C3's threshold to zero; split C8 into solar and wind and make "no change" conditional on
-the interval; name which frozen reference C7 uses; report each series; limit the reproduction check
-to arms without a correction; add the generator frame builder, the disk and memory budget, and the
-spread-factor rule. Rejected: none.
+fresher; set C3's threshold to zero; split C8 into solar and wind and make "no change" conditional
+on the interval; name which frozen reference C7 uses; report each series; limit the reproduction
+check to arms without a correction; add the generator frame builder, the disk and memory budget, and
+the spread-factor rule. Rejected: none.
 
-**Code review (Sonnet), triaged.** No leakage found. Accepted: run `--check` on the frames, cap threads
-through environment variables, split the frozen fit across workers, and note the correction's July
-warm-up and the generator spread factor's first months. Rejected: relabelling C6 and C7 in the report
-script, because the page states the rule for each.
+**Code review (Sonnet), triaged.** No leakage found. Accepted: run `--check` on the frames, cap
+threads through environment variables, split the frozen fit across workers, and note the
+correction's July warm-up and the generator spread factor's first months. Rejected: relabelling C6
+and C7 in the report script, because the page states the rule for each.
 
 **Write-up check and prose review (Sonnet), triaged.** Accepted: the absolute scores now use the
 cases the contrasts use (the baselines had shrunk the shared case set, so the table and C1 had
