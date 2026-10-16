@@ -1377,7 +1377,8 @@ single-series detector with the PF14 end rule, a difference of +0.048 (97.5% int
   LOGIT_SAME). Long transfers gain nothing (0.000). On the 35 labelled real transfers the score
   found 7 against PF14's 8.
 - **Write-up and pull request:** [the full result
-  page](00070-sw2-19-same-sign-neighbour-count/result.md), PR PRNUMBER.
+  page](00070-sw2-19-same-sign-neighbour-count/result.md), [PR
+  #1303](https://github.com/openclimatefix/nged-substation-forecast/pull/1303).
 
 ![MW-weighted recall by arm](00070-sw2-19-same-sign-neighbour-count/figure_1_recall_by_arm.svg)
 
