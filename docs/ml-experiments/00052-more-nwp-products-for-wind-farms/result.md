@@ -13,17 +13,17 @@ prediction: >-
   all leads: -0.05 to -0.15. The interval on 3 farms is wide, and experiment 35's wind blend (-0.37
   at 0 to 24 h, -0.81 to +0.02) suggests `inconclusive` is the likeliest verdict. Solar (secondary,
   descriptive): 0 to -0.05.
-decision_rule: >-
-  Two decisive contrasts for wind, the blend minus the best guess on the quantile score: C1 on the
-  1 to 2 day lead band (24 to 72 hours after the ENS run's 00 UTC), the primary contrast, and C2 over
-  all leads. Both are read at 97.5% (Bonferroni across two) with whole months and the three seeds
-  resampled, 50,000 resamples. The threshold is 0.15 points at 1 to 2 days, because the blend adds
-  two weather feeds and two pipeline steps to the serving path (a gain under that does not repay
-  them), and 0.05 over all leads. C1 is `supported` when its interval lies wholly below -0.15,
-  `small gain` when it lies wholly below zero but not wholly below -0.15, `refuted` when it lies
-  wholly above zero, and `inconclusive` otherwise. C2 does not change the verdict; it is reported
-  beside C1 under the same four labels. All other reads (per product, per farm, per band, solar)
-  are exploratory, labelled so, and read at 95%.
+>-
+  One decisive contrast, C1: the blend minus the best guess on the quantile score for cases whose
+  valid time falls 1 or 2 calendar days after the date of the ENS run (lead day 1 or 2, counted from
+  the run's 00 UTC), read at 95% with whole months and the three seeds resampled, 50,000 resamples.
+  The interval is conditional on the 3 farms, because farms are not resampled. The threshold is
+  0.15 points, because the blend adds two weather feeds and two pipeline steps to the serving path,
+  and a smaller gain does not repay them. C1 is `supported` when its interval lies wholly below
+  -0.15, `small gain` when it lies wholly below zero but not wholly below -0.15, `refuted` when it
+  lies wholly above zero, and `inconclusive` otherwise. C2, the same difference over all leads, is
+  reported beside C1 at 95% and does not change the verdict. All other reads (per product, per farm,
+  per lead day, solar) are exploratory, labelled so, and read at 95%.
 benchmark: >-
   The experiment 33 wind best guess (`bg_full`) on the same cases, read from its stored table.
 row_set_id: fold_a_tuesdays_v1
@@ -65,10 +65,10 @@ only. The data are on disk, so the experiment downloads nothing.
 
 | Product | Wind variables at the 3 farms | Validation year, July 2025 to June 2026 | Used |
 |---|---|---|---|
-| ICON-EU (Open-Meteo Previous Runs) | 10 m and 100 m speed and direction | All 8,760 hours at lead days 1 and 2; day 3 has 98.9% of hours; no day 4 | Primary |
-| IFS 0.25 degree (same archive) | Same | All 8,760 hours at lead days 1 to 3 (archive holds to day 7) | Primary |
+| ICON-EU (Open-Meteo Previous Runs) | 10 m and 100 m speed and direction | All 8,760 hours at `previous_day1`; 98.9% at `previous_day2`; complete at days 3 and 4; no day 5 | Primary |
+| IFS 0.25 degree (same archive) | Same | All 8,760 hours at days 1 to 3 (archive holds to day 7) | Primary |
 | GFS (same archive) | Same | All 8,760 hours at lead days 1 to 3 | Exploratory |
-| AIFS Single (Dynamical.org) | `wind_u_10m`, `wind_v_10m`, `wind_u_100m`, `wind_v_100m` | From the 2025-02-24 06 UTC run; version change on 2026-05 inside the year (PVDIS-8) | Exploratory, rows of one version only |
+| AIFS Single (Dynamical.org) | `wind_u_10m`, `wind_v_10m`, `wind_u_100m`, `wind_v_100m` | From the 2025-02-24 06 UTC run; version change in 2026-05 inside the year (PVDIS-8) | Not used: needs its own row set; left to a later experiment |
 | GEFS and GFS native (Dynamical.org) | 10 m wind only | Whole year | Not used: no 100 m wind |
 | The nwp-archive (ICON-EU-EPS, ICON-D2-EPS, MOGREPS) | n/a | Starts 2026-10-06 (DWD) or later | Not used: no overlap with the year |
 | UKV | n/a | CEDA UKV differs statistically from the live feed | Not used |
@@ -76,28 +76,40 @@ only. The data are on disk, so the experiment downloads nothing.
 ## Design
 
 - **Cases:** experiment 33's 53 Tuesday ENS runs of `fold_a_tuesdays_v1` for the 3 wind farms, the
-  cases its stored `bg_full` table holds, 3 seeds. Weights and spread factors for runs in month m
-  use only cases with a valid time before the first day of m (experiment 35's rolling origin). July
-  2025 has no history and uses equal weights.
+  half-hourly cases its stored `bg_full` table holds, 3 seeds. Weights and spread factors for runs in
+  month m use only cases with a run in an earlier month and a valid time before the first day of m
+  (experiment 35's rolling origin). July 2025 has no history and uses equal weights and no extra
+  spread factor.
 - **Product forecast power:** for each seed, refit experiment 33's ERA5-trained wind model (`margin`
   variant: nine quantiles with the power-curve base margin, trained on valid times before
   2025-06-17). Feed it the product's 10 m and 100 m speed (converted from km/h to m/s) and the sine
   and cosine of its direction, at the farm's grid point. The model gives nine quantiles per case.
-- **Lead and availability:** a case whose valid time falls d days after the run's date (the ENS
-  `lead_hours` // 24) reads `previous_day(d+1)`, which comes from a run initialised on or before the
-  day before the ENS run, so the product was published before the service reads ENS at 09:00 UTC.
-  This is the conservative lead of the matched-lead study. Cases beyond a product's horizon (ICON-EU
-  after day 3) have no product quantiles and keep the best guess unchanged. A case whose
-  `previous_day` value is missing is treated the same way.
+- **Lead day and availability:** the lead day d of a case is the number of calendar days from the
+  date of its ENS run (`nwp_init_time`, 00 UTC) to its valid time, not `lead_hours` // 24, because
+  experiment 33's `lead_hours` counts from `power_fcst_init_time` (09:00 UTC). A case reads
+  `previous_day(d+1)`. That selects a run initialised no later than 21:00 UTC (ICON-EU) or 18:00 UTC
+  (IFS, GFS) on the day before the ENS run, so it was published before the service reads ENS at
+  09:00 UTC. ICON-EU reaches d = 3 (`previous_day4`); IFS and GFS reach d = 6. A case beyond a
+  product's horizon, or with a null value, lacks that product.
+- **Half-hour valid times:** the archive is hourly. A case at :30 averages the speed and the u and v
+  components of the hour before and the hour after, then takes the direction from the averaged
+  components, as the ERA5 build does; both ends use the same `previous_day(d+1)` column, where d is
+  fixed by the case, so that the two ends never come from different runs.
 - **Blend:** the Vincent average (mean of each quantile level, then sorted) of `bg_full` and the
-  product forecasts, with weights on a 0.25 grid chosen per lead band (experiment 35's bands) on
-  earlier months to minimise the quantile score, and a one-weight variant. The arms are `ens+icon`,
-  `ens+ifs`, and `ens+icon+ifs`, the last being the primary arm.
-- **Stop rule:** a product whose own forecast scores more than 1.0 points worse than `bg_full` at
-  1 to 2 days on the first 6 months is dropped from the exploratory arms and reported (the rule of
-  the ranking brief). A dropped product never leaves the primary arm, which is fixed in advance.
-- **Solar (descriptive):** the 6 solar farms get the same blend where the product's shortwave
-  radiation replaces ERA5's in the best-guess mixture's single input column. Solar decides nothing.
+  available product forecasts. The weights are on a 0.25 grid, chosen per lead-day band (day 0, days
+  1 to 2, days 3 to 6, days 7 and beyond) on earlier months to minimise the quantile score, and are
+  renormalised over the members a case has; the history for a band uses cases that have all the
+  primary arm's products. A rolling-origin spread factor (experiment 33's `fit_spread_factor`,
+  grid widened to 3.0) is then fitted on the blend per band on earlier months, because a
+  perfect-weather model fed one forecast gives a band that is too narrow. A factor at the grid edge
+  is reported. The arms are `ens+icon+ifs` (primary, fixed in advance), `ens+icon`, `ens+ifs`, and
+  `ens+gfs` (exploratory), each with one weight vector for all bands as a second option.
+- **Stop rule:** a product whose own spread-corrected forecast scores more than 1.0 points worse
+  than `bg_full` at lead days 1 to 2 on the first 6 months is dropped from the exploratory arms and
+  reported. A dropped product never leaves the primary arm, which is fixed in advance.
+- **Solar (descriptive, only if the wind pipeline finishes with time to spare):** the 6 solar farms
+  get the same blend, with the product's shortwave radiation replacing ERA5's in the single input
+  column. The matched-lead study found no solar gain at this lead, so solar decides nothing.
 - **Reports:** absolute scores of every arm per farm (`W1` to `W3`) and per lead band; coverage;
   a climatology row from `ClimatologyForecaster`; the chosen weights.
 
@@ -107,8 +119,11 @@ only. The data are on disk, so the experiment downloads nothing.
 - **Calendar columns:** the ERA5-trained models use no calendar columns, as in experiment 33.
 - **Past-weather caveat:** the ERA5-trained model is trained on ERA5 but fed forecast weather at
   serving time. No ERA5 weather is read at lag times, so nothing here depends on ERA5's delay.
-- **Run availability:** a unit check asserts that for every case the product run time is earlier than
-  the ENS run date plus 9 hours, using the archive's documented run selection rule.
+- **Run availability:** a unit check asserts that for every case the selected run's initialisation
+  time plus the product's publication delay (4 hours for ICON-EU, 8 hours for IFS and GFS, upper
+  bounds taken from the providers' documentation) is no later than 09:00 UTC on the ENS run's date.
+- **Product levels:** the report prints each product's mean 100 m speed at the farms against ERA5's.
+  ICON-EU's 100 m wind is Open-Meteo's rescaling of its 120 m level.
 - **A placebo arm:** the blend of `bg_full` with a product's forecast shuffled among cases of the
   same farm, month, and hour of day shows how much of any gain comes from averaging alone.
 
