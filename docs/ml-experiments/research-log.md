@@ -862,10 +862,9 @@ refitting. The verdict is supported, on the blend alone.
   cannot test the COVID indicator. The Christmas column and the half-life are unresolved on one
   winter. P-roll scores 5.150 (quantile score, in points of capacity) and is the screening reference
   row.
-- **Write-up and pull request:** [result](00049-vp1-screening-reference-under-p-roll-
-  demand/result.md), [PR #1271 (Experiment 49: which Primary demand components still improve the
-  score under monthly retraining?)](https://github.com/openclimatefix/nged-substation-
-  forecast/pull/1271).
+- **Write-up and pull request:**
+  [result](00049-vp1-screening-reference-under-p-roll-demand/result.md),
+  [PR #1271 (Experiment 49: which Primary demand components still improve the score under monthly retraining?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1271).
 
 ![The six pre-registered contrasts](00049-vp1-screening-reference-under-p-roll-demand/figure_1.svg)
 
