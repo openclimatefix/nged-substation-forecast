@@ -79,10 +79,10 @@ advice:
   - >-
     Screen demand-feature experiments on monthly refits of a rolling 12-month window with 150
     rounds and `eta` 0.15, not on a frozen model: it reproduced full monthly retraining's contrasts
-    at 0.2 of the GPU time (rank test R1 to R3).
+    at about a third of the GPU time (rank test R1 to R3).
   - >-
     Do not use three refits a year, a linear blend of anchors, or warm-start boosting as a proxy
-    for monthly retraining, because each flips or shrinks the correction contrast (R1).
+    for monthly retraining, because each of the three flips or shrinks the correction contrast (R1).
   - >-
     Expect a feature that follows recent demand level to lose its gain once the model is
     retrained: the weekly analogues gained 0.05 on a frozen model and 0.01 under monthly
@@ -97,18 +97,30 @@ code: ml-experiments/00034-retraining-cadence-and-cheap-proxies-demand/
 
 # Experiment 34: how often should the demand model be retrained?
 
-**We asked how much a substation demand forecast improves when the model is refitted more often, and
-whether a cheaper stand-in for frequent refitting gives the same answers.** For 16 Primary
-substations, we refitted the same XGBoost model on the most recent data every year, six months,
-quarter, month, week, or day, and scored its forecasts for 73 days spread over July 2025 to June
-2026. The error is the quantile score, which rewards a forecast that is both close and honest about
-its uncertainty, in percentage points of each substation's capacity (lower is better). Refitting
-monthly lowered the error from 5.32 for the best earlier setup (a frozen model plus a correction
-from the last 14 days of errors) to 5.12, a gain of 0.20 points that is clear at 95% confidence but
-not at the stricter level we set in advance. Refitting weekly gained another 0.07, refitting daily
-almost nothing more, and the correction stopped helping once the model refitted often. Of four cheap
-stand-ins for monthly refitting, only refitting monthly on the latest 12 months of data (with fewer,
-larger trees) gave the same answers as full monthly refitting.
+**We asked how much a forecast of a substation's electricity demand improves when the forecasting
+model is refitted on newer data more often, and whether a cheaper stand-in for frequent refitting
+gives the same answers.** For each of 16 Primary substations we refitted one gradient-boosted
+decision-tree model (XGBoost) on all the data available at the refit date, once a year, every 6
+months, every quarter, every month, every week, or every day. We then scored its forecasts for 73
+runs started 5 days apart between July 2025 and June 2026. The error is the quantile score, which
+rewards a forecast that is both close and honest about its uncertainty, in percentage points of the
+substation's capacity (lower is better). The best earlier setup we had tested was a model trained
+once, with a correction added from its own errors over the last 14 days; it scored 5.32. Refitting
+monthly with no correction scored 5.12, which is 0.20 points lower. The 95% interval for that
+difference excludes zero, but the stricter 99.375% interval that we fixed in advance does not.
+Refitting weekly scored a further 0.07 lower than monthly, and refitting daily (three months only)
+scored 0.01 lower than weekly. The 14-day correction stopped helping once the model was refitted
+often. We also tested four cheaper ways to imitate monthly refitting, and judged each by whether it
+changed three earlier experiments' results the way full monthly refitting changes them. Only
+refitting monthly on the latest 12 months of data, with 150 larger boosting steps in place of 500,
+agreed on all three.
+
+**Terms used below.** N1 is the one-model-per-substation XGBoost recipe of experiment 13, trained on
+the control member of the ECMWF ensemble (ENS) weather forecast. The stack is N1 trained once, then
+given the 14-day correction and a spread factor of 1.15 that widens its uncertainty. Frozen means
+trained once, up to 30 June 2025. BSP and GSP are the bulk supply point and grid supply point
+substations above the Primary substations. A GPU hour is one hour on the graphics card that fits
+the models.
 
 **Inconclusive at the planned level, with the direction established at 95%.** The primary contrast
 C1 is monthly retraining minus the best-guess stack. It scores -0.20 points (99.375% interval -0.44
@@ -167,10 +179,10 @@ monthly -0.06 (-0.12 to -0.02). The gain flattens at weekly cadence, not at mont
 0.07 below monthly, which is above the 0.05 band the plan set.
 
 **The correction stops helping once the model is retrained, and hurts at weekly and daily cadence.**
-C2 is +0.11 and unresolved at monthly cadence. At weekly cadence it costs +0.23 (C7), and on the
-daily months it costs +0.52 (+0.18 to +0.78). For the 2 BSP and 2 GSP series, monthly retraining
-lowers the score by 0.11 (-0.23 to +0.00) and 0.43 (-1.15 to +0.10) against the frozen model, and
-the correction costs +0.24 and +0.78; these intervals are wide on two series each.
+C2 is +0.11 and unresolved at monthly cadence. At weekly cadence it raises the score by 0.23 (C7),
+and on the daily months it costs +0.52 (+0.18 to +0.78). For the 2 BSP and 2 GSP series, monthly
+retraining lowers the score by 0.11 (-0.23 to +0.00) and 0.43 (-1.15 to +0.10) against the frozen
+model, and the correction costs +0.24 and +0.78; these intervals are wide on two series each.
 
 **A half-life of 0.5 years and 2 years score the same under monthly retraining** (C6, -0.02).
 
@@ -197,17 +209,17 @@ proxy is not required to match its sign.
 ![Rank agreement of each proxy with full monthly retraining](figure_3.svg)
 
 **Three results change how later experiments should run.** First, P-roll costs 0.03 points of score
-and about a third of the GPU time of a full monthly refit (about 3 s against 10 s per fit); it
-passes. Second, the weekly-analogue columns gained 0.05 on a frozen model but only 0.01 under
-monthly retraining (R2), so a frozen reference overstates a feature that follows recent demand
-level. Third, the P-warm chains get worse with more updates: 5.41 for monthly updates, 5.67 for
-weekly updates, and on the daily months 7.76 for daily updates against 5.67 for the weekly chain
-over the same rows (+1.55, +0.33 to +3.21). Adding rounds to a booster each update never forgets
-older rows, so warm starting cannot stand in for weekly or daily refitting. P-interp scores best of
-all arms (4.91) because its later anchor saw data after the forecast origin; it is a screening
-device only and is never a forecast score.
+and about a third of the GPU time of a full monthly refit (about 3 s against 10 s per fit; 0.20
+against 0.63 GPU hours for one seed); P-roll passes. Second, the weekly-analogue columns gained 0.05
+on a frozen model but only 0.01 under monthly retraining (R2), so a frozen reference overstates a
+feature that follows recent demand level. Third, the P-warm chains get worse with more updates: 5.41
+for monthly updates, 5.67 for weekly updates, and on the daily months 7.76 for daily updates against
+6.21 for the weekly chain over the same rows (+1.55, +0.33 to +3.21). Adding rounds to a booster
+each update never forgets older rows, so warm starting cannot stand in for weekly or daily
+refitting. P-interp scores best of all arms (4.91) because its later anchor saw data after the
+forecast origin; it is a screening device only and is never a forecast score.
 
-## Cost of retraining cadence
+## Fitting time by retraining cadence
 
 N1 takes about 10 s per series for a refit on the GPU. For the 16 Primary series: a frozen arm is 16
 fits (about 3 minutes); one seed of monthly retraining is 192 fits (0.63 GPU hours, 12 times as
@@ -219,12 +231,12 @@ the manager approved the extra stage.
 
 ## Failures and limits
 
-- **No fit failed.** The first daily warm-start run crashed on a missing folder and was rerun.
+- **No fit failed.**
 - **The correction history spans model changes.** At each refit the 14-day correction reads
   forecasts from the previous model, which may understate the correction's value at weekly and daily
   cadence.
 - **The validation rows are 5 days apart,** not daily, so the correction reads forecasts 5 days
-  apart (the departure from experiment 19's advice).
+  apart (experiment 19 advised daily forecasts for this test).
 - **C1 is not an independent test:** experiment 33's seed 0 suggested it on the same rows. Seeds 1
   and 2 changed C1 by under 0.01, because months, not seeds, set the interval.
 - **R4 (experiment 32's fingerprints) and solar and wind were not run.** The BSP and GSP part covers
@@ -264,4 +276,4 @@ table per arm with every group), contrasts read three seeds where the plan said 
 except C1 and C2), the daily arm needed the weekly arm built first, and warm-start writes were not
 atomic. No leakage was found.
 
-**Prose review (Sonnet):** see the pull request for the findings and their triage.
+**Prose review (Sonnet):** applied in this page; the triage is in the pull request.

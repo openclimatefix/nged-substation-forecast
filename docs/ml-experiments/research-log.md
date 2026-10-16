@@ -952,7 +952,7 @@ forecast runs from July 2025 to June 2026. The pre-registered verdict is inconcl
   -0.07 (-0.18 to -0.00). The correction at weekly cadence: +0.23 (+0.03 to +0.44).
 - **Finding for later experiments:** of four cheap proxies for monthly retraining, only monthly
   refits on a rolling 12-month window (150 rounds, `eta` 0.15) reproduced full monthly
-  retraining's contrasts, at about a fifth of the GPU time. A frozen reference overstates a
+  retraining's contrasts, at about a third of the GPU time. A frozen reference overstates a
   feature that follows recent demand level (weekly analogues: -0.05 frozen, -0.01 retrained).
 - **Write-up and pull request:** [result](00034-retraining-cadence-and-cheap-proxies-demand/result.md),
   [PR #1243 (Experiment 34: retraining cadence and cheap proxies for Primary demand (plan))](https://github.com/openclimatefix/nged-substation-forecast/pull/1243).

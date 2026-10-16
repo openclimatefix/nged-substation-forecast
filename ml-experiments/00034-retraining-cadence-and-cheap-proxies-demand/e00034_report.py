@@ -24,6 +24,7 @@ ARMS: Final[tuple[str, ...]] = (
     "weekly_s",
     "weekly_cs",
     "monthly_2y_s",
+    "monthly_2y_cs",
     "roll12_s",
     "warm20_monthly_s",
     "warm50_monthly_s",
@@ -91,13 +92,39 @@ def main() -> None:
         .select(*common.KEYS, "seed")
     )
     print("QUANTILE SCORE on the daily arm's rows (October 2025, January 2026, April 2026), seed 0")
-    for arm in ("daily_s", "daily_cs", "weekly_s", "weekly_cs", "monthly_s", "yearly_s", "n1_cs"):
+    for arm in (
+        "daily_s",
+        "daily_cs",
+        "weekly_s",
+        "weekly_cs",
+        "monthly_s",
+        "yearly_s",
+        "n1_cs",
+        "warm20_daily_s",
+        "warm20_weekly_s",
+        "warm20_monthly_s",
+    ):
         rows = (
             pl.read_parquet(common.WORK_DIR / "metrics" / f"{arm}.parquet")
             .filter((pl.col("group") == "Primary") & (pl.col("seed") == 0))
             .join(keys, on=[*common.KEYS, "seed"], how="semi")
         )
         print(f"{arm}: {rows.height} cases, {float(rows['qs'].mean()):.3f}")  # ty: ignore[invalid-argument-type]
+    corrected = {
+        seed: pl.read_parquet(common.WORK_DIR / "metrics" / "monthly_cs.parquet")
+        .filter((pl.col("group") == "Primary") & (pl.col("seed") == seed))
+        .select(*common.KEYS, cs="qs")
+        .join(
+            pl.read_parquet(common.WORK_DIR / "metrics" / "monthly_s.parquet")
+            .filter((pl.col("group") == "Primary") & (pl.col("seed") == seed))
+            .select(*common.KEYS, s="qs"),
+            on=list(common.KEYS),
+        )
+        for seed in common.SEEDS
+    }
+    print("R1 (monthly with minus without the correction) by seed")
+    for seed, frame in corrected.items():
+        print(f"seed {seed}: {float((frame['cs'] - frame['s']).mean()):.4f}")  # ty: ignore[invalid-argument-type]
     rank = pl.read_parquet(RESULTS_DIR / "contrasts_rank.parquet")
     print("RANK TEST, all leads, 95% intervals, seed 0")
     print(
