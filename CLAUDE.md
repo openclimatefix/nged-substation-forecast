@@ -72,6 +72,7 @@ one, the mistake is already written.
 | `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
 | `study` | planning, running, re-running, charting, writing up, or reviewing a study under `studies/`, or changing `packages/studies/` |
 | `ml-experiment` | planning, running, or writing up a small experiment that tests one hypothesis about improving the production forecast, under `ml-experiments/`, or running a night's agreed experiments |
+| `ml-experiment-manager` | coordinating several ml-experiment sessions at once: ordering the queue, allocating GPU and CPU slots, writing session briefs, merging and archiving, Opus planning reviews, or running experiments overnight while the maintainer is away |
 | `release-model` | choosing which ml-experiment winners go into the next numbered model release, planning the port, or running the `model-release-N` cross-validation gate |
 | `data-download` | writing or resuming a bulk-download script (e.g. `studies/*/fetch_*.py`) that makes more than a handful of requests |
 | `data-validation` | trusting the output of a finished download or data build — gaps, duplicate keys, nulls and NaNs, implausible values, grid orientation, timestamp convention |
