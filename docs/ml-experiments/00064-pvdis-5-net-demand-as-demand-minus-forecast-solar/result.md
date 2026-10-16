@@ -1,7 +1,7 @@
 ---
 id: "00064"
 slug: pvdis-5-net-demand-as-demand-minus-forecast-solar
-status: planned
+status: done
 size: complex
 hypothesis: >-
   At the 5 Primary substations (substations that feed 11 kV circuits from the 33 kV network) with a
@@ -76,159 +76,315 @@ metric: >-
   correction and the spread factor, on daylight April-to-September rows with a CAMS unit PV shape
   and an observed power, as in experiment 00046.
 code: ml-experiments/00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/
-verdict: null
-best_arm: null
-headline: null
-lessons: null
-production_status: null
-adopted_in: null
-advice: []
+verdict: supported
+best_arm: >-
+  `am` (the XGBoost model started from the forecast solar output as a base margin): quantile score
+  4.467 points of capacity, 0.152 points (98.75% interval -0.199 to -0.111) below the best guess
+  `d0`, and 0.300 points (-0.407 to -0.198) below its own placebo twin.
+headline: >-
+  Giving the XGBoost model the forecast solar output as a starting offset, with a weight fitted on
+  the training window, beat the best guess `d0` by 0.152 points of capacity (98.75% interval -0.199
+  to -0.111; leads under 48 hours -0.272, -0.420 to -0.145), and each of the four arms beat its own
+  placebo twin. Training on gross demand and subtracting the forecast solar (`b`) was not shown to
+  match `d0` (+0.105, -0.090 to +0.292).
+lessons: >-
+  An explicit solar term can be added without losing accuracy, and as a starting offset it lowers the
+  error at every lead under 10 days and at all five series. The fitted weight on the ENS solar shift
+  is -0.60 to -0.29 (mean over series, first four lead bands) and must be zero beyond 10 days, where
+  the ENS anomaly has a correlation of 0.03 with the CAMS anomaly. Why the gross-demand arm `b` falls
+  short is not identified.
+production_status: candidate
+adopted_in: none
+advice:
+  - >-
+    Attach the forecast solar term to the XGBoost model as a starting offset (`am`), not as an input
+    column or a shift after the fit, because `am` scores 0.152 points (-0.199 to -0.111) below `d0`
+    and 0.093 points (0.057 to 0.129) below the input-column arm `a` (verdict table, `a` against
+    `am`).
+  - >-
+    Fit the solar weight per series, lead band, and season on the training window, and set it to
+    zero beyond 10 days, because the ENS anomaly has a correlation of 0.03 with the CAMS anomaly
+    there and the fitted slope ranges from -8.2 to +6.2 (weights section).
+  - >-
+    Do not train on gross demand and subtract the forecast solar afterwards (`b`) without a test
+    that bounds its loss, because `b` scores +0.105 points (-0.090 to +0.292) against `d0` and is
+    +0.249 (0.035 to 0.479) worse at 6 to 10 days (verdict table, lead bands).
+  - >-
+    Use the ensemble-mean solar shift for `sf` and `am`, because the per-member shift changes `sf`
+    by -0.004 points (-0.010 to +0.001, exploratory) (other reads).
+  - >-
+    Do not add a cell-temperature derating to the solar term, because `sf_temp` minus `sf` is +0.0003
+    points (-0.0016 to +0.0022, exploratory) (other reads).
+  - >-
+    Test noise in the CAMS sunshine estimate as the cause of a fitted weight below 1 before changing
+    the XGBoost model's inputs, because the slope on the CAMS shift stays at -0.73 to -0.78 when
+    both the lagged-power and cloud-proxy columns are removed (slope diagnostic).
+  - >-
+    Refit with a capacity table that is current for the validation year before porting, because the
+    capacity held at the 2024/25 value is 6% to 23% below experiment 45's 2025/26 constants at all
+    five series (departure 10).
 ---
 
-# Experiment 64: demand minus forecast solar (PVDIS-5), the plan
+# Experiment 64: does demand minus forecast solar match the best guess? (PVDIS-5)
 
-This page is the pre-registered plan. It is committed before any code runs, and the sections after
-"Size" are replaced by the write-up when the experiment finishes.
+**Take-home message: giving the XGBoost model the forecast solar output as a starting offset, with its
+weight fitted on the training window, beat the best guess by 0.15 points, and subtracting the
+forecast solar from an XGBoost model trained on gross demand did not match the best guess.** A
+forecast that NGED can read as "demand minus solar" therefore loses no accuracy when the solar term
+is attached as a starting offset, and gains at leads under 10 days. The open questions are whether
+the gain survives a capacity table that is current for the validation year, and why the starting
+offset also scores better in the 10-plus-day band, where its weight is zero.
 
-## The question, in plain words
+We asked whether a forecast of the power that a Primary substation draws can be split into ordinary
+demand and the output of the solar panels behind the substation without losing accuracy. A Primary
+substation is a 33/11 kV or 66/11 kV substation in the electricity distribution network, and its
+meter reads demand minus the panels' output. We built four forecasts that each carry an explicit
+solar term (the panels' capacity times a forecast of how much sunnier or cloudier the day will be
+than usual), scored them on five Primary substations over daylight half-hours of April to September,
+and compared each with the best forecast we had before and with the same forecast fed a solar term
+from another date. Three of the four forecasts scored 0.06 to 0.15 points better than the best
+guess, where 1 point is 1% of a substation's capacity, and the fourth was not shown to be as good.
 
-We ask whether a forecast of a Primary substation's power can be split into "demand" and "solar
-output" without getting worse, and whether the split ever gets better. A Primary substation's meter
-reads demand minus the output of solar panels behind it, so a sunny day lowers the metered power.
-[Experiment 46](../00046-embedded-solar-share-of-primary-forecast-error/result.md) subtracted a
-forecast of the panels' output from a demand forecast and gained almost nothing over all lead times,
-although knowing the true sunshine would have gained about 1 point. Experiment 51 and the solar
-design session found three reasons the subtraction was too crude: the coefficient of 1 was too
-large, the spread of the ensemble members added noise, and the capacity was a single 2023/24 figure.
-This experiment repairs those three and tries four ways to attach the solar term to the forecast.
+**The verdict is `supported`.** The decision rule is in the front matter, and the plan, which stated
+the rule, was committed before any code ran. Contrast N is an arm's quantile score minus that of the
+best guess `d0` (experiment 33's recipe), where a negative value favours the arm. Contrast T is an
+arm's quantile score minus that of its placebo twin, the same arm given the forecast solar shape of
+another date, so T measures what the forecast of the sunshine adds. An arm passes when the upper end
+of N is below +0.10 points (the arm matches `d0`) and the upper end of T is below 0. Arms `sf`,
+`a`, and `am` pass; `b` beats its twin but is not shown to match `d0`. A gain is reported where the
+upper end of N at leads under 48 hours is below -0.10: that holds for `a` and `am`.
 
-## Size
+| Arm | N: minus `d0`, all leads | T: minus placebo twin | Gain: minus `d0`, leads under 48 hours |
+|---|---|---|---|
+| `sf` | -0.063 (-0.126 to -0.008) | -0.293 (-0.418 to -0.180) | -0.168 (-0.357 to -0.002) |
+| `a` | -0.059 (-0.103 to -0.016) | -0.164 (-0.236 to -0.089) | -0.212 (-0.317 to -0.112) |
+| `am` | **-0.152 (-0.199 to -0.111)** | -0.300 (-0.407 to -0.198) | **-0.272 (-0.420 to -0.145)** |
+| `b` | +0.105 (-0.090 to +0.292) | -1.068 (-1.361 to -0.790) | -0.338 (-0.661 to -0.040) |
 
-- **What gets stored:** predictions of the new arms under
-  `data/ml-experiments/00064-.../predictions/`, private and never committed, and nothing else; no
-  contract, Delta table, or parquet in the pipeline changes.
-- **Production serving path:** not touched.
-- **A degradation rule:** not touched; a missing capacity or ENS solar value gives a zero shift in
-  every arm.
-- **More than one defensible design:** yes (four attachments of the solar term), which is why the
-  four are separate arms.
-- **Code whose callers could not be named without searching:** no; the scripts copy experiment
-  00046's helpers.
+The values are differences in quantile score, in points of capacity, with 98.75% intervals (a 5%
+familywise level split across the four arms) from 50,000 resamples of whole ISO weeks of forecast
+start and of seeds. The scored rows are 68,903 per seed, from 29 weeks of forecast start and 3
+seeds, at five Primary substations anonymised as D9, D10, D11, D14, and D16 (as in experiment 46).
+Every other read on this page is exploratory, at 95%.
 
-One trigger fires, the one about more than one defensible design. The experiment also adds a new
-method (gross-demand training with lagged gross inputs) and four arms with twins, so it gets the
-full process: plan, one Opus plan review, Sonnet implementation, Sonnet code review, Sonnet run
-and write-up, and Sonnet write-up and prose reviews.
+## The four arms
 
-## Earlier advice followed and departed from
+Every arm uses experiment 46's `d1l` inputs and recipe (experiment 33's XGBoost quantile model,
+trained on the ENS control member, without radiation inputs) and adds the solar term `s`: the
+capacity times the calibrated anomaly of the ensemble-mean ENS sunshine forecast, in power over
+capacity. The weight `w` on `s` is fitted per series, lead band, and season.
 
-Followed: fit the solar coefficient on the training window by lead band and season instead of fixing
-it at 1 (00046, 00051); use the ensemble-mean shift and keep the per-member shift only as a
-comparison (00051); test non-inferiority with a margin fixed after a power calculation (00046,
-00051); pre-register a gain read for 0 to 48 hours only, as its own corrected family (00046); report
-coverage of the 0.05 and 0.95 quantiles in sunny and cloudy rows (00046); read the sign of each
-contrast by valid month (00046); use no second weather forecast, because experiments 50 and 53 found
-none that improves ENS (00050, 00053); read the season-year capacity constant, not a weekly path
-(00045). Departed: none.
+- **`sf`** adds `w * s` to the stored `d1l` quantiles after the fit. No XGBoost model is refitted.
+- **`a`** adds the capacity times the calibrated ENS solar shape as one extra input column.
+- **`am`** gives XGBoost the base margin `w * s`, so the trees fit only the remainder.
+- **`b`** trains on gross demand (the metered power plus the capacity times the CAMS solar shape),
+  with lagged inputs converted to gross demand the same way, and subtracts the capacity times the
+  forecast solar shape from each ensemble member's quantiles at inference.
 
-## Design
+Each arm has a placebo twin (`sf_twin`, `a_twin`, `am_twin`, `b_twin`) that replaces the forecast
+solar shape with that of another forecast run in the same series, local month, half-hour, and lead
+band. The reference rows are `d0`, `d1l`, `climatology`, and `manual_heuristic` (experiment 33).
 
-**Rows.** The 5 verdict series of experiment 00046 (D9, D10, D11, D14, D16; their capacity status in
-experiment 45 is `clean` or `low-power`), the 3 seeds, and the scored rows of experiment 00046:
-validation runs of fold A (every fifth day, valid 2025-07-01 to 2026-06-30), daylight half-hours of
-April to September with a CAMS unit shape and an observed power. The training window is the same
-as experiment 00046's (ENS control member, 2024-04-01 to 2025-06-30, half-life 2 years). No row on
-or after 2026-07-01 is scored.
+## Arm `am` is the best arm, and `b` is the only arm not shown to match `d0`
 
-**Capacity.** One value per series, used for every training row and every validation row. It is the
-2024/25 season-year constant of experiment 45, refitted with `fit_season_year_constant` on data
-before 2025-07-01 only (the fit's `origin_week` set to the first week after the training end), so
-that no scored actual enters the capacity. Experiment 45's final constant for D14 is zero in
-2023/24 and 2024/25 (all weeks unobserved), so D14 reads experiment 40's 2023/24 `C`, the value
-experiment 46 used; a pre-fit check stops the run if any verdict series has a capacity of zero. The
-value is stale by the validation year: the 2025/26 constants of three series are 13% to 18% above
-the 2024/25 ones, which biases the placebo contrast against the solar term. The write-up says so.
+![Quantile score of each arm, and the planned contrasts](figure_1_headline.svg)
 
-**Solar shape.** The CAMS unit PV shape `u` (experiment 46) for the past. For the forecast, the CAMS
-climatology for the local month and half-hour plus the calibrated ENS anomaly, where the calibration
-slope is fitted per series and lead band on the training window (experiment 46's
-`calibration.parquet`). The headline arms use the ensemble-mean calibrated shape. The comparison
-arms use each member's calibrated shape.
+**The scores are close together, and the paired contrasts are what separate the arms.** The 95%
+intervals of the absolute scores overlap because every arm's error rises and falls with the weather
+from week to week, which pairing removes. Absolute scores, in points of capacity, with 95% intervals:
 
-**Fitted weight `w`.** For each series, lead band (the 5 bands of experiment 46), and season (April
-to June, July to September), `w` is the slope through the origin of the out-of-fold residual of the
-median (actual minus median) on the shift that `sf` applies, minus the capacity times the
-ensemble-mean calibrated ENS anomaly over the effective capacity, fitted on the daylight training
-rows of that cell. This is the slope for the regressor that is applied at forecast time. The slope
-on the oracle shift (the CAMS anomaly), which experiment 51 reported, is fitted too and reported
-beside it. The out-of-fold residuals come from 4 time-block folds of the training window that group
-by the valid time's calendar month (month index modulo 4), seed 0 only. The cells for July to
-September rest on one summer (2024), and adjacent months train each other across folds; the
-write-up says so. The same table of `w` is used by `sf` and `am`.
+| Arm | Quantile score | Placebo twin |
+|---|---|---|
+| `d0` | 4.620 (4.294 to 4.946) | |
+| `d1l` | 4.724 (4.382 to 5.058) | |
+| `sf` | 4.557 (4.239 to 4.878) | 4.850 (4.497 to 5.217) |
+| `a` | 4.561 (4.240 to 4.890) | 4.724 (4.384 to 5.060) |
+| `am` | 4.467 (4.143 to 4.785) | 4.767 (4.407 to 5.133) |
+| `b` | 4.724 (4.365 to 5.113) | 5.792 (5.343 to 6.258) |
+| `climatology` | 5.272 | |
+| `manual_heuristic` | 4.952 | |
 
-**Arms** (all use experiment 00046's `d1l` inputs and recipe unless stated):
+`climatology` and `manual_heuristic` are experiment 33's stored forecasts, scored on 68,863 rows
+because 40 of the 68,903 rows are missing from them. Neither enters the paired intervals.
 
-- `sf`: the stored `d1l` quantiles shifted by `w` times the capacity times the ensemble-mean
-  calibrated ENS anomaly over the effective capacity (predict-only on the stored boosters, no
-  refit). `sf_member` shifts each member by its own calibrated anomaly, then pools.
-- `a`: `d1l` plus one input column, the capacity times the calibrated ENS shape (the ensemble mean
-  in training and in each member's row at inference), refitted.
-- `am`: `d1l` with the XGBoost `base_margin` set to minus `w` times the capacity times the
-  calibrated anomaly of the ensemble mean over the effective capacity, so the trees fit the
-  remainder. The margin carries the anomaly only; the climatology is left to the trees. Training and
-  inference both use the ensemble-mean anomaly (`u_mean` in `ens_train`). The smoke run asserts that
-  the margin has shape (rows, 9) and is set on every inference matrix, that a zero-tree model
-  returns exactly the margin, and that `w` multiplies the anomaly only.
-- `b`: trained on gross demand, the metered power plus the capacity times the CAMS unit shape, with
-  the `d1l` inputs. Training rows whose CAMS shape is missing are dropped. Each lagged input is the
-  net lag plus the capacity times the shape at the lagged time. The shape comes from CAMS when the
-  lagged time is more than 24 hours before the forecast origin (the delay is taken from experiment
-  46's `TELEMETRY_DELAY` and the CAMS publication lag the study recorded, to be checked in the code
-  review), and otherwise from the ensemble-mean shape of the latest ENS run available at the origin
-  that covers the lagged time (today's 00:00 UTC run, else yesterday's, read from the NWP archive).
-  The construction is identical in training and at inference, and the report gives the share of each
-  source for every lag column. At inference each member's gross quantiles are shifted down by the
-  capacity times the ensemble-mean calibrated shape (coefficient 1 by construction), pooled, and
-  given the spread factor and the 14-day correction on the net residuals. `b_member` shifts each
-  member by its own shape.
-- The placebo twins `sf_twin`, `a_twin`, `am_twin`, and `b_twin` replace the forecast solar shape
-  of every row by the shape of another forecast run in the same series, calendar month, half-hour,
-  and lead band, drawn without replacement with a fixed seed, separately within the training rows
-  and within the validation rows. The capacity and the distribution of the shape are kept, and the
-  timing of the sunshine is destroyed. In `sf_twin` and `b_twin` only the inference-side shape is
-  swapped; in `a_twin` and `am_twin` the column or margin is swapped in training and at inference.
-  Experiment 00031's shuffled capacity could not serve here, because one capacity value per series
-  leaves nothing to shuffle.
-- `sf_temp` (exploratory): `sf` with its shift multiplied by `1 - 0.004 * (T_cell - T_ref)`, where
-  `T_cell` is the member-mean 2 m temperature plus 25 K times the shape, and `T_ref` is the
-  training-window mean of `T_cell` on daylight rows. The report gives how much of the slope of the
-  sunny-row quantile score on temperature the derating removes.
-- Reference rows: `d0`, `d1l`, `d1l_ens_shift` (experiment 00046's fixed-1 member shift, which
-  used the 2023/24 capacity), and experiment 00033's `climatology` and `manual_heuristic` (stored
-  predictions).
+**The twin of `b` scores 1.07 points worse than `b`, probably because `b` subtracts the shape with
+weight 1 built in, so a wrong-dated shape does more harm there than in the arms with a fitted
+weight.** The size of T for `b` is therefore not evidence that `b` uses the forecast sunshine better
+than the other arms.
 
-**Slope diagnostic.** The cause of the weak slope (-0.42 to -0.69 in experiment 51) is either noise
-in the satellite-based estimate of the fleet's sunshine (regression dilution) or the model already
-absorbing part of the anomaly through lagged power and cloud-proxy inputs. Four variants of `d1l`
-are cross-fitted as above (seed 0): all inputs, no lagged-power columns (`lag_origin`,
-`lag_same_time_latest_day`, `lag_same_time_latest_week`), no cloud-proxy columns
-(`dew_point_temperature_2m`, `precipitation`, `precipitation_type`, `pressure_surface`, and
-`pressure_msl`; `d1l` has no radiation columns already), and neither. The write-up gives the slope
-of the out-of-fold residual on the oracle shift for each. If the slope for "neither" is near -1 and
-the slope for "all inputs" is near -0.5, absorption by the inputs explains it; if all four are near
--0.5, dilution does.
+## The gain sits mostly within 6 days of the forecast start
 
-**Compute and checks.** About 90 booster fits (6 refitted arms, 5 series, 3 seeds, about 100 s
-each) plus the placebo refits of `a` and `am` (60), and 80 cross-fits (4 variants, 4 folds, 5
-series), run 4 at a time inside the slot of 8 cores and 12 GB of GPU memory, one job per series and
-seed, each written atomically. Before the fits: a smoke run on one series; a zero-shift check (every
-shift arm equals `d1l` when `w` is zero); the check that `sf` with `w` = 0 reproduces the stored
-`d1l` within 1e-6; the capacity check above; and the training-window check (no input read after
-2025-06-30 23:30 UTC in training). The fit stops at the fold's training end.
+![Contrast N by lead band](figure_2_by_lead_band.svg)
 
-**Reports.** Absolute quantile score of every arm and the reference rows, the verdict and gain
-reads, the lead-band reads (0-24 h, 1-2 d, 2-6 d, 6-10 d, 10+ d), the valid-month signs, coverage of
-the 0.05 and 0.95 quantiles in sunny and cloudy rows, the sunniest decile of rows by clear-sky
-index, each arm's effective weight (the slope of its median minus `d1l`'s median on minus the
-capacity times the ensemble-mean calibrated anomaly) against the slopes of experiment 51, the
-temperature read, and the per-series reads. Anonymised series labels only.
+**The gain of `sf` and `a` is clear up to 6 days and gone beyond, and `am` stays below `d0` at every
+lead.** At 10 days and beyond, `am` is -0.082 points (-0.126 to -0.038) from `d0` although its
+weight there is zero, `a` is +0.036 (+0.006 to +0.065), and `sf` is +0.013 (-0.019 to +0.051). The
+weight is zero in that band because the calibrated ENS anomaly has a correlation of 0.03 with the
+CAMS anomaly there on the training rows (0.80, 0.76, 0.58, and 0.27 in the four shorter bands), and
+the fitted slope ranged from -8.2 to +6.2 across series and seasons. The 10-plus-day gain of `am`
+is unexplained. One candidate is the starting point: `am` starts from its margin alone, while `d1l`
+and `a` start from XGBoost's estimated base score.
+
+**Arm `b` is worse than `d0` at 6 days and beyond.** Its N is +0.249 points (0.035 to 0.479) at 6 to
+10 days and +0.296 (0.132 to 0.462) at 10 days and beyond, where the ENS forecast of the subtracted
+term has no skill.
+
+## The fitted weights are below 1, and lagged power does not explain why
+
+**The fitted weight on the ENS shift is -0.60 to -0.29 at leads under 10 days, well short of the -1
+that a perfect shift of the right size would take.** These are the means over the five series of the
+slope of the out-of-fold residual (actual minus median forecast) on the shift that `sf` applies,
+fitted per lead band and season on the training window. The slope on the oracle shift (the CAMS
+anomaly) is -0.80 to -0.47, to compare with experiment 51's -0.69 to -0.42. The effective weights of
+the arms, measured as the slope of each arm's median minus `d1l`'s median on minus the shift, are
+0.49 for `sf`, 0.41 for `a`, and 0.31 for `am` plus its fitted margin weight, and 0.64 for `b`,
+against the constant 1 built into `b`.
+
+![The oracle slope by lead band for four variants of d1l](figure_3_slope_diagnostic.svg)
+
+**Lagged power absorbs none of the sunshine anomaly, cloud proxies absorb about 0.15 at leads
+under 2 days, and about -0.73 remains with neither.** Experiment 51 left open whether the slope
+below 1 comes from the XGBoost model already absorbing part of the anomaly through its inputs, or
+from error in the CAMS sunshine estimate. Four cross-fitted variants of `d1l` (seed 0) give the
+median oracle slope below, over five series and two seasons.
+
+| Variant | 0-24 h | 1-2 d | 2-6 d | 6-10 d | 10+ d |
+|---|---|---|---|---|---|
+| All inputs | -0.570 | -0.578 | -0.669 | -0.741 | -0.774 |
+| Without the 3 lagged-power columns | -0.551 | -0.564 | -0.658 | -0.741 | -0.776 |
+| Without the 3 cloud-proxy columns | -0.726 | -0.730 | -0.740 | -0.764 | -0.770 |
+| Without either | -0.726 | -0.728 | -0.738 | -0.766 | -0.778 |
+
+The remaining slope of about -0.73 with neither group of columns points to noise in the CAMS
+estimate of the fleet's sunshine (which pulls a regression slope towards zero) or to a mismatch
+between the CAMS shape and the panels' real output. The diagnostic does not separate the two.
+
+## Arms `sf` and `am` beat `d0` in every valid month
+
+![Contrast N by valid month](figure_4_by_month.svg)
+
+**`sf` and `am` are below `d0` in all six months, `a` in five (+0.005 in July), and `b` loses from
+April to July and wins in August and September.** The mean of `b`'s N is +0.460 in April and +0.416
+in July, and -0.173 in August and -0.327 in September. These are the sign of a mean, not an
+interval.
+
+## Other reads (exploratory, 95%)
+
+- **Per series:** `am` is below `d0` at all five series, from -0.113 (-0.165 to -0.058) at D9 to
+  -0.236 (-0.298 to -0.174) at D10.
+- **Sunniest decile of rows by clear-sky index:** `sf` is -0.296 (-0.437 to -0.168), `a` -0.216
+  (-0.283 to -0.147), `am` -0.283 (-0.350 to -0.216), and `b` -0.017 (-0.363 to +0.305). Arm `am` beats
+  `a` by 0.093 points (0.057 to 0.129) over all rows and by 0.067 (-0.019 to +0.150) on the sunniest
+  decile, so the trees' inability to extrapolate past the capacities seen in training is not shown
+  to matter more on the sunniest rows.
+- **Against the fixed-coefficient shift of experiment 46:** `d1l` plus that shift scores 4.667, which
+  is 0.056 below `d1l`. The arm `sf` is 0.111 points (0.023 to 0.196) below it, and `am` lowers `d1l`
+  by 0.256 (0.205 to 0.306).
+- **Per-member against ensemble-mean shift:** `sf_member` minus `sf` is -0.004 (-0.010 to +0.001), so
+  the member spread adds nothing for `sf`. `b_member` minus `b` is -0.145 (-0.206 to -0.094), so `b`
+  needs the member spread.
+- **Temperature derating:** `sf_temp` minus `sf` is +0.0003 (-0.0016 to +0.0022), so a derating of
+  0.4% per kelvin removes nothing. On sunny rows the quantile score rises 0.070 points per kelvin of
+  cell temperature for `d1l` and 0.036 for `sf`, and `sf_temp` leaves that slope at 0.037.
+- **Coverage:** the table gives the share of actuals below the 0.05 and 0.95 quantiles, where the
+  targets are 0.05 and 0.95. Sunny rows have a clear-sky index of 0.7 or more and cloudy rows under
+  0.3. The lower quantile is too high on sunny rows in every arm, and `b` has the worst
+  upper-quantile coverage on cloudy rows.
+
+| Arm | Sunny, below q05 | Sunny, below q95 | Cloudy, below q05 | Cloudy, below q95 |
+|---|---|---|---|---|
+| `d0` | 0.152 | 0.990 | 0.006 | 0.848 |
+| `d1l` | 0.151 | 0.990 | 0.005 | 0.846 |
+| `sf` | 0.126 | 0.989 | 0.007 | 0.879 |
+| `a` | 0.129 | 0.990 | 0.006 | 0.850 |
+| `am` | 0.131 | 0.984 | 0.004 | 0.800 |
+| `b` | 0.195 | 0.975 | 0.017 | 0.708 |
+
+## Which predictions held
+
+| Prediction made in the plan | Result |
+|---|---|
+| `sf` is the likeliest arm to pass, at -0.04 (-0.12 to +0.04) against `d0` | Held: -0.063 (-0.126 to -0.008) |
+| `sf` gains -0.10 to -0.25 at leads under 48 hours | Held: -0.168 |
+| `a` scores +0.00 to +0.10 against `d0` | Not met: `a` scores -0.059 (-0.103 to -0.016) |
+| `am` beats `a` by 0.02 to 0.08 on the sunniest 10% of rows and ties elsewhere | Not met: `am` beats `a` by 0.093 (0.057 to 0.129) over all rows, and by 0.067 (-0.019 to +0.150) on the sunniest decile |
+| `b` scores +0.05 to +0.25 against `d0` | Held in sign and size (+0.105), with a wide interval (-0.090 to +0.292) |
+| The slope on the oracle shift is -0.4 to -0.7 for the full `d1l`, and nearer -1 without lagged power and cloud proxies | Partly held: -0.57 to -0.74 for the full `d1l` and -0.73 to -0.78 without either, which is nearer -1 but not near it |
+| The upper end of N is below +0.10 for `sf` and not for `b` | Held: -0.008 for `sf`, +0.292 for `b` |
+| The placebo twin scores worse by 0.10 to 0.40 for `sf`, `am`, and `b`, and by 0.02 to 0.15 for `a` | Held for `sf` (0.293), `am` (0.300), and `a` (0.164, slightly above the range); not met for `b` (1.068) |
+| The half-width of `sf` against `d0` at 98.75% is 0.079 | Realised half-width 0.059 |
+
+## Departures from the plan
+
+**The experiment departed from its plan in the 11 ways below, all decided before any arm was
+scored.** None changes the hypothesis, the prediction, or the decision rule.
+
+1. **The weight is zero in the 10-plus-day band.** The ENS anomaly has a correlation of 0.03 with
+   the CAMS anomaly there, and the fitted slope ranged from -8.2 to +6.2. The rule was fixed from
+   the weights table, which uses training rows only, before any arm was scored.
+2. **The capacity is divided by experiment 45's recovery ratio.** The refitted season-year constant
+   for 2024/25 is divided by experiment 45's stored recovery ratio (0.71 to 0.79, from an
+   injection test on tuning farms), as experiment 45 defines capacity. The capacities used, in MW,
+   are D9 2.751, D10 2.356, D11 3.457, D14 3.705, and D16 3.578. D14 uses experiment 40's 2023/24
+   constant, because experiment 45's constant is zero there.
+3. **The no-cloud-proxy variant drops 3 columns,** `dew_point_temperature_2m`, `precipitation`, and
+   `pressure_surface`, because `d1l` has no `precipitation_type` or `pressure_msl` column.
+4. **The placebo is a seeded cyclic shift, not a random permutation.** It moves each row's shape by
+   between a quarter and three quarters of its group (series, local month, half-hour, and lead
+   band). A random permutation paired runs that forecast the same valid time, so the permuted
+   anomaly stayed correlated with the real one. After the change, the correlation of the twin's
+   anomaly with the real anomaly is -0.012 on the 256,230 validation rows.
+5. **Arm `b` drops training rows whose lag has no shape.** At inference the gross lag is missing
+   (NaN) there, on 2.8% of validation rows for the lag of the same time the day before and 8.6% for
+   the week before. No sensitivity read of this exists. The climatology fallback was not needed.
+6. **Two small confounds remain.** The reference temperature of `sf_temp` uses the control member's
+   temperature. Arm `am` starts from the margin alone, while `d1l` and `a` start from XGBoost's
+   base score, a small confound in the `a` against `am` contrast.
+7. **`climatology` and `manual_heuristic` lack 40 of the 68,903 rows,** so they are scored on shared
+   rows, outside the paired bootstrap.
+8. **The plan's refit count was wrong.** The experiment ran 75 refits (5 arms, 3 seeds, 5 series),
+   not "about 90 plus 60".
+9. **The weights rest on little data.** The training window holds two April-to-June periods and one
+   July-to-September period (2024). The 4 time-block folds of the cross-fit group months by month
+   index modulo 4, so adjacent months train each other.
+10. **The held capacity is stale.** The 2024/25 value is 6% to 23% below experiment 45's 2025/26
+    constants at the five series (D9 6%, D10 21%, D11 18%, D14 14%, D16 23%). A capacity that is too
+    low weakens the solar term, which biases the placebo contrast against the solar term, so the
+    gains are, if anything, conservative.
+11. **The sunniest-decile read and the `a` against `am` contrasts are exploratory (95%),** not
+    corrected across the four arms.
+
+## What the next experiment should answer
+
+**The evidence supports `am` as a candidate for a model release, and the decision to port belongs
+to the maintainer and the roadmap.** The next experiment should answer four questions that remain
+open:
+
+- **Does the gain survive a current capacity?** Refit `sf` and `am` with capacities that follow
+  the validation year (experiment 45's 2025/26 constants are 6% to 23% higher), because the capacity
+  held here is stale.
+- **Do the weights hold with more training data?** The July-to-September weights rest on one
+  summer, so a window with a second summer would show whether the weights move.
+- **Why does `am` also beat `d0` at 10 days and beyond?** The weight is zero there, so the base
+  score, the margin in training rows at shorter leads, and the trees are the candidates.
+- **Can the live service supply `am`'s inputs?** The live service cannot use `am` as built: it needs
+  the capacity table, the table of weights, and the ENS calibration slopes at predict time, and
+  `am` sets a base margin on each prediction matrix. Whether the serving path can do so is a
+  question for the roadmap.
+
+**Arm `b` stays untested in two respects.** Its gross lags are missing on 2.8% and 8.6% of
+validation rows with no sensitivity read, and its loss to `d0` at 6 days and beyond could come from
+the ENS forecast of the subtracted term, which has no skill there. A variant that subtracts the
+shape only inside 6 days would separate the two.
+
+## Reproducing the figures
+
+```bash
+uv run python ml-experiments/00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/e00064_stats.py
+uv run python ml-experiments/00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/e00064_report.py
+uv run python ml-experiments/00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/e00064_charts.py
+npx svgo@4 --multipass --precision=1 --final-newline figure_*.svg
+```
+
+The fits that the statistics read are in `e00064_run.sh`; the code is in
+`ml-experiments/00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/`.
