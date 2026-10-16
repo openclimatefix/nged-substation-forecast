@@ -40,13 +40,15 @@ decision_rule: >-
   is below zero (the analogues help a little on top of the offset, and the gain does not clear
   -0.05 with certainty), and `supported` if C4's lower end is at or above -0.05 (a gain of 0.05
   points is ruled out). The verdict is `inconclusive` in every other case, including when C1 does
-  not exclude zero and when C4's interval runs from below -0.05 to above zero. The threshold of -0.05 on C4 is set by the
+  not exclude zero and when C4's interval runs from below -0.05 to above zero. The threshold of
+  -0.05 on C4 is set by the
   cost of porting: an analogue builder needs the last 3 to 16 days of telemetry, an irradiance
   estimate of those days, and a day-type calendar at every forecast, whereas the explicit offset
   needs a table of capacities and weights. In experiment 64 the paired contrasts had half-widths of
   0.044 (`am` against `d0`) to 0.105 points (`am` against its placebo twin) at 98.75%, so the
   threshold of -0.05 may be unresolvable for C4. When C4's half-width exceeds 0.05, the write-up
-  says that the experiment could not rule out a gain of that size and does not claim a null. C5 and C6 decide no
+  says that the experiment could not rule out a gain of that size and does not claim a null. C5 and
+  C6 decide no
   verdict. Every other read is exploratory, labelled so, at 95%: `A1` and `A5` against `A3`, the
   night rows (April-to-September rows after dark) for `A3` against `A3S`, the leads under 48 hours,
   the sunniest tenth of rows, each valid month, and each series. Absolute scores are reported for
@@ -143,7 +145,8 @@ The climatology, calibration slopes, and weights stay at their 2025-06-30 values
 **Costs and limits, stated now.** The capacity table is experiment 64's, which is 5% to 19% below
 experiment 45's 2025/26 values. The shortfall works against `E` and `A3E`, and the analogue arms use
 no capacity. `E`'s weights were fitted for a model without analogues, so in `A3E` the offset and the
-analogues may count the same sunshine twice. The weights and the calibration are not refitted monthly. Only seed 0 decides the verdict;
+analogues may count the same sunshine twice. The weights and the calibration are not refitted
+monthly. Only seed 0 decides the verdict;
 if time remains, seeds 1 and 2 are added and labelled post hoc.
 
 ## Size
