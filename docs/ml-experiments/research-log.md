@@ -75,6 +75,7 @@ the maintainer to confirm.
 | [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
+| [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1043,3 +1044,35 @@ or more of the receiving load lasting over 24 hours.
   [PR #1261](https://github.com/openclimatefix/nged-substation-forecast/pull/1261).
 
 ![Shares of half-hours and of each score](00044-sw2-2-switching-share-of-best-guess-score/figure_2_shares.svg)
+
+### 00046: how much of the best guess's daylight error is embedded solar? (PVDIS part 3)
+
+**We asked how much of a Primary substation's daylight forecast error comes from solar panels behind
+its meter, by adding the panels' capacity times the sunshine anomaly (sunnier or cloudier than the
+average for that month and half-hour) to a demand forecast without radiation inputs.** Built from the
+true sunshine, which no real forecast has, the correction lowers the quantile score (the
+probabilistic forecast error score) by 0.966 points (-1.431 to -0.595), about 20% of the 4.724
+points the demand forecast scores. Built from the ECMWF ensemble forecast of sunshine, it lowers the
+score by 0.056 points (97.5% interval -0.191 to +0.064), against a threshold of 0.35, so the verdict
+is `refuted`. The ensemble anomaly tracks the true one for about 2 days and then fades, and the gain
+follows it: -0.262 at 0 to 24 hours, -0.277 at 1 to 2 days, and about 0 beyond.
+
+- **Finding for later experiments:** the sunshine correction built from the ensemble forecast scored
+  +0.048 (-0.059 to +0.141) against the best-guess recipe with its radiation inputs, so it is no
+  better. It is also not shown to be no worse, because the sign changes by month and by series. The
+  next experiment in the series (PVDIS-5, which retests the correction with weekly capacity
+  estimates) is a non-inferiority and explanation test with a margin set in advance, with a gain
+  test only for 0 to 48 hours.
+- **Coefficient:** a fixed coefficient of 1 was too large, because the residual's slope on the
+  oracle correction is -0.771. A coefficient fitted on the training window gives -0.143 (-0.231 to
+  -0.057, exploratory) against the plain correction.
+- **Fragile small gain:** without one series (anonymised as D9) the correction gains -0.113 (-0.230
+  to -0.000, rounded; the interval touches zero), and it is positive in June to August, so it is not
+  a consistent gain. Its lower bound stays above -0.35 in every pooled scope.
+- **Exploratory midday read:** at 09:00 to 15:00 UTC on day+1 the correction gains -0.434 (-0.559 to
+  -0.283) in April to September and scores no worse than the best-guess recipe, and the quantiles
+  move from too narrow to slightly too wide. In June to August at day+2 and day+3 it scores worse
+  than the best-guess recipe. Whether that justifies porting is not decided.
+- **Write-up:** [result](00046-embedded-solar-share-of-primary-forecast-error/result.md).
+
+![The planned contrasts and the fitted-coefficient reads](00046-embedded-solar-share-of-primary-forecast-error/figure_1_contrasts.svg)
