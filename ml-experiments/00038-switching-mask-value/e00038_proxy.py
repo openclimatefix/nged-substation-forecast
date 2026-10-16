@@ -32,8 +32,9 @@ from e00038_intervals import Interval
 
 FIRST_ORIGIN: Final[int] = 14 * 48 + 18
 """2022-01-15 09:00 UTC, so a 14-day window is complete."""
-BANDS: Final[dict[str, range]] = {"A": range(88), "B": range(144, 192)}
-"""Valid-time offsets from the origin: 3.5 to 48 hours after the newest observation, and day 6-7."""
+BANDS: Final[dict[str, range]] = {"A": range(88), "B": range(136, 184)}
+"""Valid-time offsets from the origin. The lead is counted from the newest observation, 8
+half-hours before the origin: band A is lead 4 to 48 hours, band B is lead 144 to 192 hours."""
 PAD: Final[int] = 4
 """Half-hours (2 hours) added either side of a logged interval when choosing out-of-event rows."""
 QUIET_STAMPS: Final[int] = 16 * 48
@@ -162,6 +163,7 @@ def main() -> None:
                 window=days * 48,
                 masked=masks[kind],
                 open_start={"d1_persist": persist, "d1fx_persist": persist_fx}.get(kind),
+                carry_forward=kind != "none",
             )
             for arm, (days, kind) in ARMS.items()
         }

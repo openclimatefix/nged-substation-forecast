@@ -2,8 +2,8 @@
 
 import numpy as np
 import polars as pl
-from e00038_base import SOURCE_DIR, DetectorInputs, alarms, level_shift
-from e00038_corrections import MIN_COUNT, correction_series, detected_mask
+from e00038_base import SOURCE_DIR, DetectorInputs, alarms, level_shift, prepare
+from e00038_corrections import MIN_COUNT, correction_series, detected_mask, open_interval_start
 from e00038_detect_run import load_arrays
 from e00038_intervals import (
     BLOCK,
@@ -110,41 +110,58 @@ def check_split_fractions_recover_known_split() -> None:
 
 
 def check_causality() -> None:
-    """Intervals known at an origin do not change when the residual after it is NaN."""
+    """Masks and open-interval starts at an origin do not change when later residuals are NaN."""
     panel = pl.read_parquet(SOURCE_DIR / "panel.parquet")
     residual = load_arrays(panel=panel, column="res_mw")
     expected = load_arrays(panel=panel, column="expected_mw")
-    window = 8
-    full_shift = {s: level_shift(values=v, window=window) for s, v in residual.items()}
-    from e00038_base import robust_scale
+    origins = [
+        5_000,
+        22_000,
+        30_000,
+        40_000,
+        49_960,
+        50_003,
+        50_100,
+        60_000,
+        70_200,
+        70_500,
+        72_000,
+    ]
+    for detector, window in (("D1", 8), ("D0", 48)):
+        scale = prepare(residuals=residual, window=window).scale
 
-    scale = {s: robust_scale(shift=d) for s, d in full_shift.items()}
-
-    def intervals_for(*, last: int | None, fixed: bool) -> list[Interval]:
-        res = {s: v.copy() for s, v in residual.items()}
-        if last is not None:
-            for v in res.values():
-                v[last + 1 :] = np.nan
-        shift = {s: level_shift(values=v, window=window) for s, v in res.items()}
-        inputs = DetectorInputs(window=window, shift=shift, scale=scale)
-        table = alarms(inputs=inputs, detector="D1", threshold=4.0)
-        rel = {s: relative_residual(residual=res[s], expected=expected[s]) for s in res}
-        return build_intervals(
-            alarm_table=table, relative=rel, window=window, detector="D1", fixed=fixed
-        )
-
-    for fixed in (False, True):
-        full = intervals_for(last=None, fixed=fixed)
-        for n in (30_000, 50_000, 60_000, 70_200, 70_500, 72_000):
-            cut = intervals_for(last=n, fixed=fixed)
-            a = sorted(known_at(intervals=full, newest=n, window=window))
-            b = sorted(known_at(intervals=cut, newest=n, window=window))
-            assert a == b, (
-                fixed,
-                n,
-                [x for x in a if x not in b][:3],
-                [x for x in b if x not in a][:3],
+        def intervals_for(
+            *,
+            last: int | None,
+            fixed: bool,
+            detector: str = detector,
+            window: int = window,
+            scale: dict[int, float] = scale,
+        ) -> list[Interval]:
+            res = {s: v.copy() for s, v in residual.items()}
+            if last is not None:
+                for v in res.values():
+                    v[last + 1 :] = np.nan
+            shift = {s: level_shift(values=v, window=window) for s, v in res.items()}
+            inputs = DetectorInputs(window=window, shift=shift, scale=scale)
+            table = alarms(inputs=inputs, detector=detector, threshold=4.0)  # ty: ignore[invalid-argument-type]
+            rel = {s: relative_residual(residual=res[s], expected=expected[s]) for s in res}
+            return build_intervals(
+                alarm_table=table, relative=rel, window=window, detector=detector, fixed=fixed
             )
+
+        for fixed in (False, True):
+            full = intervals_for(last=None, fixed=fixed)
+            for n in origins:
+                cut = intervals_for(last=n, fixed=fixed)
+                a = sorted(known_at(intervals=full, newest=n, window=window))
+                b = sorted(known_at(intervals=cut, newest=n, window=window))
+                extra, missing = [x for x in a if x not in b][:3], [x for x in b if x not in a][:3]
+                assert a == b, (detector, fixed, n, extra, missing)
+                for series in residual:
+                    start_full = open_interval_start(intervals=full, series=series, window=window)
+                    start_cut = open_interval_start(intervals=cut, series=series, window=window)
+                    assert start_full(n) == start_cut(n), (detector, fixed, n, series)
     _ = detected_mask
 
 

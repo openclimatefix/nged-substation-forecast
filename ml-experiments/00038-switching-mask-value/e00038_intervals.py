@@ -86,6 +86,7 @@ def level_track(
     rho = float(np.nanmean(after)) - pre
     last_good = onset
     failures = 0
+    failed_end = onset + BLOCK
     start = onset
     while start - onset < CAP_STAMPS and start < GRID_LENGTH:
         mean = _block_mean(q=q, start=start)
@@ -96,13 +97,14 @@ def level_track(
             else:
                 failures += 1
                 if failures >= patience:
+                    failed_end = start + BLOCK
                     break
         start += BLOCK
     if last_good == onset:
         return rho, onset + window, onset + BLOCK
     if start - onset >= CAP_STAMPS:  # ended by the cap, or by data still to come
         return rho, last_good, start
-    return rho, last_good, last_good + patience * BLOCK
+    return rho, last_good, failed_end
 
 
 def build_intervals(
@@ -164,17 +166,26 @@ def build_intervals(
     return out
 
 
+def ready_after(*, window: int) -> int:
+    """Return the half-hours after onset before an alarm is final.
+
+    The peak test looks `window` stamps ahead of a shift that itself needs `window` more, and the
+    partner search reads 2 stamps beyond the onset.
+    """
+    return 2 * window + 2
+
+
 def known_at(*, intervals: list[Interval], newest: int, window: int) -> list[tuple[int, int, int]]:
     """Return the `(series, start, stop_exclusive)` masks an origin can know of.
 
-    An alarm interval counts once the detector's window and the partner search that follows it are
-    complete (`onset + window + 2 <= newest`). A partner interval waits for its own first 24-hour
-    block (`onset + 48 <= newest`), since the partner is chosen by that block. If the end is not
+    An alarm interval counts once the peak test and the partner search that follow its onset are
+    complete (`onset + ready_after(window) <= newest`). A partner interval waits for its own first
+    24-hour block (`onset + 48 <= newest`), since that block chooses the partner. If the end is not
     yet known (`known_from > newest`), the mask runs to the newest observation.
     """
     out = []
     for iv in intervals:
-        ready = iv.onset + (BLOCK if iv.role == "partner" else window + 2)
+        ready = iv.onset + (BLOCK if iv.role == "partner" else ready_after(window=window))
         if ready > newest:
             continue
         stop = iv.end if iv.known_from <= newest else newest + 1

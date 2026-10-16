@@ -127,6 +127,7 @@ def main() -> None:
                 window=days * 48,
                 masked=masks[kind],
                 open_start=persist.get(kind),
+                carry_forward=kind != "none",
             )
             shift = dict(zip(origin.tolist(), per_run.tolist(), strict=True))
             c = np.array([shift[int(o)] for o in init_stamp])

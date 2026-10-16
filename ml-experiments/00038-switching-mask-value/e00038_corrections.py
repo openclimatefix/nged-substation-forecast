@@ -10,7 +10,7 @@ from collections.abc import Callable
 from typing import Final
 
 import numpy as np
-from e00038_intervals import BLOCK, Interval, known_at
+from e00038_intervals import BLOCK, Interval, known_at, ready_after
 
 MIN_COUNT: Final[int] = 3 * BLOCK
 NEWEST_AGE: Final[int] = 8
@@ -26,6 +26,7 @@ def correction_series(
     window: int,
     masked: MaskFor | None = None,
     open_start: Callable[[int], int | None] | None = None,
+    carry_forward: bool = True,
 ) -> np.ndarray:
     """Return the correction at each origin, whose newest observation stamp is in `newest`.
 
@@ -35,9 +36,10 @@ def correction_series(
         window: Window length in half-hours.
         masked: Optional mask provider; None gives the unmasked rule.
         open_start: Optional `start(newest)` giving the onset of an interval still open at
-            `newest` (or None). While one is open, the correction becomes the masked correction
-            plus the mean residual over the last 24 hours of the open interval minus the masked
-            correction, i.e. it follows the event's current residual level.
+            `newest` (or None). While one is open, the correction is the mean residual over the
+            last 24 hours of that interval, so it follows the event's current residual level.
+        carry_forward: With False (the plain arms, as in experiment 00019) the correction is zero
+            when under 3 days remain; with True the last correction that had 3 days is kept.
 
     Returns:
         One correction per origin, in the units of `residual`.
@@ -53,6 +55,8 @@ def correction_series(
             keep &= ~masked(n, lo)
         if keep.sum() >= MIN_COUNT:
             last = float(values[keep].mean())
+        elif not carry_forward:
+            last = 0.0  # experiment 00019's rule: no correction without 3 days of history
         out[i] = last
         if open_start is not None and (start := open_start(n)) is not None:
             recent = residual[max(start, n - BLOCK + 1) : n + 1]
@@ -86,7 +90,13 @@ def open_interval_start(
     own = [iv for iv in intervals if iv.series == series]
 
     def start(n: int) -> int | None:
-        open_onsets = [iv.onset for iv in own if iv.onset + window + 2 <= n < iv.known_from]
+        open_onsets = [
+            iv.onset
+            for iv in own
+            if iv.onset + (BLOCK if iv.role == "partner" else ready_after(window=window))
+            <= n
+            < iv.known_from
+        ]
         return max(open_onsets) if open_onsets else None
 
     return start

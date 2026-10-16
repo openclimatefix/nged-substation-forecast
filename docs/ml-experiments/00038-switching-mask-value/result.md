@@ -1,7 +1,7 @@
 ---
 id: "00038"
 slug: switching-mask-value
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For the 16 Primary substation demand series, excluding the half-hours of detected switching
@@ -39,10 +39,41 @@ metric: >-
   Threshold-weighted mean absolute error at each series' historical P99 (points of capacity), with
   the mean absolute error beside it; tier B uses the quantile score and its threshold-weighted form
   as in experiment 00037.
-verdict: null
-best_arm: null
-lessons: null
-advice: []
+verdict: refuted
+best_arm: >-
+  None of the pre-registered arms. The primary contrast, D1 mask with a 7-day window against the
+  plain 7-day correction, raised the threshold-weighted error at P99 by 57.1% (95% interval 0.4% to
+  133.5%) on half-hours outside logged switching. The best arm, a post hoc revision of the interval
+  builder, lowered it by 5.4% (-15.1% to +1.5%), and 105% of that gain sits in the January 2026
+  closure of Primary substations 17 and 18.
+lessons: >-
+  The detector is not the bottleneck: the one closure that carries the tail was found by D1 under
+  both interval builders, and the as-specified builder still raised the tail error 57% because its
+  interval for the return step ran 60 days. Masking raises the mean absolute error on half-hours
+  with no logged switching by 0.16 to 0.25 points under every detected mask, because the 7-day and
+  14-day windows already absorb most level shifts and a masked history cannot follow the shifts the
+  logs never recorded. Five of the 17 long closures have no threshold-weighted error to remove.
+advice:
+  - >-
+    Do not mask detected switching intervals from the error correction's history in production:
+    the as-specified D1 mask raised the threshold-weighted error at P99 by 57% outside logged
+    switching (primary contrast).
+  - >-
+    Test a 7-day error-correction window against the 14-day window as its own stack experiment:
+    the plain 7-day window lowered the threshold-weighted error by 5.2% (-10.8% to +0.0%) and the
+    mean absolute error by 0.12 points (the plain7 against plain14 contrast).
+  - >-
+    Treat a detected interval's end as the hard part, not the alarm: an interval that ends on the
+    first failing 24-hour block, or that starts at a return step, produced a 60-day mask (the
+    interval-builder diagnosis).
+  - >-
+    Read any switching result as one closure: January 2026 holds 95% to 105% of every masking gain
+    in the proxy stack, and 5 of the 17 long confirmed closures have zero tail error to remove
+    (per-event table).
+  - >-
+    Report the mean absolute error beside the tail score for any mask: the post hoc mask lowered
+    the tail by 5.4% but raised the mean absolute error by 0.25 points (4.6%) outside logged
+    switching.
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00038-switching-mask-value/
@@ -50,117 +81,175 @@ code: ml-experiments/00038-switching-mask-value/
 
 # Experiment 38: is detecting a switching event worth anything to the forecast?
 
-**Plan (status `planned`, written before any code runs).** Experiment 00037 found that the
-neighbour-balance detector D1 recovers about a third of the MW of the visible transfers. This
-experiment asks what that detection is worth: if the half-hours D1 flags are left out of the history
-of the stack's error correction, does the forecast improve on half-hours outside logged switching?
-The logs are used only to score (the oracle ceiling and the rows to score), never to build the
-detector's intervals.
+**Refuted: leaving the half-hours that the neighbour-balance detector D1 flags out of the stack's
+error correction made the forecast worse, not better, on half-hours outside logged switching.** The
+pre-registered primary contrast, `d1_mask7` against `plain7` (threshold-weighted absolute error at
+each series' P99, proxy stack, lead 4 to 48 hours, half-hours outside logged closures), is +57.1%
+(95% interval +0.4% to +133.5%, from resampling whole calendar months), against the bar of -5% or
+better. The oracle mask built from the logs lowers the same error by 8.9% for the 14-day window
+(-21.8% to +0.0%), so the ceiling is small, and 95% of it is one month. A random mask of equal
+volume changes the error by +0.1% (-0.7% to +0.5%). All numbers are from `e00038_report.py` and are
+in points of capacity unless stated.
 
-## Sizing (the five `plan-issue` triggers)
+![Per-event and aggregate change in the threshold-weighted error](figure_1_headline.svg)
 
-- **Stored:** scratch tables under `data/ml-experiments/00038-switching-mask-value/` only.
-- **Production serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes (the interval rule and the correction window); both are
-  fixed here before any result.
-- **Callers nameable without searching:** yes, this experiment's folder only.
+## What the arms scored
 
-The size is medium. Compute is CPU only, 2 cores, under an hour. Sonnet implements, one Opus review
-reads the code (this switching line has found real oracle bugs), Sonnet runs and writes up, and
-Opus reviews the result and writes the proposed next experiment.
+**Every pre-registered arm built on the detector fails; the oracle and the placebo behave as the
+plan expected.** Tier A is experiment 00017's `H0.5` (ERA5 weather, out of sample) plus a
+correction, daily 09:00 UTC origins from 2022-01-15 to 2026-03-25. **ERA5 arrives about 5 days
+after the event, so the weather is not available at forecast time and the numbers are a ceiling for
+the correction rule.** Lead 4 to 48 hours is counted from the newest usable observation, 4 hours
+before the origin. The rows are the 1,648,578 half-hours outside logged closures (plus 2 hours
+either side), the same for every arm.
 
-## Purposes the results speak to
+| Arm | Threshold-weighted error at P99 | Change (95% interval) | Mean absolute error |
+|---|---|---|---|
+| `plain14` (experiment 00019's rule) | 0.0292 | reference | 5.603 |
+| `plain7` (the detector-free bar) | 0.0277 | -5.2% against `plain14` (-10.8% to +0.0%) | 5.478 |
+| `d1_mask7` (primary, against `plain7`) | 0.0435 | +57.1% (+0.4% to +133.5%) | 5.614 |
+| `d1_mask14` | 0.0445 | +52.4% (+0.3% to +125.1%) | 5.719 |
+| `d0w48_mask14` | 0.0479 | +63.8% (+21.9% to +136.3%) | 5.958 |
+| `oracle_conf14` (logs, confirmed transfers) | 0.0266 | -8.9% (-21.8% to +0.0%) | 5.573 |
+| `oracle_logged14` (logs, all 612 closures) | 0.0261 | -10.6% (-26.1% to +0.8%) | 5.561 |
+| `random14` (placebo) | 0.0292 | +0.1% (-0.7% to +0.5%) | 5.626 |
 
-1. **Lags in the forecasting model:** measured, as the effect on the 14-day correction of knowing
-   which history half-hours lie inside an event.
-2. **A normal-running-arrangement forecast in v1:** the out-of-event scoring is that view. Masking
-   the training targets needs refits and is not tested.
-3. **Telling NGED about their switching events:** the detected-interval table is written as a
-   by-product.
+- **The ceiling is concentrated.** January 2026, which holds the 2025-12-30 closure of Primary
+  substations 17 and 18, supplies 95% of the `oracle_conf14` gain. Without it the oracle change is
+  -0.5%. Odd and even months give -13.0% and -1.2% for the oracle, and +39.3% and +89.9% for
+  `d1_mask7`.
+- **The detector found the dominant closure, and the interval rule then lost it.** D1 raised an
+  alarm on the 17-18 closure under both builders. As specified, the interval for series 18 ended on
+  the first failing 24-hour block and the closure's return step then started an interval that ran
+  the 60-day cap, so the correction held its pre-closure level for 60 days. On that closure,
+  `d1_mask7` raised the error from 3,011 to 11,657 (sum over the closure window and 16 days after).
+- **Per event, nothing improved under the as-specified builder.** Of the 17 confirmed closures of 24
+  hours or more, `d1_mask7` improved 1, worsened 3, and left 13 unchanged (binomial p 0.94 with ties
+  dropped; the plan's condition was 12 improved). The oracle improved 6 and worsened none. Of the 17
+  windows, 5 have zero threshold-weighted error in every arm, because the load never exceeded the
+  series' P99 outside the closure.
+- **The cost of false alarms is large.** On the 417,213 quiet rows, more than 16 days from any logged
+  closure or D1 alarm on that series, `d1_mask7` raises the mean absolute error by 0.125 points
+  (the plan's bar was within +/-0.01) and the threshold-weighted error by 60.6%. A detected interval
+  that overlaps no logged closure still removes real history: 75% of the 498 D1 intervals overlap no
+  logged closure, and 1.0% reached the 60-day cap.
+- **The 7-day window beats the 14-day window, which the plan predicted.** `plain7` against `plain14`
+  is -5.2% (-10.8% to +0.0%) in tail error and -0.12 points in mean absolute error. The lead 144 to
+  192 hour band agrees on sign for every contrast (primary +49.8%, oracle -11.4%).
 
-**Two views of the target are reported, and the maintainer has to settle which one NGED wants.**
-The normal running arrangement (NRA) view scores half-hours outside logged events, so a forecast
-that ignores the switched load is rewarded. The metered-load view scores every half-hour, so the
-forecast must follow the switched load while the event lasts.
+## Post hoc: a revised interval builder
 
-## Forecast sets
+**Labelled post hoc, and not part of the verdict.** The diagnosis above led to four changes to the
+builder, all made after seeing the first scores: the onset step comes from the first 24-hour block
+(not the first 4 hours), an event ends only after two consecutive failing blocks, an alarm inside an
+earlier interval of the same series or within one block after its end is skipped (it is the return
+step), and `known_from` no longer moves earlier across empty blocks. The arms keep their names with
+`fx` and are scored on the same rows.
 
-- **Tier A, proxy stack (decides the verdict).** Experiment 00017's `H0.5` (ERA5 weather, each
-  prediction out of sample, retrained monthly) plus a correction, at daily 09:00 UTC origins from
-  2022-01-15 to 2026-03-25. The newest usable observation is 3.5 hours before the origin. Lead bands
-  are 3.5 to 48 hours and day 6 to 7. **ERA5 arrives about 5 days after the event, so the proxy's
-  weather inputs are not available at forecast time; the numbers are a ceiling for the correction
-  rule, not a production forecast.**
-- **Tier B, the real stack (reported, three to four events).** Experiment 00019's `n1h` arms (three
-  seeds), runs every 5 days from July 2025 to 2026-03-25, with 00019's correction and 1.15 spread,
-  scored as in experiment 00037. It must agree in sign with tier A, or the write-up says so first.
+- **The tail error falls, within the noise.** `d1fx_mask7` against `plain7` is -5.4% (-15.1% to
+  +1.5%); `d1fx_mask14` against `plain14` is -8.9% (-22.2% to +1.3%), which equals the oracle's -8.9%.
+  Without January 2026, the 7-day change is +0.3%. Per event, 3 improve, none worsen, and 14 are
+  unchanged (p 0.125). `randomfx14` changes the error by +1.9% (-0.6% to +6.8%).
+- **The mean absolute error still rises.** `d1fx_mask7` raises it by 0.254 points (+4.6%) outside
+  logged closures and by 0.164 points on quiet rows. The tail gain and the typical-error cost come
+  from the same mechanism: a masked history cannot follow the level shifts that the logs never
+  recorded.
+- **D0 with a 24-hour window is worse than D1 under both builders** (+63.8% as specified, +48.6%
+  revised, both against `plain14`).
 
-## Arms (post-processing; no refit)
+![Raw data: Primary substations 17 and 18 across the logged closure](figure_2_raw_17_18.svg)
 
-Each arm is a rule for the correction at origin `o`; the history ends 8 half-hours before `o`.
+![The correction on substation 18 under three rules](figure_3_corrections_18.svg)
 
-- `plain14` (00019's rule), `plain7` (the detector-free bar).
-- `d1_mask14`, `d1_mask7`: the plain rule over half-hours outside D1 intervals known at that time;
-  with under 3 days left, the series' last correction that had 3 days is carried forward.
-- `d0w48_mask14`: the same with D0 (24-hour window).
-- `oracle_conf14`, `oracle_logged14`: masks from the logs (confirmed transfers; all 612 logged
-  closures of 2 hours to 60 days), the ceiling.
-- `random14`: each series' D1 intervals moved by a random whole number of days in +/-30 to 90, the
-  placebo for volume.
-- `d1_persist14`: `d1_mask14` plus, while a D1 interval is open, the mean residual of the interval's
-  last 24 hours minus the masked correction (the metered view; scored on all rows).
+![The gain sits in one month](figure_4_monthly_gain.svg)
 
-## Interval builder
+## The two views of the target
 
-D1 (window 8, h = 4) and D0 (window 48, h = 4) alarms use experiment 00037's thresholds, with scales
-from odd months. For each alarm, the builder tracks the level in relative residual (residual over
-expected power, so a step that follows the moved load's own shape stays constant): the pre-level is
-the median over the 7 days before onset, and the event continues in 24-hour blocks while the block's
-mean relative residual minus the pre-level keeps the onset's sign and at least half its size. The end
-is the end of the last qualifying block, with a cap of 60 days. The mask covers the alarm series and
-every partner whose own first block qualifies. At origin `o`, an alarm counts only when its onset
-plus window lies before the newest observation, and an open interval is masked up to that
-observation. A leakage test checks that the intervals used at `o` do not change when residuals after
-the newest observation are replaced by NaN.
+**The maintainer has to settle whether NGED wants the normal running arrangement (NRA) or the
+metered load; this experiment cannot.** The NRA view scores half-hours outside logged closures, as
+above. The metered view scores every half-hour. Under the metered view (all rows, lead 4 to 48
+hours), the persistence arm, which follows the recent residual while a D1 interval is open, changes
+the threshold-weighted error against `plain14` by -4.6% (-12.3% to +3.1%) as specified and -8.5%
+(-18.9% to +1.3%) revised. The plain 7-day window alone gives -7.1% (-13.1% to -0.4%), so
+persistence adds nothing the shorter window does not already give. At lead 144 to 192 hours the
+three are -4.8%, -6.8%, and -4.6%.
 
-## Scoring rows and intervals
+## Tier B: the real stack
 
-- **Out-of-event rows:** valid times outside every logged interval of 60 days or less on the series,
-  plus 2 hours either side.
-- **Per-event windows:** for each confirmed event of 24 hours or more, valid times from onset to the
-  end plus 16 days, out-of-event rows only.
-- **Quiet rows:** out-of-event rows more than 16 days from any logged interval or D1 alarm: the cost
-  of false alarms.
-- **Intervals:** whole calendar months are resampled; per-event results are a sign count with a
-  binomial test. Odd and even months are reported apart, and the aggregate again with the largest
-  month removed.
+**The real stack agrees in sign with the proxy on every contrast.** Experiment 00019's `n1h` arms
+(three seeds, runs every 5 days from July 2025, 1,397,181 half-hours outside logged closures) give
++68.4% (+0.1% to +221.5%) for `d1_mask7` against `plain7`, -21.2% (-34.6% to +5.1%) for the oracle
+against `plain14`, +0.4% (-0.3% to +1.4%) for the placebo, and -22.7% (-35.1% to +0.0%) for the revised
+`d1fx_mask7`. The nine-level quantile score moves by 4.3% (+0.1% to +8.7%) for `d1_mask7` and
++0.03% for `d1fx_mask7`. Only 3 to 4 closures sit in the runs, so Tier B decides nothing alone.
 
-## Injection check (secondary, decides nothing)
+![The real stack agrees with the proxy stack](figure_8_tier_b.svg)
 
-600 synthetic transfers are added to quiet periods: the moved load is a fraction (0.05, 0.15, or 0.3)
-of the donor's own power, split by Dirichlet fractions across 1 to 3 neighbours, with the fractions
-varying through the day in half the events, and durations drawn from the 28 confirmed closures of 6
-hours or more. It reports hit recall, interval overlap, end error, and split-fraction error by size
-and by number of receivers.
+## Q2: injected transfers
 
-## Pilot context
+**The detector finds a transfer only when the moved load is about 30% of the donor's own power, and
+it does not recover the split.** Six hundred synthetic transfers (1 to 3 receivers, durations drawn
+from the 28 confirmed closures of 6 hours or more) were injected into quiet periods. D1's recall by
+moved share is 0.5% at 5%, 8.6% at 15% (as specified), and 45.6% at 30%; it does not rise with the
+number of receivers (43%, 52%, and 47% at 30% for 1, 2, and 3). Of the 39 found transfers of 2
+days or more, 85% (as specified) and 87% (revised) have the end within 24 hours. The median
+absolute end error is 6 hours at 30%. The pooled split fraction has a mean error of 0.64 to 0.70
+because only 11% to 15% of the receivers are matched to a detected partner. Within-day variation of
+the split was found for too few events to say (3 found events with a true range of 0.3 or more).
 
-The pilots behind this plan (in-sample, exploratory) put the oracle gain at 21% to 28% of the
-out-of-event tail score of the real stack, 94% of it in one month (the 2025-12-30 closure of Primary
-substations 17 and 18), and found a 7-day window better than a masked 14-day window on absolute
-error. These are the reasons for the primary contrast being against `plain7`.
+![Injected transfers: recall rises with the moved share](figure_6_injection_recall.svg)
 
-## Figures planned
+![Injected transfers: error in the estimated end](figure_7_injection_end_error.svg)
 
-A headline of per-event change by arm with the aggregate and its interval; raw series 17 and 18
-around the 2025-12-30 closure with the logged span and the detected interval; six further raw
-events and two quiet periods; the correction over time for series 18 under every arm; the monthly
-gain; detected against logged interval length; the injection results; and tier B.
+## Q3: the detected-interval table for NGED
 
-## Stop rule
+**The tables are written but unvalidated.** D1 produced 347 alarms and 498 intervals under the
+as-specified builder (alarm and partner series), and 198 alarms with 374 intervals revised. Only
+25% (as specified) and 31% (revised) overlap a logged closure. The median interval is 24 and 48
+hours. At 0.38 unexplained alarms per series-month in experiment 00037, the list is about 6
+candidates a month across the 16 substations, mostly unexplained by the logs. The tables are
+`q3_table_d1.parquet`, `q3_table_d1fx.parquet`, and `split_fractions_*.parquet` in the private
+data folder.
 
-`refuted` ends the switching line's forecasting purposes (1 and 2): the detected-interval table is
-offered to NGED as an unvalidated list. `partly supported` also stops new experiments and records
-the oracle ceiling. `supported` leads to a proposal to mask detected events from the training
-targets as well.
+![Most long detected intervals overlap no logged closure](figure_5_interval_lengths.svg)
+
+![Raw data: the six largest confirmed transfers](figure_9_raw_events.svg)
+
+## Process and deviations
+
+- **Code review (Opus, one round).** Nine findings; the code was changed for seven and the
+  rest are recorded here.
+    - *Fixed:* the monthly-gain table was written with the wrong arm labels (figure 4 read it); the
+      day 6 to 7 band was actually day 3 to 4 (now offsets 136 to 183, lead 144 to 192 hours); the
+      persistence arm opened partner intervals before they exist; alarms were released at
+      `onset + window + 2` when the peak test needs `onset + 2 * window + 2`; an empty block made an
+      interval's end known early; ties counted as losses in the per-event test; the plain arms carried
+      a correction forward when under 3 days remained, where experiment 00019 uses zero. The causality
+      check now covers D0, both builders, and the open-interval start at 11 origins. The reruns moved
+      no headline number by more than 0.5 points.
+    - *Not changed:* the random mask wraps from 2026 into 2022 (it keeps volume exactly, which the plan
+      asked for), and the quiet rows exclude 16 days around D1 alarm stamps only, as the plan words it,
+      so rows inside a long false-alarm interval count as quiet, which is the cost of false alarms the
+      quiet rows exist to show.
+- **Deviations.** The lead bands count from the newest observation (lead 4 to 48 hours is
+  `0 to 87` half-hours from the origin). The post hoc builder and every `fx` arm are labelled as
+  such. The injection split estimate pools the four clock blocks (changed after seeing 0.7 errors
+  from block ratios). Tier B's quantile score uses 00037's scorer, copied.
+- **Sizing, as registered:** medium. Stored: scratch tables only. Production serving path and
+  degradation rule: not touched. Compute: 2 cores, under 5 minutes per script.
+
+## Lessons for later experiments
+
+- **Masking detected switching does not help the correction, and the detector is not the reason.**
+  The dominant closure was found in every variant. What failed is the interval's end, and then the
+  cost of masking half-hours that the logs never recorded as switching.
+- **The gain a mask could deliver is one closure.** January 2026 holds 95% to 105% of every gain,
+  and removing it leaves 0.3% to 0.5%. The write-up of any further switching experiment should
+  report the result without that closure first.
+- **The cheapest improvement found is not about switching.** A 7-day window beats the 14-day
+  window on both error measures in this proxy stack (in-sample, one lead band at a time); it
+  belongs in its own stack experiment.
+
+## Proposed next experiment
+
+*To be written by the result reviewer.*

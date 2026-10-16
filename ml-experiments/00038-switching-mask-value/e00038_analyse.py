@@ -161,7 +161,7 @@ def main() -> None:
     pl.Config.set_tbl_cols(30)
     rows = pl.read_parquet(WORK_DIR / "tier_a_rows.parquet")
     table = []
-    for band, band_name in (("A", "3.5 to 48 h"), ("B", "day 6 to 7")):
+    for band, band_name in (("A", "lead 4 to 48 h"), ("B", "lead 144 to 192 h")):
         in_band = rows.filter(pl.col("band") == band)
         for label, arm, ref in CONTRASTS:
             persist = "persist" in arm
@@ -201,13 +201,13 @@ def main() -> None:
         print(f"=== band 3.5-48h, tw, view {view}")
         print(
             contrasts.filter(
-                pl.col("band") == "3.5 to 48 h", pl.col("metric") == "tw", pl.col("view") == view
+                pl.col("band") == "lead 4 to 48 h", pl.col("metric") == "tw", pl.col("view") == view
             ).select(show)
         )
     print("=== band 3.5-48h, ae (points), out_of_event and quiet")
     print(
         contrasts.filter(
-            pl.col("band") == "3.5 to 48 h",
+            pl.col("band") == "lead 4 to 48 h",
             pl.col("metric") == "ae",
             pl.col("view").is_in(["out_of_event", "quiet"]),
         ).select(["view", "contrast", "reference_mean", "arm_mean", "change_points", "change_pct"])
@@ -215,7 +215,7 @@ def main() -> None:
     print("=== band day 6-7, tw, out_of_event")
     print(
         contrasts.filter(
-            pl.col("band") == "day 6 to 7",
+            pl.col("band") == "lead 144 to 192 h",
             pl.col("metric") == "tw",
             pl.col("view") == "out_of_event",
         ).select(show)
@@ -238,16 +238,20 @@ def main() -> None:
     for arm in arms:
         ref = ref_of[arm]
         gain = events[f"tw_{ref}"] - events[f"tw_{arm}"]
-        better = int((gain > 0).sum())
-        test = binomtest(better, events.height, 0.5, alternative="greater")
-        print(f"{arm} vs {ref}: better on {better}/{events.height}, binomial p={test.pvalue:.3f}")
+        better, worse = int((gain > 0).sum()), int((gain < 0).sum())
+        unchanged = events.height - better - worse
+        test = binomtest(better, better + worse, 0.5, alternative="greater")
+        print(
+            f"{arm} vs {ref}: better on {better}, worse on {worse}, unchanged on {unchanged} "
+            f"of {events.height}; binomial p (ties dropped)={test.pvalue:.3f}"
+        )
     months, _, sums = month_sums(
         rows=rows.filter(pl.col("band") == "A", pl.col("out_of_event")), metric="tw"
     )
-    column = {a: i for i, a in enumerate(ARMS)}
-    pl.DataFrame({"month": months, **{a: sums[:, column[a]] for a in ARMS}}).write_parquet(
-        WORK_DIR / "tier_a_months.parquet"
-    )
+    month_arms = arms_in(rows=rows, metric="tw")
+    pl.DataFrame(
+        {"month": months, **{a: sums[:, i] for i, a in enumerate(month_arms)}}
+    ).write_parquet(WORK_DIR / "tier_a_months.parquet")
 
 
 if __name__ == "__main__":

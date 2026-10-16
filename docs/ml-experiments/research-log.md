@@ -66,6 +66,7 @@ the maintainer to confirm.
 | [00033](00033-best-guess-architecture-vs-production/result.md) | Does the best-guess architecture beat production, N1, and `manual_heuristic` on the quantile score, twCRPS, and exceedance metrics, and how much would perfect weather add? | Supported: 4.89, 3.81, and 6.27 points below production | Candidate | 2026-10-15 |
 | [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted average of the quantiles of already-scored models beat the best single model for Primary demand, solar, and wind? | Supported for Primary demand (-0.10 points); null for solar and wind | Candidate (Primary demand) | 2026-10-15 |
 | [00037](00037-switching-first-look/result.md) | Does a neighbour-balance detector find logged switching in the telemetry at a lower false-alarm rate than a single-series detector? | Inconclusive: size-weighted recall 0.326 (0.093 to 0.579) against the 0.35 bar | Not for production | Not yet merged |
+| [00038](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -847,3 +848,23 @@ odd months and recall measured on even months.
   neighbour-balance detector beat a plain one?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1246).
 
 ![Validation recall against unexplained alarms](00037-switching-first-look/figure_1_headline.svg)
+
+### 00038: the value of detecting switching events
+
+**Leaving the half-hours that the neighbour-balance detector flags out of the stack's error
+correction raised the forecast's tail error, so the verdict is refuted.** The experiment masked
+detected intervals from the 14-day and 7-day corrections of the proxy stack (experiment 00017's
+ERA5-weather baseline) and of experiment 00019's real stack, and scored half-hours outside logged
+closures against an oracle mask from the logs and a random mask of equal volume.
+
+- **Headline result:** the primary contrast, D1 mask with a 7-day window against the plain 7-day
+  correction, is +57.1% (95% interval +0.4% to +133.5%) in threshold-weighted error at each series'
+  P99. The oracle mask lowers the 14-day error by 8.9% (-21.8% to +0.0%), and 95% of that gain
+  sits in January 2026, the month of the 17-18 closure. The random mask changes it by +0.1%.
+- **Finding for later experiments:** a post hoc revision of the interval builder gives -5.4%
+  (-15.1% to +1.5%), but raises the mean absolute error by 0.25 points, and 3 of 17 long closures
+  improve. The plain 7-day window beats the 14-day window by 5.2% (-10.8% to +0.0%) on its own.
+- **Write-up and pull request:** [result](00038-switching-mask-value/result.md),
+  [PR #1247 (Experiment 38: is detecting a switching event worth anything to the forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1247).
+
+![Per-event and aggregate change in the threshold-weighted error](00038-switching-mask-value/figure_1_headline.svg)

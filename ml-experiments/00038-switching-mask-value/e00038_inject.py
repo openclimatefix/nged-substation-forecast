@@ -179,7 +179,8 @@ def evaluate(
     }
     if not near:
         return record | dict.fromkeys(
-            ("iou", "end_error_hours", "split_mae", "est_range", "true_range"), None
+            ("iou", "end_error_hours", "split_mae", "receivers_matched", "est_range", "true_range"),
+            None,
         )
     best = min(near, key=lambda iv: abs(iv.onset - event.onset))
     own = [iv for iv in intervals if iv.series == event.donor and iv.onset == best.onset]
@@ -190,7 +191,13 @@ def evaluate(
     sub = fractions.filter(
         pl.col("alarm_series") == best.alarm_series, pl.col("onset") == best.onset
     )
-    est_mean = {p: g["fraction"].mean() for (p,), g in sub.group_by("partner")}
+    est_mean = {
+        p: float(
+            np.sum(g["fraction"].to_numpy() * g["alarm_step_mw"].to_numpy())
+            / np.sum(g["alarm_step_mw"].to_numpy())
+        )
+        for (p,), g in sub.group_by("partner")
+    }  # pooled over the four clock blocks, so a near-zero block step cannot dominate
     errors = [
         abs(est_mean.get(r, 0.0) - m) for r, m in zip(event.receivers, mean_true, strict=True)
     ]
@@ -212,6 +219,7 @@ def evaluate(
         "iou": overlap / union if union else 0.0,
         "end_error_hours": (donor_iv.end - true_end) / 2,
         "split_mae": float(np.mean(errors)) if sub.height else None,
+        "receivers_matched": sum(r in est_mean for r in event.receivers) / len(event.receivers),
         "est_range": max(ranges) if ranges else None,
         "true_range": true_range,
     }
