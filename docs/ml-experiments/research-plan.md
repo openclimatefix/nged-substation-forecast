@@ -180,8 +180,14 @@ work, for the plan of each iteration to confirm:
 - **SW2-7:** a shape-aware step, which models the moved load as a share of the donor's expected
   profile, not as a constant MW shift. Experiment 00037 found the step changing by more than a
   factor of 2 within 8 of 26 confirmed closures of 6 hours or more.
-- **SW2-8:** node balance, which tests whether the sum of the neighbourhood's residuals stays flat
-  while single substations step, with a subset-sum over neighbours for a split.
+- **SW2-8:** a single-series detector first, with neighbour balance as a sense check, not a gate.
+  Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's
+  confidence and names the receiver, a same-sign step on the neighbours vetoes the alarm as a
+  common-mode weather or calendar miss, and an alarm with no metered neighbour keeps its
+  single-series confidence. Experiment 00043 found the neighbour-balance detector D1, which uses
+  the neighbour test as a gate, finding almost none of the injected transfers without a metered
+  receiver. The sum of the neighbourhood's residuals and a subset-sum over neighbours for a split
+  feed the confidence score.
 - **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
   series and hour of day fitted to the residual.
 
