@@ -164,6 +164,10 @@ def weights_per_row(
             maintain_order="left",
         )
     )
+    cells = weights.filter(pl.col("site") == site)
+    if cells.height != len(common.LEAD_BANDS) * 2:
+        msg = f"{site} has {cells.height} weight cells, expected {len(common.LEAD_BANDS) * 2}"
+        raise ValueError(msg)
     return frame["slope_applied"].fill_null(0.0).to_numpy()
 
 

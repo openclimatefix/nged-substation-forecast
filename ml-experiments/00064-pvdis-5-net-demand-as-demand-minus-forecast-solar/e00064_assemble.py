@@ -124,9 +124,6 @@ def main() -> None:
         }
         # The holdout (valid times from 2026-07-01) is never stored or scored.
         forms = {k: v.filter(pl.col("valid_time") < common.HOLDOUT) for k, v in forms.items()}
-        for form, table in forms.items():
-            joined = table.join(actual, on=list(common.KEYS), how="left", validate="m:1")
-            common.write_atomically(frame=joined, target=common.ARMS_DIR / f"{form}.parquet")
         experiment_store.write_predictions(
             experiment_id=common.EXPERIMENT_ID,
             name=name,
@@ -134,6 +131,9 @@ def main() -> None:
             kind="quantiles",
             row_set_id=common.ROW_SET_ID,
         )
+        for form, table in forms.items():
+            joined = table.join(actual, on=list(common.KEYS), how="left", validate="m:1")
+            common.write_atomically(frame=joined, target=common.ARMS_DIR / f"{form}.parquet")
         print(
             f"{name}: {forms[name].height:,} rows, scored form and correction-only form", flush=True
         )

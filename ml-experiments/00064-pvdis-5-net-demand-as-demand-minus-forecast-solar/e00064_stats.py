@@ -178,7 +178,6 @@ def load_losses(*, context: pl.DataFrame) -> pl.DataFrame:
             )
         )
         for arm in SCORED_ARMS
-        if (common.ARMS_DIR / f"{arm}.parquet").exists()
     }
     losses = experiment_store.losses_for_bootstrap(arm_losses=arm_losses)
     return losses.with_columns(month=pl.col("power_fcst_init_time").dt.strftime("%G-W%V"))
