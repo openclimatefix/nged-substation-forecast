@@ -81,6 +81,9 @@ def farm_cells(*, group: zarr.Group, sites: pl.DataFrame) -> dict[int, int]:
 def fill_leads(*, values: np.ndarray) -> np.ndarray:
     """Rebuild every lead of a 55-lead series from its native leads by a straight line.
 
+    Args:
+        values: The series at the 55 leads, NaN where the store holds no value.
+
     Returns:
         The 55 leads, all NaN when any native lead (0 to 48, 51, 54) is not finite.
     """

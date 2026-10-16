@@ -151,6 +151,16 @@ def take(*, values: np.ndarray, index: np.ndarray) -> np.ndarray:
 def origin_lags(*, power: np.ndarray, target: np.ndarray, origin: np.ndarray) -> np.ndarray:
     """Return the three lags measured from the forecast origin, using only usable observations.
 
+    Args:
+        power: Observed power over effective capacity on the grid, NaN where unobserved.
+        target: Grid index of each case's valid time.
+        origin: Grid index of each case's initialisation time.
+
+    Returns:
+        A float32 array of shape (cases, 3) in `LAG_COLUMNS` order: the newest usable value, the
+        value at the latest earlier time with the valid time's half-hour of day, and the value at
+        the latest earlier time with its weekday and half-hour.
+
     Raises:
         ValueError: If a case's valid time is not after its origin.
     """
