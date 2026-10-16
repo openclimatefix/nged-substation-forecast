@@ -19,7 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
-| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
+| [SW2-15, experiment 67](00067-sw2-15-joint-edge-flow-estimator/result.md) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | Nothing (SW2-9 done: experiment 62) | Planned; slot D |
 | [SW2-16](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Does experiment 61's end rule (the interval ends at the strongest opposite step within a cap) also find more of the moved MW at the 4-hour window, and with a cap longer than 14 days? | 2 | Nothing | Proposed; its winner becomes the baseline detector for later SW2 experiments |
 | [SW2-17](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their onset, and does an onset rule that a later return step confirms recover them? | 2 | SW2-16 | Proposed |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
@@ -210,7 +210,8 @@ day.
   a likelihood-ratio sum and a logistic regression of own and neighbour opposite steps gained +0.005
   and +0.019 over the single-series detector (neither interval excludes zero). A post hoc arm that
   adds the count of same-sign neighbour steps gained +0.034.
-- **SW2-15, the joint edge-flow estimator** from approach 3 on the [switching
+- **SW2-15, the joint edge-flow estimator** (planned as [experiment
+  67](00067-sw2-15-joint-edge-flow-estimator/result.md)), from approach 3 on the [switching
   events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
   a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
   at once with a sparsity penalty and a penalty on changes, in CVXPY. Each Primary also gets a
