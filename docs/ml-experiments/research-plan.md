@@ -29,6 +29,7 @@ sooner.
 | [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-3 and PVDIS-4 | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations) | Can the share of east-, south-, and west-facing solar behind each Primary be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
+| [PVDIS-8](#pvdis-8-a-second-weather-forecast-for-the-solar-anomaly) | Does a second weather forecast, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | 2 | The maintainer's word to the ML experiment manager | Proposed; can run beside PVDIS-4, and PVDIS-5 uses its anomaly if it beats ENS |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
 ## Deferred until the first results are in
@@ -465,6 +466,30 @@ through zero, because reactive power then dominates the reading. The known-answe
 absolute value of the MW readings at the 8 Primaries metered in MW and scores the recovered sign
 and capacity against the real ones. A fit that passes that test is then applied to the 8 MVA
 Primaries. NGED would like MW at every Primary, and accepts that the result is research.
+
+#### PVDIS-8: a second weather forecast for the solar anomaly
+
+**Test whether a second weather forecast, alone or blended with ENS, forecasts the solar anomaly
+better than ENS, because experiment 00046 found that the irradiance forecast, not the capacity,
+limits the gain.** In experiment 00046, a shift built from CAMS at the valid time, an oracle, lowered
+the daylight quantile score of the demand forecast without radiation inputs by 0.97 points
+(-1.43 to -0.60), about 20% of that forecast's score. The same shift built from ENS lowered it by
+only 0.056, because the ENS anomaly's correlation with the CAMS anomaly falls from 0.80 in the first
+day to 0.28 at 6 to 10 days.
+
+- **The anomaly is scored first, with no demand fit:** its correlation and calibration slope against
+  the CAMS anomaly, by lead band, at the Primaries metered in MW, on experiment 00046's rows. The
+  arms are ENS alone, the second product alone, and a blend of the two, with the blend's weights
+  fitted on the training window only.
+- **Then the demand contrasts are repeated:** experiment 00046's C3 and C6, with the best of the
+  three anomalies and experiment 00046's lead-dependent coefficient.
+- **The product is chosen on four checks:** a forecast archive covering the training window and the
+  validation year (July 2025 to June 2026), availability at the time production runs, the
+  resolution and step length of its shortwave field, and the same product in training and in
+  serving. The CEDA UKV archive differs statistically from the live UKV, so a fit trained on one
+  is never served on the other. Candidates include the products in P15 and those Dynamical.org
+  serves. A product already on disk comes first, and any download follows the `data-download`
+  skill.
 
 #### PVDIS-T: the capacity table, a study
 
