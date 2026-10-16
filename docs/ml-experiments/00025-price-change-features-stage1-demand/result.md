@@ -71,6 +71,13 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Does the change in the intra-day price help a stage 1 demand model explain power?
 
+We asked whether the change in the electricity price during the day helps a demand model, beyond the
+price level alone. We added several price inputs to a weather-to-power model, and compared each with
+the base model and with controls that used shuffled prices, on Primary substations (substations that
+step power down to the local distribution network) in a selection year and a confirmation year.
+Price changes beat the price level in both years, but by only 0.04 to 0.05 points of capacity, below
+the 0.1 points we had set as worth using.
+
 **Verdict: small gain, and too small to use.** On Primary substations, price changes beat the price
 level alone and beat other-week changes in both years, with intervals wholly below zero, but by 0.04
 to 0.05 points of capacity against the pre-registered 0.1. The system price gained 0.05 to 0.08 over

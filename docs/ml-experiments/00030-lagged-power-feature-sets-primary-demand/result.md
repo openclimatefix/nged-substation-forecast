@@ -70,12 +70,22 @@ code: ml-experiments/00030-lagged-power-feature-sets-primary-demand/
 
 # Which lagged power columns lower the error of Primary substation demand forecasts?
 
+We asked which earlier readings of power, taken at the same time of day in previous weeks or years,
+lower the error of a demand forecast for Primary substations (substations that step power down to
+the local distribution network). We gave a single-step model 3 lags, the 6 weekly lags, the 7 annual
+lags, or all 13, and compared the quantile scores for 16 Primary substations. Adding all 13 changed
+nothing, the weekly lags alone helped a little, the annual lags hurt, and a 14-day error correction
+then removed the weekly gain. An arm added after the run, which gives the mean and median of the
+weekly values, scored lowest of all.
+
 **Verdict: inconclusive.** Giving N1 all 13 lags of `manual_heuristic` as separate columns does not
 lower its quantile score: C3 is -0.01 points of capacity (99.375% interval -0.45 to +0.43). The 6
 weekly analogues alone lower the score by 0.30 (C1, -0.63 to -0.02), the 7 annual analogues raise it
 by 0.29 (C2), and the 14-day error correction then removes the weekly gain. A post hoc arm, N1 plus
 the mean and median of the weekly analogues, scores 0.05 below N1 with the correction (-0.08 to
--0.02), the lowest score of any arm. A point is 1% of the series' effective capacity.
+-0.02), the lowest score of any arm. A point is 1% of the series' effective capacity. N1 is the
+single-stage XGBoost quantile model trained on the ensemble weather forecast (ENS) of the European
+Centre for Medium-Range Weather Forecasts.
 
 ![Quantile score of each arm, without and with the correction](figure_1.svg)
 

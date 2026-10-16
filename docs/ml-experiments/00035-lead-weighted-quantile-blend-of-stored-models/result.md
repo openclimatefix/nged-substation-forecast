@@ -84,18 +84,25 @@ code: ml-experiments/00035-lead-weighted-quantile-blend-of-stored-models/
 
 # Experiment 35: does a lead-weighted blend of quantiles beat the best single model?
 
+We asked whether averaging the forecast ranges of several stored models, with a different weight at
+each lead time, beats the best single model. We blended three stored models of demand at Primary
+substations (substations that step power down to the local distribution network), and tested similar
+blends for solar and wind. For Primary demand the blend lowered the error by 0.10 points of
+capacity, which clears the threshold for moving it into production. For solar and wind the gains
+were too small to resolve.
+
 **Primary demand gains 0.10 points of capacity from blending; solar and wind gain too little to
-resolve.**
-The stack is N1 with the 14-day correction and a spread factor of 1.15 (experiment 19). The
-lead-band blend of the monthly-retrained N1, `a7_cs`, and the stack scores 5.025 points of
-capacity against 5.122 for the best member (difference -0.097, 98.33% interval -0.187 to -0.026),
-so the outcome for Primary demand is "port" (threshold 0.05). Solar is -0.039 (-0.115 to +0.031)
-and wind is -0.074 (-0.194 to +0.055), both "null". The stop rule did not fire anywhere (corner
-cells: Primary 0 of 60, solar 6, wind 7), so the verdict is `supported`, on Primary demand alone.
-The prediction held for Primary demand's size but not its verdict (expected `small gain`, found
-"port"), and failed for wind, where the estimate was -0.074 against a predicted -0.10 to -0.30.
-Intervals resample whole months, and for Primary demand one seed, so they say nothing about
-other substations or about wind farms beyond the three scored.
+resolve.** The stack is N1 (the single-stage XGBoost quantile model trained on ENS, the ensemble
+weather forecast of the European Centre for Medium-Range Weather Forecasts) with the 14-day
+correction and a spread factor of 1.15 (experiment 19). The lead-band blend of the monthly-retrained
+N1, `a7_cs`, and the stack scores 5.025 points of capacity against 5.122 for the best member
+(difference -0.097, 98.33% interval -0.187 to -0.026), so the outcome for Primary demand is "port"
+(threshold 0.05). Solar is -0.039 (-0.115 to +0.031) and wind is -0.074 (-0.194 to +0.055), both
+"null". The stop rule did not fire anywhere (corner cells: Primary 0 of 60, solar 6, wind 7), so the
+verdict is `supported`, on Primary demand alone. The prediction held for Primary demand's size but
+not its verdict (expected `small gain`, found "port"), and failed for wind, where the estimate was
+-0.074 against a predicted -0.10 to -0.30. Intervals resample whole months, and for Primary demand
+one seed, so they say nothing about other substations or about wind farms beyond the three scored.
 
 ![Blends minus the best single member over all leads](figure_1.svg)
 

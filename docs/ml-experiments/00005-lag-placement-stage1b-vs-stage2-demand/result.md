@@ -62,12 +62,20 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/11
 
 # Where should lagged power enter a two-stage demand forecast?
 
+We asked where recent measured power should enter a two-step demand forecast: in the first step,
+which turns weather into demand, or in the second step, which corrects the first step's forecast
+range. We fitted each placement, and a placement in both steps, on the same inputs for 16 Primary
+substations (substations that step power down to the local distribution network), and compared the
+forecast error up to 48 hours ahead. Giving recent power to the second step lowered the error more
+than giving it to the first step, so the idea that the first step is the better place was refuted.
+
 **Verdict: refuted.** For the 16 Primary substations, lagged power improved the forecast more when
-it entered the stage 2 calibrator (L3) than when it entered stage 1b (L2c). The planned primary
-contrast, L2c minus L3 for leads up to 48 hours, was +0.84 points of capacity (99% interval +0.28 to
-+1.50), and 9 of the 12 validation months favoured L3. Refutation rests on the +0.15 bar and on an
-interval wholly above zero, and both hold. The plan below was committed before any fit, and the
-results above it were written after the run.
+it entered the stage 2 calibrator (L3) than when it entered stage 1b (the weather-to-power stage, in
+arm L2c). The planned primary contrast, L2c minus L3 for leads up to 48 hours, was +0.84 points of
+capacity (99% interval +0.28 to +1.50), and 9 of the 12 validation months favoured L3. Refutation
+rests on the +0.15 bar and on an interval wholly above zero, and both hold. The plan below was
+committed before any fit, and the results above it were written after the run. A point of capacity
+is 1% of the series' effective capacity.
 
 ## Results
 

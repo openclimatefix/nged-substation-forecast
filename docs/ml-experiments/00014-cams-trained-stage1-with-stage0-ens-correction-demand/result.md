@@ -78,11 +78,20 @@ code: ml-experiments/00014-cams-trained-stage1-with-stage0-ens-correction-demand
 
 # Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model?
 
+We asked whether correcting forecast sunlight before a demand model reads it improves the forecast.
+The demand model was trained on a satellite estimate of sunlight, but the weather forecasts it
+receives when it is used give more daytime sunlight than that estimate (281 against 263 watts per
+square metre). We mapped the forecast sunlight onto the satellite estimate, member by member, and
+measured the change in error. The error fell by 0.067 points of capacity, but mismatches remained in
+individual months.
+
 **This experiment is P20 of the [research plan](../research-plan.md), the follow-up to [experiment
 00009](../00009-cams-trained-stage1a-vs-era5-trained-demand/result.md).** Experiment 00009 found
-that a stage 1a trained on CAMS irradiance lowered the Primary quantile score by only 0.035
-points when fed ENS shortwave, and measured the ENS daylight shortwave at 281 W/m² against 263 for
-CAMS. This experiment tests that offset as a cause.
+that a stage 1a trained on CAMS irradiance lowered the Primary quantile score by only 0.035 points
+when fed ENS shortwave, and measured the ENS daylight shortwave at 281 W/m² against 263 for CAMS.
+This experiment tests that offset as a cause. Stage 1a is an XGBoost model per series that turns
+weather into power. The quantile score measures how well the forecast range fits what happened, and
+smaller is better.
 
 ## Size
 

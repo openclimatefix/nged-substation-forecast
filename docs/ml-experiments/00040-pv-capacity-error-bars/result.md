@@ -84,6 +84,13 @@ advice:
 
 # Experiment 40: how far can the capacity fitted to embedded solar be trusted?
 
+We asked how far the solar capacity fitted to the demand at a Primary substation (a substation that
+steps power down to the local distribution network) can be trusted. We built a test that compares
+the capacity found by six different fits of the same series, and checked it on solar-farm output
+added to demand and on loads that mimic cloud. The test raised a false alarm in 0.055 of cases and
+detected four of five cloud-like loads at 25% of the true capacity, but it detected a day-long
+cloud-like load in only 0.35 of draws, so it failed the power rule we set.
+
 **Verdict `underpowered`: the misfit test is calibrated and detects four of five cloud-driven loads
 at 25% of the true capacity, but it detects a day-long cloud load in only 0.35 of draws, so the
 pre-registered power rule fails.** The test compares the capacity that six least-squares fits assign
@@ -93,7 +100,8 @@ substation flagged in 2025/26, and the other seven are unflagged. The capacity a
 carries a bound B of 0.18 to 0.71, and the test has almost no power at Wrangle T1, so the bound is
 wider than the 0.10 predicted. The aim is explanation and capacity estimation, not forecast skill.
 CAMS irradiance is the only weather input at the lag times and it arrives too late to drive a live
-forecast, so the fits describe past data.
+forecast, so the fits describe past data. CAMS is the Copernicus Atmosphere Monitoring Service's
+satellite estimate of sunlight.
 
 ![Figure 1: capacity per Primary in 2025/26 with its interval and bound](figure_01.svg)
 

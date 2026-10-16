@@ -84,6 +84,13 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Which inputs work best for the ERA5-trained demand model (stage 1a)?
 
+We asked which extra inputs most improve a model that turns weather into electricity demand, beyond
+the weather itself. We tried the hour of day and day of week, a flag for the COVID period, weighting
+recent years more heavily, and windchill, and compared each with a model given only weather, on 16
+Primary substations (substations that step power down to the local distribution network) over a
+selection year and a confirmation year. Hour of day and day of week helped most, by about a third of
+the gain we had predicted, and windchill made almost no difference.
+
 **Verdict: partly supported.** For the Primary substations, the clock (hour of day and day of week)
 is the largest single input against the weather block alone (-0.55 points of capacity on the
 selection year and -0.46 on the confirmation year), a third of the 1.5 points the hypothesis

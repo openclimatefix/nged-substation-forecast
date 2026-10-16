@@ -76,18 +76,27 @@ code: ml-experiments/00013-primary-demand-against-stored-baselines/
 
 # Where does Primary substation demand stand against the stored baselines?
 
+We asked how well our best demand model forecasts Primary substations (substations that step power
+down to the local distribution network) compared with a stored baseline that uses the power at the
+same time in earlier weeks, and why the model now in production loses to that baseline. We scored an
+upgraded model, the production recipe, and the baseline on 16 Primary substations. The upgraded
+model was level with the baseline, with an interval that includes zero, and the production recipe
+lost to the baseline by 1.69 points of capacity.
+
 **Verdict: inconclusive.** The upgraded XGBoost quantile model N1 does not beat `manual_heuristic`
 with an interval that excludes zero. For the 16 Primary substations, N1's mean absolute error of the
 median is 8.45 points of capacity over all leads against 8.23 for `manual_heuristic`: C1 is +0.22
 (99% interval -0.54 to +0.97). Up to 48 hours N1 scores 7.38 against 7.95, which meets the planned
 0.5-point size (-0.57) but not the interval (-1.33 to +0.27), and beyond 3 days N1 is level or worse
-(+0.40, -0.39 to +1.19). The production recipe does lose to `manual_heuristic`, by +1.69 points
-(C3, +0.98 to +2.59), at every lead and in 12 of 16 series. The hypothesis named a mechanism for
-that loss, no usable power persistence at short leads, and the equal gap at every lead contradicts
-it. **The decision rule has no branch for this outcome, so the verdict and the gate action below
-are the fall-through reading of the rule and were not pre-registered.** The gate for P7 and P8 is
-not passed, so P7 compares the staged chain with `manual_heuristic` as well as with N1. A point is
-1% of the series' effective capacity. The substations are not named.
+(+0.40, -0.39 to +1.19). The production recipe does lose to `manual_heuristic`, by +1.69 points (C3,
++0.98 to +2.59), at every lead and in 12 of 16 series. The hypothesis named a mechanism for that
+loss, no usable power persistence at short leads, and the equal gap at every lead contradicts it.
+**The decision rule has no branch for this outcome, so the verdict and the gate action below are the
+fall-through reading of the rule and were not pre-registered.** The gate for P7 and P8 is not
+passed, so P7 compares the staged chain with `manual_heuristic` as well as with N1. A point is 1% of
+the series' effective capacity. The substations are not named. `manual_heuristic` is a stored
+baseline that forecasts from the power at the same time of day in earlier weeks and years. The mean
+absolute error of the median is the average gap between the median forecast and the measured power.
 
 ![Error of the median by lead band and arm](figure_1.svg)
 

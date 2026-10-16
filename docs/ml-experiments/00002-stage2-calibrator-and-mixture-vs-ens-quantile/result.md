@@ -42,10 +42,20 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/11
 
 # Does a stage 2 calibrator beat the pooled stage 1a mixture?
 
+We asked whether a second model, which corrects the forecast range produced by a first
+weather-to-power model, makes solar and wind farm forecasts better than simply pooling the first
+model's output over the 51 weather forecasts. We compared both with a model trained directly on
+archived weather forecasts, for 6 solar farms and 3 wind farms over 53 weekly forecast runs in one
+held-out year. Pooling the first model's output beat the model trained on archived forecasts. The
+second model gave no improvement over pooling, and made the solar forecasts worse.
+
 **Verdict: the pooled ERA5-trained mixture beats the ENS-trained quantile model, and the stage 2
 calibrator and learned blend did not improve on it, and were worse for solar.** Study 2b ran in one
 held-out year (fold A, 53 weekly runs) for 6 solar farms and 3 wind farms. The full write-up is the
-`Results` section of `studies/stage1_pilot/README_stage2.md`.
+`Results` section of `studies/stage1_pilot/README_stage2.md`. ERA5 is a reanalysis, an estimate of
+past weather. ENS is the European Centre for Medium-Range Weather Forecasts' ensemble forecast,
+which has 51 members. The stage 2 calibrator is a second model that corrects the forecast quantiles
+that stage 1a produces.
 
 ## Input columns
 

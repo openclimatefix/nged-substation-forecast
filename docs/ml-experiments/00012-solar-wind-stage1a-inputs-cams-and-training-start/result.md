@@ -81,15 +81,23 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Which inputs and which training start work best for the solar and wind stage 1a model?
 
-**Verdict: inconclusive.** None of the four planned input changes (CAMS-trained stage 1a, the stage 0
-model, the clear-sky-ratio target for solar, and the power-curve base margin for wind) lowered the
+We asked which inputs and which training start date give the most accurate weather-to-power model
+for solar and wind farms. We tried four changes, which were training on a satellite estimate of
+sunlight, a first step that maps forecast sunlight onto that estimate, predicting solar output as a
+share of clear-sky output, and starting the wind model from the turbine power curve, together with
+later training start dates. None lowered the error by the 0.15 points of capacity that we counted as
+a gain.
+
+**Verdict: inconclusive.** None of the four planned input changes (CAMS-trained stage 1a, the stage
+0 model, the clear-sky-ratio target for solar, and the power-curve base margin for wind) lowered the
 error by the 0.15 points the plan counted as a gain, and the interval of the CAMS-trained arm (C1)
 did not rule a gain out. The training start moved the error by less than 0.3 points, and the weather
-block by less than 0.15 points for wind (C10) and unresolved for solar (C9).
-ENS is the European Centre for Medium-Range Weather Forecasts' ensemble forecast, ERA5 is its
-reanalysis of past weather, and CAMS is the Copernicus Atmosphere Monitoring Service's satellite
-irradiance estimate. Arm `w` reproduces experiment 00001's scores exactly (7.641 for solar and
-15.386 for wind). The page is proposal P17 in the [research plan](../research-plan.md).
+block by less than 0.15 points for wind (C10) and unresolved for solar (C9). ENS is the European
+Centre for Medium-Range Weather Forecasts' ensemble forecast, ERA5 is its reanalysis of past
+weather, and CAMS is the Copernicus Atmosphere Monitoring Service's satellite irradiance estimate.
+Arm `w` reproduces experiment 00001's scores exactly (7.641 for solar and 15.386 for wind). The page
+is proposal P17 in the [research plan](../research-plan.md). Stage 1a is an XGBoost model per series
+that turns weather into power.
 
 ## Results
 

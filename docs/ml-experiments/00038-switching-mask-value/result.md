@@ -81,6 +81,12 @@ code: ml-experiments/00038-switching-mask-value/
 
 # Experiment 38: is detecting a switching event worth anything to the forecast?
 
+We asked whether a switching detector improves a demand forecast when the half-hours it flags are
+left out of the correction that uses recent forecast errors. We compared the forecast error with and
+without that exclusion, and against an exclusion built from the logs of real switching and a random
+exclusion of the same size. Excluding the detector's half-hours made the error 57.1% larger (95%
+interval +0.4% to +133.5%), where we had asked for a reduction of 5%, so the idea is refuted.
+
 **Refuted: leaving the half-hours that the neighbour-balance detector D1 flags out of the stack's
 error correction made the forecast worse, not better, on half-hours outside logged switching.** The
 pre-registered primary contrast, `d1_mask7` against `plain7` (threshold-weighted absolute error at
@@ -88,8 +94,8 @@ each series' P99, proxy stack, lead 4 to 48 hours, half-hours outside logged clo
 (95% interval +0.4% to +133.5%, from resampling whole calendar months), against the bar of -5% or
 better. The oracle mask built from the logs lowers the same error by 8.9% for the 14-day window
 (-21.8% to +0.0%), so the ceiling is small, and 95% of it is one month. A random mask of equal
-volume changes the error by +0.1% (-0.7% to +0.5%). All numbers are from `e00038_report.py` and are
-in points of capacity unless stated.
+volume changes the error by +0.1% (-0.7% to +0.5%). P99 is the power that a series exceeds 1% of the
+time. All numbers are from `e00038_report.py` and are in points of capacity unless stated.
 
 ![Per-event and aggregate change in the threshold-weighted error](figure_1_headline.svg)
 

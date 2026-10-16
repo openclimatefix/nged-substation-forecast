@@ -76,14 +76,24 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Does the staged chain beat the single-stage model for Primary substation demand?
 
+We asked whether a chain of separate forecasting steps beats a single-step model for demand at
+Primary substations (substations that step power down to the local distribution network), when both
+use only the data a live service would have, including the real delay in NGED's power readings. We
+scored the chain, the single-step model, and a simple baseline on the same 73 forecast runs. The
+chain scored 0.08 points of capacity worse than the single-step model and 0.52 worse than the
+baseline, and neither difference was clear of zero, so the chain is not supported for demand.
+
 **Verdict: inconclusive.** With lag anomalies built only from weather that serving has, and with
-NGED's real telemetry delay, the chain's quantile score is not distinguishable from N1's: 6.41
-against 6.33, and C1 is +0.08 points of capacity (99.17% interval -0.11 to +0.25). The chain's
-point estimate is above `manual_heuristic`'s 5.89 by +0.52 (-0.25 to +1.25, C3). Neither interval
-excludes zero. The decision rule needed both to be wholly below zero by at least 0.3, so the staged
-design is not supported for demand on this evidence. The prediction, that the chain would score 0.3
-to 0.8 below N1, was missed. A point is 1% of the series' effective capacity. The substations are
-not named.
+NGED's real telemetry delay, the quantile score of the staged chain (separate weather-to-power,
+lagged-power, and calibration models run in turn) is not distinguishable from N1's: 6.41 against
+6.33, and C1 is +0.08 points of capacity (99.17% interval -0.11 to +0.25). The chain's point
+estimate is above `manual_heuristic`'s 5.89 by +0.52 (-0.25 to +1.25, C3). Neither interval excludes
+zero. The decision rule needed both to be wholly below zero by at least 0.3, so the staged design is
+not supported for demand on this evidence. The prediction, that the chain would score 0.3 to 0.8
+below N1, was missed. A point is 1% of the series' effective capacity. The substations are not
+named. N1 is the single-stage XGBoost quantile model trained on the ensemble weather forecast (ENS)
+of the European Centre for Medium-Range Weather Forecasts. `manual_heuristic` is a stored baseline
+that forecasts from the power at the same time of day in earlier weeks and years.
 
 ![Quantile score by lead band](figure_1.svg)
 
