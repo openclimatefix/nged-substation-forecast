@@ -24,7 +24,7 @@ sooner.
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [PVDIS-3](#pvdis-3-how-much-forecast-error-comes-from-embedded-solar) | What does the irradiance input add to the best demand forecast, and how much of the remaining error does embedded solar explain? | 2 | The maintainer's review of this plan | Proposed; part 3 of the PVDIS series |
+| [PVDIS-3](#pvdis-3-how-much-forecast-error-comes-from-embedded-solar) | How much of the error of the demand forecast without radiation inputs does an explicit solar term built from forecast sunshine remove, and does the term beat the best guess? | 2 | Nothing | Planned: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md), part 3 of the PVDIS series |
 | [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series; can run beside PVDIS-3 |
 | [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-3 and PVDIS-4 | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations) | Can the share of east-, south-, and west-facing solar behind each Primary be identified? | 4 | PVDIS-4 | Proposed |
@@ -305,36 +305,38 @@ every part reports C as the capacity and keeps the daily fit as a cross-check.
 
 #### PVDIS-3: how much forecast error comes from embedded solar
 
-**Measure what the irradiance input adds to the best demand forecast, given the other routes by
-which the XGBoost model can learn solar, and how much of the remaining error the solar explains.**
-Two earlier results bound the answer. Experiment 00009's observed-weather diagnostic found that the
-stage 1a model does use irradiance: reading CAMS at validation lowered the daylight error of the
-median by 0.88 points of capacity, against 0.04 with ENS. Experiment 00022 found that ERA5 weather in
-place of ENS, on experiment 00033's recipe, lowered the quantile score by 0.10 points (1.9% of 5.32),
-of which ERA5 shortwave gave 0.08, so a better solar forecast has little room on that recipe. PVDIS-3
-asks how that room divides between the solar itself and the forecast of the weather that drives it.
+**Measure how much of the error of the demand forecast an explicit solar term removes, and whether
+that term beats the best guess's own use of its radiation inputs.** Two earlier results frame the
+question. Experiment 00009's observed-weather diagnostic found that the stage 1a model does use
+irradiance: reading CAMS at validation lowered the daylight error of the median by 0.88 points of
+capacity, against 0.04 with ENS. Experiment 00022 found that ERA5 weather in place of ENS, on
+experiment 00033's recipe, lowered the quantile score by 0.10 points (1.9% of 5.32), of which ERA5
+shortwave gave 0.08. PVDIS-3 asks how that gap divides between the sunshine itself and the weather
+forecast of it.
 
-- **Arm D0** retrains experiment 00033's recipe with three matched seeds, on the Primaries metered in
-  MW and the rows of `fold_a_every5d_v1`, so that refit noise does not enter the contrast.
-- **Arm D1** retrains the same recipe with the shortwave irradiance columns removed. A second arm,
-  D1L, also removes longwave radiation, which is a direct proxy for cloud. D1 is not blind to
-  solar: lagged power, temperature, the sun's position, and the 14-day error correction all carry
-  some solar, and removing irradiance also removes the route for cloud-driven demand. The write-up
-  therefore reads D0 minus D1 as what the irradiance input adds, not as the solar share.
-- **The primary measure has no fitted coefficient.** Capacity is in MW, so each arm's forecast is
-  shifted by minus the capacity times the solar anomaly, with a coefficient fixed at 1, and
-  re-scored. The anomaly is the CAMS unit shape at the valid time minus its month-by-half-hour mean
-  over the training window, because the XGBoost model has already learned the mean solar for each
-  hour and month. The capacity is experiment 00040's C for season-year 2023/24, the latest one that
-  ends before the July 2025 validation start, and the write-up states that it is about one year of
-  growth out of date.
-- **The shift that uses CAMS at the valid time is an oracle,** a ceiling on what knowing the real
-  solar would add. The capacity in the shift is itself an estimate.
-- **Any regression of the residual on the solar anomaly is cross-fitted by month:** fitted on odd
-  months and scored on even months, by lead band, clear-sky-index bin, and Primary.
-- **The decision rule**, which the plan fixes with its reasons, is stated in quantile-score points
-  on daylight rows from April to September, at the Bonferroni level for its contrasts. The plan
-  derives its thresholds from experiment 00022's 0.10 points and experiment 00009's diagnostic.
+The plan, with its contrasts, decision rule, and checks, is in [experiment
+46](00046-embedded-solar-share-of-primary-forecast-error/result.md). Its design departs from the
+first proposal in four ways:
+
+- **Arms.** `d0` is experiment 00033's recipe, and `d1l` drops both radiation columns, `shortwave`
+  and `longwave`. The single-column arm (`d1`) and the observed-shortwave arm (`d0_obs_sw`) move to a
+  later experiment, because neither changes a decision. Both refits use three matched seeds.
+- **The shift sits on `d1l` only, and the verdict is measured against `d1l`.** On the stored
+  `d0`-equivalent forecast, the residual's slope on the oracle shift was -0.52 to -0.81 by lead band
+  and not -1, because the forecast already holds part of the anomaly. The slope on `d1l` is unmeasured
+  and is reported before the verdict. The shift is minus the capacity times the solar anomaly over the
+  effective capacity, with the coefficient fixed at 1. One version uses CAMS at the valid time (the
+  oracle) and one uses the ENS forecast, calibrated to CAMS by lead band on the training window.
+- **The capacity is experiment 00040's C for season-year 2023/24,** which exists for 6 of the 8
+  Primaries metered in MW. The verdict uses the five that are not flagged, with Trusthorpe (D9)
+  reported with and without. A sensitivity read repeats the shift with the headline estimate in
+  place of C, which differs by up to 22%.
+- **The threshold is 0.35 points** on daylight April-to-September rows. It is a judgement about the
+  cost of porting the solar term (a capacity table to read and an ENS-to-CAMS calibration to keep
+  current), and the maintainer may change it. Two contrasts decide the verdict, read at 97.5%.
+  PVDIS-5 is a gain test only if the ENS solar term also lies wholly below the best guess (C6).
+  A supported verdict is unlikely: experiment 00031's linear offset (A4) scored +0.012 (-0.051 to
+  +0.081).
 
 #### PVDIS-4: a capacity series that rises easily and falls reluctantly
 
