@@ -980,25 +980,32 @@ with mostly missing readings.
 
 ### 00046: how much of the best guess's daylight error is embedded solar? (PVDIS part 3)
 
-**The ENS forecast of sunshine does not make a solar term worth porting: it lowers the quantile score
-of the demand forecast without radiation inputs by 0.056 points (97.5% interval -0.191 to +0.064),
-against a threshold of 0.35, so the verdict is `refuted`.** The solar term subtracts the panels'
-capacity times the sunshine that the weather forecast did not expect. Built from the true sunshine
-(the oracle, which no real forecast has), the same term lowers the score by 0.966 points (-1.431 to
--0.595), about 20% of the 4.724 it starts from. The ENS anomaly tracks the true one for about 2
-days and then fades, and the gain follows it: -0.262 at 0 to 24 hours, -0.277 at 1 to 2 days, and
-about 0 beyond.
+**We asked how much of a Primary substation's daylight forecast error comes from solar panels behind
+its meter, by adding the panels' capacity times the sunshine anomaly (sunnier or cloudier than the
+average for that month and half-hour) to a demand forecast without radiation inputs.** Built from the
+true sunshine, which no real forecast has, the correction lowers the quantile score (the
+probabilistic forecast error score) by 0.966 points (-1.431 to -0.595), about 20% of the 4.724
+points the demand forecast scores. Built from the ECMWF ensemble forecast of sunshine, it lowers the
+score by 0.056 points (97.5% interval -0.191 to +0.064), against a threshold of 0.35, so the verdict
+is `refuted`. The ensemble anomaly tracks the true one for about 2 days and then fades, and the gain
+follows it: -0.262 at 0 to 24 hours, -0.277 at 1 to 2 days, and about 0 beyond.
 
-- **Finding for later experiments:** the ENS solar term is not wholly below the best guess (C6
-  +0.048, -0.059 to +0.141), so PVDIS-5 is a non-inferiority and explanation test, with a gain test
-  only for 0 to 48 hours.
-- **Finding for later experiments:** a fixed coefficient of 1 was too large, because the residual's
-  slope on the oracle shift is -0.771. A coefficient fitted on the training window gives -0.143
-  (-0.231 to -0.057, exploratory).
-- **Fragile small gain:** without one series (D9) C3 is -0.113 (-0.230 to -0.000), and C3 is positive
-  in June to August, so it is not a consistent gain.
-- **Exploratory midday read:** at 09:00 to 15:00 UTC on day+1, C3 is -0.434 (-0.559 to -0.283) in
-  April to September, and the quantiles move from too narrow to slightly too wide.
+- **Finding for later experiments:** the sunshine correction built from the ensemble forecast scored
+  +0.048 (-0.059 to +0.141) against the best-guess recipe with its radiation inputs, so it is no
+  better. It is also not shown to be no worse, because the sign changes by month and by series. The
+  next experiment in the series (PVDIS-5, which retests the correction with weekly capacity
+  estimates) is a non-inferiority and explanation test with a margin set in advance, with a gain
+  test only for 0 to 48 hours.
+- **Coefficient:** a fixed coefficient of 1 was too large, because the residual's slope on the
+  oracle correction is -0.771. A coefficient fitted on the training window gives -0.143 (-0.231 to
+  -0.057, exploratory) against the plain correction.
+- **Fragile small gain:** without one series (anonymised as D9) the correction gains -0.113 (-0.230
+  to -0.000, rounded; the interval touches zero), and it is positive in June to August, so it is not
+  a consistent gain. Its lower bound stays above -0.35 in every pooled scope.
+- **Exploratory midday read:** at 09:00 to 15:00 UTC on day+1 the correction gains -0.434 (-0.559 to
+  -0.283) in April to September and scores no worse than the best-guess recipe, and the quantiles
+  move from too narrow to slightly too wide. In June to August at day+2 and day+3 it scores worse
+  than the best-guess recipe. Whether that justifies porting is not decided.
 - **Write-up:** [result](00046-embedded-solar-share-of-primary-forecast-error/result.md).
 
 ![The planned contrasts and the fitted-coefficient reads](00046-embedded-solar-share-of-primary-forecast-error/figure_1_contrasts.svg)
