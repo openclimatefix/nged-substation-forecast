@@ -76,6 +76,7 @@ the maintainer to confirm.
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
+| [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only: correlation +0.020 (0.002 to 0.036) at 0 to 6 hours and cross-validated mean squared error 6.8% lower over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours | Not for production | Pending |
 
@@ -1078,6 +1079,27 @@ follows it: -0.262 at 0 to 24 hours, -0.277 at 1 to 2 days, and about 0 beyond.
 - **Write-up:** [result](00046-embedded-solar-share-of-primary-forecast-error/result.md).
 
 ![The planned contrasts and the fitted-coefficient reads](00046-embedded-solar-share-of-primary-forecast-error/figure_1_contrasts.svg)
+
+### 00050: does a second weather forecast beat ENS at the solar anomaly? (PVDIS part 8)
+
+**We asked whether the American GEFS ensemble forecast, alone or blended with the ECMWF ensemble
+(ENS), predicts the sunshine anomaly (sunnier or cloudier than usual) better than ENS, because
+experiment 00046 found that the sunshine forecast limits the gain from a solar correction.** In
+cross-validation on the training window, GEFS made 10.9% more squared error against the satellite-
+based CAMS anomaly than ENS did, and was worse in all 9 held-out months. The fitted blend made 0.2%
+more, against the 1% less the gate needed, so the verdict is `refuted` and the demand contrasts were
+not run. On the validation year GEFS correlates with the CAMS anomaly 0.072 less than ENS at 0 to 24
+hours (95% interval -0.100 to -0.039), and the blend 0.002 more (-0.001 to +0.006).
+
+- **Finding for later experiments:** a second global ensemble shares ENS's errors, so a gain inside
+  2 days needs a product of a different kind, such as a high-resolution regional model or a
+  satellite-based nowcast. The fitted blend gives GEFS about 0.1 weight inside 2 days and none from
+  2 to 10 days.
+- **Unverified:** the 00 UTC GEFS run's availability by 09:00 UTC was not observed in that window,
+  so the same-day run, the optimistic case for GEFS, was assumed.
+- **Write-up:** [result](00050-second-weather-forecast-for-solar-anomaly/result.md).
+
+![Correlation with the CAMS anomaly, GEFS and the blend minus ENS](00050-second-weather-forecast-for-solar-anomaly/figure_1_headline.svg)
 
 ### 00051: why does the solar term lose at sunny summer middays? (PVDIS part 3b)
 
