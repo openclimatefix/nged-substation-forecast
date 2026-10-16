@@ -53,7 +53,11 @@ lessons: >-
   precision of the real alarms by about 3 points at 24 hours and 6 to 7 points at 4 hours, and the
   alarms that find a transfer with a metered receiver name the donor or a receiver in 88% of the
   cases. In this population its gain is unlikely to exceed 0.022, because it removes only about a
-  third of the unexplained alarms and the threshold then falls by only 0.30.
+  third of the unexplained alarms and the threshold then falls by only 0.30. The veto removes 35% of
+  the unexplained 24-hour alarms and 20% of the alarms a logged closure explains (a ratio of 1.8,
+  under the 2 that would make it useful). Of experiment 41's 148 labelled alarms, 5 of 79
+  confirmed, 4 of 49 unconfirmed, and 0 of 20 vetoed were visible transfers, so the confirmed tier
+  is not a better mask for SW2-12.
 advice:
   - >-
     Do not expect neighbour logic that only removes or re-ranks single-series alarms to lift the
