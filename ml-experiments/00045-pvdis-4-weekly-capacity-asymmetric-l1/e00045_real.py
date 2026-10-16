@@ -58,11 +58,14 @@ VARIANTS: Final[dict[VariantName, inject.FitSpec]] = {
 }
 """Each variant's fit name, `a`, and `r`."""
 VINTAGE_VARIANTS: Final[tuple[VariantName, ...]] = ("frozen", "alt_post_hoc")
-RECOMMENDED: Final[VariantName] = "alt_post_hoc"
+RECOMMENDED: Final[VariantName] = "season_year_constant"
 RECOMMENDED_REASON: Final[str] = (
-    "alt_post_hoc (a=2, r=10, chosen post hoc) met the false-step limits on the placebo sky and "
-    "recovered 0.79 of a 26-week fall in tuning; the frozen pair (a=4, r=30) equals the strictly "
-    "non-decreasing fit and fails the fall-recovery limit."
+    "season_year_constant has the lowest path error on held-out units (0.027), and neither weekly "
+    "variant beat it. alt_post_hoc (a=2, r=10) is offered for a change within a year, but on "
+    "held-out units its constant-path false steps (median 1.22, worst 3.32 per Primary-year) and "
+    "its coverage failed the plan's limits, and it recovered 0.52 of an 8-week fall. "
+    "season_year_constant falls to about 0 MW at Mount Bridge Boston from 2023-09-04 to "
+    "2025-08-25 (104 weeks, all unobserved), outside the report period; do not read those weeks."
 )
 STATUS: Final[dict[str, str]] = {
     "D5": "range-only",

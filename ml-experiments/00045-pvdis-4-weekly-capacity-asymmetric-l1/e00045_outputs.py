@@ -5,7 +5,9 @@ the experiment's private data folder:
 
 - `capacity_weekly.parquet`: the final fit of every variant, one row per Primary, variant, and week.
 - `capacity_weekly_vintages.parquet`: the same columns plus `origin_monday`, for `frozen` and
-  `alt_post_hoc`. The vintage rows carry no bootstrap interval (`low_mw` and `high_mw` are null).
+  `alt_post_hoc` (so its `recommended` column is false throughout; the recommended variant is
+  fitted only as a constant per season-year and has no vintages). The vintage rows carry no
+  bootstrap interval (`low_mw` and `high_mw` are null).
 - `real_report.txt`: every number the summary quotes (per-Primary capacity, rises and falls, false
   steps on the placebo sky, the gap diagnostic, and the vintage ratio).
 
@@ -25,6 +27,7 @@ never a real fall.
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from typing import Final
 
@@ -137,8 +140,8 @@ def interval_notes(*, final: pl.DataFrame) -> str:
         + ". The frozen configuration, tuning code, limits, and verdict logic were not changed. "
         "Every interval is clipped to include the point estimate (a bootstrap percentile on the "
         "wrong side of the point is replaced by the point); the share of observed weeks with at "
-        f"least one clipped end is {shares}. The recommendation of alt_post_hoc was made after "
-        "seeing the scoring results, not before."
+        f"least one clipped end is {shares}. The recommendation of season_year_constant was made "
+        "after seeing the held-out scoring results, not before."
     )
 
 
@@ -387,11 +390,19 @@ def notes_section(*, final: pl.DataFrame) -> str:
 
 def rewrite_notes_only() -> None:
     """Rewrite the two files' metadata and the report's notes, without refitting anything."""
-    final = pl.read_parquet(CAPACITY_PATH)
-    vintages = pl.read_parquet(VINTAGES_PATH)
+    final = pl.read_parquet(CAPACITY_PATH).with_columns(
+        recommended=pl.col("variant") == real.RECOMMENDED
+    )
+    vintages = pl.read_parquet(VINTAGES_PATH).with_columns(
+        recommended=pl.col("variant") == real.RECOMMENDED
+    )
+    check_final(final=final)
     final.write_parquet(CAPACITY_PATH, metadata=metadata(final=final))
     vintages.write_parquet(VINTAGES_PATH, metadata=metadata(final=final))
     text = REPORT_PATH.read_text().split("\n\n" + NOTES_MARKER)[0].rstrip("\n")
+    text = re.sub(
+        r"recommended variant \w+\.", f"recommended variant {real.RECOMMENDED}.", text, count=1
+    )
     REPORT_PATH.write_text(text + "\n\n" + notes_section(final=final) + "\n")
     print(notes_section(final=final))
 
