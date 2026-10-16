@@ -67,6 +67,7 @@ the maintainer to confirm.
 | [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted average of the quantiles of already-scored models beat the best single model for Primary demand, solar, and wind? | Supported for Primary demand (-0.10 points); null for solar and wind | Candidate (Primary demand) | 2026-10-15 |
 | [00037](00037-switching-first-look/result.md) | Does a neighbour-balance detector find logged switching in the telemetry at a lower false-alarm rate than a single-series detector? | Inconclusive: size-weighted recall 0.326 (0.093 to 0.579) against the 0.35 bar | Not for production | Not yet merged |
 | [00038](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | Not yet merged |
+| [00039](00039-pv-disaggregation-cams-injection/result.md) | Can a CAMS-driven fit separate embedded solar from Primary substation demand, recovering injected solar-farm output within 25% and passing four checks on the real series? | Partly supported: recovery passes (0.854, 0.815 to 0.866), real checks pass at 6 of 8 Primaries | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -869,3 +870,24 @@ closures against an oracle mask from the logs and a random mask of equal volume.
   [PR #1247 (Experiment 38: is detecting a switching event worth anything to the forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1247).
 
 ![Per-event and aggregate change in the threshold-weighted error](00038-switching-mask-value/figure_1_headline.svg)
+
+### 00039: separating embedded solar from Primary substation demand
+
+**A fit of a calendar-plus-temperature demand term minus one CAMS-driven PV shape recovers injected
+solar-farm output to within 25%, and the real series pass four checks at 6 of 8 Primaries, so the
+pre-registered verdict is `recovers-but-confounded`.** The experiment injected the output of 6
+metered solar farms, scaled to 20% of each Primary's effective capacity, into the demand of the 8
+directional Primary substations (218 units), and ran four checks (placebo sky, season, cloud-demand
+term, day type) on the real series.
+
+- **Headline result:** the half-hourly fit recovers a median 0.773 of the injected capacity (95%
+  interval 0.740 to 0.818). The daily fit recovers 0.854 (0.815 to 0.866), which passes the
+  recovery rule. In 2025/26 Kirton fails the season and cloud-term checks, and Wrangle T1 fails
+  the placebo check by a hair, so the placebo check passes at 7 of 8 Primaries and all four at 6.
+- **Finding for later experiments:** injection cannot detect a demand confound, because a linear fit
+  returns the same increment on any demand. The fitted capacity is 0.9 to 3.2 MW per Primary
+  before dividing by the recovery ratio. The next experiment is PVDIS-2B, a richer demand model.
+- **Write-up and pull request:** [result](00039-pv-disaggregation-cams-injection/result.md),
+  [PR #1248 (Experiment 39: can a CAMS-driven fit separate embedded solar from Primary substation demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1248).
+
+![Median recovery ratio by model and irradiance point](00039-pv-disaggregation-cams-injection/figure_01.svg)
