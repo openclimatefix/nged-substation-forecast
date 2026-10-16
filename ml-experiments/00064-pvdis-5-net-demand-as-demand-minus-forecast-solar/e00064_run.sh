@@ -19,7 +19,7 @@ SITES=(D9 D10 D11 D14 D16)
 SEEDS=(0 1 2)
 VARIANTS=(all no_lags no_cloud_proxies neither)
 ARMS=(a am b a_twin am_twin)
-export OMP_NUM_THREADS=1 POLARS_MAX_THREADS=2 OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1 POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1
 
 uptime
 nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=csv,noheader || true

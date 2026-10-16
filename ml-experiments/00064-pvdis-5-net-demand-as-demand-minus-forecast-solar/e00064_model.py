@@ -57,6 +57,15 @@ ANOMALY_COLUMN: Final[str] = "anomaly_mean_calibrated"
 TWIN_COLUMN: Final[str] = "anomaly_mean_calibrated_twin"
 SHAPE_LAG_NAMES: Final[tuple[str, ...]] = common.FIT_LAG_SHAPE_COLUMNS
 
+NO_SKILL_BAND: Final[int] = 4
+"""Lead bands from this index on (10+ days) get a weight of zero.
+
+The training-window correlation of the ENS anomaly with the CAMS anomaly is 0.02 to 0.04 there
+(experiment 46), so the applied-shift slope is a ratio of near-zero numbers (it ranges from -8.2
+to +6.2 across the series). The rule was fixed from the collected weights, which use training rows
+only, before any arm was scored.
+"""
+
 
 def d1l_columns(*, drop: tuple[str, ...] = ()) -> list[str]:
     """Return the input columns of `d1l` in matrix order, less any columns in `drop`.
@@ -168,7 +177,8 @@ def weights_per_row(
     if cells.height != len(common.LEAD_BANDS) * 2:
         msg = f"{site} has {cells.height} weight cells, expected {len(common.LEAD_BANDS) * 2}"
         raise ValueError(msg)
-    return frame["slope_applied"].fill_null(0.0).to_numpy()
+    slope = frame["slope_applied"].fill_null(0.0).to_numpy()
+    return np.where(band >= NO_SKILL_BAND, 0.0, slope)
 
 
 def read_weights(*, path: Path = common.WEIGHTS_FILE) -> pl.DataFrame:
