@@ -11,10 +11,10 @@ from typing import Final
 
 import polars as pl
 import shapely
+from pyproj import Transformer
 from shapely import wkt
 from shapely.geometry import Point
 from shapely.ops import transform
-from pyproj import Transformer
 
 METADATA_PATH: Final[Path] = Path("data/NGED/metadata.parquet")
 OUT_DIR: Final[Path] = Path("data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1")
@@ -23,6 +23,7 @@ TO_BNG: Final = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True).
 
 
 def main() -> None:
+    """Print the polygon checks and write the two result tables."""
     meta = (
         pl.read_parquet(METADATA_PATH)
         .filter(pl.col("time_series_type") == "Disaggregated Demand")
@@ -87,7 +88,8 @@ def main() -> None:
     print(out.drop("invalid_reason"))
     print(ov.sort("share_of_smaller", descending=True))
     print(f"Union area {union.area / 1e6:.1f} km2; sum of areas (Wrangle once) {sum_area:.1f} km2")
-    print(f"Union convex hull {hull.area / 1e6:.1f} km2; hull minus union {gaps.area / 1e6:.1f} km2")
+    hull_km2, gaps_km2 = hull.area / 1e6, gaps.area / 1e6
+    print(f"Union convex hull {hull_km2:.1f} km2; hull minus union {gaps_km2:.1f} km2")
     print(f"Union parts: {len(getattr(union, 'geoms', [union]))}")
 
 
