@@ -23,7 +23,9 @@ decision_rule: >-
   and two pipeline steps to the serving path, and a smaller gain does not justify them. C1 is
   `supported` when its interval lies wholly below -0.15, `small gain` when it lies wholly below zero
   but not wholly below -0.15, `refuted` when it lies wholly above zero, and `inconclusive`
-  otherwise. C2 (the same difference over all leads) is reported beside C1 and does not change the
+  otherwise. `supported` also needs the primary blend's 5% to 95% coverage at lead days 1 and 2 to
+  be at least 0.87 (nominal 0.90), because averaging a wide ensemble mixture with narrow product
+  quantiles can under-cover; a blend below that is `small gain` at best. C2 (the same difference over all leads) is reported beside C1 and does not change the
   verdict. Every other read (per product, per farm, per lead day, uncorrected, with the spread step)
   is exploratory, labelled so, and read at 95%.
 benchmark: >-
@@ -38,7 +40,7 @@ adopted_in: none
 code: ml-experiments/00054-aligned-products-bias-corrected-wind-farms/
 ---
 
-# Experiment 54: do aligned, bias-corrected weather forecasts lower the wind farms' error at 1 to 2 days ahead?
+# Experiment 54: do aligned, bias-corrected forecasts lower wind-farm error at 1 to 2 days?
 
 **Status: planned. No code has run.** [Experiment 52](../00052-more-nwp-products-for-wind-farms/result.md)
 could not tell whether ICON-EU and IFS 0.25 degree help the wind-farm forecast, and it fed runs
@@ -87,30 +89,53 @@ the validation year; an ICON-EU arm is not run.
 - **Product forecast:** each product's 00 UTC run of the ENS run's date, read at the farm's grid
   point at lead `valid_time - 00:00` of that date. A valid time at :30 averages the east-west and
   north-south wind components of the hours either side (IFS HRES) or interpolates linearly between
-  steps (GFS, which is 3-hourly beyond lead 120). IFS HRES run days missing from the archive, and
-  cases beyond a product's lead, keep the best guess.
+  steps (GFS, which is 3-hourly beyond lead 120). Two of the 53 Tuesday runs (2025-08-05 and
+  2026-06-23) have no IFS HRES run on disk, so the IFS arm keeps the best guess for them. Cases
+  beyond a product's lead also keep the best guess.
 - **Bias correction (primary):** for each farm, product, lead day, and height (10 m and 100 m), a
   multiplicative factor on speed equal to the mean ERA5 speed over the mean product speed on the
-  hours of the training window (valid times before 2025-06-17, where the product exists). The
-  factor is fixed for the whole validation year, so no month uses ERA5 weather that arrives after
-  forecast time. Directions are unchanged. An uncorrected arm is exploratory.
+  whole hours of the training window (valid times before 2025-06-17, where the product exists),
+  taken per `lead_hours // 24` of the product run. The fit keeps finite values only (the GFS store
+  holds NaN, not null, in some 100 m wind rows), requires at least 500 hours per cell, and falls
+  back to the factor pooled over lead days where a cell is thinner. Each factor must lie between
+  0.7 and 1.5 or the script stops. The factor is fixed for the whole validation year, so no month
+  uses ERA5 weather that arrives after forecast time. Directions are unchanged. An uncorrected arm
+  and a quantile-mapped speed correction are exploratory.
 - **Wind-power model:** experiment 33's ERA5-trained wind-power model, refitted per seed as in
   experiment 52.
 - **Blend:** the average of each quantile level of the best guess and the available products, with
   weights on a grid of quarters chosen per lead-day band (day 0, days 1 and 2, days 3 to 6, days 7
-  and later) on earlier months only, as in experiment 52. July 2025 uses equal weights. The primary
+  and later) on earlier months only, as in experiment 52, with ties going to the weights nearest
+  equal. July 2025 has no earlier month, so it uses the best guess alone (weights 1, 0, and 0);
+  experiment 52's equal weights in July scored +0.188 at lead days 1 and 2 against -0.070 in the
+  other months. C1 is also reported without July as a named sensitivity. The primary
   arm applies **no spread step**, because experiment 52's spread step was fitted on blends made
   under other weights and worsened the blend. A blend with the spread step is exploratory.
 - **Arms:** primary (best guess + IFS HRES + GFS, corrected, no spread step); the same with one weight
   for all leads; each product alone in the blend; uncorrected; with the spread step; and a placebo
   that shuffles the product forecasts among cases of the same farm, month, lead day, and time of
-  day. Each product's own forecast, corrected and spread-scaled, is also scored.
-- **Run availability check:** every selected run starts at 00 UTC on the ENS run's date, and the
-  assumed latency of 8 hours is below the 09:00 UTC read time. The check cannot test the live
-  latency.
+  day. The placebo must equal the best guess from August onwards, because the chosen weights
+  reject it; any other result is a bug. Each product's own forecast, corrected and spread-scaled,
+  is also scored.
+- **Run alignment:** an assertion on the data checks that every selected run's `init_time` date
+  equals the case's ENS run date at 00:00, so the product's `lead_hours // 24` equals the case's lead
+  day. The assumed latency of 8 hours cannot be tested on data at rest.
+- **Cells:** GFS reads the nearest 0.25 degree cell of its nine-cell crop to each farm
+  (`studies.grid_sampling.nearest_cells`); IFS HRES reads Open-Meteo's nearest land cell. The two
+  products may therefore read cells of different character.
 - **Reports:** absolute scores per arm, lead-day band, and farm; coverage; the share of cases above
-  the 0.95 quantile; the chosen weights; each product's mean 100 m speed before and after the
-  correction against ERA5; July against the other months.
+  the 0.95 quantile; the chosen weights; each product's mean and upper quantiles of 100 m speed
+  before and after the correction against ERA5 on the validation year; IFS bias before and after
+  2026-05-12 (IFS cycle 50r1) and by the 2024-11-12 cycle (49r1); July against the other months.
+
+## Limits of the plan
+
+**The cases are the same 53 Tuesdays and three farms as experiment 52, so C1 is not a confirmation
+on fresh data.** The choice of no spread step in the primary arm follows experiment 52's exploratory
+read on those cases, on the design argument that its spread factor was fitted on blends made under
+other weights. The product set also changed after experiment 52 (ICON-EU dropped, IFS HRES 9 km
+in). IFS cycle 50r1 went live on 2026-05-12, so about 7 weeks of the validation year run on a cycle
+the correction never saw.
 
 ## Advice followed and departures
 
