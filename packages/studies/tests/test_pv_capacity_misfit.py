@@ -152,3 +152,31 @@ def test_load_detector_reads_unit_real_and_bootstrap_tables(tmp_path: Path) -> N
     assert set(detector.units[0].shapes) == {"dayL"}
     assert detector.noise["P", 2025].mean(axis=0) == pytest.approx(np.zeros(7))
     assert detector.real["P", 2025] == pytest.approx(2 * RATIOS)
+
+
+def test_misfit_is_finite_for_a_small_positive_capacity() -> None:
+    _, misfit = m.capacity_and_misfit(vectors=0.5 * RATIOS[None, :], ratios=RATIOS)
+    assert np.isfinite(misfit[0])
+
+
+def test_ratios_are_the_median_over_farms_not_the_mean() -> None:
+    units = [_unit(farm=f, jitter=j) for f, j in (("A", -0.1), ("B", 0.0), ("C", 0.5))]
+    detector = m.Detector(units=units, real={}, noise={})
+    ratios = detector.ratios(site="P", excluded=frozenset())
+    assert ratios is not None
+    assert ratios == pytest.approx(RATIOS)
+
+
+def test_power_of_exactly_the_minimum_does_not_count_as_weak(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def exactly_at_the_minimum(**_: object) -> tuple[np.ndarray, np.ndarray]:
+        return np.array([True, True, True, True, False]), np.ones(5)
+
+    monkeypatch.setattr(m, "scenario", exactly_at_the_minimum)
+    units = [_unit(farm=f, jitter=j) for f, j in (("A", -0.02), ("B", 0.0), ("C", 0.02))]
+    noise = {("P", 2025): np.zeros((5, 7))}
+    detector = m.Detector(units=units, real={("P", 2025): 2.0 * RATIOS}, noise=noise)
+    bound = m.shape_bound(detector=detector, site="P", year=2025, leakage=LEAKAGE)
+    assert bound.power_by_amplitude == pytest.approx((0.8,) * len(m.AMPLITUDES))
+    assert bound.bound_amplitude is None
