@@ -164,6 +164,8 @@ def print_contrasts(*, out: Path, veto_z: float) -> tuple[float, float, float]:
     data = results(out=out, veto_z=veto_z)
     base = data.filter(pl.col("headline"), pl.col("even"), pl.col("set") != "holiday")
     print(f"\nC1 to C4 population: {base.filter(pl.col('setting') == 'D2_48').height} transfers")
+    by_set = base.filter(pl.col("setting") == "D2_48").group_by("set").len().sort("set")
+    print("C1 to C4 population by set:", dict(by_set.iter_rows()))
     specs = {
         "C1": ("48", None),
         "C2": ("8", None),
