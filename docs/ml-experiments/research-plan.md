@@ -19,7 +19,8 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
-| [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
+| [00047](00047-sw2-4-better-residual-switching-detector/result.md) (SW2-4) | Does adding the days to the nearest bank holiday to the lagless demand model H0.5 raise the 24-hour single-series detector's share of injected transfers found, at the same rate of unexplained alarms? | 3 | Nothing (SW2-1 done: experiment 43) | Planned |
+| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-4 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-3](#pvdis-3-how-much-forecast-error-comes-from-embedded-solar) | What does the irradiance input add to the best demand forecast, and how much of the remaining error does embedded solar explain? | 2 | The maintainer's review of this plan | Proposed; part 3 of the PVDIS series |
@@ -171,8 +172,11 @@ NRA forecast.
 months, scored on even months.** The order below is a proposal, by expected gain per hour of
 work, for the plan of each iteration to confirm:
 
-- **SW2-4:** a better residual, from the best lagless model available live, refitted with a robust
-  loss, in place of `H0.5`.
+- **SW2-4:** a better residual, planned as [experiment 47](00047-sw2-4-better-residual-switching-detector/result.md).
+  The best lagless model available is `H0.5` itself, which already fits the median with absolute
+  error, so experiment 47 adds one column, the days to the nearest bank holiday in England, because
+  16% of the 24-hour single-series detector's unexplained alarms fall within 1 day of a bank holiday
+  outside Christmas.
 - **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
   XGBoost model without the detected intervals.
 - **SW2-6:** paired-step intervals, which find the onset and its opposite return step as one

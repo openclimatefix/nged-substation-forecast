@@ -182,6 +182,7 @@ nav:
       - "Which logged switching jobs show up in the power readings?": ml-experiments/00041-sw2-0a-labeller-gate/labelled-set.md
       - "How well do the two existing switching detectors find transfers?": ml-experiments/00043-sw2-1-detector-scoreboard/result.md
       - "How much do labelled switching events hurt the best guess?": ml-experiments/00044-sw2-2-switching-share-of-best-guess-score/result.md
+      - "Does a bank-holiday column help the switching detector find transfers?": ml-experiments/00047-sw2-4-better-residual-switching-detector/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
