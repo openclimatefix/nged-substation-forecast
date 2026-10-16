@@ -86,7 +86,7 @@ the maintainer to confirm.
 | [00060 - Switching event detector, part 6](00060-sw2-7-profile-weighted-step-detector/result.md) | Does a step statistic that weights each half-hour by the daily profile find more of the moved MW than the constant step, on injection shapes it does not assume? | Refuted: the pooled gain in the share of moved MW found is below 0.001 (98.33% interval -0.006 to +0.008) | Not for production | 2026-10-16 |
 | [00061 - Switching event detector, part 7](00061-sw2-6-paired-step-intervals/result.md) | Does scoring an onset step and its return step as one pair find more of the moved MW than the single-step detector? | Refuted: the paired score finds 0.13 less (98.33% interval -0.233 to -0.007); keeping the single-step alarms and taking the end from the strongest return step finds 0.19 more (+0.148 to +0.237) | Not for production | 2026-10-16 |
 | [00062 - Switching event detector, part 7](00062-sw2-9-whitened-residual-step-detector/result.md) | Does filtering out the residual's half-hour-to-half-hour memory raise the share of moved MW the 24-hour detector finds? | Refuted: the pooled change in the share of moved MW found is -0.097 (98.33% interval -0.132 to -0.057) | Not for production | 2026-10-16 |
-| [00066 - Switching event detector, part 8](00066-sw2-16-end-rule-as-baseline/result.md) | Which window (4 or 24 hours) and cap (14, 30, or 60 days) should the end rule use, as the benchmark for later detectors? | Inconclusive: the 4-hour window finds 0.147 less (99% interval -0.248 to -0.054); a 30-day cap finds 0.534 more on transfers over 15.6 days (+0.131 to +0.780) and 0.045 less on shorter ones (-0.070 to -0.011) | Not for production | 2026-10-16 |
+| [00066 - Switching event detector, part 8](00066-sw2-16-end-rule-as-baseline/result.md) | Which window (4 or 24 hours) and cap (14, 30, or 60 days) should the end rule use, as the benchmark for later detectors? | Inconclusive: the 4-hour window finds 0.147 less of the moved MW than the 24-hour window (99% interval -0.248 to -0.054); a 30-day cap finds 0.534 more on transfers over 15.6 days (+0.131 to +0.780) and 0.045 less on shorter ones (-0.070 to -0.011) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1284,15 +1284,18 @@ MW. At 4 hours the change was -0.145 (-0.209 to -0.097).
 ### 00066: which window and cap should the end rule of the switching detector use? (SW2-16)
 
 **Lengthening the end rule's search from 14 to 30 or 60 days repairs the end of transfers longer
-than 15.6 days and breaks some shorter ones, and a rule that ends at the first return step of at
-least half the onset step's size beats both.** We added known load transfers to the power history
-and gave each alarm of the single-step detector D0M an interval end from the strongest opposite step
-within a cap. On a new set of 215 transfers lasting 15.6 to 60 days, the 14-day cap found 0.013 of
-the moved MW and a 30-day cap 0.547, a gain of 0.534 (99% interval +0.131 to +0.780). On experiment
-58's 620 transfers, of which 1.5% last over 14 days, the 30-day cap found 0.045 less (-0.070 to
--0.011) and the 60-day cap 0.080 less (-0.113 to -0.035). The 4-hour window at the same alarm rate
-found 0.147 less than the 24-hour window (-0.248 to -0.054). The verdict is `inconclusive` by the
-pre-registered rule, because the longer cap fails its guard on the short transfers.
+than 15.6 days and breaks some shorter ones. A rule that ends at the first return step of at least
+half the onset step's size beats the 14-day rule on both sets of transfers.** An alarm interval runs
+from the step that raises an alarm (the onset step) to the opposite step (the return step) that ends
+it, and the cap is how many days after the onset the search for the return step may run. We added
+known load transfers to the power history and gave each alarm of the single-step detector D0M an
+interval end from the strongest opposite step within a cap. On a new set of 215 transfers lasting
+15.6 to 60 days, the 14-day cap found 0.013 of the moved MW and a 30-day cap 0.547, a gain of 0.534
+(99% interval +0.131 to +0.780). On experiment 58's 620 transfers, of which 1.5% last over 14 days,
+the 30-day cap found 0.045 less (-0.070 to -0.011) and the 60-day cap 0.080 less (-0.113 to -0.035).
+The 4-hour window at about the same alarm rate found 0.147 less than the 24-hour window (-0.248 to
+-0.054). The verdict is `inconclusive` by the pre-registered rule, because the longer cap fails its
+guard on the short transfers.
 
 - **Finding for later experiments:** a post hoc rule that takes the first opposite step of at least
   half the onset step's size, and otherwise keeps the tracked end, gains +0.042 (+0.013 to +0.066)

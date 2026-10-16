@@ -224,20 +224,23 @@ day.
 
 #### SW2-17: the missed onsets of the end rule
 
-**Experiment 66 found that the end rule needs a return step as large as half the onset step, and
-that the 4-hour window and caps of 30 or 60 days do not help.** The post hoc first-return rule (end at
-the first opposite step of at least half the onset step, else the tracked end) beat the 14-day end
-rule on both populations and needs a confirmation on a fresh draw before it is the benchmark. The end
-rule needs up to its cap's worth of hindsight, so a detector built on it serves training-time masks
-(SW2-12) and the event table for NGED, not a live input to the forecast.
+**Experiment 66 found that an end rule requiring a return step of at least half the onset step beats
+the 14-day end rule, and that the 4-hour window and caps of 30 or 60 days do not help.** The post
+hoc first-return rule ends the interval at the first opposite step of at least half the onset step,
+and otherwise keeps the tracked end. That rule beat the 14-day end rule on both sets of transfers
+and needs a confirmation on a fresh draw before it is the benchmark. The end rule needs up to its
+cap's worth of hindsight, so a detector built on it serves training-time masks (SW2-12) and the
+event table for NGED, not a live input to the forecast.
 
 - **SW2-17** first classifies the 24 of 35 labelled real transfers over 1 day that raise no alarm
   at their onset: a donor step under the threshold, a step spread over several hours, an onset
   inside a data gap, or an alarm outside the 2-hour tolerance. It then tests the fix the
   classification points to. The leading candidate is a lower onset threshold accepted only when
-  the end rule finds a matching return step within the cap, which uses the same hindsight as the
-  end rule. Injected transfers measure the false alarms this adds. Its benchmark is the first-return
-  rule and the 14-day end rule together.
+  the end rule finds a matching return step within the cap. That test uses the same hindsight as
+  the end rule. Injected transfers measure the false alarms this adds. Its first step is a pre-registered
+  confirmation of the first-return rule: new injection seeds on both populations of experiment 66,
+  even months only, PF14 minus PE14 at the same alarm rate. PF14 becomes the benchmark if the
+  interval lies above zero on both populations, and the 14-day end rule stays otherwise.
 
 #### SW2-10: v2 in miniature, a linear joint fit
 
