@@ -18,6 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [VP1](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Under monthly retraining on a rolling 12 months (P-roll), which adopted Primary demand components still earn their place, what spread factor does a retrained model need, and does a quantile blend of retrained models still beat the best single model? | 2 | Stage 0: nothing. Stage 1: the manager's confirmation of RT2's cadence | Planned as experiment 49 |
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
