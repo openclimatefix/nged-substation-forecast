@@ -1,7 +1,7 @@
 ---
 id: "00050"
 slug: second-weather-forecast-for-solar-anomaly
-status: planned
+status: done
 size: complex
 hypothesis: >-
   At the five Primary substations metered in MW in experiment 00046's verdict set (D9, D10, D11,
@@ -51,6 +51,43 @@ metric: >-
   score (twice the mass-weighted mean pinball loss over nine levels) in points of capacity after the
   14-day correction and the spread factor, on its scored rows (daylight April-to-September rows with
   a CAMS unit PV shape and an observed power)
+verdict: refuted
+best_arm: >-
+  ENS (ECMWF), the arm the demand forecast already uses: its calibrated anomaly correlates with the
+  CAMS anomaly at 0.822 at 0 to 24 hours, 0.747 at 1 to 2 days, 0.628 at 2 to 6 days, and 0.337 at
+  6 to 10 days. The fitted blend ties it (0.824, 0.754, 0.627, 0.336) and GEFS alone is worse (0.749,
+  0.685, 0.518, 0.328).
+headline: >-
+  The stage 1 gate stopped the experiment: in cross-validation on the training window GEFS's squared
+  error against the CAMS anomaly is 1.109 times ENS's (worse in all 9 held-out months) and the fitted
+  blend's is 1.002 times, against the 0.99 needed. On the validation year GEFS correlates 0.072 less
+  than ENS at 0 to 24 hours (95% interval -0.100 to -0.039) and the blend 0.002 more (-0.001 to
+  +0.006). The demand contrasts C7 and C7s were not run.
+lessons: >-
+  A second global ensemble weather forecast adds no skill to the sunshine anomaly that ENS has: the
+  fitted blend gives GEFS about 0.1 of its weight inside 2 days and none from 2 to 10 days, so the
+  errors of the two forecasts are strongly shared. GEFS's raw anomaly is about 15% too large and
+  needs calibration that ENS does not. The 10+ day band has too little skill (correlation 0.25 for
+  ENS) for any blend to help. The sunshine forecast stays the bottleneck that experiment 46 found.
+advice:
+  - >-
+    Do not add GEFS, or a blend of GEFS with ENS, to the solar term of the demand forecast, because
+    the fitted blend's cross-validated error is 1.002 times ENS's and GEFS alone is 1.109 times
+    (selection gate).
+  - >-
+    Keep PVDIS-5 on the ENS anomaly, because its calibrated correlation with the CAMS anomaly is
+    0.82 at 0 to 24 hours and no tested second product beats it in any lead band (correlation
+    figure).
+  - >-
+    Look for gains in the first 2 days with a product of a different kind (a high-resolution
+    regional model or a satellite-based nowcast) and not with another global ensemble, because GEFS
+    and ENS share their errors at those leads (blend weights figure).
+  - >-
+    Fit a calibration slope for every source before comparing anomalies, because GEFS's raw anomaly
+    overshoots by about 15% (slope of CAMS on GEFS 0.87 at 0 to 48 hours, raw data figure).
+  - >-
+    Cross-validate a blend by whole valid months and leave out the runs initialised in the held-out
+    month, because month blocks are what set the interval width (selection gate, interval figure).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00050-second-weather-forecast-for-solar-anomaly/
@@ -58,19 +95,125 @@ code: ml-experiments/00050-second-weather-forecast-for-solar-anomaly/
 
 # Experiment 50: does a second weather forecast give a better forecast of the solar anomaly than ENS?
 
-**We ask whether a second weather forecast, from the American NOAA Global Ensemble Forecast System
-(GEFS), predicts how much sunnier or cloudier than usual a day will be better than the European
-ECMWF ensemble forecast (ENS) that the demand forecast uses today.** Experiment 46 found that a
-correction for embedded solar panels lowered the demand forecast's error by about 20% when it used
-the true sunshine, taken from the satellite-based CAMS data, and by almost nothing when it used the
-ENS forecast of sunshine. The sunshine forecast, not the panels' capacity, limits the gain. We
-first score the two forecasts, and a weighted blend of them, against the CAMS sunshine at the five
-substations metered in MW, on the April-to-September forecasts of the validation year that
-experiment 46 scored. We then
-lay the best of the three into experiment 46's correction, without refitting any demand model, and
-check whether the demand forecast's error falls by at least 0.1 points (a point is 1% of the
-substation's capacity). We expect ENS to stay at least as good, because ECMWF usually leads in
-multi-model comparisons of irradiance. The experiment has not run yet.
+**We asked whether a second weather forecast, the American GEFS ensemble, predicts how much sunnier
+or cloudier than usual a day will be better than the European ECMWF ensemble (ENS) that the demand
+forecast uses today.** Experiment 46 had found that a correction for embedded solar panels lowered
+the demand forecast's error by about 20% when it used the true sunshine (taken from the satellite-
+based CAMS data), and by almost nothing when it used the ENS forecast of sunshine. We scored three
+forecasts of the sunshine anomaly (ENS, GEFS, and a weighted blend of the two) against the CAMS
+sunshine, at five substations that meter in MW, and planned to lay the best one into experiment 46's
+correction only if it beat ENS. It did not. In cross-validation on 9 held-out months, GEFS made
+10.9% more squared error than ENS and the blend made 0.2% more. On the 6 validation months, GEFS
+correlated with the true sunshine anomaly less well than ENS in every lead band, and the blend
+matched ENS. The experiment therefore stopped before the demand forecast was tested.
+
+**The verdict is `refuted`: no tested forecast beats ENS by the 1% the gate requires, so the demand
+contrasts C7 and C7s were not run.** The rule is in the front matter. Each calibration is a slope
+(or a pair of weights) fitted per substation and lead band on the training window, and the gate
+scores April-to-September daylight half-hours at leads of 0 to 240 hours.
+
+![Correlation with the CAMS anomaly, GEFS and the blend minus ENS, by lead band](figure_1_headline.svg)
+
+## Results
+
+**Stage 1 gate, training window only.** Fifteen month-block folds fit every calibration on the other
+months and predict the held-out month. Nine folds hold April-to-September rows. The pooled mean
+squared error against the CAMS anomaly is 0.03194 for ENS, 0.03542 for GEFS (1.109 times ENS's),
+0.03201 for the blend (1.002 times), and 0.04422 for a zero anomaly. GEFS is worse than ENS in all 9
+months, and the blend beats ENS in 4 of 9 months by at most 0.1%. The gate needs the blend or GEFS
+at 0.99 or lower.
+
+![Squared error relative to ENS by held-out month](figure_4_cv.svg)
+
+**Absolute skill on the validation year (exploratory; the gate decided the verdict).** The
+correlation of each calibrated anomaly with the CAMS anomaly, pooled over the five verdict series,
+with 68,903 scored rows in total (the printed report gives the rows in each band):
+
+| Lead band | ENS | GEFS | Fitted blend | GEFS minus ENS (95% interval) | Blend minus ENS (95% interval) |
+|---|---|---|---|---|---|
+| 0 to 24 h | 0.822 | 0.749 | 0.824 | -0.072 (-0.100 to -0.039) | +0.002 (-0.001 to +0.006) |
+| 1 to 2 d | 0.747 | 0.685 | 0.754 | -0.062 (-0.141 to -0.003) | +0.007 (+0.000 to +0.010) |
+| 2 to 6 d | 0.628 | 0.518 | 0.627 | -0.109 (-0.204 to -0.031) | -0.001 (-0.001 to +0.000) |
+| 6 to 10 d | 0.337 | 0.328 | 0.336 | -0.009 (-0.077 to +0.050) | -0.001 (-0.001 to +0.000) |
+| 10+ d | 0.247 | 0.182 | 0.181 | -0.064 (-0.201 to +0.098) | -0.065 (-0.201 to +0.097) |
+
+The intervals resample the 7 months in which runs were started, so they are wide. The calibration
+slope of the CAMS anomaly on each calibrated anomaly (1 is ideal) is 0.98 for ENS and 1.09 for GEFS
+at 0 to 24 hours, and 1.21 for ENS and 2.01 for GEFS at 6 to 10 days. The mean-squared-error skill
+against a zero anomaly for ENS is 0.676, 0.555, 0.400, and 0.118 in the first four bands. Averaged
+to 3-hour windows (exploratory), the correlations are higher for all three arms and keep the same
+order: at 0 to 24 hours ENS 0.883, GEFS 0.810, blend 0.886.
+
+![Correlation with the CAMS anomaly by lead band, for each arm](figure_2_correlation.svg)
+
+**The raw data.** In bins of each forecast's raw anomaly, the mean CAMS anomaly rises with both. The
+slope of the CAMS anomaly on the raw GEFS anomaly is 0.87 at 0 to 48 hours, so GEFS's raw anomaly is
+about 15% too large, while the slope for ENS is 0.98 to 1.07.
+
+![The CAMS anomaly against the raw ENS and GEFS anomalies, in bins](figure_3_raw.svg)
+
+**The blend learns to ignore GEFS.** The mean fitted weight on GEFS is 0.107 at 0 to 24 hours and
+0.080 at 1 to 2 days, and -0.012 and -0.008 at 2 to 6 and 6 to 10 days, where the blend is ENS
+alone. At 10+ days the weights (0.24 on GEFS, 0.01 on ENS) are fitted on little skill. Ten of the 30
+weight pairs have a negative weight; they were kept and flagged. An equal-weight average of the two
+calibrated anomalies (exploratory) correlates 0.814 at 0 to 24 hours, below ENS, and 0.357 at 6 to
+10 days, above it (0.337); neither difference was tested.
+
+![The fitted blend's mean weights by lead band](figure_5_weights.svg)
+
+**Predictions against results.** The plan predicted GEFS correlations of 0.68, 0.63, 0.50, and 0.20
+in the first four bands against ENS's 0.79, 0.75, 0.58, and 0.27. The results are GEFS 0.749, 0.685,
+0.518, and 0.328 against ENS's 0.822, 0.747, 0.628, and 0.337, so the ordering held and both sources
+were more skilful than predicted. The plan predicted blend gains of +0.01 to +0.03 at 0 to 6 days,
+and the results are +0.002, +0.007, and -0.001.
+
+## Data validation, and what is unverified
+
+**The GEFS archive and the conversion passed seven checks (`e00050_validate_gefs.py`).**
+
+- All 821 00 UTC runs from 2024-04-01 to 2026-06-30 are complete (31 members, 9 grid cells, no
+  duplicate keys, no `NaN` after lead 0).
+- De-accumulation: 2.55% of the 3-hour means are below -1 W/m² (lowest -20.0), and clipping them at
+  zero removes 0.057% of the positive energy.
+- The half-hours of each native window average to the native mean, and the daily profile's centre of
+  mass lies within 0.10 half-hours of CAMS's.
+- The true cell weights beat the latitude-mirrored mapping at the five sites that mirroring changes.
+- The chain test gives 0.999 on window means at every site and 0.91 to 0.93 on half-hours (planned
+  bound 0.95; see the implementation notes).
+- The 99th percentile of the clear-sky index is 1.081, and GEFS irradiance is 6% to 22% above CAMS's
+  by month, which the anomaly removes. The monthly ratio stepped by 19.4% into November 2025, a
+  warning that did not persist as a lasting change.
+
+**The latency check is unverified.** The check needs observations between 07:00 and 09:00 UTC on
+three dates. The session ran at 15:00 UTC, so `results/latency_decision.json` records the same-day
+00 UTC run as an assumption. The same-day run is the optimistic case for GEFS, so the verdict also
+holds for the previous day's run. Today's run was present in the store at 14:59 UTC. For D16 the
+crop covers 0.898 of the cell, and the weights were renormalised.
+
+## Lessons
+
+**ENS stays the source of the solar anomaly.** A second global ensemble shares the errors of ENS at
+the leads that matter. The first 2 days hold nearly all of the skill (correlation 0.75 to 0.82), and
+there GEFS is worse and the blend adds at most 0.007. GEFS's raw anomaly needs a calibration slope
+of about 1.15 where ENS needs none.
+
+## What the next experiment should answer
+
+**Does a product of a different kind than a global ensemble, such as a high-resolution regional
+model at the substations' own points or a satellite-based nowcast of the next few hours, raise the
+correlation with the CAMS anomaly above ENS's 0.82 at 0 to 24 hours?** This experiment found that a
+second global ensemble adds nothing there, so the next test should use a source with independent
+errors at short range, calibrated in-fold as here and scored first without any demand fit. The live
+UKV differs statistically from the CEDA UKV archive, so the product must be the same in training and
+serving. Beyond 6 days no product on disk is likely to beat ECMWF, so a gain there is not worth a
+test.
+
+## Not done
+
+The demand contrasts C7, C7s, C3b, and C6b were not run, because the pre-registered gate stopped the
+experiment. `e00050_predict.py` and `e00050_stats.py` are written, are tested against experiment
+46's stored arm (a rebuild matches to 1.2e-7), and stay unrun. No prediction set was written, since
+no demand arm exists.
 
 ## Plan
 
@@ -110,8 +253,9 @@ archives are held at the generator meter points and reach at most 5 days. No dow
 
 **GEFS radiation is a 6-hour mean at 00, 06, 12, and 18 UTC and a 3-hour mean at 03, 09, 15, and 21
 UTC, so the means are de-accumulated before use.** The 3-hour mean ending at a 6-hourly label `L`
-is `2 * v(L) - v(L - 3 h)`. Means below zero are clipped to zero and counted (the source is
-quantised, and the first look found 5.2% of 3-hour means below -1 W/m²). Beyond a lead of 144 hours
+is `2 * v(L) - v(L - 3 h)`. Means below zero are clipped to zero and counted (the first look
+found 5.2% of
+3-hour means below -1 W/m², and the full sample 2.55%). Beyond a lead of 144 hours
 pairs of 3-hour means are averaged into 6-hour means, which gives the same schedule as ENS's native
 radiation windows, so the conversion passes the production resampler's schedule check. Each
 Primary's H3 cell is area-weighted over the GEFS grid cells; for D16 only 0.898 of the cell lies
@@ -226,7 +370,7 @@ C7 and C7s widens both intervals; both stay at 97.5% unless the maintainer rules
 CAMS to 3-hour or 6-hour windows discards its within-window cloud detail, which caps the half-hour
 correlation near 0.91 to 0.95 whatever the chain does; a smoke run gave 0.98 or more on window means
 and 0.91 to 0.93 on half-hours. The dark-window bound of check 2 is 10 W/m², set after a smoke run
-found up to 7.9 W/m² across the six sites, because the archive's 3-hour and 6-hour windows are not
+found up to 8.0 W/m² across the six sites, because the archive's 3-hour and 6-hour windows are not
 exactly consistent near dusk, and the PV model returns 0 when the sun is below the horizon. The
 monthly-ratio step of check 7 reached 19.4% (into November 2025, in low winter irradiance) over
 every run, which is why that read is a warning. The calibration of the 10+ d lead band uses every

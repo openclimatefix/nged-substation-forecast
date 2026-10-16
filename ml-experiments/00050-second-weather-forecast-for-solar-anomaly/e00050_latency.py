@@ -87,10 +87,23 @@ def choose_offset(*, observations: list[dict[str, str | bool]]) -> tuple[int, st
     )
 
 
-def decide() -> None:
-    """Write the decision from the recorded observations."""
+def decide(*, assume_offset: int | None = None) -> None:
+    """Write the decision from the recorded observations, or an assumed one marked unverified.
+
+    Args:
+        assume_offset: When given, record this offset (0 or 1) as unverified instead of deriving
+            it. Assuming the same-day run is the optimistic case for GEFS: a verdict of `refuted`
+            under it holds under the previous-day run too.
+    """
     observations = json.loads(OBSERVATIONS_PATH.read_text()) if OBSERVATIONS_PATH.exists() else []
-    offset, reason = choose_offset(observations=observations)
+    if assume_offset is None:
+        offset, reason = choose_offset(observations=observations)
+    else:
+        offset = assume_offset
+        reason = (
+            "UNVERIFIED: no observations were possible from 07:00 to 09:00 UTC, so the offset was "
+            "assumed; the same-day run is the optimistic case for GEFS"
+        )
     common.LATENCY_PATH.write_text(
         json.dumps(
             {"run_offset_days": offset, "reason": reason, "observations": observations}, indent=2
@@ -104,12 +117,13 @@ def main() -> None:
     """Run the requested step."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("step", choices=("observe", "decide"))
+    parser.add_argument("--assume-offset", type=int, choices=(0, 1), default=None)
     args = parser.parse_args()
     common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     if args.step == "observe":
         observe()
     else:
-        decide()
+        decide(assume_offset=args.assume_offset)
 
 
 if __name__ == "__main__":
