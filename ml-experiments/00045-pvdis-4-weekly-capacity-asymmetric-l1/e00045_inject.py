@@ -49,6 +49,7 @@ CaseName = Literal[
     "seasonal_load_independent",
     "seasonal_load_sunshine",
     "constant_path",
+    "ratio_constant_farm",
 ]
 CASES: Final[tuple[CaseName, ...]] = (
     "ramp_25",
@@ -66,7 +67,13 @@ CASES: Final[tuple[CaseName, ...]] = (
     "seasonal_load_sunshine",
     "constant_path",
 )
-"""The 14 cases: 2 ramps, 4 steps, 3 temporary falls, 2 transfers, 2 seasonal loads, 1 constant."""
+"""The 14 scored cases: 2 ramps, 4 steps, 3 temporary falls, 2 transfers, 2 seasonal loads, and 1
+constant path. The constant path is built on the placebo sky: the PV shape is permuted within each
+month and the known constant capacity times the permuted shape is added to the real power, so the
+baseline holds no real growth and the known path is exactly constant."""
+RATIO_CASES: Final[tuple[CaseName, ...]] = ("ratio_constant_farm",)
+"""Auxiliary units, not scored: a constant capacity injected from a farm on the semi-synthetic
+baseline, which measures each Primary's recovery ratio (the farm's shape differs from `u`)."""
 RAMP_SHARES: Final[dict[str, float]] = {"ramp_25": 0.25, "ramp_50": 0.50}
 STEP_SHARES: Final[dict[str, float]] = {
     "step_05": 0.05,
@@ -358,7 +365,7 @@ def _rng(*, unit: Unit) -> np.random.Generator:
             unit.seed,
             common.FARMS.index(unit.farm),
             common.PRIMARIES.index(unit.primary),
-            CASES.index(unit.case),
+            (*CASES, *RATIO_CASES).index(unit.case),
         ]
     )
 
@@ -500,7 +507,7 @@ def build_injection(
             delta_for=_farm_delta(weekly_change=increment),
             fall=(start, duration),
         )
-    elif case == "constant_path":
+    elif case == "ratio_constant_farm":
         increment = np.full(common.N_WEEKS, capacity)
     elif case.startswith("transfer"):
         return _transfer_injection(unit=unit, base=base, rng=rng, weeks=weeks, inputs=inputs)
@@ -606,6 +613,10 @@ def fit_unit(
     Returns:
         The fitted paths with and without the injection.
     """
+    if unit.case == "constant_path":
+        return _fit_constant_path_on_placebo_sky(
+            unit=unit, base=base, farm_rows=farm_rows, fits=fits
+        )
     injection = build_injection(unit=unit, base=base, farm_rows=farm_rows, inputs=inputs)
     rows = (
         farm_rows
@@ -629,6 +640,36 @@ def fit_unit(
         paths=_fit_all(design=_design(rows=rows, power=power1), fits=fits),
         baseline_paths=baseline_paths,
         fall=injection.fall,
+    )
+
+
+def _fit_constant_path_on_placebo_sky(
+    *, unit: Unit, base: PrimaryBase, farm_rows: pl.DataFrame, fits: tuple[FitSpec, ...]
+) -> UnitFit:
+    """Fit the constant-path unit: permuted PV shape, with the known capacity added back.
+
+    The real power is kept, the PV shape `u` is permuted among the days of each month, and the
+    known baseline capacity times the permuted shape is subtracted from the power (PV lowers
+    power). The real series' own growth is uncorrelated with the permuted shape, so the known
+    path is constant.
+
+    Args:
+        unit: The constant-path unit.
+        base: The Primary's baseline.
+        farm_rows: `unit_rows(...)` without a mask window (the rows that the farm's gaps leave).
+        fits: The fits to run.
+
+    Returns:
+        The fits, with a zero true increment and no baseline fits.
+    """
+    rows = permute_u(table=farm_rows, rng=_rng(unit=unit))
+    power = rows["power"].to_numpy() - base.capacity * rows["u"].to_numpy()
+    return UnitFit(
+        increment=np.zeros(common.N_WEEKS),
+        observed=observed_weeks(table=rows),
+        paths=_fit_all(design=_design(rows=rows, power=power), fits=fits),
+        baseline_paths={},
+        fall=None,
     )
 
 
@@ -686,7 +727,7 @@ def run_unit_job(
     )
     path_rows, unit_rows_out = [], []
     for seed in SEEDS_BY_SPLIT[split]:
-        for case in CASES:
+        for case in (*CASES, *RATIO_CASES):
             unit = Unit(primary=primary, farm=farm, seed=seed, case=case)
             result = fit_unit(
                 unit=unit,
@@ -815,7 +856,7 @@ def recovery_ratio(*, units: pl.DataFrame, paths: pl.DataFrame, spec: FitSpec) -
     key = ["primary", "farm", "seed", "case"]
     joined = (
         paths.filter(
-            (pl.col("case") == "constant_path")
+            (pl.col("case") == "ratio_constant_farm")
             & (pl.col("fit") == spec[0])
             & (pl.col("a") == spec[1])
             & (pl.col("r") == spec[2])

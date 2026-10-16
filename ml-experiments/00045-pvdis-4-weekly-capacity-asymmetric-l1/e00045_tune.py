@@ -168,11 +168,14 @@ def unit_scores(
     """
     units, paths = _read_variant(out_dir=out_dir, variant=variant)
     key = ["primary", "farm", "seed", "case"]
-    joined = paths.join(units.drop("variant"), on=key)
+    joined = paths.join(units.drop("variant"), on=key).filter(
+        ~pl.col("case").is_in(list(inject.RATIO_CASES))
+    )
     rows = []
     for row in joined.iter_rows(named=True):
         spec: inject.FitSpec = (row["fit"], row["a"], row["r"])
-        ratio = ratios[(row["primary"], spec)]
+        # The constant path is built from `u` itself, which the fit recovers at a ratio of 1.
+        ratio = 1.0 if row["case"] == "constant_path" else ratios[(row["primary"], spec)]
         observed = np.array(row["observed"], dtype=bool)
         increment = np.array(row["increment"], dtype=float)
         estimate = inject.estimate_path(
@@ -404,6 +407,10 @@ def main() -> None:
         return
     fallback = min(table, key=lambda row: (row["violation"], row["path_error_mixture"]))
     pick = chosen or fallback
+    previous = json.loads(FROZEN_PATH.read_text()) if FROZEN_PATH.exists() else {}
+    first_attempt = previous.get("first_attempt_real_baseline") or {
+        key: value for key, value in previous.items() if key != "supersedes"
+    }
     config = {
         "status": "frozen" if chosen else "refuted-fallback",
         "experiment": common.EXPERIMENT_ID,
@@ -436,6 +443,17 @@ def main() -> None:
             "draw. This config subtracts the season-year constant fit and scores the fit of "
             "baseline plus injection against the known path."
         ),
+        "constant_path_redefinition": (
+            "The constant-path unit was redefined after the first attempt's tuning results were "
+            "seen. The first attempt injected a constant capacity from a farm into the "
+            "semi-synthetic baseline, whose real series still held intra-year growth, so real "
+            "rises counted as false steps. The constant-path unit now uses the placebo sky: the PV "
+            "shape is permuted within each month and the known constant capacity times the "
+            "permuted shape is added back, so the baseline holds no real growth. The change was "
+            "made on tuning units only. The scoring units were never fitted or touched. The "
+            "write-up must report both attempts. The limits and the tie rule are unchanged."
+        ),
+        "first_attempt_real_baseline": first_attempt,
         "tuning_script_commit": commit,
         "frozen_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }

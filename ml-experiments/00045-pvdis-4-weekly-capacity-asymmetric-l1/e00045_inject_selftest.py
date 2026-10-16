@@ -103,6 +103,33 @@ def test_baseline_keeps_weekly_noise(*, inputs: inject.Inputs) -> None:
     )
 
 
+def test_constant_path_has_no_trend(*, inputs: inject.Inputs) -> None:
+    """The constant-path baseline holds a known constant capacity and has no trend."""
+    worst = 0.0
+    detail = []
+    for site in SITES:
+        base = inject.primary_base(inputs=inputs, site=site)
+        farm_rows = inject.unit_rows(base=base, inputs=inputs, farm="A")
+        unit = inject.Unit(primary=site, farm="A", seed=0, case="constant_path")
+        rows = inject.permute_u(table=farm_rows, rng=inject._rng(unit=unit))
+        power = rows["power"].to_numpy() - base.capacity * rows["u"].to_numpy()
+        design = model.design_from_rows_table(table=rows.with_columns(power=pl.Series(power)))
+        free = inject.unconstrained_weekly_fit(design=design)
+        weeks = np.nonzero(np.isfinite(free))[0]
+        slope, intercept = np.polyfit(weeks, free[weeks], 1)
+        residual = free[weeks] - (slope * weeks + intercept)
+        slope_se = residual.std(ddof=2) / np.sqrt(((weeks - weeks.mean()) ** 2).sum())
+        z = abs(slope) / slope_se
+        worst = max(worst, float(z))
+        drift = slope * 52 * 5 / base.capacity
+        detail.append(f"{site} slope {drift:+.3f} of capacity per 5 years, {z:.1f} standard errors")
+    report(
+        name="constant-path baseline has no trend",
+        passed=worst < 3.0,
+        detail="; ".join(detail),
+    )
+
+
 def _noise_free_error(*, inputs: inject.Inputs, site: str, case: inject.CaseName) -> float:
     """Inject `case` with `u` as the farm shape; return the largest increment error.
 
@@ -135,7 +162,7 @@ def _noise_free_error(*, inputs: inject.Inputs, site: str, case: inject.CaseName
 
 def test_noise_free_recovery(*, inputs: inject.Inputs) -> None:
     """With the farm shape equal to `u`, the free fit returns the injected path to 1e-6 MW."""
-    cases: tuple[inject.CaseName, ...] = ("ramp_50", "step_30", "fall_30_26", "constant_path")
+    cases: tuple[inject.CaseName, ...] = ("ramp_50", "step_30", "fall_30_26", "ratio_constant_farm")
     worst = {
         case: max(_noise_free_error(inputs=inputs, site=s, case=case) for s in SITES)
         for case in cases
@@ -345,6 +372,7 @@ def main() -> None:
     test_split_guard()
     test_baseline_keeps_weekly_noise(inputs=inputs)
     test_noise_free_recovery(inputs=inputs)
+    test_constant_path_has_no_trend(inputs=inputs)
     test_farm_gaps(inputs=inputs)
     test_transfers(inputs=inputs)
     test_steps_and_seeds(inputs=inputs)
