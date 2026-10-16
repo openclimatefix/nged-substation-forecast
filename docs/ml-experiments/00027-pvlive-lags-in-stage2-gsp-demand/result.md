@@ -63,14 +63,23 @@ code: ml-experiments/00027-pvlive-lags-in-stage2-gsp-demand/
 
 # Does PV_Live at the lag times help the stage 2 forecast of GSP demand?
 
-**Verdict: refuted for the two GSPs, Walpole and Bicker Fen.** Giving the stage 2 calibrator
-Sheffield Solar's PV_Live estimate at the lag times lowered the quantile score by at most 0.08
-points of capacity, and every interval includes zero. The best planned contrast, C1 (PV_Live level
-minus no PV_Live, all leads), is -0.08 (98.33% interval -0.26 to +0.08). The three intervals all lie
-above -0.30, so a gain of 0.3 points or more (the decision threshold) is excluded at 98.33% for
-these two series, and the intervals say nothing about other GSPs. Scores are on 73 forecast runs,
-one every 5 days, July 2025 to June 2026, with ENS weather, in points of capacity (1% of the series'
-effective capacity). Attribution: Sheffield Solar PV_Live, CC BY 4.0.
+We asked whether Sheffield Solar's estimate of solar generation at the earlier times used as inputs
+(the lag times, such as 24 and 48 hours before the forecast origin) helps the second step of a
+demand forecast at two grid supply points. We gave the second step that estimate and compared its
+error with the same step without it, over 73 forecast runs. The estimate lowered the error by at
+most 0.08 points of capacity, and every interval included zero, so a gain of 0.3 points or more is
+ruled out for these two series.
+
+**Verdict: refuted for the two grid supply points (GSPs), Walpole and Bicker Fen.** Giving the stage
+2 calibrator Sheffield Solar's PV_Live estimate at the lag times lowered the quantile score by at
+most 0.08 points of capacity, and every interval includes zero. The best planned contrast, C1
+(PV_Live level minus no PV_Live, all leads), is -0.08 (98.33% interval -0.26 to +0.08). The three
+intervals all lie above -0.30, so a gain of 0.3 points or more (the decision threshold) is excluded
+at 98.33% for these two series, and the intervals say nothing about other GSPs. Scores are on 73
+forecast runs, one every 5 days, July 2025 to June 2026, with ENS weather, in points of capacity (1%
+of the series' effective capacity). Attribution: Sheffield Solar PV_Live, CC BY 4.0. The stage 2
+calibrator is a second model that corrects the forecast quantiles that stage 1a produces. The
+quantile score measures how well the forecast quantiles fit what happened, and smaller is better.
 
 ![Stage 2 arms with PV_Live minus the arm without](figure_1.svg)
 

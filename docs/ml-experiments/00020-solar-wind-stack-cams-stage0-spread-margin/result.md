@@ -87,6 +87,12 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Do the candidate changes for solar and wind add up to a better pooled mixture?
 
+We asked whether combining the small improvements found earlier for solar and wind farm forecasts
+gives a better forecast than the current method. We built the full combination, removed each
+improvement in turn, and measured the accuracy of the forecast range. For wind, the combination
+improved accuracy by 0.071 points of capacity, and a starting guess taken from the turbine power
+curve supplied most of it. For solar, no improvement helped detectably.
+
 **Verdict: partly supported.** For wind, the full stack (a power-curve base margin and a spread
 factor) lowers the continuous ranked probability score (CRPS) by 0.071 points of capacity, and the
 base margin carries the gain. For solar, no component detectably helped and the full stack was 0.035

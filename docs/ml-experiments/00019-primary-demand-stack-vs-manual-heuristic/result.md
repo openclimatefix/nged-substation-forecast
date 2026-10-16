@@ -72,17 +72,27 @@ code: ml-experiments/00019-primary-demand-stack-vs-manual-heuristic/
 
 # Experiment 19: does stacking small gains beat `manual_heuristic` for Primary demand?
 
+We asked whether stacking several small improvements gives a demand forecast for Primary substations
+(substations that step power down to the local distribution network) that beats a stored baseline
+built from the power at the same time in earlier weeks. The stack added to a single-step model a
+correction using the previous 14 days of forecast errors, a weighting of recent years, and a 15%
+widening of the forecast range. We scored it on 16 Primary substations over 73 forecast runs from
+July 2025 to June 2026. The stack beat the baseline and the single-step model, and the 14-day
+correction supplied nearly all of the gain.
+
 **Supported: the full stack beats `manual_heuristic` and N1, and the 14-day error correction
 supplies nearly all of the gain (-0.99 of -1.00).** N1 is the single-stage quantile model trained on
-the ECMWF ensemble (ENS) control member. Scores are the quantile score over all leads, in points of
-capacity (1 point is 1% of a series' effective capacity), on 16 Primary substations, 73 forecast
-runs every 5 days from July 2025 to June 2026, with ENS weather. C1, the stack minus
-`manual_heuristic`, is -0.56 (99.44% interval -0.93 to -0.26), and the mean absolute error of the
-median agrees (-0.88, -1.51 to
--0.30). C2, the stack minus N1, is -1.00 (-1.88 to -0.14), which meets the -0.3 threshold. The
-stack's quantile score is 5.32, N1's is 6.33, and `manual_heuristic`'s is 5.89. Up to 48 hours
-the stack scores 4.61 against 5.68 (C1, 95% interval -1.38 to -0.79), and from 3 days on 5.49
-against 5.94.
+the control member of the ensemble weather forecast (ENS) of the European Centre for Medium-Range
+Weather Forecasts. Scores are the quantile score over all leads, in points of capacity (1 point is
+1% of a series' effective capacity), on 16 Primary substations, 73 forecast runs every 5 days from
+July 2025 to June 2026, with ENS weather. C1, the stack minus `manual_heuristic`, is -0.56 (99.44%
+interval -0.93 to -0.26), and the mean absolute error of the median agrees (-0.88, -1.51 to -0.30).
+C2, the stack minus N1, is -1.00 (-1.88 to -0.14), which meets the -0.3 threshold. The stack's
+quantile score is 5.32, N1's is 6.33, and `manual_heuristic`'s is 5.89. Up to 48 hours the stack
+scores 4.61 against 5.68 (C1, 95% interval -1.38 to -0.79), and from 3 days on 5.49 against 5.94.
+The quantile score measures how well the forecast quantiles fit what happened, and smaller is
+better. `manual_heuristic` is a stored baseline that forecasts from the power at the same time of
+day in earlier weeks and years.
 
 ![Quantile score by arm](figure_1.svg)
 

@@ -80,6 +80,13 @@ code: ml-experiments/00036-hierarchy-aware-bsp-gsp-forecasts/
 
 # Experiment 36: do forecasts of the series beneath a BSP or GSP lower its error?
 
+We asked whether forecasts of the substations beneath a bulk supply point help forecast the demand
+of that point, and whether adding wind and solar generation helps at a grid supply point. We added
+those forecasts to a single-step model and scored 4 series: 2 bulk supply points and 2 grid supply
+points. Neither addition lowered the error. A model trained on estimates of past weather lowered the
+grid supply point scores by 0.36 and 0.40 points of capacity, but its intervals span -1.8 to +1.0
+points.
+
 **Verdict: inconclusive.** Adding forecasts of the series beneath a bulk supply point (BSP) to N1
 (the single-stage XGBoost quantile model trained on ENS, the ECMWF ensemble weather forecast) did
 not lower its quantile score, and adding wind and solar columns to a grid supply point (GSP) did not
