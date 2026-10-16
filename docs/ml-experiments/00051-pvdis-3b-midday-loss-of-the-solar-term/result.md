@@ -34,6 +34,21 @@ decision_rule: >-
   of the ENS shift minus that of the ensemble-mean shift has an interval wholly above zero and is
   at least half of the ENS shift minus `d1l`, at day+2 and day+3 pooled. More than one cause may
   hold; if none holds the verdict is inconclusive and the write-up says what the residuals show.
+  A load that rises with sunshine mimics a clipping knee (visitor load at coastal resorts, cooling
+  of crop stores, irrigation), so cause (a) also needs the splits below. The hinge is compared with
+  a straight line out of fold, by the mean absolute error of the median on the held-out weeks, not
+  by the in-sample sum of squares: (a) requires the hinge to beat the straight line out of fold. A
+  knee that appears in the inland series, in term-time weekdays, and in school-holiday weekdays and
+  weekends alike is clipping. A knee that is absent inland, or that concentrates in school-holiday
+  and weekend rows, is load, and the write-up names it as load. The splits are coastal (within 10
+  km of the open coast, by distance computed in the process and never published) against inland
+  series, and school-holiday weeks (from 22 July to 31 August, and the week of the late May bank
+  holiday) plus weekends against term-time weekdays. The coastal split compares the series that
+  qualify with the rest, and the write-up states how many qualify. Temperature at fixed
+  clear-sky index is also read: the ERA5 2 m temperature is binned in three terciles within each
+  clear-sky-index bin, and the residual is read by tercile. A residual that grows with temperature
+  at fixed clear-sky index points to load, since clipping depends on irradiance and hot panels
+  clip slightly less.
 benchmark: >-
   The `d1l` median (experiment 00046), shifted by the oracle with coefficient 1, for the repairs;
   `d1l_ens_shift` for repair C.
