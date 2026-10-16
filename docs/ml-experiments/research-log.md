@@ -77,6 +77,7 @@ the maintainer to confirm.
 | [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
+| [00045 - Weekly solar capacity series, part 4](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md) | Can a weekly capacity series for embedded solar, with rises penalised lightly and falls heavily, recover injected changes at the 8 Primary substations metered in MW, without inventing steps? | Refuted: no pair of penalties met the tuning limits; the frozen pair scored a path error of 0.040 against 0.027 for a capacity held constant within each season-year, and gave 0.66 false steps per Primary-year against a limit of 0.5 | Not for production | 2026-10-16 |
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
 | [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
 | [00055 - Switching event detector, part 5](00055-sw2-8-neighbour-veto-single-series-detector/result.md) | Does vetoing the single-series detector's alarms that the neighbouring substations show as a common-mode miss let the threshold fall at the same rate of unexplained alarms and find more injected transfers? | Inconclusive: the share found rose by +0.008 (98.75% interval -0.003 to +0.022) | Not for production | 2026-10-16 |
@@ -1078,6 +1079,42 @@ or more of the receiving load lasting over 24 hours.
   [PR #1261](https://github.com/openclimatefix/nged-substation-forecast/pull/1261).
 
 ![Shares of half-hours and of each score](00044-sw2-2-switching-share-of-best-guess-score/figure_2_shares.svg)
+
+### 00045: a weekly series of embedded solar capacity
+
+**No single pair of penalty settings for a weekly capacity series was both quiet on noise and able
+to follow a real fall, so the verdict is refuted; for SW2-10, use one capacity per season-year and
+read it as a range.** The experiment added the recorded output of real
+solar farms to the demand of the 8 Primary substations metered in MW, in known steps, ramps, and
+temporary falls, and measured how far each method's weekly capacity lay from the known amount. The
+plan's literal clause order also reads inconclusive, because its detection clause was evaluated on a
+degenerate pair; the page says why refuted applies. On the semi-synthetic baseline, which favours
+the season-year constant by construction, no weekly fit beat the constant. On the real series plus
+injection, every weekly fit beat it on ramps and steps (0.012 to 0.017 against 0.020).
+
+- **Headline result:** the median path error on ramps and steps (the mean gap between the fitted and
+  the true weekly capacity, as a share of the true mean capacity, on the semi-synthetic baseline) is
+  0.027 for the season-year constant, 0.040 for the frozen asymmetric fit, and 0.159 for a weekly
+  fit with no penalty. The frozen fit gives a median of 0.66 false steps of 10% per Primary-year on
+  a constant capacity (limit 0.5, worst Primary 1.43 against 1.0) and recovers 0.000 of a 30% fall
+  lasting 26 weeks. The relative change in path error against the season-year constant (C2) is
+  +0.400. On the plan's main interval, which resamples the 8 Primaries only, the 95% interval is
+  +0.029 to +0.634, so its lower limit above 0 is a second route to refuted. The two-way interval,
+  which also resamples farm-seeds, is -0.078 to +0.773.
+- **Finding for later experiments:** a pair chosen after the scoring run (a=2, r=10) recovers 0.576
+  of the fall but gives a median of 1.22 false steps. The smallest step that the frozen pair detects
+  in 80% of injections is above 25% of capacity at all 8 Primaries in both seasons. The free weekly
+  fit reaches 80% at 5% steps at 3 of the 8 Primaries from April to September, with a median of 11.6
+  false steps per Primary-year. The latest week of a real-time estimate has 3.63 times the path
+  error of the final fit, and the 90% intervals cover 0.620 of non-step weeks and 0.347 of step
+  weeks. The recommended series for SW2-10 is the season-year constant.
+- **Process finding:** the first tuning attempt used a baseline that had removed the weekly noise
+  and was redone, and the constant-path unit was redefined after its results were seen; both
+  attempts are in the write-up.
+- **Write-up and pull request:** [result](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md),
+  [PR #1266 (Experiment 45: PVDIS-4 plan, a weekly capacity series that rises easily and falls reluctantly)](https://github.com/openclimatefix/nged-substation-forecast/pull/1266).
+
+![Path error by case family and fit](00045-pvdis-4-weekly-capacity-asymmetric-l1/figure_07.svg)
 
 ### 00046: how much of the best guess's daylight error is embedded solar? (PVDIS part 3)
 
