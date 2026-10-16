@@ -125,6 +125,26 @@ def _headline(*, plain: pl.DataFrame, bracket: pl.DataFrame) -> None:
             r = [float(found[s]["found"].to_numpy().mean()) for s in (d0, d1)]
             diff = event_f1(recall=r[1], precision=p[1]) - event_f1(recall=r[0], precision=p[0])
             print(f"      F1 difference at the {bound} precision bound: {diff:+.3f}")
+    print("\n== D1 minus D0 on the headline events that have a metered receiver")
+    metered = band.filter(pl.col("metered_receivers") > 0)
+    for window, (d0, d1) in PAIRS.items():
+        found = {s: metered.filter(pl.col("setting") == s).sort("event_id") for s in (d0, d1)}
+        month = months[found[d0]["onset"].to_numpy()]
+        resampled = [
+            month_bootstrap(
+                months=month,
+                values=found[s]["found"].to_numpy().astype(float),
+                n_resamples=N_RESAMPLES,
+                seed=SEED,
+            )
+            for s in (d0, d1)
+        ]
+        point = found[d1]["found"].to_numpy().mean() - found[d0]["found"].to_numpy().mean()
+        lo, hi = np.percentile(resampled[1] - resampled[0], [2.5, 97.5])
+        print(
+            f"  {window}: recall difference {point:+.3f} ({lo:+.3f} to {hi:+.3f}) "
+            f"over {found[d0].height} events"
+        )
     print("\n== Headline band by whether a metered receiver exists")
     for setting, label in LABELS.items():
         for name, keep in (
