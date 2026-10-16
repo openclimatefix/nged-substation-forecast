@@ -91,6 +91,7 @@ the maintainer to confirm.
 | [00069 - Switching event detector, part 10](00069-sw2-17-missed-onsets-of-the-end-rule/result.md) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their start, and does a weak alarm confirmed by a later step back recover them? | Inconclusive: the weak alarms add +0.146 of the moved MW, but the strong threshold must rise from 4.0 to 6.55 to keep 80 alarms, so the net change is +0.007 (98.75% interval -0.014 to +0.040); the first-return end rule beats the 14-day rule on a fresh draw (+0.038, +0.016 to +0.077) | Not for production | 2026-10-16 |
 | [00070 - Switching event detector, part 11](00070-sw2-19-same-sign-neighbour-count/result.md) | Does counting the neighbours that step the same way as the alarming substation find more of the moved MW than the single-series detector with the PF14 end rule? | Supported: +0.048 of the moved MW (97.5% interval +0.021 to +0.096) on fresh headline-band transfers at 80 odd-month unexplained alarms; no gain on long transfers or the 35 real transfers (7 against 8) | Candidate | 2026-10-16 |
 | [00071 - Switching event detector, part 12](00071-sw2-18-refit-offset-and-gap-bridging/result.md) | Does taking the step statistic from two residual models refitted half a month apart, so that no alarm is suppressed at a refit, find more of the moved MW than the benchmark detector PF14? | Supported: +0.050 of the moved MW (98.33% interval +0.012 to +0.107) at no more than 80 odd-month unexplained alarms, all of it in transfers within 24 hours of a refit. Lifting the suppression alone gives +0.056, and gap bridging changes no outcome | Candidate | 2026-10-16 |
+| [00068 - Switching event detector, part 13](00068-sw2-5-train-detect-retrain-loop/result.md) | Does refitting the lagless XGBoost model without the detected switching intervals, for three rounds, raise the share of moved MW the detector finds and lower the forecast error? | Inconclusive, and no gain worth porting: recall gains +0.011 (97.5% interval +0.000 to +0.034) and the forecast's mean absolute error changes -0.175% (-1.145% to +0.603%); a random mask of about equal volume does as well | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1382,6 +1383,27 @@ single-series detector with the PF14 end rule, a difference of +0.048 (97.5% int
   #1303](https://github.com/openclimatefix/nged-substation-forecast/pull/1303).
 
 ![MW-weighted recall by arm](00070-sw2-19-same-sign-neighbour-count/figure_1_recall_by_arm.svg)
+
+### 00068: does refitting without the detected switching help the detector and the forecast? (SW2-5)
+
+**Refitting the lagless XGBoost model without the load transfers the detector found barely changed
+what the detector finds or the forecast error, so in these 16 series the limit on the detector is not
+that the forecast has learned the transfers.** We ran three rounds of
+refitting the XGBoost model that forecasts a Primary substation's demand from weather and calendar
+inputs, with zero weight on the half-hours inside the intervals found on the previous round's
+residual, and detecting again. To test the loop we added 130 synthetic load transfers to the
+measured power before the model trained, and the detector found a larger share of the moved
+megawatts (MW), rising from 0.522 to 0.532 (+0.011, 97.5% interval +0.000 to +0.034). The forecast's
+mean absolute error on half-hours with no logged or labelled switching changed by -0.175% (-1.145%
+to +0.603%). A mask of equal volume at random times did as well.
+
+- **Finding for later experiments:** the share of the moved MW that is missed stays at 0.47 (the
+  130 transfers in the training data) and 0.34 (620 transfers added to the residual after the
+  forecast) across all four rounds, so the onset step is where to look next.
+- **Write-up and pull request:** [the full result page](00068-sw2-5-train-detect-retrain-loop/result.md),
+  [PR #1299](https://github.com/openclimatefix/nged-substation-forecast/pull/1299).
+
+![Change in MW-weighted recall from round 0, by round](00068-sw2-5-train-detect-retrain-loop/figure_1_recall_gain.svg)
 
 ### 00071: does ignoring alarms near a refit make the detector miss load transfers? (SW2-18)
 
