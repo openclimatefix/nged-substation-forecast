@@ -390,6 +390,9 @@ def main() -> None:
     nthread = max(1, CORES // workers)
     started = time.monotonic()
     ordered = sorted(jobs.items(), key=lambda item: -len(item[1]))
+    # Fewer refits than workers (the frozen model has one): split the series so every worker works.
+    n_chunks = workers if len(ordered) < workers else 1
+    site_chunks = [sites[i::n_chunks] for i in range(n_chunks)]
     with ProcessPoolExecutor(max_workers=workers) as pool:
         futures = [
             pool.submit(
@@ -397,12 +400,13 @@ def main() -> None:
                 config_name=config.name,
                 refit=refit,
                 origins=origins,
-                sites=sites,
+                sites=chunk,
                 out_root=out_root,
                 rounds=rounds,
                 nthread=nthread,
             )
             for refit, origins in ordered
+            for chunk in site_chunks
         ]
         for done, future in enumerate(futures, start=1):
             for line in future.result():

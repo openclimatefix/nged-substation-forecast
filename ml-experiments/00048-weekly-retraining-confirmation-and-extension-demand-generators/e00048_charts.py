@@ -122,7 +122,12 @@ def figure_1(*, folder: Path) -> alt.TopLevelMixin:
         .encode(x="low:Q", x2="high:Q")
     )
     base = alt.Chart(data).encode(
-        y=alt.Y("label:N", sort=list(CONTRAST_LABELS.values()), title=None)
+        y=alt.Y(
+            "label:N",
+            sort=list(CONTRAST_LABELS.values()),
+            title=None,
+            axis=alt.Axis(labelLimit=380),
+        )
     )
     points = base.mark_point(filled=True, size=60, color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
@@ -165,7 +170,12 @@ def figure_2(*, folder: Path) -> alt.TopLevelMixin:
         if data.is_empty():
             continue
         base = alt.Chart(data).encode(
-            y=alt.Y("label:N", sort=[ARM_LABELS[a] for a in arms], title=None),
+            y=alt.Y(
+                "label:N",
+                sort=[ARM_LABELS[a] for a in arms],
+                title=None,
+                axis=alt.Axis(labelLimit=300),
+            ),
             color=alt.Color(
                 "kind:N",
                 scale=alt.Scale(domain=list(KIND_COLOURS), range=list(KIND_COLOURS.values())),
