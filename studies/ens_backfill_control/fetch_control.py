@@ -93,6 +93,12 @@ def order_dates(*, complete: list[date], first: date, last: date) -> list[date]:
 def fetch_date(*, day: date, output_dir: Path, workers: int, dry_run: bool) -> bool | None:
     """Fetch one date, write its checkpoint, and log a summary line.
 
+    Args:
+        day: The forecast date.
+        output_dir: The destination folder.
+        workers: The number of concurrent connections.
+        dry_run: Fetch only the sidecars and print the plan.
+
     Returns:
         True on success, False on a failure that points at the server or network (every retry
         failed), and None on a failure confined to this date's data, such as a bad sidecar.
