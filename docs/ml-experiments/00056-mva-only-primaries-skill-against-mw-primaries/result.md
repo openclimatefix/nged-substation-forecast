@@ -150,7 +150,8 @@ verdict does not use this check.
 ## Lessons for later experiments
 
 **The experiment found no case for special handling of the MVA-only Primaries in Flexpectation v1,
-and no strong evidence against one; the half-hours near zero flow are the place to look next.** PVDIS-7 is the planned work to recover signed MW at the
-MVA-only Primaries. The case for it rests on separating solar from demand, which the PVDIS series
-tests, and not on forecast skill. A later comparison of unit groups should use more than 8 time
-series or show each series, and should say which series account for the gap.
+and no strong evidence against one; the half-hours near zero flow are the place to look next.**
+PVDIS-7 is the planned work to recover signed MW at the MVA-only Primaries. The case for it rests
+on separating solar from demand, which the PVDIS series tests, and not on forecast skill. A later
+comparison of unit groups should use more than 8 time series or show each series, and should say
+which series account for the gap.
