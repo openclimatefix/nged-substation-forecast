@@ -4,46 +4,49 @@ slug: second-weather-forecast-for-solar-anomaly
 status: done
 size: complex
 hypothesis: >-
-  At the five Primary substations metered in MW in experiment 00046's verdict set (D9, D10, D11,
-  D14, and D16), an anomaly forecast that blends the NOAA GEFS ensemble mean with the ECMWF ENS
-  ensemble mean, with weights fitted on the training window only, tracks the CAMS solar anomaly more
-  closely than ENS alone. Laid into experiment 00046's solar term with its fitted lead-dependent
-  coefficient, the blended anomaly lowers the quantile score by at least 0.1 points of capacity
-  against the same term built from ENS alone.
+  At the five Primary substations metered in MW in experiment 00046's verdict set (anonymised series
+  D9, D10, D11, D14, and D16), an anomaly forecast that blends the NOAA GEFS ensemble mean with the
+  ECMWF ENS ensemble mean, with weights fitted on the training window only, tracks the CAMS solar
+  anomaly more closely than ENS alone. Laid into experiment 00046's solar term with its fitted
+  lead-dependent coefficient, the blended anomaly lowers the quantile score by at least 0.1 points
+  of capacity against the same term built from ENS alone.
 prediction: >-
   GEFS alone correlates with the CAMS anomaly less well than ENS in every lead band: about 0.68 at 0
-  to 24 hours (ENS 0.79), 0.63 at 1 to 2 days (ENS 0.75), 0.50 at 2 to 6 days (ENS 0.58), and 0.20 at
-  6 to 10 days (ENS 0.27). The blend gains +0.01 to +0.03 in correlation at 0 to 6 days and about 0 at
-  6 to 10 days. In the demand forecast, C7 is -0.02 (-0.06 to +0.01) and C7s is -0.04 (-0.10 to
-  0.00). The likely verdict is `refuted`, decided at stage 1. If the demand stage runs, a C7s
-  interval of -0.10 to 0.00 would read `inconclusive`, and one lying wholly below 0 would read
-  `small gain`. The basis: in multi-model irradiance comparisons ECMWF usually leads, and adding a
-  weaker model helps only where the two models' errors are not correlated.
+  to 24 hours (ENS 0.79), 0.63 at 1 to 2 days (ENS 0.75), 0.50 at 2 to 6 days (ENS 0.58), and 0.20
+  at 6 to 10 days (ENS 0.27). The blend gains +0.01 to +0.03 in correlation at 0 to 6 days and about
+  0 at 6 to 10 days. In the demand forecast, C7 (the change in the quantile score from using the
+  selected arm's solar term instead of ENS's, on all rows) is -0.02 (-0.06 to +0.01) and C7s (the
+  same, on leads of 0 to 48 hours) is -0.04 (-0.10 to 0.00). The likely verdict is `refuted`,
+  decided at stage 1. If the demand stage runs, a C7s interval of -0.10 to 0.00 would read
+  `inconclusive`, and one lying wholly below 0 would read `small gain`. The basis: in multi-model
+  irradiance comparisons ECMWF usually leads, and adding a weaker model helps only where the two
+  models' errors are not correlated.
 decision_rule: >-
   The verdict is set in two stages. Stage 1, the anomaly selection gate, uses the training window
   only. Fifteen-fold month-block cross-validation, one fold per training valid month from April 2024
   to June 2025, fits every calibration on the other 14 months, leaving out the rows of runs
   initialised in the held-out month as well as the rows valid in it (including each source's
   climatology, the daylight mask, the slopes, and the blend weights) and predicts the held-out
-  month. It scores
-  the mean squared error of each of the three calibrated anomalies against the CAMS anomaly on
-  daylight rows at leads of 0 to 240 hours in April to September, the months the validation scoring
-  uses, pooled over the five verdict series. The arm with the
-  lowest error is the best anomaly. The blend or GEFS replaces ENS only if its error is at least 1%
-  lower than ENS's. If ENS wins, the demand stage is not run, the verdict is `refuted`, and the
-  validation anomaly table is the evidence. Stage 2, the demand contrasts. C7 (all scored rows) and
-  C7s (scored rows at leads of 0 to 48 hours) each compare the selected arm's solar term with the
-  ENS solar term, are read at 97.5% (Bonferroni across two), and decide the verdict. The verdict is
-  `supported` when either interval lies wholly below -0.1, `small gain` when either interval lies
-  wholly below 0 but neither lies wholly below -0.1, `refuted` when both intervals lie wholly above
-  -0.1 and neither lies wholly below 0, and `inconclusive` otherwise. The verdict is also reported
-  without D9, as in experiment 00046. The threshold of 0.1 points (about 2% of `d0`'s 4.620) is set
-  by the cost of adopting the blend, which adds a second NWP ingest from Dynamical.org with its own
-  Delta table, schedule, and degradation path for a late GEFS run, plus a blend table to refit. The
-  threshold matches PVDIS-5's non-inferiority margin.
+  month. It scores the mean squared error of each of the three calibrated anomalies against the CAMS
+  anomaly on daylight rows at leads of 0 to 240 hours in April to September, the months the
+  validation scoring uses, pooled over the five verdict series. The arm with the lowest error is the
+  best anomaly. The blend or GEFS replaces ENS only if its error is at least 1% lower than ENS's. If
+  ENS wins, the demand stage is not run, the verdict is `refuted`, and the validation anomaly table
+  is the evidence. Stage 2, the demand contrasts. C7 (all scored rows) and C7s (scored rows at leads
+  of 0 to 48 hours) each compare the selected arm's solar term with the ENS solar term, are read at
+  97.5% (Bonferroni across two), and decide the verdict. The verdict is `supported` when either
+  interval lies wholly below -0.1, `small gain` when either interval lies wholly below 0 but neither
+  lies wholly below -0.1, `refuted` when both intervals lie wholly above -0.1 and neither lies
+  wholly below 0, and `inconclusive` otherwise. The verdict is also reported without D9, as in
+  experiment 00046. The threshold of 0.1 points (about 2% of 4.620, the score of experiment 00046's
+  `d0`, its best-guess demand forecast) is set by the cost of adopting the blend, which adds a
+  second NWP ingest from Dynamical.org with its own Delta table, schedule, and degradation path for
+  a late GEFS run, plus a blend table to refit. The threshold matches the non-inferiority margin of
+  PVDIS-5, the planned test of a solar feature in the demand forecast.
 benchmark: >-
-  `d1l_ens_shift_fitted` of experiment 00046: the same `d1l` boosters, the same member spread, and
-  the same coefficient, with the ENS central anomaly.
+  `d1l_ens_shift_fitted` of experiment 00046: the same `d1l` boosters (experiment 00046's demand
+  models without radiation inputs), the same member spread, and the same coefficient, with the ENS
+  central anomaly.
 row_set_id: fold_a_every5d_v1
 metric: >-
   Stage 1: Pearson correlation, calibration slope, and mean-squared-error skill of each calibrated
@@ -54,15 +57,15 @@ metric: >-
 verdict: refuted
 best_arm: >-
   ENS (ECMWF), the arm the demand forecast already uses: its calibrated anomaly correlates with the
-  CAMS anomaly at 0.822 at 0 to 24 hours, 0.747 at 1 to 2 days, 0.628 at 2 to 6 days, and 0.337 at
-  6 to 10 days. The fitted blend ties it (0.824, 0.754, 0.627, 0.336) and GEFS alone is worse (0.749,
+  CAMS anomaly at 0.822 at 0 to 24 hours, 0.747 at 1 to 2 days, 0.628 at 2 to 6 days, and 0.337 at 6
+  to 10 days. The fitted blend ties it (0.824, 0.754, 0.627, 0.336) and GEFS alone is worse (0.749,
   0.685, 0.518, 0.328).
 headline: >-
   The stage 1 gate stopped the experiment: in cross-validation on the training window GEFS's squared
-  error against the CAMS anomaly is 1.109 times ENS's (worse in all 9 held-out months) and the fitted
-  blend's is 1.002 times, against the 0.99 needed. On the validation year GEFS correlates 0.072 less
-  than ENS at 0 to 24 hours (95% interval -0.100 to -0.039) and the blend 0.002 more (-0.001 to
-  +0.006). The demand contrasts C7 and C7s were not run.
+  error against the CAMS anomaly is 1.109 times ENS's (worse in all 9 held-out months) and the
+  fitted blend's is 1.002 times, against the 0.99 needed. On the validation year GEFS correlates
+  0.072 less than ENS at 0 to 24 hours (95% interval -0.100 to -0.039) and the blend 0.002 more
+  (-0.001 to +0.006). The demand contrasts C7 and C7s (defined in the decision rule) were not run.
 lessons: >-
   A second global ensemble weather forecast adds no skill to the sunshine anomaly that ENS has: the
   fitted blend gives GEFS about 0.1 of its weight inside 2 days and none from 2 to 10 days, so the
@@ -75,9 +78,9 @@ advice:
     the fitted blend's cross-validated error is 1.002 times ENS's and GEFS alone is 1.109 times
     (selection gate).
   - >-
-    Keep PVDIS-5 on the ENS anomaly, because its calibrated correlation with the CAMS anomaly is
-    0.82 at 0 to 24 hours and no tested second product beats it in any lead band (correlation
-    figure).
+    Keep PVDIS-5 (the planned test of a solar feature in the demand forecast) on the ENS anomaly,
+    because its calibrated correlation with the CAMS anomaly is 0.82 at 0 to 24 hours and no tested
+    second product beats it in any lead band (correlation figure).
   - >-
     Look for gains in the first 2 days with a product of a different kind (a high-resolution
     regional model or a satellite-based nowcast) and not with another global ensemble, because GEFS
@@ -105,14 +108,16 @@ sunshine. We scored three forecasts of the sunshine anomaly (ENS, GEFS, and a we
 two) against the CAMS sunshine, at five substations that meter in MW, and planned to lay the best
 one into experiment 46's correction only if it beat ENS. Neither GEFS nor the blend did. In
 cross-validation on 9 held-out months, GEFS made 10.9% more squared error than ENS and the blend
-made 0.2% more. On the 6 validation months, GEFS correlated with the true sunshine anomaly less well
-than ENS in every lead band, and the blend matched ENS. The experiment therefore stopped before the
-demand forecast was tested.
+made 0.2% more. On the 6 validation months (July to September 2025 and April to June 2026), GEFS
+correlated with the true sunshine anomaly less well than ENS in every lead band, and the blend
+matched ENS. The experiment therefore stopped before the demand forecast was tested.
 
 **The verdict is `refuted`: no tested forecast beats ENS by the 1% the gate requires, so the demand
-contrasts C7 and C7s were not run.** The rule is in the front matter. Each calibration is a slope
-(or a pair of weights) fitted per substation and lead band on the training window, and the gate
-scores April-to-September daylight half-hours at leads of 0 to 240 hours.
+contrasts C7 and C7s (the change in the demand forecast's score from using the selected anomaly in
+place of ENS's, on all leads and on leads of 0 to 48 hours) were not run.** The rule is in the front
+matter. Each calibration is a slope (or a pair of weights) fitted per substation and lead band on
+the training window, and the gate scores April-to-September daylight half-hours at leads of 0 to 240
+hours.
 
 ![Correlation with the CAMS anomaly, GEFS and the blend minus ENS, by lead band](figure_1_headline.svg)
 
@@ -139,7 +144,8 @@ with 68,903 scored rows in total (the printed report gives the rows in each band
 | 6 to 10 d | 0.337 | 0.328 | 0.336 | -0.009 (-0.077 to +0.050) | -0.001 (-0.001 to +0.000) |
 | 10+ d | 0.247 | 0.182 | 0.181 | -0.064 (-0.201 to +0.098) | -0.065 (-0.201 to +0.097) |
 
-The intervals resample the 7 months in which runs were started, so they are wide. The calibration
+The intervals resample the 7 months in which runs were started (July to September 2025 and
+March to June 2026; the March 2026 runs reach into April), so they are wide. The calibration
 slope of the CAMS anomaly on each calibrated anomaly (1 is ideal) is 0.98 for ENS and 1.09 for GEFS
 at 0 to 24 hours, and 1.21 for ENS and 2.01 for GEFS at 6 to 10 days. The mean-squared-error skill
 against a zero anomaly for ENS is 0.676, 0.555, 0.400, and 0.118 in the first four bands. Averaged
@@ -178,8 +184,8 @@ results are +0.002, +0.007, and -0.001.
   duplicate keys, no `NaN` after lead 0).
 - De-accumulation: 2.55% of the 3-hour means are below -1 W/m² (lowest -20.0), and clipping them at
   zero removes 0.057% of the positive energy.
-- The half-hours of each native window average to the native mean, and the daily profile's centre of
-  mass lies within 0.10 half-hours of CAMS's.
+- The half-hours of each native window average to the native mean.
+- The daily profile's centre of mass lies within 0.10 half-hours of CAMS's.
 - The true cell weights beat the latitude-mirrored mapping at the five sites that mirroring changes.
 - The chain test gives 0.999 on window means at every site and 0.91 to 0.93 on half-hours (planned
   bound 0.95; see the implementation notes).
@@ -290,7 +296,8 @@ exploratory read repeats A1 on 3-hour mean anomalies, free of any difference in 
 
 ### Stage 2: the demand contrasts
 
-**Every demand arm is a shift of experiment 46's saved `d1l` boosters, so nothing is refitted.**
+**Every demand arm is a shift of experiment 46's saved `d1l` boosters (its demand models without
+radiation inputs; `d0` is the same models with them), so nothing is refitted.**
 The shift of ENS member `m` is `-K(site, band) * C * (central + (a_m - mean(a))) / capacity`, where
 `C` is experiment 40's 2023/24 capacity, `K` is experiment 46's fitted lead-band coefficient (1 in
 bands where none was fitted), `central` is the arm's calibrated anomaly, and `a_m - mean(a)` is
@@ -362,11 +369,12 @@ take minutes.
 **Amendments from the plan review, accepted:** clip the de-accumulated means at zero and state the
 clip; add "neither wholly below zero" to `refuted`, so that `small gain` and `refuted` cannot both
 hold; fit the ENS calibration, each climatology, and the blend weights inside each fold; check the
-publication time of the GEFS run; and verify the D16 crop coverage in the private store. **Rejected:**
-skipping the demand stage, because the brief requires repeating experiment 46's C3 and C6, and a
-fixed 50/50 blend as the only blend, because the fitted blend is one of the three pre-registered
-arms (the fixed blend is added as an exploratory arm). **Open:** the Bonferroni correction across
-C7 and C7s widens both intervals; both stay at 97.5% unless the maintainer rules otherwise.
+publication time of the GEFS run; and verify the D16 crop coverage in the private store.
+**Rejected:** skipping the demand stage, because the brief requires repeating experiment 46's C3 and
+C6, and a fixed 50/50 blend as the only blend, because the fitted blend is one of the three
+pre-registered arms (the fixed blend is added as an exploratory arm). **Open:** the Bonferroni
+correction across C7 and C7s widens both intervals; both stay at 97.5% unless the maintainer rules
+otherwise.
 
 **Implementation notes (post hoc, labelled so).** Check 6 gates on window means because averaging
 CAMS to 3-hour or 6-hour windows discards its within-window cloud detail, which caps the half-hour
