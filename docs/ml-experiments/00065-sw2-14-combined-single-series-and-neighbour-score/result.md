@@ -104,6 +104,28 @@ log-likelihood ratios and logistic coefficients.
 **Post hoc, labelled and outside the verdict.** LOGIT with the count of same-sign neighbour steps
 added (the veto's own evidence, which the pre-registered score omits), and D2 at veto strength 1.0.
 
+## Clarifications after the plan review
+
+- **Same alarm unit for every arm.** Every arm's alarms are candidates (one per local peak, per
+  series), counted as unexplained on odd months by the same `odd_unexplained` rule. A transfer is
+  found when an interval on any of its series (the donor or a metered receiver) matches, for every
+  arm. Every arm builds its interval ends the same way.
+- **The floor of 2.5 noise units is a limit.** A transfer whose donor and receivers all step by
+  less than 2.5 noise units cannot be alarmed by either score, and the recall tables report that
+  bin as unreachable by design.
+- **Ties.** Scores break ties by `x1 + x2` (scaled by 0.001 and added), so the alarm count can land
+  on 80.
+- **Seeds and scales.** The transfers, seeds, and noise scales are experiment 61's, so no
+  even-month transfer or scale is refitted. The labelled real transfers are reported separately for
+  odd and even onset months.
+- **Verdict.** Each version gets its own verdict. The experiment takes the more favourable of the
+  two, and the page says that this choice is not covered by the Bonferroni correction. Experiment
+  61's intervals were about 0.04 wide at the 98% level, so a version whose point value is near zero
+  can reach `refuted` only if its upper end falls under +0.02.
+- **Topology.** Injections draw donors and receivers from the interconnection list, so the topology
+  flags are partly a property of where transfers were injected. The page treats the coefficients on
+  them as descriptive.
+
 ## Sizing
 
 - **Stored:** nothing outside the experiment's private folder.
