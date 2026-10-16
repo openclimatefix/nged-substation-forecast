@@ -16,10 +16,11 @@ member only, for 23 dates, and checks that the values decode exactly and are phy
   It writes one checkpoint file per date and skips dates already written.
 - `check_pilot.py` compares a sample of messages with ecCodes and writes `report.md`. Every number
   in the report is printed by the script.
-- `pilot_common.py` holds the constants and the HTTP code that the two scripts share.
 
-The decoding, sidecar parsing, and de-accumulation live in `packages/studies/src/studies/`
-(`grib1_simple.py`, `ens_grib_source.py`, `deaccumulation.py`), where they have unit tests.
+The constants, the HTTP code, and the one-date fetch that both scripts share live in
+`packages/studies/src/studies/ens_backfill_fetch.py`. The decoding, sidecar parsing, and
+de-accumulation live in the same folder (`grib1_simple.py`, `ens_grib_source.py`,
+`deaccumulation.py`), where they have unit tests.
 
 ## Commands
 
