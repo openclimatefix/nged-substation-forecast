@@ -160,6 +160,45 @@ folder yet goes in the table of `research-plan.md` marked "Proposed". An experim
 `invalid` or `failed` keeps its entry, and the entry says why. Write the entry for a reader who has
 not opened `result.md`.
 
+**The first column of each table in `research-log.md` states the topic, and the position in a series
+when the experiment belongs to one.** Write it as the id, a dash, a few words naming the topic, and
+the part number for an experiment in a series, such as "00037 - Switching event detector, part 1".
+Name every experiment in a series with the same topic words, so a reader can find the series by eye.
+
+## Exploratory series
+
+**When the question is exploratory, run a series of small experiments, each designed from the
+result of the one before.** A question is exploratory when no single hypothesis yet states what to
+test, such as "can switching events be found in the telemetry at all?" or "can embedded solar be
+separated from substation demand?". A series replaces one large pre-registered experiment, which
+would spend its whole budget before anything is learned. Every experiment in the series still has
+its own `result.md`, hypothesis, prediction, decision rule, and stop rule, and the series is one
+topic in the research log.
+
+The loop has two steps, repeated:
+
+1. **Opus plans one experiment, chosen to learn as much as possible about how to proceed.** Make the
+   first experiment fast to run. It may be data analysis with no model training, for example a look
+   at whether the events in a log are visible in the telemetry at all. It produces plenty of plots
+   of the data (load the `dataviz` skill, and show the raw data before any model output). A first
+   Sonnet agent implements the code, a second Sonnet agent reviews the code, a third Sonnet agent
+   runs the experiment, and a fourth Sonnet agent gathers the results into the write-up. Each agent
+   works from the files and never starts a sub-agent of its own.
+2. **Opus reads the results and decides what comes next.** The decision rule depends on how many
+   experiments the series has run and on what they found:
+    - **The results are positive.** Opus designs the next experiment, which builds on the finding,
+      and the loop repeats.
+    - **The results are inconclusive or negative, and the series has run only one experiment.** Do
+      not stop yet. Opus designs a second experiment that attacks the problem from a different angle,
+      such as a different signal, a different data source, or a different way of scoring.
+    - **The results are still negative after at least two experiments.** Stop the series. The last
+      write-up says what was tried, what the data showed, and what would have to change for another
+      attempt to be worth running.
+
+Each write-up in a series ends with a short "what the next experiment should answer" paragraph,
+written after Opus has read the results. The experiment's own session does not start that next
+experiment. The maintainer decides when each step runs, and may stop the series at any step.
+
 ## Small gains and stacking
 
 **`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls
