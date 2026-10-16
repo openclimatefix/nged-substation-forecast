@@ -19,6 +19,9 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, a shape-aware step, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
+| [SW2-13](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does one detector that combines the step evidence of several windows (4 hours, 24 hours, and others) find more transfers than the best single window at the same alarm rate? | 2 | Nothing | Proposed; run next beside SW2-7 |
+| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | SW2-13 and SW2-8b (experiment 58) | Proposed |
+| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
@@ -181,6 +184,37 @@ work, for the plan of each iteration to confirm:
   feed the confidence score.
 - **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
   series and hour of day fitted to the residual.
+
+#### SW2-13 to SW2-15: combining evidence across windows and neighbours
+
+**Three experiments replace the detectors' hard rules with combined evidence: across window sizes
+first, then across neighbours, then across the whole electricity network at once.** Experiment 43
+found that the better detector depends on the window, D1 at 4 hours and D0 at 24 hours, and
+experiment 55 found that the neighbour test helps little as a veto. Each experiment is scored on the
+experiment 43 scoreboard at matched unexplained-alarm rates. Each reports recall by donor step in
+noise units, split by metered receiver. Each scores injected transfers whose shapes the detector
+does not assume (a constant MW, a share of the receiver's profile, and the labelled real transfers'
+fitted shapes), plus the labelled real transfers over 1 day.
+
+- **SW2-13, several windows in one detector.** Compute D0's step statistic at windows of 4, 12,
+  24, and 48 hours, and combine them into one score per stamp: the maximum over windows after
+  calibrating each window to the same false-alarm rate on odd months, against a sum of the
+  calibrated statistics. The benchmark is the best single window at the same alarm rate. An
+  interval for the event's end comes from the window that alarms.
+- **SW2-14, one combined score.** Add the single-series step evidence and the neighbour
+  opposite-step evidence into one score, so that strong evidence on either side can raise an alarm
+  and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
+  the two calibrated statistics, and a small logistic regression on both statistics plus topology
+  (the number of metered neighbours, and whether any neighbour is metered in MVA). The logistic
+  regression trains on odd-month injections only. The benchmarks are D1 and experiment 55's veto
+  at the same alarm rate.
+- **SW2-15, the joint edge-flow estimator** from approach 3 on the [switching
+  events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
+  a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
+  at once with a sparsity penalty and a penalty on changes, in CVXPY. Each Primary also gets a
+  slack term for load moved to a neighbour that is not metered. The 8 Primaries metered only in MVA
+  carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
+  injections. The benchmark is the best sequential detector from SW2-13 or SW2-14.
 
 #### SW2-10: v2 in miniature, a linear joint fit
 
