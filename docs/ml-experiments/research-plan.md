@@ -27,6 +27,7 @@ sooner.
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations-and-the-dc-to-ac-ratio) | Can the share of east-, south-, and west-facing solar behind each Primary, and the ratio of DC to AC capacity, be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
+| [P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a step-loss monitor, an L0 change-point fit of the neighbour-normalised daily power ratio, find a lost inverter at the 5 long-record solar farms, and how small a loss does it find? | 3 | Nothing | Experiment 72, planned; monitoring only, no forecast gain expected |
 
 ## Deferred until the first results are in
 
