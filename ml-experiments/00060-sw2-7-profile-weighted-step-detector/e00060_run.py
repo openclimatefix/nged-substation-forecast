@@ -81,6 +81,14 @@ def build_detectors(*, residual: dict, expected: dict, scales: dict, thresholds:
     return out
 
 
+def profile_correlation(*, moved: np.ndarray, expected: np.ndarray) -> float:
+    """Correlation of a transfer's moved MW with the donor's expected power; NaN if constant."""
+    ok = np.isfinite(expected) & np.isfinite(moved)
+    if ok.sum() < 3 or moved[ok].std() < 1e-12 or expected[ok].std() < 1e-12:
+        return float("nan")
+    return float(np.corrcoef(moved[ok], expected[ok])[0, 1])
+
+
 def init_worker(state: dict) -> None:
     """Pool initializer: share the panel, scales, and thresholds."""
     _STATE.update(state)
@@ -116,6 +124,10 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
                     "shape": shape,
                     "found": match.found,
                     "onset_found": match.onset_found,
+                    "corr_expected": profile_correlation(
+                        moved=-injection.delta[event.donor][event.onset : event.end],
+                        expected=panel["expected"][event.donor][event.onset : event.end],
+                    ),
                     "moved_mw": float(
                         -np.mean(injection.delta[event.donor][event.onset : event.end])
                     ),

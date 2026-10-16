@@ -18,8 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, a shape-aware step, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
-| [SW2-7](00060-sw2-7-profile-weighted-step-detector/result.md) | Does a step that weights each half-hour by the daily profile find more of the moved MW than the constant step, on injection shapes it does not assume? | 2 | Nothing | Planned: experiment 60, slot D |
+| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
 | [SW2-13](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does one detector that combines the step evidence of several windows (4 hours, 24 hours, and others) find more transfers than the best single window at the same alarm rate? | 2 | Nothing | Proposed; run next beside SW2-7 |
 | [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | SW2-13 and SW2-8b (experiment 58) | Proposed |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
@@ -172,9 +171,11 @@ confirm:
   XGBoost model without the detected intervals.
 - **SW2-6:** paired-step intervals, which find the onset and its opposite return step as one
   interval with an end, with a prior on duration from the labelled set.
-- **SW2-7 (planned, [experiment 60](00060-sw2-7-profile-weighted-step-detector/result.md)):** a shape-aware step, which models the moved load as a share of the donor's expected
-  profile, not as a constant MW shift. Experiment 00037 found the step changing by more than a
-  factor of 2 within 8 of 26 confirmed closures of 6 hours or more.
+- **SW2-7 (done, [experiment 60](00060-sw2-7-profile-weighted-step-detector/result.md)):** a
+  step statistic that weights each half-hour by the expected power found the same transfers as the
+  constant step on five injection shapes, so the step's shape does not limit the 24-hour detector.
+  About a third of the transfers with a donor step of 6 noise units or more have the right onset and
+  the wrong end, which SW2-6 (paired-step intervals) addresses.
 - **SW2-8 (done, [experiment 55](00055-sw2-8-neighbour-veto-single-series-detector/result.md)):** a
   single-series detector first, with neighbour balance as a sense check, not a gate.
   Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's

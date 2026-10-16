@@ -81,6 +81,7 @@ the maintainer to confirm.
 | [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
 | [00055 - Switching event detector, part 5](00055-sw2-8-neighbour-veto-single-series-detector/result.md) | Does vetoing the single-series detector's alarms that the neighbouring substations show as a common-mode miss let the threshold fall at the same rate of unexplained alarms and find more injected transfers? | Inconclusive: the share found rose by +0.008 (98.75% interval -0.003 to +0.022) | Not for production | 2026-10-16 |
 | [00058 - Switching event detector, part 5b](00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md) | Is the gap in recall between injected transfers with and without a metered receiver a step-size effect of the injection, and does a veto stronger than 1.5 noise units find more transfers? | Partly supported: step size explains at least half the gap; the stronger veto gained +0.013 (98.33% interval 0.000 to +0.029) | Not for production | 2026-10-16 |
+| [00060 - Switching event detector, part 6](00060-sw2-7-profile-weighted-step-detector/result.md) | Does a step statistic that weights each half-hour by the daily profile find more of the moved MW than the constant step, on injection shapes it does not assume? | Refuted: the pooled gain in MW-weighted recall is -0.000 (98.33% interval -0.006 to +0.008) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1192,6 +1193,25 @@ experiment cannot resolve a gain below about 0.04.
   [PR #1268](https://github.com/openclimatefix/nged-substation-forecast/pull/1268).
 
 ![Unexplained 24-hour alarms by days to the nearest bank holiday](00047-sw2-4-better-residual-switching-detector/figure_6_alarms_by_holiday_distance.svg)
+
+### 00060: does a step that weights each half-hour by the daily profile find more of the moved load? (SW2-7)
+
+**The shape of the moved load does not limit the 24-hour switching detector, so a shape-aware step
+statistic is not worth building.** A step weighted by each substation's expected power found the same
+injected transfers as the constant step on all five shapes tested, including the shape the weights
+assume: the pooled gain in MW-weighted recall was -0.000 (98.33% interval -0.006 to +0.008), and both
+detectors missed 0.53 to 0.56 of the moved MW. The two step statistics correlate at 0.996 where the
+alarms are.
+
+- **Finding for later experiments:** at donor steps of 6 noise units or more, about a third of the
+  transfers have an alarm at the right start and the wrong end (72 of 215 for a constant MW), and 7%
+  have no alarm. Only 2 of the 35 labelled real transfers of more than 1 day are found, against 0.35
+  of injected ones, so the injection is much easier than the real events or the real events are
+  smaller. Paired-step intervals (SW2-6) are the next detector change to test.
+- **Write-up and pull request:** [the full result page](00060-sw2-7-profile-weighted-step-detector/result.md),
+  PR to be linked on merge.
+
+![Gain of the profile-weighted step by injection shape](00060-sw2-7-profile-weighted-step-detector/figure_1_gain_by_shape.svg)
 
 ### 00058: is the recall gap without a metered receiver a step-size effect, and does a stronger veto help? (SW2-8b)
 

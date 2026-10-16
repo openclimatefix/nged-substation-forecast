@@ -110,8 +110,9 @@ def fit_profile_shares(*, panel: dict) -> list[float]:
         ok = np.isfinite(y) & np.isfinite(e)
         if ok.sum() < 0.75 * (end - onset) or e[ok].mean() <= 0:
             continue
+        sign = 1.0 if y[ok].mean() >= 0 else -1.0
         design = np.column_stack([np.ones(ok.sum()), e[ok] / e[ok].mean()])
-        constant, slope = np.linalg.lstsq(design, np.abs(y[ok]), rcond=None)[0]
+        constant, slope = np.linalg.lstsq(design, sign * y[ok], rcond=None)[0]
         if constant + slope <= 0:
             continue
         shares.append(float(np.clip(slope / (constant + slope), 0.0, 1.0)))
@@ -133,9 +134,10 @@ def inject_shaped(
     metered receiver its weight times that level times its own power relative to its mean, and the
     donor loses the total plus the unmetered remainder, flat. S4 mixes S2 and S1, with a profile
     share drawn from `shares` per transfer (uniform on 0 to 1 when `shares` has under
-    `MIN_FITS`). S5 is S1's profile shifted by 12 hours, a guard that D3's weights work against.
+    `MIN_FITS`). S5 is the donor's profile 12 hours ahead, a guard that D3's weights work against.
     """
     rng = np.random.default_rng(seed)
+    mix_rng = np.random.default_rng((seed, 1))
     out = {s: v.copy() for s, v in power.items()}
     delta = {s: np.zeros(GRID_LENGTH) for s in power}
     for event in events:
@@ -155,12 +157,14 @@ def inject_shaped(
                 gains[receiver] = weight * level * relative
                 moved = moved + gains[receiver]
         elif shape == "S5":
-            moved = level * np.roll(donor, 24) / max(float(donor.mean()), 1e-9)
+            ahead = np.clip(stamps + 24, 0, GRID_LENGTH - 1)
+            shifted = np.nan_to_num(power[event.donor][ahead], nan=np.nanmedian(power[event.donor]))
+            moved = level * shifted / max(float(shifted.mean()), 1e-9)
         else:
             lam = (
-                float(rng.choice(shares))
+                float(mix_rng.choice(shares))
                 if len(shares) >= MIN_FITS
-                else float(rng.uniform(0.0, 1.0))
+                else float(mix_rng.uniform(0.0, 1.0))
             )
             moved = level * ((1.0 - lam) + lam * donor / max(float(donor.mean()), 1e-9))
         target = float((share * donor).mean())

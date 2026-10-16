@@ -1,7 +1,7 @@
 ---
 id: "00060"
 slug: sw2-7-profile-weighted-step-detector
-status: planned
+status: done
 size: medium
 hypothesis: >-
   A step statistic that weights each half-hour by the series' expected power (the daily profile of
@@ -26,7 +26,8 @@ decision_rule: >-
   no more than 10% above D0M's, and no non-matching shape (S2, S3, S4) has an interval wholly
   below zero. `partly supported` when the first three hold and at least one non-matching shape has an
   interval wholly below zero. The MW weight of a transfer is its mean moved MW under S1, the same
-  in every shape and for both detectors; a transfer that moves no MW has weight zero. `refuted` when the upper end of the C1 interval lies below +0.01.
+  in every shape and for both detectors; a transfer that moves no MW has weight zero.
+  `refuted` when the upper end of the C1 interval lies below +0.01.
   `inconclusive` otherwise. The threshold +0.01 is the one experiments 55 and 58 used, and it is
   low because D3 replaces the step statistic and adds no pipeline step. C2 is the same contrast
   on the matching shape and C3 is the paired count of labelled real transfers of more than 1 day
@@ -44,89 +45,158 @@ metric: >-
   transfers the detector finds, where a transfer is found when an alarm interval starts within 2
   hours and ends within the larger of 6 hours and 10% of the duration. Unweighted recall is
   secondary.
-verdict: null
 code: ml-experiments/00060-sw2-7-profile-weighted-step-detector/
+verdict: refuted
+best_arm: >-
+  Neither arm: D3 (profile-weighted step) minus D0M (constant step) in MW-weighted recall, pooled
+  over the three shapes D3 does not assume, is -0.000 (98.33% interval -0.006 to +0.008). On the
+  shape D3 assumes the gain is +0.004 (-0.005 to +0.019). D0M finds 0.44 to 0.47 of the moved MW
+  and D3 the same, so both miss 0.53 to 0.56.
+lessons: >-
+  The shape of the moved load does not limit the 24-hour detector: weighting each half-hour by the
+  expected power changes the step statistic by 1.6% on average (correlation 0.996 where it
+  matters). The misses are elsewhere. At donor steps of 6 noise units or more, about a third of
+  D0M's transfers have an alarm at the right onset but the wrong end, and 7% have no alarm at the
+  onset. Only 2 of the 35 labelled real transfers of more than 1 day are found, against 0.35 of
+  injected ones.
+advice:
+  - >-
+    Do not add a profile-weighted or other shape-aware step statistic to the 24-hour detector; it
+    changes the step by 1.6% and finds the same transfers on every injection shape (C1, figure 1).
+  - >-
+    Work on the interval end estimate (paired-step intervals, SW2-6) before the step statistic:
+    about a third of transfers with a donor step of 6 noise units or more have the right onset and
+    the wrong end (post hoc table, big steps).
+  - >-
+    Look at why only 2 of the 35 labelled real transfers of more than 1 day are found while the
+    injected transfers are found at 0.35 to 0.47, because the injection may be far easier than the
+    real events (C3).
+  - >-
+    Report recall by donor step in noise units, split by metered receiver, in every detector
+    experiment; it is a standard table now (recall by step table).
+production_status: not-for-production
+adopted_in: none
 ---
 
 # Experiment 60: does a step that weights each half-hour by the daily profile find more of the moved load?
 
-*Plan, committed before any code runs. SW2-7 of the switching line.*
+**A detector that expects a load transfer to follow the daily shape of the load finds no more of the
+moved power than a detector that expects a constant step, so the shape of the step is not why
+transfers are missed.** We asked whether the weights help. Both detectors raise an alarm when the
+24-hour average of one Primary substation's residual (measured minus predicted power) differs from the
+average of the previous 24 hours. The constant-step detector, D0M, takes a plain average. The
+profile-weighted detector, D3, weights each half-hour by the substation's predicted power, so that
+the busy hours, where a transfer that is a share of the load moves the most MW, count most. We added
+known load transfers to the power history in five different shapes and compared the share of the moved
+MW that each detector found. D0M found 0.44 to 0.47 of the moved MW and D3 found the same, within
+0.005, on every shape. Both detectors therefore miss between 0.53 and 0.56 of the moved MW. The step
+statistics of the two detectors are almost the same, and the transfers that are missed are missed for
+another reason: at large steps, a third of them have an alarm at the right start but the interval
+ends at the wrong time.
 
-## What we ask and how
+![Gain of D3 over D0M by shape](figure_1_gain_by_shape.svg)
 
-**We ask whether a detector that expects a load transfer to follow the daily shape of the load
-finds more of the moved power than a detector that expects a constant step.** Both detectors raise
-an alarm when the 24-hour mean of one Primary substation's residual (measured minus predicted
-power) differs from the mean of the previous 24 hours. The constant-step detector, D0M, takes a
-plain mean. The profile-weighted detector, D3, weights each half-hour by the predicted power of the
-same series, so that the high-load hours, where a transfer that is a share of the load moves the
-most MW, count most. We inject known load transfers into the power history, with five different
-shapes, and compare the share of the moved MW each detector finds. Experiments 43, 55 and 58
-injected every transfer as a share of the donor's profile, which is exactly what D3 assumes, so a
-gain on that shape alone would be circular. The verdict therefore rests on the three other shapes.
+## Verdict
 
-## Design
+**Refuted.** The upper end of the pooled interval, +0.008, lies below the +0.01 the decision rule
+required. All intervals are 98.33% (Bonferroni across C1 to C3), from 20,000 resamples of whole
+calendar months, over experiment 58's 620 headline-band transfers (25% to 40% of the receiving load,
+over 1 day) that start in even months. MW-weighted recall is the share of the moved MW that sits in
+transfers an alarm interval finds (start within 2 hours, end within the larger of 6 hours and 10% of
+the duration). D3's threshold is matched on odd months, where D3 raises 76 alarms that no logged
+closure explains against 80 for D0M; on even months it raises 82 against 80.
 
-**D3 changes only the step statistic.** For series *s* and stamp *t*, D3's step is the mean of the
-residual over the 24 hours from *t*, weighted by the series' expected power, minus the same
-weighted mean over the 24 hours before *t*. Expected power is floored at 10% of its median, as in
-`relative_residual`. Everything after the statistic is D0's: the noise scale is the robust spread
-(1.4826 times the median absolute deviation) over odd months, the alarms are local peaks of the
-step in noise units, alarms next to a monthly refit are dropped, and intervals are built by the
-same `build_intervals`. D3's threshold is the lowest on a 0.05 grid whose odd-month count of alarms
-that no logged closure explains is at most D0M's 80, found by experiment 58's `tune_d2` search with
-the veto switched off.
-
-**Transfers: the 620 headline-band transfers of experiment 58 that start in even months.** They are
-25% to 40% of the receiving load for over 1 day (the original 160 and the extra 1,000 sets, without
-the holiday set), with the donor, receivers, weights, onsets, and durations of experiment 58. Each
-transfer is injected five times, once per shape, with the slow drift between 0.5 and 2 times the
-start share that the earlier experiments used, and every shape is rescaled so that the mean moved MW of each transfer equals S1's.
-
-| Shape | Moved MW at each half-hour | Matches D3's model? |
+| Contrast | Result | Reading |
 |---|---|---|
-| S1, donor profile | start share × drift × the donor's power (the earlier harness) | Yes |
-| S2, constant MW | start share × drift × the donor's mean power | No |
-| S3, receiver profile | each metered receiver gains its weight × the same MW level × its own power relative to its mean; the donor loses the total, with the unmetered remainder flat | No |
-| S4, fitted mix | S2's level with a share λ of the donor's profile and 1 − λ constant, λ drawn per transfer from the λ fitted to the labelled real transfers | No |
-| S5, profile shifted 12 h | S1's profile moved by 12 hours, so the load peak falls at the donor's trough | No, and works against D3's weights |
+| C1, pooled over S2, S3, S4, D3 minus D0M | -0.000 (-0.006 to +0.008) | Refuted: no gain of +0.01 |
+| C2, on S1, the shape D3 assumes | +0.004 (-0.005 to +0.019) | Not even a gain on D3's own shape |
+| S2, constant MW | -0.001 (-0.007 to +0.008) | None |
+| S3, receivers' own profiles | -0.001 (-0.007 to +0.007) | None |
+| S4, mix fitted to real transfers | +0.001 (-0.005 to +0.008) | None |
+| S5, profile 12 hours ahead (guard) | +0.001 (0.000 to +0.006) | None |
 
-A transfer with no metered receiver has no receiver profile, so S3 moves a constant MW for it, as S2 does. S3 is therefore also reported for the transfers with a metered receiver alone. The donor's and receivers' profiles are all daily shapes of Primary demand and so resemble each other, which is why S2 is the cleanest non-matching shape and S5 is the guard. The write-up reports the correlation between each shape's moved-MW profile and the donor's expected-power profile.
+The shapes are S1 (a share of the donor's power, which is how experiments 43, 55 and 58 injected
+transfers), S2 (a constant MW), S3 (each metered receiver gains a share of its own power, and the
+donor loses the total), S4 (a mix of S1 and S2 whose profile share is drawn from 32 fits to labelled
+real transfers), and S5 (S1's profile 12 hours ahead). Each is rescaled to the same mean MW per
+transfer as S1. The mean correlation between the moved MW and the donor's predicted power is +0.70
+(S1), +0.00 (S2), +0.29 (S3), +0.56 (S4), and -0.17 (S5), so the shapes differ.
 
-For S4, λ is fitted for each labelled real transfer (visibility `conserved` or `one_sided`) of at
-least 6 hours with a known donor: least squares of the donor's residual during the transfer on a
-constant and the donor's expected power relative to its mean, and λ is the profile term's share of
-the fitted mean, clipped to 0 to 1 (a transfer whose fitted mean is not positive is dropped). The fit uses the same real transfers that C3 scores, so S4 and C3 are in-sample with respect to each other. If fewer than 10 transfers have a usable fit, S4 instead draws
-λ uniformly from 0 to 1, and the write-up says so. Thresholds and noise scales come from the
-uninjected residual and odd months only, and scoring uses even months only.
+![MW-weighted recall by shape](figure_2_recall_by_shape.svg)
 
-**What we report.** For each shape and detector: recall and MW-weighted recall with month-resampled
-intervals, the share of the moved MW that is missed (1 minus the MW-weighted recall), and a table
-of recall by the donor's step in noise units (bins below 2, 2 to 4, 4 to 6, 6 to 10, and 10 or
-more), split by whether any receiver is metered. For the labelled real transfers of more than 1
-day, the paired counts of transfers found by each detector, with MW-weighted recall using the
-labelled median MW. The stronger neighbour veto is not rerun: experiment 58 already ran it, and its
-result is quoted.
+## Why the two detectors agree
 
-## Sizing
+**D3's step is almost D0's step.** Across every stamp of the 16 series, the two steps (each in its own
+noise units) have a correlation of 0.989, and 0.996 where D0 exceeds 3 noise units; D3's step averages
+0.984 of D0's there. A demand profile varies by a modest factor within a 24-hour window, so weighting
+by it moves each half-hour's weight a little. Only the 4-hour window, which this experiment did not
+test, could see more of the shape.
 
-**Medium.** D3's threshold is matched by alarm count, and the grid may settle below the target; the write-up reports D3's odd-month and even-month counts beside D0M's. D3's gain is a signal-to-noise gain, because the weighted mean of a constant step is unbiased. The five `plan-issue` triggers:
+**Recall depends on the size of the step, not its shape.** The recall by step table (private
+`e00060_report.py` output) gives the same counts for both detectors in every bin of donor step. Pooled
+over S2, S3 and S4, the share found rises from 0.18 at 2 to 4 noise units to 0.60 at 6 to 10, and
+stays at about 0.59 above 10.
 
-- **What gets stored:** only private tables and the experiment's figures; nothing the production
-  pipeline reads.
-- **The production serving path:** not touched.
-- **A degradation rule:** not touched.
-- **More than one defensible design:** yes. The weights could be the expected power or its square,
-  and the non-matching shapes could be drawn differently. Both are fixed here before any fit.
-- **Code whose callers cannot be named without searching:** no. The harness is a copy of
-  experiment 58's, and each function's callers are in the experiment folder.
+![Share found by donor step](figure_3_found_by_step.svg)
 
-## Earlier advice followed
+## Where the misses are (post hoc)
 
-- Experiment 58: score on shapes the detector does not assume, on the labelled real transfers, and
-  by bins of step in noise units (followed; this is the design).
-- Experiment 58: look at why about half of the transfers stepping by 4 noise units or more are
-  missed (followed in part: the step-by-shape table shows whether the misses depend on shape).
-- Experiment 58: do not build a better step statistic to close the no-metered-receiver gap
-  (not in conflict: this experiment tests the MW-weighted headline, not that gap).
-- Experiment 55: threshold of +0.01 for a pipeline step (followed).
+**At donor steps of 6 noise units or more, most misses have the right start but the wrong end.** Of the
+215 S2 transfers with a donor step of 6 noise units or more, D0M finds 128, finds the start but not
+the end of 72, and has no alarm at the start for 15. The other four shapes are within a few
+transfers of these counts. The interval end comes from the level tracker, which both detectors share
+(experiments 43 and 58), so it is the next place to look. This table was not pre-registered.
+
+**The labelled real transfers of more than 1 day are almost all missed.** Of the 35 (10 conserved and
+25 one-sided), D0M and D3 each find 2, the same 2, which is 0.054 of the labelled MW. An alarm at the
+right start (within 2 hours) exists for 11 of the 35. Experiment 58 found 0.35 to 0.50 of injected
+transfers. The injection is therefore much easier than the real events, or the real events are
+smaller in noise units than the injected ones. We have not separated the two.
+
+## What held in the prediction and what did not
+
+- **Not held: D3 gained nothing on the shape it assumes.** The prediction was +0.03 to +0.10 on S1; the
+  result is +0.004.
+- **Not held: pooled gain of +0.01 to +0.04.** The result is -0.000.
+- **Held in direction: S2 level with D0M**, the prediction was 0 to 0.03 worse; the result is -0.001.
+- **Held: D0M's MW-weighted recall of 0.40 to 0.55**, at 0.44 to 0.47.
+
+## Limits
+
+- **The 24-hour window only.** A shape-aware step could still help at 4 hours, where a transfer's
+  daily shape is a larger part of the window.
+- **The weights are the predicted power, one choice among several.** Weights proportional to the
+  square of the predicted power, or a fit of the profile share per window, were not tried.
+- **Profile shares for S4 come from 32 least-squares fits to labelled real transfers** of 6 hours
+  or more, on the same transfers C3 scores, and many shares sit at 0 or 1 because a short transfer
+  fits its profile poorly. S4 and C3 are therefore in-sample with respect to each other.
+- **The 620 transfers were already used in experiments 55 and 58,** and the four shapes share events,
+  so the shape results are not independent of each other. The month-resampled intervals pair them.
+- **The labelled real transfers are too few for an interval:** 35 transfers, 2 found.
+- **Two of the 620 transfers move no MW** (the donor's power is zero or missing), so they carry weight
+  zero.
+
+## Reviews
+
+- **Plan review (Sonnet):** accepted the fixed MW weights, the guard shape S5, the rescaling of every
+  shape to S1's mean, the rule for transfers with no metered receiver, and a stricter decision rule;
+  rejected a separate noise-by-load check, because the correlation of 0.989 between the two steps
+  answers the same question.
+- **Code review (Sonnet):** accepted a sign-aligned fit for the profile shares, a second random
+  generator for S4's draws, and a correct 12-hour shift for S5. Rejected writing a new event table (the
+  report reads experiment 58's, and the harness check proves the events are the same), a 24-hour
+  minimum for the S4 fits (the plan fixed 6 hours before any result), and an assertion on zero-MW
+  transfers (two are known).
+- **Harness check:** with S1, D0M reproduces experiment 58's outcome for all 1,900 transfers.
+
+## What the next experiment should answer
+
+**The next experiment should ask why the interval ends are wrong, and why the real transfers are
+harder than the injected ones.** A step statistic that knows the shape does not help at 24 hours, so
+SW2-6 (paired-step intervals, which find the start and the return step together) is the next
+detector change to test, with the table of start-found-but-end-wrong counts as its benchmark. The
+real-transfer gap needs its own look at the 35 transfers' steps in noise units against the injected
+ones.
+
+Code: `ml-experiments/00060-sw2-7-profile-weighted-step-detector/`, with every number printed by
+`e00060_report.py`.
