@@ -17,7 +17,7 @@ substations, seed 0, and writes the tables the write-up quotes under
 import itertools
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -256,7 +256,7 @@ def per_case_loss(*, cases: pl.DataFrame, quantiles: np.ndarray) -> pl.DataFrame
 
 def contrast(
     *, arms: dict[str, pl.DataFrame], treatment: str, reference: str, level: float, n: int
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Return treatment minus reference in quantile score, with its interval."""
     losses = experiment_store.losses_for_bootstrap(
         arm_losses={name: arms[name].select(*KEYS, "qs") for name in (treatment, reference)}
@@ -283,7 +283,7 @@ def contrast(
     }
 
 
-def blend_outcome(*, row: dict[str, object]) -> str:
+def blend_outcome(*, row: dict[str, Any]) -> str:
     """Return B1's outcome under the plan: port, small gain, harm, or null."""
     lower, upper, estimate = float(row["lower"]), float(row["upper"]), float(row["difference"])
     if upper < 0:
@@ -356,7 +356,7 @@ def main() -> None:
         members=list(members.values()), weights=np.full(len(members), 1 / len(members))
     )
     arms["blend_five_equal"] = per_case_loss(cases=cases, quantiles=equal_quantiles)
-    member_scores = {n: float(arms[n]["qs"].mean()) for n in BLEND_MEMBERS}
+    member_scores = {n: float(arms[n]["qs"].to_numpy().mean()) for n in BLEND_MEMBERS}
     best = min(member_scores, key=lambda n: member_scores[n])
     three_best = min(("monthly", "a7_monthly", "stack"), key=lambda n: member_scores[n])
     plan = [
@@ -390,7 +390,7 @@ def main() -> None:
                 "qs": interval["value"],
                 "lower_95": interval["lower_95"],
                 "upper_95": interval["upper_95"],
-                "mae": float(frame["mae"].mean()),
+                "mae": float(frame["mae"].to_numpy().mean()),
             }
         )
     tables = {
