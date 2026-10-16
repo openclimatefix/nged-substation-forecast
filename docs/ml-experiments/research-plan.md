@@ -18,12 +18,14 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
+| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
+| [SW2-13](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does one detector that combines the step evidence of several windows (4 hours, 24 hours, and others) find more transfers than the best single window at the same alarm rate? | 2 | Nothing | Proposed; run next beside SW2-7 |
+| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | SW2-13 and SW2-8b (experiment 58) | Proposed |
+| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series |
 | [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-4 (PVDIS-3 is done: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md)) | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations-and-the-dc-to-ac-ratio) | Can the share of east-, south-, and west-facing solar behind each Primary, and the ratio of DC to AC capacity, be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
@@ -158,19 +160,23 @@ The full labeller design is in the private file `data/ml-experiments/briefs/sw2_
 
 #### SW2-4 to SW2-9: detector iterations
 
-**Each iteration tests one change to the detector against the
-[experiment 43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd
-months, scored on even months.** The order below is a proposal, by expected gain per hour of
-work, for the plan of each iteration to confirm:
+**Each iteration tests one change to the detector against the [experiment
+43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd months,
+scored on even months, with recall weighted by the MW moved as the headline from SW2-7 onwards.**
+The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
+confirm:
 
 - **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
   XGBoost model without the detected intervals.
 - **SW2-6:** paired-step intervals, which find the onset and its opposite return step as one
   interval with an end, with a prior on duration from the labelled set.
-- **SW2-7:** a shape-aware step, which models the moved load as a share of the donor's expected
-  profile, not as a constant MW shift. Experiment 00037 found the step changing by more than a
-  factor of 2 within 8 of 26 confirmed closures of 6 hours or more.
-- **SW2-8:** a single-series detector first, with neighbour balance as a sense check, not a gate.
+- **SW2-7 (done, [experiment 60](00060-sw2-7-profile-weighted-step-detector/result.md)):** a
+  step statistic that weights each half-hour by the expected power found the same transfers as the
+  constant step on five injection shapes, so the step's shape does not limit the 24-hour detector.
+  About a third of the transfers with a donor step of 6 noise units or more have the right onset and
+  the wrong end, which SW2-6 (paired-step intervals) addresses.
+- **SW2-8 (done, [experiment 55](00055-sw2-8-neighbour-veto-single-series-detector/result.md)):** a
+  single-series detector first, with neighbour balance as a sense check, not a gate.
   Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's
   confidence and names the receiver, a same-sign step on the neighbours vetoes the alarm as a
   common-mode weather or calendar miss, and an alarm with no metered neighbour keeps its
@@ -180,6 +186,40 @@ work, for the plan of each iteration to confirm:
   feed the confidence score.
 - **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
   series and hour of day fitted to the residual.
+
+#### SW2-13 to SW2-15: combining evidence across windows and neighbours
+
+**Three experiments replace the detectors' hard rules with combined evidence: across window sizes
+first, then across neighbours, then across the whole electricity network at once.** Experiment 43
+found that the better detector depends on the window, D1 at 4 hours and D0 at 24 hours, and
+experiment 55 found that the neighbour test helps little as a veto. Each experiment is scored on the
+experiment 43 scoreboard at matched unexplained-alarm rates, with recall weighted by the MW moved as
+the headline and unweighted recall second, because a small transfer matters less than a large
+transfer. Each take-home message states the share of the moved MW that the detector misses. Each
+reports recall by donor step in noise units, split by metered receiver. Each scores injected
+transfers whose shapes the detector does not assume (a constant MW, a share of the receiver's
+profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
+day.
+
+- **SW2-13, several windows in one detector.** Compute D0's step statistic at windows of 4, 12,
+  24, and 48 hours, and combine them into one score per stamp: the maximum over windows after
+  calibrating each window to the same false-alarm rate on odd months, against a sum of the
+  calibrated statistics. The benchmark is the best single window at the same alarm rate. An
+  interval for the event's end comes from the window that alarms.
+- **SW2-14, one combined score.** Add the single-series step evidence and the neighbour
+  opposite-step evidence into one score, so that strong evidence on either side can raise an alarm
+  and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
+  the two calibrated statistics, and a small logistic regression on both statistics plus topology
+  (the number of metered neighbours, and whether any neighbour is metered in MVA). The logistic
+  regression trains on odd-month injections only. The benchmarks are D1 and experiment 55's veto
+  at the same alarm rate.
+- **SW2-15, the joint edge-flow estimator** from approach 3 on the [switching
+  events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
+  a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
+  at once with a sparsity penalty and a penalty on changes, in CVXPY. Each Primary also gets a
+  slack term for load moved to a neighbour that is not metered. The 8 Primaries metered only in MVA
+  carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
+  injections. The benchmark is the best sequential detector from SW2-13 or SW2-14.
 
 #### SW2-10: v2 in miniature, a linear joint fit
 
@@ -310,60 +350,6 @@ every part reports C as the capacity and keeps the daily fit as a cross-check.
   domestic load falls on sunny days, as people go outside, and biases the fitted capacity high. Each
   write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
   weeks.
-
-#### PVDIS-4: a capacity series that rises easily and falls reluctantly
-
-**Estimate capacity on a weekly grid, with weekly increments under an asymmetric L1 penalty: a light
-penalty on rises and a heavy penalty on falls.** Weeks then share information, and the series steps
-only where the evidence supports a step. A free capacity per week would be too noisy: the
-season-year standard error of about 1.2% of capacity implies about 8.7% per week on average (1.2% ×
-√52), and far more in a winter week, when the sun is low. The part reports the standard error of a
-week by season and the smallest step it can detect at each Primary.
-
-- **Why falls are allowed at all.** The fit estimates the solar that the Primary's meter sees, not
-  the installed capacity. That apparent solar can fall when home batteries charge from midday solar,
-  when a feeder is permanently reconfigured, or when a solar site is switched off for repairs. A
-  strict constraint that never lets the series fall would lower past capacity to fit a fall instead.
-  The fit with no constraint is reported beside the asymmetric fit, and the gap between them is a
-  diagnostic with a threshold that the plan sets.
-- **The estimand on the injections is the injected change.** A penalised, constrained fit is not
-  linear, and the real series already carries unknown solar. So the score is the path fitted with an
-  injection minus the path fitted without it, compared with the injected path. The plan also
-  injects the same path at several baseline levels to check how far the fit departs from
-  additivity, or injects into a semi-synthetic baseline whose solar is known.
-- **The injections add four cases to experiment 00039's harness:** capacity ramps, capacity steps,
-  temporary falls of weeks to months, and transfers that carry the donor's solar. A fifth case is a
-  seasonal cycle in daytime demand, like the coastal visitor season or irrigation, which measures
-  how far a seasonal load creeps into the capacity series. The penalties are tuned on the
-  injections and scored on held-out injections.
-- **The estimate production reads is scored as a real-time vintage.** The fit is repeated at rolling
-  origins, each truncated at its origin, and the latest week of each vintage is scored against the
-  truth. The part reports how far the first estimate of a week moves by the final fit. Penalised
-  fits are least constrained at the end of the record, which is the week production reads.
-- **False steps on the real series** are counted with experiment 00039's placebo sky, which shuffles
-  days within a month, as a measure of steps that weather noise alone produces.
-- **A probabilistic capacity has two separate parts.** The first part, sampling uncertainty, is an
-  ensemble of capacity paths from a bootstrap over blocks of 7 days or more, refitting the whole
-  path each time. A bootstrap of a penalised fit at a boundary tends to under-cover, so the part
-  checks the ensemble's coverage on the injections separately at weeks with no true step and at
-  weeks with a step. The second part, systematic uncertainty, is reported as named scenarios and
-  never merged into the ensemble: the farm-to-rooftop difference in solar shape, an undetected
-  day-long load (which pushes capacity up), and a load that rises with sunshine (which pushes it
-  down).
-- **Outside checks, in order of strength:**
-    - The Department for Energy Security and Net Zero's sub-regional statistics of small-scale solar
-      installations, by lower-layer super output area, summed over each Primary's polygon and
-      converted to expected peak AC output, are the strongest check. The plan states the tolerance
-      before the comparison.
-    - The Embedded Capacity Register is a soft prior check, not a floor. NGED's Primary series is
-      "Disaggregated Demand", from which metered generation has already been removed, and experiment
-      00031 found the register's median at 0.08 of effective capacity against 0.33 from the data.
-      The check uses only connected solar sites of 50 kW to under 1 MW, dated before each week, and
-      first confirms what the register's date field records. A step-date check uses only sites
-      larger than the Primary's detectable step, against randomly placed placebo dates.
-    - Solar mapped in OpenStreetMap inside each polygon is descriptive only, because its rooftop
-      coverage is uneven.
-    - Experiment 00039's comparison with each BSP's fitted capacity is repeated weekly.
 
 #### PVDIS-5: forecasting net demand as demand minus forecast solar
 
