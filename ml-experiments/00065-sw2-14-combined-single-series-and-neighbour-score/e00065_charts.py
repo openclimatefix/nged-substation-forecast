@@ -4,7 +4,7 @@ Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newl
 
 The series are Primary substations, not NGED generators.
 
-    uv run python ml-experiments/00060-*/e00065_charts.py
+    uv run python ml-experiments/00065-*/e00065_charts.py
 """
 
 from __future__ import annotations
@@ -17,8 +17,9 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from e00065_common import WORK_DIR
-from e00065_profile import SHAPE_NAMES, SHAPES
-from e00065_report import ARMS, NAMES, contrast, population, recall_rows, wide
+from e00065_profile import NON_MATCHING
+from e00065_report import contrast, population, wide
+from e00065_run import setting
 
 OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -28,15 +29,25 @@ OUT_DIR: Final[Path] = (
 )
 WIDTH: Final[int] = 520
 WRAP: Final[int] = 80
-STEP_EDGES: Final[list[float]] = [0.0, 2.0, 4.0, 6.0, 10.0, 1000.0]
-STEP_LABELS: Final[list[str]] = ["0-2", "2-4", "4-6", "6-10", "10+"]
 LABELS: Final[dict[str, str]] = {
-    "f0": "D0M: tracked end",
-    "fe": "PE: D0M alarms, new end",
-    "fl": "PL: pairs, labelled prior",
-    "ff": "PF: pairs, flat prior",
+    "D1": "D1: neighbour gate",
+    "D2": "D2: neighbour veto",
+    "LR": "LR: likelihood-ratio sum",
+    "LOGIT": "LOGIT: logistic regression",
+    "LOGIT_SAME": "LOGIT + same-sign count",
 }
-COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN, "#888888"]
+GAIN_ORDER: Final[tuple[str, ...]] = ("D1", "D2", "LR", "LOGIT", "LOGIT_SAME")
+COLOURS: Final[list[str]] = [
+    "#888888",
+    ocf.DATA_BLUE,
+    ocf.BRAND_ORANGE,
+    ocf.DATA_GREEN,
+    ocf.DATA_PURPLE,
+]
+STEP_EDGES: Final[list[float]] = [0.0, 2.5, 4.0, 6.0, 10.0, 1000.0]
+STEP_LABELS: Final[list[str]] = ["0-2.5", "2.5-4", "4-6", "6-10", "10+"]
+RECALL_ARMS: Final[tuple[str, ...]] = ("D0M", "D2", "LOGIT", "LOGIT_SAME")
+RECALL_LABELS: Final[dict[str, str]] = {"D0M": "D0M: single series", **LABELS}
 
 
 def _title(*, text: str, lines: list[str]) -> alt.TitleParams:
@@ -52,154 +63,121 @@ def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     print("wrote", name)
 
 
-def _label(shape: str) -> str:
-    return f"{shape}: {SHAPE_NAMES[shape]}"
-
-
-def figure_difference(*, data: pl.DataFrame) -> alt.TopLevelMixin:
-    """Gain in MW-weighted recall of PE, PL and PF over D0M for each shape, with intervals."""
+def figure_gain(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """Gain in MW-weighted recall over D0M, pooled over S2, S3, and S4, under the PE end rule."""
+    frames = [wide(data=data, shape=s) for s in NON_MATCHING]
     rows = []
-    for shape in SHAPES:
-        for arm in ("fe", "fl", "ff"):
-            point, low, high = contrast(frames=[wide(data=data, shape=shape)], arm=arm, base="f0")
-            rows.append(
-                {
-                    "shape": _label(shape),
-                    "arm": LABELS[arm],
-                    "point": point,
-                    "low": low,
-                    "high": high,
-                }
-            )
+    for arm in GAIN_ORDER:
+        point, low, high = contrast(
+            frames=frames, arm=setting(arm=arm, rule="PE"), base=setting(arm="D0M", rule="PE")
+        )
+        rows.append({"arm": LABELS[arm], "point": point, "low": low, "high": high})
     base = alt.Chart(pl.DataFrame(rows))
-    y = alt.Y("shape:N", sort=[_label(s) for s in SHAPES], title=None)
+    y = alt.Y("arm:N", sort=[LABELS[a] for a in GAIN_ORDER], title=None)
     color = alt.Color(
         "arm:N",
-        title=None,
-        scale=alt.Scale(domain=[LABELS[a] for a in ("fe", "fl", "ff")], range=COLOURS[1:]),
-        legend=alt.Legend(orient="top", columns=1),
+        scale=alt.Scale(domain=[LABELS[a] for a in GAIN_ORDER], range=COLOURS),
+        legend=None,
     )
     grey = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888888")
     bars = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("low:Q", title="Gain in MW-weighted recall over D0M (larger is better)"),
         x2="high:Q",
         y=y,
-        yOffset="arm:N",
         color=color,
     )
     dots = base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
-        x="point:Q", y=y, yOffset="arm:N", color=color
+        x="point:Q", y=y, color=color
     )
     return (grey.encode(x="x:Q") + bars + dots).properties(  # ty: ignore[unresolved-attribute]
         width=WIDTH,
-        height=330,
+        height=190,
         title=_title(
-            text="Finding the end from the return step helps; pairing the alarm itself hurts",
+            text="Neighbour evidence adds little; counting same-sign neighbours adds the most",
             lines=[
                 (
-                    "Dot: estimate. Line: 98.33% interval from resampling whole calendar months. "
-                    "Grey rule: no gain. 620 injected transfers of 25% to 40% of the receiving "
-                    "load, over 1 day, starting in even months, all arms at the same number of "
-                    "unexplained alarms on odd months."
+                    "Last row is post hoc. Dot: estimate. Line: 99.17% interval from resampling "
+                    "whole calendar months. "
+                    "Grey rule: no gain over D0M. 620 injected transfers of 25% to 40% of the "
+                    "receiving load, over 1 day, starting in even months, pooled over three "
+                    "shapes, all arms at 80 unexplained alarms on odd months, interval end from "
+                    "the strongest opposite step."
                 )
             ],
         ),
     )
 
 
-def figure_absolute(*, data: pl.DataFrame) -> alt.TopLevelMixin:
-    """MW-weighted recall of every arm for each shape."""
+def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """Share found by donor step in noise units, split by metered receiver, shapes S2 to S4."""
     rows = []
-    for shape in SHAPES:
-        rec = recall_rows(frame=wide(data=data, shape=shape))
-        rows.extend(
-            {"shape": _label(shape), "arm": LABELS[arm], "recall": rec[f"{arm}_mw"]}
-            for arm in NAMES
-        )
-    base = alt.Chart(pl.DataFrame(rows)).encode(
-        y=alt.Y("shape:N", sort=[_label(s) for s in SHAPES], title=None),
-        x=alt.X("recall:Q", title="Share of moved MW found", scale=alt.Scale(domain=[0, 1])),
-        color=alt.Color(
-            "arm:N",
-            title=None,
-            scale=alt.Scale(domain=[LABELS[a] for a in NAMES], range=COLOURS),
-            legend=alt.Legend(orient="top", columns=1),
-        ),
-        yOffset="arm:N",
-    )
-    text = base.mark_text(align="left", dx=4, fontSize=9).encode(  # ty: ignore[unresolved-attribute]
-        text=alt.Text("recall:Q", format=".2f")
-    )
-    return (base.mark_bar() + text).properties(
-        width=WIDTH,
-        height=420,
-        title=_title(
-            text="The best arm still misses about a third of the moved MW",
-            lines=[
-                (
-                    "MW-weighted recall, 24-hour window, 620 injected transfers starting in even "
-                    "months. Larger is better; the missed share is one minus the bar."
+    for shape in NON_MATCHING:
+        frame = wide(data=data, shape=shape)
+        for flag, group in ((True, "Metered receiver"), (False, "No metered receiver")):
+            part = frame.filter((pl.col("metered_receivers") > 0) == flag)
+            for low, high, label in zip(STEP_EDGES[:-1], STEP_EDGES[1:], STEP_LABELS, strict=True):
+                bin_ = part.filter(pl.col("donor_step_z").abs().is_between(low, high, "left"))
+                rows.extend(
+                    {
+                        "group": group,
+                        "step": label,
+                        "arm": RECALL_LABELS[arm],
+                        "shape": shape,
+                        "found": int(bin_[setting(arm=arm, rule="PE")].sum()),
+                        "n": bin_.height,
+                    }
+                    for arm in RECALL_ARMS
                 )
-            ],
-        ),
+    table = (
+        pl.DataFrame(rows)
+        .group_by("group", "step", "arm")
+        .agg(pl.col("found").sum(), pl.col("n").sum())
+        .with_columns(share=pl.col("found") / pl.col("n"))
+        .filter(pl.col("n") > 0)
     )
-
-
-def figure_outcomes(*, data: pl.DataFrame) -> alt.TopLevelMixin:
-    """How the transfers with a donor step of 6 noise units or more end up, shape S2."""
-    rows = []
-    for setting, arm in ARMS.items():
-        part = data.filter(
-            pl.col("shape") == "S2",
-            pl.col("setting") == setting,
-            pl.col("donor_step_z").abs() >= 6,
-        )
-        n = part.height
-        found = int(part["found"].sum())
-        wrong = part.filter(pl.col("onset_found") & ~pl.col("found")).height
-        for outcome, count in (
-            ("Found", found),
-            ("Right start, wrong end", wrong),
-            ("No alarm at the start", n - found - wrong),
-        ):
-            rows.append({"arm": LABELS[arm], "outcome": outcome, "count": count})
-    order = ["Found", "Right start, wrong end", "No alarm at the start"]
-    return (
-        alt.Chart(pl.DataFrame(rows))
-        .mark_bar()
+    chart = (
+        alt.Chart(table)
+        .mark_line(point=True)
         .encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("arm:N", sort=[LABELS[a] for a in NAMES], title=None),
-            x=alt.X("count:Q", title="Transfers (constant-MW shape S2)"),
+            x=alt.X("step:N", sort=STEP_LABELS, title="Donor step (noise units)"),
+            y=alt.Y("share:Q", title="Share of transfers found", scale=alt.Scale(domain=[0, 1])),
             color=alt.Color(
-                "outcome:N",
+                "arm:N",
                 title=None,
-                sort=order,
-                scale=alt.Scale(domain=order, range=[ocf.DATA_GREEN, ocf.BRAND_ORANGE, "#888888"]),
-                legend=alt.Legend(orient="top"),
+                scale=alt.Scale(
+                    domain=[RECALL_LABELS[a] for a in RECALL_ARMS],
+                    range=["#888888", ocf.DATA_BLUE, ocf.DATA_GREEN, ocf.DATA_PURPLE],
+                ),
+                legend=alt.Legend(orient="top", columns=2),
             ),
         )
-        .properties(
-            width=WIDTH,
-            height=170,
-            title=_title(
-                text="Pairing the alarm loses starts; the return step repairs ends",
-                lines=[
-                    (
-                        "The 215 injected constant-MW transfers whose donor step is 6 noise "
-                        "units or more, scored on even months."
-                    )
-                ],
-            ),
+        .properties(width=WIDTH, height=160)
+        .facet(
+            row=alt.Row(
+                "group:N",
+                title=None,
+                sort=["Metered receiver", "No metered receiver"],
+            )
+        )
+    )
+    return chart.properties(
+        title=_title(
+            text="The scores gain where the donor step is 2.5 to 6 noise units",
+            lines=[
+                (
+                    "Unweighted share found, transfers pooled over three shapes and counted once "
+                    "per shape, even months, interval end from the strongest opposite step."
+                )
+            ],
         )
     )
 
 
 def main() -> None:
-    """Write the three figures."""
+    """Write the figures."""
     data = population(out=WORK_DIR)
-    _save(figure_difference(data=data), name="figure_1_gain_by_arm.svg")
-    _save(figure_absolute(data=data), name="figure_2_recall_by_arm.svg")
-    _save(figure_outcomes(data=data), name="figure_3_outcomes_big_steps.svg")
+    _save(figure_gain(data=data), name="figure_1_gain_over_d0m.svg")
+    _save(figure_by_step(data=data), name="figure_2_share_found_by_step.svg")
 
 
 if __name__ == "__main__":
