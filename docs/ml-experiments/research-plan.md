@@ -18,7 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b (done) | Planned as experiment [43](00043-sw2-1-detector-scoreboard/result.md) |
 | [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
@@ -158,18 +157,6 @@ line therefore starts by building a reference set independent of the detectors.
 
 The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
 
-#### SW2-1: a fixed scoreboard and an injection harness
-
-**Score D0 and D1 from experiment 00037 on a scoreboard that every later detector experiment
-reuses.** An event counts as found only when both its onset and its end match, each at the
-detector's causal `known_from` stamp, because experiment 00038 found the end of a detected interval
-to be where the damage happens. The tolerances and bands are proposals for the plan to confirm: an
-onset within 2 hours and an end within 6 hours, duration bands of 6 to 24 hours, 1 to 3 days, and
-over 3 days, and size bands of moved load under 10%, 10% to 25%, and 25% or more of the receiving
-load. The injection harness follows experiment 00038's, with 1 to 3 receivers and durations drawn
-from the confirmed closures, and adds a moved share that drifts during the event. Tuning uses odd
-months and injections; even months score.
-
 #### SW2-2: how much the visible events hurt the best guess
 
 **Measure the share of experiment 00033's best guess's quantile score and tail score that falls in
@@ -186,7 +173,7 @@ NRA forecast.
 
 #### SW2-4 to SW2-9: detector iterations
 
-**Each iteration tests one change to the detector against the SW2-1 scoreboard, tuned on injections
+**Each iteration tests one change to the detector against the [experiment 43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections
 and odd months, scored on even months.** The order below is a proposal, by expected gain per hour of
 work, for the plan of each iteration to confirm:
 
