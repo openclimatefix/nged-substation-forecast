@@ -11,7 +11,7 @@ scores, fits the growth rate per Primary, and prints every number the page quote
 import math
 from typing import Final
 
-import capacity_inputs as inputs
+import embedded_pv_inputs as inputs
 import numpy as np
 import polars as pl
 

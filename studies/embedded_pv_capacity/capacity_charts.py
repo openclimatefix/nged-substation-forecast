@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import altair as alt
-import capacity_inputs as inputs
+import embedded_pv_inputs as inputs
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl

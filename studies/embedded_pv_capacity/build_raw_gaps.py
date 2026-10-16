@@ -10,7 +10,7 @@ The sky class of a day comes from CAMS irradiance at the Primary's own location.
 
 from typing import Final
 
-import capacity_inputs as inputs
+import embedded_pv_inputs as inputs
 import polars as pl
 from scipy import stats
 
