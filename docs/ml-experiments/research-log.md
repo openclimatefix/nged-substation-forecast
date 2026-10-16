@@ -78,7 +78,7 @@ the maintainer to confirm.
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
-| [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only: correlation +0.020 (0.002 to 0.036) at 0 to 6 hours and cross-validated mean squared error 6.8% lower over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours | Not for production | Pending |
+| [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1130,17 +1130,24 @@ scale error. The members of the European Centre for Medium-Range Weather Forecas
 how sunny each half-hour will be better than the European ensemble forecast (ENS), at the 5 Primary
 substations that decide experiment 46's verdict.** Each forecast's output of a generic solar fleet
 was compared with the satellite-based CAMS estimate, as a departure from the forecast's own monthly
-average, on 72 forecast runs from July 2025 to June 2026. The UKV alone was worse than ENS in every
-lead band (correlation lower by 0.032 to 0.359 within 54 hours). A blend with weights fitted on the
-earlier 15 months was better by 0.02 to 0.03 in correlation within 24 hours and cut the
-cross-validated mean squared error by 4.4% to 11.6% in every band within 54 hours, and gained nothing
-beyond 54 hours. Forming 3-hour window means from the UKV, as ENS delivers its flux, scored slightly
-better than the native hourly values, so the UKV's time resolution is not what limits it. On 14 days
-of overlap with CAMS, the live MOGREPS-UK ensemble was also no better than ENS.
+average, on 72 forecast runs from July 2025 to June 2026. The run is post hoc and was not
+pre-registered: the brief and the PVDIS-8 plan fixed the arms, the lead bands, the 1% margin and the
+15-fold month-block cross-validation beforehand, while the `ukv3w` control and the `t54_late`
+variant were chosen after seeing results. The UKV alone was worse than ENS in every lead band
+(correlation lower by 0.034 to 0.364 within 54 hours). A blend with weights fitted on the earlier 15
+months cut the cross-validated mean squared error by 3.8% to 13.8% in every band within 54 hours,
+which gives the verdict `small gain`. In the validation year the blend's correlation gain was
+smaller than its uncertainty: +0.019 (-0.000 to +0.038) at 0 to 6 hours and +0.011 (-0.006 to
++0.027) over 0 to 54 hours, with 3 of 6 origin-month blocks favouring the blend, and at 48 to 54
+hours its validation mean squared error (0.0382) was worse than ENS's (0.0337). The blend gained
+nothing beyond 54 hours. Forming 3-hour window means from the UKV, as ENS delivers its flux, scored
+slightly better than the native hourly values, so the UKV's time resolution is not what limits it.
+On 14 days of overlap with CAMS, the live MOGREPS-UK ensemble was also no better than ENS.
 
 - **Findings that bear on later experiments:** the only UKV with a matched history is the CEDA
   archive, which is not the live product and is licensed for non-commercial use, so the gain is a
-  ceiling; the demand contrasts at 0 to 48 hours were not run and are the manager's call.
+  ceiling; the demand contrasts at 0 to 48 hours were not run, because the gain is a ceiling from a
+  non-live product and its interval over 0 to 54 hours includes zero; the manager decides.
 - **Write-up:** [result](00053-ukv-vs-ens-solar-anomaly/result.md).
 
 ![Correlation with the CAMS anomaly by lead band](00053-ukv-vs-ens-solar-anomaly/figure_2_correlation_by_band.svg)

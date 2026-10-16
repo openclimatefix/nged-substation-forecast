@@ -28,6 +28,16 @@ import polars as pl
 
 ARMS: Final[tuple[str, ...]] = ("ens", "ukv", "blend", "ukv3h", "ukv3w")
 SOURCES: Final[tuple[str, ...]] = ("ens", "ukv", "ukv3h", "ukv3w")
+MIN_FITTING_ROWS: Final[int] = 50
+"""Site-band cells with fewer fitting rows are left out of the calibration."""
+MIN_CORRELATION_WITH_E46: Final[float] = 0.98
+"""The rebuilt ENS anomaly must correlate this closely with experiment 00046's calibrated anomaly.
+
+Experiment 00046 averages its ENS climatology over all leads, while this script keeps the shortest
+lead per valid time. The two climatologies correlate at 0.998, and the anomalies at 0.986 to 0.989,
+so the threshold is 0.98 and not higher."""
+SUMMER_MONTHS: Final[tuple[int, ...]] = (4, 5, 6, 7, 8, 9)
+"""Local calendar months whose folds make the summer-only column of the gate."""
 MARGIN: Final[float] = 0.01
 """A candidate replaces ENS only if its cross-validated mean squared error is this share lower."""
 FOLD_MONTHS: Final[tuple[tuple[int, int], ...]] = tuple(
@@ -89,7 +99,9 @@ def climatologies(*, cams: pl.DataFrame, rows: pl.DataFrame, exclude_block: int 
 
     Args:
         cams: Columns `site`, `valid_time`, `u_cams`, `block`.
-        rows: Columns `site`, `valid_time`, `block`, and one `u_<source>` column per source.
+        rows: Columns `site`, `power_fcst_init_time`, `valid_time`, `block`, and one `u_<source>`
+            column per source. Each source's climatology uses, for every valid time, the row with
+            the shortest lead.
         exclude_block: A `block` to leave out, or `None` for the whole training window.
 
     Returns:
@@ -105,7 +117,15 @@ def climatologies(*, cams: pl.DataFrame, rows: pl.DataFrame, exclude_block: int 
         ).select("site", "month", "hh", "clim")
     }
     for source in SOURCES:
-        unique = rows.select("site", "valid_time", f"u_{source}").unique(["site", "valid_time"])
+        # Keep the shortest-lead row of each valid time, the same row for every source.
+        unique = (
+            rows.with_columns(
+                lead=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
+            )
+            .sort("lead")
+            .select("site", "valid_time", f"u_{source}")
+            .unique(["site", "valid_time"], keep="first", maintain_order=True)
+        )
         result[source] = common.climatology(
             frame=unique, value=f"u_{source}", time_column="valid_time", pool=True
         ).select("site", "month", "hh", "clim")
@@ -165,17 +185,22 @@ def fit(*, rows: pl.DataFrame) -> pl.DataFrame:
         swc=(pl.col("a_ukv3w") * pl.col("a_cams")).sum(),
     )
     det = pl.col("see") * pl.col("suu") - pl.col("seu") ** 2
+
+    def safe_ratio(numerator: pl.Expr, denominator: pl.Expr) -> pl.Expr:
+        """Return the ratio, or null where the denominator is zero."""
+        return pl.when(denominator != 0).then(numerator / denominator)
+
     return grouped.select(
         "site",
         "band",
         "n",
-        slope_ens=pl.col("sec") / pl.col("see"),
-        slope_ukv=pl.col("suc") / pl.col("suu"),
-        slope_ukv3h=pl.col("s3c") / pl.col("s33"),
-        slope_ukv3w=pl.col("swc") / pl.col("sww"),
-        w_ens=(pl.col("sec") * pl.col("suu") - pl.col("suc") * pl.col("seu")) / det,
-        w_ukv=(pl.col("suc") * pl.col("see") - pl.col("sec") * pl.col("seu")) / det,
-    )
+        slope_ens=safe_ratio(pl.col("sec"), pl.col("see")),
+        slope_ukv=safe_ratio(pl.col("suc"), pl.col("suu")),
+        slope_ukv3h=safe_ratio(pl.col("s3c"), pl.col("s33")),
+        slope_ukv3w=safe_ratio(pl.col("swc"), pl.col("sww")),
+        w_ens=safe_ratio(pl.col("sec") * pl.col("suu") - pl.col("suc") * pl.col("seu"), det),
+        w_ukv=safe_ratio(pl.col("suc") * pl.col("see") - pl.col("sec") * pl.col("seu"), det),
+    ).drop_nulls()
 
 
 def predict(*, rows: pl.DataFrame, coefficients: pl.DataFrame) -> pl.DataFrame:
@@ -198,7 +223,11 @@ def predict(*, rows: pl.DataFrame, coefficients: pl.DataFrame) -> pl.DataFrame:
 
 
 def cross_validate(
-    *, rows: pl.DataFrame, cams: pl.DataFrame, daylight: pl.DataFrame, minimum_n: int = 50
+    *,
+    rows: pl.DataFrame,
+    cams: pl.DataFrame,
+    daylight: pl.DataFrame,
+    minimum_n: int = MIN_FITTING_ROWS,
 ) -> pl.DataFrame:
     """Run the 15-fold month-block cross-validation and return squared errors by arm and band.
 
@@ -247,7 +276,7 @@ def main() -> None:  # noqa: PLR0915
     )
     validation_ens_frame = validation_ens()
     selection: dict[str, dict] = {}
-    all_cv, all_coefficients, all_validation = [], [], []
+    all_cv, all_summer, all_coefficients, all_validation = [], [], [], []
     for variant in ("t54", "t54_late", "t120"):
         own = ukv.filter(pl.col("variant") == variant).drop("variant")
         training_rows = (
@@ -274,10 +303,21 @@ def main() -> None:  # noqa: PLR0915
             .agg(n=pl.col("n").sum(), sse=pl.col("sse").sum())
             .with_columns(mse=pl.col("sse") / pl.col("n"), variant=pl.lit(variant))
         )
+        summer = (
+            folds.filter((pl.col("fold") % 100).is_in(list(SUMMER_MONTHS)))
+            .group_by("band", "arm")
+            .agg(n=pl.col("n").sum(), sse=pl.col("sse").sum())
+            .with_columns(mse=pl.col("sse") / pl.col("n"), variant=pl.lit(variant))
+        )
         all_cv.append(cv)
+        all_summer.append(summer)
         clims = climatologies(cams=cams, rows=training_rows, exclude_block=None)
         table = anomalies(rows=training_rows, clims=clims, daylight=daylight)
-        coefficients = fit(rows=table).with_columns(variant=pl.lit(variant))
+        coefficients = (
+            fit(rows=table)
+            .filter(pl.col("n") >= MIN_FITTING_ROWS)
+            .with_columns(variant=pl.lit(variant))
+        )
         all_coefficients.append(coefficients)
         # Validation rows: ENS anomaly from experiment 00046's files, UKV from this variant.
         validation = validation_ens_frame.join(
@@ -300,12 +340,15 @@ def main() -> None:  # noqa: PLR0915
             rows=anomalies(rows=validation, clims=full_clims, daylight=daylight),
             coefficients=coefficients,
         ).with_columns(variant=pl.lit(variant))
-        check = validation.select(pl.corr("c_ens", "a_ens_46")).item()
+        check = validation.select(pl.corr("a_ens", "a_ens_46")).item()
         print(
-            f"{variant}: validation rows {validation.height:,}; correlation of the ENS arm with "
-            f"experiment 00046's calibrated ENS anomaly {check:.4f}",
+            f"{variant}: validation rows {validation.height:,}; correlation of the rebuilt ENS "
+            f"anomaly with experiment 00046's calibrated ENS anomaly {check:.4f}",
             flush=True,
         )
+        if not check > MIN_CORRELATION_WITH_E46:
+            msg = f"{variant}: the rebuilt ENS anomaly differs from experiment 00046's ({check})"
+            raise ValueError(msg)
         all_validation.append(validation)
         # Stage 1 gate.
         pooled = (
@@ -333,7 +376,30 @@ def main() -> None:  # noqa: PLR0915
                 "pooled_relative": pooled_mse[arm] / pooled_mse["ens"] - 1.0,
                 "pooled_clears_margin": bool(pooled_mse[arm] <= (1.0 - MARGIN) * pooled_mse["ens"]),
             }
+        summer_pooled = (
+            summer.group_by("arm")
+            .agg(sse=pl.col("sse").sum(), n=pl.col("n").sum())
+            .with_columns(mse=pl.col("sse") / pl.col("n"))
+        )
+        summer_mse = dict(zip(summer_pooled["arm"], summer_pooled["mse"], strict=True))
+        selection[variant]["summer_months_4_to_9"] = {
+            arm: {
+                "pooled_relative": summer_mse[arm] / summer_mse["ens"] - 1.0,
+                "by_band": {
+                    name: (
+                        dict(zip(part["arm"], part["mse"], strict=True))[arm]
+                        / dict(zip(part["arm"], part["mse"], strict=True))["ens"]
+                        - 1.0
+                    )
+                    for band, name in enumerate(common.BAND_NAMES)
+                    if (part := summer.filter(pl.col("band") == band)).height > 0
+                },
+            }
+            for arm in ("ukv", "blend", "ukv3h", "ukv3w")
+        }
     cv_table = pl.concat(all_cv).sort("variant", "band", "arm")
+    summer_table = pl.concat(all_summer).sort("variant", "band", "arm")
+    common.write_atomically(frame=summer_table, target=common.RESULTS_DIR / "cv_mse_summer.parquet")
     coefficient_table = pl.concat(all_coefficients).sort("variant", "site", "band")
     common.write_atomically(frame=cv_table, target=common.RESULTS_DIR / "cv_mse.parquet")
     common.write_atomically(

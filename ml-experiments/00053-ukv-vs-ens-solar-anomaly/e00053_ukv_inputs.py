@@ -9,7 +9,7 @@ For each daily ENS origin (the 00 UTC run plus 9 hours) of the training window a
 - `t54_late`: the 00 UTC run of the same day, a sensitivity check that assumes the 06 UTC run is
   not yet available; leads reach 45 h.
 - `t120`: the 03 UTC run of the same day (the T120 files of the 03 and 15 UTC runs); leads reach
-  117 h.
+  114 h (120 h from the run, less the 6 h from the run to the origin).
 
 Two forecasts of `u` are built from each run:
 

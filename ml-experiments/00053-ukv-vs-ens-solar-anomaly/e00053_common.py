@@ -56,7 +56,6 @@ UKV_LATENCY: Final[timedelta] = timedelta(hours=3)
 """Assumed delay from a UKV run's initialisation to its availability at the forecast origin."""
 SCORED_MONTHS: Final[tuple[int, ...]] = (4, 5, 6, 7, 8, 9)
 DAYLIGHT_THRESHOLD: Final[float] = 0.02
-MIN_CLIMATOLOGY_DAYS: Final[int] = 30
 DAYLIGHT_FLOOR_W_M2: Final[float] = 20.0
 MAX_CLEAR_SKY_INDEX: Final[float] = 1.5
 KEYS: Final[tuple[str, ...]] = ("site", "power_fcst_init_time", "valid_time")

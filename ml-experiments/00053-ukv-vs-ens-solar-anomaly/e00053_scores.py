@@ -155,6 +155,14 @@ def score_group(*, rows: pl.DataFrame, rng: np.random.Generator) -> dict[str, di
             "mse_low": float(low[2]),
             "mse_high": float(high[2]),
         }
+    result["blocks"] = {}
+    for arm, reference in COMPARISONS:
+        per_block = [metrics(totals=stats[name]) for name in (arm, reference)]
+        result["blocks"][f"{arm} - {reference}"] = {
+            "blocks": int(blocks),
+            "lower_mse": int(np.sum(per_block[0][:, 2] < per_block[1][:, 2])),
+            "higher_correlation": int(np.sum(per_block[0][:, 0] > per_block[1][:, 0])),
+        }
     for arm, reference in COMPARISONS:
         point = result["arms"][arm]["correlation"] - result["arms"][reference]["correlation"]
         boot = resampled[arm][:, 0] - resampled[reference][:, 0]
@@ -229,7 +237,15 @@ def main() -> None:
                 continue
             scored = score_group(rows=part, rng=rng)
             for pair, values in scored["differences"].items():
-                differences.append({"variant": variant, "band": name, "pair": pair, **values})
+                differences.append(
+                    {
+                        "variant": variant,
+                        "band": name,
+                        "pair": pair,
+                        **values,
+                        **scored["blocks"][pair],
+                    }
+                )
     diff_table = pl.DataFrame(differences)
     common.write_atomically(frame=diff_table, target=common.RESULTS_DIR / "differences.parquet")
     profile = profile_check(validation=rows.filter(pl.col("variant") == "t54"))
