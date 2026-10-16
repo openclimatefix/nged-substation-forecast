@@ -125,6 +125,19 @@ therefore exact, as in experiment 47. The harness check must reproduce experimen
 | C3 | D2 minus D0M, 24 h | C1's transfers that have a metered receiver | reported |
 | C4 | D2 minus D0M, 24 h | C1's transfers that have no metered receiver | reported |
 
+**The veto is useful only if it removes unexplained alarms at least twice as often as logged-explained
+ones.** The prerun shows 18% of the unexplained odd-month 24-hour alarms and 12% of the 137
+logged-explained ones (all months) removed at 2.0 noise units, a ratio of 1.5. The prediction is
+that the ratio stays under 2 in the scored run too; the write-up examines the vetoed logged alarms
+(multi-receiver splits, MVA sides, or coincident weather). Both are reported and neither changes the
+verdict.
+
+**The confirmed tier is also tested as a precision filter.** Experiment 41 labelled 148 unexplained
+alarms. Each is assigned the tier its alarm would receive, and the labelled-visible rate is reported
+per tier (confirmed, unconfirmed, vetoed), beside the logged-explained share of all real alarms by
+tier. This decides nothing; it shows whether the confirmed tier is the alarm set a normal-running-
+arrangement training mask (SW2-12) should use.
+
 Also reported: the holiday set as counts (transfers D0 finds, D2 finds, and D2 loses to a veto); the
 odd-month and even-month unexplained-alarm counts; the precision bounds and event F1 as in
 experiment 43; the share of real alarms by tier and the share of each tier that a logged closure

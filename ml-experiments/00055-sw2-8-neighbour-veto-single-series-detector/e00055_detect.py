@@ -7,6 +7,7 @@ matched on odd months so that its unexplained-alarm count equals D0's.
 
 from __future__ import annotations
 
+import json
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from datetime import timedelta
@@ -19,11 +20,13 @@ from e00055_common import (
     EXPERIMENT_43_DIR,
     GRID_LENGTH,
     GRID_START,
+    LABELLED_PATH,
     OPERATING_POINTS,
     TUNING_MONTHS,
     load_panel,
     near_log_masks,
     stamp_months,
+    stamp_of,
 )
 from e00055_detectors import DetectorInputs, alarms, neighbour_check, prepare
 from e00055_inject import QUIET_STAMPS, Event, batches, draw_events, events_frame, inject_power
@@ -377,3 +380,73 @@ def real_alarm_rows(*, results: RawResult, logged: dict[int, np.ndarray]) -> pl.
             )
         )
     return pl.concat(pieces)
+
+
+def _usual_load(*, power: Arrays, series: int, onset: int) -> float:
+    """Mean absolute power of a series in the 28 days before `onset`, as in experiment 44."""
+    return float(np.nanmean(np.abs(power[series][max(onset - 28 * 48, 0) : onset])))
+
+
+def real_events(*, power: Arrays) -> pl.DataFrame:
+    """The labelled real transfers: stamps, series, visibility, hours, and share of the load."""
+    frame = (
+        pl.read_parquet(LABELLED_PATH)
+        .filter(
+            ~pl.col("is_sentinel"),
+            pl.col("kind") == "real_operation",
+            pl.col("visibility").is_in(["conserved", "one_sided"]),
+        )
+        .with_columns(
+            hours=(pl.col("logged_open_utc") - pl.col("logged_close_utc")).dt.total_minutes() / 60,
+        )
+    )
+    rows = []
+    for row in frame.iter_rows(named=True):
+        receivers = [int(r["series"]) for r in json.loads(row["receivers"])]
+        series = sorted(
+            {
+                int(s)
+                for s in (row["donor"], row["side_a"], row["side_b"], *receivers)
+                if s is not None
+            }
+        )
+        visibility = "one_sided" if row["max_side_missing_share"] > 0.5 else row["visibility"]
+        onset = stamp_of(when=row["onset_utc"])
+        metered = sorted(set(receivers) & set(power))
+        load = sum(_usual_load(power=power, series=r, onset=onset) for r in metered)
+        moved = row["moved_mw_p50"]
+        share = moved / load if metered and moved is not None and load > 0 else None
+        rows.append(
+            {
+                "card_id": row["card_id"],
+                "visibility": visibility,
+                "onset": onset,
+                "end": stamp_of(when=row["end_utc"]) + 1,
+                "hours": row["hours"],
+                "share": share,
+                "series": ",".join(map(str, series)),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
+def score_real(*, results: RawResult, real: pl.DataFrame) -> pl.DataFrame:
+    """Match the labelled real transfers against each setting's intervals on the real residual."""
+    rows = []
+    for setting, (_, intervals) in results.items():
+        grouped = by_series(intervals=intervals)
+        for row in real.iter_rows(named=True):
+            series = tuple(int(s) for s in row["series"].split(","))
+            match = match_event(
+                series=series, onset=row["onset"], end=row["end"], intervals=grouped
+            )
+            rows.append(
+                {
+                    **row,
+                    "setting": setting,
+                    "onset_found": match.onset_found,
+                    "found": match.found,
+                    "end_error": match.end_error,
+                }
+            )
+    return pl.DataFrame(rows)
