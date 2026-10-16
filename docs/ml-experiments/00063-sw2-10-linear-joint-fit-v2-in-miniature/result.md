@@ -104,14 +104,14 @@ Sonnet reviewer could not check against the printed report.
   series, on 4 cores. Every baseline prediction for a month comes from a model that never saw that
   month, so the joint fit's residuals are not shrunk by overfitting.
 - **The joint fit.** For Primary p, with residual r_t = y_t - b_t, an ordinary least-squares fit of
-  r_t = -k * C_w(t) * u_t + sum_j beta_j * x_j,t * 1[t in I_j] + e_t, where k is a scale on the
+  r_t = -k x C_w(t) x u_t + sum_j beta_j x x_j,t x 1[t in I_j] + e_t, where k is a scale on the
   capacity C_w(t) of the week, u_t the CAMS unit PV shape, I_j the labelled interval of transfer j,
   x_j,t the donor's net power in MW (receiver gains when the donor is switched onto it), and beta_j
   its share. Rows are daylight half-hours (for k) plus all half-hours inside labelled intervals, with
   rows in logged closures that carry no label dropped. The labelled intervals are experiment 00041's
   real visible events, conserved or one-sided, with `onset_utc` and `end_utc`.
 - **Held-out scoring (C1).** Leave one calendar month out. Fit k on the other months, predict
-  b_t - k * C * u_t for the held-out month, and score the median. Transfer terms are zero outside
+  b_t - k x C x u_t for the held-out month, and score the median. Transfer terms are zero outside
   switching, so C1 is a test of the solar term only; the transfer terms are tested by S2 and R1.
   The v1 arm is b_t with radiation, and the control arm is b_t without radiation, so the page can say
   what the solar term buys over simply removing radiation.
