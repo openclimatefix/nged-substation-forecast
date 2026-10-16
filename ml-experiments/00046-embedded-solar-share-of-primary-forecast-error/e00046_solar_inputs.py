@@ -351,7 +351,11 @@ def calibration_table(
         .join(cams_anomaly, on=["site", "valid_time"], how="inner")
         .pipe(lambda frame: common.with_cell(frame=frame, time_column="valid_time"))
         .join(daylight, on=["site", "month", "hh"], how="left")
-        .filter(pl.col("daylight"))
+        .filter(
+            pl.col("daylight")
+            & pl.col("anomaly_mean").is_finite()
+            & pl.col("anomaly_control").is_finite()
+        )
     )
     return (
         joined.group_by("site", "band")

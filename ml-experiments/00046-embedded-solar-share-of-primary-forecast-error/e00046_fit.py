@@ -170,6 +170,11 @@ def cams_anomaly_vector(
     return np.nan_to_num(joined["anomaly_cams"].to_numpy().astype(np.float64), nan=0.0)
 
 
+def capacity_cases(*, member_quantiles: np.ndarray) -> int:
+    """Return the number of cases in an array of member quantiles."""
+    return int(member_quantiles.shape[0])
+
+
 def variant_tables(
     *,
     arm: ArmType,
@@ -183,8 +188,9 @@ def variant_tables(
     Args:
         arm: The arm; shifted variants exist for `d1l` only.
         member_quantiles: Shape (cases, members, 9).
-        run_context: `capacity_mw` (a dict with `C` and `headline`), `effective_capacity_mw`,
-            `ens` (a dict of anomaly arrays by column name), and `cams` (shape (cases,)).
+        run_context: `effective_capacity_mw`, `ens` (a dict of anomaly arrays by column name),
+            `cams` (shape (cases,)), and optionally `scale` (shape (cases,)), a multiplier on the
+            capacity for each case (one when absent).
         coefficients: The capacity in MW for each of `C` and `headline`.
         names: The variants to build.
 
@@ -198,15 +204,16 @@ def variant_tables(
             out[name] = common.mixture_quantiles(member_quantiles=member_quantiles)
             continue
         mw = coefficients["headline" if name.endswith("headline") else "C"]
+        scale = run_context.get("scale", np.ones(capacity_cases(member_quantiles=member_quantiles)))
         if name.startswith("cams_shift"):
-            shift = mw * run_context["cams"] / capacity
+            shift = mw * scale * run_context["cams"] / capacity
             out[name] = (
                 common.mixture_quantiles(member_quantiles=member_quantiles)
                 - shift.astype(np.float32)[:, None]
             )
         else:
             column = "anomaly_mean_calibrated" if name == "ens_mean_shift" else "anomaly_calibrated"
-            shift = mw * run_context["ens"][column] / capacity
+            shift = mw * scale[:, None] * run_context["ens"][column] / capacity
             out[name] = shifted_pool(member_quantiles=member_quantiles, member_shift=shift)
     return out
 
@@ -251,6 +258,7 @@ def write_site(
     suffix: str,
     target: Path,
     capacity_scale: float,
+    band_coefficients: dict[int, float] | None = None,
 ) -> None:
     """Predict every validation run of one series and write the requested variants.
 
@@ -265,6 +273,8 @@ def write_site(
         suffix: Appended to each variant's name (`ens_shift_<suffix>`) when not empty.
         target: The output file.
         capacity_scale: The coefficient multiplying both capacities (1.0 for the planned arms).
+        band_coefficients: When given, a further multiplier for each lead band (an index into
+            `LEAD_BANDS`) of this series; a band absent from the dict keeps 1.0.
     """
     cams_anomaly = pl.read_parquet(common.SOLAR_DIR / "cams_anomaly.parquet")
     columns = input_columns(arm=arm)
@@ -275,6 +285,11 @@ def write_site(
     ):
         times = keys["valid_time"]
         context: dict = {"effective_capacity_mw": row["effective_capacity_mw"]}
+        if band_coefficients is not None:
+            lead = ((times - keys["power_fcst_init_time"]).dt.total_minutes() / 60.0).to_numpy()
+            context["scale"] = np.array(
+                [band_coefficients.get(int(b), 1.0) for b in common.lead_band(lead_hours=lead)]
+            )
         if arm == "d1l" and names != ("base",):
             anomaly_file = pl.read_parquet(common.SOLAR_DIR / "ens_val" / file_name)
             context["ens"] = {
@@ -305,6 +320,18 @@ def write_site(
     common.write_atomically(frame=pl.concat(pieces), target=target)
 
 
+def band_coefficients_for(*, path: Path | None, site: str) -> dict[int, float] | None:
+    """Return one site's lead-band multipliers from a `site, band, coefficient` parquet, if any."""
+    if path is None:
+        return None
+    return dict(
+        pl.read_parquet(path)
+        .filter(pl.col("site") == site)
+        .select("band", "coefficient")
+        .iter_rows()
+    )
+
+
 def main() -> None:
     """Fit (or reload) the boosters of one arm and seed and write the sites' variants."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -314,6 +341,12 @@ def main() -> None:
     parser.add_argument("--predict-only", action="store_true")
     parser.add_argument("--coefficient", type=float, default=1.0)
     parser.add_argument("--suffix", default="")
+    parser.add_argument(
+        "--band-coefficients-file",
+        type=Path,
+        default=None,
+        help="parquet with site, band (index), and coefficient columns; multiplies the capacity",
+    )
     parser.add_argument("--out-dir", type=Path, default=common.RAW_ARMS_DIR)
     args = parser.parse_args()
     arm: ArmType = args.arm
@@ -379,6 +412,7 @@ def main() -> None:
             suffix=args.suffix,
             target=target,
             capacity_scale=args.coefficient,
+            band_coefficients=band_coefficients_for(path=args.band_coefficients_file, site=site),
         )
         print(f"{arm} seed {args.seed} {site}: {time.monotonic() - started:.0f} s", flush=True)
 

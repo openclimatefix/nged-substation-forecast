@@ -666,3 +666,107 @@ def latest_time(*, times: pl.Series) -> datetime:
     latest = times.max()
     assert isinstance(latest, datetime)
     return latest
+
+
+def with_cell(*, frame: pl.DataFrame, time_column: str) -> pl.DataFrame:
+    """Add the climatology cell of each row: the local calendar month and the UTC half-hour of day.
+
+    Args:
+        frame: Rows with a UTC datetime column.
+        time_column: The name of that column (a period-ending stamp).
+
+    Returns:
+        The frame with `month` (Int8, Europe/London calendar month) and `hh` (Int8, 0 to 47, the
+        UTC half-hour of day of the stamp).
+    """
+    stamp = pl.col(time_column)
+    return frame.with_columns(
+        month=stamp.dt.convert_time_zone("Europe/London").dt.month().cast(pl.Int8),
+        hh=(stamp.dt.hour() * 2 + stamp.dt.minute() // 30).cast(pl.Int8),
+    )
+
+
+SUNNY_INDEX: Final[float] = 0.7
+CLOUDY_INDEX: Final[float] = 0.3
+"""Clear-sky index (CAMS over clear-sky irradiance) bounds of sunny and cloudy rows."""
+
+
+def scored_rows(*, series: pl.DataFrame, arrays: dict[str, SeriesArrays]) -> pl.DataFrame:
+    """Return every validation case of the six sites with the facts that decide if it is scored.
+
+    A case is scored when its local month is April to September, its month-by-half-hour cell is
+    daylight (CAMS climatology above `DAYLIGHT_THRESHOLD`, training window only), CAMS `u` is
+    present, and the observed power is finite.
+
+    Args:
+        series: `series_table()` filtered to `SITES`.
+        arrays: `load_series_arrays` for those series.
+
+    Returns:
+        One row per run, valid time, and series with `KEYS`, `site`, `actual`, `u_cams`,
+        `anomaly_cams`, `clear_sky_index` (null where the clear-sky irradiance is zero), `month`,
+        `hh`, `lead_hours`, `band` (index into `LEAD_BANDS`), the boolean `scored`, and the boolean
+        `scored_all_months` (the same without the April-to-September restriction).
+    """
+    keys = pl.concat(
+        [
+            pl.read_parquet(path, columns=list(KEYS))
+            .filter(pl.col("time_series_id").is_in(series["time_series_id"].implode()))
+            .unique()
+            for path in sorted(VALIDATION_DIR.glob("init=*.parquet"))
+        ]
+    ).join(series.select("time_series_id", "site"), on="time_series_id", validate="m:1")
+    actual = pl.concat(
+        [
+            keys.filter(pl.col("site") == site).with_columns(
+                actual=pl.Series(
+                    take(
+                        values=arrays[site].power,
+                        index=np.asarray(
+                            grid_index(times=keys.filter(pl.col("site") == site)["valid_time"])
+                        ),
+                    )
+                )
+            )
+            for site in series["site"]
+        ]
+    )
+    cams = (
+        pl.read_parquet(FRAME_00039_PATH)
+        .filter((pl.col("kind") == "substation") & pl.col("site").is_in(list(SITES)))
+        .select(
+            "site",
+            valid_time=pl.col("time"),
+            clear_sky_index=pl.when(pl.col("ghi_u_clear") > 0)
+            .then(pl.col("ghi_u") / pl.col("ghi_u_clear"))
+            .otherwise(None),
+        )
+    )
+    anomaly = pl.read_parquet(SOLAR_DIR / "cams_anomaly.parquet")
+    u_cams = pl.read_parquet(SOLAR_DIR / "cams_u.parquet").rename(
+        {"time": "valid_time", "u": "u_cams"}
+    )
+    daylight = pl.read_parquet(SOLAR_DIR / "climatology.parquet").select(
+        "site", "month", "hh", "daylight"
+    )
+    lead = (
+        (actual["valid_time"] - actual["power_fcst_init_time"]).dt.total_minutes() / 60.0
+    ).to_numpy()
+    return (
+        with_cell(frame=actual, time_column="valid_time")
+        .with_columns(lead_hours=pl.Series(lead), band=pl.Series(lead_band(lead_hours=lead)))
+        .join(u_cams, on=["site", "valid_time"], how="left", validate="m:1")
+        .join(anomaly, on=["site", "valid_time"], how="left", validate="m:1")
+        .join(cams, on=["site", "valid_time"], how="left", validate="m:1")
+        .join(daylight, on=["site", "month", "hh"], how="left", validate="m:1")
+        .with_columns(
+            scored_all_months=pl.col("daylight").fill_null(False)
+            & pl.col("u_cams").is_not_null()
+            & pl.col("actual").is_finite()
+            & (pl.col("valid_time") < HOLDOUT)
+        )
+        .with_columns(
+            scored=pl.col("scored_all_months") & pl.col("month").is_in(list(SCORED_MONTHS))
+        )
+        .drop("daylight")
+    )
