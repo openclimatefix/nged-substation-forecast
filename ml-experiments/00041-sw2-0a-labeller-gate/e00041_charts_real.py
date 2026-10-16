@@ -54,6 +54,7 @@ def figure_3() -> alt.TopLevelMixin:
             pl.col("kind") == "real_operation",
             pl.col("visibility") == "conserved",
             pl.col("confidence") == "high",
+            pl.col("max_side_missing_share") < 0.5,
         )
         .sort("moved_mw_p50", descending=True)
         .head(60)

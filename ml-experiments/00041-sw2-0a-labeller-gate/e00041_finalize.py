@@ -14,7 +14,7 @@ import pickle
 import numpy as np
 import polars as pl
 from e00041_common import WORK_DIR
-from e00041_panel import INDEX, Panel, load_panel, reference, time_of
+from e00041_panel import INDEX, Panel, excess, load_panel, reference, time_of
 
 OUT = WORK_DIR / "real"
 VIS = ("conserved", "one_sided")
@@ -67,6 +67,16 @@ def _shares(*, panel: Panel, label: dict) -> tuple[float, float]:
     )
 
 
+def _missing_share(*, panel: Panel, sides: list[int | None], first: int, last: int) -> float:
+    """Largest share, over the card's metered sides, of event half-hours with no excess."""
+    shares = [
+        float(np.mean(np.isnan(excess(panel=panel, row=INDEX[s], lo=first, hi=last + 1))))
+        for s in sides
+        if s in INDEX
+    ]
+    return max(shares) if shares else float("nan")
+
+
 def main() -> None:
     """Merge the labels and write the final set."""
     meta = json.loads((OUT / "meta.json").read_text())
@@ -106,6 +116,9 @@ def main() -> None:
                 "moved_mw_p90": label.get("moved_mw_p90"),
                 "moved_share_of_receiver": share_receiver,
                 "moved_share_of_donor_range": share_donor,
+                "max_side_missing_share": _missing_share(
+                    panel=panel, sides=[spec.side_a, spec.side_b], first=spec.first, last=spec.last
+                ),
                 "adjudicated": card_id in adjudicated,
                 "is_sentinel": meta[card_id]["kind"].startswith("sentinel"),
             }
