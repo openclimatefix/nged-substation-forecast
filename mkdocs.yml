@@ -171,6 +171,7 @@ nav:
       - "Which lagged power columns lower the error of Primary substation demand forecasts?": ml-experiments/00030-lagged-power-feature-sets-primary-demand/result.md
       - "Does a lead-weighted blend of quantiles beat the best single model?": ml-experiments/00035-lead-weighted-quantile-blend-of-stored-models/result.md
       - "Do substation fingerprints improve a pooled demand model?": ml-experiments/00032-substation-fingerprints-pooled-demand/result.md
+      - "How often should the demand model be retrained, and which cheap proxy stands in for it?": ml-experiments/00034-retraining-cadence-and-cheap-proxies-demand/result.md
       - "Do forecasts of the series beneath a BSP or GSP lower its error?": ml-experiments/00036-hierarchy-aware-bsp-gsp-forecasts/result.md
       - "Does the best-guess architecture beat production, N1, and manual_heuristic?": ml-experiments/00033-best-guess-architecture-vs-production/result.md
       - "Do logged switching closures show up in the telemetry, and does a neighbour-balance detector beat a plain one?": ml-experiments/00037-switching-first-look/result.md
