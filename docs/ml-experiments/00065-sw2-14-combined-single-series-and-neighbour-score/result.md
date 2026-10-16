@@ -53,7 +53,7 @@ best_arm: >-
   same-sign neighbour steps, finds 0.681 (+0.034, +0.013 to +0.091).
 lessons: >-
   Adding the neighbours' opposite-sign steps to a substation's own step did not find more of the
-  moved MW than the own step alone. The neighbour gate D1 finds 0.097 less. What did help, in a
+  moved MW than the own step alone. The neighbour gate D1 finds about 0.1 less. What did help, in a
   post hoc arm, was the count of neighbours that stepped the same way, which is the evidence the
   veto uses: it raised recall by +0.034 over D0M and by +0.023 over the veto. The gain sits in
   transfers whose donor step is 2.5 to 6 noise units. Every candidate has an MVA-only neighbour,
@@ -68,7 +68,7 @@ advice:
     count raised recall, by +0.034 (+0.013 to +0.091) over D0M (post hoc arm, figure 1).
   - >-
     Use D0M with the PE end rule, not D1, as the benchmark for neighbour evidence: D1 at 80
-    unexplained alarms finds 0.097 less than D0M (figure 1).
+    unexplained alarms finds about 0.1 less than D0M (figure 1).
   - >-
     Do not use an MVA-neighbour flag as a feature on the 16 trial Primaries: all 16 have an
     MVA-only neighbour, so the flag is constant (fitted scores section).
@@ -79,27 +79,36 @@ adopted_in: none
 # Experiment 65: does one score from a substation's own step and its neighbours' opposite steps find more of the moved load?
 
 **Adding the neighbouring substations' opposite-sign steps to a substation's own step did not find
-clearly more of the moved load than the own step alone. The neighbour evidence that did help was how
-many neighbours stepped the same way, which a veto already uses, so the next experiment should
-combine all three pieces of evidence in one score.** We asked whether a load transfer, which moves
-load off a donor substation and onto receiver substations, is found more often when one alarm score
-adds the donor's own 24-hour step to the largest opposite step among its neighbours. We injected
-known transfers into the measured power and counted the share of the moved MW whose transfer an
-alarm finds. A transfer counts as found when an alarm starts within 2 hours of its start and ends
-within the larger of 6 hours and 10% of its duration. Every detector was held to the same count of
-alarms that no logged closure explains. The single-series detector D0M finds 0.646 of the moved MW
-(0.354 missed). A logistic regression on the two steps finds 0.665 (+0.019, interval -0.011 to
-+0.062), and a likelihood-ratio sum finds 0.651 (+0.005, -0.010 to +0.014).
+clearly more of the moved load than the own step alone.** In a post hoc variant, adding the count of
+neighbours that stepped the same way raised the share found. The neighbour veto of experiment 55
+already uses that count. Whether one score that combines the own step, the opposite neighbour step,
+and the same-sign count beats the own step alone is untested.
+
+We asked whether load transfers are found more often when one alarm score adds a substation's own
+step to the largest opposite step among its neighbours. A load transfer moves power off a donor
+Primary substation and onto receiver substations. The step of a substation is the change in the
+average of its residual (measured minus predicted power) from the 24 hours before a half-hour to
+the 24 hours after it, in noise units (multiples of the usual size of that step on a quiet day). We
+injected 620 known load transfers into the measured power of 16 Primary substations and counted
+the share of the moved megawatts (MW) found. A transfer counts as found when an alarm starts within
+2 hours of its start and ends within the larger of 6 hours and 10% of its duration. Every detector
+was held to 80 alarms on odd months that match no closure in the NGED switching log. The
+single-series detector D0M finds 0.646 of the moved MW (0.354 missed). The logistic-regression
+score (LOGIT) finds 0.665, which is +0.019 more (99.17% interval, from resampling whole calendar
+months, -0.011 to +0.062). The likelihood-ratio score (LR) finds 0.651, which is +0.005 more
+(-0.010 to +0.014).
 
 ![Gain in MW-weighted recall over D0M](figure_1_gain_over_d0m.svg)
 
 ## Verdict
 
-**Inconclusive.** The likelihood-ratio sum (LR) is refuted, because the upper end of its interval
-against D0M is below +0.02. The logistic regression (LOGIT) is inconclusive, because its interval
+**The experiment is inconclusive, because the better score's interval against D0M includes zero.**
+The likelihood-ratio score (LR) is refuted, because the upper end of its interval
+against D0M is below +0.02. The logistic-regression score (LOGIT) is inconclusive, because its interval
 against D0M includes zero and its upper end is above +0.02. The experiment takes the more favourable
-verdict of the two, and that choice is not covered by the Bonferroni correction. All intervals are
-99.17% (six planned contrasts), from 20,000 resamples of whole calendar months, over the 620
+verdict of the two scores, and that choice is not covered by the correction for six planned
+contrasts (a Bonferroni correction). All intervals are
+99.17%, from 20,000 resamples of whole calendar months, over the 620
 injected transfers that move 25% to 40% of the receiving load for over 1 day and start in even
 months, pooled with equal weight over the constant-MW, receiver-profile, and fitted-mix shapes
 (none of which the scores assume). Interval ends come from the strongest opposite step in the next
@@ -113,9 +122,9 @@ event table, not live forecast inputs.
 | Against D1, the neighbour gate | +0.101 (+0.043 to +0.176) | +0.116 (+0.050 to +0.231) |
 | Against D2, the neighbour veto of [experiment 55](../00055-sw2-8-neighbour-veto-single-series-detector/result.md) | -0.007 (-0.036 to +0.008) | +0.008 (-0.028 to +0.042) |
 
-Both scores beat D1 by a wide margin because D1 is the weakest detector: at 80 unexplained alarms it
-finds 0.550 of the moved MW against D0M's 0.646. D2 finds 0.658. The pre-registered rule needed an
-interval above zero against D0M as well, and neither score has one.
+**Both scores beat the neighbour gate D1 clearly, but D1 is the weakest detector.** At 80
+unexplained alarms D1 finds 0.550 of the moved MW against D0M's 0.646. D2 finds 0.658. The
+pre-registered rule needed an interval above zero against D0M as well, and neither score has one.
 
 ## Recall by arm
 
@@ -139,13 +148,13 @@ counts are all 80 or 79.
 
 ## Where the gain sits
 
-**The scores gain where the donor step is 2.5 to 6 noise units, and mostly for transfers with a
-metered receiver.** A noise unit is the usual size of the 24-hour step statistic on a quiet day.
-With a metered receiver (a receiver whose own power is measured) the share of transfers found at a
-donor step of 2.5 to 4 rises from 0.58 for D0M to 0.72 for LOGIT with the same-sign count. Without
-a metered receiver the gain sits at 4 to 6 noise units (0.38 for D0M, 0.55 for that arm). Neither
-score finds a transfer whose own and neighbour steps are all under 2.5 noise units, the floor of
-the candidate list, and a donor step above 6 gains nothing because D0M already finds those.
+**The scores gain where the donor step is 2.5 to 6 noise units, mostly for transfers with a metered
+receiver.** A noise unit is the usual size of the 24-hour step statistic on a quiet day. With a
+metered receiver (a receiver whose own power is measured) the share of transfers found at a donor
+step of 2.5 to 4 rises from 0.58 for D0M to 0.71 for LOGIT with the same-sign count. Without a
+metered receiver the gain spans 2.5 to 6 noise units and is larger at 4 to 6 (0.37 for D0M, 0.55
+for that arm). Donor steps below 2.5 noise units are found for 5 of 40 transfers at most. A donor
+step above 6 gains nothing, because D0M already finds those transfers.
 
 ![Share found by donor step](figure_2_share_found_by_step.svg)
 
@@ -158,7 +167,7 @@ count is too small to rank the scores. Of the 35, 20 start in even months and 15
 
 ## Fitted scores
 
-**LR's tables rise with both statistics, and the fitted LOGIT weights the neighbour step about as
+**The fitted LR lookup tables rise with both statistics, and LOGIT weights the neighbour step about as
 much as the own step.** The standardised logistic coefficients are 2.59 on the own step, 2.95 on the
 largest opposite neighbour step, and -1.11 on the number of neighbours. The coefficient on the
 MVA-neighbour flag is zero, because every one of the 16 series has an MVA-only neighbour, so the flag
@@ -170,8 +179,8 @@ neighbour step lowers the score, as the veto does.
 - **Training data come from the same injection generator as the test transfers.** Training uses odd
   months and scoring uses even months, but both draw donors and receivers the same way, so the
   scores may do worse on real transfers.
-- **The candidate floor of 2.5 noise units** caps recall, and the negatives are 507 candidates from
-  the real odd-month residual.
+- **The candidate floor of 2.5 noise units caps recall.** The 507 negative examples are alarm
+  candidates from the real odd-month residual.
 - **Weights and shrinkage.** Every shape weights a transfer by its MW moved under the donor-profile
   shape, so the three shapes share one set of weights. The logistic regression's penalty of 1.0 is
   weak against about 2,700 training candidates, so it shrinks the coefficients very little.
