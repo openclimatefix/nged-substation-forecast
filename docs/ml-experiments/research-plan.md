@@ -161,10 +161,11 @@ The full labeller design is in the private file `data/ml-experiments/briefs/sw2_
 
 #### SW2-4 to SW2-9: detector iterations
 
-**Each iteration tests one change to the detector against the
-[experiment 43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd
-months, scored on even months.** The order below is a proposal, by expected gain per hour of
-work, for the plan of each iteration to confirm:
+**Each iteration tests one change to the detector against the [experiment
+43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd months,
+scored on even months, with recall weighted by the MW moved as the headline from SW2-7 onwards.**
+The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
+confirm:
 
 - **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
   XGBoost model without the detected intervals.
@@ -191,10 +192,13 @@ work, for the plan of each iteration to confirm:
 first, then across neighbours, then across the whole electricity network at once.** Experiment 43
 found that the better detector depends on the window, D1 at 4 hours and D0 at 24 hours, and
 experiment 55 found that the neighbour test helps little as a veto. Each experiment is scored on the
-experiment 43 scoreboard at matched unexplained-alarm rates. Each reports recall by donor step in
-noise units, split by metered receiver. Each scores injected transfers whose shapes the detector
-does not assume (a constant MW, a share of the receiver's profile, and the labelled real transfers'
-fitted shapes), plus the labelled real transfers over 1 day.
+experiment 43 scoreboard at matched unexplained-alarm rates, with recall weighted by the MW moved as
+the headline and unweighted recall second, because a small transfer matters less than a large
+transfer. Each take-home message states the share of the moved MW that the detector misses. Each
+reports recall by donor step in noise units, split by metered receiver. Each scores injected
+transfers whose shapes the detector does not assume (a constant MW, a share of the receiver's
+profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
+day.
 
 - **SW2-13, several windows in one detector.** Compute D0's step statistic at windows of 4, 12,
   24, and 48 hours, and combine them into one score per stamp: the maximum over windows after
