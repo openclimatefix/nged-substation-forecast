@@ -67,8 +67,13 @@ COLUMNS: Final[tuple[str, ...]] = (
     "days_to_christmas_window",
 )
 """Experiment 17's input set: weather block, clock, COVID flag, windowed Christmas days."""
-KNOWN_BEFORE: Final[int] = BLOCK
-"""An interval is masked only when its end is this many stamps (24 hours) before `train_end`."""
+KNOWN_BEFORE: Final[int] = 15 * BLOCK
+"""An interval is masked only when its end is this many stamps before `train_end`.
+
+That is 14 days, which the end search looks ahead, plus the 24 hours the step window needs.
+"""
+WORLD_B_DELTA: Final[Path] = WORK_DIR / "world_b_delta.parquet"
+"""Injected MW per series and stamp for world B (columns `series`, `stamp`, `delta_mw`)."""
 
 
 def round_dir(*, name: str) -> Path:
@@ -124,6 +129,20 @@ def masked_stamps(*, intervals: np.ndarray, train_end: datetime) -> np.ndarray:
     return out
 
 
+def with_injected_target(*, frame: pl.DataFrame, time_series_id: int) -> pl.DataFrame:
+    """World B: add the injected MW, in units of capacity, to the training target."""
+    delta = pl.read_parquet(WORLD_B_DELTA).filter(pl.col("series") == time_series_id)
+    capacity = frame["effective_capacity_mw"].median()
+    return (
+        frame.with_columns(
+            stamp=((pl.col("valid_time") - GRID_START).dt.total_seconds() // 1800).cast(pl.Int64)
+        )
+        .join(delta.select("stamp", "delta_mw"), on="stamp", how="left")
+        .with_columns(fitted_target=pl.col("target") + pl.col("delta_mw").fill_null(0.0) / capacity)
+        .drop("stamp", "delta_mw")
+    )
+
+
 def _matrix(*, frame: pl.DataFrame) -> xgb.DMatrix:
     return xgb.DMatrix(frame.select([pl.col(c).cast(pl.Float32) for c in COLUMNS]).to_numpy())
 
@@ -140,7 +159,8 @@ def fit_one(
     age_years = (train_end - rows["valid_time"]).dt.total_days().to_numpy() / 365.25
     weight = 0.5 ** (age_years / HALF_LIFE_YEARS) * keep
     matrix = _matrix(frame=rows)
-    matrix.set_label(rows["target"].to_numpy())
+    label = "fitted_target" if "fitted_target" in rows.columns else "target"
+    matrix.set_label(rows[label].to_numpy())
     matrix.set_weight(weight)
     return xgb.train({**PARAMETERS, "nthread": nthread}, matrix, num_boost_round=N_ROUNDS)
 
@@ -161,9 +181,11 @@ def fit_series(*, name: str, time_series_id: int, nthread: int = 1) -> str:
         pl.scan_parquet(FEATURES_PATH)
         .filter(pl.col("time_series_id") == time_series_id, pl.col("target").is_not_null())
         .with_columns(days_to_christmas_window=_christmas_window())
-        .select("time_series_id", "valid_time", "target", *COLUMNS)
+        .select("time_series_id", "valid_time", "target", "effective_capacity_mw", *COLUMNS)
         .collect()
     )
+    if name.startswith("B"):
+        frame = with_injected_target(frame=frame, time_series_id=time_series_id)
     pieces: list[pl.DataFrame] = []
     for month in months():
         train_end = month - PURGE
@@ -175,9 +197,9 @@ def fit_series(*, name: str, time_series_id: int, nthread: int = 1) -> str:
             continue
         booster = fit_one(frame=frame, train_end=train_end, intervals=intervals, nthread=nthread)
         pieces.append(
-            valid.select("time_series_id", "valid_time", "target").with_columns(
-                pred=pl.Series(booster.predict(_matrix(frame=valid)).astype(np.float32))
-            )
+            valid.select(
+                "time_series_id", "valid_time", "target", "effective_capacity_mw"
+            ).with_columns(pred=pl.Series(booster.predict(_matrix(frame=valid)).astype(np.float32)))
         )
     path.parent.mkdir(parents=True, exist_ok=True)
     out = pl.concat(pieces)

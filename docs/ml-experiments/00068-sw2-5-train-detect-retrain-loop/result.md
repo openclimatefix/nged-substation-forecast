@@ -101,8 +101,10 @@ at round 0's threshold as a sensitivity.
 labelled real transfers, which are in the training data and in the mask by construction, so the
 count of those found is descriptive. World B puts injected transfers into the measured power before
 the lagless XGBoost model is fitted, so the model can learn them as it would learn real ones. The
-injected transfers of world B are experiment 58's headline-band transfers that start in even months,
-reduced greedily to a set with no two transfers on one series within 14 days of each other. Each
+injected transfers of world B are a fresh draw of 4,000 headline-band transfers (25% or more of the
+receiving load, over 1 day) from experiment 58's generator, with onsets in even months, reduced
+greedily to a set with no two transfers on one series within 1 day of each other. (Experiment 58's
+own 620 even-month transfers overlap too much on one series: only 103 of them fit.) Each
 transfer takes shape S2, S3, or S4 in turn, so the pooled recall covers the three shapes the
 detector does not assume. World B contains no injected transfers in odd months, so the odd-month
 tuning is unaffected. The loop runs in world B on its own residuals and masks. World A with injected
