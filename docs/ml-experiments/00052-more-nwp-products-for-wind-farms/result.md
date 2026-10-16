@@ -13,7 +13,7 @@ prediction: >-
   all leads: -0.05 to -0.15. The interval on 3 farms is wide, and experiment 35's wind blend (-0.37
   at 0 to 24 h, -0.81 to +0.02) suggests `inconclusive` is the likeliest verdict. Solar (secondary,
   descriptive): 0 to -0.05.
->-
+decision_rule: >-
   One decisive contrast, C1: the blend minus the best guess on the quantile score for cases whose
   valid time falls 1 or 2 calendar days after the date of the ENS run (lead day 1 or 2, counted from
   the run's 00 UTC), read at 95% with whole months and the three seeds resampled, 50,000 resamples.
