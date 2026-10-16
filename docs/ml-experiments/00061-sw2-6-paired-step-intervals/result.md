@@ -15,8 +15,7 @@ prediction: >-
   months, pooled over the three shapes S2, S3 and S4 of experiment 60, rises by +0.03 to +0.08 for
   the paired detector with the labelled-duration prior (PL) over D0M (C1). The flat-prior detector
   (PF) gains +0.02 to +0.06 (C2). Experiment 60 found D0M at 0.44 to 0.47, so PL is expected at
-  0.48 to 0.54. Among transfers with a donor step of 6 noise units or more, the count with the
-  right start and a wrong end falls from about a third to about a fifth.
+  0.48 to 0.54.
 decision_rule: >-
   Three planned contrasts, read at 98.33% (Bonferroni across C1 to C3) from 20,000 resamples of
   whole calendar months. C1 is the paired difference PL minus D0M in MW-weighted recall, averaged
@@ -65,20 +64,34 @@ quiet day. Only 2 of the 35 labelled real transfers of more than 1 day are found
 
 **The paired-step detector scores an onset and a return step together.** At a candidate onset `s`
 with step `z(s)` in noise units, and a candidate return stamp `e`, at least 24 hours later and
-within 60 days, the pair score is `(sign * z(s) - sign * z(e)) / sqrt(2)`, where `sign` is the sign of
-`z(s)`. The return step is the same 24-hour step statistic, in the opposite direction. The detector
+within 60 days, the pair score is `(|z(s)| + r(e)) / sqrt(2)`. Here `z` is D0's 24-hour level shift
+(the mean of the next 24 hours minus the mean of the previous 24 hours, at each stamp) divided by
+the series' odd-month noise scale, and `r(e) = -sign(z(s)) * z(e)` is the return step, positive when
+the level steps back. An onset of +5 and a return of -4 scores 6.4. The interval's end is `e`, the
+first stamp at the old level, the same convention as D0M's `end`; the alarm is known 24 hours later
+(`e` + 48 half-hours), so every arm here is a retrospective interval estimator, scored on the
+interval alone, as D0M is. The detector
 takes every local peak of `|z|` of 2.5 noise units or more as a candidate onset, picks the `e` with
 the largest score plus a log prior on the duration `e - s`, and keeps the alarm when that total
 reaches a threshold. A candidate with no return step of at least 1.5 noise units keeps D0M's
 tracked end and scores `|z(s)| / sqrt(2)` plus the lowest prior value.
 
+- **PE** (the simplest test of the end estimate) keeps D0M's alarms exactly (threshold 4.0, so the
+  unexplained alarms are identical by construction) and replaces D0M's tracked end by the stamp `e`
+  between 24 hours and 14 days after the onset with the largest return step `r(e)`, when that step
+  is 1.5 noise units or more, else D0M's tracked end. PE has no prior. It is reported beside C1 and C2
+  as a descriptive contrast (PE minus D0M) with the same interval level, and adds no verdict.
 - **PL** takes the prior from a kernel density of the log durations of the labelled real transfers
-  (experiment 41's set, 2 hours to 30 days), weight 1 noise unit per unit of log density ratio.
+  (experiment 41's set, 2 hours to 30 days), a Gaussian kernel (Silverman bandwidth) on the log duration in hours, evaluated at each
+  half-hour duration searched, as a log ratio to the density's peak, floored at -1 and added to the
+  pair score with weight 1. A candidate with no return step takes the floor.
 - **PF** has a flat prior, and is the guard against PL's prior leaking information about the injected
   durations (see Limits).
 - **Thresholds** of PL and PF are each set on odd months so that the unexplained-alarm count (alarms
   more than 24 hours from any logged closure on the series) equals D0M's 80, as in experiment 60.
   Even months are scored only.
+- **Candidates** are local peaks of `|z|` within +/- 24 hours, as D0 uses, skipping peaks within 24
+  hours of a monthly refit. The return stamp `e` may be any stamp, not only a peak.
 - **A return step does not raise a new alarm:** a candidate on a series, of the opposite sign, within
   24 hours of an accepted pair's end is dropped.
 - **Shapes and population** are experiment 60's: 620 headline-band transfers (25% to 40% of the
@@ -87,9 +100,15 @@ tracked end and scores `|z(s)| / sqrt(2)` plus the lowest prior value.
   transfers), and S5 (the guard, profile shifted 12 hours). The detector assumes none of the
   shapes, so C1 and C2 pool S2, S3 and S4, as experiment 60 did; S1 and S5 are reported alone.
 
+**The match on alarm count is a match on count, not on composition,** and the maximum over up to
+2,800 return stamps inflates the score of noise candidates; the odd-month calibration absorbs the
+average inflation. The report therefore also prints, for each arm, the odd-month and even-month
+alarm counts, the share of alarms near a logged closure, and the number of candidate onsets above
+the 2.5 floor.
+
 **Standard tables, as experiments 55, 58 and 60 print them:** recall by donor step in noise units,
 split by metered receiver; MW-weighted recall as the headline with unweighted recall second; and
-the share of the moved MW missed, stated in the take-home message. A post hoc table counts, among
+the share of the moved MW missed, stated in the take-home message. A post hoc table (no predicted values) counts, among
 transfers with a donor step of 6 noise units or more, those found, those with the right start and a
 wrong end, and those with no alarm at the start.
 
