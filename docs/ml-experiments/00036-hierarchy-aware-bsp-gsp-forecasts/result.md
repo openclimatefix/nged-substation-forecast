@@ -1,7 +1,7 @@
 ---
 id: "00036"
 slug: hierarchy-aware-bsp-gsp-forecasts
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the two bulk supply points (BSPs) Boston and Skegness and the two grid supply points (GSPs)
@@ -38,22 +38,133 @@ row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over nine levels, the estimate of the
   CRPS), in points of capacity; MAE of the median
-advice: []
+verdict: inconclusive
+best_arm: >-
+  B3, the ERA5-trained N1 applied to ENS members (quantile score 9.31 at Boston, 6.29 at Skegness,
+  18.05 at Walpole, 20.34 at Bicker Fen, against 9.72, 6.39, 18.41, and 20.74 for N1); no
+  planned interval excludes the pre-registered bar of -0.5.
+headline: >-
+  B1 minus B0 over all leads: +0.04 (99.17% interval -0.18 to +0.25) at Boston and +0.19 (-0.10 to
+  +0.73) at Skegness. B3 minus B0: -0.36 (-1.60 to +0.43) at Walpole and -0.40 (-1.84 to +0.97) at
+  Bicker Fen. B4 minus B0: -0.02 (-0.06 to +0.03) and -0.04 (-0.13 to +0.07). The oracle that sees
+  the observed children scores 5.6 and 3.4 points below N1 at the two BSPs.
+lessons: >-
+  The children's forecasts carried no information N1 lacked: B1 and B2 did not beat N1 although
+  the oracle with observed children gains 3.4 to 5.6 points. The ERA5-trained N1 gained 0.41 points
+  (95% interval 0.15 to 0.66, exploratory) at Boston up to day 6 and was unresolved at the other
+  three series.
+advice:
+  - >-
+    Do not add the summed median forecasts of the Primary substations and metered generators
+    beneath a BSP to its N1 model, because B1 minus B0 was +0.04 and +0.19 points (C1, C2).
+  - >-
+    Do not add a generic wind power curve and a PV_Live solar forecast as columns to a GSP's N1
+    model, because B4 minus B0 was -0.02 and -0.04 points with intervals under 0.2 wide (C5, C6).
+  - >-
+    Do not read the oracle's gain from observed children as the headroom a forecast of the
+    children can capture, because the oracle gained 3.4 to 5.6 points and the forecast columns
+    gained none (O minus B0, B1 minus B0).
+  - >-
+    Test an ERA5-trained N1 at more than 2 GSPs and 2 BSPs before porting it, because the planned
+    GSP intervals span -1.8 to +1.0 points and only Boston resolved a gain, up to day 6
+    (B3 minus B0, exploratory).
+  - >-
+    Do not replace a BSP's N1 by a regression on the median forecasts of its children, because B2
+    minus B0 was +0.25 and +0.29 points (exploratory).
 production_status: not-for-production
 adopted_in: none
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1245
 code: ml-experiments/00036-hierarchy-aware-bsp-gsp-forecasts/
 ---
 
 # Experiment 36: do forecasts of the series beneath a BSP or GSP lower its error?
 
-**This page is the plan, committed before any code runs.** The results replace the sections below
-when the experiment finishes.
+**Verdict: inconclusive.** Adding forecasts of the series beneath a bulk supply point (BSP) did not
+lower its quantile score, and adding wind and solar columns to a grid supply point (GSP) did not
+either. The ERA5-trained N1 lowered the GSP scores by 0.36 and 0.40 points of capacity, but its
+99.17% intervals span -1.8 to +1.0 points. Scores are in points of capacity (1% of a series'
+effective capacity) on 73 forecast runs, one every 5 days, July 2025 to June 2026, with ENS
+weather, for four series: the BSPs Boston and Skegness and the GSPs Walpole and Bicker Fen. The
+intervals describe these four series only. Attribution: Sheffield Solar PV_Live, CC BY 4.0.
+
+![The planned contrasts and B3 at the BSPs](figure_1.svg)
+
+## Results
+
+**Per family, by the pre-registered rule: the BSP family is refuted, the GSP wind and solar family
+is refuted, and the GSP ERA5-trained family is inconclusive.** All three families are not
+supported, so the experiment is inconclusive. The oracle gave a gain of more than 0.5 at both BSPs,
+so the stop rule did not apply and B1 and B2 were fitted.
+
+| Series | B0 N1 | B1 child columns | B2 bottom-up sum | B3 ERA5-trained N1 | B4 wind, solar columns | O oracle | Climatology |
+|---|---|---|---|---|---|---|---|
+| Boston (BSP) | 9.72 | 9.76 | 9.97 | 9.31 | | 4.13 | 11.32 |
+| Skegness (BSP) | 6.39 | 6.58 | 6.68 | 6.29 | | 2.97 | 7.26 |
+| Walpole (GSP) | 18.41 | 18.36 | | 18.05 | 18.39 | | 19.97 |
+| Bicker Fen (GSP) | 20.74 | 20.70 | | 20.34 | 20.70 | | 22.51 |
+
+The table shows the quantile score over all leads. The refit B0 matches experiment 13's stored N1
+within 0.003 points at every series.
+
+- **C1 and C2, B1 minus B0 (BSPs):** +0.04 (99.17% interval -0.18 to +0.25) at Boston and +0.19
+  (-0.10 to +0.73) at Skegness. Both lower bounds exceed -0.5, so the BSP family is refuted.
+- **C3 and C4, B3 minus B0 (GSPs):** -0.36 (-1.60 to +0.43) at Walpole and -0.40 (-1.84 to +0.97)
+  at Bicker Fen. The point estimates are inside the predicted -0.5 to -1.5 range, and the intervals
+  are too wide to exclude zero or the -0.5 bar.
+- **C5 and C6, B4 minus B0 (GSPs):** -0.02 (-0.06 to +0.03) at Walpole and -0.04 (-0.13 to +0.07)
+  at Bicker Fen. Both lower bounds exceed -0.5, so the family is refuted.
+- **The oracle (exploratory, 95%):** O minus B0 is -5.58 (-6.56 to -4.55) at Boston and -3.42
+  (-4.30 to -2.62) at Skegness, and O minus B1 is -5.62 and -3.61. The share of oracle child values
+  filled from forecasts is about 10% in the validation rows of both BSPs.
+- **B2 (exploratory):** B2 minus B1 is +0.21 (-0.15 to +0.59) at Boston and +0.10 (-0.68 to +0.63)
+  at Skegness, inside the predicted 0.5. B2 minus B0 is +0.25 (-0.11 to +0.63) and +0.29 (-0.16 to
+  +0.67).
+- **B3 at the BSPs (exploratory, 95%):** -0.41 (-0.66 to -0.15) at Boston and -0.10 (-0.28 to +0.07)
+  at Skegness. At Boston the gain is -0.70 (0 to 24 hours), -0.88 (1 to 2 days), and -0.66 (3 to 6
+  days), and shrinks beyond day 6.
+
+![The quantile score of every arm](figure_2.svg)
+
+![B3 minus B0 by lead band](figure_3.svg)
+
+## Predictions against outcomes
+
+- **Missed:** B1 minus B0 was predicted at -0.5 to -1.5 and was +0.04 and +0.19.
+- **Met:** B2 within 0.5 of B1, and O below B1 at both BSPs.
+- **Not resolved:** B3 minus B0 at the GSPs was predicted at -0.5 to -1.5, largest beyond day 2.
+  The estimates are -0.36 and -0.40, larger beyond day 1 at Walpole, with intervals that include
+  zero.
+- **Missed:** B4 minus B0 was predicted at -0.2 to -0.8 and was -0.02 and -0.04.
+
+## Lessons
+
+**The forecast columns added nothing although the oracle's observed children added a great deal.**
+One reading is that the observed children tell N1 what is happening now, and a forecast of a child
+carries no more than N1 already derives from the same ENS weather and the power lags. The
+experiment did not test this reading.
+
+## Limits
+
+- **Four series.** Two BSPs and two GSPs cannot support a release decision, and the intervals
+  resample months and seeds, not series.
+- **Training columns come from the control member and validation columns from each member,** so the
+  ensemble spread of the children reaches the model at validation and not in training.
+- **The training columns are cross-fitted by time block, not out of time.** A block's child model
+  sees months both before and after the block.
+- **Unforecast flows.** Four series beneath Boston have no forecast, and the GSPs carry flows from
+  outside the trial area.
+- **B4's bias correction was dropped,** and experiment 28 found the PV_Live member mean 1.8 to 3.0
+  points of PV_Live capacity too high.
+- **The 14-day correction was not applied,** because experiment 21 found it unproven at BSP and
+  GSP.
+
+## Plan, written before any code ran
 
 Units are points of capacity (1 point is 1% of a series' effective capacity). The rows are the 73
 runs of `fold_a_every5d_v1` (one run every 5 days, valid times 2025-07-01 to 2026-06-30) for four
 series, each fitted with seeds 0, 1, and 2. No valid time on or after 2026-07-01 is scored.
 
-## Why the question is worth asking
+### Why the question is worth asking
 
 **A bulk supply point (BSP) flow is almost exactly a linear sum of the series beneath it, and N1
 does not use that.** On the validation year, a least-squares fit of each BSP on the Primary
@@ -66,7 +177,7 @@ ceiling arms (not yet published) suggest that an N1 trained on ERA5 and fed ERA5
 fifth of the error at BSPs and GSPs, three times the gain of an ENS-trained N1 given the same ERA5
 inputs. This experiment asks how much of that headroom a deployable forecast can capture.
 
-## Series and hierarchy
+### Series and hierarchy
 
 NGED's hierarchy file (private, never committed) assigns each Primary substation and metered
 generator to a BSP and a GSP. The series are:
@@ -84,7 +195,7 @@ Boston have no forecast (a biofuel generator, a battery, a solar site, and a gen
 type), so their flows stay in the residual. Every generator beneath Skegness has a forecast.
 Generator names and identifiers never appear on the published page.
 
-## Arms
+### Arms
 
 All arms are N1 per series, with experiment 13's recipe: a nine-level quantile XGBoost model
 (500 rounds, `eta` 0.05, depth 6) trained on the ENS control member of every daily run, valid times
@@ -129,7 +240,7 @@ BSP or a GSP, because experiment 21 found it unproven there.
 A month-by-half-hour climatology row (`ClimatologyForecaster`) is scored for reference, repeated
 once per seed.
 
-## How the child columns are built without leakage
+### How the child columns are built without leakage
 
 **A child's forecast in the training rows must not come from a model that saw those rows.** An
 XGBoost model with 500 rounds and depth 6 reproduces its own training rows closely, so an in-sample
@@ -162,7 +273,7 @@ one per ENS member at validation, so it sees the same kind of column in both. Th
 the children is therefore part of what the model receives at validation and not in training, and
 the page reports it as a limit.
 
-## Scoring
+### Scoring
 
 Quantile score and MAE of the median, per series, over all leads and in the five lead bands (0 to
 24 h, 1 to 2 days, 3 to 6 days, 7 to 10 days, 11 to 15 days). Contrasts use
@@ -172,7 +283,7 @@ level. The page reports the absolute score of every arm, per series. Intervals d
 series and say nothing about other BSPs or GSPs. B3 minus B0 at the BSPs, B1 minus B0 at the GSPs,
 B2 minus B1, O minus B0, and the lead-band contrasts are exploratory.
 
-## Sizing
+### Sizing
 
 - **Stored data:** prediction sets and cross-fitted columns under `data/ml-experiments/`; no
   production table changes.
@@ -189,7 +300,7 @@ B2 minus B1, O minus B0, and the lead-band contrasts are exploratory.
 Size: complex. Sonnet writes the plan, Opus reviews it, Sonnet implements, Opus reviews the code,
 Sonnet runs the code and writes up, and Sonnet reviews the write-up.
 
-## Earlier advice followed and departed from
+### Earlier advice followed and departed from
 
 - **Followed:** treat BSP and GSP findings as provisional with four series (experiments 6, 21, 24);
   report intervals over validation months (13); keep the 14-day correction off BSP and GSP (21);
@@ -198,14 +309,14 @@ Sonnet runs the code and writes up, and Sonnet reviews the write-up.
 - **Departed from:** the experiment adds no calendar-placebo or shuffled-input control. The columns
   are forecasts of real series, and the oracle already bounds what a perfect column gives.
 
-## Past weather
+### Past weather
 
 B3, B1, B2, B4, and every child forecast use ENS weather only, so all are deployable as far as
 weather goes (ERA5 arrives about 5 days late and is used only at training times). The lag
 features use observed power from the forecast origin, as in experiment 13. B4's PV_Live model trains
 on ERA5 weather and PV_Live's revised values, both of which exist at training time.
 
-## Limits
+### Limits
 
 - **Four series.** Two BSPs and two GSPs cannot support a release decision alone.
 - **Unforecast flows.** Four series beneath Boston are not forecast, and the GSPs carry flows from

@@ -18,7 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [00036](00036-hierarchy-aware-bsp-gsp-forecasts/result.md) | Do forecasts of the Primary substations and metered generators beneath a bulk supply point (BSP) or grid supply point (GSP), and an ERA5-trained N1 applied to ENS members, lower the BSP and GSP quantile score? (proposal HB1; absorbs P29) | 1 | Nothing | Planned; plan committed, awaiting plan review |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 
 ## Deferred until the first results are in
