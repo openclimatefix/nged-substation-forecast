@@ -181,6 +181,7 @@ nav:
       - "Is detecting a switching event worth anything to the forecast?": ml-experiments/00038-switching-mask-value/result.md
       - "Can a CAMS-driven fit separate embedded solar from Primary substation demand?": ml-experiments/00039-pv-disaggregation-cams-injection/result.md
       - "How far can the capacity fitted to embedded solar be trusted?": ml-experiments/00040-pv-capacity-error-bars/result.md
+      - "Can a weekly capacity series that rises easily and falls reluctantly recover injected changes in solar capacity?": ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md
       - "Can a labeller pass a known-answer gate on switching events?": ml-experiments/00041-sw2-0a-labeller-gate/result.md
       - "Which logged switching jobs show up in the power readings?": ml-experiments/00041-sw2-0a-labeller-gate/labelled-set.md
       - "How much of the best guess's daylight error is embedded solar?": ml-experiments/00046-embedded-solar-share-of-primary-forecast-error/result.md
@@ -195,6 +196,7 @@ nav:
       - "Does a neighbour veto help the single-series switching detector?": ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/result.md
       - "Is the recall gap without a metered receiver a step-size effect, and does a stronger veto help?": ml-experiments/00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md
       - "Does one detector over several windows find more transfers than the best single window?": ml-experiments/00059-sw2-13-several-windows-in-one-detector/result.md
+      - "Does a step that weights each half-hour by the daily profile find more of the moved load?": ml-experiments/00060-sw2-7-profile-weighted-step-detector/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
