@@ -205,9 +205,10 @@ transfers whose shapes the detector does not assume (a constant MW, a share of t
 profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
 day.
 
-- **SW2-14, one combined score (planned as [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)).** Add the single-series step evidence and the neighbour
-  opposite-step evidence into one score, so that strong evidence on either side can raise an alarm
-  and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
+- **SW2-14, one combined score (planned as [experiment
+  65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)).** Add the single-series
+  step evidence and the neighbour opposite-step evidence into one score, so that strong evidence on
+  either side can raise an alarm and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
   the two calibrated statistics, and a small logistic regression on both statistics plus topology
   (the number of metered neighbours, and whether any neighbour is metered in MVA). The logistic
   regression trains on odd-month injections only. The benchmarks are D1 and experiment 55's veto
