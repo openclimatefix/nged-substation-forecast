@@ -1,4 +1,4 @@
-"""D3, the profile-weighted step detector, and the four injection shapes.
+"""D3, the profile-weighted step detector, and the five injection shapes.
 
 D3 differs from experiment 43's D0 in one place, the step statistic: each half-hour of the 24-hour
 windows before and after a stamp is weighted by the series' expected power (floored at 10% of its

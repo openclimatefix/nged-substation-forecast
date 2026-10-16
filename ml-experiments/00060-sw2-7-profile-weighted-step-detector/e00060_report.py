@@ -186,6 +186,7 @@ def print_statistic_similarity() -> None:
         y.append(profile.shift[s][ok] / profile.scale[s])
     x, y = np.concatenate(x), np.concatenate(y)
     big = np.abs(x) > 3
+    print(f"\n{len(plain.shift)} series")
     print(
         f"\nD0 and D3 step in noise units, all stamps: correlation {np.corrcoef(x, y)[0, 1]:.3f}; "
         f"where D0 exceeds 3: correlation {np.corrcoef(x[big], y[big])[0, 1]:.3f}, "
@@ -278,7 +279,12 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=WORK_DIR)
     out = parser.parse_args().out
     data = population(out=out)
-    print(f"{data.filter(pl.col('shape') == 'S1', pl.col('setting') == 'D0M_48').height} transfers")
+    one = data.filter(pl.col("shape") == "S1", pl.col("setting") == "D0M_48")
+    print(f"{one.height} transfers; {one.filter(pl.col('weight') <= 0).height} move no MW")
+    shares = json.loads((out / "profile_shares.json").read_text())
+    print(
+        f"{len(shares)} fitted profile shares; {sum(x in (0.0, 1.0) for x in shares)} sit at 0 or 1"
+    )
     shapes = print_shapes(data=data)
     pooled = contrast(frames=[wide(data=data, shape=s) for s in NON_MATCHING])
     print(

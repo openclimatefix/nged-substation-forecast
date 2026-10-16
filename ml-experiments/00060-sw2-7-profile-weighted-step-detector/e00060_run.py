@@ -230,7 +230,7 @@ def harness_check(*, out: Path) -> None:
 
 
 def score(*, out: Path) -> None:
-    """Score every transfer under all four shapes with both detectors."""
+    """Score every transfer under all five shapes with both detectors."""
     state, groups = make_state(out=out)
     shares = state["shares"]
     print(f"{len(shares)} fitted profile shares: {shares_json(shares=shares)}", flush=True)
