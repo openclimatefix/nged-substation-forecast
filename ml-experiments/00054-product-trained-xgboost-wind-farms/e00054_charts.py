@@ -76,6 +76,11 @@ def figure_1(*, results: dict) -> alt.TopLevelMixin:
         e
         for e in results["exploratory"] + [results["c1"]]
         if (e["treatment"], e["reference"]) in CONTRASTS
+        and not (
+            (e["treatment"], e["reference"]) == ("b", "a")
+            and e["band"] == "days 1-2 (24-54 h)"
+            and "verdict" not in e
+        )
         and e["band"] in BANDS
         and e.get("series") is None
         and "split" not in e

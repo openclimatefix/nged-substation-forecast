@@ -147,6 +147,7 @@ def exploratory_contrasts(
     upgrade = pl.col("power_fcst_init_time") >= common.UKV_UPGRADE
     first_month = pl.col("power_fcst_init_time").dt.strftime("%Y-%m") == "2025-07"
     pairs = [
+        ("b", "a"),
         ("c", "a"),
         ("b_placebo", "a"),
         ("b", "b_placebo"),

@@ -76,9 +76,13 @@ the maintainer to confirm.
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
+| [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
+| [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
+| [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
+| [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as a ceiling: -0.198 (-0.316 to -0.069) against a 0.15 threshold; CEDA UKV is not the live product | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1141,3 +1145,99 @@ lead days 1 and 2 (95% interval -0.200 to +0.072), against a threshold of 0.15, 
 - **Write-up:** [result](00052-more-nwp-products-for-wind-farms/result.md).
 
 ![Each blend minus the best guess](00052-more-nwp-products-for-wind-farms/figure_1.svg)
+
+### 00047: does a bank-holiday column in the demand model help the switching detector?
+
+**Adding the days to the nearest bank holiday to the demand model did not measurably raise the share
+of simulated load transfers the 24-hour single-series detector finds, so the verdict is
+inconclusive.** The share found rose from 0.348 to 0.360 (+0.011, 98.75% interval -0.010 to +0.044)
+on 89 simulated transfers of 25% to 40% of the receiving load lasting over 1 day, with both models
+matched to raise the same number of alarms in odd months that the switching log does not explain. The
+experiment cannot resolve a gain below about 0.04.
+
+- **Finding for later experiments:** the column cut unexplained alarms within 1 day of a bank holiday
+  from 26 to 9 or 10 and the demand model's error on bank holidays by about 1.15 points of capacity,
+  but the matched threshold rose by 0.22 instead of falling, probably because the residual became
+  more persistent, so the detector gained nothing. Matching on odd months left the new model at 64
+  to 67 unexplained alarms in even months against 71 to 80 for the baseline.
+- **Series status:** experiment 43 was refuted at the 24-hour window and this experiment is
+  inconclusive; neither found a detector improvement.
+- **Write-up and pull request:** [the full result page](00047-sw2-4-better-residual-switching-detector/result.md),
+  [PR #1268](https://github.com/openclimatefix/nged-substation-forecast/pull/1268).
+
+![Unexplained 24-hour alarms by days to the nearest bank holiday](00047-sw2-4-better-residual-switching-detector/figure_6_alarms_by_holiday_distance.svg)
+
+### 00053: does the UKV forecast the solar anomaly better than ENS? (PVDIS part 8b)
+
+**We asked whether the Met Office UKV, a 2 km weather model that runs to 2 to 5 days ahead, forecasts
+how sunny each half-hour will be better than the European ensemble forecast (ENS), at the 5 Primary
+substations that decide experiment 46's verdict.** Each forecast's output of a generic solar fleet
+was compared with the satellite-based CAMS estimate, as a departure from the forecast's own monthly
+average, on 72 forecast runs from July 2025 to June 2026. The run is post hoc and was not
+pre-registered: the brief and the PVDIS-8 plan fixed the arms, the lead bands, the 1% margin and the
+15-fold month-block cross-validation beforehand, while the `ukv3w` control and the `t54_late`
+variant were chosen after seeing results. The UKV alone was worse than ENS in every lead band
+(correlation lower by 0.034 to 0.364 within 54 hours). A blend with weights fitted on the earlier 15
+months cut the cross-validated mean squared error by 3.8% to 13.8% in every band within 54 hours,
+which gives the verdict `small gain`. In the validation year the blend's correlation gain was
+smaller than its uncertainty: +0.019 (-0.000 to +0.038) at 0 to 6 hours and +0.011 (-0.006 to
++0.027) over 0 to 54 hours, with 3 of 6 origin-month blocks favouring the blend, and at 48 to 54
+hours its validation mean squared error (0.0382) was worse than ENS's (0.0337). The blend gained
+nothing beyond 54 hours. Forming 3-hour window means from the UKV, as ENS delivers its flux, scored
+slightly better than the native hourly values, so the UKV's time resolution is not what limits it.
+On 14 days of overlap with CAMS, the live MOGREPS-UK ensemble was also no better than ENS.
+
+- **Findings that bear on later experiments:** the one UKV we found with a matched history is the CEDA
+  archive, which is not the live product and is licensed for non-commercial use, so the gain is a
+  ceiling; the demand contrasts at 0 to 48 hours were not run, because the gain is a ceiling from a
+  non-live product and its interval over 0 to 54 hours includes zero; the manager decides.
+- **Write-up:** [result](00053-ukv-vs-ens-solar-anomaly/result.md).
+
+![Correlation with the CAMS anomaly by lead band](00053-ukv-vs-ens-solar-anomaly/figure_2_correlation_by_band.svg)
+
+### 00056: does Flexpectation v1 need special handling for Primary substations metered only in MVA?
+
+**At sunny middays the best-guess forecast has 5.6 percentage points less skill at the 8 Primary
+substations metered only in MVA than at the 8 metered in MW, but the 95% interval (-5.0 to 14.6)
+includes zero, so the verdict is `inconclusive`.** The experiment found no evidence that Flexpectation
+v1 needs special handling, and could not rule out a loss of up to about 15 percentage points. An
+MVA meter records the magnitude of the power with no sign, so a substation whose net flow embedded
+solar pushes through zero loses the direction of flow. The experiment fitted nothing. It took
+the forecasts that experiment 33 stored for July 2025 to June 2026, and compared the quantile
+score of the best-guess forecast of Primary-substation demand with that of a simple rule-based
+forecast, `manual_heuristic`, at each group of 8. Skill is the percentage by which the best guess's
+quantile score is lower. At sunny middays (April to September, 10:00 to 13:30 UTC) the skill is 15.9%
+at the MW substations and 10.3% at the MVA substations.
+
+- **Finding for later experiments:** skill is lower at the MVA group all year (a gap of 10.5
+  percentage points, 2.1 to 17.5), not specifically at middays, and one MW substation with 31%
+  skill accounts for most of that gap (3.8 percentage points without it; checked after seeing the
+  results).
+- **Near-zero flow:** 1.5% of the MVA group's half-hours have power within 10% of capacity of
+  zero, against 2.5% of the MW group's, and the best guess's skill on them is 18.8% in the MVA
+  group against 46.1% in the MW group (gap 27.4 percentage points, -0.3 to 48.2). At sunny
+  middays, leaving those half-hours out cuts the gap from 5.6 to 2.0 percentage points.
+- **Write-up:** [result](00056-mva-only-primaries-skill-against-mw-primaries/result.md),
+  [PR #1284](https://github.com/openclimatefix/nged-substation-forecast/pull/1284).
+
+![Skill by unit group](00056-mva-only-primaries-skill-against-mw-primaries/figure_1_skill_by_unit.svg)
+
+### 00054: does UKV, learned from its own history, help the wind-farm forecast?
+
+**UKV, the Met Office's 2 km forecast, adds real information to an ENS-based wind-farm forecast at
+1 to 2 days ahead, worth about 0.2 points of capacity, and the experiment rules out a gain larger
+than about 0.3.** We asked whether giving the three metered wind farms' forecast model UKV's wind as
+extra inputs lowers its error, with every model trained on its own forecast history. The error fell
+by 0.198 points of capacity (95% interval -0.316 to -0.069) at 24 to 54 hours after the ENS run's
+00 UTC start, against a threshold of 0.15, so the verdict is `small gain`. The archive is not the
+live UKV product, so the result is a ceiling.
+
+- **Finding for later experiments:** a shuffled-UKV placebo scores the same as ENS alone (+0.013),
+  UKV alone is far worse than ENS alone (+0.881), and two of three farms gain (W1 -0.413, W2 -0.198,
+  W3 +0.018; exploratory). The ENS-only model scored level with the ERA5-trained best guess at these
+  leads (-0.218, -0.472 to +0.069; exploratory).
+- **Next step:** build a matched history of the live UKV for the farms, or test UKV at lead day 0 on
+  Open-Meteo's live history.
+- **Write-up:** [result](00054-product-trained-xgboost-wind-farms/result.md).
+
+![Contrasts between the arms](00054-product-trained-xgboost-wind-farms/figure_1.svg)

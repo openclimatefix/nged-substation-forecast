@@ -1,7 +1,7 @@
 ---
 id: "00054"
 slug: product-trained-xgboost-wind-farms
-status: planned
+status: done
 size: complex
 hypothesis: >-
   For the three metered wind farms, an XGBoost quantile model trained on ENS and given UKV's wind as
@@ -36,6 +36,37 @@ metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over nine levels, the estimate of the
   CRPS), in points of capacity; coverage of the 5% to 95% band; share of cases above the 0.95
   quantile
+verdict: small gain
+best_arm: >-
+  The ENS-plus-UKV arm (arm B): 5.921 points of capacity at lead hours 24 to 54 against 6.119 for the
+  ENS-only arm (difference -0.198, 95% interval -0.316 to -0.069; C1). UKV is the CEDA archive, so
+  this is a ceiling and not a deployable result.
+lessons: >-
+  UKV's wind, given to an ENS-trained XGBoost model as extra columns, lowers the wind-farm error at
+  lead hours 24 to 54 by about 0.2 points of capacity, and the placebo shows the gain is real
+  information, not extra columns. The gain rules out a UKV gain larger than 0.32 points, and it
+  does not reach the 0.15-point threshold at the interval's upper end. Two farms gain and one does
+  not. The CEDA archive is not the live product, so nothing here is deployable until a matched UKV
+  history exists.
+advice:
+  - >-
+    Obtain a matched, live UKV history for the wind farms before any port: the CEDA archive gives
+    -0.198 (-0.316 to -0.069) at lead hours 24 to 54, and Open-Meteo's UKV history reaches lead
+    day 0 only (C1).
+  - >-
+    Give a product's wind to the XGBoost model as extra columns trained on that product's own
+    history, not to an ERA5-trained model: the ENS-plus-UKV arm beats the ENS-only arm by 0.198
+    while the shuffled-UKV placebo does not (+0.013, -0.012 to +0.040).
+  - >-
+    Do not expect a UKV gain at every farm: at lead hours 24 to 54 it is -0.413 (-0.686 to -0.155)
+    at W1, -0.198 (-0.378 to -0.000) at W2, and +0.018 (-0.177 to +0.219) at W3, exploratory.
+  - >-
+    Retest ENS-trained against ERA5-trained wind models at lead hours 24 to 54 before assuming ERA5
+    training wins: the ENS-only arm minus the ERA5-trained best guess is -0.218 (-0.472 to +0.069),
+    exploratory and unresolved, against experiment 1's 1.70-point ERA5 advantage.
+  - >-
+    Test UKV at lead day 0 with Open-Meteo's live UKV history, which covers 71% of the training
+    window at one farm: the CEDA arm gains -0.374 (-0.526 to -0.203) at lead day 0, exploratory.
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00054-product-trained-xgboost-wind-farms/
@@ -43,137 +74,119 @@ code: ml-experiments/00054-product-trained-xgboost-wind-farms/
 
 # Experiment 54: does UKV, learned from its own history, help the wind-farm forecast?
 
-**Status: planned. No code has run.** [Experiment 52](../00052-more-nwp-products-for-wind-farms/result.md)
-fed ICON-EU and IFS 0.25 degree into a wind-power model trained on ERA5, an estimate of past
-weather, and could not tell whether they help. That design favours ENS, because the ERA5-trained
-model never learned either product's own errors. This experiment trains every model on a forecast
-product's own history, with one training protocol for every arm, and the product is UKV, at the
-maintainer's request, relayed by the manager. ICON-EU, IFS HRES 9 km, and GFS are not run.
+**UKV, the Met Office's 2 km forecast, adds real information to an ENS-based wind-farm forecast at
+1 to 2 days ahead, worth about 0.2 points of capacity, and the experiment rules out a gain larger
+than about 0.3.** We asked whether giving three metered wind farms' forecast model the Met Office's
+UKV wind forecast, as extra inputs beside the European Centre's ensemble forecast (ENS), lowers the
+forecast error. Every model learned from its own history of forecasts and metered power, with the
+same training window and settings. The error fell by 0.198 points of capacity (95% interval -0.316
+to -0.069) at 24 to 54 hours after the ENS run's 00 UTC start. That gain is resolved, and its upper
+end is too small to clear the 0.15-point bar we set before the run, so the verdict is `small
+gain`. The UKV data come from a research archive, not the live feed, so the result is a ceiling,
+and no deployable UKV history exists for lead days 1 and 2. The next step is to find or build a
+live UKV history for the farms, and to test UKV at lead day 0, where a live history exists.
 
-## The three arms
+**What it narrows.** UKV's own forecast alone is much worse than ENS (+0.881, +0.460 to +1.308),
+so UKV helps as an addition and not as a replacement. A placebo that shuffles the UKV values scores
+the same as ENS alone (+0.013, -0.012 to +0.040), so the gain comes from UKV's information. Two of
+three farms gain and one does not. The ENS-only model scored level with the ERA5-trained best
+guess here, which experiment 1 had not led us to expect.
 
-**Each arm is an XGBoost model with nine quantile levels, trained per farm and per seed with the
-same window, the same recency weights, and the same lagged-power inputs.** The training protocol is
-that of experiment 33's ENS-trained model (N1): the ENS control member of every daily 00 UTC run
-with valid times from 2024-04-01 to 2025-06-30, a recency weight with a half-life of 2 years, the
-wind columns, `lead_hours`, and three lags of power from the forecast origin (09:00 UTC).
+![Contrasts between the arms](figure_1.svg)
 
-- **Arm A, ENS only:** the six ENS wind columns (speed and direction at 10 m and 100 m, direction as
-  sine and cosine).
-- **Arm B, ENS plus UKV:** the six ENS columns and four UKV columns (10 m speed, the sine and cosine
-  of the 10 m direction, and the speed at 925 hPa, about 750 m above sea level; UKV-CEDA archives no
-  100 m wind). At prediction the model runs once per ENS member with the UKV columns fixed, and the
-  51 member quantile sets are pooled, as arm A does.
-- **Arm C, UKV alone:** the four UKV columns. At prediction the model gives one set of nine
-  quantiles per case.
-- **Reference row:** experiment 33's ERA5-trained best guess (`bg_full`) and its ENS-trained N1,
-  scored on the same cases. They are not the control.
+## Results
 
-**All three arms train and score the same rows: valid times up to 54 hours after the 00 UTC start of
-the ENS run's date, and only the 24 to 54 hour cases are scored.** UKV's leads stop at 54 hours, so
-the scored cases are lead day 1 (24 to 48 hours) and the first 6 hours of lead day 2 (48 to 54
-hours). The page says "days 1 and 2" for these cases and states the 54-hour limit wherever it quotes
-a number. Training on every valid time from the 09:00 UTC origin (9.5 hours after the run's
-start) to 54 hours gives the models more rows than the scored range alone and does not use any
-validation data.
+**The primary contrast C1 is the ENS-plus-UKV arm minus the ENS-only arm, for cases 24 to 54 hours
+after the 00 UTC start of the ENS run's date.** UKV's leads stop at 54 hours, so these cases are
+lead day 1 and the first 6 hours of lead day 2. C1 is -0.198 (95% interval -0.316 to -0.069; 28,230
+cases, three farms, three seeds, whole months re-drawn), and the pre-registered threshold was
+-0.15 for the interval's upper end. The CEDA archive is not the live product (its licence is
+non-commercial and it differs statistically from the live feed), so the page reports the result as a
+ceiling: a gain a matched UKV might add, not one a service could now deliver. The prediction was
+-0.2 to -0.5, and the estimate lies at the low end of that range.
 
-## UKV, as read, and what the data on disk supports
+## Absolute scores
 
-**UKV is the CEDA archive's 00 UTC run of the ENS run's date, aligned with the ENS run.** The
-archive (`UKV-CEDA` and its later parts) holds runs at 00, 06, 12, and 18 UTC at 2 km, hourly to 48
-hours and 3-hourly to 54 hours. A valid time at an hour that has no archived step (49, 50, 52, and 53
-hours) interpolates linearly between the steps either side, and a valid time at :30 takes the
-average of the east-west and north-south wind components of the hours either side. The wind
-farms' nearest 2 km cell is read, with the cell-matching code of the matched-lead study.
+**The quantile score (twice the mean pinball loss over nine quantile levels, in points of capacity;
+smaller is better) of every arm.** Coverage is the share of cases inside the 5% to 95% band
+(nominally 0.90), and the 0.95 column is the share above the 0.95 quantile. Arm A is the ENS-only
+XGBoost model, B adds UKV, C is UKV alone, and the placebo is B with the UKV values shuffled. The
+reference rows are experiment 33's ERA5-trained best guess and its ENS-trained model on the same
+cases, which are the 52 Tuesday runs that have a complete UKV run.
 
-**The archive covers the whole training window and nearly the whole validation year.** A count on
-disk shows 455 of the 456 daily 00 UTC runs of 2024-04-01 to 2025-06-30 with a complete wind set,
-and 52 of the 53 Tuesday validation runs; the 2026-06-30 run is missing and its cases are dropped
-from every arm.
+| Arm | Lead day 0 (0 to 24 h) | 24 to 54 h | All cases | Coverage, 24 to 54 h | Above 0.95, 24 to 54 h |
+|---|---|---|---|---|---|
+| A, ENS only | 6.337 | 6.119 | 6.189 | 0.924 | 0.031 |
+| B, ENS plus UKV | 5.963 | 5.921 | 5.935 | 0.900 | 0.042 |
+| C, UKV only | 6.666 | 7.000 | 6.892 | 0.858 | 0.062 |
+| Placebo | 6.334 | 6.133 | 6.198 | 0.925 | 0.030 |
+| Reference, ERA5-trained best guess | 6.789 | 6.337 | 6.483 | 0.915 | 0.050 |
+| Reference, ENS-trained (experiment 33) | 6.312 | 6.137 | 6.193 | 0.947 | 0.019 |
 
-**No matched live history exists for the wind farms, so the result is a labelled ceiling.**
-Open-Meteo's UKV history at the three wind farms holds only `previous_day1` (a forecast issued at
-least 1 day before the hour); `previous_day2` to `previous_day7` are empty. `previous_day1` starts
-on 2024-08-06 and holds 7,769 of the 10,944 hourly values of the ENS window at one farm (71%), so
-it could support lead day 0 only. The CEDA archive is not the live product: its licence is
-non-commercial, the [UKV-CEDA blends study](../../studies/forecasts/ukv-ceda-blends.md) found it
-statistically different from the live feed, and UKV was upgraded on 2026-01-21, inside the
-validation year. A UKV-CEDA gain therefore says what a matched UKV might add, not what a deployable
-one would.
+At 24 to 54 hours, arm B's band is slightly narrower than arm A's (coverage 0.900 against 0.924, and
+0.042 above the 0.95 quantile against 0.031), as expected when the trees lean on UKV and no spread
+factor corrects it. Per farm at 24 to 54 hours, the scores are A 5.871, 6.382, 6.109 and B 5.458,
+6.184, 6.127 at W1, W2, and W3.
 
-**The latency UKV has live is stated, not measured.** The service reads ENS at 09:00 UTC. The
-experiment assumes the 00 UTC UKV run is available within 8 hours of its start, from the Met
-Office's published schedule, and does not measure when it publishes.
+## What else the numbers show
 
-## Caveats
+All reads in this section are exploratory.
 
-- **ENS-trained models are weaker for wind.** Experiment 1 found the ERA5-trained wind model beat
-  the ENS-trained model by 1.70 points, so arm A and arm B sit above the best-guess reference row.
-- **UKV's history is short.** Training uses 455 daily runs (about 15 months).
-- **A UKV upgrade lies inside the validation year** (2026-01-21), so part of the validation year
-  runs on a version the models never saw in training.
-- **The cases are the same Tuesday runs and three farms as experiment 52's**, so the contrast is
-  not a confirmation on fresh data.
-- **Arm B's pooled mixture may be too narrow.** Its spread comes only from the six ENS columns, so the
-  more the trees lean on UKV, the narrower the pooled mixture. No spread factor corrects this; the
-  report's coverage and above-0.95-quantile share show it.
-- **The scored cases cover lead day 1 and 6 hours of lead day 2 only**, because UKV stops at 54
-  hours. A result at days 1 and 2 of ENS-based forecasts in other experiments is not comparable.
+- **Two farms gain and one does not.** B minus A at 24 to 54 hours is -0.413 (-0.686 to -0.155) at
+  W1, -0.198 (-0.378 to -0.000) at W2, and +0.018 (-0.177 to +0.219) at W3.
 
-## Sizing
+  ![ENS plus UKV minus ENS only, per farm](figure_2.svg)
 
-- **What gets stored:** private prediction tables under `data/ml-experiments/`. Not a trigger.
-- **Serving path:** untouched. A `supported` verdict would add a weather feed and a model input.
-- **Degradation rule:** untouched. A missing UKV run would fall back to arm A.
-- **Defensible designs:** more than one (UKV as extra columns, as a second model in a blend, or as a
-  calibrator input). The plan follows the maintainer's request for arms A, B, and C.
-- **Callers:** the experiment copies experiment 33's N1 recipe and the matched-lead study's UKV
-  reading, which it may not import.
-- **Size: complex** (two triggers). One Sonnet plan review, one Sonnet code review, one Sonnet prose
-  review, and one Opus result review only if the result needs it.
+- **The gain holds across the UKV upgrade and without July.** B minus A is -0.189 (-0.342 to
+  -0.025) before UKV's upgrade of 2026-01-21, -0.210 (-0.387 to -0.006) after it, and -0.180
+  (-0.309 to -0.045) without July 2025.
+- **Lead day 0 gains more.** B minus A at 0 to 24 hours is -0.374 (-0.526 to -0.203), and over all
+  cases it is -0.255 (-0.348 to -0.145). Lead day 0 lies outside the contrast.
+- **The placebo scores the same as arm A.** The placebo minus A is +0.013 (-0.012 to +0.040) at 24 to
+  54 hours, and B minus the placebo is -0.211 (-0.334 to -0.076).
+- **UKV alone is far worse than ENS alone.** C minus A is +0.881 (+0.460 to +1.308) at 24 to 54
+  hours and +0.329 (-0.113 to +0.795) at lead day 0.
+- **ENS plus UKV beats the ERA5-trained best guess.** B minus the best guess is -0.416 (-0.693 to
+  -0.136) at 24 to 54 hours and -0.826 (-1.586 to -0.103) at lead day 0.
+- **The ENS-only model is level with the best guess.** A minus the best guess is -0.218 (-0.472 to
+  +0.069) at 24 to 54 hours, and the experiment 33 ENS-trained model minus A is +0.018 (-0.026 to
+  +0.064). Experiment 1 had the ERA5-trained model ahead by 1.70 points; this contrast covers only
+  the first 54 hours.
+- **UKV is slower than ENS at the farms.** Over the scored cases, UKV's mean 10 m wind speed is
+  4.46 m/s against 5.00 m/s for the ENS control member.
 
-## Design details
+## How the experiment was run
 
-- **Cases:** the half-hourly cases of experiment 33's stored `bg_full` table (three farms, three
-  seeds, the Tuesday runs), restricted to valid times 24 to 54 hours after the 00 UTC start of the
-  ENS run's date. A case where UKV is absent is dropped from every arm, so C1 is scored on the
-  52 Tuesday runs that have a complete UKV run, not on all 53 stored runs.
-- **Training rows:** every 00 UTC run of 2024-04-01 to 2025-06-30 for which the UKV run is complete,
-  per farm, using the ENS control member's half-hourly valid times from 9.5 to 54 hours after the run's
-  00 UTC. The `lead_hours`, lag, and recency-weight definitions are experiment 33's. Arms A, B, and
-  C train on the same rows.
-- **Fits:** the nine-level quantile loss, `eta` 0.05, depth 6, 500 rounds, on the GPU, as in
-  experiment 33; seeds 0, 1, and 2.
-- **Spread factor and blend:** none. Every arm is scored as the model outputs it.
-- **Missing values:** a case or training row with a non-finite value in any UKV column (the 925 hPa
-  speed is NaN where the level lies below the ground) is dropped from all three arms alike.
-- **Units and cells:** UKV-CEDA speeds are in m/s, as ENS's are. Each farm reads its nearest 2 km
-  cell (the three farms lie 0.9 to 1.1 km from one), by `studies.grid_sampling.nearest_cells`; the
-  store reader is copied from the study script that already reads it.
-- **Exploratory splits:** C1 is also read before and after UKV's upgrade of 2026-01-21, and without
-  the first validation month.
-- **Alignment assertion:** every run read has `init_time` at 00:00 on the ENS run's date.
-- **Scores reported:** the absolute quantile score of every arm per farm and per lead-day band (lead
-  day 1 and the first 6 hours of lead day 2); the coverage of the 5% to 95% band; the share of cases
-  above the 0.95 quantile; UKV's mean 10 m wind speed on the validation year against ENS's and
-  ERA5's; the number of training rows and runs per arm. Cases at lead day 0 (0 to 24 hours) are
-  scored and reported as exploratory, labelled as outside the contrast.
-- **Placebo:** arm B with the UKV columns shuffled among rows of the same farm, month, lead hour of
-  day, and lead day, in training and in scoring. It shows how much of any gain comes from the extra
-  columns' mere presence.
+- **Arms:** every arm is an XGBoost model with nine quantile levels, trained per farm and per seed
+  (0, 1, and 2) with experiment 33's recipe for its ENS-trained model: the ENS control member of the
+  daily 00 UTC runs from 2024-04-01 to 2025-06-30, recency weights with a half-life of 2 years,
+  `lead_hours`, and three lags of power from the 09:00 UTC origin. The three farms have 40,864,
+  40,876, and 40,846 training rows (W1, W2, W3), identical for every arm. Arm B runs once per ENS
+  member with the UKV columns fixed, and the 51 member quantile sets are pooled.
+- **UKV:** the CEDA archive's 00 UTC run of the ENS run's date, at each farm's nearest 2 km cell
+  (0.9 to 1.1 km away). The four columns are 10 m speed, the sine and cosine of the 10 m direction,
+  and the speed at 925 hPa, because the archive holds no 100 m wind. The store lacks hourly steps
+  49, 50, 52, and 53, which are interpolated linearly, and a valid time at :30 averages the east-west
+  and north-south components of the hours either side. All 455 of the 456 training runs and 52 of
+  the 53 validation Tuesday runs have a complete UKV wind set at each farm; the run of 2026-06-30 is
+  missing and its cases are dropped from every arm.
+- **Latency:** the experiment assumes the 00 UTC UKV run is available within 8 hours of its start,
+  from the Met Office's published schedule, and did not measure it. The service reads ENS at 09:00
+  UTC.
+- **No matched live history:** Open-Meteo's UKV history at the farms holds only `previous_day1`
+  (lead day 0), starting on 2024-08-06 and covering 71% of the training window at one farm.
+- **Departures from the plan:** none in the contrast or the decision rule. The plan's four-column UKV
+  set and the 24 to 54 hour range are as planned; the exploratory splits were added as planned.
+- **Code:** `ml-experiments/00054-product-trained-xgboost-wind-farms/`. One Sonnet plan review and
+  one Sonnet code review found no leakage; the code review noted that the UKV run coverage is
+  counted per run in the fit script, so a separate check script counts it per farm (455 and 52 at
+  every farm) and finds no placebo group of one row.
 
-## Advice followed and departures
+## What the next experiment should answer
 
-- **Followed:** experiment 52's advice to rerun with the product aligned to the ENS run, and not to
-  fit a spread factor on blends made under other weights.
-- **Departed from:** experiment 52's advice to correct each product's wind speed. The trees learn
-  the product's bias from its own history, so no separate correction is fitted.
-- **Departures from earlier plans:** no ERA5-trained model, blend, or spread step is used; ICON-EU,
-  IFS HRES 9 km, and GFS are dropped; the contrast is arm B minus arm A.
-
-## Compute
-
-Slot E: 6 cores, GPU at most 12 GB. Each seed fits arms A, B, and C for three farms (9 fits), so 27
-fits in all, plus 9 for the placebo, each on about 40,000 rows (455 runs times about 89
-half-hourly valid times). The XGBoost thread count is set to 6.
-No download.
+**Whether a live UKV feed gives the same gain.** The Met Office's live UKV forecast is the product a
+service would receive, and the CEDA archive differs from it statistically. The next experiment
+should build a matched history of the live UKV for the three farms, which needs a source that holds
+live UKV at lead days 1 and 2 (Open-Meteo's history stops at lead day 0), and rerun arms A and B on
+it. A second option is a lead day 0 test on Open-Meteo's live UKV, where the CEDA arm already gains
+-0.374.
