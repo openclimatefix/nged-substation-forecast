@@ -1,7 +1,7 @@
 ---
 id: "00070"
 slug: sw2-19-same-sign-neighbour-count
-status: planned
+status: done
 size: simple
 hypothesis: >-
   One alarm score that adds the count of neighbouring substations stepping the same way as the
@@ -44,43 +44,129 @@ metric: >-
   split by metered receiver, each shape separately, and the count of the 35 labelled real transfers
   over 1 day found follow.
 code: ml-experiments/00070-sw2-19-same-sign-neighbour-count/
+verdict: supported
+best_arm: >-
+  LOGIT_SAME (the logistic score with the same-sign neighbour count) finds 0.712 of the moved MW on
+  the fresh headline-band transfers (97.5% interval 0.621 to 0.793), against PF14's 0.665 (0.555
+  to 0.745). The paired difference C1 is +0.048 (+0.021 to +0.096).
+lessons: >-
+  Counting the neighbours that step the same way as the alarming substation lowers its alarm
+  score, as the neighbour veto does, and doing so finds +0.048 more of the moved MW than the
+  single-series detector at the same 80 odd-month unexplained alarms. The gain is larger than the
+  +0.019 of the score without the count. It sits in transfers with no metered receiver and a donor
+  step of 2 to 4 noise units. It does not extend to transfers lasting over 15 days (C2 is 0.000),
+  and on the 35 labelled real transfers LOGIT_SAME finds 7 against PF14's 8, so the real data do
+  not confirm it.
+advice:
+  - >-
+    Use LOGIT_SAME (own step, largest opposite neighbour step, neighbour count, same-sign
+    neighbour count) rather than the single-series detector where a better onset is wanted for
+    headline-band transfers; it found +0.048 (+0.021 to +0.096) more of the moved MW (C1).
+  - >-
+    Do not expect the same-sign count to help on transfers lasting over 15 days; the long-set
+    contrast was 0.000 because those transfers are found only through strong own-step alarms (C2).
+  - >-
+    Treat the labelled real transfers as unconfirmed for the score: it found 7 of the 35 against
+    PF14's 8, and onsets for 12 against 11 (real transfers section).
+production_status: candidate
+adopted_in: none
 ---
 
-# Experiment 70 (SW2-19, part of the switching-event detector series): does the count of neighbours that step the same way find more moved load?
+# Experiment 70 (SW2-19, part of the switching-event detector series): does counting the neighbours that step the same way find more moved load?
 
-*Plan, written before any fresh transfer is scored.*
+**Counting how many neighbouring substations step in the same direction as the alarming substation
+finds more of the moved load, so the common-mode evidence that the neighbour veto uses is worth
+keeping as a score input. The gain showed up on injected transfers of 1 to 15 days and not on the
+labelled real transfers, so the real data have not yet confirmed it.** The planned contrast is
+supported.
 
-**Question.** Experiment 65 found, after reading its results, that adding the count of neighbouring
-substations stepping the same way to a logistic alarm score raised the share of moved MW found by
-+0.034 over the single-series detector (+0.013 to +0.091). This experiment repeats that arm as a
-planned contrast, against the first-return end rule PF14 that experiment 69 made the benchmark,
-on injected transfers drawn with new seeds.
+We asked whether a detector for load transfers finds more of them when its alarm score uses the
+count of neighbours that step the same way. A load transfer is a switching operation that moves
+part of one Primary substation's demand (the donor) onto neighbouring substations (the receivers)
+for some hours or days. A Primary substation is the 11 kV or 6.6 kV substation that feeds local
+distribution circuits. The single-series detector raises an alarm when the 24-hour average of a
+substation's residual (measured power minus an XGBoost forecast that uses no past power) steps by
+4.0 noise units or more, where one noise unit is the usual size of that step on odd-numbered
+months. We added known transfers to the power history of 16 Primary substations, and counted the
+share of the moved megawatts (MW) that each detector found. A transfer counts as found when an
+alarm starts within 2 hours of its start and ends within the larger of 6 hours and 10% of its
+duration. Each detector was held to 80 alarms on odd months that match no closure in NGED's
+switching log. On 615 fresh transfers per injection shape that start in even months, the
+single-series detector (PF14) found 0.665 of the moved MW. The score with the same-sign count
+(LOGIT_SAME) found 0.712, which is +0.048 more (97.5% interval, from resampling whole calendar
+months, +0.021 to +0.096). The share of moved MW missed falls from 0.335 to 0.288.
 
-**Design.**
+![MW-weighted recall by arm](figure_1_recall_by_arm.svg)
 
-- **Scores.** A candidate is a local peak of a substation's 24-hour step statistic at or above 2.5
-  noise units. LOGIT_SAME is a logistic regression on the candidate's own step, the largest
-  opposite-sign neighbour step, the number of neighbours, and the number of neighbours whose
-  same-sign step exceeds 2.0 noise units. LOGIT is the same without the same-sign count. Both are
-  fitted as in experiment 65: positives are the candidates within 2 hours of the onset of an
-  injected headline-band transfer that starts in an odd month (experiment 58's draw), negatives
-  are the unexplained odd-month candidates of the real residual. Each threshold is set so that
-  80 odd-month unexplained real alarms remain.
-- **End rule.** Every arm uses PF14: the first opposite step of at least half the onset step,
-  otherwise the tracked end.
-- **Test transfers.** A fresh headline-band draw of 1,160 transfers and a fresh long-set draw, both
-  with seeds that experiments 58 and 69 did not use, scored under the five injection shapes.
-  The headline pools S2, S3, and S4, which the scores do not assume.
-- **Real transfers.** The 35 labelled real transfers over 1 day are scored for each arm.
-- **Caveat.** Interval ends use up to 14 days of hindsight, so the detector serves training-time
-  masks and the NGED event table, not live forecast inputs.
+## Verdict
 
-**Size.** Simple: (1) nothing new is stored beyond private score tables; (2) no production serving
-path; (3) no degradation rule; (4) the design repeats experiment 65's score under experiment 69's
-benchmark, with one defensible reading; (5) the code is a copy of the two experiments' harnesses,
-whose callers are all inside this folder.
+**The experiment is supported.** C1, LOGIT_SAME minus PF14 on the fresh headline-band draw, has
+its lower end above zero (+0.021) and a point value above the threshold of +0.02. C2, the same
+contrast on the fresh long draw, is 0.000 (0.000 to 0.000), above the guard of -0.02. All intervals
+are 97.5% (Bonferroni across the two planned contrasts), from 20,000 resamples of whole calendar
+months. The injection shapes are the constant MW, the receiver profile, and the fitted mix (S2, S3,
+and S4 of experiment 60), none of which the scores assume, pooled with equal weight. Interval ends
+use the first-return end rule PF14 of [experiment 69](../00069-sw2-17-missed-onsets-of-the-end-rule/result.md),
+which needs up to 14 days of hindsight, so the detector serves training-time masks and the NGED
+event table, not live forecast inputs.
 
-**Earlier advice followed.** Experiment 65: pre-register the score with the same-sign count
-(done), use D0M as the benchmark for neighbour evidence (done, with experiment 69's end rule).
-Experiment 69: use PF14 as the end rule (done); keep a matched-alarm-count control (the matched
-count of 80 applies to every arm).
+| Arm (even months, 80 odd-month unexplained alarms) | Headline-band recall | Share of MW missed | Long-set recall |
+|---|---|---|---|
+| PF14 (benchmark) | 0.665 (0.555 to 0.745) | 0.335 | 0.400 (0.092 to 0.562) |
+| LOGIT (no same-sign count) | 0.688 (0.597 to 0.760) | 0.312 | 0.402 (0.095 to 0.563) |
+| LOGIT_SAME | 0.712 (0.621 to 0.793) | 0.288 | 0.400 (0.092 to 0.562) |
+
+**The same-sign count roughly doubles the gain of the logistic score.** LOGIT minus PF14 is +0.024
+(-0.004 to +0.061), and LOGIT_SAME minus LOGIT is +0.024 (+0.007 to +0.053). Both descriptive
+contrasts use the same 97.5% level and carry no verdict. On odd months, which the scores were
+tuned on, LOGIT_SAME minus PF14 is +0.050 (+0.017 to +0.096).
+
+**The count of alarms did not rise to buy the recall.** Even-month unexplained alarms were 80 for
+PF14, 54 for LOGIT, and 61 for LOGIT_SAME, against exactly 80 on the odd months for all three.
+
+## Where the gain sits
+
+**The gain sits in transfers with no metered receiver, where the donor step is 2 to 4 noise
+units.** A metered receiver is a receiver whose own power is measured. Without one, PF14 finds 68
+of 537 such transfers (shapes S2, S3, and S4 summed), LOGIT finds 118, and LOGIT_SAME finds 167.
+With a metered receiver and a step of 2 to 4 noise units, LOGIT_SAME finds 84 of 135 against
+PF14's 85, so it gains nothing there. Without a metered receiver and with a step of 4 to 6,
+LOGIT_SAME finds 146 of 257 against PF14's 125. The score can raise an alarm on a step below
+4.0 noise units, which PF14 cannot, when no neighbour steps the same way. The experiment does not
+test why the gain is confined to transfers with no metered receiver.
+
+![Share found by donor step](figure_2_share_found_by_step.svg)
+
+By injection shape the contrast is similar: LOGIT_SAME minus PF14 is +0.046 for S2, +0.050 for
+S3, and +0.047 for S4, and +0.049 for the donor-profile shape S1 and +0.039 for S5 (a profile
+shifted by 12 hours). Every one of the five has its lower end above zero.
+
+## Long transfers and labelled real transfers
+
+**Long transfers gain nothing, because the first-return end rule dominates and strong own-step
+alarms find them.** The long-set recall of PF14 and LOGIT_SAME is 0.400 for both, and C2 is 0.000.
+A transfer lasting over 15 days is found only when the alarm at its onset has the right end, and
+the end comes from the return step, not from the score.
+
+**On the 35 labelled real transfers of more than 1 day, LOGIT_SAME found 7 and PF14 found 8.**
+The onset alarm was right for 12 with LOGIT_SAME and 11 with PF14. Thirty-five transfers cannot
+rank the arms, so the real data neither support nor contradict the injected result.
+
+## Limits
+
+- **The scores are trained on the generator that draws the test transfers.** Training uses odd
+  months of the draw of experiment 58 and scoring uses even months of a draw with new seeds, but
+  both draw donors and receivers the same way. Real transfers may look different, and the 7 of 35
+  does not confirm the gain.
+- **The fitted weights are shrunk very little.** The standardised logistic coefficients are 2.66
+  on the own step, 2.44 on the largest opposite neighbour step, -1.02 on the number of
+  neighbours, and -0.85 on the same-sign count, from 2,230 positive and 507 negative candidates.
+  The neighbour count may be a stand-in for how well a substation is connected.
+- **The candidate floor of 2.5 noise units caps recall.** Steps below it cannot be found.
+
+## What the next experiment should answer
+
+**Does the same-sign count survive a labelled set of real transfers large enough to separate the
+arms?** The injected transfers show a gain of about +0.05, and the 35 real transfers cannot confirm
+or refute it. The detector series could next test the score on the transfers the labeller finds in
+a later period, or combine it with the refit and gap fixes of SW2-18.

@@ -89,6 +89,7 @@ the maintainer to confirm.
 | [00065 - Switching event detector, part 8](00065-sw2-14-combined-single-series-and-neighbour-score/result.md) | Does one score that adds a substation's own step to its neighbours' opposite steps find more of the moved MW than the single-series detector, the neighbour gate, and the neighbour veto? | Inconclusive: the logistic-regression score gains +0.019 in share of moved MW found over the single-series detector (99.17% interval -0.011 to +0.062) and the likelihood-ratio score +0.005 (-0.010 to +0.014); a post hoc variant that adds the count of same-sign neighbour steps gains +0.034 (+0.013 to +0.091) | Not for production | 2026-10-16 |
 | [00066 - Switching event detector, part 9](00066-sw2-16-end-rule-as-baseline/result.md) | Which window (4 or 24 hours) and cap (14, 30, or 60 days) should the end rule use, as the benchmark for later detectors? | Inconclusive: the 4-hour window finds 0.147 less of the moved MW than the 24-hour window (99% interval -0.248 to -0.054); a 30-day cap finds 0.534 more on transfers over 15.6 days (+0.131 to +0.780) and 0.045 less on shorter ones (-0.070 to -0.011) | Not for production | 2026-10-16 |
 | [00069 - Switching event detector, part 10](00069-sw2-17-missed-onsets-of-the-end-rule/result.md) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their start, and does a weak alarm confirmed by a later step back recover them? | Inconclusive: the weak alarms add +0.146 of the moved MW, but the strong threshold must rise from 4.0 to 6.55 to keep 80 alarms, so the net change is +0.007 (98.75% interval -0.014 to +0.040); the first-return end rule beats the 14-day rule on a fresh draw (+0.038, +0.016 to +0.077) | Not for production | 2026-10-16 |
+| [00070 - Switching event detector, part 11](00070-sw2-19-same-sign-neighbour-count/result.md) | Does counting the neighbours that step the same way as the alarming substation find more of the moved MW than the single-series detector with the PF14 end rule? | Supported: +0.048 of the moved MW (97.5% interval +0.021 to +0.096) on fresh headline-band transfers at 80 odd-month unexplained alarms; no gain on long transfers or the 35 real transfers (7 against 8) | Candidate | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1359,6 +1360,25 @@ verdict is `inconclusive`.
   #1300](https://github.com/openclimatefix/nged-substation-forecast/pull/1300).
 
 ![The class of each unalarmed real transfer](00069-sw2-17-missed-onsets-of-the-end-rule/figure_1_classes.svg)
+
+### 00070: does counting the neighbours that step the same way find more of the moved load? (SW2-19)
+
+**Counting how many neighbouring substations step in the same direction as the alarming substation
+finds more of the moved load on injected transfers, so the common-mode evidence the neighbour veto
+uses is worth keeping as a score input. The 35 labelled real transfers cannot confirm it.** A
+logistic alarm score on the substation's own 24-hour step, the largest opposite neighbour step, the
+number of neighbours, and the same-sign neighbour count found 0.712 of the moved MW on 615 fresh
+headline-band transfers per injection shape that start in even months, against 0.665 for the
+single-series detector with the PF14 end rule, a difference of +0.048 (97.5% interval +0.021 to
++0.096) at 80 odd-month unexplained alarms for both. The verdict is `supported`.
+
+- **Finding for later experiments:** the gain sits in transfers with no metered receiver and a
+  donor step of 2 to 4 noise units (68 of 537 found by PF14, 167 by the score). Long transfers gain
+  nothing (0.000). On the 35 labelled real transfers the score found 7 against PF14's 8.
+- **Write-up and pull request:** [the full result
+  page](00070-sw2-19-same-sign-neighbour-count/result.md), PR PRNUMBER.
+
+![MW-weighted recall by arm](00070-sw2-19-same-sign-neighbour-count/figure_1_recall_by_arm.svg)
 
 ### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
 
