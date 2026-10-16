@@ -1212,7 +1212,7 @@ size of the step on a quiet day.
   events, or the real events may be smaller in noise units. Paired-step intervals (SW2-6 in the
   research plan) are a candidate next test.
 - **Write-up and pull request:** [the full result page](00060-sw2-7-profile-weighted-step-detector/result.md),
-  PR to be linked on merge.
+  [PR #1290](https://github.com/openclimatefix/nged-substation-forecast/pull/1290).
 
 ![Gain of the profile-weighted step by injection shape](00060-sw2-7-profile-weighted-step-detector/figure_1_gain_by_shape.svg)
 
