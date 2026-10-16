@@ -1,25 +1,33 @@
-"""What the fetch and check scripts of the ENS backfill pilot share: paths, the crop, and HTTP.
+"""Fetching a band of grid rows from Dynamical.org's staged ECMWF ENS GRIB files.
 
-The pilot downloads a band of grid rows from each message of Dynamical.org's staged ECMWF ENS
-GRIB files. `studies.grib1_simple` reads the messages, `studies.ens_grib_source` reads the
-sidecars, and this module holds the parts that only these two scripts need.
+The ENS backfill pilot and the control-member backfill fetch both download the same band of grid
+rows from each message. `studies.grib1_simple` reads the messages, `studies.ens_grib_source` reads
+the sidecars, and this module holds the constants, the HTTP code, and the one-date fetch they share.
 """
 
+import hashlib
+import os
 import random
+import subprocess
 import threading
 import time
+from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 import numpy as np
 import requests
-from studies.ens_grib_source import IdxEntry, parse_idx, prefix_range_header
+
+from studies.ens_grib_source import IdxEntry, find_gaps, parse_idx, prefix_range_header
 from studies.grib1_simple import (
     Grib1Header,
     bytes_needed_for_rows,
+    decode_values,
     parse_header,
+    unpack_rows,
 )
 from studies.sources import ENS_BACKFILL_PILOT_DIR
 
@@ -33,9 +41,21 @@ BUCKET_PREFIX: Final[str] = (
 """The bucket prefix that `aws s3 ls --no-sign-request` lists."""
 
 USER_AGENT: Final[str] = (
-    "nged-substation-forecast-ens-pilot/0.1 (+https://github.com/openclimatefix/nged-substation-forecast)"
+    "nged-substation-forecast-ens-backfill/0.1 (+https://github.com/openclimatefix/nged-substation-forecast)"
 )
 """The proxy answers 403 to Python's default user agent."""
+
+
+def list_bucket() -> str:
+    """List every object under the ENS prefix with the AWS command line, anonymously."""
+    result = subprocess.run(
+        ["aws", "s3", "ls", "--no-sign-request", "--recursive", BUCKET_PREFIX],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
+
 
 MembersType = Literal["control", "all"]
 """Which ensemble members a run fetches."""
@@ -130,6 +150,10 @@ class FetchError(Exception):
     """A request failed in a way that retrying will not fix."""
 
 
+class RetriesExhaustedError(FetchError):
+    """Every attempt at a request failed, which points at the server or the network."""
+
+
 @dataclass
 class RequestStats:
     """Thread-safe counters for one run of requests."""
@@ -205,7 +229,9 @@ def get_bytes(
             continue
         stats.add(byte_count=len(body))
         return body
-    raise FetchError(f"{url} {byte_range}: gave up after {MAX_ATTEMPTS} attempts ({last_problem})")
+    raise RetriesExhaustedError(
+        f"{url} {byte_range}: gave up after {MAX_ATTEMPTS} attempts ({last_problem})"
+    )
 
 
 def file_url(*, day: date, file_name: str) -> str:
@@ -330,7 +356,7 @@ def fetch_message_prefix(
 
     Raises:
         FetchError: If the request fails.
-        ValueError: If the header is not one this pilot can decode, or disagrees with the idx
+        ValueError: If the header is not one this module can decode, or disagrees with the idx
             entry about the message length, parameter, level, step or member, or the grid is not
             the 1440 by 721 grid the crop assumes.
     """
@@ -386,3 +412,122 @@ def _check_header_against_idx(*, day: date, message: PlannedMessage, header: Gri
             f"{day} {message.file_name} {message.variable} member {message.member} step "
             f"{message.step_hours}: " + "; ".join(problems)
         )
+
+
+def load_plan(*, day: date, members: MembersType, stats: RequestStats) -> list[PlannedMessage]:
+    """Fetch the sidecars of one date, check they tile their files, and plan the messages."""
+    idx_by_file: dict[str, list[IdxEntry]] = {}
+    for file_name in files_needed(members=members):
+        entries = fetch_idx(day=day, file_name=file_name, stats=stats)
+        gaps = find_gaps(entries=entries)
+        if gaps:
+            raise FetchError(f"{day} {file_name}.idx has {len(gaps)} gaps, the first: {gaps[0]}")
+        idx_by_file[file_name] = entries
+    return plan_date(idx_by_file=idx_by_file, members=members)
+
+
+def fetch_one(*, day: date, message: PlannedMessage, stats: RequestStats) -> dict[str, object]:
+    """Fetch, check and decode one message, returning what goes in the output arrays."""
+    body, header = fetch_message_prefix(day=day, message=message, stats=stats)
+    packed = unpack_rows(message=body, header=header, first_row=FIRST_ROW, last_row=LAST_ROW)
+    cropped = packed[:, CROP_COLUMNS]
+    return {
+        "raw_x": cropped,
+        "values": decode_values(packed=cropped, header=header).astype(np.float32),
+        "reference_value": header.reference_value,
+        "binary_scale": header.binary_scale,
+        "decimal_scale": header.decimal_scale,
+        "bits_per_value": header.bits_per_value,
+        "sha256": hashlib.sha256(body).hexdigest(),
+        "range_bytes": len(body),
+    }
+
+
+def fetch_planned(
+    *,
+    day: date,
+    planned: list[PlannedMessage],
+    members: MembersType,
+    workers: int,
+    stats: RequestStats,
+) -> dict[str, Any]:
+    """Fetch every planned message of one date and return the arrays of its checkpoint file."""
+    member_numbers = members_for(members=members)
+    shape = (len(PILOT_VARIABLES), len(member_numbers), len(STEPS_HOURS))
+    rows = LAST_ROW - FIRST_ROW + 1
+    arrays: dict[str, Any] = {
+        "values": np.full((*shape, rows, len(CROP_COLUMNS)), np.nan, dtype=np.float32),
+        "raw_x": np.zeros((*shape, rows, len(CROP_COLUMNS)), dtype=np.uint16),
+        "reference_value": np.full(shape, np.nan),
+        "binary_scale": np.zeros(shape, dtype=np.int16),
+        "decimal_scale": np.zeros(shape, dtype=np.int16),
+        "bits_per_value": np.zeros(shape, dtype=np.uint8),
+        "sha256": np.full(shape, "", dtype="U64"),
+        "range_bytes": np.zeros(shape, dtype=np.int64),
+        "message_offset": np.zeros(shape, dtype=np.int64),
+        "message_length": np.zeros(shape, dtype=np.int64),
+        "file_name": np.full(shape, "", dtype="U16"),
+    }
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(fetch_one, day=day, message=message, stats=stats): message
+            for message in planned
+        }
+        try:
+            for future in as_completed(futures):
+                message = futures[future]
+                position = (
+                    PILOT_VARIABLES.index(message.variable),
+                    member_numbers.index(message.member),
+                    STEPS_HOURS.index(message.step_hours),
+                )
+                result = future.result()
+                for key, value in result.items():
+                    arrays[key][position] = value
+                arrays["message_offset"][position] = message.entry.offset
+                arrays["message_length"][position] = message.entry.length
+                arrays["file_name"][position] = message.file_name
+        except BaseException:
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
+    arrays["latitudes"] = CROP_LATITUDES
+    arrays["longitudes"] = CROP_LONGITUDES
+    arrays["longitudes_degrees_east"] = CROP_LONGITUDES_DEGREES_EAST
+    arrays["variables"] = np.array(PILOT_VARIABLES)
+    arrays["members"] = np.array(member_numbers)
+    arrays["steps_hours"] = np.array(STEPS_HOURS)
+    arrays["date"] = np.array(day.isoformat())
+    return arrays
+
+
+def write_checkpoint(*, arrays: dict[str, Any], out_path: Path) -> None:
+    """Write one date's arrays through a `.partial` file, so a crash leaves no half-written file."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    partial = out_path.with_suffix(".npz.partial")
+    with partial.open("wb") as file:
+        np.savez_compressed(file, **arrays)
+        file.flush()
+        os.fsync(file.fileno())
+    partial.rename(out_path)
+
+
+def shard_dates(*, dates: Sequence[date], shard: int, shard_count: int) -> list[date]:
+    """Return every `shard_count`-th date from `shard`, so parallel processes interleave.
+
+    Interleaving keeps the processes working through the dates in the same order, so an early
+    date range finishes first however many processes run.
+
+    Args:
+        dates: The dates in the order they should be fetched.
+        shard: This process's number, from 0 to `shard_count - 1`.
+        shard_count: How many processes share the dates.
+
+    Returns:
+        This shard's dates, in the original order.
+
+    Raises:
+        ValueError: If `shard` is outside 0 to `shard_count - 1`.
+    """
+    if not 0 <= shard < shard_count:
+        raise ValueError(f"shard {shard} is not in 0 to {shard_count - 1}")
+    return list(dates)[shard::shard_count]
