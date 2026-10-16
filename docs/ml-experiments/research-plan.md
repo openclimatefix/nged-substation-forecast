@@ -20,7 +20,6 @@ sooner.
 |---|---|---|---|---|
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
-| [SW2-18](#sw2-18-and-sw2-19-onsets-lost-to-refits-and-gaps-and-the-same-sign-neighbour-count) | Does removing the monthly-refit suppression and bridging data gaps recover the real transfers whose onset PF14 misses, without raising the alarm rate? | 2 | Nothing | Proposed; 9 of the 24 unalarmed real transfers in experiment 69 |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
@@ -216,22 +215,6 @@ day.
   carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
   injections. The benchmark is the best sequential detector from experiment 59 (the 24-hour single
   window) or SW2-14.
-
-#### SW2-18 and SW2-19: onsets lost to refits and gaps, and the same-sign neighbour count
-
-**PF14 is the benchmark end rule from experiment 69 onwards, and the two remaining leads are onsets
-the detector cannot see for mechanical reasons and one neighbour feature found post hoc.**
-Experiment 69 found that half of the 24 labelled real transfers over 1 day with no onset alarm are
-not a threshold problem: 6 start inside a data gap, 3 fall at a monthly refit of the residual
-XGBoost model, where the detector suppresses alarms, and 3 have an alarm 2 to 12 hours off the
-labelled start.
-
-- **SW2-18** removes the refit suppression by computing the residual from two monthly-refit XGBoost
-  models whose refit dates are offset by half a month, taking at each stamp the model furthest from
-  its refit. It also bridges a data gap by comparing the mean residual in the 24 hours before the
-  gap with the 24 hours after it. The benchmark is PF14 at the same alarm rate. Onset tolerances
-  that scale with the transfer's duration are reported as a scoring sensitivity for every arm and
-  decide nothing.
 
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 
