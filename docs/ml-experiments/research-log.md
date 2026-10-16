@@ -959,3 +959,20 @@ cards visible. The receivers-named bar was waived by the maintainer after the ru
   [PR #1253 (Experiment 41: SW2-0a switching-event labeller and its known-answer gate (plan))](https://github.com/openclimatefix/nged-substation-forecast/pull/1253).
 
 ![Recall of injected transfers by size and duration band](00041-sw2-0a-labeller-gate/figure_2_recall_by_band.svg)
+
+### 00041, part 2 (SW2-0b): the labelled set of real switching jobs
+
+**Of 537 logged switching jobs of 2 hours to 60 days, 66 (12%) show a visible transfer of load
+between substations, and 9 of 148 detector alarms with no logged closure do.** Two independent
+Sonnet runs labelled 1,017 summary cards (817 real, 200 hidden known-answer cards) and Opus settled
+66 disagreements. No hidden placebo card (0 of 100) and no quiet alarm window (0 of 40) was called
+visible. Few of the 440 not-visible jobs are proven quiet, because Sonnet misses transfers under 25%
+of the receiving load and under 1 day, and 13 of the 35 conserved calls rest on one substation
+with mostly missing readings.
+
+- **Finding for later experiments:** score detectors against the 82 visible cards, and treat the
+  331 not-visible operations of under 1 day as don't-care.
+- **Cost:** 20.1 million subagent tokens, a third above the estimate of 15 million.
+- **Write-up:** [labelled set](00041-sw2-0a-labeller-gate/labelled-set.md).
+
+![Final labels by card kind](00041-sw2-0a-labeller-gate/figure_4_labelled_counts.svg)

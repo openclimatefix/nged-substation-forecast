@@ -61,15 +61,21 @@ def real_operations() -> pl.DataFrame:
     )
 
 
+QUIET_RULE: dict[str, bool] = {"relaxed": False}
+"""`relaxed` keeps only the event's own surroundings free of logged intervals (SW2-0b sentinels)."""
+
+
 def is_quiet(*, panel: Panel, rows: list[int], first: int, last: int) -> bool:
     """True if the rows are unexcluded and mostly observed around the window."""
-    lo, hi = first - QUIET_STAMPS - 4 * WEEK, last + QUIET_STAMPS
-    if lo < 0 or hi >= min(N_STAMPS, LOG_END_STAMP):
+    relaxed = QUIET_RULE["relaxed"]
+    pad = 2 * 48 if relaxed else QUIET_STAMPS
+    lo, hi = first - pad - (0 if relaxed else 4 * WEEK), last + pad
+    if lo < (4 * WEEK if relaxed else 0) or hi >= min(N_STAMPS, LOG_END_STAMP):
         return False
     for row in rows:
-        if panel.excluded[row, lo + 4 * WEEK : hi].any():
+        if panel.excluded[row, (lo if relaxed else lo + 4 * WEEK) : hi].any():
             return False
-        if np.isnan(panel.obs[row, first : last + 1]).mean() > 0.2:
+        if np.isnan(panel.obs[row, first : last + 1]).mean() > (0.8 if relaxed else 0.2):
             return False
     return True
 
