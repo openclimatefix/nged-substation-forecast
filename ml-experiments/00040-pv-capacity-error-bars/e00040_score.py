@@ -101,7 +101,7 @@ def scenario(
     """
     vector = pv[:N_ARMS].copy()
     if lam is not None:
-        assert lam[0] != 0.0
+        assert abs(lam[0]) > 0.5, f"M1 leakage of the shape is {lam[0]}"
         vector = vector + amplitude * lam[:N_ARMS] / abs(lam[0])
     capacity, misfit = detector.capacity_and_misfit(
         vectors=scale * vector[None, :] + noise[:, :N_ARMS], ratios=ratios
@@ -182,14 +182,18 @@ def real_scores(
             for a in common.AMPLITUDES:
                 flags, errors = [], []
                 for unit in units:
+                    left_out = frozenset({unit.farm})
+                    unit_ratios = det.ratios(site=site, excluded=left_out)
+                    if unit_ratios is None:
+                        continue
                     flagged, ratio = scenario(
-                        scale=scale,
+                        scale=det.capacity(site=site, year=year, excluded=left_out),
                         pv=unit.pv,
                         lam=lam,
                         amplitude=a,
                         noise=noise,
-                        ratios=ratios,
-                        tau=tau,
+                        ratios=unit_ratios,
+                        tau=det.tau(site=site, year=year, excluded=left_out),
                     )
                     flags.append(flagged)
                     errors.append(np.abs(ratio[~flagged] - 1.0))
@@ -285,7 +289,7 @@ def continuity() -> list[str]:
     return lines
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Score everything, write the tables, and print the report."""
     det = load_detector()
     units = unit_scores(det=det)
@@ -353,6 +357,19 @@ def main() -> None:
         f"power at a = {common.POWER_AMPLITUDE}: "
         + ", ".join(f"{s} {p:.2f}" for s, p in power_by_shape.items())
     )
+    at_quarter = per_primary.filter(pl.col("amplitude") == common.POWER_AMPLITUDE)
+    counts = {
+        shape: int(
+            at_quarter.filter(
+                (pl.col("shape") == shape) & (pl.col("power") >= common.MIN_POWER)
+            ).height
+        )
+        for shape in common.SHAPES
+    }
+    lines.append(
+        "Primaries (of 8) with power >= 0.8 at a = 0.25: "
+        + ", ".join(f"{shape} {n}" for shape, n in counts.items())
+    )
     limit = (
         median_power.filter(pl.col("power") >= common.MIN_POWER)
         .group_by("shape")
@@ -408,7 +425,16 @@ def main() -> None:
         + str(
             real.filter(pl.col("flagged")).group_by("site").agg(pl.col("year").sort()).sort("site")
         )
+        + "\nFlagged years of Kirton: "
+        + str(sorted(real.filter(pl.col("flagged") & (pl.col("site") == "D5"))["year"].to_list()))
+        + "; flagged Primary-years elsewhere: "
+        + str(real.filter(pl.col("flagged") & (pl.col("site") != "D5")).height)
     )
+    with pl.Config(tbl_rows=20, tbl_width_chars=200, float_precision=2, tbl_cols=20):
+        lines.append(
+            "Bound B by shape, 2025/26:\n"
+            + str(latest_real.select("site", *[f"B_{s}" for s in common.OUT_OF_ARM_SHAPES], "B"))
+        )
     lines.append(
         "B at the clean Primaries: "
         + ", ".join(f"{r['site']} {r['B']:.3f}" for r in clean.iter_rows(named=True))

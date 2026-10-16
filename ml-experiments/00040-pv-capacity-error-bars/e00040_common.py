@@ -14,7 +14,7 @@ never written.
 from pathlib import Path
 from typing import Final
 
-from studies.sources import ML_EXPERIMENTS_DATA_DIR
+from studies.sources import CAMS_SITE_POINTS_DIR, ML_EXPERIMENTS_DATA_DIR, study_dir_for
 
 EXPERIMENT_ID: Final[int] = 40
 SLUG: Final[str] = "pv-capacity-error-bars"
@@ -38,6 +38,13 @@ REPORT_CHECKS_PATH: Final[Path] = INPUT_DIR / "report_checks.parquet"
 REAL_00039_PATH: Final[Path] = INPUT_DIR / "real.parquet"
 TIMESTAMP_SCAN_PATH: Final[Path] = INPUT_DIR / "timestamp_scan.parquet"
 FRAME_ROWS: Final[int] = 2_891_184
+MENU_PATH: Final[Path] = WORK_DIR / "orientation_menu.parquet"
+SERIES_PATH: Final[Path] = (
+    study_dir_for(study="stage1_pilot") / "demand" / "inputs" / "series.parquet"
+)
+CAMS_DEMAND_POINTS_PATH: Final[Path] = (
+    CAMS_SITE_POINTS_DIR.parent / "demand_points" / "cams_demand_points.parquet"
+)
 
 MAX_ZENITH_DEG: Final[float] = 75.0
 MIN_RELIABILITY: Final[float] = 0.9

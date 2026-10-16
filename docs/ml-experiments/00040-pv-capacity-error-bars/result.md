@@ -1,7 +1,7 @@
 ---
 id: "00040"
 slug: pv-capacity-error-bars
-status: planned
+status: done
 size: medium
 hypothesis: >-
   On the 8 directional (MW) Primary substations, comparing the PV capacity that six least-squares
@@ -39,138 +39,210 @@ metric: >-
   Capacity ratio C over truth, the false-positive rate of the misfit test, its power by confound
   shape and amplitude, and the bound B on the absolute relative error of C at an undetected
   Primary-year
+verdict: partly supported
+separation_verdict: underpowered
+best_arm: >-
+  Not applicable: the experiment scores a detector, not an arm. The headline capacity uses the
+  daily fit M1d divided by its injected recovery ratio.
+headline: >-
+  The misfit test is calibrated (median capacity over truth 0.992, 95% interval 0.951 to 1.032;
+  false-positive rate 0.055) and detects four of the five confound shapes that no fit contains at
+  25% of capacity, but it detects a day-long cloud load in only 0.35 of draws, so the
+  pre-registered power rule fails and the verdict is `underpowered`. Kirton is the one Primary
+  flagged in 2025/26, the bound on the capacity at the other seven is 0.18 to 0.71 (not the 0.10
+  predicted), and no confound is detectable at Wrangle T1.
+lessons: >-
+  A cross-arm misfit test separates a cloud-driven load from solar generation when the load has a
+  within-day shape (low sun, evening, a cloud threshold, a mixture), because the six fits then
+  disagree. It cannot do so for a load that is the same on every daylight half-hour of a day, or for
+  a load that rises with sunshine, because the disagreement between the fits then stays within
+  their sampling noise. Those two loads set the bound on the capacity.
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00040-pv-capacity-error-bars/
+advice:
+  - >-
+    Do not quote an embedded-solar capacity from a fit of one Primary as solar generation alone
+    without a stated bound, because a day-long cloud load of 25% of capacity is flagged in only
+    0.35 of draws and moves the capacity by about 20% (V2, bound B).
+  - >-
+    Leave Wrangle T1 (capacity near 1 MW and noisy) out of any claim that a Primary is free of a
+    cloud load, because the misfit test flags no confound shape there above 0.29 of draws at 25% of
+    capacity (figure 10).
+  - >-
+    Check a new solar farm against the others before using its injected output as the ratio vector,
+    because the ratios of Solar farm E leave the capacity 17% short and raise its false-positive rate
+    to 0.23 (figure 8).
+  - >-
+    Use the evening cloud response (18:00 to 22:30, sun at least 10 degrees below the horizon) as a
+    measured covariate in a next test of the bound, because it is a cloud response that cannot be
+    solar generation and it appears at several Primaries (figure 3).
+  - >-
+    Report the amplitude grid with any bound B, because B takes the median error at the largest
+    grid amplitude whose power is under 0.8 and so moves in steps of the grid (0.25 to 0.5 here).
 ---
 
 # Experiment 40: how far can the capacity fitted to embedded solar be trusted?
 
-**Status `planned`: this page is the plan, committed before any code runs.** Experiment 39 recovered
-a median 0.77 of the capacity of solar-farm output injected into the 8 directional Primary
-substations (0.85 for the daily fit), but it could not say how far a demand load that rises with
-cloud biases the fitted capacity of the real series. The scratch probes behind this plan found that
-such a load leaks into the half-hourly capacity at about 3 MW per MW of load, that richer demand
-terms lower the recovery below 0.75, and that no library of confound shapes recovers the PV capacity
-when the real confound has a shape outside the library. They also found that the same confound is
-easy to detect, because the six fits disagree about the capacity by an amount that a pure PV signal
-cannot produce. This experiment tests that detector with known answers and then applies it to the
-real series.
+**Verdict `underpowered`: the misfit test is calibrated and detects four of five cloud-driven loads at
+25% of the true capacity, but it detects a day-long cloud load in only 0.35 of draws, so the
+pre-registered power rule fails.** The test compares the capacity that six least-squares fits assign
+to the same series. Pure injected solar-farm output gives a median capacity over truth of 0.992 (95%
+interval 0.951 to 1.032) with a false-positive rate of 0.055. Kirton is the one directional Primary
+substation flagged in 2025/26, and the other seven are unflagged. The capacity at those seven carries
+a bound B of 0.18 to 0.71, and the test has almost no power at Wrangle T1, so the bound is wider than
+the 0.10 predicted. The aim is explanation and capacity estimation, not forecast skill. CAMS
+irradiance is the only weather input at the lag times and it arrives too late to drive a live
+forecast, so the fits describe past data.
 
-## Size
+![Figure 1: capacity per Primary in 2025/26 with its interval and bound](figure_01.svg)
 
-- **What gets stored:** nothing outside `data/ml-experiments/00040-pv-capacity-error-bars/work/`,
-  which is private and never committed. No Delta table, no model file, no prediction set.
-- **Production serving path:** not touched. The fits describe past data and use CAMS irradiance,
-  which arrives too late to drive a live forecast.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes, and the design was chosen by an Opus review of
-  experiment 39 over a richer demand model (PVDIS-2B) because the richer model fails a held-out
-  shape test.
-- **Code whose callers are hard to name:** no. The fitting code is copied from experiment 39's
-  folder and lives in this experiment's folder, and `packages/` is untouched.
+## Results against the plan
 
-The size is medium. The Opus design is the plan review. One Sonnet reviewer reads the code (the
-injection arithmetic, the false-positive and bias definitions, and leakage), and one Sonnet reviewer
-checks the write-up against the printed report.
+| Quantity | Prediction | Result |
+|---|---|---|
+| Median capacity over truth on pure injected PV (V1) | 1.00 (0.97 to 1.03) | 0.992 (0.951 to 1.032) |
+| False-positive rate | 0.05 to 0.10 | 0.055 (0.024 to 0.108) |
+| Power at amplitude 0.25, lowsun | at least 0.8 at 7 of 8 Primaries | 1.00 (median), at 7 of 8 |
+| Power at amplitude 0.25, evening | same | 1.00, at 7 of 8 |
+| Power at amplitude 0.25, mixture | same | 1.00, at 7 of 8 |
+| Power at amplitude 0.25, threshold | same | 1.00, at 6 of 8 |
+| Power at amplitude 0.25, dayL | same | 0.35, at 0 of 8 |
+| Kirton flagged | 2022/23 to 2025/26 | 2019/20 and 2021/22 to 2025/26 |
+| Other seven unflagged in 2025/26 | at most 3 flagged Primary-years elsewhere | 0 flagged Primary-years elsewhere |
+| Bound B at an unflagged Primary | at most 0.10 | 0.18 to 0.23 at five, 0.47 at Trusthorpe, 0.71 at Wrangle T1 |
 
-## Question and design
+**The test is calibrated.** The false-positive interval (0.024 to 0.108) comes from resampling
+Primaries and farms independently, and the 218 units are the (Primary, farm, season-year) triples of
+experiment 39. The ratios of one solar farm do not transfer to the others, which is a finding about
+the ratio vector and not about the test. Solar farm E's ratios leave the capacity at 0.825 of truth
+and its false-positive rate at 0.230, and the other five farms give a median between 0.955 and 1.046
+with a false-positive rate of at most 0.087.
 
-**Question.** On the 8 directional Primaries, does a cross-arm misfit test detect a cloud-driven
-demand load large enough to push M1's capacity outside the ±25% band with at least 80% power, at a
-false-positive rate of at most 10% on pure injected PV, and at how many Primaries is no such load
-detected in 2025/26?
+![Figure 8: capacity over truth by solar farm, leave-one-farm-out](figure_08.svg)
 
-**Arms.** Each arm fits, within one season-year of daylight half-hours, `power = cell + b * HDD +
-(cloud terms) - c * u`, where `u` is the unit PV shape driven by CAMS irradiance at the substation,
-`HDD` is heating degree-days, `L` is the flat cloud response `1 - min(GHI / clear-sky GHI, 1)`, and
-`cell` is a fixed effect for (month, local half-hour, day type). The six detector arms differ in the
-cloud terms:
+**The test finds a load with a within-day shape and misses a load that is the same all day.** Four
+shapes are flagged at 25% of capacity in at least 0.997 of draws at the median Primary: low sun,
+evening, a cloud threshold, and a half-and-half mixture. The shape `dayL`, the day's mean cloud on
+every daylight half-hour, reaches median power 0.904 only at amplitude 0.5. The post hoc detection
+limit, the smallest grid amplitude with median power at least 0.8, is 0.1 for low sun and evening,
+0.25 for the threshold and the mixture, and 0.5 for `dayL`.
 
-- **M1:** none.
-- **M1L:** `L`.
-- **M2:** `L * summer` and `L * winter`.
-- **M2h:** `L` by season half and by three local half-hour bands (before 20, 20 to 27, 28 and later).
-- **M1_s:** M1 on April to September rows only.
-- **M2h_s:** M2h on April to September rows only, with three band terms.
+![Figure 9: power against confound amplitude, one line per shape](figure_09.svg)
 
-The daily fit M1d is also fitted. It gives the headline capacity and is not one of the six detector
-arms. The east, south, and west orientation menu is fitted once per Primary-year as a descriptive
-figure and decides nothing.
+![Figure 10: power at amplitude 0.25 per Primary](figure_10.svg)
 
-**Injected PV and the ratios.** Each unit is a (Primary, solar farm, season-year) triple, paired as in
-experiment 39. A farm's output is normalised by its 99th percentile (dropouts removed), so the
-unit's true capacity is 1 MW. The fits are linear, so the arm vector of a unit is the six capacities
-fitted to the normalised output alone. For arm `a` at a Primary, `R_a` is the median over that
-Primary's units of the arm's capacity, computed leave-one-farm-out: a unit of farm `f` uses the units
-of the other farms.
+**A load that rises with sunshine escapes the test by construction.** Its shape is the solar shape,
+so every fit assigns it the same negative capacity. Its power is 0.12 at amplitude 0.1, 0.29 at 0.25,
+and 0.74 at 0.5, and the capacity it leaves undetected is 14%, 33%, and 64% too low. The amplitude is
+defined as the load's leakage into the half-hourly fit M1, and the capacity responds more strongly
+than M1 does because the recovery ratios are below 1.
 
-**Capacity and misfit.** For an arm vector `c`, the capacity under no confound is `C = (R . c) / (R .
-R)` and the relative misfit is `T = sqrt(mean((c - R * C)^2)) / C`. The headline capacity of a
-Primary-year is `c_M1d / R_M1d`, which is experiment 39's chosen arm, corrected.
+![Figure 15: detection power and bias for a load that rises with sunshine](figure_15.svg)
 
-**Noise.** For each real Primary-year, 200 bootstrap draws resample whole 7-day blocks of local dates
-with replacement, up to the season-year's length, with a fixed seed. Each draw gives an arm vector.
-The noise draws are each vector minus the mean of the 200.
+## The real series
 
-**Null and threshold.** For Primary-year `(p, y)` the pure-PV arm vector of a unit is its arm vector
-scaled so the truth equals the real `C` of `(p, y)`, plus one noise draw. The threshold `tau(p, y)`
-is the 95th percentile of `T` over the units of the other farms at `p` (any year) times the 200
-draws, with `R` leaving out both the unit's farm and the scored unit's farm. A Primary-year is
-flagged when its real `T` exceeds `tau` built from all six farms.
+**Kirton is flagged in 6 of 7 season-years, and no other Primary is flagged in any.** Kirton's
+misfit is 0.075 and 0.098 in the two early flagged years and 0.20 to 0.31 from 2022/23, against
+thresholds of 0.07 to 0.12. Its six fits disagree by up to 2 MW in 2025/26.
+The test cannot flag Wrangle T1, whose threshold is 1.23 against a
+misfit of 0.25, so "unflagged" at Wrangle T1 means that the test has no power, and not that no load is
+present.
 
-**Confound shapes.** Each shape is divided by its mean over daylight rows: `flat = L`; `lowsun = L *
-(1 - u_clear)`; `winter = L * 1[October to March]`; `dayL` (the day's mean `L` on every daylight row);
-`evening = L * 1[local half-hour >= 30]`; `threshold = 1[L > 0.6]`; `mixture` (half flat and half
-lowsun, each mean-scaled); and `sunload = -u`. A shape's arm vector is the six capacities fitted to
-the shape alone, so adding the confound is a sum of vectors. The amplitude `a`, on the grid {0.1,
-0.25, 0.5, 1.0}, is set so that the shape's M1 leakage equals `a` times the truth, using that unit's
-own rows. The out-of-arm shapes, which no arm contains, are lowsun, dayL, evening, threshold, and
-mixture. Flat and winter are contained in some arms and are reported but not scored. `sunload` is the
-known blind spot, a load that rises with sunshine, and is reported but not scored.
+![Figure 11: misfit against threshold per Primary-year](figure_11.svg)
 
-**Scores.**
+| Primary, 2025/26 | Capacity (MW) | 95% interval | Bound B | Status |
+|---|---|---|---|---|
+| Kirton | 3.35 | 3.02 to 4.01 | 0.41 | flagged, library range 1.2 to 4.4 MW |
+| Trusthorpe | 2.48 | 2.23 to 2.88 | 0.47 | unflagged |
+| Spilsby | 2.57 | 2.16 to 3.01 | 0.21 | unflagged |
+| Horncastle | 3.43 | 3.04 to 3.98 | 0.21 | unflagged |
+| Mount Bridge Boston | 3.86 | 3.37 to 4.55 | 0.19 | unflagged |
+| Wrangle T1 | 1.41 | 0.62 to 2.07 | 0.71 | unflagged, no power |
+| Donington | 3.69 | 3.20 to 4.22 | 0.18 | unflagged |
+| Wrangle T2 | 2.29 | 2.10 to 2.61 | 0.23 | unflagged |
 
-- **V1, calibration:** over all pure-PV units, the median of `C` over truth (leave-one-farm-out `R`)
-  and the false-positive rate, the share of (unit, noise draw) pairs whose `T` exceeds the threshold
-  built without that unit's farm.
-- **V2, power:** for each out-of-arm shape and amplitude, the share of (unit, draw) pairs flagged,
-  per Primary-year and as the median over Primaries' latest season-years.
-- **Bound B:** for each Primary-year not flagged, and each out-of-arm shape, the median `|C / truth -
-  1|` over undetected pairs at the largest amplitude on the grid whose power is under 0.8 (zero when
-  power is at least 0.8 at 0.1). B is the largest over the shapes.
-- **Real:** `T`, the flag, `C`, the headline capacity, and B per directional Primary-year, and the
-  number of Primaries not flagged ("clean") in 2025/26.
-- **Continuity:** checks K1 to K4 as experiment 39 defined them (read from its stored report, so a
-  redefined check cannot count as progress), and K1 with its second clause replaced by `c / SE > 4`.
+The capacity is the daily fit divided by its recovery ratio. The bound is the median error of the
+no-confound capacity at the largest grid amplitude whose power is under 0.8, taken as the largest over
+the five shapes no fit contains. At every unflagged Primary except Wrangle T1 the day-long load sets
+the bound, because the other four shapes are detected by amplitude 0.25. The bound moves in steps of
+the amplitude grid and is an approximation of the error, not an interval.
 
-**Self-tests, run first, failing the script on a breach.** (a) Linearity: for one Primary-year and
-arm M2h, `c(y + g) - c(y) - c(g)` is under 1e-8 for a confound shape `g`. (b) Injecting exactly `R *
-C` with no noise gives `T` under 1e-10 and `C` equal to the truth within 1e-10. (c) The flat shape
-fitted by arm M1L leaks under 1e-8, because the arm contains it. (d) The shape `-u` fitted by M1 has
-leakage equal to minus the M1 capacity of `u` itself within 1e-6, so the blind spot is wired the
-right way round. (e) With a pure-PV unit's own 200 draws as its null, the false-positive rate is 0.05
-within 0.02.
+![Figure 12: capacity per Primary and season-year](figure_12.svg)
 
-**Leakage traps to check in code review.** The threshold for a unit must not use that unit's farm. `R`
-must be leave-one-farm-out wherever it scores a unit. The confound amplitude comes from the M1
-leakage of that unit's own rows, not a Primary-wide median. Summer-only arms must drop rows before
-building cells. Bootstrap blocks must be whole 7-day spans of local dates.
+![Figure 13: the six fits at each Primary in 2025/26 against solar output alone](figure_13.svg)
 
-## Weather source at the lag times
+**On the continuity checks of experiment 39 the count does not move.** With the checks defined as in
+experiment 39, K1 to K4 pass at 7, 7, 6, and 7 of 8 Primaries in 2025/26 and all four pass at 6. With
+K1's second clause replaced by a capacity over standard error above 4, K1 passes at 8 of 8 and all four
+checks still pass at 6.
 
-**CAMS irradiance is the only weather input of the fit, and it is not available at forecast time.**
-The fits describe past data, so the result is for explanation and capacity estimation, and not for
-a live forecast. Temperature (for HDD) is from ERA5.
+## Raw data and the method
 
-## Planned figures
+**The raw data show a cloud response that solar generation cannot explain.** Overcast days raise
+Kirton's power more than Donington's in every half-hour, in winter too (figure 2). Kirton's midday
+power falls with irradiance in winter as well as summer (figure 4). Evening demand, after dark,
+rises with the day's cloud at several Primaries (figure 3).
 
-Raw, model-free charts first (overcast-minus-clear power by half-hour, evening power against cloud,
-midday power against CAMS irradiance), then the method (shapes, leakage heat map, daily collinearity),
-the calibration and power results, and the real results (headline capacity with bound, `T` against
-`tau`, the capacity trend, the arm capacities against `R * C`, the orientation menu, and the blind
-spot). Solar farms are labelled A to F, and no chart pairs a farm label with a name or identifier.
+![Figure 2: overcast minus clear-sky power by half-hour, Kirton against Donington](figure_02.svg)
 
-## Where the code lives
+![Figure 3: evening power against the day's cloud](figure_03.svg)
 
-The fitting code is copied from experiment 39 into `ml-experiments/00040-pv-capacity-error-bars/`,
-and `packages/` is untouched. The write-up says whether the maintainer should later move it into
-`packages/studies`.
+![Figure 4: Kirton midday power against irradiance, 2019/20 and 2025/26](figure_04.svg)
+
+**The six fits differ in how much cloud-driven demand each allows, so a cloud load leaks into them
+unequally.** The arms are M1 (calendar cells and temperature), M1L (plus a flat cloud term), M2
+(cloud term by season half), M2h (cloud term by season half and three local-hour bands), and M1 and
+M2h on April to September rows only. Every arm is linear, so the capacity fitted to a series plus a
+load is the sum of the two fitted alone. A unit's injected solar output and each of eight loads are
+therefore fitted once and added as vectors. The heat map shows each load's leakage per MW into each
+fit. The daily fit cannot carry a cloud term, because after the cell means are removed the daily sums
+of the solar shape and of the cloud response correlate at -0.986 to -0.977.
+
+![Figure 5: the eight loads and the solar shape through two days](figure_05.svg)
+
+![Figure 6: leakage of each load into each fit](figure_06.svg)
+
+![Figure 7: daily solar shape against daily cloud response](figure_07.svg)
+
+**The detector is a misfit of the six capacities to a multiple of the recovery ratios.** For a unit
+of injected solar output of true capacity 1 MW, fit `a` returns `R_a`, the median over the Primary's
+units of the other farms (leave-one-farm-out). For an arm vector `c`, the capacity under no
+confound is `C = (R . c) / (R . R)` and the misfit is `T = sqrt(mean((c - R * C)^2)) / C`. The
+noise is 200 resamples of whole 7-day blocks of each real Primary-year, minus their mean. The
+threshold of a Primary-year is the 95th percentile of `T` over the units of the other farms scaled to
+the real capacity, each with its own farm also left out of `R`. The real Primary-years use the ratios
+of all six farms. The injected loads are `flat`, `lowsun`, `winter`, `dayL`, `evening`, `threshold`,
+`mixture`, and `sunload`. The first and third are contained in some fits and are reported, not scored.
+The self-tests of linearity, exact recovery, a contained shape, the sign of `sunload`, and the
+false-positive rate of the threshold all passed, and the farm-point timestamp scan of experiment 39
+peaks at a shift of zero.
+
+**The orientation menu is not identified.** The east, south, and west capacities swap from one
+season-year to the next at the same Primary (figure 14), so the menu decides nothing.
+
+![Figure 14: east, south, and west capacities per Primary-year](figure_14.svg)
+
+## Caveats
+
+- **The real Primary-years use the ratios of all six farms.** Every injected unit leaves its own
+  farm out of the ratios, the threshold, and the real capacity it is scaled to.
+- **Solar farms are not rooftop fleets.** The ratio vector comes from six metered farms with one
+  orientation each, and a fleet of mixed orientations may have a different ratio vector. Only the
+  comparison with an external capacity register can test that.
+- **The write-up quotes a bound with a step of the grid.** The grid is 0.1, 0.25, 0.5, 1.0.
+- **The unflagged Primary-years include Wrangle T1.** The clean count of 7 includes a Primary where
+  the power is under 0.3 for every shape.
+
+## What the next experiment should answer
+
+**The next experiment should ask whether the evening cloud response measures the daylight load
+that the six fits cannot detect.** The two loads that set the bound, a day-long cloud load and a
+load that rises with sunshine, are the loads the misfit test cannot see. Evening demand after dark
+responds to cloud at several Primaries (figure 3), and solar generation cannot cause that
+response. An experiment could inject a known day-long load into the real series, estimate its
+amplitude from the evening rows alone, and test whether that amplitude predicts the bias of the
+capacity. The test is whether such a covariate narrows the bound at Spilsby, Horncastle, Mount Bridge
+Boston, Donington, and Wrangle T2 below 0.1. The fitting code lives in this experiment's folder and a
+later experiment, or the deliverable, could move it to `packages/studies`, which needs the
+maintainer's review.
