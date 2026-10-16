@@ -88,6 +88,7 @@ the maintainer to confirm.
 | [00062 - Switching event detector, part 7](00062-sw2-9-whitened-residual-step-detector/result.md) | Does filtering out the residual's half-hour-to-half-hour memory raise the share of moved MW the 24-hour detector finds? | Refuted: the pooled change in the share of moved MW found is -0.097 (98.33% interval -0.132 to -0.057) | Not for production | 2026-10-16 |
 | [00065 - Switching event detector, part 8](00065-sw2-14-combined-single-series-and-neighbour-score/result.md) | Does one score that adds a substation's own step to its neighbours' opposite steps find more of the moved MW than the single-series detector, the neighbour gate, and the neighbour veto? | Inconclusive: the logistic-regression score gains +0.019 in share of moved MW found over the single-series detector (99.17% interval -0.011 to +0.062) and the likelihood-ratio score +0.005 (-0.010 to +0.014); a post hoc variant that adds the count of same-sign neighbour steps gains +0.034 (+0.013 to +0.091) | Not for production | 2026-10-16 |
 | [00066 - Switching event detector, part 9](00066-sw2-16-end-rule-as-baseline/result.md) | Which window (4 or 24 hours) and cap (14, 30, or 60 days) should the end rule use, as the benchmark for later detectors? | Inconclusive: the 4-hour window finds 0.147 less of the moved MW than the 24-hour window (99% interval -0.248 to -0.054); a 30-day cap finds 0.534 more on transfers over 15.6 days (+0.131 to +0.780) and 0.045 less on shorter ones (-0.070 to -0.011) | Not for production | 2026-10-16 |
+| [00069 - Switching event detector, part 10](00069-sw2-17-missed-onsets-of-the-end-rule/result.md) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their start, and does a weak alarm confirmed by a later step back recover them? | Inconclusive: the weak alarms add +0.146 of the moved MW, but the strong threshold must rise from 4.0 to 6.55 to keep 80 alarms, so the net change is +0.007 (98.75% interval -0.014 to +0.040); the first-return end rule beats the 14-day rule on a fresh draw (+0.038, +0.016 to +0.077) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1332,6 +1333,32 @@ guard on the short transfers.
   [PR #1297](https://github.com/openclimatefix/nged-substation-forecast/pull/1297).
 
 ![MW-weighted recall by arm on the 620 transfers and on the long set](00066-sw2-16-end-rule-as-baseline/figure_1_recall_by_arm.svg)
+
+### 00069: why do real load transfers raise no alarm at their start? (SW2-17)
+
+**Most of the 24 real transfers with no alarm at their start are not hiding under the threshold, and
+accepting weaker alarms that a later step back confirms did not find more of the moved power.** Of
+the 35 labelled real transfers over 1 day, 24 have no alarm of the single-step detector D0M within 2
+hours of the start. Of those 24, 6 lie in gaps in the data, 3 in a month where a refit of the
+residual model suppresses the alarm, 3 have an alarm 2 to 12 hours from the labelled start, 8 have a
+sharp step of 2 to 4 noise units, 2 have a spread or late step, and 2 show no step. On injected
+transfers, a rule that also raises a weak alarm at half the strong threshold when a matching
+opposite step follows within 14 days recovered 0.146 more of the moved MW than the strong alarms
+alone, but the strong threshold had to rise from 4.0 to 6.55 to keep 80 odd-month false alarms,
+which lost 0.140. The net change against the benchmark was +0.007 (98.75% interval -0.014 to
++0.040), and the verdict is `inconclusive`.
+
+- **Finding for later experiments:** the first-return end rule PF14 beat the 14-day strongest-step
+  rule on a fresh draw, by +0.038 (+0.016 to +0.077) on 625 headline-band transfers and +0.416
+  (+0.059 to +0.595) on 206 long transfers, so PF14 is the benchmark end rule. The monthly refit and
+  a 2-hour onset tolerance hide 6 of the 24 real transfers, which is more than a lower threshold can
+  reach. The end rule and the weak-alarm rule need up to 14 days of hindsight, so they serve
+  training-time masks and the event table for NGED, not live forecast inputs.
+- **Write-up and pull request:** [the full result
+  page](00069-sw2-17-missed-onsets-of-the-end-rule/result.md), [PR
+  #1300](https://github.com/openclimatefix/nged-substation-forecast/pull/1300).
+
+![The class of each unalarmed real transfer](00069-sw2-17-missed-onsets-of-the-end-rule/figure_1_classes.svg)
 
 ### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
 

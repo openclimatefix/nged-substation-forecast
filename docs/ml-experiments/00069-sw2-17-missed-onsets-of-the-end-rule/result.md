@@ -1,7 +1,7 @@
 ---
 id: "00069"
 slug: sw2-17-missed-onsets-of-the-end-rule
-status: planned
+status: done
 size: medium
 hypothesis: >-
   An onset rule that accepts a weak alarm only when a matching opposite step follows within 14 days
@@ -56,143 +56,229 @@ metric: >-
   at the onset and a wrong end), recall by donor step in noise units split by metered receiver, and
   the count of the 35 labelled real transfers over 1 day found follow.
 code: ml-experiments/00069-sw2-17-missed-onsets-of-the-end-rule/
+verdict: inconclusive
+best_arm: >-
+  Of the onset rules, the first-return end rule PF14 at D0M's threshold of 4.0 stays the benchmark.
+  It finds 0.668 of the moved MW on the fresh headline-band transfers (98.75% interval 0.549 to
+  0.763). The paired low-threshold onset PP finds 0.675 (0.581 to 0.756), a change of +0.007
+  (-0.014 to +0.040).
+lessons: >-
+  The first-return end rule PF14 beats the 14-day strongest-step rule PE14 on a fresh draw of both
+  populations, so PF14 is the benchmark. The 24 real transfers with no onset alarm are mostly not
+  under the threshold: 6 lie in data gaps, 3 in a monthly refit, 3 have an alarm 2 to 12 hours from
+  the labelled start, and 8 have a sharp step of 2 to 4 noise units. A weak onset confirmed by a
+  step back recovers +0.146 of the moved MW, but keeping 80 odd-month alarms forces the strong
+  threshold from 4.0 to 6.55, which loses 0.140, so the net change is +0.007. On the 35 real
+  transfers PP finds 6, against 8 for PF14, because it raised the threshold for the strong alarms.
+advice:
+  - >-
+    Use PF14 (the first opposite step of at least half the onset step, otherwise the tracked end)
+    as the end rule of later switching detectors; it beat PE14 by +0.038 (+0.016 to +0.077) on a
+    fresh headline-band draw and by +0.416 (+0.059 to +0.595) on a fresh long draw (A1, A2).
+  - >-
+    Do not accept weak onsets on a matching step back at the 80-alarm budget; the weak alarms are
+    mostly noise pairs, so the strong threshold has to rise to 6.55 and the net change is +0.007
+    (-0.014 to +0.040) (C1, figure 4).
+  - >-
+    Fix the monthly-refit suppression of alarms and test a 12-hour onset tolerance before lowering
+    any threshold; 6 of the 24 unalarmed real transfers have a step of 4 noise units or more that a
+    refit suppresses or an alarm 2 to 12 hours from the labelled start (classes table).
+  - >-
+    Expect no detector to find the 6 of 24 unalarmed real transfers that lie in data gaps; count
+    them as unobserved in any score on real transfers (classes table).
+  - >-
+    Keep a control arm of strong alarms only when testing an alarm rule at matched alarm counts, so
+    that the effect of the raised threshold is separated from the effect of the new alarms (S arm,
+    figure 3).
 production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 69 (SW2-17, part of the switching-event detector series): why do real transfers raise no alarm at the start?
+# Experiment 69 (SW2-17, part of the switching-event detector series): why do real transfers raise no alarm at their start?
 
-**Planned; this page is rewritten with the results.** The experiment asks why 24 of the 35 labelled
-real load transfers lasting over 1 day raise no alarm at their start, and whether an alarm rule that
-accepts a weaker step when a matching step back follows recovers more of the moved power without
-raising the number of false alarms. A load transfer is a switching operation that moves part of one
-Primary substation's demand to neighbouring substations for some hours or days. A Primary substation
-is the 11 kV or 6.6 kV substation that feeds local distribution circuits. The detector D0M raises an
-alarm when the 24-hour average of a substation's residual (measured power minus an XGBoost forecast
-that uses no past power) steps away from the previous 24-hour average by 4.0 noise units or more.
-Experiment 66 found that ending each alarm interval at the first opposite step of at least half the
-onset step (PF14) beat a search for the strongest opposite step within 14 days (PE14), but chose
-that rule after seeing the results. The experiment first re-tests that rule on newly drawn injected
-transfers. It then sorts the 24 unalarmed real transfers by cause and tests the fix the sorting
-points to.
+**Most of the 24 real load transfers with no alarm at their start are not hiding under the
+threshold, and accepting weaker alarms that a step back confirms did not help, because the strong
+threshold had to rise to keep the same number of false alarms.** A load transfer is a switching
+operation that moves part of one Primary substation's demand to neighbouring substations for some
+hours or days. A Primary substation is the 11 kV or 6.6 kV substation that feeds local distribution
+circuits. The detector D0M raises an alarm when the 24-hour average of a substation's residual
+(measured power minus an XGBoost forecast that uses no past power) steps by 4.0 noise units or more.
+Of the 35 labelled real transfers over 1 day, 24 have no D0M alarm within 2 hours of the start. We
+sorted those 24 by cause: 6 lie in gaps in the data, 3 in a month where a refit of the residual
+model suppresses the alarm, 3 have an alarm 2 to 12 hours from the labelled start, 8 have a sharp
+step of 2 to 4 noise units, 2 have a step that is spread out or late, and 2 show no step. We then
+added known transfers to the power history and tested a rule (PP) that also raises a weaker alarm
+when an opposite step of a matching size follows within 14 days. At the same number of false alarms
+on odd months, PP found 0.675 of the moved power and the benchmark 0.668, a difference of +0.007
+(98.75% interval -0.014 to +0.040). We also confirmed on newly drawn transfers that ending each
+alarm interval at the first opposite step of at least half the onset step (PF14) beats a search for
+the strongest opposite step in 14 days (PE14).
 
-## Size
+The end rule and PP use up to 14 days of hindsight, so they serve training-time masks (SW2-12) and
+the event table for NGED, not live forecast inputs.
 
-**Medium: one of the five triggers fires.**
+![The class of each unalarmed real transfer](figure_1_classes.svg)
 
-- **What gets stored:** private tables under `data/ml-experiments/`; no production table.
-- **Production serving path:** not touched. The end rule and the paired onset use up to 14 days of
-  hindsight, so they serve training-time masks (SW2-12) and the event table for NGED, not live
-  forecast inputs.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes. A lower onset threshold confirmed by a return step is
-  the leading candidate, but the classification may point to another cause.
-- **Code whose callers are hard to name:** no. The scripts copy experiment 66's harness and add the
-  classification and the paired onset.
+## What we tested
 
-Sonnet writes the plan, implements, runs, and reviews; Opus is not used.
+**Three steps, all scored on injected transfers or on the labelled real transfers, never on
+forecasts.** All scores are shares of the moved power in MW (MW-weighted recall): a transfer counts
+as found when an alarm interval starts within 2 hours of the true start and ends within the larger
+of 6 hours and 10% of the duration.
 
-## Earlier advice followed and departed from
+- **Step 1, confirm PF14.** New injected transfers: 1,160 in the headline band (25% to 40% of the
+  receiving load, lasting over 1 day; 625 start in even months) and 400 lasting 15.6 to 60 days (206
+  start in even months), under five injection shapes. The headline pools the three shapes (S2, S3,
+  and S4) that no detector in this series assumes. PE14 ends each interval at the strongest opposite
+  step within 14 days, and PF14 at the first opposite step of at least half the onset step.
+- **Step 2, sort the 24 unalarmed real transfers** into seven classes by the first test that
+  applies, using the 24-hour step statistic in noise units and D0M's alarms, with control windows
+  that show how large the largest step is when no transfer is present.
+- **Step 3, PP.** PP raises every D0M alarm at a strong threshold, and also a weak alarm at half
+  that threshold when a later opposite step of the same size (0.5 to 2.0 times) follows within 14
+  days. The strong threshold is tuned on odd months so that PP and D0M both raise 80 unexplained
+  alarms, and the contrasts are read on even months with 98.75% intervals from resampling whole
+  calendar months. The arm S raises only the strong alarms of PP.
 
-- **Followed:** keep the 24-hour window (experiment 66, C5); confirm PF14 on a fresh draw before
-  using it as a baseline (experiment 66); test on transfers over 15.6 days as well as the headline
-  band (experiment 66); report recall by donor step split by metered receiver (experiments 58 and
-  60); look at why the real transfers raise no alarm (experiments 60 and 61).
-- **Departed from:** experiment 61 advised keeping the onset a single step and not folding the
-  return step into the alarm score, because a threshold that keeps 80 unexplained alarms needed a
-  lone onset step of about 8.8 noise units. This experiment folds the return step in only for weak
-  onsets, and tunes the strong-onset threshold to the same alarm count, so the cost of the departure
-  is read directly from the matched-rate contrast C1.
+## Verdict
 
-## What we will do
+**`inconclusive` for PP by the rule fixed in the plan: the lower end of C1 is below zero and its
+upper end is above +0.02.** The rule has no outcome for a point change of +0.007 with an interval
+that wide, and the interval does not exclude a gain of +0.04. The point values say that PP is no
+better than the benchmark: C1 is +0.007 on the headline-band transfers and C2 is -0.006 on the long
+transfers. The benchmark end rule is PF14, because the lower ends of A1 and A2 both lie above zero.
 
-**Step 1, confirm the first-return rule.** The experiment draws new injected transfers with new
-seeds: 1,160 headline-band transfers (25% to 40% of the receiving load, lasting over 1 day, with the
-`draw_events` procedure of experiment 58, draw seed 6900, event ids from 10,000, injection seeds
-7900 and up) and 400 long-set transfers (15.6 to 60 days, with experiment 66's `draw_long_events`
-procedure, draw seed 7900, event ids from 15,000, injection seeds 8900 and up). The seeds and ids do
-not overlap those of experiments 43, 58, and 66. Each is injected under the five shapes of
-experiment 60, and the headline pools S2, S3, and S4, the shapes none of the detectors assumes. D0M,
-PE14, and PF14 run at D0M's threshold of 4.0, which gives 80 unexplained alarms on odd months. A1
-and A2 read PF14 minus PE14.
+| Contrast (even months, S2, S3, and S4 pooled) | Change in MW-weighted recall | Reading |
+|---|---|---|
+| A1, PF14 minus PE14, 625 fresh headline-band transfers | +0.038 (+0.016 to +0.077) | PF14 confirmed |
+| A2, PF14 minus PE14, 206 fresh long transfers | +0.416 (+0.059 to +0.595) | PF14 confirmed |
+| C1, PP minus PF14, headline band | +0.007 (-0.014 to +0.040) | No gain |
+| C2, PP minus PF14, long transfers | -0.006 (-0.063 to +0.018) | No gain |
 
-**Step 2, sort the 24 unalarmed real transfers.** A real transfer has an alarm at its start when D0M
-(24-hour window, threshold 4.0) raises an alarm on one of its series within 4 half-hours (2 hours)
-of its labelled start. Each of the other transfers goes into the first of these classes whose test
-it meets, using the step statistic `z` (the 24-hour step in noise units, as above):
+![Planned and descriptive contrasts](figure_3_contrasts.svg)
 
-1. **Data gap:** `z` is missing (under 75% of either 24-hour window present) at every stamp within 4
-   half-hours of the start on every series of the transfer.
-2. **Monthly refit:** the largest |`z`| within 4 half-hours of the start is at least 4.0, but a
-   monthly refit of the residual model lies within 48 half-hours of the stamp, which suppresses the
-   alarm.
-3. **Alarm outside the tolerance:** D0M raises an alarm on a series of the transfer between 4 and 96
-   half-hours (2 hours and 2 days) from the labelled start. A second count splits this class into
-   alarms within 12 hours and later alarms.
-4. **Peak suppressed:** the largest |`z`| within 96 half-hours is at least 4.0 but D0M raises no
-   alarm there, because a larger peak within the window or a refit takes the alarm.
-5. **Sharp step under the threshold:** the largest |`z`| within 4 half-hours of the start is
-   between 2.0 and 4.0.
-6. **Spread or late step under the threshold:** the largest |`z`| within 96 half-hours is between
-   2.0 and 4.0 and lies more than 4 half-hours from the start.
-7. **No step visible:** the largest |`z`| within 96 half-hours is under 2.0.
+**Recall rises by +0.146 with the weak alarms and falls by 0.140 with the stronger threshold.** The
+control arm S raises only the strong alarms of PP, at the threshold of 6.55 that keeps 77 odd-month
+alarms. S finds 0.528 of the moved MW on the headline-band transfers (0.345 to 0.625), which is
+0.140 less than PF14 (-0.221 to -0.089), and PP finds 0.146 more than S (+0.091 to +0.253). The
+version of PP with the weak threshold at three quarters of the strong one, tuned separately to a
+strong threshold of 4.65, differs from PF14 by +0.008 (-0.004 to +0.027).
 
-Control windows test whether a step under the threshold is a real hidden step or ordinary noise. For
-each transfer the experiment draws 2,000 control windows on the same series, each at a stamp in an
-odd month at least 7 days from any logged closure on that series, and takes the largest |`z`| within
-4 and within 96 half-hours of the stamp, over the transfer's series. A step counts as above noise
-when it exceeds the 95th percentile of those control peaks. The write-up gives, per class, the
-count, the number above noise, the median moved MW (`moved_mw_p50` of the labelled set), the median
-donor step in noise units, and whether the transfer has a metered receiver. Classes 5 and 6 are the
-classes a weaker onset threshold can reach, although PP's weak threshold is half of its tuned strong
-threshold, so the write-up also counts the transfers with a largest |`z`| of at least that weak
-threshold. Class 4 is non-empty only when a refit away from the start suppressed the peak. When they
-hold fewer than 12 of the 24 transfers, the write-up says the paired onset targets a minority and
-names the fix the largest class points to; that fix is a recommendation for the next experiment,
-because most classes (a data gap, a timing error in the log) cannot be tested on injected transfers.
+| Arm (PF14 end rule unless stated) | Headline band | Long set |
+|---|---|---|
+| D0M, tracked end | 0.418 (0.345 to 0.505) | 0.521 (0.080 to 0.761) |
+| PE14 | 0.630 (0.501 to 0.723) | 0.010 (0.000 to 0.022) |
+| PF14 (benchmark) | 0.668 (0.549 to 0.763) | 0.426 (0.059 to 0.617) |
+| S, strong alarms at 6.55 only | 0.528 (0.345 to 0.625) | 0.420 (0.052 to 0.628) |
+| PP, weak alarms at half the threshold | 0.675 (0.581 to 0.756) | 0.420 (0.052 to 0.628) |
+| PP, weak alarms at three quarters | 0.676 (0.568 to 0.767) | 0.423 (0.056 to 0.615) |
 
-**Step 3, the paired low-threshold onset (PP).** PP raises every D0M alarm at a strong threshold
-`T`. PP also raises a weak alarm at a series and stamp where the step statistic is a local peak (the
-largest |`z`| within 48 half-hours either side, the test of `local_peaks`) of at least `T/2` but
-under `T`, when a matching step back follows. A matching step back is a stamp from 48 half-hours (24
-hours) to 14 days later that is a local peak with the opposite sign, at least `T/2` noise units, and
-between 0.5 and 2.0 times the size of the onset step (the same ratio range as the balance test of
-detector D1). The first such stamp counts. The interval's end comes from the benchmark end rule
-(PE14 or PF14), as in Step 1. `T` is tuned on odd months, over a full grid from 4.0 to 9.0 in steps
-of 0.05, to the lowest value whose unexplained alarms (D0M alarms plus accepted weak alarms, more
-than 24 hours from a logged closure on the series) number at most 80, so that PP and the benchmark
-are scored at the same alarm count. The count need not fall steadily as `T` rises, so the write-up
-reports the whole curve and the share of the alarms that are weak. The tuning gave `T` of 6.55 (73
-of 77 odd-month alarms weak) for the primary version and 4.65 for the version with the weak
-threshold at `3T/4` (34 of 75), before any transfer was scored. The `3T/4` version is descriptive,
-with no contrast. The weak-threshold share (0.5 of `T`) is the first value tried and was not tuned.
-A control arm, S, raises only the strong alarms of the primary version (at `T` of 6.55), so that the
-effect of raising the strong threshold is separated from the effect of the weak alarms. The long set
-can be found only through strong alarms, because a weak alarm needs its step back within 14 days, so
-C2 mostly measures the raised strong threshold.
+*Absolute MW-weighted recall at 80 odd-month unexplained alarms, with 98.75% intervals. The missed
+share is one minus the recall. For PF14 on the headline band, 0.298 of the moved MW sits in
+transfers with no alarm at the start and 0.034 in transfers whose start was found and whose end was
+wrong. For PP the two shares are 0.304 and 0.021.*
 
-**Scoring.** Everything is scored as in experiment 66. A transfer counts as found when an alarm
-interval on one of its series starts within 2 hours of the true start and ends within the larger of
-6 hours and 10% of the duration. The odd-month and even-month recall, unweighted recall, the missed
-MW split into no alarm at the start and a wrong end, and recall by donor step split by metered
-receiver follow, as does the count of the 35 labelled real transfers found, with the alarm counts on
-the real residual. Before the fresh draws are scored, a harness check reproduces experiment 66's
-D0M, PE14, and PF14 flags on the first 400 transfers of experiments 43 and 58 under shapes S1 and
-S4, and checks that PP with the weak alarms disabled equals D0M; the run stops when any flag
-differs. C1 is also read by donor-step band beside the count of labelled real transfers found.
+![MW-weighted recall by arm](figure_2_recall_by_arm.svg)
 
-## Limits to keep in mind
+**The weak alarms are mostly pairs of noise steps.** At D0M's threshold of 4.0, PP would raise 673
+odd-month unexplained alarms, of which 593 are weak. Only a strong threshold of 6.55 brings the
+count to 77, of which 73 are weak (figure 4). The count did not rise anywhere along the grid from
+4.0 to 9.0. On even months, which were not used to tune the threshold, PP raises 56 unexplained
+alarms and D0M 80, so the matched alarm count is conservative for PP there.
 
-- **The fresh draws re-use experiment 66's code,** so PF14's definition cannot change between the
-  draw that suggested it and the draw that tests it.
-- **PP and the benchmark are scored on the same fresh draws that choose the benchmark end rule.**
-  The contrast C1 is paired, so the choice moves both arms; the write-up says so.
-- **Injected transfers are clean boxcars,** so a return step is easier to find than a real one.
-  This favours PP in C1, because a matching step back always exists, while the false alarms of PP
-  are measured on the real residual.
-- **A fresh draw is new in the placement of transfers and in the injection noise only.** It uses
-  the same residual panel, series, months, and set of 25 long operations as experiment 66, so the
-  check cannot detect a rule that fits quirks of that panel.
-- **Alarms within 24 hours of a logged closure count as explained** for both arms, so PP's weak
-  alarms near the many logged closures cost nothing against the alarm count.
-- **The real-transfer count of 35 is too small for an interval,** so it carries no verdict.
+![Alarms against the strong threshold](figure_4_tuning.svg)
+
+## Recall by donor step
+
+**PP finds more of the transfers with no metered receiver and loses some with a metered receiver and
+a donor step of 4 to 6 noise units.** The table counts transfers found out of transfers, summed over
+S2, S3, and S4, on the fresh headline-band transfers that start in even months, in 24-hour noise
+units. The printed report also gives the other arms and the steps below 2.
+
+| Donor step | Receiver | Transfers | D0M | PF14 | PP |
+|---|---|---|---|---|---|
+| 2 to 4 | metered | 140 | 61 | 87 | 89 |
+| 4 to 6 | metered | 164 | 86 | 131 | 117 |
+| 6 to 10 | metered | 239 | 151 | 207 | 207 |
+| 10 or more | metered | 311 | 166 | 295 | 295 |
+| 2 to 4 | unmetered | 610 | 48 | 68 | 77 |
+| 4 to 6 | unmetered | 222 | 53 | 103 | 120 |
+
+## Labelled real transfers
+
+**On the 35 labelled real transfers over 1 day, PP finds 6 and PF14 finds 8.** D0M finds 2. The
+onset alarm is found for 11 transfers by PF14 and 7 by PP, because the raised strong threshold
+removes alarms between 4.0 and 6.55 noise units. PP raised an onset alarm for 1 of the 8 transfers
+with a sharp step under the threshold. The counts are too small for an interval.
+
+| Class of the 24 transfers with no D0M onset alarm | Transfers | Largest step above noise |
+|---|---|---|
+| Data gap | 6 | 0 |
+| Monthly refit | 3 | 3 |
+| Alarm outside the 2-hour tolerance (all within 12 hours) | 3 | 3 |
+| Sharp step of 2 to 4 noise units | 8 | 7 |
+| Spread or late step of 2 to 4 noise units | 2 | 0 |
+| No step visible | 2 | 0 |
+
+*The class peak suppressed is empty. Above noise: the largest step within 2 hours of the start
+exceeds the 95th percentile of control windows' largest steps (2,000 windows per transfer, each
+series drawn at its own stamp in an odd month at least 7 days from a logged closure). The median
+moved MW is 1.8 MW for the data gaps, 2.5 for the refits, 0.9 for the timing cases, and 0.8 for the
+sharp steps.*
+
+## What held in the prediction and what did not
+
+- **Held:** A1 (+0.038, predicted +0.02 to +0.06), C1 (+0.007, predicted -0.15 to +0.03), and C2
+  (-0.006, predicted -0.15 to 0.00). The lowest strong threshold that keeps 80 alarms, 6.55, was
+  known before any transfer was scored.
+- **Just outside:** A2 at +0.416, against a predicted +0.10 to +0.40.
+- **Not held:** PE14 was expected to stay the benchmark, and PF14 became it. The classification was
+  predicted to put at least 12 of 24 in classes under the threshold, and put 10 there. At most 4
+  were predicted in the data gap class, and 6 are. PP was predicted to find 2 to 6 more real
+  transfers, and finds 2 fewer.
+
+## Limits
+
+- **The end rule and PP need up to 14 days of hindsight,** so they serve training-time masks and the
+  event table, not live inputs.
+- **A fresh draw is new in the placement of transfers and in the injection noise only.** It uses the
+  same residual panel, series, months, and set of 25 long operations as experiment 66, so the
+  confirmation cannot detect a rule that fits quirks of that panel. On odd months the gain of PF14
+  over PE14 is smaller: +0.010 (-0.005 to +0.031) on the headline band and +0.333 (0.000 to +0.560)
+  on the long set.
+- **PP and the benchmark are scored on the same fresh draws that chose PF14 as the benchmark.**
+- **Injected transfers are clean boxcars,** so a matching step back always exists, which favours PP.
+  PP gained nothing even so.
+- **Weak alarms can chain:** a weak alarm can itself be the step back of an earlier weak alarm.
+- **Alarms within 24 hours of a logged closure count as explained,** for both arms.
+- **The weak threshold of half the strong one and the ratio range of 0.5 to 2.0** are the first
+  values tried and were not tuned; the version at three quarters is the only other value tried.
+- **The 35 real transfers are too few for an interval,** and the class counts rest on a log whose
+  start times may be late or early by hours.
+- **The control windows draw an independent stamp for each series of a transfer,** so they are a
+  fair test of the largest step but not of a step shared across series at one stamp.
+
+## Reviews
+
+- **Plan review (Sonnet agent):** accepted control windows for the classification, an exhaustive
+  verdict rule, a full-grid tuning scan, a control arm of strong alarms only, a check that PP with
+  the weak alarms disabled equals D0M, named seeds and ids, and a note on boxcar favouritism.
+  Accepted a prediction about the benchmark end rule. Rejected a second-series consistency
+  requirement for the pair and a minimum duration, because the plan tests the simplest rule first.
+- **Code review (Sonnet agent):** found no leakage. Accepted a NaN-safe quantile, a clamp on slice
+  starts, a stricter refit test, and a hand-built test of the pairing rule's boundaries. Rejected
+  extending the harness check to PP (the control arm S already isolates it) and excluding refit
+  windows from the controls (the effect is conservative).
+
+## What the next experiment should answer
+
+**The next experiment should recover the onsets that a fixable rule hides, before any lower
+threshold is tried.** Of the 24 unalarmed real transfers, 3 have a step of 4 noise units or more
+that the monthly refit suppresses, and 3 have an alarm 2 to 12 hours from the labelled start. A
+detector that survives a refit and a scorer that allows 12 hours at the start could recover up to 6
+of the 35, and the 6 in data gaps are unobservable. PP would be worth another look only with a
+second series that must confirm each weak pair, because a single series produces 593 weak alarms at
+4.0.
+
+Code: `ml-experiments/00069-sw2-17-missed-onsets-of-the-end-rule/`, with every number printed by
+`e00069_report.py`.

@@ -49,8 +49,8 @@ def classify(
     onset = row["onset"]
     refit = near_refit()
     near, wide = (
-        slice(onset - ONSET_TOLERANCE, onset + ONSET_TOLERANCE + 1),
-        slice(onset - NEAR, onset + NEAR + 1),
+        slice(max(onset - ONSET_TOLERANCE, 0), onset + ONSET_TOLERANCE + 1),
+        slice(max(onset - NEAR, 0), onset + NEAR + 1),
     )
     z_near = np.concatenate([np.abs(inputs.shift[s][near] / inputs.scale[s]) for s in series])
     z_wide = np.concatenate([np.abs(inputs.shift[s][wide] / inputs.scale[s]) for s in series])
@@ -64,7 +64,7 @@ def classify(
     )  # None: no alarm within two days
     if not np.isfinite(z_near).any():
         label = CLASSES[0]
-    elif peak_near >= THRESHOLD and refit[near].any():
+    elif (z_near >= THRESHOLD)[np.tile(refit[near], len(series))].any():
         label = CLASSES[1]
     elif distance is not None:
         label = CLASSES[2]
@@ -81,8 +81,8 @@ def classify(
     )
     return {
         "card_id": row["card_id"],
-        "near_above_control": peak_near > np.quantile(control_near, CONTROL_PERCENTILE),
-        "wide_above_control": peak_wide > np.quantile(control_wide, CONTROL_PERCENTILE),
+        "near_above_control": peak_near > np.nanquantile(control_near, CONTROL_PERCENTILE),
+        "wide_above_control": peak_wide > np.nanquantile(control_wide, CONTROL_PERCENTILE),
         "control_median_wide": float(np.median(control_wide)),
         "class": label,
         "peak_near_z": peak_near,

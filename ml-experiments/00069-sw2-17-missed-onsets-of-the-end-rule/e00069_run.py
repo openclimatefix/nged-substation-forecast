@@ -26,7 +26,13 @@ from typing import Final
 import numpy as np
 import polars as pl
 from e00069_classify import classify
-from e00069_common import LABELLED_PATH, ML_EXPERIMENTS_DATA_DIR, WORK_DIR, near_log_masks
+from e00069_common import (
+    GRID_LENGTH,
+    LABELLED_PATH,
+    ML_EXPERIMENTS_DATA_DIR,
+    WORK_DIR,
+    near_log_masks,
+)
 from e00069_detect import (
     EXPLAIN_PAD,
     NO_VETO,
@@ -44,7 +50,7 @@ from e00069_detect import (
     seeded_batches,
     tune_d2,
 )
-from e00069_detectors import alarms, prepare
+from e00069_detectors import DetectorInputs, alarms, prepare
 from e00069_endrule import end_rule_intervals, first_return_intervals
 from e00069_inject import BLOCK, Event, draw_events, events_frame
 from e00069_intervals import build_intervals, relative_residual
@@ -258,12 +264,40 @@ def harness_check(*, out: Path) -> None:
         print(f"{setting}: {joined.height} rows, {different} differ from experiment 66")
         if joined.height != mine.height or different:
             raise SystemExit(f"STOP: the harness does not reproduce experiment 66 at {setting}")
+    check_pairing()
     plain = prepare(residuals=panel["residual"], window=WINDOW, scale=state["scales"][WINDOW])
     strong = alarms(inputs=plain, detector="D0", threshold=4.0)
     disabled = paired_alarms(inputs=plain, threshold=4.0, weak_share=1.0).drop("weak")
     if not strong.equals(disabled):
         raise SystemExit("STOP: PP with the weak alarms disabled differs from D0M")
     print("harness reproduced; PP with weak alarms disabled equals D0M")
+
+
+def check_pairing() -> None:
+    """Hand-built steps: a weak onset is accepted only for a matching step back within limits.
+
+    The strong threshold is 4.0, so the weak threshold is 2.0, and the onset step is 2.5.
+    """
+    scale = {1: 1.0}
+    for gap, size, expected in (
+        (48, -2.5, True),  # exactly 24 hours later, ratio 1.0
+        (47, -2.5, False),  # one stamp too early
+        (14 * 48, -2.5, True),  # exactly the cap
+        (14 * 48 + 1, -2.5, False),  # one stamp past the cap
+        (100, -2.01, True),  # just over the weak threshold
+        (100, -1.99, False),  # just under the weak threshold
+        (100, -5.0, True),  # ratio 2.0
+        (100, -5.1, False),  # ratio over 2.0
+        (100, 2.5, False),  # same sign
+    ):
+        shift = np.zeros(GRID_LENGTH)
+        shift[3000], shift[3000 + gap] = 2.5, size
+        inputs = DetectorInputs(window=48, shift={1: shift}, scale=scale)
+        table = paired_alarms(inputs=inputs, threshold=4.0, weak_share=0.5)
+        got = table.filter(pl.col("weak"), pl.col("stamp") == 3000).height == 1
+        if got != expected:
+            raise SystemExit(f"STOP: pairing gap {gap}, size {size}: got {got}, wanted {expected}")
+    print("pairing rule checked on hand-built steps")
 
 
 def fresh_events(*, panel: dict) -> tuple[list[Event], list[Event]]:

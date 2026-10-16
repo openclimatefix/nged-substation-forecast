@@ -26,8 +26,6 @@ MAX_RATIO: Final[float] = 2.0
 """The step back must be at most this multiple of the onset step's size."""
 CAP_DAYS: Final[int] = 14
 """Longest gap between the weak onset and its step back."""
-WEAK_SHARES: Final[tuple[float, ...]] = (0.5, 0.75)
-"""The primary weak threshold is half of `T`; the descriptive variant is three quarters."""
 TARGET_ALARMS: Final[int] = 80
 """Odd-month unexplained alarms of D0M at 4.0 noise units, which PP is matched to."""
 SCAN_START: Final[float] = 4.0
