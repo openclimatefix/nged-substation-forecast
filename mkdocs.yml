@@ -187,6 +187,7 @@ nav:
       - "How well do the two existing switching detectors find transfers?": ml-experiments/00043-sw2-1-detector-scoreboard/result.md
       - "How much do labelled switching events hurt the best guess?": ml-experiments/00044-sw2-2-switching-share-of-best-guess-score/result.md
       - "Do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?": ml-experiments/00052-more-nwp-products-for-wind-farms/result.md
+      - "Do aligned, bias-corrected weather forecasts lower the wind farms' error at 1 to 2 days ahead?": ml-experiments/00054-aligned-products-bias-corrected-wind-farms/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
