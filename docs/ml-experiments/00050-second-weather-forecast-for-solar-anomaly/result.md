@@ -95,17 +95,19 @@ code: ml-experiments/00050-second-weather-forecast-for-solar-anomaly/
 
 # Experiment 50: does a second weather forecast give a better forecast of the solar anomaly than ENS?
 
-**We asked whether a second weather forecast, the American GEFS ensemble, predicts how much sunnier
-or cloudier than usual a day will be better than the European ECMWF ensemble (ENS) that the demand
-forecast uses today.** Experiment 46 had found that a correction for embedded solar panels lowered
-the demand forecast's error by about 20% when it used the true sunshine (taken from the satellite-
-based CAMS data), and by almost nothing when it used the ENS forecast of sunshine. We scored three
-forecasts of the sunshine anomaly (ENS, GEFS, and a weighted blend of the two) against the CAMS
-sunshine, at five substations that meter in MW, and planned to lay the best one into experiment 46's
-correction only if it beat ENS. It did not. In cross-validation on 9 held-out months, GEFS made
-10.9% more squared error than ENS and the blend made 0.2% more. On the 6 validation months, GEFS
-correlated with the true sunshine anomaly less well than ENS in every lead band, and the blend
-matched ENS. The experiment therefore stopped before the demand forecast was tested.
+**We asked whether a second weather forecast, the American Global Ensemble Forecast System (GEFS),
+predicts how much sunnier or cloudier than usual a day will be better than the European Centre for
+Medium-Range Weather Forecasts (ECMWF) ensemble (ENS) that the demand forecast uses today.**
+Experiment 46 had found that a correction for embedded solar panels lowered the demand forecast's
+error by about 20% when it used the true sunshine (taken from the satellite- based Copernicus
+Atmosphere Monitoring Service (CAMS) data), and by almost nothing when it used the ENS forecast of
+sunshine. We scored three forecasts of the sunshine anomaly (ENS, GEFS, and a weighted blend of the
+two) against the CAMS sunshine, at five substations that meter in MW, and planned to lay the best
+one into experiment 46's correction only if it beat ENS. Neither GEFS nor the blend did. In
+cross-validation on 9 held-out months, GEFS made 10.9% more squared error than ENS and the blend
+made 0.2% more. On the 6 validation months, GEFS correlated with the true sunshine anomaly less well
+than ENS in every lead band, and the blend matched ENS. The experiment therefore stopped before the
+demand forecast was tested.
 
 **The verdict is `refuted`: no tested forecast beats ENS by the 1% the gate requires, so the demand
 contrasts C7 and C7s were not run.** The rule is in the front matter. Each calibration is a slope
@@ -163,9 +165,10 @@ calibrated anomalies (exploratory) correlates 0.814 at 0 to 24 hours, below ENS,
 
 **Predictions against results.** The plan predicted GEFS correlations of 0.68, 0.63, 0.50, and 0.20
 in the first four bands against ENS's 0.79, 0.75, 0.58, and 0.27. The results are GEFS 0.749, 0.685,
-0.518, and 0.328 against ENS's 0.822, 0.747, 0.628, and 0.337, so the ordering held and both sources
-were more skilful than predicted. The plan predicted blend gains of +0.01 to +0.03 at 0 to 6 days,
-and the results are +0.002, +0.007, and -0.001.
+0.518, and 0.328 against ENS's 0.822, 0.747, 0.628, and 0.337, so the ordering held. GEFS was more
+skilful than predicted in every band, and ENS in three of the four (at 1 to 2 days ENS was 0.747
+against 0.75 predicted). The plan predicted blend gains of +0.01 to +0.03 at 0 to 6 days, and the
+results are +0.002, +0.007, and -0.001.
 
 ## Data validation, and what is unverified
 
@@ -195,7 +198,7 @@ crop covers 0.898 of the cell, and the weights were renormalised.
 **ENS stays the source of the solar anomaly.** A second global ensemble shares the errors of ENS at
 the leads that matter. The first 2 days hold nearly all of the skill (correlation 0.75 to 0.82), and
 there GEFS is worse and the blend adds at most 0.007. GEFS's raw anomaly needs a calibration slope
-of about 1.15 where ENS needs none.
+of about 0.87 where ENS's slope is 0.98 to 1.07.
 
 ## What the next experiment should answer
 
@@ -205,8 +208,8 @@ correlation with the CAMS anomaly above ENS's 0.82 at 0 to 24 hours?** This expe
 second global ensemble adds nothing there, so the next test should use a source with independent
 errors at short range, calibrated in-fold as here and scored first without any demand fit. The live
 UKV differs statistically from the CEDA UKV archive, so the product must be the same in training and
-serving. Beyond 6 days no product on disk is likely to beat ECMWF, so a gain there is not worth a
-test.
+serving. Beyond 6 days, none of the products on disk that we considered is likely to beat ECMWF, so
+a gain there is not worth a test.
 
 ## Not done
 
@@ -254,8 +257,7 @@ archives are held at the generator meter points and reach at most 5 days. No dow
 **GEFS radiation is a 6-hour mean at 00, 06, 12, and 18 UTC and a 3-hour mean at 03, 09, 15, and 21
 UTC, so the means are de-accumulated before use.** The 3-hour mean ending at a 6-hourly label `L`
 is `2 * v(L) - v(L - 3 h)`. Means below zero are clipped to zero and counted (the first look
-found 5.2% of
-3-hour means below -1 W/m², and the full sample 2.55%). Beyond a lead of 144 hours
+found 5.2% of 3-hour means below -1 W/m², and the full sample 2.55%). Beyond a lead of 144 hours
 pairs of 3-hour means are averaged into 6-hour means, which gives the same schedule as ENS's native
 radiation windows, so the conversion passes the production resampler's schedule check. Each
 Primary's H3 cell is area-weighted over the GEFS grid cells; for D16 only 0.898 of the cell lies
