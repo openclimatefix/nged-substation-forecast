@@ -18,10 +18,9 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-0b](#sw2-0b-the-labelled-reference-set) | Which logged closures since 2022 are visible in the telemetry, with what onset, end, receivers, and MW moved? | 1 | SW2-0a (done: experiment 41), and the maintainer seeing its token cost | Proposed |
-| [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b | Proposed |
-| [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b | Proposed |
-| [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b | Proposed |
+| [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
+| [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
+| [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
@@ -152,18 +151,6 @@ detectors use, so a detector that shares the residual's blind spots is flattered
 line therefore starts by building a reference set independent of the detectors.
 
 The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
-
-#### SW2-0b: the labelled reference set
-
-**Label every logged operation of 2 hours to 60 days since 2022, and a sample of the detectors'
-unexplained alarms.** There are 533 such operations, which group experiment 00037's 612 closures
-where closures overlap in time and share a substation. The labeller also labels the 18 closures of
-more than 60 days as two separate edge events each, 50 closures of 30 minutes to 2 hours to confirm
-that they cannot be seen, and about 150 alarms from D0 and D1 that overlap no logged closure. The
-alarms give precision as a bracket, from logged events alone up to logged events plus the alarms the
-labeller judges real, because the logs miss real switching. Experiment 00037 suggests the set will
-hold 40 to 70 visible events, so F1 by band will carry wide intervals and the injection harness will
-carry most of the detector tuning.
 
 #### SW2-1: a fixed scoreboard and an injection harness
 
