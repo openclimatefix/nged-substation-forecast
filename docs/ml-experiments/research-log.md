@@ -1185,7 +1185,7 @@ nothing beyond 54 hours. Forming 3-hour window means from the UKV, as ENS delive
 slightly better than the native hourly values, so the UKV's time resolution is not what limits it.
 On 14 days of overlap with CAMS, the live MOGREPS-UK ensemble was also no better than ENS.
 
-- **Findings that bear on later experiments:** the only UKV with a matched history is the CEDA
+- **Findings that bear on later experiments:** the one UKV we found with a matched history is the CEDA
   archive, which is not the live product and is licensed for non-commercial use, so the gain is a
   ceiling; the demand contrasts at 0 to 48 hours were not run, because the gain is a ceiling from a
   non-live product and its interval over 0 to 54 hours includes zero; the manager decides.

@@ -27,7 +27,8 @@ decision_rule: >-
   1% margin is a screening threshold for adding a second weather product, not a threshold on
   demand-forecast error, which this experiment does not measure.
 benchmark: >-
-  ENS alone: the slope through the origin of the CAMS anomaly on the ENS ensemble-mean anomaly, fitted
+  ENS alone: the slope through the origin of the CAMS anomaly on the ENS ensemble-mean anomaly,
+  fitted
   per series and lead band on the training window, as in experiment 00046 but with this page's lead
   bands.
 row_set_id: >-
@@ -56,8 +57,9 @@ lessons: >-
   of ENS's, so a fitted blend improves on ENS's cross-validated error by a small margin within 2
   days, by an amount the validation year cannot confirm, and by nothing beyond 54 hours. The finer
   time steps of the UKV are not what limits it: forming 3-hour window means from
-  the UKV, as ENS delivers its flux, scores slightly better than the native hourly values. The only
-  UKV with a matched history is the CEDA archive, which is not the live product and is licensed for
+  the UKV, as ENS delivers its flux, scores slightly better than the native hourly values. The one
+  UKV we found with a matched history is the CEDA archive, which is not the live product and is
+  licensed for
   non-commercial use, so the result is a ceiling and does not justify adoption.
 production_status: not-for-production
 adopted_in: none
@@ -99,10 +101,10 @@ worse than ENS at every lead time. A mix of ENS and UKV, with weights fitted on 
 months, had a squared error 4% to 14% lower than ENS within 2 days in a cross-validation on those
 15 months. In the validation year its correlation with CAMS was higher than ENS's by only 0.02 to
 0.03 within 24 hours, and several of those gains are within the range that chance alone could
-produce. The mix was no better beyond 54 hours. The only UKV with a long matching history is the
-CEDA archive, which differs from the live UKV and is licensed for non-commercial use, so any gain is
-an upper bound. This experiment was run post hoc and was not pre-registered, as the next section
-explains.
+produce. The mix was no better beyond 54 hours. The one UKV we found with a long matching history is
+the CEDA archive, which differs from the live UKV and is licensed for non-commercial use, so any
+gain is
+an upper bound. This experiment was run post hoc and was not pre-registered, as explained below.
 
 **The verdict is `small gain` for the blend, and no gain for the UKV alone.** The blend clears the
 1% cross-validation margin of the stage 1 gate in every lead band within 54 hours, and the UKV
@@ -142,14 +144,15 @@ run plus 9 hours, 09:00 UTC.** Each arm uses the freshest forecast available at 
 - **CAMS** is the reference: experiment 39's half-hour irradiance for the substation, kept where
   CAMS reliability is at least 0.9.
 
-The five arms of each table are ENS alone, the UKV alone (native steps), the blend, and two controls
+The five arms are ENS alone, the UKV alone (native steps), the blend, and two controls
 that separate the time resolution of the UKV from its skill. **Control `ukv3h`** subsamples the UKV
 to ENS's 3-hourly steps and passes the instantaneous values through the production ENS resampler,
 labelled as if they were ENS's 3-hour window means, as the maintainer asked. **Control `ukv3w`**
 first forms 3-hour window means from the UKV (the trapezoid mean of the instantaneous values inside
 each window) and then uses the same resampler. The second control was added after the first scores
 because the first has a half-window timing error built in: in the hour-of-day figure below, the mean
-`u` of `ukv3h` peaks at 10 UTC, while CAMS, ENS, the UKV, and `ukv3w` all peak at 12 UTC.
+fleet output `u` of `ukv3h` peaks at 10 UTC, while CAMS, ENS, the UKV, and `ukv3w` all peak at 12
+UTC.
 
 The calibration is a slope through the origin of the CAMS anomaly on a forecast's anomaly, fitted
 per series and lead band on the training window (valid times to 2025-06-30), leaving out site-band
@@ -180,7 +183,7 @@ blend's cross-validated error is still 3.6% to 7.7% lower in every band.
 ## Shortwave conventions and how each was aligned with CAMS
 
 **CAMS and ENS are half-hour or window means labelled at the period end, and the UKV and MOGREPS-UK
-are instantaneous values, so only they need the interpolation.**
+are instantaneous values, so only the UKV and MOGREPS-UK need the interpolation.**
 
 | Source | Shortwave convention | Valid-time stamp | Alignment with CAMS |
 |---|---|---|---|
@@ -205,7 +208,8 @@ visibly the worst, with a flat top.
 
 **All sources peak at 12 UTC, as CAMS does, so no label is shifted, except the `ukv3h` control,
 whose mean `u` peaks at 10 UTC.** The UKV's mean `u` is 0.875 of CAMS's at leads under 24 hours and
-ENS's is 1.023. A multiplicative bias of the UKV does not affect its anomaly, which is taken against
+ENS's mean `u` is 1.023 of CAMS's. A multiplicative bias of the UKV does not affect its anomaly,
+which is taken against
 its own climatology.
 
 ![Mean u by hour of day for each source at leads under 24 hours](figure_3_hour_of_day.svg)
@@ -250,7 +254,8 @@ The literal `ukv3h` control scores 0.122 lower than the native steps over 0 to 5
 -0.093), because the instantaneous values stand in for window means, which moves the peak of its
 mean `u` from 12 UTC to 10 UTC.
 
-Calibration slope (ideal 1) and mean squared error of the calibrated anomaly, same rows:
+The next table gives the calibration slope (ideal 1) and the mean squared error of the calibrated
+anomaly, on the same rows as the correlations:
 
 | Lead | ENS slope, MSE | UKV slope, MSE | Blend slope, MSE |
 |---|---|---|---|
@@ -268,8 +273,9 @@ band holds only leads of 48 to 51 hours, from 3 to 6 blocks, so neither figure i
 ## The stage 1 gate on the training window
 
 **The blend clears the 1% margin in every band within 54 hours and the UKV alone in none.**
-Cross-validated mean squared error, relative to ENS, pooled over the five verdict series (`t54`).
-The last column restricts the same cross-validation to the folds of local months April to September,
+The table gives the cross-validated mean squared error relative to ENS, pooled over the five verdict
+series (`t54`). The last column restricts the same cross-validation to the folds of local months
+April to September,
 the months the validation year scores. The verdict follows the all-months column, as the decision
 rule states.
 
@@ -283,7 +289,7 @@ rule states.
 | 0-54 h pooled | 0.0208 | +22.3% | -7.6% | +17.4% | -7.4% |
 
 The April to September column shows the same gain as the all-months column (-7.4% against -7.6%
-pooled), and the UKV alone is +22.8% worse in those months, so the winter months do not drive the
+pooled), and the UKV alone is worse by 22.8% in those months, so the winter months do not drive the
 result.
 
 For `t120` the blend is 3.4% lower pooled over 0 to 120 hours and 1.1% lower at 54 to 120 hours,
@@ -295,14 +301,14 @@ band.
 ## The check on MOGREPS-UK
 
 **MOGREPS-UK, the live ensemble of the Met Office, is no better than ENS on 14 days of overlap with
-CAMS, although its point estimates are above ENS's in some bands, and an equal-weight blend is not
-distinguishable from ENS.** MOGREPS-UK has 3 members and about 7 weeks of archive (27 August to 16
+CAMS.** Its point estimates are above ENS's in some bands, but an equal-weight blend is not
+distinguishable from ENS. MOGREPS-UK has 3 members and about 7 weeks of archive (27 August to 16
 October 2026), so nothing was calibrated or fitted. The blend here averages the two anomalies with
 equal weight. The check starts after the holdout date of 2026-07-01, so it uses holdout-period data
 that no calibration touched, outside the validation year. MOGREPS-UK is anomalised against the CAMS
 climatology of experiment 46, while ENS is anomalised against ENS's own climatology, so
-MOGREPS-UK's bias is not removed. Its mean squared error is therefore unfavourable, and its
-correlation is not affected. CAMS ends on 11 September 2026, so the reference covers only 14
+MOGREPS-UK's bias is not removed. The mean squared error of MOGREPS-UK is therefore unfavourable,
+and its correlation is not affected. CAMS ends on 11 September 2026, so the reference covers only 14
 forecast origin days (27 August to 10 September). Correlation with the CAMS anomaly, 95% interval
 from resampling whole origin days:
 
@@ -317,11 +323,11 @@ from resampling whole origin days:
 | 0-24 h | 1,551 | 0.741 (0.584-0.847) | 0.627 (0.416-0.771) | 0.742 (0.538-0.845) |
 
 At 6 to 12 hours, 12 to 24 hours, and 48 to 54 hours, the point estimates of MOGREPS-UK and of the
-At 6 to 12 hours, 12 to 24 hours, and 48 to 54 hours, the point estimates of MOGREPS-UK and of the
 blend are above ENS's, but every interval overlaps ENS's widely, on 12 to 14 days. Over all 49
 origin days from 27 August 2026, the MOGREPS-UK anomaly correlates with the ENS anomaly at 0.768
-within 24 hours, 0.699 at 24 to 54 hours, and 0.545 at 54 to 120 hours. That agreement is not a
-skill score, because neither anomaly is the reference. MOGREPS-UK's mean `u` is 0.303 against ENS's
+within 24 hours, 0.699 at 24 to 54 hours, and 0.545 at 54 to 120 hours. That correlation between the
+two anomalies is not a skill score, because neither anomaly is the reference. MOGREPS-UK's mean `u`
+is 0.303 against ENS's
 0.373 and CAMS's 0.378 on those rows.
 
 ## The demand step was not run
@@ -333,15 +339,13 @@ were not run with the blend.** The blend's gain is a ceiling from a product that
 demand contrast of the order of a 0.02 gain in correlation, which experiment 46's intervals
 (half-widths of 0.13 to 0.32 points of capacity at 0 to 48 hours) could not resolve. A non-live
 product with a licence that forbids production is a weak case for the spend, so the manager decides
-whether to run them.
+whether to run the contrasts.
 
 ## What these data could not show
 
 - **The live UKV is not the CEDA UKV.** The CEDA archive differs statistically from the live feed,
-- **The live UKV is not the CEDA UKV.** The CEDA archive differs statistically from the live feed,
-  its licence is non-commercial, and the live product has no history at the Primaries, so the
+  the CEDA licence is non-commercial, and the live product has no history at the Primaries, so the
   blend's gain is a ceiling.
-- **The delivery delay of the 06 UTC run is assumed.** See "What was compared" above: it was not
 - **The delivery delay of the 06 UTC run is assumed.** See "What was compared" above: it was not
   measured, and the blend's gain survived the `t54_late` reading, so no latency at which it
   disappears was found.
