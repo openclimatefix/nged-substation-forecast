@@ -61,7 +61,7 @@ from e00065_detect import (
 )
 from e00065_detectors import DetectorInputs, alarms, prepare
 from e00065_ends import end_only_intervals
-from e00065_inject import BLOCK, HEADLINE_BAND, Event
+from e00065_inject import BLOCK, HEADLINE_BAND, Event, Injection
 from e00065_intervals import build_intervals, relative_residual
 from e00065_profile import SHAPES, Shape, fit_profile_shares, inject_shaped, shares_json
 from e00065_score import by_series, match_event
@@ -174,7 +174,7 @@ def init_worker(state: dict) -> None:
     _STATE.update(state)
 
 
-def injected_inputs(*, seed: int, batch: list[Event], shape: Shape) -> tuple[dict, object]:
+def injected_inputs(*, seed: int, batch: list[Event], shape: Shape) -> tuple[dict, Injection]:
     """The injected residual of one batch and shape, and the injection."""
     panel = _STATE["panel"]
     injection = inject_shaped(
