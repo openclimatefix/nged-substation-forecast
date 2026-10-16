@@ -395,6 +395,29 @@ def run_dates(*, split: str, limit: int | None) -> list[tuple[date, Path, bool]]
     return jobs
 
 
+def require_complete(*, split: str) -> None:
+    """Raise, naming the dates, when a split lacks the input file of any ENS run date.
+
+    A run date has no file when the GEFS store holds no run for it, so a gap in the archive stops
+    the experiment here and not as a quietly smaller set of rows later.
+
+    Args:
+        split: `train` or `val`.
+
+    Raises:
+        FileNotFoundError: If any run date of the split has no file.
+    """
+    missing = [run for run, target, _ in run_dates(split=split, limit=None) if not target.exists()]
+    if missing:
+        shown = ", ".join(f"{run:%Y-%m-%d}" for run in missing[:10])
+        msg = (
+            f"{len(missing)} {split} run dates have no GEFS input file (first: {shown}); "
+            "build them with e00050_gefs_inputs.py, and if the archive lacks the GEFS run for "
+            "a date, stop and decide how to treat that date"
+        )
+        raise FileNotFoundError(msg)
+
+
 def write_climatology() -> None:
     """Write the GEFS month-by-half-hour climatology of `u` over the full training window.
 
@@ -406,11 +429,8 @@ def write_climatology() -> None:
     assert common.scalar(value=daylight_cells["days_ens"].min()) > 62, (
         "experiment 00046 pooled its months"
     )
+    require_complete(split="train")
     files = sorted(common.SOLAR_DIR_TRAIN.glob("init=*.parquet"))
-    expected = (common.LAST_TRAINING_VALID.date() - common.FIRST_TRAINING_RUN.date()).days + 1
-    if len(files) != expected:
-        print(f"climatology not written: {len(files)} of {expected} training runs built")
-        return
     train = pl.concat([pl.read_parquet(path) for path in files])
     clim = common.climatology(
         frame=train.select("site", time=pl.col("valid_time"), u=pl.col("u_mean")),

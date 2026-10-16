@@ -14,9 +14,11 @@ daylight rows (a month-by-half-hour cell is daylight when the CAMS climatology e
   from April 2024 to June 2025, fit the three calibrations on the other 14 months and predict the
   held-out month. **Inside each fold, each source's climatology, the CAMS climatology, the
   daylight mask, the slopes, and the blend weights are all fitted on the other 14 months only.**
-  Rows with a valid time in the held-out month are removed from fitting, so a held-out target never
+  Rows with a valid time in the held-out month, and rows of runs initialised in it, are removed from
+  fitting, so a held-out target never
   appears in training at another lead. The scored rows are daylight rows at leads of 0 to 240
-  hours, pooled over the five verdict series. The arm with the lowest squared error is the best
+  hours in April to September (the months the validation scoring uses), pooled over the five
+  verdict series. The arm with the lowest squared error is the best
   arm, and GEFS or the blend replaces ENS only when its error is at least 1% lower. The result is
   written to `results/selection.json`.
 - `validate` fits the same calibrations on the whole training window, computes each arm's central
@@ -36,6 +38,7 @@ from datetime import UTC, datetime
 from typing import Final
 
 import e00050_common as common
+import e00050_gefs_inputs as inputs
 import numpy as np
 import polars as pl
 
@@ -137,8 +140,12 @@ def apply_calibrations(*, rows: pl.DataFrame, calibrations: pl.DataFrame) -> pl.
     )
 
 
-def read_training_rows() -> pl.DataFrame:
-    """Return the training-window rows both sources and CAMS share, up to a lead of 240 hours.
+def read_training_rows(*, max_lead_hours: float | None) -> pl.DataFrame:
+    """Return the training-window rows both sources and CAMS share.
+
+    Args:
+        max_lead_hours: Keep leads up to this many hours (the CV gate uses 240); all leads, to 351
+            hours, when None, so the calibration of the 10+ d band has rows to fit.
 
     Returns:
         Columns `site`, `power_fcst_init_time`, `valid_time`, `lead_hours`, `band`, `block` (the
@@ -147,6 +154,7 @@ def read_training_rows() -> pl.DataFrame:
     Raises:
         FileNotFoundError: If either training window has no files yet.
     """
+    inputs.require_complete(split="train")
     ens_files = sorted((common.SOURCE_SOLAR_DIR / "ens_train").glob("init=*.parquet"))
     gefs_files = sorted(common.SOLAR_DIR_TRAIN.glob("init=*.parquet"))
     if not ens_files or not gefs_files:
@@ -174,7 +182,7 @@ def read_training_rows() -> pl.DataFrame:
         )
         .filter(
             (pl.col("valid_time") <= common.LAST_TRAINING_VALID)
-            & (pl.col("lead_hours") <= common.SELECTION_MAX_LEAD_HOURS)
+            & (pl.col("lead_hours") <= (max_lead_hours if max_lead_hours is not None else 1e9))
             & pl.col("u_ens").is_finite()
             & pl.col("u_gefs").is_finite()
             & pl.col("u_cams").is_finite()
@@ -240,13 +248,13 @@ def fold_errors(*, rows: pl.DataFrame, cams: pl.DataFrame, fold: int) -> pl.Data
     Raises:
         ValueError: If the held-out month leaks into the rows the fit sees.
     """
-    train = rows.filter(pl.col("block") != fold)
+    init_block = block_index(times=pl.col("power_fcst_init_time"))
+    train = rows.filter((pl.col("block") != fold) & (init_block != fold))
     test = rows.filter(pl.col("block") == fold)
     cams_train = cams.filter(pl.col("block") != fold)
-    if (train["block"] == fold).any() or common.latest_time(times=train["valid_time"]) > (
-        common.LAST_TRAINING_VALID
-    ):
-        msg = "the training side of a fold must exclude the held-out month"
+    leaked = (train["block"] == fold).any() or (train.select((init_block == fold).any()).item())
+    if leaked or common.latest_time(times=train["valid_time"]) > common.LAST_TRAINING_VALID:
+        msg = "a fold must exclude runs initialised in, and valid times in, the held-out month"
         raise ValueError(msg)
     clims = {
         name: common.climatology(
@@ -268,7 +276,11 @@ def fold_errors(*, rows: pl.DataFrame, cams: pl.DataFrame, fold: int) -> pl.Data
     calibrations = fit_calibrations(rows=fit_rows)
     scored = anomalies(
         rows=test, clim_ens=lookup["ens"], clim_gefs=lookup["gefs"], clim_cams=lookup["cams"]
-    ).filter(pl.col("daylight") & pl.col("site").is_in(list(common.VERDICT_SITES)))
+    ).filter(
+        pl.col("daylight")
+        & pl.col("month").is_in(list(common.SCORED_MONTHS))
+        & pl.col("site").is_in(list(common.VERDICT_SITES))
+    )
     scored = apply_calibrations(rows=scored, calibrations=calibrations)
     rows_out = [
         {
@@ -315,7 +327,7 @@ def select_arm(*, errors: pl.DataFrame) -> dict[str, object]:
 
 def run_cv() -> None:
     """Run the 15-fold month-block cross-validation and write `selection.json`."""
-    rows = read_training_rows()
+    rows = read_training_rows(max_lead_hours=common.SELECTION_MAX_LEAD_HOURS)
     cams = (
         pl.read_parquet(common.SOURCE_SOLAR_DIR / "cams_u.parquet")
         .rename({"time": "valid_time"})
@@ -352,7 +364,7 @@ def full_window_calibrations() -> tuple[pl.DataFrame, dict[str, pl.DataFrame]]:
         "cams": table.select("site", "month", "hh", clim=pl.col("clim_cams")),
         "gefs": gefs.select("site", "month", "hh", clim=pl.col("clim_gefs")),
     }
-    rows = read_training_rows()
+    rows = read_training_rows(max_lead_hours=None)
     fit_rows = anomalies(
         rows=rows, clim_ens=clims["ens"], clim_gefs=clims["gefs"], clim_cams=clims["cams"]
     )
@@ -628,11 +640,29 @@ def correlation_intervals(*, verdict_rows: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(intervals)
 
 
+def shared_rows(*, scored: pl.DataFrame) -> pl.DataFrame:
+    """Keep the rows every arm can be scored on, and print how many rows had no GEFS value.
+
+    Args:
+        scored: Scored rows with `has_gefs`.
+
+    Returns:
+        The rows with a GEFS value, so that no arm is scored on a fallback to ENS.
+    """
+    shared = scored.filter(pl.col("has_gefs"))
+    print(
+        f"scored rows {scored.height:,}; rows with no GEFS value dropped so that every arm is "
+        f"scored on the same rows: {scored.height - shared.height:,}"
+    )
+    return shared
+
+
 def run_validate() -> None:
     """Score the three arms' anomalies on the validation year and write the tables."""
     if not common.SELECTION_PATH.exists():
         msg = "run `cv` first: the selection must be written before the validation scores are read"
         raise FileNotFoundError(msg)
+    inputs.require_complete(split="val")
     calibrations, clims = full_window_calibrations()
     common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     common.write_atomically(
@@ -669,6 +699,7 @@ def run_validate() -> None:
         .filter(pl.col("anomaly_cams").is_finite())
         .with_columns(init_block=block_index(times=pl.col("power_fcst_init_time")))
     )
+    scored = shared_rows(scored=scored)
     rows: list[dict[str, object]] = []
     verdict_rows = scored.filter(pl.col("site").is_in(list(common.VERDICT_SITES)))
     for band in [None, *range(len(BAND_NAMES))]:

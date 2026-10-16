@@ -365,6 +365,46 @@ def check_10_gefs_run() -> None:
     )
 
 
+def check_11_long_leads_have_no_nan() -> None:
+    """Rows beyond 240 h are calibrated and scored with no NaN for any arm."""
+    generator = np.random.default_rng(5)
+    count = 4000
+    truth = generator.normal(0.0, 0.2, count)
+    lead = generator.uniform(0.0, 351.0, count)
+    rows = pl.DataFrame(
+        {
+            "site": "D9",
+            "band": common.lead_band(lead_hours=lead),
+            "a_cams": truth,
+            "a_ens": truth + generator.normal(0.0, 0.3, count),
+            "a_gefs": truth + generator.normal(0.0, 0.3, count),
+        }
+    )
+    print(f"check 11: bands {sorted(rows['band'].unique().to_list())}, longest {lead.max():.0f} h")
+    calibrations = anomaly.fit_calibrations(rows=rows)
+    centrals = anomaly.apply_calibrations(rows=rows, calibrations=calibrations).with_columns(
+        anomaly_cams=pl.col("a_cams")
+    )
+    long_rows = centrals.filter(pl.col("band") == len(common.LEAD_BANDS) - 1)
+    values = anomaly.metric_rows(frame=long_rows, scope="pooled", band="10+ d")
+    columns = [c for c in centrals.columns if c.startswith("central_")]
+    _require(
+        passed=long_rows.height > 100
+        and all(
+            long_rows[c].is_not_null().all() and long_rows[c].is_finite().all() for c in columns
+        )
+        and all(np.isfinite(float(str(v["value"]))) for v in values),
+        message="check 11: no central anomaly and no correlation is NaN in the 10+ d band",
+    )
+    shared = anomaly.shared_rows(
+        scored=centrals.with_columns(has_gefs=pl.Series(generator.uniform(size=count) > 0.1))
+    )
+    _require(
+        passed=shared.height < count,
+        message="check 11: rows with no GEFS value are dropped and counted",
+    )
+
+
 CHECKS: Final = {
     1: check_1_deaccumulation,
     2: check_2_weights_sum_to_one,
@@ -376,6 +416,7 @@ CHECKS: Final = {
     8: check_8_correlation_sums,
     9: check_9_benchmark_rebuild,
     10: check_10_gefs_run,
+    11: check_11_long_leads_have_no_nan,
 }
 
 
