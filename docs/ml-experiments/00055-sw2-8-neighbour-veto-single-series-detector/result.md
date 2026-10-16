@@ -120,8 +120,7 @@ therefore exact, as in experiment 47. The harness check must reproduce experimen
 
 | Contrast | Detector, window | Transfers | Reads |
 |---|---|---|---|
-| C1 | D2 minus D0M, 24 h | headline band, even months, all sets except the holiday set | the
-verdict |
+| C1 | D2 minus D0M, 24 h | headline band, even months, all sets except the holiday set | the verdict |
 | C2 | D2 minus D0M, 4 h | same | reported |
 | C3 | D2 minus D0M, 24 h | C1's transfers that have a metered receiver | reported |
 | C4 | D2 minus D0M, 24 h | C1's transfers that have no metered receiver | reported |
