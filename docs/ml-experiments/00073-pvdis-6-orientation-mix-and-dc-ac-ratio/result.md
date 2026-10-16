@@ -1,7 +1,7 @@
 ---
 id: "00073"
 slug: pvdis-6-orientation-mix-and-dc-ac-ratio
-status: planned
+status: finished
 size: medium
 hypothesis: >-
   On the 8 Primary substations metered in MW, (a) the share of east-, south-, and west-facing solar
@@ -60,28 +60,210 @@ row_set_id: none
 metric: >-
   Total-variation error of the orientation shares, absolute error of the fitted DC:AC ratio, and
   the relative change in held-out root mean square error of daylight power.
-verdict: null
-best_arm: null
-headline: null
-lessons: null
-production_status: null
-adopted_in: null
+verdict: refuted
+verdict_note: >-
+  The pre-registered rule has no clause for this outcome: the orientation fit passes its known
+  answers (so it is `identified`) but has no held-out gain, and the verdict list needs a gain for
+  `partly supported` and an interval that excludes zero for `small gain`. The verdict is read from
+  the rule's stated purpose, which is whether the mix or the ratio is worth porting into the solar
+  forecast of PVDIS-5, and it is not.
+best_arm: >-
+  Pooled orientation fit with no prior (one mix per Primary shared by its season-years), chosen on
+  tuning units: median share error 0.088 on scoring units, against 0.300 for guessing the fleet mix.
+headline: >-
+  On injected mixes the orientation fit beats guessing the fleet mix by 0.181 (98.75% interval
+  -0.228 to -0.122), but the real series give a mix that changes by a median 0.24 between
+  consecutive season-years, and the fitted mix changes held-out error by +0.8% (-0.9% to +2.8%)
+  against all-south panels. The DC:AC ratio search has a median absolute error of 0.055 on a farm's
+  output alone and 0.195 once the farm is added to a Primary's power, and beats the constant guess
+  on 0 of 6 farms in that case, so it is dropped before any real-series fit.
+lessons: >-
+  A known-answer test that passes is necessary and not sufficient. The orientation mix is
+  recoverable when the true shapes are the fitted shapes, and still does not stay put on the real
+  series, so the real fleet differs from three clean orientations. The DC:AC ratio is visible in a
+  farm's own output, but a Primary's demand and its own solar hide it.
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00073-pvdis-6-orientation-mix-and-dc-ac-ratio/
-advice: []
+advice:
+  - >-
+    Keep one south-facing shape and a fixed DC:AC ratio of 1.15 in the explicit solar term of
+    PVDIS-5, because neither the fitted orientation mix nor a fitted ratio is worth a per-Primary
+    table (C3, figure 7; DC:AC known answers, figure 4).
+  - >-
+    Do not read an orientation mix from one season-year of a Primary's power, because the shares
+    change by a median 0.24 between consecutive season-years (figure 5).
+  - >-
+    Inject known mixes at tilts other than the fitted one before trusting an orientation fit,
+    because the median share error rose from 0.09 at the fitted 25 degrees to 0.20 at 15 degrees
+    (robustness arm in the known-answer report).
+  - >-
+    Test a clipping search with the farm added to a real Primary's power and not only on the farm's
+    own output, because the median error went from 0.055 to 0.195 between the two (figure 4).
+  - >-
+    Check whether the west lean of the pooled mix at 5 of 8 Primaries is evening demand before
+    calling it solar, using rows after dark as experiment 40 suggested (figure 6).
 ---
 
 # Experiment 73: can the mix of solar panel orientations and the DC to AC ratio be recovered?
 
-*Status: planned. The opening paragraph and the results are written after the run.*
+We asked whether two properties of the solar panels behind a substation can be read from the
+substation's power alone. The first is the share of panels facing east, south, and west. The second
+is the ratio of DC capacity to AC (inverter) capacity, which sets the level at which output flattens
+at midday. We first tested each fit on answers we know: we added made-up east-south-west output,
+and the real output of six metered solar farms, to the real power of 8 Primary substations (the
+substations that step power down to the local network), and checked what the fit recovered. The
+orientation fit passed that test, finding the shares with a median error of 0.09 where guessing the
+usual mix gives 0.30 (error 0 means exact, 1 means worst). On the real power it did not stay put:
+the fitted shares changed by a median 0.24 from one year to the next, and the fitted mix predicted
+held-out weeks no better than assuming every panel faces south. The DC:AC ratio search found the
+ratio of a farm's own output, but not once that farm's output sat inside a Primary's power, so we
+dropped it before touching the real series.
 
-**The plan, in plain words.** Solar panels facing east, south, and west produce power at different
-times of day, and panels with more DC capacity than inverter capacity clip their output at midday.
-We ask whether either can be read from a substation's power alone. We test each on answers we know
-first: we add made-up east-south-west mixes, and the real output of six metered solar farms, to a
-substation's real demand, and check what the fitting method recovers. Only if the method passes do
-we fit the real series.
+**Take-home message: the explicit solar forecast of PVDIS-5 should keep one south-facing shape and
+a fixed DC:AC ratio of 1.15, because neither extra parameter can be read from a Primary's power well
+enough to be worth carrying.** The orientation mix is recoverable only when the real fleet looks
+like three clean orientations, and the real series show that it does not. The DC:AC ratio is hidden
+by the Primary's own demand and solar. The search therefore narrows to better inputs (the sunshine
+forecast itself) and away from richer solar shapes.
 
-## Size: medium
+**Verdict `refuted`, read from the plan's purpose.** The pre-registered rule has no clause for an
+orientation fit that passes its known answers and then shows no held-out gain. Orientation is
+`identified` by the plan's definition (median error 0.088, at most 0.15; C1 upper limit -0.122,
+below -0.10), and C3 is not a gain. DC:AC is not identified. The verdict follows the question the
+experiment was asked, which is whether either parameter is worth porting into the solar forecast of
+PVDIS-5, and neither is.
+
+![Figure 1: clear-day output of the six solar farms against irradiance](figure_01.svg)
+
+![Figure 2: east, south, and west shapes through one clear day](figure_02.svg)
+
+## Known answers
+
+**Injected east-south-west mixes are recovered far better than a guess.** The arm chosen on the
+tuning units (solar-farm locations A to C) was the pooled fit with no prior. On the scoring units
+(locations D to F) its median share error is 0.088, against 0.300 for guessing the fleet mix. C1,
+the arm's error minus the guess's, is -0.181 (98.75% interval -0.228 to -0.122), pooled over the
+five true mixes. Per true mix, the guess is exact at the fleet mix itself and the fit is not (0.097
+against 0), and the fit wins at the other four.
+
+| True mix (east/south/west) | Pooled fit | Guess: fleet mix | Guess: all south |
+|---|---|---|---|
+| all south (0/1/0) | 0.102 | 0.400 | 0.000 |
+| fleet mix (0.2/0.6/0.2) | 0.097 | 0.000 | 0.400 |
+| east-heavy (0.5/0.4/0.1) | 0.097 | 0.300 | 0.600 |
+| west-heavy (0.1/0.4/0.5) | 0.100 | 0.300 | 0.600 |
+| east and west (0.5/0/0.5) | 0.045 | 0.600 | 1.000 |
+
+![Figure 3: share error by true mix, fit against guesses](figure_03.svg)
+
+**The known answer is the easy case.** Both the injected output and the fitted shapes come from the
+same physics, and only the sky differs (CAMS at the farm location against CAMS at the Primary). The
+robustness arm injected shapes at 15° and 40° tilt while the fit stayed at 25°. The pooled fit's
+median error was 0.100 at 40° and 0.200 at 15°, so the 0.15 limit holds at 25° and 40° and not at
+15°. At the fitted tilt, 0.192 of the scoring units hit one of the two bounds (a negative increment
+set to zero, or a total increment under 0.3 MW).
+
+**The DC:AC ratio is found from a farm's own output and lost once the farm is added to a Primary.**
+The knee gate passed: the median number of clear-day half-hours at or above the knee at ratio 1.15
+is 165 to 188 for five farms and 110.5 for farm D, against the threshold of 100. The search on each
+farm's output alone has a median absolute error of 0.055 over the six farms and beats the constant
+guess (the median ratio of the other five farms) on 5 of 6. With 10 MW of the farm's output added to
+a Primary's power, the median error is 0.195 and the search beats the guess on 0 of 6, so D is not
+identified. The searched ratio sits at 1.00 to 1.10 for every farm in that case.
+
+| Farm | True ratio | Error, farm alone | Error, added to a Primary | Error of the guess |
+|---|---|---|---|---|
+| A | 1.15 | 0.050 | 0.150 | 0.070 |
+| B | 1.17 | 0.020 | 0.170 | 0.050 |
+| C | 1.22 | 0.070 | 0.220 | 0.050 |
+| D | 1.42 | 0.220 | 0.320 | 0.250 |
+| E | 1.12 | 0.030 | 0.120 | 0.100 |
+| F | 1.26 | 0.060 | 0.260 | 0.090 |
+
+![Figure 4: searched ratio against true ratio](figure_04.svg)
+
+The ratios of experiment 29 come from the same CAMS irradiance and the same clipping form as the
+search, so the farm-alone case is the easy bound. With six farms the intervals are descriptive, and
+the sign count decides.
+
+## The real series
+
+**The real series do not support a stable orientation mix.** The free fit to each Primary-year
+changes its shares by a median total-variation distance of 0.237 between consecutive season-years
+(33 pairs), and the clear-day fit by 0.326. The known-answer error of the same arms is about 0.1.
+The pooled fit shares one mix per Primary across its season-years, and its 95% intervals (200
+resamples of 7-day blocks of clear days) are on average 0.49 wide on a share that runs from 0 to 1.
+
+![Figure 5: shares of the free fit per Primary and season-year](figure_05.svg)
+
+| Primary | Capacity (MW) | East | South | West |
+|---|---|---|---|---|
+| Kirton (flagged in experiment 40) | 1.58 | 0.00 (0.00 to 0.10) | 0.95 (0.68 to 1.00) | 0.05 (0.00 to 0.29) |
+| Trusthorpe | 7.58 | 0.33 (0.01 to 0.49) | 0.08 (0.00 to 0.40) | 0.58 (0.41 to 0.65) |
+| Spilsby | 2.57 | 0.27 (0.07 to 0.44) | 0.24 (0.00 to 0.66) | 0.49 (0.21 to 0.65) |
+| Horncastle | 3.03 | 0.31 (0.00 to 0.49) | 0.19 (0.00 to 0.66) | 0.50 (0.30 to 0.59) |
+| Mount Bridge Boston | 3.65 | 0.06 (0.00 to 0.30) | 0.51 (0.19 to 0.75) | 0.43 (0.23 to 0.57) |
+| Wrangle T1 (little power) | 3.71 | 0.27 (0.00 to 0.64) | 0.23 (0.00 to 1.00) | 0.50 (0.00 to 0.92) |
+| Donington | 3.27 | 0.30 (0.00 to 0.48) | 0.23 (0.00 to 0.58) | 0.46 (0.32 to 0.59) |
+| Wrangle T2 | 2.69 | 0.49 (0.18 to 0.89) | 0.29 (0.00 to 0.71) | 0.22 (0.00 to 0.53) |
+
+The capacity column is the mean of the years' south-only capacities times the sum of the shares, and
+it differs from experiment 40's capacities (for example 7.58 MW against 2.48 MW at Trusthorpe). The
+orientation fit trades capacity against shape, so these totals are not capacity estimates.
+
+![Figure 6: pooled shares with 95% intervals](figure_06.svg)
+
+**The fitted mix does not predict held-out weeks better than all-south panels.** C3, the relative
+change in held-out root mean square error of daylight power from the pooled mix against the
+south-only shape, is +0.8% (98.75% interval -0.9% to +2.8%, 80 held-out year-folds). The threshold
+for a gain is an upper limit below -0.5%, so C3 is not a gain, and it is not distinguishable from
+zero. C4 was not computed, because the DC:AC fit failed its known answers.
+
+![Figure 7: held-out change in error by Primary](figure_07.svg)
+
+**Five of the eight Primaries lean west.** Trusthorpe, Spilsby, Horncastle, Wrangle T1, and
+Donington have a pooled west share of 0.46 to 0.58, against 0.2 in the fleet mix. This experiment
+cannot say whether the lean is west-facing panels or demand that rises in the evening, which looks
+like west-facing output to the fit.
+
+## Changes from the plan
+
+- **The held-out cell minimum is 5 rows, not 20.** With alternate 28-day blocks, no cell reached 20
+  fitted rows, so every held-out row was dropped in the first run. The change was made before any
+  held-out result existed.
+- **The null arm became a bootstrap.** The plan injected nothing and reported the shares, but the
+  increment of no injection is exactly zero. The pooled shares' 95% intervals from resampled blocks
+  report the noise instead.
+- **The pooled arm with ridge 0 won the tuning, so the prior never entered.** Its name in the plan,
+  "pooled with a prior", stands for the family whose best member has no prior.
+- **The 5 MW injection was dropped,** as the plan review advised, and the 10 MW injection decides.
+- **DC:AC has no fitted parameter beyond its grid,** so all six farms are scored, and no tuning
+  split applies. The Primaries' own series were searched without injection as a reference only
+  (41 Primary-years, quartiles 1.00, 1.00, and 1.30, range 1.00 to 1.60); the plan stops real-series
+  fits for D, and this reference is not a claim about the Primaries.
+
+## Caveats
+
+- **The known answers use one physics.** Passing them is necessary and not sufficient, as the 15°
+  robustness arm shows.
+- **Only 6 farms score DC:AC,** so the sign count is a coarse test.
+- **No Opus plan review was run;** the plan had one Sonnet review.
+- **The pooled capacity depends on a south-only scale and a floor of 0.1 MW,** which is why its
+  total differs from experiment 40's capacity.
+
+## What the next experiment should answer
+
+**The next experiment should ask whether the west lean of the pooled mix is evening demand.** The
+evidence is that five Primaries lean west by the same amount and the shares swap from year to year.
+A test could fit the same three shapes to rows after sunset, where no solar exists, and see whether
+the "west" capacity appears there as well. If it does, the lean is demand, and the plan for PVDIS-5
+stands as it is. If it does not, a west-facing share is real at those Primaries and a per-Primary
+shape table is worth reconsidering with a larger sample of years.
+
+## Method
+
+### Size: medium
 
 - **What gets stored:** only private work tables under `data/ml-experiments/`; no Delta table.
 - **Serving path:** untouched.
@@ -91,19 +273,18 @@ we fit the real series.
 - **Callers:** the machinery is experiment 39's and 40's code, copied into this folder; no caller
   outside `ml-experiments/`.
 
-Because the designs are several, the process is the full one: a Sonnet plan, one Sonnet plan review,
-a Sonnet implementation, a Sonnet code review, and a Sonnet write-up and prose review. An Opus plan
-review is added only if the Sonnet review finds a flaw it cannot settle.
+The process was the full one, with Sonnet throughout: a plan, one plan review, an implementation, a
+code review, and a write-up with a prose review.
 
-## Earlier advice followed
+### Earlier advice followed
 
 - **From experiment 40:** do not quote a capacity without a bound, and leave Wrangle T1 out of any
-  claim that a Primary is free of a load. Every real-series table here keeps Kirton as a range and
-  marks Wrangle T1.
+  claim that a Primary is free of a load. Every real-series table here flags Kirton and
+  Wrangle T1.
 - **From experiment 45:** the capacity is held constant within each season-year, not weekly.
 - **Departure:** none.
 
-## Data and fits
+### Data and fits
 
 **Inputs are experiment 39's frame, read and never rebuilt:** half-hourly power of the 8
 directional Primaries and 6 solar farms, CAMS irradiance, and ERA5 temperature, on daylight
@@ -131,13 +312,12 @@ rows with the shape `min(r × irradiance / 1000, 1)` (south, 25° tilt) and keep
 residual sum of squares. A ratio of 1.00 never clips in GB. The interval is the 2.5th to 97.5th
 percentile of the best r over 200 resamples of 7-day blocks.
 
-## Known answers, run before any real fit
+### Known answers, run before any real fit
 
 - **Orientation:** inject 3 MW of synthetic output, `3 × (wE uE + wS uS + wW uW)` with the shapes
   built from CAMS at each solar farm's location, so the injected sky differs from the sky the fit
   uses at the Primary. A robustness arm, reported and not decisive, injects shapes at 15° and 40°
   tilt while the fit stays at 25°, and passing the known answers is necessary but not sufficient.
-  A null arm injects nothing and reports the estimated shares, so the size of the noise is known.
   The five true mixes (wE, wS, wW) are (0, 1, 0), (0.2, 0.6, 0.2), (0.5, 0.4,
   0.1), (0.1, 0.4, 0.5), and (0.5, 0, 0.5). Units are Primary × season-year × farm location × mix.
   The estimated shares come from the increment of the fitted capacities, with negative increments
@@ -151,21 +331,9 @@ percentile of the best r over 200 resamples of 7-day blocks.
   injection into zero demand returns the true mix to 1e-6; noise-free clipped output returns the
   true ratio; linearity of the increment.
 
-## Real series (only for a part that passes its known answers)
+### Real series
 
-Report the fitted shares or ratio for every Primary-year with the interval, the year-to-year change
-in shares (a mix that swaps between years is not identified), and C3 and C4. Keep Kirton as a range
-and mark Wrangle T1.
-
-## Figures planned
-
-Raw data first: clear-day midday power against irradiance for the farms and a Primary, to show
-whether a clipping knee is visible; then the three orientation shapes through two days; recovery of
-the shares per true mix and arm; the DC:AC error by farm; the profile of residual sum of squares
-against r; the real shares and ratios per Primary-year; held-out contrasts C3 and C4. Farms carry
-anonymous labels A to F.
-
-## Compute
-
-Slot B: 6 cores. Fits are least squares and non-negative least squares on small matrices; the run
-uses 6 worker processes, one Primary per job, each with fixed seeds and its own output file.
+The real-series fits use the same designs. The free and clear-day fits are per season-year. The
+pooled fit has a 200-draw block bootstrap. Contrast C3 fits on alternate 28-day blocks, scores the
+others, and reverses, with the capacities fixed from the training blocks and the calendar cells and
+nuisance terms refitted on them.
