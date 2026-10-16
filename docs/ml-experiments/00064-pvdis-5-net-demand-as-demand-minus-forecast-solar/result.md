@@ -8,9 +8,9 @@ hypothesis: >-
   clean solar-capacity estimate, a demand forecast that carries an explicit solar term (the
   substation's embedded solar capacity times a calibrated forecast of the solar output) scores no
   worse than experiment 00033's best-guess recipe `d0` by more than 0.10 points of capacity on
-  daylight April-to-September rows, and the solar term carries real capacity information, because the
-  same arm with capacities shuffled between forecast dates scores worse. The solar term is built in
-  four ways: added to the forecast after the fit with a coefficient fitted on the training window
+  daylight April-to-September rows, and the solar term carries real solar information, because
+  the same arm with the forecast sunshine taken from another date scores worse. The solar term is built
+  in four ways: added to the forecast after the fit with a coefficient fitted on the training window
   (`sf`), given to the XGBoost model as an input column (`a`), given to it as a starting offset so
   that the trees fit only the remainder (`am`), or removed from the training target and added back
   after the fit (`b`, "demand minus solar").
@@ -29,9 +29,10 @@ prediction: >-
   cloud-proxy inputs, if the lower slope is the model already absorbing part of the anomaly. The
   full-leads upper end of the non-inferiority read is therefore expected below +0.10 for `sf` and
   not for `b`. A placebo twin (the forecast sunshine taken from another date) is expected to score
-  worse than its real arm by 0.10 to 0.40 points for `sf`, `am`, and `b`, and by 0.02 to 0.15 for `a`, whose
-  trees can learn to ignore a column that does not help. The 0.10 margin is read at 98.75%, where the
-  half-width of the paired contrast of the fitted ensemble shift against `d0` is 0.079 points.
+  worse than its real arm by 0.10 to 0.40 points for `sf`, `am`, and `b`, and by 0.02 to 0.15 for
+  `a`, whose trees can learn to ignore a column that does not help. The 0.10 margin is read at
+  98.75%, where the half-width of the paired contrast of the fitted ensemble shift against `d0` is
+  0.079 points.
 decision_rule: >-
   Two families of reads, each Bonferroni-corrected across the 4 arms (`sf`, `a`, `am`, and `b`), so
   98.75% intervals from 50,000 resamples of whole ISO weeks of forecast start (about 29 blocks) and
@@ -124,10 +125,11 @@ and write-up, and Sonnet write-up and prose reviews.
 Followed: fit the solar coefficient on the training window by lead band and season instead of fixing
 it at 1 (00046, 00051); use the ensemble-mean shift and keep the per-member shift only as a
 comparison (00051); test non-inferiority with a margin fixed after a power calculation (00046,
-00051); pre-register a gain read for 0 to 48 hours only, as its own corrected family (00046);
-report coverage of the 0.05 and 0.95 quantiles in sunny and cloudy rows (00046); read the sign of each contrast by valid month (00046);
-use no second weather forecast, because experiments 50 and 53 found none that improves ENS (00050,
-00053); read the season-year capacity constant, not a weekly path (00045). Departed: none.
+00051); pre-register a gain read for 0 to 48 hours only, as its own corrected family (00046); report
+coverage of the 0.05 and 0.95 quantiles in sunny and cloudy rows (00046); read the sign of each
+contrast by valid month (00046); use no second weather forecast, because experiments 50 and 53 found
+none that improves ENS (00050, 00053); read the season-year capacity constant, not a weekly path
+(00045). Departed: none.
 
 ## Design
 
@@ -205,15 +207,15 @@ write-up says so. The same table of `w` is used by `sf` and `am`.
   used the 2023/24 capacity), and experiment 00033's `climatology` and `manual_heuristic` (stored
   predictions).
 
-**Slope diagnostic.** The cause of the weak slope (-0.42 to -0.69 in experiment 51) is either
-noise in the satellite-based estimate of the fleet's sunshine (regression dilution) or the model
-already absorbing part of the anomaly through lagged power and cloud-proxy inputs. Four variants of
-`d1l` are cross-fitted as above (seed 0): all inputs, no lagged-power columns (`lag_origin`,
+**Slope diagnostic.** The cause of the weak slope (-0.42 to -0.69 in experiment 51) is either noise
+in the satellite-based estimate of the fleet's sunshine (regression dilution) or the model already
+absorbing part of the anomaly through lagged power and cloud-proxy inputs. Four variants of `d1l`
+are cross-fitted as above (seed 0): all inputs, no lagged-power columns (`lag_origin`,
 `lag_same_time_latest_day`, `lag_same_time_latest_week`), no cloud-proxy columns
 (`dew_point_temperature_2m`, `precipitation`, `precipitation_type`, `pressure_surface`, and
-`pressure_msl`; `d1l` has no radiation columns already), and neither. The write-up gives the slope of
-the out-of-fold residual on the oracle shift for each. If the slope for "neither" is near -1 and the
-slope for "all inputs" is near -0.5, absorption by the inputs explains it; if all four are near
+`pressure_msl`; `d1l` has no radiation columns already), and neither. The write-up gives the slope
+of the out-of-fold residual on the oracle shift for each. If the slope for "neither" is near -1 and
+the slope for "all inputs" is near -0.5, absorption by the inputs explains it; if all four are near
 -0.5, dilution does.
 
 **Compute and checks.** About 90 booster fits (6 refitted arms, 5 series, 3 seeds, about 100 s
@@ -226,7 +228,7 @@ shift arm equals `d1l` when `w` is zero); the check that `sf` with `w` = 0 repro
 
 **Reports.** Absolute quantile score of every arm and the reference rows, the verdict and gain
 reads, the lead-band reads (0-24 h, 1-2 d, 2-6 d, 6-10 d, 10+ d), the valid-month signs, coverage of
-the 0.05 and 0.95 quantiles in sunny and cloudy rows, the sunniest decile of rows by clear-sky index,
-each arm's effective weight (the slope of its median minus `d1l`'s median on minus the capacity times
-the ensemble-mean calibrated anomaly) against the slopes of experiment 51, the temperature read, and
-the per-series reads. Anonymised series labels only.
+the 0.05 and 0.95 quantiles in sunny and cloudy rows, the sunniest decile of rows by clear-sky
+index, each arm's effective weight (the slope of its median minus `d1l`'s median on minus the
+capacity times the ensemble-mean calibrated anomaly) against the slopes of experiment 51, the
+temperature read, and the per-series reads. Anonymised series labels only.
