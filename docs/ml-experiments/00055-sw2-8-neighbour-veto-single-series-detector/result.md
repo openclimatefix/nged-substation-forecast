@@ -16,30 +16,32 @@ prediction: >-
   lasting over 1 day, starting in even months) rises by 0.00 to 0.02 from about 0.35, with a point
   value near +0.01. Experiment 47 saw the odd-month share found change by -0.019 when its threshold
   rose by 0.22, which puts the gain from a fall of 0.05 to 0.20 near +0.005 to +0.015. The veto
-  removes the alarm that found fewer than 10% of the transfers the benchmark finds. Of the alarms on the real residual, the confirmed tier (an opposite neighbour
-  step that balances the alarm's step) is explained by a logged closure more often than the
-  unconfirmed tier.
+  removes the alarm that found fewer than 10% of the transfers the benchmark finds. Of the alarms on
+  the real residual, the confirmed tier (an opposite neighbour step that balances the alarm's step)
+  is explained by a logged closure more often than the unconfirmed tier.
 decision_rule: >-
   The headline is C1, D2 minus D0M in the share of injected transfers found, paired by transfer, on
   the 24-hour window and the headline band, over transfers that start in even months, read at 98.75%
-  (Bonferroni across C1 to C4) from 20,000 resamples of whole calendar months. D2's veto strength and
-  threshold are chosen on odd months and on the injected transfers that start in odd months, never
-  on even months. `supported` when the C1 interval lies wholly above zero, the C1 point value is
-  at least +0.01, and D2's even-month unexplained-alarm count is no more than 10% above D0's.
+  (Bonferroni across C1 to C4) from 20,000 resamples of whole calendar months. D2's veto strength
+  and threshold are chosen on odd months and on the injected transfers that start in odd months,
+  never on even months. `supported` when the C1 interval lies wholly above zero, the C1 point value
+  is at least +0.01, and D2's even-month unexplained-alarm count is no more than 10% above D0's.
   `refuted` when the upper end of the C1 interval lies below +0.01. `inconclusive` otherwise. C2 to
   C4 and the real-event counts are reported without changing the verdict.
 benchmark: >-
   D0M, D0 with its threshold chosen by the search D2 uses and no veto (so that neither detector
   gets a threshold step the other was not offered); D0 at experiment 43's thresholds (4-hour window
-  6.0, 24-hour window 4.0) through experiment 43's harness, whose 600 injected transfers and outcomes the harness check must reproduce; D1 at its
-  experiment 43 thresholds for reference; and a detector that raises no alarm.
+  6.0, 24-hour window 4.0) through experiment 43's harness, whose 600 injected transfers and
+  outcomes the harness check must reproduce; D1 at its experiment 43 thresholds for reference; and a
+  detector that raises no alarm.
 row_set_id: >-
   none (this experiment scores detector alarms against injected and labelled transfers, as
   experiment 43 does, not forecasts)
 metric: >-
   The share of injected transfers found (start within 2 hours and end within the larger of 6 hours
   and 10% of the duration), event F1 at the two precision bounds of experiment 43, the
-  even-month unexplained-alarm count, and the share of found transfers whose receiver the alarm names.
+  even-month unexplained-alarm count, and the share of found transfers whose receiver the alarm
+  names.
 code: ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/
 ---
 
@@ -72,11 +74,11 @@ unexplained-alarm count on odd months equals D0's, and the lower threshold finds
 
 ## Design
 
-- **Residual and harness.** The residual is experiment 17's `H0.5` residual as experiment 37 stored it
-  (`panel.parquet`), the harness is experiment 43's (copied with the experiment number changed), and
-  the detector changes, not the residual model. The fast residual (`residual + moved MW`) is therefore
-  exact, as in experiment 47. The harness check must reproduce experiment 43's alarm counts
-  (432, 444, 297, 110) and every one of its 600 injected-transfer outcomes before anything else runs.
+- **Residual and harness.** The residual is experiment 17's `H0.5` residual as experiment 37 stored
+it (`panel.parquet`), the harness is experiment 43's (copied with the experiment number changed),
+and the detector changes, not the residual model. The fast residual (`residual + moved MW`) is
+therefore exact, as in experiment 47. The harness check must reproduce experiment 43's alarm counts
+(432, 444, 297, 110) and every one of its 600 injected-transfer outcomes before anything else runs.
 - **Detector D2.** D0's alarms, annotated by the neighbour check above. The interval builder runs on
   the alarm series only (partners are not masked), so the headline contrast differs from D0 only by
   which alarms exist. The partners are used only to score receiver naming (C4 below is not this).
@@ -86,8 +88,9 @@ unexplained-alarm count on odd months equals D0's, and the lower threshold finds
   so. The check reads odd months only and decides nothing.
 - **Tuning on odd months.** The veto strength is chosen from 1.5, 2.0, and 3.0 noise units, and for
   each the threshold is the lowest on a 0.05 grid whose odd-month unexplained-alarm count does not
-  exceed D0's (80 at the 24-hour window, 120 at the 4-hour window). The choice maximises the share of
-  injected transfers found that start in odd months, 24-hour window, headline band. Ties go to 2.0.
+  exceed D0's (80 at the 24-hour window, 120 at the 4-hour window). The choice maximises the share
+  of injected transfers found that start in odd months, 24-hour window, headline band. Ties go to
+  2.0.
 - **Scoring on even months.** The chosen strength and threshold score the transfers that start in
   even months. The even-month unexplained-alarm counts of D0 and D2 are reported, because matching
   on odd months does not hold them equal.
@@ -95,12 +98,12 @@ unexplained-alarm count on odd months equals D0's, and the lower threshold finds
   A further 1,000 headline-band transfers are drawn with the same generator and a new seed, which
   gives about 500 to 600 in even months against experiment 47's 89. A third set of 300 headline-band
   transfers is drawn with the onset within 1 day of a bank holiday in England outside Christmas and
-  New Year, where a calendar miss is most likely and a wrong veto most costly. The original and extra sets are
-  quiet on every series they use (no logged closure within 7 days, no alarm of experiment 43's four
-  settings within 2 days), as in experiment 43. That mask removes the onsets where a series had a
-  weather or calendar miss, so it understates how often a wrong veto happens. The holiday set
-  therefore uses logged closures only, and the write-up counts the holiday onsets that the alarm
-  part of the mask would have rejected.
+  New Year, where a calendar miss is most likely and a wrong veto most costly. The original and
+  extra sets are quiet on every series they use (no logged closure within 7 days, no alarm of
+  experiment 43's four settings within 2 days), as in experiment 43. That mask removes the onsets
+  where a series had a weather or calendar miss, so it understates how often a wrong veto happens.
+  The holiday set therefore uses logged closures only, and the write-up counts the holiday onsets
+  that the alarm part of the mask would have rejected.
 
 ## Veto details
 
@@ -117,7 +120,8 @@ unexplained-alarm count on odd months equals D0's, and the lower threshold finds
 
 | Contrast | Detector, window | Transfers | Reads |
 |---|---|---|---|
-| C1 | D2 minus D0M, 24 h | headline band, even months, all sets except the holiday set | the verdict |
+| C1 | D2 minus D0M, 24 h | headline band, even months, all sets except the holiday set | the
+verdict |
 | C2 | D2 minus D0M, 4 h | same | reported |
 | C3 | D2 minus D0M, 24 h | C1's transfers that have a metered receiver | reported |
 | C4 | D2 minus D0M, 24 h | C1's transfers that have no metered receiver | reported |
