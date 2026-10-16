@@ -26,6 +26,7 @@ sooner.
 | [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series |
 | [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-4 (PVDIS-3 is done: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md)) | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations-and-the-dc-to-ac-ratio) | Can the share of east-, south-, and west-facing solar behind each Primary, and the ratio of DC to AC capacity, be identified? | 4 | PVDIS-4 | Proposed |
+| [MVA1](#mva1-do-the-mva-only-primaries-need-special-handling-in-v1) | Is the best guess's skill against `manual_heuristic` clearly worse at the 8 trial Primaries metered only in MVA than at the 8 metered in MW, in particular at sunny middays? | 3 | Nothing | Planned: [experiment 56](00056-mva-only-primaries-skill-against-mw-primaries/result.md) |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
@@ -130,6 +131,11 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
+
+### MVA1: do the MVA-only Primaries need special handling in v1?
+
+**Re-scoring only.** Experiment 33's stored forecasts are split by meter unit and by sunny midday.
+The plan and decision rule are in [experiment 56](00056-mva-only-primaries-skill-against-mw-primaries/result.md).
 
 ### SW2: switching-event detection
 

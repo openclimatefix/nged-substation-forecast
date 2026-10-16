@@ -186,6 +186,7 @@ nav:
       - "Why does the solar term lose at sunny summer middays?": ml-experiments/00051-pvdis-3b-midday-loss-of-the-solar-term/result.md
       - "Does the UKV forecast the solar anomaly better than ENS?": ml-experiments/00053-ukv-vs-ens-solar-anomaly/result.md
       - "How well do the two existing switching detectors find transfers?": ml-experiments/00043-sw2-1-detector-scoreboard/result.md
+      - "Do the Primaries metered only in MVA need special handling in v1?": ml-experiments/00056-mva-only-primaries-skill-against-mw-primaries/result.md
       - "How much do labelled switching events hurt the best guess?": ml-experiments/00044-sw2-2-switching-share-of-best-guess-score/result.md
       - "Do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?": ml-experiments/00052-more-nwp-products-for-wind-farms/result.md
       - "Does a bank-holiday column in the demand model help the switching detector find transfers?": ml-experiments/00047-sw2-4-better-residual-switching-detector/result.md
