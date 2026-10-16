@@ -223,7 +223,7 @@ def false_alarm_chart() -> alt.Chart:
     return chart.properties(
         title=_title(
             text=(
-                "False alarms are about 0.3 a year on the placebo and 0.4 to 0.5 on the real record"
+                "False alarms are about 0.3 a year on the placebo and 0.36 to 0.54 on the real record"
             ),
             body=(
                 "Alarms of at least 5% on the 5 pool farms. The unmodified record excludes "

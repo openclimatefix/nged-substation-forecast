@@ -91,7 +91,7 @@ the maintainer to confirm.
 | [00069 - Switching event detector, part 10](00069-sw2-17-missed-onsets-of-the-end-rule/result.md) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their start, and does a weak alarm confirmed by a later step back recover them? | Inconclusive: the weak alarms add +0.146 of the moved MW, but the strong threshold must rise from 4.0 to 6.55 to keep 80 alarms, so the net change is +0.007 (98.75% interval -0.014 to +0.040); the first-return end rule beats the 14-day rule on a fresh draw (+0.038, +0.016 to +0.077) | Not for production | 2026-10-16 |
 | [00070 - Switching event detector, part 11](00070-sw2-19-same-sign-neighbour-count/result.md) | Does counting the neighbours that step the same way as the alarming substation find more of the moved MW than the single-series detector with the PF14 end rule? | Supported: +0.048 of the moved MW (97.5% interval +0.021 to +0.096) on fresh headline-band transfers at 80 odd-month unexplained alarms; no gain on long transfers or the 35 real transfers (7 against 8) | Candidate | 2026-10-16 |
 | [00071 - Switching event detector, part 12](00071-sw2-18-refit-offset-and-gap-bridging/result.md) | Does taking the step statistic from two residual models refitted half a month apart, so that no alarm is suppressed at a refit, find more of the moved MW than the benchmark detector PF14? | Supported: +0.050 of the moved MW (98.33% interval +0.012 to +0.107) at no more than 80 odd-month unexplained alarms, all of it in transfers within 24 hours of a refit. Lifting the suppression alone gives +0.056, and gap bridging changes no outcome | Candidate | 2026-10-16 |
-| [00072 - Step-loss monitor for the solar farms, P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a monitor find a loss of generating capacity at the 5 long-record solar farms from their daily power telemetry? | Refuted: it found 0.45 of 25% losses lasting 30 days (the plan required 0.80), 0.84 of 25% losses lasting 90 days, 0.26 of 10% losses lasting 90 days, and no 3% loss at above chance; false alarms 0.29 per farm-year on a placebo | Not for production | 2026-10-16 |
+| [00072 - Step-loss monitor for the solar farms, P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a monitor find a loss of generating capacity at the 5 long-record solar farms from their daily power telemetry? | Refuted: it found 0.45 of 25% losses lasting 30 days (the plan required 0.80), 0.84 of 25% losses lasting 90 days, 0.26 of 10% losses lasting 90 days, and 3% losses barely above chance; false alarms 0.29 per farm-year on a placebo | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1365,21 +1365,23 @@ verdict is `inconclusive`.
 
 ### 00072: can a step-loss monitor find a lost inverter at the solar farms? (P35)
 
-**The daily power of a solar farm shows a loss of 25% of its output that lasts 90 days or more, and
-almost nothing smaller or shorter, so it cannot give early warning of one lost inverter.** We
-planted known losses in the real power of 5 solar farms and scored three monitors that were each
-tuned to about 0.35 false alarms per farm-year on a placebo. The change-point monitor found 0.45 of
-25% losses lasting 30 days, against the 0.80 the plan required, so the verdict is `refuted`. It
-found 0.84 of 25% losses lasting 90 days and 0.26 of 10% losses lasting 90 days. A loss of 3% was
-found no more often than chance.
+**A solar farm's daily power readings show that the farm has lost 25% of its output only if the loss
+lasts 90 days or more, and they show a smaller or shorter loss rarely or never, so they cannot give
+early warning of one lost inverter.** We added artificial losses to the real power of 5 of the
+project's 6 solar farms (farm E has too short a record) and scored three monitors, each tuned to
+about 0.35 false alarms per farm-year on a placebo. The change-point monitor found 0.45 of 25%
+losses lasting 30 days, against the 0.80 the plan required, so the verdict is `refuted`. It found
+0.84 of 25% losses lasting 90 days and 0.26 of 10% losses lasting 90 days. A loss of 3% was found
+0.02 to 0.07 of the time, against 0.00 to 0.02 when no loss was added.
 
-- **Finding for later experiments:** a farm has only 3.1 valid days a week from April to
-  September and 2.0 from October to March, and the signal wanders by 6% to 11%, so a 30-day loss
-  holds about 13 valid days. The hysteresis rule (7 valid days below a 10% drop) found 0.86 of 25%
-  losses lasting 30 days, better than the change-point fit, and nothing found 10% losses lasting 30
-  days (0.04 to 0.13).
-- **A next experiment could:** obtain NGED's outage notices and curtailment records for the 6 solar
-  farms, so the monitor is tested on more than farm A's three low months.
+- **Finding for later experiments:** a farm has only 3.1 usable days a week from April to
+  September and 2.0 from October to March, and the daily reading wanders by 6% to 11%, so a 30-day
+  loss holds about 13 usable days. A hysteresis rule (7 usable days in a row at least 10% below
+  normal) found 0.86 of 25% losses lasting 30 days, better than the change-point fit, after a
+  median delay of 14.5 days. Nothing found 10% losses lasting 30 days (0.04 to 0.13).
+- **A next experiment could:** obtain outage notices and curtailment records from National Grid
+  Electricity Distribution for the 6 solar farms, so that monitors are tested on more than farm A's
+  three low months.
 - **Write-up and pull request:** [the full result
   page](00072-p35-step-loss-monitor-for-solar-farms/result.md), [PR
   #1305](https://github.com/openclimatefix/nged-substation-forecast/pull/1305).
