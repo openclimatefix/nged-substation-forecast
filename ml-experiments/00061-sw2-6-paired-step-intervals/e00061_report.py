@@ -1,8 +1,9 @@
 """Print every number the write-up of experiment 61 quotes, and the verdict the decision rule gives.
 
-Reads the tables that `e00061_run.py` wrote: MW-weighted recall of D0M and D3 for each injection
-shape with month-resampled intervals (C1 pooled over S2, S3 and S4; C2 on S1), recall by donor
-step in noise units and metered receiver, the labelled real transfers (C3), and alarm counts.
+Reads the tables that `e00061_run.py` wrote: MW-weighted recall of D0M, PE, PL and PF for each
+injection shape with month-resampled intervals (C1: PL minus D0M and C2: PF minus D0M, pooled over
+S2, S3 and S4), recall by donor step in noise units and metered receiver, the labelled real
+transfers (C3), and alarm counts.
 
     uv run python ml-experiments/00060-*/e00061_report.py
 """
@@ -26,7 +27,8 @@ from e00061_common import (
 )
 from e00061_detectors import prepare
 from e00061_inject import HEADLINE_BAND
-from e00061_profile import NON_MATCHING, SHAPE_NAMES, SHAPES, prepare_profile
+from e00061_paired import GRID, flat_prior, labelled_duration_prior, paired_alarms
+from e00061_profile import NON_MATCHING, SHAPE_NAMES, SHAPES
 
 EXPERIMENT_58_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00058-sw2-8b-donor-step-recut-and-stronger-veto"
@@ -35,10 +37,12 @@ N_RESAMPLES: Final[int] = 20_000
 LEVEL: Final[float] = 1 - 0.05 / 3
 """Two-sided level of the intervals: Bonferroni across the three contrasts C1 to C3 (98.33%)."""
 SEED: Final[int] = 6000
-SUPPORT_AT_LEAST: Final[float] = 0.01
+SUPPORT_AT_LEAST: Final[float] = 0.02
 ALARM_TOLERANCE: Final[float] = 1.10
 STEP_EDGES: Final[tuple[float, ...]] = (0.0, 2.0, 4.0, 6.0, 10.0, float("inf"))
-DETECTORS: Final[tuple[str, str]] = ("D0M_48", "D3_48")
+DETECTORS: Final[tuple[str, ...]] = ("D0M_48", "PE_48", "PL_48", "PF_48")
+ARMS: Final[dict[str, str]] = {"D0M_48": "f0", "PE_48": "fe", "PL_48": "fl", "PF_48": "ff"}
+NAMES: Final[dict[str, str]] = {"f0": "D0M", "fe": "PE", "fl": "PL", "ff": "PF"}
 
 
 def population(*, out: Path) -> pl.DataFrame:
@@ -68,13 +72,19 @@ def population(*, out: Path) -> pl.DataFrame:
 
 
 def wide(*, data: pl.DataFrame, shape: str) -> pl.DataFrame:
-    """One row per transfer with both detectors' `found` for one shape."""
+    """One row per transfer with every arm's `found` for one shape."""
     one = data.filter(pl.col("shape") == shape)
-    d0 = one.filter(pl.col("setting") == "D0M_48").select(
+    frame = one.filter(pl.col("setting") == "D0M_48").select(
         "event_id", "weight", "year_month", "metered_receivers", "donor_step_z", f0="found"
     )
-    d3 = one.filter(pl.col("setting") == "D3_48").select("event_id", f3="found")
-    return d0.join(d3, on="event_id", validate="1:1").sort("event_id")
+    for setting, column in ARMS.items():
+        if setting != "D0M_48":
+            frame = frame.join(
+                one.filter(pl.col("setting") == setting).select("event_id", **{column: "found"}),
+                on="event_id",
+                validate="1:1",
+            )
+    return frame.sort("event_id")
 
 
 def interval(*, resampled: np.ndarray) -> tuple[float, float]:
@@ -95,72 +105,82 @@ def month_sums(*, frame: pl.DataFrame, found: str) -> tuple[np.ndarray, np.ndarr
     return grouped["wf"].to_numpy(), grouped["weight"].to_numpy()
 
 
-def diffs(*, frames: list[pl.DataFrame], picks: np.ndarray | None) -> np.ndarray:
-    """MW-weighted recall, D3 minus D0M, averaged over shapes; `picks` resamples months."""
+def diffs(
+    *, frames: list[pl.DataFrame], arm: str, base: str, picks: np.ndarray | None
+) -> np.ndarray:
+    """MW-weighted recall of `arm` minus `base`, averaged over shapes; `picks` resamples months."""
     total = 0.0
     for frame in frames:
-        wf3, w = month_sums(frame=frame, found="f3")
-        wf0, _ = month_sums(frame=frame, found="f0")
+        wf_a, w = month_sums(frame=frame, found=arm)
+        wf_b, _ = month_sums(frame=frame, found=base)
         if picks is None:
-            total = total + (wf3.sum() - wf0.sum()) / w.sum()
+            total = total + (wf_a.sum() - wf_b.sum()) / w.sum()
         else:
-            total = total + (wf3[picks].sum(axis=1) - wf0[picks].sum(axis=1)) / w[picks].sum(axis=1)
+            total = total + (wf_a[picks].sum(axis=1) - wf_b[picks].sum(axis=1)) / w[picks].sum(
+                axis=1
+            )
     return np.atleast_1d(total / len(frames))
 
 
-def contrast(*, frames: list[pl.DataFrame]) -> tuple[float, float, float]:
+def contrast(
+    *, frames: list[pl.DataFrame], arm: str = "fl", base: str = "f0"
+) -> tuple[float, float, float]:
     """Point value and interval of the shape-averaged MW-weighted recall difference."""
     months = np.unique(frames[0]["year_month"].to_numpy())
     rng = np.random.default_rng(SEED)
     picks = rng.integers(0, len(months), size=(N_RESAMPLES, len(months)))
-    point = float(diffs(frames=frames, picks=None)[0])
-    low, high = interval(resampled=diffs(frames=frames, picks=picks))
+    point = float(diffs(frames=frames, arm=arm, base=base, picks=None)[0])
+    low, high = interval(resampled=diffs(frames=frames, arm=arm, base=base, picks=picks))
     return point, low, high
 
 
 def recall_rows(*, frame: pl.DataFrame) -> dict[str, float]:
-    """Weighted and unweighted recall of both detectors for one set of transfers."""
+    """Weighted and unweighted recall of every arm for one set of transfers."""
     w = frame["weight"].to_numpy()
     out = {}
-    for name in ("f0", "f3"):
+    for name in NAMES:
         found = frame[name].to_numpy().astype(float)
         out[f"{name}_mw"] = float((w * found).sum() / w.sum())
         out[f"{name}_n"] = float(found.mean())
     return out
 
 
-def print_shapes(*, data: pl.DataFrame) -> dict[str, tuple[float, float, float]]:
-    """Per-shape table; returns each shape's difference and interval."""
-    found: dict[str, tuple[float, float, float]] = {}
+def fmt(point: float, low: float, high: float) -> str:
+    """A point value with its interval."""
+    return f"{point:+.3f} ({low:+.3f} to {high:+.3f})"
+
+
+def print_shapes(*, data: pl.DataFrame) -> dict[str, dict[str, tuple[float, float, float]]]:
+    """Per-shape table; returns each shape's differences from D0M and from PF, with intervals."""
+    found: dict[str, dict[str, tuple[float, float, float]]] = {}
     print("\nMW-weighted recall (share of the moved MW in found transfers), even months")
     for shape in SHAPES:
         frame = wide(data=data, shape=shape)
         rec = recall_rows(frame=frame)
-        found[shape] = contrast(frames=[frame])
-        point, low, high = found[shape]
-        print(
-            f"{shape} {SHAPE_NAMES[shape]:22s} n={frame.height} D0M {rec['f0_mw']:.3f} "
-            f"D3 {rec['f3_mw']:.3f} diff {point:+.3f} ({low:+.3f} to {high:+.3f}); "
-            f"missed MW D0M {1 - rec['f0_mw']:.3f} D3 {1 - rec['f3_mw']:.3f}; "
-            f"unweighted D0M {rec['f0_n']:.3f} D3 {rec['f3_n']:.3f}"
-        )
+        found[shape] = {
+            "PL-D0M": contrast(frames=[frame], arm="fl", base="f0"),
+            "PF-D0M": contrast(frames=[frame], arm="ff", base="f0"),
+            "PE-D0M": contrast(frames=[frame], arm="fe", base="f0"),
+            "PL-PF": contrast(frames=[frame], arm="fl", base="ff"),
+        }
+        recalls = " ".join(f"{NAMES[n]} {rec[f'{n}_mw']:.3f}" for n in NAMES)
+        unweighted = " ".join(f"{NAMES[n]} {rec[f'{n}_n']:.3f}" for n in NAMES)
+        print(f"{shape} {SHAPE_NAMES[shape]:22s} n={frame.height} {recalls}")
+        print("   missed MW: " + " ".join(f"{NAMES[n]} {1 - rec[f'{n}_mw']:.3f}" for n in NAMES))
+        print(f"   unweighted: {unweighted}")
+        print("   " + "; ".join(f"{k} {fmt(*v)}" for k, v in found[shape].items()))
         metered = frame.filter(pl.col("metered_receivers") > 0)
         rec = recall_rows(frame=metered)
-        point, low, high = contrast(frames=[metered])
         print(
-            f"   metered receiver only n={metered.height} D0M {rec['f0_mw']:.3f} "
-            f"D3 {rec['f3_mw']:.3f} diff {point:+.3f} ({low:+.3f} to {high:+.3f})"
+            f"   metered receiver only n={metered.height} "
+            + " ".join(f"{NAMES[n]} {rec[f'{n}_mw']:.3f}" for n in NAMES)
         )
-    print("\nMean correlation of the moved MW with the donor's expected power over the transfer")
-    for shape in SHAPES:
-        corr = data.filter(pl.col("shape") == shape, pl.col("setting") == "D0M_48")["corr_expected"]
-        print(f"{shape} {SHAPE_NAMES[shape]:22s} {corr.drop_nans().mean():+.3f}")
     return found
 
 
 def print_by_step(*, data: pl.DataFrame) -> None:
     """Standard table: recall by donor step in noise units, split by metered receiver."""
-    print("\nRecall by donor step in noise units (count found / transfers), D0M | D3")
+    print("\nRecall by donor step in noise units (count found / transfers), D0M | PE | PL | PF")
     for shape in SHAPES:
         frame = wide(data=data, shape=shape)
         for flag, label in ((True, "metered"), (False, "unmetered")):
@@ -168,108 +188,92 @@ def print_by_step(*, data: pl.DataFrame) -> None:
             cells = []
             for low, high in itertools.pairwise(STEP_EDGES):
                 bin_ = part.filter(pl.col("donor_step_z").abs().is_between(low, high, "left"))
-                cells.append(
-                    f"[{low:g},{high:g}) {bin_['f0'].sum()}|{bin_['f3'].sum()}/{bin_.height}"
-                )
+                counts = "|".join(str(bin_[c].sum()) for c in NAMES)
+                cells.append(f"[{low:g},{high:g}) {counts}/{bin_.height}")
             print(f"{shape} {label:9s} " + "; ".join(cells))
 
 
-def print_statistic_similarity() -> None:
-    """How far D3's step differs from D0's on the real residual, over all stamps and series."""
-    panel = load_panel()
-    plain = prepare(residuals=panel["residual"], window=48)
-    profile = prepare_profile(residuals=panel["residual"], expected=panel["expected"], window=48)
-    x, y = [], []
-    for s in plain.shift:
-        ok = np.isfinite(plain.shift[s]) & np.isfinite(profile.shift[s])
-        x.append(plain.shift[s][ok] / plain.scale[s])
-        y.append(profile.shift[s][ok] / profile.scale[s])
-    x, y = np.concatenate(x), np.concatenate(y)
-    big = np.abs(x) > 3
-    print(f"\n{len(plain.shift)} series")
-    print(
-        f"\nD0 and D3 step in noise units, all stamps: correlation {np.corrcoef(x, y)[0, 1]:.3f}; "
-        f"where D0 exceeds 3: correlation {np.corrcoef(x[big], y[big])[0, 1]:.3f}, "
-        f"mean ratio D3/D0 {np.mean(y[big] / x[big]):.3f}"
-    )
-
-
 def print_big_steps(*, data: pl.DataFrame) -> None:
-    """Whether D0M's misses at donor steps of 6 noise units or more lack an alarm or an end."""
-    print("\nD0M on transfers whose donor step is 6 noise units or more")
+    """Among transfers with a donor step of 6 noise units or more: found, wrong end, no start."""
+    print("\nTransfers whose donor step is 6 noise units or more (post hoc)")
     for shape in SHAPES:
-        part = data.filter(
-            pl.col("shape") == shape,
-            pl.col("setting") == "D0M_48",
-            pl.col("donor_step_z").abs() >= 6,
-        )
-        n = part.height
-        found = part["found"].sum()
-        wrong_end = part.filter(pl.col("onset_found") & ~pl.col("found")).height
-        print(
-            f"{shape}: {n} transfers, found {found}, onset found but end wrong {wrong_end}, "
-            f"no alarm at the onset {n - found - wrong_end}"
-        )
+        for setting in DETECTORS:
+            part = data.filter(
+                pl.col("shape") == shape,
+                pl.col("setting") == setting,
+                pl.col("donor_step_z").abs() >= 6,
+            )
+            n, found = part.height, part["found"].sum()
+            wrong_end = part.filter(pl.col("onset_found") & ~pl.col("found")).height
+            print(
+                f"{shape} {setting}: {n} transfers, found {found}, onset found but end wrong "
+                f"{wrong_end}, no alarm at the onset {n - found - wrong_end}"
+            )
 
 
 def print_real(*, out: Path) -> None:
-    """C3: the labelled real transfers of more than 1 day, found by each detector."""
+    """C3: the labelled real transfers of more than 1 day, found by each arm."""
     real = pl.read_parquet(out / "real_results.parquet").filter(pl.col("hours") > 24)
-    d0 = real.filter(pl.col("setting") == "D0M_48").sort("card_id")
-    d3 = real.filter(pl.col("setting") == "D3_48").sort("card_id")
-    both = d0.join(d3, on="card_id", suffix="_d3", validate="1:1")
-    n = both.height
+    n = real.filter(pl.col("setting") == "D0M_48").height
     print(f"\nC3: labelled real transfers of more than 1 day: {n}")
-    for vis in ("conserved", "one_sided"):
-        part = both.filter(pl.col("visibility") == vis)
+    for setting in DETECTORS:
+        part = real.filter(pl.col("setting") == setting)
+        w = part["moved_mw_p50"].fill_null(0).to_numpy()
+        f = part["found"].to_numpy().astype(float)
         print(
-            f"  {vis}: {part.height}; D0M {part['found'].sum()}, D3 {part['found_d3'].sum()}, "
-            f"only D0M {part.filter(pl.col('found') & ~pl.col('found_d3')).height}, "
-            f"only D3 {part.filter(~pl.col('found') & pl.col('found_d3')).height}"
+            f"  {setting}: found {int(f.sum())}, onset found {part['onset_found'].sum()}, "
+            f"MW-weighted recall {(w * f).sum() / w.sum():.3f}"
         )
+        for vis in ("conserved", "one_sided"):
+            sub = part.filter(pl.col("visibility") == vis)
+            print(f"      {vis}: {sub.height}, found {sub['found'].sum()}")
+    base = real.filter(pl.col("setting") == "D0M_48").sort("card_id")
+    pl_ = real.filter(pl.col("setting") == "PL_48").sort("card_id")
     print(
-        f"  onset found (within 2 hours): D0M {both['onset_found'].sum()}, "
-        f"D3 {both['onset_found_d3'].sum()} of {n}"
+        f"  only D0M {base.filter(pl.col('found') & ~pl_['found']).height}, "
+        f"only PL {pl_.filter(pl.col('found') & ~base['found']).height}"
     )
-    w = both["moved_mw_p50"].fill_null(0).to_numpy()
-    for name in ("found", "found_d3"):
-        f = both[name].to_numpy().astype(float)
-        print(f"  MW-weighted recall ({name}): {(w * f).sum() / w.sum():.3f}; count {int(f.sum())}")
 
 
-def print_alarms(*, out: Path) -> tuple[int, int]:
-    """Even-month unexplained alarm counts of the real residual, and the odd-month counts."""
+def print_alarms(*, out: Path) -> dict[str, tuple[int, int]]:
+    """Unexplained alarm counts by even and odd month, with the composition counts."""
     alarms = pl.read_parquet(out / "alarms.parquet")
-    curves = pl.read_parquet(out / "curves.parquet")
     thresholds = json.loads((out / "thresholds.json").read_text())
+    panel = load_panel()
+    plain = prepare(residuals=panel["residual"], window=48)
+    candidates = sum(len(c) for c in paired_alarms(inputs=plain, prior=flat_prior()).values())
+    print(f"\nthresholds {thresholds}; candidate onsets at or above 2.5 noise units: {candidates}")
     counts = {}
     for setting in DETECTORS:
-        part = alarms.filter(pl.col("setting") == setting, ~pl.col("logged_matched"))
+        part = alarms.filter(pl.col("setting") == setting)
+        unexplained = part.filter(~pl.col("logged_matched"))
         counts[setting] = (
-            part.filter(pl.col("month") % 2 == 0).height,
-            part.filter(pl.col("month") % 2 == 1).height,
-        )
-    print(f"\nthresholds {thresholds}")
-    for detector, setting in (("D0M", "D0M_48"), ("D3", "D3_48")):
-        row = curves.filter(
-            pl.col("detector") == detector, pl.col("threshold") == thresholds[setting]
+            unexplained.filter(pl.col("month") % 2 == 0).height,
+            unexplained.filter(pl.col("month") % 2 == 1).height,
         )
         print(
-            f"{setting}: odd-month unexplained alarms {counts[setting][1]} "
-            f"(tuning curve {row['odd_unexplained'].item()}); even-month {counts[setting][0]}"
+            f"{setting}: unexplained alarms even months {counts[setting][0]}, "
+            f"odd {counts[setting][1]}; "
+            f"odd {counts[setting][1]}; "
+            f"all alarms {part.height}, near a logged closure {part['logged_matched'].sum()}"
         )
-    return counts["D0M_48"][0], counts["D3_48"][0]
+    return counts
 
 
-def verdict(*, pooled: tuple[float, float, float], shapes: dict, alarms: tuple[int, int]) -> str:
+def verdict(
+    *,
+    shapes: dict[str, dict[str, tuple[float, float, float]]],
+    pooled: dict[str, tuple[float, float, float]],
+    alarms: dict[str, tuple[int, int]],
+) -> str:
     """Apply the pre-registered decision rule."""
-    point, low, high = pooled
-    d0_alarms, d3_alarms = alarms
+    point, low, high = pooled["PL-D0M"]
     if high < SUPPORT_AT_LEAST:
         return "refuted"
-    if low > 0 and point >= SUPPORT_AT_LEAST and d3_alarms <= ALARM_TOLERANCE * d0_alarms:
-        below = [s for s in NON_MATCHING if shapes[s][2] < 0]
-        return "partly supported" if below else "supported"
+    base = alarms["D0M_48"][0]
+    quiet = all(alarms[s][0] <= ALARM_TOLERANCE * base for s in ("PL_48", "PF_48"))
+    if low > 0 and point >= SUPPORT_AT_LEAST and quiet:
+        return "supported" if pooled["PF-D0M"][1] > 0 else "partly supported"
     return "inconclusive"
 
 
@@ -281,22 +285,31 @@ def main() -> None:
     data = population(out=out)
     one = data.filter(pl.col("shape") == "S1", pl.col("setting") == "D0M_48")
     print(f"{one.height} transfers; {one.filter(pl.col('weight') <= 0).height} move no MW")
-    shares = json.loads((out / "profile_shares.json").read_text())
+    full = labelled_duration_prior()
+    held = labelled_duration_prior(
+        exclude_cards=frozenset(pl.read_parquet(out / "real_results.parquet")["card_id"].to_list())
+    )
+    for hours in (24, 48, 72, 168, 336):
+        print(f"PL prior at {hours} hours: {full[int(hours * 2 - GRID[0])]:+.3f}")
     print(
-        f"{len(shares)} fitted profile shares; {sum(x in (0.0, 1.0) for x in shares)} sit at 0 or 1"
+        f"largest change of the prior without the scored transfers: {np.abs(full - held).max():.3f}"
     )
     shapes = print_shapes(data=data)
-    pooled = contrast(frames=[wide(data=data, shape=s) for s in NON_MATCHING])
-    print(
-        f"\nC1 pooled over {NON_MATCHING}: {pooled[0]:+.3f} ({pooled[1]:+.3f} to {pooled[2]:+.3f})"
-    )
-    print(f"C2 (S1): {shapes['S1'][0]:+.3f} ({shapes['S1'][1]:+.3f} to {shapes['S1'][2]:+.3f})")
+    frames = [wide(data=data, shape=s) for s in NON_MATCHING]
+    pooled = {
+        "PL-D0M": contrast(frames=frames, arm="fl", base="f0"),
+        "PF-D0M": contrast(frames=frames, arm="ff", base="f0"),
+        "PE-D0M": contrast(frames=frames, arm="fe", base="f0"),
+        "PL-PF": contrast(frames=frames, arm="fl", base="ff"),
+    }
+    print(f"\nPooled over {NON_MATCHING}:")
+    for name, value in pooled.items():
+        print(f"  {name}: {fmt(*value)}")
     print_by_step(data=data)
     print_big_steps(data=data)
-    print_statistic_similarity()
     print_real(out=out)
     alarms = print_alarms(out=out)
-    print(f"\nVERDICT: {verdict(pooled=pooled, shapes=shapes, alarms=alarms)}")
+    print(f"\nVERDICT: {verdict(shapes=shapes, pooled=pooled, alarms=alarms)}")
 
 
 if __name__ == "__main__":

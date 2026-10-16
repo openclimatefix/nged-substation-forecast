@@ -1,15 +1,15 @@
-r"""Match D3's threshold on odd months, then score D0M and D3 on injected and real transfers.
+r"""Match PL's and PF's thresholds on odd months, then score D0M, PE, PL and PF.
 
 The injected transfers use five shapes; the real ones are the labelled transfers.
 
 Stages, in order. Each writes files to the private output folder.
 
-- `tune`: D3's matched threshold (and D0M's, which must come back as 4.0).
+- `tune`: PL's and PF's matched thresholds (and D0M's, which must come back as 4.0).
 - `harness-check`: with shape S1, D0M must reproduce experiment 58's outcome for every transfer.
-- `score`: the outcome of every injected transfer for both detectors and every shape.
+- `score`: the outcome of every injected transfer for every arm and every shape.
 - `real`: the labelled real transfers' outcomes and the real alarm counts.
 
-    uv run python ml-experiments/00060-*/e00061_run.py tune harness-check score real
+    uv run python ml-experiments/00061-*/e00061_run.py tune harness-check score real
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ from e00061_detect import (
     explained_flags,
     load,
     new_events,
+    odd_unexplained,
     original_events,
     real_alarm_rows,
     real_events,
@@ -39,17 +40,19 @@ from e00061_detect import (
     seeded_batches,
     tune_d2,
 )
-from e00061_detectors import alarms, prepare
+from e00061_detectors import DetectorInputs, alarms, prepare
 from e00061_inject import BLOCK, Event
 from e00061_intervals import build_intervals, relative_residual
-from e00061_profile import (
-    SHAPES,
-    Shape,
-    fit_profile_shares,
-    inject_shaped,
-    prepare_profile,
-    shares_json,
+from e00061_paired import (
+    alarm_table,
+    cut,
+    end_only_intervals,
+    flat_prior,
+    labelled_duration_prior,
+    paired_alarms,
+    paired_intervals,
 )
+from e00061_profile import SHAPES, Shape, fit_profile_shares, inject_shaped, shares_json
 from e00061_score import by_series, match_event
 
 WINDOW: Final[int] = 48
@@ -58,25 +61,30 @@ EXPERIMENT_58_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00058-sw2-8b-donor-step-recut-and-stronger-veto"
 )
 N_WORKERS: Final[int] = 4
-SETTINGS: Final[tuple[str, ...]] = ("D0M_48", "D3_48")
+SETTINGS: Final[tuple[str, ...]] = ("D0M_48", "PE_48", "PL_48", "PF_48")
 _STATE: dict = {}
 
 
-def build_detectors(*, residual: dict, expected: dict, scales: dict, thresholds: dict) -> dict:
-    """Alarms and plain intervals of D0M and D3 on one residual panel."""
+def build_detectors(
+    *, residual: dict, expected: dict, scale: dict, thresholds: dict, priors: dict
+) -> dict:
+    """Alarms and intervals of D0M, PE, PL and PF on one residual panel."""
     relative = {s: relative_residual(residual=residual[s], expected=expected[s]) for s in residual}
-    inputs = {
-        "D0M_48": prepare(residuals=residual, window=WINDOW, scale=scales["plain"]),
-        "D3_48": prepare_profile(
-            residuals=residual, expected=expected, window=WINDOW, scale=scales["profile"]
-        ),
+    inputs = prepare(residuals=residual, window=WINDOW, scale=scale)
+    table = alarms(inputs=inputs, detector="D0", threshold=thresholds["D0M_48"])
+    d0m = build_intervals(alarm_table=table, relative=relative, window=WINDOW, detector="D0")
+    out = {
+        "D0M_48": (table, d0m),
+        "PE_48": (table, end_only_intervals(intervals=d0m, inputs=inputs)),
     }
-    out = {}
-    for setting, one in inputs.items():
-        table = alarms(inputs=one, detector="D0", threshold=thresholds[setting])
-        out[setting] = (
-            table,
-            build_intervals(alarm_table=table, relative=relative, window=WINDOW, detector="D0"),
+    for name in ("PL", "PF"):
+        kept = cut(
+            scored=paired_alarms(inputs=inputs, prior=priors[name]),
+            threshold=thresholds[f"{name}_48"],
+        )
+        out[f"{name}_48"] = (
+            alarm_table(kept=kept, shift=inputs.shift),
+            paired_intervals(kept=kept, residual=residual, expected=expected, window=WINDOW),
         )
     return out
 
@@ -95,7 +103,7 @@ def init_worker(state: dict) -> None:
 
 
 def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
-    """Inject one batch with one shape, detect with both detectors, return one row per event."""
+    """Inject one batch with one shape, detect with every arm, return one row per event."""
     seed, batch, shape = args
     panel = _STATE["panel"]
     injection = inject_shaped(
@@ -104,10 +112,11 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
     results = build_detectors(
         residual=injection.fast_residual(panel["residual"]),
         expected=panel["expected"],
-        scales=_STATE["scales"],
+        scale=_STATE["scale"],
         thresholds=_STATE["thresholds"],
+        priors=_STATE["priors"],
     )
-    plain_scale = _STATE["scales"]["plain"]
+    plain_scale = _STATE["scale"]
     rows = []
     for setting, (_, intervals) in results.items():
         grouped = by_series(intervals=intervals)
@@ -154,14 +163,9 @@ def run_shapes(*, shapes: tuple[Shape, ...], groups: list, state: dict) -> pl.Da
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
-def both_scales(*, panel: dict) -> dict:
-    """The uninjected odd-month noise scales of the plain and profile-weighted steps."""
-    return {
-        "plain": prepare(residuals=panel["residual"], window=WINDOW).scale,
-        "profile": prepare_profile(
-            residuals=panel["residual"], expected=panel["expected"], window=WINDOW
-        ).scale,
-    }
+def priors() -> dict:
+    """The log duration priors of PL (labelled durations) and PF (flat)."""
+    return {"PL": labelled_duration_prior(), "PF": flat_prior()}
 
 
 def read_thresholds(*, out: Path) -> dict[str, float]:
@@ -169,24 +173,57 @@ def read_thresholds(*, out: Path) -> dict[str, float]:
     return json.loads((out / "thresholds.json").read_text())
 
 
+def tune_paired(
+    *, inputs: DetectorInputs, prior: np.ndarray, logged: dict
+) -> tuple[float, list[tuple[float, int]]]:
+    """Return the lowest threshold on a 0.05 grid whose odd-month unexplained count is at most 80.
+
+    The scan moves down from 8 in steps of 0.25 to the first count above the target, then up in
+    steps of 0.05 to the first count at or under it. The second value holds every pair evaluated.
+    """
+    scored = paired_alarms(inputs=inputs, prior=prior)
+    curve: dict[float, int] = {}
+
+    def count(threshold: float) -> int:
+        key = round(threshold, 2)
+        if key not in curve:
+            kept = cut(scored=scored, threshold=key)
+            curve[key] = odd_unexplained(
+                table=alarm_table(kept=kept, shift=inputs.shift), logged=logged
+            )
+        return curve[key]
+
+    threshold = 8.0
+    while threshold > 0.5 and count(threshold) <= TARGET:
+        threshold = round(threshold - 0.25, 2)
+    while count(threshold) > TARGET:
+        threshold = round(threshold + 0.05, 2)
+    print(f"  odd-month unexplained alarms at {threshold}: {count(threshold)} (target {TARGET})")
+    return threshold, sorted(curve.items())
+
+
+TARGET: Final[int] = 80
+"""D0M's odd-month unexplained-alarm count, which PL and PF are matched to."""
+
+
 def tune(*, out: Path) -> None:
-    """Match D3's threshold to D0M's odd-month unexplained-alarm count (80), and confirm D0M's."""
+    """Confirm D0M's threshold (4.0, 80 alarms), and match PL's and PF's to its count."""
     panel, _ = load()
     logged = near_log_masks(pad_stamps=EXPLAIN_PAD)
     plain = prepare(residuals=panel["residual"], window=WINDOW)
-    profile = prepare_profile(
-        residuals=panel["residual"], expected=panel["expected"], window=WINDOW
-    )
-    d0m, plain_curve = tune_d2(inputs=plain, veto_z=NO_VETO, logged=logged)
-    d3, profile_curve = tune_d2(inputs=profile, veto_z=NO_VETO, logged=logged)
-    print(f"matched thresholds: D0M {d0m}, D3 {d3}")
+    d0m, d0m_curve = tune_d2(inputs=plain, veto_z=NO_VETO, logged=logged)
+    print(f"matched thresholds: D0M {d0m}")
     if d0m != D0M_THRESHOLD:
         raise SystemExit("STOP: D0M's matched threshold is not experiment 58's 4.0")
-    (out / "thresholds.json").write_text(json.dumps({"D0M_48": d0m, "D3_48": d3}))
-    pl.DataFrame(
-        [{"detector": "D0M", "threshold": t, "odd_unexplained": c} for t, c in plain_curve]
-        + [{"detector": "D3", "threshold": t, "odd_unexplained": c} for t, c in profile_curve]
-    ).write_parquet(out / "curves.parquet")
+    thresholds = {"D0M_48": d0m}
+    curves = [{"detector": "D0M", "threshold": t, "odd_unexplained": c} for t, c in d0m_curve]
+    for name, prior in priors().items():
+        threshold, curve = tune_paired(inputs=plain, prior=prior, logged=logged)
+        print(f"{name}: threshold {threshold}")
+        thresholds[f"{name}_48"] = threshold
+        curves += [{"detector": name, "threshold": t, "odd_unexplained": c} for t, c in curve]
+    (out / "thresholds.json").write_text(json.dumps(thresholds))
+    pl.DataFrame(curves).write_parquet(out / "curves.parquet")
 
 
 def event_groups(*, panel: dict) -> tuple[list, list[tuple[int, list[Event]]]]:
@@ -206,7 +243,8 @@ def make_state(*, out: Path) -> tuple[dict, list]:
     shares = fit_profile_shares(panel=panel)
     return {
         "panel": panel,
-        "scales": both_scales(panel=panel),
+        "scale": prepare(residuals=panel["residual"], window=WINDOW).scale,
+        "priors": priors(),
         "thresholds": read_thresholds(out=out),
         "shares": shares,
     }, groups
@@ -230,7 +268,7 @@ def harness_check(*, out: Path) -> None:
 
 
 def score(*, out: Path) -> None:
-    """Score every transfer under all five shapes with both detectors."""
+    """Score every transfer under all five shapes with every arm."""
     state, groups = make_state(out=out)
     shares = state["shares"]
     print(f"{len(shares)} fitted profile shares: {shares_json(shares=shares)}", flush=True)
@@ -241,21 +279,39 @@ def score(*, out: Path) -> None:
 
 
 def real(*, out: Path) -> None:
-    """Score the labelled real transfers and count the real alarms of both detectors."""
+    """Score the labelled real transfers and count the real alarms of every arm.
+
+    PL's scores on the real transfers use a cross-fitted prior: the transfers are split into two
+    halves by the parity of their rank in card id, and each half is scored with a prior fitted
+    without that half's cards.
+    """
     panel, _ = load()
-    results = build_detectors(
-        residual=panel["residual"],
-        expected=panel["expected"],
-        scales=both_scales(panel=panel),
-        thresholds=read_thresholds(out=out),
-    )
+    kwargs = {
+        "residual": panel["residual"],
+        "expected": panel["expected"],
+        "scale": prepare(residuals=panel["residual"], window=WINDOW).scale,
+        "thresholds": read_thresholds(out=out),
+    }
+    results = build_detectors(priors=priors(), **kwargs)
     logged = near_log_masks(pad_stamps=EXPLAIN_PAD)
     real_alarm_rows(results=results, logged=logged).write_parquet(out / "alarms.parquet")
-    events = real_events(power=panel["power"])
+    events = real_events(power=panel["power"]).sort("card_id").with_row_index("rank")
     moved = pl.read_parquet(LABELLED_PATH).select("card_id", "moved_mw_p50")
-    score_real(results=results, real=events).join(
-        moved, on="card_id", validate="m:1"
-    ).write_parquet(out / "real_results.parquet")
+    scored = score_real(results=results, real=events.drop("rank")).filter(
+        pl.col("setting") != "PL_48"
+    )
+    pieces = [scored]
+    for half in (0, 1):
+        held = events.filter(pl.col("rank") % 2 == half)
+        held_out = frozenset(held["card_id"].to_list())
+        cross = build_detectors(
+            priors={"PL": labelled_duration_prior(exclude_cards=held_out), "PF": flat_prior()},
+            **kwargs,
+        )
+        pieces.append(score_real(results={"PL_48": cross["PL_48"]}, real=held.drop("rank")))
+    pl.concat(pieces).join(moved, on="card_id", validate="m:1").write_parquet(
+        out / "real_results.parquet"
+    )
     print({s: explained_flags(table=t, logged=logged).sum() for s, (t, _) in results.items()})
 
 

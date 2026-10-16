@@ -7,7 +7,8 @@ noise units.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import cache
 from typing import Final
 
 import numpy as np
@@ -58,6 +59,15 @@ def labelled_duration_prior(*, exclude_cards: frozenset[str] = frozenset()) -> n
     return np.maximum(np.log(density / density.max()), PRIOR_FLOOR)
 
 
+@cache
+def near_refit() -> np.ndarray:
+    """True within 24 hours of a monthly refit, where the residual model's jump can mimic a step."""
+    mask = np.zeros(GRID_LENGTH, dtype=bool)
+    for stamp in refit_stamps():
+        mask[max(stamp - BLOCK + 1, 0) : stamp + BLOCK] = True
+    return mask
+
+
 @dataclass(frozen=True)
 class Candidate:
     """The best reading of one candidate onset: with a return step, or without one."""
@@ -70,7 +80,9 @@ class Candidate:
     score: float
 
 
-def best_candidates(*, z: np.ndarray, series: int, window: int, prior: np.ndarray) -> list[Candidate]:
+def best_candidates(
+    *, z: np.ndarray, series: int, window: int, prior: np.ndarray
+) -> list[Candidate]:
     """Score every candidate onset of one series and keep its best total.
 
     The pair score of a return stamp `e` is `(|z(s)| + return_z) / sqrt(2)` plus the prior at the
@@ -83,12 +95,14 @@ def best_candidates(*, z: np.ndarray, series: int, window: int, prior: np.ndarra
         if len(refits) and (np.abs(refits - s) < window).any():
             continue
         sign = np.sign(z[s])
-        alone = abs(z[s]) / SQRT2 + PRIOR_WEIGHT * PRIOR_FLOOR
+        alone = abs(z[s]) / SQRT2 + PRIOR_WEIGHT * prior.min()
         best = Candidate(series, int(s), float(z[s]), None, 0.0, float(alone))
         stop = min(s + CAP_STAMPS + 1, GRID_LENGTH)
         ret = -sign * z[s + MIN_DURATION : stop]
         if ret.size:
-            usable = np.isfinite(ret) & (ret >= RETURN_Z_MIN)
+            usable = (
+                np.isfinite(ret) & (ret >= RETURN_Z_MIN) & ~near_refit()[s + MIN_DURATION : stop]
+            )
             total = np.where(
                 usable,
                 (abs(z[s]) + np.nan_to_num(ret)) / SQRT2 + PRIOR_WEIGHT * prior[: ret.size],
@@ -97,18 +111,23 @@ def best_candidates(*, z: np.ndarray, series: int, window: int, prior: np.ndarra
             k = int(np.argmax(total))
             if total[k] > alone:
                 best = Candidate(
-                    series, int(s), float(z[s]), int(s + MIN_DURATION + k), float(ret[k]), float(total[k])
+                    series,
+                    int(s),
+                    float(z[s]),
+                    int(s + MIN_DURATION + k),
+                    float(ret[k]),
+                    float(total[k]),
                 )
         out.append(best)
     return out
 
 
-def paired_alarms(
-    *, inputs: DetectorInputs, prior: np.ndarray
-) -> dict[int, list[Candidate]]:
+def paired_alarms(*, inputs: DetectorInputs, prior: np.ndarray) -> dict[int, list[Candidate]]:
     """Every series' scored candidates, ready to be cut at any threshold."""
     return {
-        s: best_candidates(z=inputs.shift[s] / inputs.scale[s], series=s, window=inputs.window, prior=prior)
+        s: best_candidates(
+            z=inputs.shift[s] / inputs.scale[s], series=s, window=inputs.window, prior=prior
+        )
         for s in inputs.shift
     }
 
@@ -120,7 +139,7 @@ def cut(*, scored: dict[int, list[Candidate]], threshold: float) -> list[Candida
     return step and is dropped.
     """
     kept: list[Candidate] = []
-    for series, candidates in scored.items():
+    for candidates in scored.values():
         accepted: list[Candidate] = []
         for c in sorted(candidates, key=lambda c: c.onset):
             if c.score < threshold:
@@ -175,9 +194,37 @@ def paired_intervals(
     out: list[Interval] = []
     for c in kept:
         if c.end is not None:
-            out.append(Interval(c.series, c.onset, c.end, c.end + BLOCK, c.series, "P", "alarm", c.onset_z))
+            out.append(
+                Interval(c.series, c.onset, c.end, c.end + BLOCK, c.series, "P", "alarm", c.onset_z)
+            )
             continue
         rho, end, known = level_track(q=relative[c.series], onset=c.onset, window=window)
         if np.isfinite(rho):
             out.append(Interval(c.series, c.onset, end, known, c.series, "P", "alarm", rho))
+    return out
+
+
+END_SEARCH_STAMPS: Final[int] = 14 * BLOCK
+"""PE searches for the return step up to 14 days after the onset."""
+
+
+def end_only_intervals(*, intervals: list[Interval], inputs: DetectorInputs) -> list[Interval]:
+    """Replace each interval's end by the strongest return step in the next 14 days (PE).
+
+    The alarms stay as they are. When no stamp reaches `RETURN_Z_MIN` in the opposite direction, the
+    interval keeps its tracked end.
+    """
+    out: list[Interval] = []
+    for iv in intervals:
+        z = inputs.shift[iv.series] / inputs.scale[iv.series]
+        sign = np.sign(z[iv.onset])
+        stop = min(iv.onset + END_SEARCH_STAMPS + 1, GRID_LENGTH)
+        ret = -sign * z[iv.onset + MIN_DURATION : stop]
+        blocked = near_refit()[iv.onset + MIN_DURATION : stop]
+        usable = np.where(np.isfinite(ret) & (ret >= RETURN_Z_MIN) & ~blocked, ret, -np.inf)
+        if usable.size == 0 or not np.isfinite(usable.max()):
+            out.append(iv)
+            continue
+        end = int(iv.onset + MIN_DURATION + np.argmax(usable))
+        out.append(replace(iv, end=end, known_from=end + BLOCK))
     return out
