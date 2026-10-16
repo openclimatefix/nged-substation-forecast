@@ -70,6 +70,13 @@ def regime_refits(*, name: str, origins: list[datetime]) -> tuple[datetime, ...]
 def chosen_refit(*, refits: tuple[datetime, ...], origin: datetime) -> datetime:
     """Return the latest refit at or before an origin.
 
+    Args:
+        refits: A regime's refit times.
+        origin: A validation run's forecast origin.
+
+    Returns:
+        The latest refit time that is not after the origin.
+
     Raises:
         ValueError: If every refit is later than the origin.
     """

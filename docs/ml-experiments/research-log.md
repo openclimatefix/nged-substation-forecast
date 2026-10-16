@@ -27,6 +27,7 @@ the maintainer to confirm.
 | [00024 - Pooled demand models, part 1](00024-pooling-groupings-demand-xgboost/result.md) | Train one XGBoost model per substation type (or per size band), with the series identifier as a categorical column, instead of one per series | Costs 0.15 points on Primary demand after the error correction and saves 16 of 20 models; needs the series identifier, and the test covered 20 series |
 | [00033 - Best guess against production](00033-best-guess-architecture-vs-production/result.md) | Replace the production recipe with the best guess: N1 with the 14-day correction and spread factor 1.15 for Primary demand, N1 for BSP and GSP demand, ERA5-trained mixtures for solar and wind | The comparison that ranks the candidates against production; monthly retraining without the correction scored 5.12 on one seed and needs a three-seed test |
 | [00035 - Quantile blend of stored models](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
+| [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction | Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again |
 
 ## The experiments so far
 
@@ -70,6 +71,7 @@ the maintainer to confirm.
 | [00038 - Switching event detector, part 2](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | 2026-10-16 |
 | [00039 - PV disaggregation, part 1](00039-pv-disaggregation-cams-injection/result.md) | Can a CAMS-driven fit separate embedded solar from Primary substation demand, recovering injected solar-farm output within 25% and passing four checks on the real series? | Partly supported: recovery passes (0.854, 0.815 to 0.866), real checks pass at 6 of 8 Primaries | Not for production | 2026-10-16 |
 | [00040 - PV disaggregation, part 2](00040-pv-capacity-error-bars/result.md) | Can a cross-arm misfit test detect a cloud-driven demand load that biases the capacity fitted to embedded solar, and how many directional Primaries are free of one in 2025/26? | Partly supported: calibrated (median capacity over truth 0.992, 0.951 to 1.032), but a day-long cloud load is flagged in only 0.35 of draws at 25% of capacity, so the verdict is `underpowered` | Not for production | 2026-10-16 |
+| [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | How does the Primary demand score change from frozen to daily retraining, with and without the 14-day correction, and which cheap proxy ranks arms like full monthly retraining? | Inconclusive at the planned level: monthly minus the stack -0.20 points (95% interval -0.38 to -0.01); weekly -0.07 lower again | Candidate | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -936,3 +938,23 @@ directional Primary substations.
   [PR #1249 (Experiment 40: how far can the capacity fitted to embedded solar be trusted?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1249).
 
 ![Capacity per Primary in 2025/26 with its interval and bound](00040-pv-capacity-error-bars/figure_01.svg)
+
+### 00034: how often to retrain the Primary demand model, and which cheap proxy stands in
+
+**Refitting the Primary demand model monthly lowered the quantile score from 5.32 to 5.12 points of
+capacity, refitting weekly lowered it by a further 0.07, and the 14-day correction stopped
+helping.** The experiment refitted N1 for 16 Primary substations at six cadences and scored 73
+forecast runs from July 2025 to June 2026. The pre-registered verdict is inconclusive: the
+99.375% interval on monthly minus the stack is -0.44 to +0.08.
+
+- **Headline result:** monthly retraining minus the stack, quantile score over all leads: -0.20
+  points (99.375% interval -0.44 to +0.08; 95% interval -0.38 to -0.01). Weekly minus monthly:
+  -0.07 (-0.18 to -0.00). The correction at weekly cadence: +0.23 (+0.03 to +0.44).
+- **Finding for later experiments:** of four cheap proxies for monthly retraining, only monthly
+  refits on a rolling 12-month window (150 rounds, `eta` 0.15) reproduced full monthly
+  retraining's contrasts, at about a fifth of the GPU time. A frozen reference overstates a
+  feature that follows recent demand level (weekly analogues: -0.05 frozen, -0.01 retrained).
+- **Write-up and pull request:** [result](00034-retraining-cadence-and-cheap-proxies-demand/result.md),
+  [PR #1243 (Experiment 34: retraining cadence and cheap proxies for Primary demand (plan))](https://github.com/openclimatefix/nged-substation-forecast/pull/1243).
+
+![Difference from the stack by retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/figure_1.svg)

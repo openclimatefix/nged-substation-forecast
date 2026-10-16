@@ -141,6 +141,14 @@ def regime_rows(*, arm: Arm, site: str, seed: int, origins: list[datetime]) -> p
 def arm_table(*, name: str, series: pl.DataFrame, origins: list[datetime]) -> pl.DataFrame:
     """Return an arm's raw quantiles for every series and seed that has refit predictions.
 
+    Args:
+        name: The arm's name in `ARMS`.
+        series: `common.series_table()`.
+        origins: The validation runs' forecast origins.
+
+    Returns:
+        The quantiles keyed by series, run, valid time, and seed.
+
     Raises:
         FileNotFoundError: If no series has the arm's seed-0 predictions.
     """

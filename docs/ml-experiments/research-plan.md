@@ -18,7 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [00034](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | How does the Primary demand score change along the retraining cadence (frozen, half-yearly, quarterly, monthly, weekly, daily), with and without the 14-day correction, where does the gain flatten, and which cheap proxy ranks arms like full monthly retraining? | 1 | Nothing | Planned; plan PR open |
 | [SW2-0a](#sw2-0a-an-agent-labeller-gated-on-known-answers) | Does an agent labeller, built on log-timed features that use no forecasting model, pass a pre-registered gate on injected transfers and placebo windows, and does Sonnet beat a rules-only labeller on the same features? | 1 | Nothing | Proposed; the maintainer asked for it to start soon |
 | [SW2-0b](#sw2-0b-the-labelled-reference-set) | Which logged closures since 2022 are visible in the telemetry, with what onset, end, receivers, and MW moved? | 1 | SW2-0a passing its gate | Proposed |
 | [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b | Proposed |
