@@ -112,7 +112,14 @@ def prepare(*, arms: dict[str, pl.DataFrame], cases: pl.DataFrame) -> dict[str, 
     """Restrict every arm to the series and cases it shares with all others, and add losses."""
     shared = cases
     for frame in arms.values():
-        shared = shared.join(frame.select(*KEYS).unique(), on=KEYS, how="semi")
+        ids = frame["time_series_id"].unique().to_list()
+        held = shared.filter(pl.col("time_series_id").is_in(ids))
+        shared = pl.concat(
+            [
+                shared.filter(~pl.col("time_series_id").is_in(ids)),
+                held.join(frame.select(*KEYS).unique(), on=KEYS, how="semi"),
+            ]
+        )
     out = {}
     for name, frame in arms.items():
         kept = frame.join(shared.select(*KEYS, "label", "actual"), on=KEYS, how="inner").sort(
