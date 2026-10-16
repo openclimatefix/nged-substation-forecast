@@ -234,7 +234,12 @@ def figure_tuning() -> alt.TopLevelMixin:
         .mark_line()
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("threshold:Q", title="Strong threshold T (noise units)"),
-            y=alt.Y("n:Q", title="Odd-month unexplained alarms", scale=alt.Scale(type="symlog")),
+            y=alt.Y(
+                "n:Q",
+                title="Odd-month unexplained alarms",
+                scale=alt.Scale(type="symlog"),
+                axis=alt.Axis(values=[0, 10, 30, 80, 200, 700]),
+            ),
             color=alt.Color(
                 "kind:N",
                 title=None,
@@ -264,8 +269,8 @@ def main() -> None:
     """Write the four figures."""
     data = populations(out=WORK_DIR)
     _save(figure_classes(), name="figure_1_classes.svg")
-    _save(figure_recall(data=data), name="figure_2_recall_by_arm.svg")
-    _save(figure_contrasts(data=data), name="figure_3_contrasts.svg")
+    _save(figure_recall(data=data), name="figure_3_recall_by_arm.svg")
+    _save(figure_contrasts(data=data), name="figure_2_contrasts.svg")
     _save(figure_tuning(), name="figure_4_tuning.svg")
 
 

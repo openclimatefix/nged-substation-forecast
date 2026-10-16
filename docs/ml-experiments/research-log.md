@@ -1336,23 +1336,23 @@ guard on the short transfers.
 
 ### 00069: why do real load transfers raise no alarm at their start? (SW2-17)
 
-**Most of the 24 real transfers with no alarm at their start are not hiding under the threshold, and
+**Half of the 24 real transfers with no alarm at their start are not a threshold problem, and
 accepting weaker alarms that a later step back confirms did not find more of the moved power.** Of
 the 35 labelled real transfers over 1 day, 24 have no alarm of the single-step detector D0M within 2
-hours of the start. Of those 24, 6 lie in gaps in the data, 3 in a month where a refit of the
-residual model suppresses the alarm, 3 have an alarm 2 to 12 hours from the labelled start, 8 have a
-sharp step of 2 to 4 noise units, 2 have a spread or late step, and 2 show no step. On injected
-transfers, a rule that also raises a weak alarm at half the strong threshold when a matching
-opposite step follows within 14 days recovered 0.146 more of the moved MW than the strong alarms
-alone, but the strong threshold had to rise from 4.0 to 6.55 to keep 80 odd-month false alarms,
-which lost 0.140. The net change against the benchmark was +0.007 (98.75% interval -0.014 to
-+0.040), and the verdict is `inconclusive`.
+hours of the start. Of those 24, 6 lie in gaps in the data, 3 where the monthly refit of the XGBoost
+forecast suppresses the alarm, 3 have an alarm 2 to 12 hours from the labelled start, 8 have a sharp
+step of 2 to 4 noise units, 2 have a spread or late step, and 2 show no step. On injected transfers,
+a rule that also raises a weak alarm at half the strong threshold when a matching opposite step
+follows within 14 days recovered 0.146 more of the moved MW than the strong alarms alone, but the
+strong threshold had to rise from 4.0 to 6.55 to keep 80 odd-month unexplained alarms, which lost
+0.140. The net change against the benchmark was +0.007 (98.75% interval -0.014 to +0.040), and the
+verdict is `inconclusive`.
 
 - **Finding for later experiments:** the first-return end rule PF14 beat the 14-day strongest-step
   rule on a fresh draw, by +0.038 (+0.016 to +0.077) on 625 headline-band transfers and +0.416
   (+0.059 to +0.595) on 206 long transfers, so PF14 is the benchmark end rule. The monthly refit and
-  a 2-hour onset tolerance hide 6 of the 24 real transfers, which is more than a lower threshold can
-  reach. The end rule and the weak-alarm rule need up to 14 days of hindsight, so they serve
+  a 2-hour onset tolerance account for 6 of the 24 unalarmed real transfers, and a lower threshold
+  does not address them. PF14 and the weak-alarm rule need up to 14 days of hindsight, so they serve
   training-time masks and the event table for NGED, not live forecast inputs.
 - **Write-up and pull request:** [the full result
   page](00069-sw2-17-missed-onsets-of-the-end-rule/result.md), [PR
