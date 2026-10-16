@@ -53,10 +53,18 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Do summaries of recent power help the stage 2 calibrator?
 
+We asked whether giving the second step of a demand forecast a few summaries of recent power, such
+as the minimum, mean, and maximum over the last 24 hours, helps when it already has the individual
+recent readings. We added six such summaries and compared the forecast error for the Primary
+substations (substations that step power down to the local distribution network) up to 48 hours
+ahead. The summaries changed the error by about 0.02 points of capacity, which cannot be told apart
+from no change.
+
 **Verdict: inconclusive.** Adding the six summaries to 00005's L3 calibrator changed the quantile
 score for leads up to 48 hours by -0.02 points of capacity (98.75% interval -0.14 to +0.13), so the
 prediction of at least -0.15 failed and the interval does not exclude zero. The plan below was
-committed before any fit, and the results above it were written after the run.
+committed before any fit, and the results above it were written after the run. A point of capacity
+is 1% of the series' effective capacity.
 
 ## Results
 

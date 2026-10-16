@@ -40,12 +40,21 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/11
 
 # Does an ERA5-trained weather-to-power model beat the same model trained on ENS?
 
+We asked whether a model that turns weather into solar or wind farm output works better when it is
+trained on estimates of past weather than when it is trained on archived weather forecasts. We
+trained one model each way for 6 solar farms and 3 wind farms, gave both the same 51 weather
+forecasts for the days ahead, and compared their errors over 53 weekly forecast runs in one held-out
+year. Training on estimates of past weather gave the smaller error for forecasts up to 6 days ahead,
+and the benefit was not shown beyond that.
+
 **Verdict: supported up to day 6, not supported beyond.** Stage 1a (one XGBoost model per series,
-trained on ERA5 and CAMS, no calendar and no power-history columns) applied to the 51 ENS members
-and averaged has a smaller error than the same columns trained on ENS weather, for lead bands up to
-6 days, for 6 solar farms and 3 wind farms, in one held-out year (fold A, 53 weekly runs). The
-planned contrasts were revised after two scientific reviews, so they are not pre-registered. The
-full write-up is the study README in `studies/stage1_pilot/README.md`.
+trained on ERA5 (a reanalysis, an estimate of past weather) and CAMS (the Copernicus Atmosphere
+Monitoring Service's satellite estimate of sunlight), no calendar and no power-history columns)
+applied to the 51 members of ENS (the European Centre for Medium-Range Weather Forecasts' ensemble
+forecast) and averaged has a smaller error than the same columns trained on ENS weather, for lead
+bands up to 6 days, for 6 solar farms and 3 wind farms, in one held-out year (fold A, 53 weekly
+runs). The planned contrasts were revised after two scientific reviews, so they are not
+pre-registered. The full write-up is the study README in `studies/stage1_pilot/README.md`.
 
 ## Input columns
 

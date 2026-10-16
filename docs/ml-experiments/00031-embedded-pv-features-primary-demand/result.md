@@ -84,14 +84,27 @@ code: ml-experiments/00031-embedded-pv-features-primary-demand/
 
 # Experiment 31: do embedded-solar capacity features lower the error of Primary demand forecasts?
 
+We asked whether telling a demand forecast for Primary substations (substations that step power
+down to the local distribution network) how much solar generation capacity is installed behind each
+substation lowers its error. The capacity estimates came from the demand data and from a register.
+We added several versions of installed-capacity inputs to the best demand forecast, plus a control
+whose capacity values were shuffled between forecast dates within each series and calendar month,
+and scored 16 Primary substations over 73 forecast runs. None lowered the error. The reference
+forecast had a (smaller is better) quantile score of 5.32 points of capacity, and the best arms
+matched it to within 0.01 points. Two arms were worse: the one that added capacity statistics as
+columns and the one that added PV products built from the data alone.
+
 **Inconclusive: none of the capacity features lowers the all-lead quantile score of Primary demand
-forecasts, and the two arms that came closest cannot be separated from zero.** B0 is the 00019
-stack without its half-life: N1 with the 14-day correction and the 1.15 spread factor. Scores are
-the quantile score over all leads, in points of capacity (1 point is 1% of a series' effective
+forecasts, and the two arms that came closest cannot be separated from zero.** B0 is the 00019 stack
+without its half-life: N1 with the 14-day correction and the 1.15 spread factor. Scores are the
+quantile score over all leads, in points of capacity (1 point is 1% of a series' effective
 capacity), on 16 Primary substations, 73 forecast runs every 5 days from July 2025 to June 2026,
 with ENS weather. B0 scores 5.32. A3 (PV products using the register) scores 5.32, A5 (the shaped
 correction) 5.33, A4 (the linear offset) 5.33, and the shuffled control A6 5.31. A1 (capacity
-statistics as columns) scores 5.49 and A2 (PV products from data alone) 5.35, which are losses.
+statistics as columns) scores 5.49 and A2 (PV products from data alone) 5.35, which are losses. ENS
+is the European Centre for Medium-Range Weather Forecasts' ensemble forecast, which has 51 members.
+The quantile score measures how well the forecast quantiles fit what happened, and smaller is
+better.
 
 ![The six planned contrasts](figure_1.svg)
 

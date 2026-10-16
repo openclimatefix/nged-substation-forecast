@@ -61,14 +61,26 @@ code: ml-experiments/00022-era5-weather-ceiling-primary-demand/
 
 # Experiment 22: how much would Primary demand gain from ERA5 weather in place of ENS weather?
 
+We asked how much better the demand forecast for Primary substations (substations that step power
+down to the local distribution network) would be if its weather input were an estimate of past
+weather instead of a weather forecast. The answer is an upper limit on what better weather products
+could bring, because estimates of past weather arrive about 5 days late and cannot be used live. We
+swapped the weather in the best demand forecast and scored 16 Primary substations over 73 forecast
+runs. The estimates of past weather lowered the error by only 0.10 points of capacity, so the
+0.3-point gain we had predicted is ruled out.
+
 **Refuted: ERA5 weather lowered the quantile score by 0.10 points of capacity (99.38% interval -0.16
 to -0.04), so the 0.3-point gain the decision rule asked for is ruled out.** The rows are the 16
-Primary substations and 73 forecast runs of experiment 19, scored with its full stack (N1 with a
+Primary substations and 73 forecast runs of experiment 00019, scored with its full stack (N1 with a
 half-life of 0.5 years, the 14-day correction, the spread factor of 1.15). The ENS arm scores 5.32
 and the all-variable ERA5 arm scores 5.22, in points of capacity (1 point is 1% of a series'
-effective capacity). `manual_heuristic` scores 5.89 on the same rows. The ENS arm matches
-experiment 19's stored stack to within 0.0003 points. ERA5 reaches us about 5 days late, so no
-serving system could use it: the arm is a ceiling for a weather product as accurate as ERA5.
+effective capacity). `manual_heuristic` scores 5.89 on the same rows. The ENS arm matches experiment
+19's stored stack to within 0.0003 points. ERA5 reaches us about 5 days late, so no serving system
+could use it: the arm is a ceiling for a weather product as accurate as ERA5. ENS is the European
+Centre for Medium-Range Weather Forecasts' ensemble forecast, which has 51 members. The quantile
+score measures how well the forecast quantiles fit what happened, and smaller is better.
+`manual_heuristic` is a stored baseline that forecasts from the power at the same time of day in
+earlier weeks and years.
 
 ![Each ERA5 arm minus the ENS arm](figure_1.svg)
 

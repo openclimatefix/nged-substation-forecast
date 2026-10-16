@@ -66,13 +66,25 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Does the lagged electricity price help the demand model at substations with batteries?
 
-**Verdict: inconclusive.** Adding the Elexon price from 7 days earlier did not lower the error of
-the stage 1a demand model at the substation hosting the largest battery (B2) with an interval that
-excludes zero, and the gain seen in the selection year disappeared in the confirmation year. The
-pre-registered mechanism test (C4) failed in the selection year and pointed the wrong way in the
-confirmation year, so the experiment cannot support a price response by batteries.
+We asked whether the electricity price from 7 days earlier helps predict demand at substations that
+host a battery, whose charging may follow the price. We added that price to a weather-to-power
+demand model and compared its error with the same model without it, on the substation hosting the
+largest battery and on 16 other series, in a selection year and a confirmation year. The price
+lowered the error in the selection year, but the gain disappeared in the confirmation year, so the
+experiment cannot support the idea that batteries respond to the price.
 
-**Absolute scores** (mean absolute error of the median, points of capacity, 3 seeds):
+**Verdict: inconclusive.** Adding the electricity price published by Elexon (the electricity market
+operator for Great Britain) from 7 days earlier did not lower the error of the stage 1a demand model
+at the substation hosting the largest battery (B2) with an interval that excludes zero, and the gain
+seen in the selection year disappeared in the confirmation year. The pre-registered mechanism test
+(C4) failed in the selection year and pointed the wrong way in the confirmation year, so the
+experiment cannot support a price response by batteries. Stage 1a is an XGBoost model per series
+that turns weather into power.
+
+**Absolute scores.** The arms are BASE (the demand model without the price), PRICE (BASE plus the
+price from 7 days earlier), CONTROL (BASE plus three columns that contain no price), and SHUFFLED
+(BASE plus the price from a different week). The scores are the mean absolute error of the median in
+points of capacity (1 point is 1% of a series' effective capacity), averaged over 3 random seeds:
 
 | Scope and year | BASE | PRICE | CONTROL | SHUFFLED |
 | --- | --- | --- | --- | --- |

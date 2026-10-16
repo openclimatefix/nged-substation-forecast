@@ -68,20 +68,31 @@ code: ml-experiments/00037-switching-first-look/
 
 # Experiment 37: does a neighbour-balance detector find logged switching in the telemetry?
 
-**Inconclusive: the neighbour-balance detector D1 recovers a third of the MW of the 18 visible
-validation transfers, and beats the single-series detector D0 by about +0.14 at equal alarm rates,
-but the small reference set leaves the verdict between the two pre-registered bars.**
-D1 with a 4-hour window and a threshold of 4 reaches a size-weighted recall of 0.326 (95% interval
-0.093 to 0.579) at 0.38 unexplained alarms per series-month. D0 reaches 0.036 (0.000 to 0.131) at
-0.14, and the difference is +0.290 (+0.034 to +0.557). The two thresholds sit at different alarm
-rates, so the fairer comparison is at about 0.5 alarms per series-month, where D0 reaches 0.224 and
-D1 0.362. Shifted logs give 0.004 for D1. D1 misses the 0.35 bar for `supported` and clears the 0.20
-bar for `refuted`, so the rule gives `inconclusive`. Of 612 logged closures of 2 hours to 60 days,
-37 are confirmed, and about 6 of those are expected by chance (shifted logs give 6.2). Eighteen of
-the 37 are in the validation months, above the stop-rule minimum of 15 but not by much. Recall on
-all logged closures of 2 hours or more is 0.086. All figures are on the residual of the monthly-
-retrained XGBoost model with ERA5 weather and no power lags (experiment 00017's `H0.5`). ERA5
-arrives about 5 days after the event, so the detector is retrospective and cannot yet run live.
+We asked whether comparing a substation with its neighbours can find the moments when load was
+switched from one substation to another, which NGED's logs of closures record. We built a detector
+based on the balance between neighbouring substations and a simpler detector that looks at one
+series, and measured how much of the switched power each found, against how many alarms had no
+logged cause. The neighbour-based detector found 0.326 of the switched power in the validation
+months (the even-numbered months, kept apart from the months used to set its threshold) and beat the
+single-series detector. The 18 visible switching events were too few to show whether it meets the
+bar we set.
+
+**Inconclusive: the neighbour-balance detector D1 (which flags a step in a substation that its
+neighbours' steps do not balance) recovers a third of the MW of the 18 visible validation transfers,
+and beats the single-series detector D0 by about +0.14 at equal alarm rates, but the small reference
+set leaves the verdict between the two pre-registered bars.** D1 with a 4-hour window and a
+threshold of 4 reaches a size-weighted recall (the share of switched megawatts found) of 0.326 (95%
+interval 0.093 to 0.579) at 0.38 unexplained alarms (alarms with no logged closure) per
+series-month. D0 reaches 0.036 (0.000 to 0.131) at 0.14, and the difference is +0.290 (+0.034 to
++0.557). The two thresholds sit at different alarm rates, so the fairer comparison is at about 0.5
+alarms per series-month, where D0 reaches 0.224 and D1 0.362. Shifted logs give 0.004 for D1. D1
+misses the 0.35 bar for `supported` and clears the 0.20 bar for `refuted`, so the rule gives
+`inconclusive`. Of 612 logged closures of 2 hours to 60 days, 37 are confirmed, and about 6 of those
+are expected by chance (shifted logs give 6.2). Eighteen of the 37 are in the validation months,
+above the stop-rule minimum of 15 but not by much. Recall on all logged closures of 2 hours or more
+is 0.086. All figures are on the residual of the monthly- retrained XGBoost model with ERA5 weather
+and no power lags (experiment 00017's `H0.5`). ERA5 arrives about 5 days after the event, so the
+detector is retrospective and cannot yet run live.
 
 ![Validation recall against unexplained alarms](figure_1_headline.svg)
 

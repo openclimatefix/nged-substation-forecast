@@ -84,23 +84,33 @@ code: ml-experiments/00033-best-guess-architecture-vs-production/
 
 # Experiment 33: does the best-guess architecture beat production, N1, and `manual_heuristic`?
 
+We asked whether our best-guess forecasting design beats the design now in production (the stored
+`xgboost_baseline`), a single-step model (N1), and a simple baseline (`manual_heuristic`), for
+demand, solar, and wind. The best guess is N1 plus a 14-day correction for Primary substation
+demand, N1 alone for bulk supply point and grid supply point demand, and mixtures of models trained
+on ERA5 weather (an estimate of past weather) for solar and wind farms. We scored all of them on the
+same forecast runs from July 2025 to June 2026, for 20 demand series, 6 solar farms, and 3 wind
+farms. The best guess lowered the error against production by 4.89 points of capacity for Primary
+demand, 3.81 for solar, and 6.27 for wind, and every interval lay wholly below its threshold.
+
 **Supported: the best guess lowered the quantile score below production's by 4.89 points of capacity
 for Primary demand (98.33% interval -5.66 to -4.06), 3.81 for solar (-5.07 to -2.64), and 6.27 for
 wind (-7.65 to -5.28), and each interval lies wholly below its threshold.** The quantile score is
 twice the mean pinball loss over nine quantile levels, the estimate of the continuous ranked
 probability score (CRPS), in points of capacity (1 point is 1% of a series' effective capacity). The
-best guess for Primary substations (the 16 substations that supply customers directly) is N1, an
-XGBoost model per series trained on the ensemble forecast of the European Centre for Medium-Range
-Weather Forecasts (ENS) with recent power as inputs, plus an additive correction by the mean error
-of the previous 14 days and a spread factor of 1.15 on the forecast band. For bulk supply point
-(BSP) and grid supply point (GSP) substations the best guess is N1 alone. For solar and wind it is a
-mixture over the 51 ENS members of a model trained on ERA5 weather (the ERA5 reanalysis, an estimate
-of past weather), with a spread factor and, for wind, a power-curve margin. Production is the stored
-`xgboost_baseline` forecast. The rows are the 73 runs of `fold_a_every5d_v1` for the 20 demand
-series and the 53 Tuesday runs of `fold_a_tuesdays_v1` for the 6 solar and 3 wind farms, July 2025
-to June 2026. The planned intervals use month-block resampling; the level is 98.33% for C1 to C3,
-and the other contrasts use their family's Bonferroni level (the Planned contrasts section and the
-appendix give each).
+best guess for the 16 Primary substations (substations that step power down to the local
+distribution network) is N1, an XGBoost model per series
+trained on the ensemble forecast of the European Centre for Medium-Range Weather Forecasts (ENS)
+with recent power as inputs, plus an additive correction by the mean error of the previous 14 days
+and a spread factor of 1.15 on the forecast band. For bulk supply point (BSP) and grid supply point
+(GSP) substations the best guess is N1 alone. For solar and wind it is a mixture over the 51 ENS
+members of a model trained on ERA5 weather (the ERA5 reanalysis, an estimate of past weather), with
+a spread factor and, for wind, a power-curve margin. Production is the stored `xgboost_baseline`
+forecast. The rows are the 73 runs of `fold_a_every5d_v1` for the 20 demand series and the 53
+Tuesday runs of `fold_a_tuesdays_v1` for the 6 solar and 3 wind farms, July 2025 to June 2026. The
+planned intervals use month-block resampling; the level is 98.33% for C1 to C3, and the other
+contrasts use their family's Bonferroni level (the Planned contrasts section and the appendix give
+each).
 
 ![Quantile score of every headline arm, per family](figure_1_headline.svg)
 

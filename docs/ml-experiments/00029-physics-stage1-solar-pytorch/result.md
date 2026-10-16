@@ -71,6 +71,11 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 # Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?
 
+We asked whether a solar forecasting model built from the physics of a solar panel, with its
+parameters fitted by gradient descent, beats an XGBoost model for solar farms. We fitted the physics
+model and combinations of it with XGBoost for 6 solar farms, and compared their forecast accuracy.
+No combination beat XGBoost, and the physics model alone was worse by 0.079 points of capacity.
+
 **Verdict: refuted.** No physics arm lowered the continuous ranked probability score (CRPS) of the
 XGBoost stage 1, and the PyTorch physics stage 1 alone scored 0.079 points of capacity worse (98.75%
 interval +0.029 to +0.135).

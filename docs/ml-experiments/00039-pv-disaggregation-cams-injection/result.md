@@ -82,14 +82,26 @@ code: ml-experiments/00039-pv-disaggregation-cams-injection/
 
 # Experiment 39: can a CAMS-driven fit separate embedded solar from Primary substation demand?
 
+We asked whether the output of solar farms embedded in the distribution network can be separated
+from the demand at a Primary substation (a substation that steps power down to the local
+distribution network) by fitting a model to the demand and a satellite estimate of sunlight. We
+added the recorded output of real solar farms to the demand of the 8 Primary substations that meter
+power in one direction, and checked how much of the added capacity the fit found again. The fit
+found a median of 77% of the added capacity, and its daily version found 85%, over 218 units (every
+Primary, solar farm, and season-year). We then ran the same fit on the real series with four further
+checks. Our rule needed 6 of the 8 substations to pass all four checks and the first check, which
+fits a placebo sky, to pass at all 8. Six of the 8 passed all four, but the placebo-sky check failed
+at one substation (Wrangle T1).
+
 **Verdict `recovers-but-confounded`: injected solar-farm output is recovered to within 25%, but the
-real series pass the four checks at 6 of 8 Primaries, and the pre-registered rule needs K1 to pass at
-all 8.** A fit of a calendar-plus-temperature demand term minus one CAMS-driven PV shape recovers a
-median 0.773 of the capacity of real solar-farm output injected into the demand of the 8 directional
-Primary substations (95% interval 0.740 to 0.818). The daily version of the fit recovers 0.854
-(0.815 to 0.866) and passes the recovery rule. The aim is explanation and capacity estimation, not
-forecast skill. Neither CAMS irradiance nor ERA5 temperature arrives in time to drive a live
-forecast, so the fit describes past data only.
+real series pass the four checks at 6 of 8 Primaries, and the pre-registered rule needs K1 to pass
+at all 8.** A fit of a calendar-plus-temperature demand term minus one CAMS-driven PV shape recovers
+a median 0.773 of the capacity of real solar-farm output injected into the demand of the 8
+directional Primary substations (95% interval 0.740 to 0.818). The daily version of the fit recovers
+0.854 (0.815 to 0.866) and passes the recovery rule. The aim is explanation and capacity estimation,
+not forecast skill. Neither CAMS irradiance nor ERA5 temperature arrives in time to drive a live
+forecast, so the fit describes past data only. CAMS is the Copernicus Atmosphere Monitoring
+Service's satellite estimate of sunlight.
 
 ![Figure 1: Median recovery ratio by model and irradiance point, with 95% intervals](figure_01.svg)
 
