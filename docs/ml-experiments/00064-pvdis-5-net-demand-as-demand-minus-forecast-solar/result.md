@@ -88,11 +88,12 @@ headline: >-
   placebo twin. Training on gross demand and subtracting the forecast solar (`b`) was not shown to
   match `d0` (+0.105, -0.090 to +0.292).
 lessons: >-
-  An explicit solar term can be added without losing accuracy, and as a starting offset it lowers the
-  error at every lead under 10 days and at all five series. The fitted weight on the ENS solar shift
-  is -0.60 to -0.29 (mean over series, first four lead bands) and must be zero beyond 10 days, where
-  the ENS anomaly has a correlation of 0.03 with the CAMS anomaly. Why the gross-demand arm `b` falls
-  short is not identified.
+  An explicit solar term attached as a starting offset (`am`) lowered the error at every lead under
+  10 days and at all five series, but the explicit-solar-term arm trained on gross demand (`b`) was
+  not shown to match `d0`. The fitted weight on the ENS solar shift is -0.60 to -0.29 (mean over
+  series, first four lead bands) and was set to zero beyond 10 days, where the ENS anomaly has a
+  correlation of 0.03 with the CAMS anomaly. Why the gross-demand arm `b` falls short is not
+  identified.
 production_status: candidate
 adopted_in: none
 advice:
@@ -110,8 +111,9 @@ advice:
     that bounds its loss, because `b` scores +0.105 points (-0.090 to +0.292) against `d0` and is
     +0.249 (0.035 to 0.479) worse at 6 to 10 days (verdict table, lead bands).
   - >-
-    Use the ensemble-mean solar shift for `sf` and `am`, because the per-member shift changes `sf`
-    by -0.004 points (-0.010 to +0.001, exploratory) (other reads).
+    Use the ensemble-mean solar shift for `sf`, because the per-member shift changes it by -0.004
+    points (-0.010 to +0.001, exploratory) (other reads); `am` with a per-member margin was not
+    tested.
   - >-
     Do not add a cell-temperature derating to the solar term, because `sf_temp` minus `sf` is +0.0003
     points (-0.0016 to +0.0022, exploratory) (other reads).
@@ -121,51 +123,55 @@ advice:
     both the lagged-power and cloud-proxy columns are removed (slope diagnostic).
   - >-
     Refit with a capacity table that is current for the validation year before porting, because the
-    capacity held at the 2024/25 value is 6% to 23% below experiment 45's 2025/26 constants at all
+    capacity held at the 2024/25 value is 5% to 19% below experiment 45's 2025/26 constants at the
     five series (departure 10).
 ---
 
 # Experiment 64: does demand minus forecast solar match the best guess? (PVDIS-5)
 
-**Take-home message: giving the XGBoost model the forecast solar output as a starting offset, with its
-weight fitted on the training window, beat the best guess by 0.15 points, and subtracting the
-forecast solar from an XGBoost model trained on gross demand did not match the best guess.** A
-forecast that NGED can read as "demand minus solar" therefore loses no accuracy when the solar term
-is attached as a starting offset, and gains at leads under 10 days. The open questions are whether
-the gain survives a capacity table that is current for the validation year, and why the starting
-offset also scores better in the 10-plus-day band, where its weight is zero.
+**Take-home message: giving the XGBoost model the forecast solar output as a starting offset (a
+fixed amount added to every tree prediction), with its weight fitted on the training window, beat
+`d0`, the best-guess recipe of experiment 33, by 0.15 points of capacity.** Training the XGBoost
+model on gross demand (metered power plus the solar panels' output) and then subtracting the
+forecast solar output was not shown to score within 0.10 points of `d0`. The starting-offset
+forecast has a separate solar term, was no worse than `d0` over all leads, and scored lower than
+`d0` at leads under 10 days. The open questions are whether the gain survives a capacity table that
+is current for the validation year, and why the starting offset also scores better at 10 days and
+beyond, where the weight on the solar term is set to zero.
 
 We asked whether a forecast of the power that a Primary substation draws can be split into ordinary
 demand and the output of the solar panels behind the substation without losing accuracy. A Primary
-substation is a 33/11 kV or 66/11 kV substation in the electricity distribution network, and its
-meter reads demand minus the panels' output. We built four forecasts that each carry an explicit
-solar term (the panels' capacity times a forecast of how much sunnier or cloudier the day will be
-than usual), scored them on five Primary substations over daylight half-hours of April to September,
-and compared each with the best forecast we had before and with the same forecast fed a solar term
-from another date. Three of the four forecasts scored 0.06 to 0.15 points better than the best
-guess, where 1 point is 1% of a substation's capacity, and the fourth was not shown to be as good.
+substation is a 33/11 kV or 66/11 kV substation in the electricity distribution network. The
+substation's meter reads demand minus the panels' output. We built four forecasts that each carry an
+explicit solar term, which is the panels' capacity times a forecast of how much sunnier or cloudier
+the day will be than usual. We scored them on five Primary substations over daylight half-hours of
+April to September. We compared each with `d0`, and with the same forecast given the solar term of
+another date. The score is the quantile score, an error measure in which lower is better, and 1
+point is 1% of a substation's capacity. Three of the four forecasts scored 0.06 to 0.15 points lower
+than `d0`. The fourth was not shown to score within 0.10 points of `d0`.
 
-**The verdict is `supported`.** The decision rule is in the front matter, and the plan, which stated
-the rule, was committed before any code ran. Contrast N is an arm's quantile score minus that of the
-best guess `d0` (experiment 33's recipe), where a negative value favours the arm. Contrast T is an
-arm's quantile score minus that of its placebo twin, the same arm given the forecast solar shape of
-another date, so T measures what the forecast of the sunshine adds. An arm passes when the upper end
-of N is below +0.10 points (the arm matches `d0`) and the upper end of T is below 0. Arms `sf`,
-`a`, and `am` pass; `b` beats its twin but is not shown to match `d0`. A gain is reported where the
-upper end of N at leads under 48 hours is below -0.10: that holds for `a` and `am`.
+**The verdict is `supported`.** The decision rule is in the front matter and was committed before
+any code ran. Contrast N is an arm's quantile score minus the quantile score of `d0`. A negative
+value favours the arm. Contrast T is an arm's quantile score minus that of its placebo twin, the
+same arm given the forecast solar shape of another date, so T measures what the forecast of the
+sunshine adds. An arm passes when two conditions hold. The upper end of N is below +0.10 points, so
+the arm is within the margin of `d0`. The upper end of T is below 0, so the arm beats its placebo
+twin. Arms `sf`, `a`, and `am` pass; `b` beats its twin but is not shown to be within the margin of
+`d0`. A gain is reported where the upper end of N at leads under 48 hours is below -0.10, which
+holds for `a` and `am`.
 
-| Arm | N: minus `d0`, all leads | T: minus placebo twin | Gain: minus `d0`, leads under 48 hours |
+| Arm | N: score minus `d0`, all leads | T: score minus placebo twin | Gain: score minus `d0`, leads under 48 hours |
 |---|---|---|---|
 | `sf` | -0.063 (-0.126 to -0.008) | -0.293 (-0.418 to -0.180) | -0.168 (-0.357 to -0.002) |
 | `a` | -0.059 (-0.103 to -0.016) | -0.164 (-0.236 to -0.089) | -0.212 (-0.317 to -0.112) |
 | `am` | **-0.152 (-0.199 to -0.111)** | -0.300 (-0.407 to -0.198) | **-0.272 (-0.420 to -0.145)** |
 | `b` | +0.105 (-0.090 to +0.292) | -1.068 (-1.361 to -0.790) | -0.338 (-0.661 to -0.040) |
 
-The values are differences in quantile score, in points of capacity, with 98.75% intervals (a 5%
-familywise level split across the four arms) from 50,000 resamples of whole ISO weeks of forecast
-start and of seeds. The scored rows are 68,903 per seed, from 29 weeks of forecast start and 3
-seeds, at five Primary substations anonymised as D9, D10, D11, D14, and D16 (as in experiment 46).
-Every other read on this page is exploratory, at 95%.
+The values are differences in quantile score, in points of capacity, with 98.75% intervals (a 95%
+interval split across the four arms by a Bonferroni correction) from 50,000 resamples of whole ISO
+weeks of forecast start and of seeds. The 68,903 scored rows per seed are half-hourly forecasts from
+29 ISO weeks of forecast start, with 3 seeds, at five Primary substations anonymised as D9, D10,
+D11, D14, and D16 (as in experiment 46). Every other read on this page is exploratory, at 95%.
 
 ## The four arms
 
@@ -207,27 +213,29 @@ from week to week, which pairing removes. Absolute scores, in points of capacity
 `climatology` and `manual_heuristic` are experiment 33's stored forecasts, scored on 68,863 rows
 because 40 of the 68,903 rows are missing from them. Neither enters the paired intervals.
 
-**The twin of `b` scores 1.07 points worse than `b`, probably because `b` subtracts the shape with
-weight 1 built in, so a wrong-dated shape does more harm there than in the arms with a fitted
-weight.** The size of T for `b` is therefore not evidence that `b` uses the forecast sunshine better
-than the other arms.
+**The twin of `b` scores 1.07 points worse than `b`.** One candidate explanation is that `b`
+subtracts the shape with a weight of 1 built in, so a wrong-dated shape does more harm there than in
+the arms with a fitted weight; no arm tests this. The size of T for `b` is not evidence that `b`
+uses the forecast sunshine better than the other arms.
 
 ## The gain sits mostly within 6 days of the forecast start
 
 ![Contrast N by lead band](figure_2_by_lead_band.svg)
 
-**The gain of `sf` and `a` is clear up to 6 days and gone beyond, and `am` stays below `d0` at every
-lead.** At 10 days and beyond, `am` is -0.082 points (-0.126 to -0.038) from `d0` although its
-weight there is zero, `a` is +0.036 (+0.006 to +0.065), and `sf` is +0.013 (-0.019 to +0.051). The
-weight is zero in that band because the calibrated ENS anomaly has a correlation of 0.03 with the
-CAMS anomaly there on the training rows (0.80, 0.76, 0.58, and 0.27 in the four shorter bands), and
-the fitted slope ranged from -8.2 to +6.2 across series and seasons. The 10-plus-day gain of `am`
-is unexplained. One candidate is the starting point: `am` starts from its margin alone, while `d1l`
-and `a` start from XGBoost's estimated base score.
+**The gain of `a` is clear up to 6 days and the gain of `sf` from 1 to 6 days, and both are gone
+beyond, and `am` stays below `d0` at every lead.** At 10 days and beyond, `am` is -0.082 points
+(-0.126 to -0.038) from `d0` although its weight there is zero, `a` is +0.036 (+0.006 to +0.065),
+and `sf` is +0.013 (-0.019 to +0.051). The weight is zero in that band because the calibrated ENS
+anomaly has a correlation of 0.03 with the CAMS anomaly there on the training rows (0.80, 0.76,
+0.58, and 0.27 in the four shorter bands), and the fitted slope ranged from -8.2 to +6.2 across
+series and seasons. The 10-plus-day gain of `am` is unexplained. One candidate is the starting
+point: `am` starts from its margin alone, while `d1l` and `a` start from XGBoost's estimated base
+score.
 
 **Arm `b` is worse than `d0` at 6 days and beyond.** Its N is +0.249 points (0.035 to 0.479) at 6 to
 10 days and +0.296 (0.132 to 0.462) at 10 days and beyond, where the ENS forecast of the subtracted
-term has no skill.
+term has little or no skill (its correlation with the CAMS anomaly is 0.27 at 6 to 10 days and 0.03
+beyond). This experiment does not test that as the cause.
 
 ## The fitted weights are below 1, and lagged power does not explain why
 
@@ -237,8 +245,8 @@ slope of the out-of-fold residual (actual minus median forecast) on the shift th
 fitted per lead band and season on the training window. The slope on the oracle shift (the CAMS
 anomaly) is -0.80 to -0.47, to compare with experiment 51's -0.69 to -0.42. The effective weights of
 the arms, measured as the slope of each arm's median minus `d1l`'s median on minus the shift, are
-0.49 for `sf`, 0.41 for `a`, and 0.31 for `am` plus its fitted margin weight, and 0.64 for `b`,
-against the constant 1 built into `b`.
+0.49 for `sf`, 0.41 for `a`, 0.31 for `am` (on top of its fitted margin), and 0.64 for `b`, against
+the constant 1 built into `b`.
 
 ![The oracle slope by lead band for four variants of d1l](figure_3_slope_diagnostic.svg)
 
@@ -305,13 +313,13 @@ interval.
 | Prediction made in the plan | Result |
 |---|---|
 | `sf` is the likeliest arm to pass, at -0.04 (-0.12 to +0.04) against `d0` | Held: -0.063 (-0.126 to -0.008) |
-| `sf` gains -0.10 to -0.25 at leads under 48 hours | Held: -0.168 |
+| `sf` gains -0.10 to -0.25 at leads under 48 hours | Held for the point estimate, -0.168 (98.75% interval -0.357 to -0.002); `sf` does not meet the gain rule |
 | `a` scores +0.00 to +0.10 against `d0` | Not met: `a` scores -0.059 (-0.103 to -0.016) |
-| `am` beats `a` by 0.02 to 0.08 on the sunniest 10% of rows and ties elsewhere | Not met: `am` beats `a` by 0.093 (0.057 to 0.129) over all rows, and by 0.067 (-0.019 to +0.150) on the sunniest decile |
+| `am` beats `a` by 0.02 to 0.08 on the sunniest 10% of rows and ties elsewhere | Partly held: `am` beats `a` by 0.067 (-0.019 to +0.150) on the sunniest decile, inside the predicted range, but also by 0.093 (0.057 to 0.129) over all rows, so the tie elsewhere was not met |
 | `b` scores +0.05 to +0.25 against `d0` | Held in sign and size (+0.105), with a wide interval (-0.090 to +0.292) |
 | The slope on the oracle shift is -0.4 to -0.7 for the full `d1l`, and nearer -1 without lagged power and cloud proxies | Partly held: -0.57 to -0.74 for the full `d1l` and -0.73 to -0.78 without either, which is nearer -1 but not near it |
 | The upper end of N is below +0.10 for `sf` and not for `b` | Held: -0.008 for `sf`, +0.292 for `b` |
-| The placebo twin scores worse by 0.10 to 0.40 for `sf`, `am`, and `b`, and by 0.02 to 0.15 for `a` | Held for `sf` (0.293), `am` (0.300), and `a` (0.164, slightly above the range); not met for `b` (1.068) |
+| The placebo twin scores worse by 0.10 to 0.40 for `sf`, `am`, and `b`, and by 0.02 to 0.15 for `a` | Held for `sf` (0.293) and `am` (0.300); not met for `a` (0.164, slightly above the range) and for `b` (1.068) |
 | The half-width of `sf` against `d0` at 98.75% is 0.079 | Realised half-width 0.059 |
 
 ## Departures from the plan
@@ -323,10 +331,10 @@ scored.** None changes the hypothesis, the prediction, or the decision rule.
    the CAMS anomaly there, and the fitted slope ranged from -8.2 to +6.2. The rule was fixed from
    the weights table, which uses training rows only, before any arm was scored.
 2. **The capacity is divided by experiment 45's recovery ratio.** The refitted season-year constant
-   for 2024/25 is divided by experiment 45's stored recovery ratio (0.71 to 0.79, from an
-   injection test on tuning farms), as experiment 45 defines capacity. The capacities used, in MW,
-   are D9 2.751, D10 2.356, D11 3.457, D14 3.705, and D16 3.578. D14 uses experiment 40's 2023/24
-   constant, because experiment 45's constant is zero there.
+   for 2024/25 is divided by experiment 45's stored recovery ratio (0.71 to 0.79, from an injection
+   test on tuning farms), as experiment 45 defines capacity. The capacities used, in MW, are D9
+   2.751, D10 2.356, D11 3.457, D14 3.705, and D16 3.578. D14 uses experiment 40's 2023/24 constant,
+   because the experiment 64 refit has no 2024/25 constant for it (all of its weeks are unobserved).
 3. **The no-cloud-proxy variant drops 3 columns,** `dew_point_temperature_2m`, `precipitation`, and
    `pressure_surface`, because `d1l` has no `precipitation_type` or `pressure_msl` column.
 4. **The placebo is a seeded cyclic shift, not a random permutation.** It moves each row's shape by
@@ -347,10 +355,10 @@ scored.** None changes the hypothesis, the prediction, or the decision rule.
 9. **The weights rest on little data.** The training window holds two April-to-June periods and one
    July-to-September period (2024). The 4 time-block folds of the cross-fit group months by month
    index modulo 4, so adjacent months train each other.
-10. **The held capacity is stale.** The 2024/25 value is 6% to 23% below experiment 45's 2025/26
-    constants at the five series (D9 6%, D10 21%, D11 18%, D14 14%, D16 23%). A capacity that is too
-    low weakens the solar term, which biases the placebo contrast against the solar term, so the
-    gains are, if anything, conservative.
+10. **The held capacity is stale.** The held value is 5% to 19% below experiment 45's 2025/26
+    constants at the five series (D9 5%, D10 17%, D11 15%, D14 13%, D16 19%). D14 holds the 2023/24
+    constant of experiment 40. A capacity that is too low plausibly weakens the solar term and so
+    works against the placebo contrast, which would make the gains conservative; no run tests this.
 11. **The sunniest-decile read and the `a` against `am` contrasts are exploratory (95%),** not
     corrected across the four arms.
 
