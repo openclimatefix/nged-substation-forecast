@@ -82,6 +82,7 @@ the maintainer to confirm.
 | [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
 | [00055 - Switching event detector, part 5](00055-sw2-8-neighbour-veto-single-series-detector/result.md) | Does vetoing the single-series detector's alarms that the neighbouring substations show as a common-mode miss let the threshold fall at the same rate of unexplained alarms and find more injected transfers? | Inconclusive: the share found rose by +0.008 (98.75% interval -0.003 to +0.022) | Not for production | 2026-10-16 |
 | [00058 - Switching event detector, part 5b](00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md) | Is the gap in recall between injected transfers with and without a metered receiver a step-size effect of the injection, and does a veto stronger than 1.5 noise units find more transfers? | Partly supported: step size explains at least half the gap; the stronger veto gained +0.013 (98.33% interval 0.000 to +0.029) | Not for production | 2026-10-16 |
+| [00059 - Switching event detector, part 6](00059-sw2-13-several-windows-in-one-detector/result.md) | Does one detector that combines the step statistic at windows of 4, 12, 24, and 48 hours find more injected transfers, by MW moved, than the best single window at the same unexplained-alarm count? | Refuted: the 24-hour window finds 0.473 of the moved MW and the maximum of four windows 0.423 (difference -0.050, 97.5% interval -0.094 to -0.022) | Not for production | 2026-10-16 |
 | [00060 - Switching event detector, part 6](00060-sw2-7-profile-weighted-step-detector/result.md) | Does a step statistic that weights each half-hour by the daily profile find more of the moved MW than the constant step, on injection shapes it does not assume? | Refuted: the pooled gain in the share of moved MW found is below 0.001 (98.33% interval -0.006 to +0.008) | Not for production | 2026-10-16 |
 | [00062 - Switching event detector, part 7](00062-sw2-9-whitened-residual-step-detector/result.md) | Does filtering out the residual's half-hour-to-half-hour memory raise the share of moved MW the 24-hour detector finds? | Refuted: the pooled change in the share of moved MW found is -0.097 (98.33% interval -0.132 to -0.057) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
@@ -90,6 +91,7 @@ the maintainer to confirm.
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
 | [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
 | [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as an upper limit: -0.198 (-0.316 to -0.069) points of capacity against a 0.15 target; the UKV data are a research archive, not the live feed | Not for production | 2026-10-16 |
+| [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1256,6 +1258,28 @@ MW. At 4 hours the change was -0.145 (-0.209 to -0.097).
 
 ![Change in MW-weighted recall by injection shape](00062-sw2-9-whitened-residual-step-detector/figure_1_gain_by_shape.svg)
 
+### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
+
+**Neither of two ways of combining four window lengths found more of the moved MW than the 24-hour
+window alone, and most misses of large transfers are an interval end placed outside tolerance.** On
+injected transfers that start in even months, with every detector set to the same count of
+unexplained alarms on odd months, the 24-hour window finds 0.473 of the MW moved (95% interval 0.410
+to 0.511). The maximum of the four windows' scores finds 0.423, and their sum finds 0.451. The
+maximum minus the 24-hour window is -0.050 (97.5% interval -0.094 to -0.022), so the 24-hour window
+still misses 0.527 of the moved MW.
+
+- **Finding for later experiments:** of the 541 rows of transfers with a metered receiver and a donor
+  step of 4.0 noise units or more, the 24-hour window misses 223, and 170 of those have a found start
+  and an end placed outside tolerance, against 4 with no alarm. The missed ends are off by 7.5 hours
+  at the median, against a tolerance of 6 hours for the median 32-hour transfer (the larger of 6 hours
+  and 10% of the duration). The 24-hour window is the single-window benchmark for SW2-7, SW2-14, and
+  SW2-15, and the share found by start alone is worth reporting beside the share found by start and
+  end.
+- **Write-up and pull request:** [the full result page](00059-sw2-13-several-windows-in-one-detector/result.md),
+  [PR #1289](https://github.com/openclimatefix/nged-substation-forecast/pull/1289).
+
+![Share of the moved MW found by each detector](00059-sw2-13-several-windows-in-one-detector/figure_1_share_found.svg)
+
 ### 00060: does a step that weights each half-hour by the daily profile find more of the moved load? (SW2-7)
 
 **The daily shape of the moved load does not limit the 24-hour switching detector, so a shape-aware
@@ -1398,3 +1422,25 @@ service could get.
 - **Write-up:** [result](00054-product-trained-xgboost-wind-farms/result.md).
 
 ![Contrasts between the arms](00054-product-trained-xgboost-wind-farms/figure_1.svg)
+
+### 00057: does UKV, learned from its own history, help the solar-farm forecast?
+
+**Giving the Met Office's UK Variable-resolution (UKV) weather forecast to a solar-farm forecast
+that already uses the ensemble forecast of the European Centre for Medium-Range Weather Forecasts
+(ENS) lowered the error by only about 0.03 points of the farms' capacity at 1 to 2 days ahead, whose
+95% interval includes zero, so the verdict is `inconclusive`.** The error is the quantile score, and
+1 point is 1% of a farm's capacity. We trained XGBoost models for six metered solar farms, each on
+its own forecast history, and the difference at 24 to 54 hours after the ENS run's 00 UTC start is
+-0.035 points (95% interval -0.119 to +0.037), against a decision threshold of 0.10. The UKV data
+come from the CEDA research archive, not the live feed, so any gain would be an upper limit.
+
+- **Finding for later experiments:** UKV helps the solar farms far less than it helped the three
+  wind farms of experiment 54, and a gain above 0.12 points is ruled out. UKV alone scores 0.40
+  points worse than ENS alone, and the shuffled-UKV placebo and the 3-hourly UKV control differ from
+  the plain arms by under 0.03 points. After UKV's upgrade of 2026-01-21 the ENS-plus-UKV model
+  beats the ENS-only model by 0.133 points (95% interval -0.262 to -0.017; exploratory).
+- **A next experiment could:** try a source of a different kind, such as a satellite-based nowcast
+  at lead day 0, since a second numerical forecast adds little at these leads.
+- **Write-up:** [result](00057-product-trained-xgboost-solar-farms/result.md).
+
+![Contrasts between the arms](00057-product-trained-xgboost-solar-farms/figure_1.svg)
