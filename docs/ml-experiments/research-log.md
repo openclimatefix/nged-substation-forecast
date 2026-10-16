@@ -75,7 +75,10 @@ the maintainer to confirm.
 | [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
+| [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
 | [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
+| [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
+| [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1044,6 +1047,82 @@ or more of the receiving load lasting over 24 hours.
   [PR #1261](https://github.com/openclimatefix/nged-substation-forecast/pull/1261).
 
 ![Shares of half-hours and of each score](00044-sw2-2-switching-share-of-best-guess-score/figure_2_shares.svg)
+
+### 00046: how much of the best guess's daylight error is embedded solar? (PVDIS part 3)
+
+**We asked how much of a Primary substation's daylight forecast error comes from solar panels behind
+its meter, by adding the panels' capacity times the sunshine anomaly (sunnier or cloudier than the
+average for that month and half-hour) to a demand forecast without radiation inputs.** Built from the
+true sunshine, which no real forecast has, the correction lowers the quantile score (the
+probabilistic forecast error score) by 0.966 points (-1.431 to -0.595), about 20% of the 4.724
+points the demand forecast scores. Built from the ECMWF ensemble forecast of sunshine, it lowers the
+score by 0.056 points (97.5% interval -0.191 to +0.064), against a threshold of 0.35, so the verdict
+is `refuted`. The ensemble anomaly tracks the true one for about 2 days and then fades, and the gain
+follows it: -0.262 at 0 to 24 hours, -0.277 at 1 to 2 days, and about 0 beyond.
+
+- **Finding for later experiments:** the sunshine correction built from the ensemble forecast scored
+  +0.048 (-0.059 to +0.141) against the best-guess recipe with its radiation inputs, so it is no
+  better. It is also not shown to be no worse, because the sign changes by month and by series. The
+  next experiment in the series (PVDIS-5, which retests the correction with weekly capacity
+  estimates) is a non-inferiority and explanation test with a margin set in advance, with a gain
+  test only for 0 to 48 hours.
+- **Coefficient:** a fixed coefficient of 1 was too large, because the residual's slope on the
+  oracle correction is -0.771. A coefficient fitted on the training window gives -0.143 (-0.231 to
+  -0.057, exploratory) against the plain correction.
+- **Fragile small gain:** without one series (anonymised as D9) the correction gains -0.113 (-0.230
+  to -0.000, rounded; the interval touches zero), and it is positive in June to August, so it is not
+  a consistent gain. Its lower bound stays above -0.35 in every pooled scope.
+- **Exploratory midday read:** at 09:00 to 15:00 UTC on day+1 the correction gains -0.434 (-0.559 to
+  -0.283) in April to September and scores no worse than the best-guess recipe, and the quantiles
+  move from too narrow to slightly too wide. In June to August at day+2 and day+3 it scores worse
+  than the best-guess recipe. Whether that justifies porting is not decided.
+- **Write-up:** [result](00046-embedded-solar-share-of-primary-forecast-error/result.md).
+
+![The planned contrasts and the fitted-coefficient reads](00046-embedded-solar-share-of-primary-forecast-error/figure_1_contrasts.svg)
+
+### 00050: does a second weather forecast beat ENS at the solar anomaly? (PVDIS part 8)
+
+**We asked whether the American GEFS ensemble forecast, alone or blended with the ECMWF ensemble
+(ENS), predicts the sunshine anomaly (sunnier or cloudier than usual) better than ENS, because
+experiment 00046 found that the sunshine forecast limits the gain from a solar correction.** In
+cross-validation on the training window, GEFS made 10.9% more squared error against the satellite-
+based CAMS anomaly than ENS did, and was worse in all 9 held-out months. The fitted blend made 0.2%
+more, against the 1% less the gate needed, so the verdict is `refuted` and the demand contrasts were
+not run. On the validation year GEFS correlates with the CAMS anomaly 0.072 less than ENS at 0 to 24
+hours (95% interval -0.100 to -0.039), and the blend 0.002 more (-0.001 to +0.006).
+
+- **Finding for later experiments:** a second global ensemble shares ENS's errors, so a gain inside
+  2 days needs a product of a different kind, such as a high-resolution regional model or a
+  satellite-based nowcast. The fitted blend gives GEFS about 0.1 weight inside 2 days and none from
+  2 to 10 days.
+- **Unverified:** the 00 UTC GEFS run's availability by 09:00 UTC was not observed in that window,
+  so the same-day run, the optimistic case for GEFS, was assumed.
+- **Write-up:** [result](00050-second-weather-forecast-for-solar-anomaly/result.md).
+
+![Correlation with the CAMS anomaly, GEFS and the blend minus ENS](00050-second-weather-forecast-for-solar-anomaly/figure_1_headline.svg)
+
+### 00051: why does the solar term lose at sunny summer middays? (PVDIS part 3b)
+
+**We asked why the solar correction of experiment 46 scored worse than the forecast that kept its own
+radiation inputs (`d0`) at 09:00 to 15:00 UTC in June to August, using only experiment 46's stored
+forecasts.** Three explanations were tested against a rule written in advance. The correction built
+from the sunshine that actually occurred (the oracle shift) is too large: the actual power fell by
+only 0.4 to 0.7 of the amount the correction removed, in every month and hour bin, and a coefficient
+fitted on half the weeks lowers the median's mean absolute error on the other half by 0.991 points
+of capacity (-1.473 to -0.495). A hinge for inverter clipping was lower than a straight line by only
+0.103 points (-0.233 to +0.030, which includes 0), and a hinge fitted after the coefficient repair
+changed the error by +0.003 (-0.071 to +0.084, post hoc), so clipping is not distinguished from a
+scale error. The members of the European Centre for Medium-Range Weather Forecasts ensemble forecast
+(ENS) add 0.129 points (0.057 to 0.212) to the correction's quantile score at 2 and 3 days ahead.
+
+- **Findings that bear on later experiments:** fit the solar coefficient per lead band and season, test
+  dropping the member spread, and test non-inferiority against `d0` with a margin the PVDIS-5 plan
+  confirms or halves (0.10 points was set here), judged on at least 25 weeks of forecast start.
+- **Open cause:** the page does not say why the coefficient is below 1. Overstated capacity, error
+  in the CAMS sunshine, clipping, demand that rises with sunshine, and panel temperature all fit.
+- **Write-up:** [result](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md).
+
+![Residual of the best guess against the oracle shift](00051-pvdis-3b-midday-loss-of-the-solar-term/figure_4_residual_against_shift.svg)
 
 ### 00047: does a bank-holiday column in the demand model help the switching detector?
 
