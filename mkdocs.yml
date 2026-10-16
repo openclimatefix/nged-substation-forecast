@@ -192,6 +192,7 @@ nav:
       - "Does UKV, learned from its own history, help the wind-farm forecast?": ml-experiments/00054-product-trained-xgboost-wind-farms/result.md
       - "Does a bank-holiday column in the demand model help the switching detector find transfers?": ml-experiments/00047-sw2-4-better-residual-switching-detector/result.md
       - "Does a neighbour veto help the single-series switching detector?": ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/result.md
+      - "Is the recall gap without a metered receiver a step-size effect, and does a stronger veto help?": ml-experiments/00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
