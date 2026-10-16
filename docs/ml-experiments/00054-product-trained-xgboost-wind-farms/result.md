@@ -69,12 +69,13 @@ wind columns, `lead_hours`, and three lags of power from the forecast origin (09
 - **Reference row:** experiment 33's ERA5-trained best guess (`bg_full`) and its ENS-trained N1,
   scored on the same cases. They are not the control.
 
-**All three arms train and score the same rows: valid times 0 to 54 hours after the 00 UTC start of
+**All three arms train and score the same rows: valid times up to 54 hours after the 00 UTC start of
 the ENS run's date, and only the 24 to 54 hour cases are scored.** UKV's leads stop at 54 hours, so
 the scored cases are lead day 1 (24 to 48 hours) and the first 6 hours of lead day 2 (48 to 54
 hours). The page says "days 1 and 2" for these cases and states the 54-hour limit wherever it quotes
-a number. Training on the lead hours 0 to 54 gives the models more rows than the scored range alone
-and does not use any validation data.
+a number. Training on every valid time from the 09:00 UTC origin (9.5 hours after the run's
+start) to 54 hours gives the models more rows than the scored range alone and does not use any
+validation data.
 
 ## UKV, as read, and what the data on disk supports
 
@@ -138,7 +139,7 @@ Office's published schedule, and does not measure when it publishes.
   ENS run's date. A case where UKV is absent is dropped from every arm, so C1 is scored on the
   52 Tuesday runs that have a complete UKV run, not on all 53 stored runs.
 - **Training rows:** every 00 UTC run of 2024-04-01 to 2025-06-30 for which the UKV run is complete,
-  per farm, using the ENS control member's half-hourly valid times 0 to 54 hours after the run's
+  per farm, using the ENS control member's half-hourly valid times from 9.5 to 54 hours after the run's
   00 UTC. The `lead_hours`, lag, and recency-weight definitions are experiment 33's. Arms A, B, and
   C train on the same rows.
 - **Fits:** the nine-level quantile loss, `eta` 0.05, depth 6, 500 rounds, on the GPU, as in
