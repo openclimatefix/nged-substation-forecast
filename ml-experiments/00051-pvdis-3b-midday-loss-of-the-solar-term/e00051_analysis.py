@@ -256,6 +256,14 @@ def main() -> None:  # noqa: PLR0912, PLR0915
                     | paired(cases=part, treatment=treatment, reference=reference)
                 )
         loss = pl.DataFrame(loss_rows)
+        reproduced = loss.filter(pl.col("contrast") == "C6 ens_shift - d0").filter(
+            pl.col("band").is_in(["day+2", "day+3"])
+        )
+        for band, published in (("day+2", 0.477), ("day+3", 0.172)):
+            value = float(reproduced.filter(pl.col("band") == band)["difference"][0])
+            if abs(value - published) > 0.005:
+                msg = f"C6 at {band} is {value:.3f}, experiment 46 published {published}"
+                raise ValueError(msg)
         print("\n0. Quantile-score contrasts (negative favours the treatment), points of capacity")
         print(loss)
         loss.write_parquet(RESULTS_DIR / "contrasts.parquet")
@@ -323,6 +331,13 @@ def main() -> None:  # noqa: PLR0912, PLR0915
                 }
             )
         slopes = pl.DataFrame(slope_rows)
+        cells = slopes.filter(pl.col("month") > 0)
+        print(
+            "\n(b) cells with the interval wholly above -0.85:",
+            cells.filter(pl.col("lower") > -0.85).height,
+            "of",
+            cells.height,
+        )
         print("\n(b) Slope of the d1l residual on the oracle shift (a coefficient of 1 gives -1)")
         print("    month 0 = by lead day, month -1 = by series")
         print(slopes)

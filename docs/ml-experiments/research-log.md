@@ -76,6 +76,7 @@ the maintainer to confirm.
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
+| [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does experiment 46's solar term score worse than the best guess at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ENS members? | Partly supported: the coefficient is too large (a fitted one lowers the median's error by 0.991 points, -1.473 to -0.495); a clipping knee is not distinguished from a straight line (-0.103, -0.233 to +0.030); member noise adds 0.129 (0.057 to 0.212) | Not for production | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1076,3 +1077,24 @@ follows it: -0.262 at 0 to 24 hours, -0.277 at 1 to 2 days, and about 0 beyond.
 - **Write-up:** [result](00046-embedded-solar-share-of-primary-forecast-error/result.md).
 
 ![The planned contrasts and the fitted-coefficient reads](00046-embedded-solar-share-of-primary-forecast-error/figure_1_contrasts.svg)
+
+### 00051: why does the solar term lose at sunny summer middays? (PVDIS part 3b)
+
+**We asked why the solar correction of experiment 46 scored worse than the demand forecast with its
+own radiation inputs at 09:00 to 15:00 UTC in June to August, using only experiment 46's stored
+forecasts.** Three explanations were tested against a rule fixed in advance. The correction built
+from the true sunshine is too large: the actual power fell by only 0.4 to 0.7 of what it removed in
+every month and hour bin, and a coefficient fitted on half the weeks lowers the median's error on the
+other half by 0.991 points (-1.473 to -0.495). A hinge for inverter clipping beat a straight line by
+0.103 points (-0.233 to +0.030), so clipping is not distinguished, and the implied ratios of DC to
+AC capacity (1.8 to 3.2) are not credible. The ensemble members' spread adds 0.129 points (0.057 to
+0.212) to the ENS correction's score at 2 and 3 days ahead.
+
+- **Finding for later experiments:** fit the solar coefficient by hour and season, and test
+  non-inferiority against the best guess with a margin of 0.10 points of capacity, judged on at
+  least 25 weeks of forecast start.
+- **Load signs:** at fixed clear-sky index the sunniest rows' error rises 0.67 points per kelvin of
+  2 m temperature (0.21 to 1.16), which a load would do and clipping would not.
+- **Write-up:** [result](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md).
+
+![Residual of the best guess against the oracle shift](00051-pvdis-3b-midday-loss-of-the-solar-term/figure_4_residual_against_shift.svg)

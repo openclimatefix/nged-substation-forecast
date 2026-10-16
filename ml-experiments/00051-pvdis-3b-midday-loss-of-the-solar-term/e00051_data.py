@@ -14,6 +14,7 @@ another experiment.
 """
 
 from datetime import time
+from itertools import pairwise
 from pathlib import Path
 from typing import Final
 
@@ -90,9 +91,16 @@ def coast_distance_km(*, latitude: np.ndarray, longitude: np.ndarray) -> np.ndar
         ]
     )
     kilometres_per_degree = 111.2
-    y = (latitude[:, None] - coast[None, :, 0]) * kilometres_per_degree
-    x = (longitude[:, None] - coast[None, :, 1]) * kilometres_per_degree * np.cos(np.radians(53.1))
-    return np.sqrt(x**2 + y**2).min(axis=1)
+    scale = np.array([kilometres_per_degree, kilometres_per_degree * np.cos(np.radians(53.1))])
+    vertices = coast * scale
+    points = np.column_stack([latitude, longitude]) * scale
+    distances = np.full(points.shape[0], np.inf)
+    for start, end in pairwise(vertices):
+        segment = end - start
+        fraction = np.clip(((points - start) @ segment) / (segment @ segment), 0.0, 1.0)
+        nearest = start + fraction[:, None] * segment
+        distances = np.minimum(distances, np.sqrt(((points - nearest) ** 2).sum(axis=1)))
+    return distances
 
 
 def main() -> None:
@@ -112,10 +120,10 @@ def main() -> None:
         latitude=series["latitude"].to_numpy().astype(np.float64),
         longitude=series["longitude"].to_numpy().astype(np.float64),
     )
-    sites = series.select("time_series_id", "site", "effective_capacity_mw").join(
+    series = series.with_columns(coastal=pl.Series(coast < COAST_KILOMETRES))
+    sites = series.select("time_series_id", "site", "effective_capacity_mw", "coastal").join(
         capacity, on="site", validate="1:1"
     )
-    sites = sites.with_columns(coastal=pl.Series(coast < COAST_KILOMETRES))
     print("series that qualify as coastal:", int(sites["coastal"].sum()), "of", sites.height)
 
     def midday(frame: pl.LazyFrame) -> pl.LazyFrame:
@@ -178,6 +186,7 @@ def main() -> None:
         INPUTS_DIR / "era5_features.parquet",
         columns=["time_series_id", "valid_time", "temperature_2m"],
     ).filter(pl.col("time_series_id").is_in(sites["time_series_id"].implode()))
+    candidates = base.height
     rows = (
         base.join(sites, on="time_series_id")
         .join(cams, on=["site", "valid_time"], how="left", validate="m:1")
@@ -199,6 +208,7 @@ def main() -> None:
             & pl.col("actual").is_finite()
         )
     )
+    print("candidate cases", candidates, "kept", rows.height, "dropped", candidates - rows.height)
     arms_long = arms_long.join(rows.select(*KEYS), on=list(KEYS), how="semi").select(
         "arm", "seed", *KEYS, *LEVEL_COLUMNS
     )
