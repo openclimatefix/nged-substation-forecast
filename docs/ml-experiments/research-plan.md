@@ -18,6 +18,12 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [SW2-0a](#sw2-0a-an-agent-labeller-gated-on-known-answers) | Does an agent labeller, built on log-timed features that use no forecasting model, pass a pre-registered gate on injected transfers and placebo windows, and does Sonnet beat a rules-only labeller on the same features? | 1 | Nothing | Proposed; the maintainer asked for it to start soon |
+| [SW2-0b](#sw2-0b-the-labelled-reference-set) | Which logged closures since 2022 are visible in the telemetry, with what onset, end, receivers, and MW moved? | 1 | SW2-0a passing its gate | Proposed |
+| [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b | Proposed |
+| [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b | Proposed |
+| [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b | Proposed |
+| [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 
 ## Deferred until the first results are in
@@ -121,6 +127,130 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 **Resolution limit.** The top quartile of 16 Primary substations by embedded solar capacity is 4
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
+
+### SW2: switching-event detection
+
+**The SW2 line improves the switching-event detector first, scored by event-level F1 against a
+labelled set of visible events, and leaves the use of the detector until the detector works.** The
+detector serves two purposes later. The first is a lower forecast error, if switching periods act as
+unexplained noise for the XGBoost model and corrupt its lagged power inputs. The second, and the
+more important to NGED, is a forecast under the normal running arrangement (NRA), into which NGED
+can add its own switching. The [switching events](../roadmap/switching-events.md) roadmap page
+proposes building that forecast by excluding switching periods from the training target. An event
+table for NGED is a third purpose, at lower priority. The production detector has to run on power
+alone, because the switching logs exist only for the trial area, so the logs are used here for
+evaluation only.
+
+**The line reopens a question that experiment 00038 closed, because experiment 00038 tested a
+different use of the detector.** Experiment 00038 masked detected switching from the history of the
+error correction that runs after the XGBoost model, and the mask made the forecast worse. No
+experiment has yet masked switching from an XGBoost training target or from a lagged input.
+Experiment 00037 confirmed 37 of 612 logged closures of 2 hours to 60 days as visible in its own
+residual, and scored its detectors on the 18 of them in the validation months. That reference set is
+small, about 6 of the 37 are expected by chance, and the label was built from the residual the
+detectors use, so a detector that shares the residual's blind spots is flattered by the label. The
+line therefore starts by building a reference set independent of the detectors.
+
+The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
+
+#### SW2-0a: an agent labeller gated on known answers
+
+**Build a labeller from log-timed features that use no forecasting model, gate it on injected
+transfers and placebo windows, and use its labels only if it passes.** The labeller sees one card
+per logged switching operation, with closures that overlap in time and share a substation grouped so
+that a split across 1 to 3 receivers is visible.
+
+- **The deciding features need the log and hindsight, which a live detector never has.** They are
+  measured on raw power against the median of the same half-hour and day-type over the 4 weeks
+  before and the 4 weeks after, excluding logged intervals. The deciding features are the step at
+  the logged close on each side, the reverse step at the logged open, the transfer against the
+  common mode of donor and receiver, how well the moved load follows the donor's daily shape, the
+  step in the sum over the neighbourhood, and the share of the 16 series that step the same way at
+  the same stamp.
+- **A hindsight XGBoost model adds weather-adjusted evidence only.** The hindsight XGBoost model
+  uses experiment 00006's 13 input columns, the inputs of experiment 00017's `H0.5`, with a quantile
+  loss at q10, q50, and q90, cross-fitted leaving out one month at a time from 2019-09 to 2026-06,
+  with every logged closure padded by 24 hours left out of training. The cross-fit is about 864 fits
+  on 2 cores. The logs give the exclusion directly, so the line runs no train, detect, retrain loop
+  for the labeller.
+- **A rules-only labeller is built and gated first.** A Sonnet labeller then reads the features, and
+  a plot where a closure lasts a day or more or the features disagree. A second Sonnet labeller
+  relabels the cards the first calls visible or low-confidence, plus a quarter of the rest, and Opus
+  settles only the disagreements. Sonnet is kept only if its event-level F1 beats the rules'.
+- **Hidden sentinels in every batch.** About a fifth of the cards are placebo windows (a real
+  operation's substations and clock time shifted into a quiet week) or injected transfers.
+- **The gate, on 300 fresh known-answer cards scored once:** 5% or fewer placebo cards called
+  visible, recall of 0.8 or more on injected transfers of 25% or more of the receiving load lasting
+  6 hours or more, onset within 1 hour on 90% of found injections, end within the larger of 2 hours
+  and 10% of the duration on 80%, and agreement between the two labellers of 0.7 or more in Cohen's
+  kappa. In any size and duration band where the labeller's recall on injections is under 0.8, a
+  "not visible" label cannot be trusted, and later scoring treats that band as neither a hit nor a
+  miss.
+- **Each visible event carries a rough magnitude.** The moved load is not constant during an
+  event, so the labeller gives the median MW moved over the event with a 10th-to-90th percentile
+  range, from the donor's and receivers' excess over the reference. Python divides that median by
+  the donor's usual range, the 99th minus the 1st percentile of the donor's half-hourly power over
+  the 365 days before the event with logged closures left out, a robust stand-in for maximum minus
+  minimum. The gate's check on magnitude is a median relative error of 25% or less on injected
+  transfers.
+
+#### SW2-0b: the labelled reference set
+
+**Label every logged operation of 2 hours to 60 days since 2022, and a sample of the detectors'
+unexplained alarms.** There are 533 such operations, which group experiment 00037's 612 closures
+where closures overlap in time and share a substation. The labeller also labels the 18 closures of
+more than 60 days as two separate edge events each, 50 closures of 30 minutes to 2 hours to confirm
+that they cannot be seen, and about 150 alarms from D0 and D1 that overlap no logged closure. The
+alarms give precision as a bracket, from logged events alone up to logged events plus the alarms the
+labeller judges real, because the logs miss real switching. Experiment 00037 suggests the set will
+hold 40 to 70 visible events, so F1 by band will carry wide intervals and the injection harness will
+carry most of the detector tuning.
+
+#### SW2-1: a fixed scoreboard and an injection harness
+
+**Score D0 and D1 from experiment 00037 on a scoreboard that every later detector experiment
+reuses.** An event counts as found only when both its onset and its end match, each at the
+detector's causal `known_from` stamp, because experiment 00038 found the end of a detected interval
+to be where the damage happens. The tolerances and bands are proposals for the plan to confirm: an
+onset within 2 hours and an end within 6 hours, duration bands of 6 to 24 hours, 1 to 3 days, and
+over 3 days, and size bands of moved load under 10%, 10% to 25%, and 25% or more of the receiving
+load. The injection harness follows experiment 00038's, with 1 to 3 receivers and durations drawn
+from the confirmed closures, and adds a moved share that drifts during the event. Tuning uses odd
+months and injections; even months score.
+
+#### SW2-2: how much the visible events hurt the best guess
+
+**Measure the share of experiment 00033's best guess's quantile score and tail score that falls in
+labelled switching half-hours, and in half-hours whose lagged power falls inside a labelled event.**
+The measurement needs no new fit, and it sets how much a detector could lower the forecast error.
+
+#### SW2-3: the label-exclusion ceiling
+
+**Train the lagless XGBoost model with labelled switching excluded from the target, without
+exclusion, and with a random exclusion of equal volume, and score all three outside switching.**
+SW2-3 is the label-exclusion family on the roadmap page. The labelled-against-random gap is the most
+a detector could gain by cleaning the training target. The same gap is the first evidence for the
+NRA forecast.
+
+#### SW2-4 to SW2-9: detector iterations
+
+**Each iteration tests one change to the detector against the SW2-1 scoreboard, tuned on injections
+and odd months, scored on even months.** The order below is a proposal, by expected gain per hour of
+work, for the plan of each iteration to confirm:
+
+- **SW2-4:** a better residual, from the best lagless model available live, refitted with a robust
+  loss, in place of `H0.5`.
+- **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
+  XGBoost model without the detected intervals.
+- **SW2-6:** paired-step intervals, which find the onset and its opposite return step as one
+  interval with an end, with a prior on duration from the labelled set.
+- **SW2-7:** a shape-aware step, which models the moved load as a share of the donor's expected
+  profile, not as a constant MW shift. Experiment 00037 found the step changing by more than a
+  factor of 2 within 8 of 26 confirmed closures of 6 hours or more.
+- **SW2-8:** node balance, which tests whether the sum of the neighbourhood's residuals stays flat
+  while single substations step, with a subset-sum over neighbours for a split.
+- **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
+  series and hour of day fitted to the residual.
 
 ### P11: ensemble statistics as inputs
 
