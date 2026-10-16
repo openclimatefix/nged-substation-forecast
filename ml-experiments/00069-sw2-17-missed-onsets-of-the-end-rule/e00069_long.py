@@ -90,8 +90,14 @@ def _try_long(
     )
 
 
-def draw_long_events(*, quiet: dict[int, np.ndarray], power: dict[int, np.ndarray]) -> list[Event]:
-    """Draw `LONG_EVENTS` headline-size transfers lasting 15.6 to 60 days.
+def draw_long_events(
+    *,
+    quiet: dict[int, np.ndarray],
+    power: dict[int, np.ndarray],
+    seed: int = SEED_LONG,
+    first_id: int = FIRST_ID,
+) -> list[Event]:
+    """Draw `LONG_EVENTS` headline-size transfers lasting 15.6 to 60 days, numbered from `first_id`.
 
     Unlike `draw_events`, the quiet and data rules apply to the two windows around the onset and
     the end, not to the whole transfer, because 7 quiet days either side of a transfer of 15.6 days
@@ -100,7 +106,7 @@ def draw_long_events(*, quiet: dict[int, np.ndarray], power: dict[int, np.ndarra
     pool = long_operations()
     if pool.height != 25 or pool.filter(pl.col("hours") > 30 * 24).height != 5:
         raise RuntimeError("the pool of long labelled operations differs from the plan's 25 and 5")
-    rng = np.random.default_rng(SEED_LONG)
+    rng = np.random.default_rng(seed)
     events: list[Event] = []
     attempts = 0
     while len(events) < LONG_EVENTS:
@@ -108,7 +114,7 @@ def draw_long_events(*, quiet: dict[int, np.ndarray], power: dict[int, np.ndarra
         if attempts > MAX_ATTEMPTS:
             raise RuntimeError(f"only {len(events)} long events after {attempts} draws")
         event = _try_long(
-            pool=pool, quiet=quiet, power=power, rng=rng, event_id=FIRST_ID + len(events)
+            pool=pool, quiet=quiet, power=power, rng=rng, event_id=first_id + len(events)
         )
         if event is None:
             continue
