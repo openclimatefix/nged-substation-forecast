@@ -195,8 +195,8 @@ class Design:
         return self._problems[origin_week]
 
 
-def design_from_half_hourly(*, half_hourly: pl.DataFrame, weeks: pl.DataFrame, site: str) -> Design:
-    """Build one Primary's design from the U1 outputs.
+def usable_rows_table(*, half_hourly: pl.DataFrame, weeks: pl.DataFrame, site: str) -> pl.DataFrame:
+    """Return one Primary's usable half-hours, sorted by time, with the demand cell and HDD.
 
     Args:
         half_hourly: `inputs_half_hourly.parquet`.
@@ -204,13 +204,15 @@ def design_from_half_hourly(*, half_hourly: pl.DataFrame, weeks: pl.DataFrame, s
         site: Frame site code, such as `"D16"`.
 
     Returns:
-        The design over the `common.N_WEEKS` weeks, with unobserved weeks left without rows.
+        The half-hours that are usable and lie in an observed week. Columns: `time` (period-ending
+        UTC), `power` (MW), `u`, `ghi_u`, `ghi_u_clear`, `week` (Int32), `cell` (Int64 demand-cell
+        code), and `hdd` (degrees C).
     """
     unobserved = weeks.filter((pl.col("site") == site) & pl.col("unobserved"))["week"]
     holiday_dates = pl.Series(
         sorted(holidays.country_holidays("GB", subdiv="ENG", years=range(2018, 2028)))
     ).cast(pl.Date)
-    rows = (
+    return (
         half_hourly.filter(
             (pl.col("site") == site)
             & pl.col("usable")
@@ -239,23 +241,55 @@ def design_from_half_hourly(*, half_hourly: pl.DataFrame, weeks: pl.DataFrame, s
             hdd=(HDD_BASE_C - pl.col("temperature_2m")).clip(lower_bound=0.0),
         )
         .sort("time")
+        .select("time", "power", "u", "ghi_u", "ghi_u_clear", "week", "cell", "hdd")
     )
-    season_years = np.array(
+
+
+def season_years_of_weeks() -> np.ndarray:
+    """Return the season-year (September to August, named by its start year) of every week."""
+    return np.array(
         [
             (start := common.week_start(week=w)).year - (start.month < 9)
             for w in range(common.N_WEEKS)
         ]
     )
+
+
+def design_from_rows_table(*, table: pl.DataFrame) -> Design:
+    """Build a design from a table with the columns of `usable_rows_table`.
+
+    Args:
+        table: Rows sorted by time with `power`, `u`, `hdd`, `cell`, and `week`.
+
+    Returns:
+        The design over the `common.N_WEEKS` weeks; weeks without rows are unobserved.
+    """
     return Design(
         rows=Rows(
-            power=rows["power"].to_numpy().astype(float),
-            u=rows["u"].to_numpy().astype(float),
-            hdd=rows["hdd"].to_numpy().astype(float),
-            cells=rows["cell"].to_numpy(),
-            week=rows["week"].to_numpy().astype(np.int64),
+            power=table["power"].to_numpy().astype(float),
+            u=table["u"].to_numpy().astype(float),
+            hdd=table["hdd"].to_numpy().astype(float),
+            cells=table["cell"].to_numpy(),
+            week=table["week"].to_numpy().astype(np.int64),
         ),
         n_weeks=common.N_WEEKS,
-        week_season_year=season_years,
+        week_season_year=season_years_of_weeks(),
+    )
+
+
+def design_from_half_hourly(*, half_hourly: pl.DataFrame, weeks: pl.DataFrame, site: str) -> Design:
+    """Build one Primary's design from the U1 outputs.
+
+    Args:
+        half_hourly: `inputs_half_hourly.parquet`.
+        weeks: `inputs_primary_weeks.parquet`.
+        site: Frame site code, such as `"D16"`.
+
+    Returns:
+        The design over the `common.N_WEEKS` weeks, with unobserved weeks left without rows.
+    """
+    return design_from_rows_table(
+        table=usable_rows_table(half_hourly=half_hourly, weeks=weeks, site=site)
     )
 
 
