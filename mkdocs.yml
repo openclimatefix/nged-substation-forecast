@@ -201,6 +201,7 @@ nav:
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
       - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
       - "Does removing the residual's half-hour-to-half-hour memory help the switching detector?": ml-experiments/00062-sw2-9-whitened-residual-step-detector/result.md
+      - "Does one score from a substation's own step and its neighbours' opposite steps find more of the moved load?": ml-experiments/00065-sw2-14-combined-single-series-and-neighbour-score/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md

@@ -19,8 +19,9 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
-| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | Nothing (experiments 58 and 59 are done) | Proposed |
-| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
+| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
+| [SW2-16](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Does experiment 61's end rule (the interval ends at the strongest opposite step within a cap) also find more of the moved MW at the 4-hour window, and with a cap longer than 14 days? | 2 | Nothing | Proposed; its winner becomes the baseline detector for later SW2 experiments |
+| [SW2-17](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their onset, and does an onset rule that a later return step confirms recover them? | 2 | SW2-16 | Proposed |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
@@ -204,13 +205,10 @@ transfers whose shapes the detector does not assume (a constant MW, a share of t
 profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
 day.
 
-- **SW2-14, one combined score.** Add the single-series step evidence and the neighbour
-  opposite-step evidence into one score, so that strong evidence on either side can raise an alarm
-  and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
-  the two calibrated statistics, and a small logistic regression on both statistics plus topology
-  (the number of metered neighbours, and whether any neighbour is metered in MVA). The logistic
-  regression trains on odd-month injections only. The benchmarks are D1 and experiment 55's veto
-  at the same alarm rate.
+- **SW2-14 (done, [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)):**
+  a likelihood-ratio sum and a logistic regression of own and neighbour opposite steps gained +0.005
+  and +0.019 over the single-series detector (neither interval excludes zero). A post hoc arm that
+  adds the count of same-sign neighbour steps gained +0.034.
 - **SW2-15, the joint edge-flow estimator** from approach 3 on the [switching
   events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
   a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
@@ -219,6 +217,25 @@ day.
   carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
   injections. The benchmark is the best sequential detector from experiment 59 (the 24-hour single
   window) or SW2-14.
+
+#### SW2-16 and SW2-17: the end rule as the baseline, and the missed onsets
+
+**Experiment 61 found that ending each of D0M's intervals at the strongest opposite step in the
+next 14 days finds 0.19 more of the moved MW (+0.148 to +0.237), so the end rule becomes the
+baseline, and the onset becomes the main remaining loss.** The end rule needs up to 14 days of
+hindsight, so a detector built on the end rule serves training-time masks (SW2-12) and the event
+table for NGED, not a live input to the forecast.
+
+- **SW2-16** tests the end rule at the 4-hour window as well as the 24-hour window, and with caps of
+  14, 30, and 60 days, against D0M with the 14-day cap. The labelled closures run up to 60 days, so
+  a 14-day cap ends every longer closure early. The winning window and cap become the benchmark for
+  every later SW2 detector experiment, SW2-14 included if its benchmark is not yet fixed.
+- **SW2-17** first classifies the 24 of 35 labelled real transfers over 1 day that raise no alarm
+  at their onset: a donor step under the threshold, a step spread over several hours, an onset
+  inside a data gap, or an alarm outside the 2-hour tolerance. It then tests the fix the
+  classification points to. The leading candidate is a lower onset threshold accepted only when
+  the end rule finds a matching return step within the cap, which uses the same hindsight as the
+  end rule. Injected transfers measure the false alarms this adds.
 
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 
