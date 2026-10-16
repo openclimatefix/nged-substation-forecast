@@ -1395,11 +1395,11 @@ two-model statistic found 0.715 of the moved MW against 0.665 for PF14 (+0.050, 
 gain lies in the 13% of transfers within 24 hours of a refit (+0.431 there, -0.005 elsewhere).
 
 - **Finding for later experiments:** lifting the suppression with the first model alone finds as
-  much on injected transfers (+0.056), so the second model matters only for the 3 real transfers that
-  start at a refit, where it finds 3 and the lift alone finds 2. Gap bridging changes the outcome of 0
-  of 1,860 transfers, because the panel holds only 3 gaps of a day or longer, and the 6 real "data
-  gap" transfers lie on series with no earlier telemetry. The 8 sharp small steps and 3 timing
-  errors among the real transfers are untouched.
+  much on injected transfers (+0.056), so the second model matters only for the 3 real transfers
+  that start at a refit, where it finds 3 and the lift alone finds 2. Gap bridging changes the
+  outcome of 0 of 1,860 transfers, because the panel holds only 3 gaps of a day or longer, and the 6
+  real "data gap" transfers lie on series with no earlier telemetry. The 8 sharp small steps and 3
+  timing errors among the real transfers are untouched.
 - **Write-up and pull request:** [the full result
   page](00071-sw2-18-refit-offset-and-gap-bridging/result.md), [PR
   #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
