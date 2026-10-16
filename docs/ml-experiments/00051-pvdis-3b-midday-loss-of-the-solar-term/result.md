@@ -16,24 +16,29 @@ prediction: >-
   removes under a third of the ENS shift's excess over `d1l`.
 decision_rule: >-
   Rows are the 5 verdict series, June to August, valid 09:00 to 15:00 UTC, day+1 to day+3, from
-  experiment 00046's stored predictions (no new fit). Intervals are 95%, resampling whole ISO
-  weeks of forecast start and seeds, 10,000 resamples. Three repairs are scored out of fold (fit on
-  odd ISO weeks of the valid time, score on even, and the reverse) by the mean absolute error of
-  the median, in points of capacity, against the `d1l` median shifted by the oracle with
-  coefficient 1. Repair A is a clip: the shift uses min(u, u_knee) in place of u, with the knee
-  fitted per series. Repair B is a coefficient fitted per series and hour. Repair C is the shift
+  experiment 00046's stored predictions (no new fit). Per-row values are averaged over the 3 seeds.
+  Intervals are 95%, resampling whole ISO weeks of forecast start, 10,000 resamples (1,000 where a
+  hinge is refitted in each resample). Let e be the actual minus the `d1l` median shifted by the
+  oracle with coefficient 1, in points of capacity; it is zero if the oracle shift is exactly right,
+  and positive where the shift over-corrects. Three repairs to that median are scored out of fold
+  (fit on odd ISO weeks of the valid time and score on even, then the reverse) by the mean absolute
+  error of the median. Repair A is a hinge, e = a + c * max(0, csi - k), fitted per series with
+  the knee k on a grid from 0.4 to 0.95 of the CAMS clear-sky index. Repair L is a straight line,
+  e = a + b * csi, the comparison for A. Repair B is a coefficient fitted per series and hour bin
+  (09-12 and 12-15 UTC), median = `d1l` median minus coefficient times shift. Repair C is the shift
   built from the ensemble-mean anomaly (no member spread), scored on the quantile score and the
   sunny 0.05-quantile coverage against the member-based ENS shift. (a) clipping explains the loss
-  when the hinge fit beats a straight line by at least 10% of the residual sum of squares, with a
-  positive slope above the knee at 3 or more series, and repair A lowers the out-of-fold error by
-  at least 0.05 points with an interval wholly below zero. (b) a too-large coefficient explains it
-  when the slope of the `d1l` residual on the oracle shift has an interval wholly above -0.85 in
-  at least 4 of the 6 hour-by-month cells (09-15 UTC by June, July, August, pooled across series),
-  the hinge criteria of (a) fail, and repair B lowers the out-of-fold error by at least 0.05
-  points with an interval wholly below zero. (c) member noise explains it when the quantile score
-  of the ENS shift minus that of the ensemble-mean shift has an interval wholly above zero and is
-  at least half of the ENS shift minus `d1l`, at day+2 and day+3 pooled. More than one cause may
-  hold; if none holds the verdict is inconclusive and the write-up says what the residuals show.
+  when repair A beats repair L out of fold with an interval wholly below zero, the slope c above
+  the knee is positive with an interval above zero at 3 or more series, and repair A lowers the
+  out-of-fold error against the unrepaired oracle shift by at least 0.05 points with an interval
+  wholly below zero. (b) a too-large coefficient explains it when the slope of the `d1l` residual
+  on the oracle shift has an interval wholly above -0.85 in at least 4 of the 6 cells of three
+  months by two hour bins, pooled across series, (a) fails, and repair B lowers the out-of-fold
+  error by at least 0.05 points with an interval wholly below zero. (c) member noise explains it
+  when the quantile score of the ENS shift minus that of the ensemble-mean shift has an interval
+  wholly above zero and is at least half of the ENS shift minus `d1l`, at day+2 and day+3 pooled.
+  More than one cause may hold; if none holds the verdict is inconclusive and the write-up says
+  what the residuals show.
   A load that rises with sunshine mimics a clipping knee (visitor load at coastal resorts, cooling
   of crop stores, irrigation), so cause (a) also needs the splits below. The hinge is compared with
   a straight line out of fold, by the mean absolute error of the median on the held-out weeks, not
@@ -42,8 +47,7 @@ decision_rule: >-
   weekends alike is clipping. A knee that is absent inland, or that concentrates in school-holiday
   and weekend rows, is load, and the write-up names it as load. The splits are coastal (within 10
   km of the open coast, by distance computed in the process and never published) against inland
-  series, and school-holiday weeks (from 22 July to 31 August, and the week of the late May bank
-  holiday) plus weekends against term-time weekdays. The coastal split compares the series that
+  series, and school-holiday weeks (22 July to 31 August) plus weekends against term-time weekdays. The coastal split compares the series that
   qualify with the rest, and the write-up states how many qualify. Temperature at fixed
   clear-sky index is also read: the ERA5 2 m temperature is binned in three terciles within each
   clear-sky-index bin, and the residual is read by tercile. A residual that grows with temperature
