@@ -19,8 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
-| [SW2-13](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does one detector that combines the step evidence of several windows (4 hours, 24 hours, and others) find more transfers than the best single window at the same alarm rate? | 2 | Nothing | Proposed; run next beside SW2-7 |
-| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | SW2-13 and SW2-8b (experiment 58) | Proposed |
+| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | Nothing (experiments 58 and 59 are done) | Proposed |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
@@ -167,8 +166,10 @@ confirm:
 
 - **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
   XGBoost model without the detected intervals.
-- **SW2-6:** paired-step intervals, which find the onset and its opposite return step as one
-  interval with an end, with a prior on duration from the labelled set.
+- **SW2-6 (done, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** pairing the
+  onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
+  the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
+  the moved MW.
 - **SW2-7 (done, [experiment 60](00060-sw2-7-profile-weighted-step-detector/result.md)):** a
   step statistic that weights each half-hour by the expected power found the same transfers as the
   constant step on five injection shapes, so the step's shape does not limit the 24-hour detector.
@@ -183,13 +184,16 @@ confirm:
   the neighbour test as a gate, finding almost none of the injected transfers without a metered
   receiver. The sum of the neighbourhood's residuals and a subset-sum over neighbours for a split
   feed the confidence score.
-- **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
-  series and hour of day fitted to the residual.
+- **SW2-9 (done, [experiment 62](00062-sw2-9-whitened-residual-step-detector/result.md)):**
+  whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and
+  hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
+  24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
 
 #### SW2-13 to SW2-15: combining evidence across windows and neighbours
 
 **Three experiments replace the detectors' hard rules with combined evidence: across window sizes
-first, then across neighbours, then across the whole electricity network at once.** Experiment 43
+first (SW2-13, finished as [experiment 59](00059-sw2-13-several-windows-in-one-detector/result.md)),
+then across neighbours, then across the whole electricity network at once.** Experiment 43
 found that the better detector depends on the window, D1 at 4 hours and D0 at 24 hours, and
 experiment 55 found that the neighbour test helps little as a veto. Each experiment is scored on the
 experiment 43 scoreboard at matched unexplained-alarm rates, with recall weighted by the MW moved as
@@ -200,11 +204,6 @@ transfers whose shapes the detector does not assume (a constant MW, a share of t
 profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
 day.
 
-- **SW2-13, several windows in one detector.** Compute D0's step statistic at windows of 4, 12,
-  24, and 48 hours, and combine them into one score per stamp: the maximum over windows after
-  calibrating each window to the same false-alarm rate on odd months, against a sum of the
-  calibrated statistics. The benchmark is the best single window at the same alarm rate. An
-  interval for the event's end comes from the window that alarms.
 - **SW2-14, one combined score.** Add the single-series step evidence and the neighbour
   opposite-step evidence into one score, so that strong evidence on either side can raise an alarm
   and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
@@ -218,7 +217,8 @@ day.
   at once with a sparsity penalty and a penalty on changes, in CVXPY. Each Primary also gets a
   slack term for load moved to a neighbour that is not metered. The 8 Primaries metered only in MVA
   carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
-  injections. The benchmark is the best sequential detector from SW2-13 or SW2-14.
+  injections. The benchmark is the best sequential detector from experiment 59 (the 24-hour single
+  window) or SW2-14.
 
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 

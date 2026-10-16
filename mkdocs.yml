@@ -192,11 +192,15 @@ nav:
       - "How much do labelled switching events hurt the best guess?": ml-experiments/00044-sw2-2-switching-share-of-best-guess-score/result.md
       - "Do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?": ml-experiments/00052-more-nwp-products-for-wind-farms/result.md
       - "Does UKV, learned from its own history, help the wind-farm forecast?": ml-experiments/00054-product-trained-xgboost-wind-farms/result.md
+      - "Does UKV, learned from its own history, help the solar-farm forecast?": ml-experiments/00057-product-trained-xgboost-solar-farms/result.md
       - "Does a bank-holiday column in the demand model help the switching detector find transfers?": ml-experiments/00047-sw2-4-better-residual-switching-detector/result.md
       - "Does a neighbour veto help the single-series switching detector?": ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/result.md
       - "Is the recall gap without a metered receiver a step-size effect, and does a stronger veto help?": ml-experiments/00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md
+      - "Does one detector over several windows find more transfers than the best single window?": ml-experiments/00059-sw2-13-several-windows-in-one-detector/result.md
       - "Does a step that weights each half-hour by the daily profile find more of the moved load?": ml-experiments/00060-sw2-7-profile-weighted-step-detector/result.md
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
+      - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
+      - "Does removing the residual's half-hour-to-half-hour memory help the switching detector?": ml-experiments/00062-sw2-9-whitened-residual-step-detector/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
