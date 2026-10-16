@@ -23,8 +23,8 @@ decision_rule: >-
   and S4. LOGIT_SAME is experiment 65's post hoc logistic score with the count of same-sign
   neighbour steps (PE end rule), a benchmark chosen after seeing its result and labelled so. EF is
   held to at most 80 unexplained odd-month alarms, counted per series (each run counts twice per
-  series metered in MW, at its onset and at its end), and to no more than 10 above D0M's unexplained alarms on
-  even months. An EF that breaks the even-month cap is `inconclusive` whatever its recall.
+  series metered in MW, at its onset and at its end), and to no more than 10 above D0M's
+  unexplained alarms on even months. An EF that breaks the even-month cap is `inconclusive` whatever its recall.
   EF is `supported` when C1's interval lies wholly above zero and its point value is at least
   +0.05. EF is `small gain` when C1's interval lies wholly above zero and its point value is under
   +0.05. EF is `refuted` when C1's upper end lies below +0.02. Otherwise it is `inconclusive`. C2
