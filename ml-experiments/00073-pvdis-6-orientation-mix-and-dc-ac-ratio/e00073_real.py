@@ -8,8 +8,7 @@ Per Primary (one worker each):
 - contrast C3: fit on alternate 28-day blocks, score the other blocks, and the reverse. The
   comparator is the same fit with all capacity on the south-facing shape.
 
-    POLARS_MAX_THREADS=6 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --with holidays python \
-        ml-experiments/00073-pvdis-6-orientation-mix-and-dc-ac-ratio/e00073_real.py
+    uv run --with holidays python ml-experiments/00073-*/e00073_real.py
 """
 
 from multiprocessing import Pool
@@ -38,6 +37,13 @@ def refit_and_predict(
     *, w: inputs.YearWindow, train: np.ndarray, test: np.ndarray, u: np.ndarray, c: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
     """Fix the capacities `c`, refit the calendar cells and nuisance on `train`, predict `test`.
+
+    Args:
+        w: The season-year window.
+        train: Mask of the rows the cells and nuisance terms are fitted on.
+        test: Mask of the rows that are predicted.
+        u: The unit shapes at the Primary, `(n, 3)`.
+        c: The fixed capacities, MW.
 
     Returns:
         The predictions and the observed power on the test rows whose cell has enough train rows.

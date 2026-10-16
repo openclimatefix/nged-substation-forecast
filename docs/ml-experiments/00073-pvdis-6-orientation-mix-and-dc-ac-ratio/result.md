@@ -137,8 +137,8 @@ one of the 8 Primaries, but it is a more flexible shape and not a measurement of
 orientation.** The shares that make up the blend swap from year to year and miss by about 0.2 on a
 noisy known answer, so none of them should be published as a finding about a Primary's panels. The
 DC:AC ratio cannot be read from a Primary's power at all, so the solar term keeps the fixed ratio of
-1.15. The next test is whether the three-shape blend lowers the error of the PVDIS-5 forecast and
-not only the fit.
+1.15. The next test is whether the three-shape blend lowers the error of the forecasts of experiment
+64 (PVDIS-5), and not only the error of the fit.
 
 **Verdict `partly supported`, read by the rule written before the run.** Orientation passes its
 pre-registered known answers (median error 0.088, at most 0.15; C1 upper limit -0.122, below -0.10)
@@ -306,13 +306,13 @@ which looks like west-facing output to the fit.
 
 ## What the next experiment should answer
 
-**The next experiment should ask whether the three-shape blend lowers the error of the PVDIS-5
-forecast, and not only the error of the fit.** The held-out gain of 1.3% is for the daylight power of
-a fit with the weather inputs known. A forecast has only forecast weather. The test is whether the
-per-Primary blend, fitted on the training window, lowers the best guess's error on the PVDIS-5
-forecast starts by more than the 0.5% threshold. A second test could fit the same three shapes to
-rows after sunset, where no solar exists. If the western capacity appears there, the west lean is
-demand and not panels.
+**The next experiment should ask whether the three-shape blend lowers the error of the forecasts of
+experiment 64 (PVDIS-5), and not only the error of the fit.** The held-out gain of 1.3% is for the
+daylight power of a fit with the weather inputs known. A forecast has only forecast weather. The
+test is whether the per-Primary blend, fitted on the training window and used as the solar term of
+experiment 64's arm `am`, lowers that arm's score by more than the 0.5% threshold. A second test
+could fit the same three shapes to rows after sunset, where no solar exists. If the western capacity
+appears there, the west lean is demand and not panels.
 
 ## Method
 
