@@ -141,8 +141,8 @@ percentile of the best r over 200 resamples of 7-day blocks.
   The five true mixes (wE, wS, wW) are (0, 1, 0), (0.2, 0.6, 0.2), (0.5, 0.4,
   0.1), (0.1, 0.4, 0.5), and (0.5, 0, 0.5). Units are Primary × season-year × farm location × mix.
   The estimated shares come from the increment of the fitted capacities, with negative increments
-  set to zero. A total increment under 0.3 MW counts as an error of 0.5. Each arm reports the share of units that
-  hit either rule.
+  set to zero. A total increment under 0.3 MW counts as an error of 0.5.
+  Each arm reports the share of units that hit either rule.
 - **DC:AC:** the DC:AC ratios of the six farms are experiment 29's PyTorch fits: 1.15, 1.17, 1.22,
   1.42, 1.12, and 1.26. Run the search on each farm's output alone against its own location's shape,
   and on each farm's output scaled to 10 MW and added to a Primary's real series. The
