@@ -203,6 +203,7 @@ nav:
       - "Does removing the residual's half-hour-to-half-hour memory help the switching detector?": ml-experiments/00062-sw2-9-whitened-residual-step-detector/result.md
       - "Does one score from a substation's own step and its neighbours' opposite steps find more of the moved load?": ml-experiments/00065-sw2-14-combined-single-series-and-neighbour-score/result.md
       - "Which window and cap should the end rule of the switching detector use?": ml-experiments/00066-sw2-16-end-rule-as-baseline/result.md
+      - "Why do real load transfers raise no alarm at their start, and does a weak step confirmed by a step back recover them?": ml-experiments/00069-sw2-17-missed-onsets-of-the-end-rule/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
