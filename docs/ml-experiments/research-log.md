@@ -71,6 +71,7 @@ the maintainer to confirm.
 | [00039 - PV disaggregation, part 1](00039-pv-disaggregation-cams-injection/result.md) | Can a CAMS-driven fit separate embedded solar from Primary substation demand, recovering injected solar-farm output within 25% and passing four checks on the real series? | Partly supported: recovery passes (0.854, 0.815 to 0.866), real checks pass at 6 of 8 Primaries | Not for production | 2026-10-16 |
 | [00040 - PV disaggregation, part 2](00040-pv-capacity-error-bars/result.md) | Can a cross-arm misfit test detect a cloud-driven demand load that biases the capacity fitted to embedded solar, and how many directional Primaries are free of one in 2025/26? | Partly supported: calibrated (median capacity over truth 0.992, 0.951 to 1.032), but a day-long cloud load is flagged in only 0.35 of draws at 25% of capacity, so the verdict is `underpowered` | Not for production | 2026-10-16 |
 | [00041 - Switching-event labeller and gate](00041-sw2-0a-labeller-gate/result.md) | Can a labeller built on log-timed features that use no forecasting model pass a known-answer gate on injected transfers and placebo windows? | Partly supported: placebo 0 of 120 visible, recall 0.74 (0.57 to 0.85) on large, long transfers against a bar of 0.80; the receivers-named bar was waived post hoc | Not for production | 2026-10-16 |
+| [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -976,3 +977,28 @@ with mostly missing readings.
 - **Write-up:** [labelled set](00041-sw2-0a-labeller-gate/labelled-set.md).
 
 ![Final labels by card kind](00041-sw2-0a-labeller-gate/figure_4_labelled_counts.svg)
+
+### 00046: how much of the best guess's daylight error is embedded solar? (PVDIS part 3)
+
+**The ENS forecast of sunshine does not make a solar term worth porting: it lowers the quantile score
+of the demand forecast without radiation inputs by 0.056 points (97.5% interval -0.191 to +0.064),
+against a threshold of 0.35, so the verdict is `refuted`.** The solar term subtracts the panels'
+capacity times the sunshine that the weather forecast did not expect. Built from the true sunshine
+(the oracle, which no real forecast has), the same term lowers the score by 0.966 points (-1.431 to
+-0.595), about 20% of the 4.724 it starts from. The ENS anomaly tracks the true one for about 2
+days and then fades, and the gain follows it: -0.262 at 0 to 24 hours, -0.277 at 1 to 2 days, and
+about 0 beyond.
+
+- **Finding for later experiments:** the ENS solar term is not wholly below the best guess (C6
+  +0.048, -0.059 to +0.141), so PVDIS-5 is a non-inferiority and explanation test, with a gain test
+  only for 0 to 48 hours.
+- **Finding for later experiments:** a fixed coefficient of 1 was too large, because the residual's
+  slope on the oracle shift is -0.771. A coefficient fitted on the training window gives -0.143
+  (-0.231 to -0.057, exploratory).
+- **Fragile small gain:** without one series (D9) C3 is -0.113 (-0.230 to -0.000), and C3 is positive
+  in June to August, so it is not a consistent gain.
+- **Exploratory midday read:** at 09:00 to 15:00 UTC on day+1, C3 is -0.434 (-0.559 to -0.283) in
+  April to September, and the quantiles move from too narrow to slightly too wide.
+- **Write-up:** [result](00046-embedded-solar-share-of-primary-forecast-error/result.md).
+
+![The planned contrasts and the fitted-coefficient reads](00046-embedded-solar-share-of-primary-forecast-error/figure_1_contrasts.svg)

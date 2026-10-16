@@ -24,9 +24,8 @@ sooner.
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [PVDIS-3](#pvdis-3-how-much-forecast-error-comes-from-embedded-solar) | How much of the error of the demand forecast without radiation inputs does an explicit solar term built from forecast sunshine remove, and does the term beat the best guess? | 2 | Nothing | Planned: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md), part 3 of the PVDIS series |
-| [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series; can run beside PVDIS-3 |
-| [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-3 and PVDIS-4 | Proposed |
+| [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series |
+| [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-4 (PVDIS-3 is done: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md)) | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations) | Can the share of east-, south-, and west-facing solar behind each Primary be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
@@ -303,46 +302,6 @@ every part reports C as the capacity and keeps the daily fit as a cross-check.
   write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
   weeks.
 
-#### PVDIS-3: how much forecast error comes from embedded solar
-
-**Measure how much of the error of the demand forecast an explicit solar term removes, and whether
-that term beats the best guess's own use of its radiation inputs.** Two earlier results frame the
-question. Experiment 00009's observed-weather diagnostic found that the stage 1a model does use
-irradiance: reading CAMS at validation lowered the daylight error of the median by 0.88 points of
-capacity, against 0.04 with ENS. Experiment 00022 found that ERA5 weather in place of ENS, on
-experiment 00033's recipe, lowered the quantile score by 0.10 points (1.9% of 5.32), of which ERA5
-shortwave gave 0.08. PVDIS-3 asks how that gap divides between the sunshine itself and the weather
-forecast of it.
-
-The plan, with its contrasts, decision rule, and checks, is in [experiment
-46](00046-embedded-solar-share-of-primary-forecast-error/result.md). Its design departs from the
-first proposal in four ways:
-
-- **Arms.** `d0` is experiment 00033's recipe, and `d1l` drops both radiation columns, `shortwave`
-  and `longwave`. The single-column arm (`d1`) and the observed-shortwave arm (`d0_obs_sw`) move to a
-  later experiment, because neither changes a decision. Both refits use three matched seeds.
-- **The shift sits on `d1l` only, and the verdict is measured against `d1l`.** On the stored
-  `d0`-equivalent forecast, the residual's slope on the oracle shift was -0.52 to -0.81 by lead band
-  and not -1, because the forecast already holds part of the anomaly. The slope on `d1l` is unmeasured
-  and is reported before the verdict. The shift is minus the capacity times the solar anomaly over the
-  effective capacity, with the coefficient fixed at 1. One version uses CAMS at the valid time (the
-  oracle) and one uses the ENS forecast. The ENS version fits, by series and lead band on the training
-  window, a slope of the CAMS anomaly on the ensemble-mean ENS anomaly, applies it to the ensemble
-  mean, and adds each member's deviation from the mean unscaled, because attenuation is right for
-  the mean and wrong for the spread.
-- **The capacity is experiment 00040's C for season-year 2023/24,** which exists for 6 of the 8
-  Primaries metered in MW. The verdict uses the five that are not flagged, with Trusthorpe (D9)
-  reported with and without. A sensitivity read repeats the shift with the headline estimate in
-  place of C, which differs by up to 22%.
-- **The threshold is 0.35 points** on daylight April-to-September rows. It is a judgement about the
-  cost of porting the solar term (a capacity table to read and an ENS-to-CAMS calibration to keep
-  current), and the maintainer may change it. Two contrasts decide the verdict, read at 97.5%.
-  PVDIS-5 is a gain test only if the ENS solar term also lies wholly below the best guess (C6).
-  A supported verdict is unlikely: experiment 00031's linear offset (A4) scored +0.012 (-0.051 to
-  +0.081). The expected half-width of C3 is about 0.4 points, so inconclusive is the likely
-  verdict. C6 stays a finding in its own right, because a solar term no worse than the best guess
-  is useful even if C3 misses 0.35.
-
 #### PVDIS-4: a capacity series that rises easily and falls reluctantly
 
 **Estimate capacity on a weekly grid, with weekly increments under an asymmetric L1 penalty: a light
@@ -430,8 +389,13 @@ the best guess's score.**
 - **Power.** Experiment 00031's paired contrasts reached half-widths of 0.03 to 0.08 points over 16
   Primaries, so about 0.05 to 0.11 is expected over the 8 metered in MW. The plan states which
   effects that resolves.
-- **Waits for** PVDIS-3, which says how large a gain is possible, and PVDIS-4, which supplies the
-  capacity vintages.
+- **What [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md) (PVDIS-3)
+  changes.** The solar term built from ENS did not lower the error against the best guess over all
+  leads (C6 +0.048, -0.059 to +0.141), so the overall test is non-inferiority and explanation. A
+  gain test is only worth pre-registering for leads of 0 to 48 hours, where the ENS anomaly tracks
+  CAMS, with a lead-dependent coefficient fitted on the training window so that the term fades where
+  ENS has no skill.
+- **Waits for** PVDIS-4, which supplies the capacity vintages.
 
 #### PVDIS-6: the mix of panel orientations
 

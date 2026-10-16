@@ -409,13 +409,16 @@ def build_validation(
                 .join(clim.filter(pl.col("site") == row["site"]), on=["site", "month", "hh"])
                 .with_columns(
                     anomaly=pl.col("u") - pl.col("clim"),
-                    band=pl.Series(
-                        common.lead_band(
-                            lead_hours=(
-                                (u["valid_time"] - origin).dt.total_minutes() / 60.0
-                            ).to_numpy()
-                        )
-                    ),
+                )
+                .with_columns(
+                    band=pl.col("valid_time").map_batches(
+                        lambda v, origin=origin: pl.Series(
+                            common.lead_band(
+                                lead_hours=((v - origin).dt.total_minutes() / 60.0).to_numpy()
+                            )
+                        ),
+                        return_dtype=pl.Int64,
+                    )
                 )
                 .sort("valid_time", "ensemble_member")
             )

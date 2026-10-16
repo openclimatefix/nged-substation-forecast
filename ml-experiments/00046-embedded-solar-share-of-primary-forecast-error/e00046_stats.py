@@ -42,6 +42,8 @@ ARMS: Final[tuple[str, ...]] = (
     "d1l_ens_shift_headline",
     "d1l_cams_shift_headline",
     "d1l_ens_mean_shift",
+    "d1l_ens_shift_fitted",
+    "d1l_cams_shift_fitted",
 )
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C3": ("d1l_ens_shift", "d1l"),
@@ -55,6 +57,8 @@ EXTRA_CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C3_headline": ("d1l_ens_shift_headline", "d1l"),
     "C4_headline": ("d1l_cams_shift_headline", "d1l"),
     "C3_ens_mean": ("d1l_ens_mean_shift", "d1l"),
+    "C3_fitted": ("d1l_ens_shift_fitted", "d1l"),
+    "C4_fitted": ("d1l_cams_shift_fitted", "d1l"),
 }
 CSI_BINS: Final[tuple[str, ...]] = ("cloudy", "middle", "sunny")
 BAND_NAMES: Final[tuple[str, ...]] = tuple(name for name, _low, _high in common.LEAD_BANDS)
@@ -95,6 +99,7 @@ def load_losses() -> pl.DataFrame:
             "series_label",
             band=pl.col("band_name"),
             valid_month=pl.col("month"),
+            lead_hours=pl.col("lead_hours"),
             csi_bin=pl.col("csi_bin"),
             scored=pl.col("scored"),
             oracle_shift=pl.col("oracle_shift"),
@@ -107,6 +112,7 @@ def load_losses() -> pl.DataFrame:
             )
         )
         for arm in ARMS
+        if (common.ARMS_DIR / f"{arm}.parquet").exists()
     }
     return experiment_store.losses_for_bootstrap(arm_losses=arm_losses)
 
@@ -217,7 +223,7 @@ def absolute_scores(*, losses: pl.DataFrame) -> pl.DataFrame:
     """Return each arm's mean score and median error on the verdict series, with intervals."""
     scoped = scope_rows(losses=losses, scope=VERDICT_SCOPE)
     rows = []
-    for arm in ARMS:
+    for arm in (a for a in ARMS if a in set(scoped["arm"].unique().to_list())):
         row: dict[str, str | float | int] = {"arm": arm}
         for metric in ("qs", "mae"):
             interval = bootstrap.bootstrap_absolute(losses=scoped, arm=arm, metric=metric)
@@ -402,10 +408,14 @@ def contrast_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
     ]
     for contrast_id, (treatment, reference) in {**CONTRASTS, **EXTRA_CONTRASTS}.items():
         planned = contrast_id in CONTRASTS
+        if treatment not in set(losses["arm"].unique().to_list()):
+            continue
         read = [
             (name, scope, "month", True)
             for name, scope in [*scopes, *(split_scopes() if planned else [])]
         ]
+        if contrast_id.endswith("_fitted"):
+            read.append(("verdict series", VERDICT_SCOPE, "month", True))
         read.append(("verdict series, all 12 months", VERDICT_SCOPE, "month", False))
         if planned:
             read.append(("verdict series", VERDICT_SCOPE, "week", True))

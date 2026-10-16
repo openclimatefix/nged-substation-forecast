@@ -28,6 +28,8 @@ ARMS: Final[dict[str, tuple[str, str]]] = {
     "d1l_ens_shift_headline": ("d1l", "ens_shift_headline"),
     "d1l_cams_shift_headline": ("d1l", "cams_shift_headline"),
     "d1l_ens_mean_shift": ("d1l", "ens_mean_shift"),
+    "d1l_ens_shift_fitted": ("d1l", "ens_shift_fitted"),
+    "d1l_cams_shift_fitted": ("d1l", "cams_shift_fitted"),
 }
 """Each arm's name mapped to the fit arm and the variant it reads."""
 
@@ -49,7 +51,8 @@ def raw_variant(*, fit_arm: str, variant: str, series: pl.DataFrame) -> pl.DataF
     pieces = []
     for seed in common.SEEDS:
         for site in common.SITES:
-            path = common.RAW_ARMS_DIR / f"{fit_arm}_seed{seed}_{site}.parquet"
+            suffix = "_fitted" if variant.endswith("_fitted") else ""
+            path = common.RAW_ARMS_DIR / f"{fit_arm}_seed{seed}_{site}{suffix}.parquet"
             if not path.exists():
                 msg = f"{path} is missing"
                 raise FileNotFoundError(msg)
@@ -71,6 +74,10 @@ def main() -> None:
     arrays = common.load_series_arrays(series=series)
     actual = common.actual_table(series=series, arrays=arrays)
     for name, (fit_arm, variant) in ARMS.items():
+        if variant.endswith("_fitted") and not list(
+            common.RAW_ARMS_DIR.glob(f"{fit_arm}_seed*_fitted.parquet")
+        ):
+            continue
         target = common.ARMS_DIR / f"{name}.parquet"
         if target.exists():
             continue

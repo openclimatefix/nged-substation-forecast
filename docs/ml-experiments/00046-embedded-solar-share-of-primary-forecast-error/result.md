@@ -1,7 +1,7 @@
 ---
 id: "00046"
 slug: embedded-solar-share-of-primary-forecast-error
-status: planned
+status: done
 size: complex
 hypothesis: >-
   At the five Primary substations metered in MW that have a clean 2023/24 capacity estimate, an
@@ -52,332 +52,269 @@ metric: >-
   CRPS) in points of capacity, after the 14-day correction and the spread factor, on daylight
   April-to-September rows with a CAMS unit PV shape and an observed power
 code: ml-experiments/00046-embedded-solar-share-of-primary-forecast-error/
+verdict: refuted
+best_arm: >-
+  `d0`, the best guess with its radiation inputs, at 4.620 points of quantile score, is the best arm
+  usable at forecast time. `d1l_cams_shift`, the oracle that reads the true sunshine at the valid
+  time, scores 3.758 and cannot be served.
+headline: >-
+  The ENS solar term lowers the quantile score of `d1l` by 0.056 points (97.5% interval -0.191 to
+  +0.064), against a threshold of 0.35, so the verdict is `refuted`. The oracle lowers it by 0.966
+  (-1.431 to -0.595), about 20% of `d1l`'s 4.724.
+lessons: >-
+  Knowing the true sunshine is worth about 1 point of capacity, but the ENS forecast of the solar
+  anomaly carries that skill only to about 2 days ahead, so over all leads the term gains too little
+  to port, and it is no better than the best guess's own radiation inputs. The residual's slope on the
+  oracle shift is -0.771, not -1, probably because the remaining inputs of `d1l` already capture part
+  of the anomaly.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Do not port the ENS solar term into the serving path as built, because over all leads it lowers
+    the quantile score of `d1l` by 0.056 points (-0.191 to +0.064) against a 0.35-point threshold
+    (C3).
+  - >-
+    Run PVDIS-5 as a non-inferiority and explanation test overall, because the ENS solar term is not
+    wholly below the best guess (C6 +0.048, -0.059 to +0.141).
+  - >-
+    Pre-register any PVDIS-5 gain test at leads of 0 to 48 hours only, with a coefficient that
+    depends on lead and is fitted on the training window, because C3 is -0.262 and -0.277 in the two
+    bands under 2 days and about 0 beyond (lead-band figure), and because at summer midday on day+1
+    C3 is -0.434 (-0.559 to -0.283; exploratory, post hoc, midday figure).
+  - >-
+    Fit the solar coefficient instead of fixing it at 1, because the residual of `d1l` has a slope
+    of -0.771 on the oracle shift, and a fitted coefficient lowers C3 to -0.143 (-0.231 to -0.057,
+    exploratory; coefficient diagnostic).
+  - >-
+    Check the sign of a contrast in every valid month before reading its pooled interval, because C3
+    is negative in April, May, and September and positive in June to August (by-month figure).
+  - >-
+    Compare arms that share one fitted booster where the design allows, because two identical GPU
+    fits of one series differ by 0.127 points, and that noise enters every contrast between separate
+    fits (check 1).
+  - >-
+    Report the coverage of the 0.05 and 0.95 quantiles in sunny and cloudy rows for any change to
+    the member spread, because the shift moved the sunny 0.05 quantile from 0.151 to 0.045 while its
+    score gain stayed near zero (coverage figure).
+  - >-
+    Treat the irradiance forecast, not the capacity, as the bottleneck, because the CAMS version
+    gains 0.910 points more than the ENS version (C5) and the headline capacity changes the arms'
+    scores by under 0.1.
 ---
 
 # Experiment 46: how much of the best guess's daylight error is embedded solar?
 
-We asked how much of the error in the demand forecast for a Primary substation comes from solar
-panels behind the substation's meter. The meter shows demand minus the panels' output, so a sunnier
-day than the weather forecast expected lowers the metered power. We retrain the demand forecast
-without its two radiation inputs. We then add a solar term: a shift that subtracts the fitted solar
-capacity times the sunshine that the weather forecast did not expect. We score every version on the
-same daylight half-hours of July to September 2025 and April to June 2026, and we separate the gain
-from knowing the true sunshine from the gain from the weather forecast of it. The planned verdict
-rests on one contrast: whether the solar term built from the weather forecast lowers the error of the
-demand forecast without radiation inputs (`d1l`) by at least 0.35 points of capacity. That contrast
-does not test whether the solar term beats the best guess, which still has its radiation inputs. The
-contrast of the solar term with the best guess is C6, and it decides what PVDIS-5 tests.
+We asked how much of the error in a 0-to-10-day forecast of a Primary substation's power comes from
+solar panels behind the substation's meter. The meter reads demand minus the panels' output, so a
+sunnier day than forecast lowers the metered power. We took a demand forecast with no sunshine
+inputs and added a correction: the panels' capacity, estimated in an earlier experiment, times how
+much sunnier or cloudier the day is than usual. We built the correction twice. The first copy read
+the true sunshine, taken from the satellite-based CAMS data, which no real forecast has. The second
+copy read the sunshine that the ECMWF ensemble weather forecast (ENS) predicted. We scored both on
+68,903 daylight half-hour forecasts at 5 substations, in April to September. Knowing the true sunshine
+lowered the forecast error by about 1 point (a point is 1% of the substation's capacity), which is
+about 20% of the error. The correction built from the weather forecast lowered it by 0.06 points.
+That is within the noise, and short of the 0.35 points we judged worth the effort of adding the
+correction to the live forecast.
 
-**Inconclusive is the likely verdict, because C3's interval is expected to be wider than the
-threshold allows.** Experiment 00031's arm A4 had a 99.17% half-width of 0.07 points over 12 month
-blocks, 16 series, and all rows, with only the 8 refitted Primaries moving, so about 0.14 points
-on those 8. Scaling to 5 scored series (about 1.1 to 1.3 times wider), the 97.5% level (0.85 times),
-6 month blocks (about 1.4 times), and daylight April-to-September rows only, which are 0.277 of
-all half-hours (about 1.9 times, since the same noise is averaged over fewer rows), gives a 97.5%
-half-width for C3 of about 0.4 points (0.3 to 0.5). That is at or above 0.3 points, so C3 can lie
-wholly below -0.35 only if the gain is 0.7 points or more, more than twice the 0.3 predicted. The
-scaling is approximate. The statistics script prints the realised half-width of C3 and C4 beside
-the contrasts.
+**The verdict is `refuted`: the ENS solar term does not reach the 0.35-point threshold, and the
+oracle shows that the missing gain lies in the sunshine forecast, not in the capacity.** The
+scores below are the quantile score (an estimate of the CRPS, twice the mass-weighted mean pinball
+loss over nine quantile levels) in points of capacity. Smaller is better. `d0` is experiment 00033's
+best-guess recipe. `d1l` is `d0` without its `shortwave` and `longwave` columns. The two shift arms
+add the solar term to `d1l`, with the coefficient fixed at 1. The oracle arm is the CAMS one.
 
-**C6 is the contrast to read first for PVDIS-5.** If the ENS solar term is no worse than `d0`
-(the best guess with its radiation inputs) while holding an explicit capacity, that is a useful
-finding even when C3 misses 0.35, because it shows that the explanation costs no accuracy.
-
-**The experiment tests whether PVDIS-5 should be a gain test or only an explanation test.** If the
-solar term built from the ENS weather forecast clears the threshold (C3) and also lies wholly below
-the best guess (C6), PVDIS-5 compares its two forecasts against the best guess for gain. If C3 clears
-the threshold but C6 does not lie wholly below zero, PVDIS-5 runs only as a non-inferiority test of
-the explanation. If the solar term built from CAMS (C4) gains a lot but the ENS version gains little,
-the weather forecast is the bottleneck, and PVDIS-5 also runs only as a non-inferiority test. If the
-CAMS version gains little, the fixed-coefficient measure is not usable, and PVDIS-5 waits for the
-coefficient diagnostic below. Supported is unlikely. Experiment 00031's arm A4, a linear offset
-built from ENS solar output, scored +0.012 (-0.051 to +0.081) against its baseline, and the
-prediction above puts the ENS version just short of the threshold. Experiment 00022 found that ERA5
-weather in place of ENS weather lowered the score by 0.10 points over all rows, and experiment 00009
-found that the stage 1a model gained 0.88 points of daylight error from observed irradiance against
-0.04 from ENS. This experiment divides that gap between the sunshine itself and the weather forecast
-of it.
-
-## Size
-
-**The experiment is complex because more than one design would test the hypothesis, and the other
-four triggers are absent.**
-
-| Trigger | Answer |
+| Arm | Quantile score (95% interval) |
 |---|---|
-| What gets stored | Four private prediction sets, and two more for the headline-capacity sensitivity read, under `data/ml-experiments/`, written with `experiment_store.write_predictions`. No production table changes. |
-| The production serving path | Not touched. |
-| A degradation rule | Not touched. |
-| More than one defensible design | Yes. The shift could sit on `d0` or on `d1l`, the ENS anomaly could be calibrated or raw, and the coefficient could be fixed or fitted. The sections below fix one choice for each and give the reason. |
-| Code whose callers could not be named without searching | No. The scripts copy named helpers of experiment 00033 and read three earlier experiments' outputs and `studies.pv_physics`. |
+| `d0`, with radiation inputs | 4.620 (4.168 to 5.224) |
+| `d1l`, without radiation inputs | 4.724 (4.252 to 5.325) |
+| `d1l` + ENS shift | 4.667 (4.292 to 5.204) |
+| `d1l` + CAMS shift (oracle) | 3.758 (3.484 to 4.033) |
+| `d1l` + ENS shift, coefficient fitted per series and lead band (exploratory) | 4.581 (4.189 to 5.134) |
+| `d1l` + CAMS shift, coefficient fitted (exploratory) | 3.667 (3.389 to 3.999) |
 
-The full process applies: a Sonnet plan, an Opus plan review, a Sonnet implementation, a Sonnet code
-review for leakage, a Sonnet run, and a Sonnet write-up with a prose review.
+![The planned contrasts and the fitted-coefficient reads](figure_1_contrasts.svg)
 
-## Arms
+**The two deciding contrasts at 97.5% are C3, the ENS shift minus `d1l`, and C4, the oracle minus
+`d1l`.** C3 is -0.056 (-0.191 to +0.064), so the interval lies above -0.35 and includes zero, which
+the rule calls `refuted`. C4 is -0.966 (-1.431 to -0.595), so the validity gate passes. Two reads at
+95% are exploratory. C5, the oracle minus the ENS shift, is -0.910 (-1.209 to -0.643). C6, the ENS
+shift minus `d0`, is +0.048 (-0.059 to +0.141). Removing the two radiation columns costs 0.104
+points (`d0` minus `d1l`, from the table).
 
-All arms use the 6 Primaries metered in MW that have a 2023/24 capacity (D5, D9, D10, D11, D14, and
-D16), three seeds, and the 73 runs of `fold_a_every5d_v1`. The two refitted arms share seeds, so
-XGBoost's row subsampling is identical across them. Experiment 00033's recipe uses a column sampling
-rate of 1.0, so the arm with fewer columns does not also change which columns each tree sees.
+**C6 decides PVDIS-5: the ENS solar term is not wholly below the best guess, so PVDIS-5 is a
+non-inferiority and explanation test, not a gain test.** At the leads that matter most, C6 is +0.073
+(-0.195 to +0.322) at 0 to 24 hours and -0.014 (-0.144 to +0.112) at 1 to 2 days. Both intervals
+include zero and are wide, with 6 resampling blocks each. The other bands are +0.054 (-0.104 to
++0.192) at 2 to 6 days, +0.049 (-0.099 to +0.147) at 6 to 10 days, and +0.049 (-0.028 to +0.124) from
+10 days.
 
-| Arm | What it is | Fitted? |
-|---|---|---|
-| `d0` | Experiment 00033's N1 recipe: 13 weather and calendar columns, `lead_hours`, and 3 power lags, trained on the ENS control member, with the 14-day correction and the 1.15 spread factor | yes |
-| `d1l` | `d0` without `shortwave` and `longwave` | yes |
-| `d1l_ens_shift` | `d1l` with each ENS member's quantiles shifted by minus the capacity times that member's calibrated ENS solar anomaly (below), divided by the series' effective capacity, before the members are pooled | no, post hoc |
-| `d1l_cams_shift` | `d1l` with every quantile shifted by minus the capacity times the CAMS solar anomaly at the valid time (the oracle) | no, post hoc |
+## The ENS forecast carries the oracle's gain only to about 2 days
 
-**Two arms from the first proposal move to a later experiment.** Arm `d1` (`d0` without `shortwave`
-alone) and arm `d0_obs_sw` (`d0` with observed CAMS shortwave at serving) would answer what the ENS
-shortwave column adds (C1) and how much observed shortwave would add through the model's own route
-(C2). Neither answer changes the verdict or the design of PVDIS-5, so both contrasts wait. The
-contrast ids C3 to C6 are kept so that earlier reviews still point at the right contrast.
+**The ENS anomaly tracks the CAMS anomaly for about 2 days, then fades, and C3 follows it.** On the
+training window, the correlation of the ensemble-mean anomaly with the CAMS anomaly runs from 0.77
+to 0.81 at 0 to 24 hours, 0.73 to 0.77 at 1 to 2 days, 0.56 to 0.60 at 2 to 6 days, 0.25 to 0.29 at 6
+to 10 days, and 0.02 to 0.04 from 10 days, across the six series. The oracle gains at every lead
+(C4 from -0.59 to -1.21). The ENS version gains -0.262 (-0.598 to +0.037) at 0 to 24 hours and -0.277
+(-0.406 to -0.144) at 1 to 2 days, then -0.079, -0.002, and +0.011 in the bands beyond. All of these
+intervals are at 95%, exploratory.
 
-**`d1l` removes both radiation columns, so `d0` minus `d1l` reads what the radiation inputs add and
-never the solar share of the error.** The frozen column list (experiment 00006's, as experiment 00005
-froze it) holds `shortwave`, `longwave`, `temperature_2m`, `dew_point_temperature_2m`,
-`pressure_surface`, `precipitation`, and `wind_speed_10m`, then `solar_zenith`, `solar_azimuth`,
-`hour_local`, `day_of_week_local`, `covid_indicator`, and `days_to_christmas`. Experiment 00033 adds
-`lead_hours` and the three power lags. Four routes to solar stay in `d1l`: the sun's position
-(`solar_zenith` and `solar_azimuth`) gives the clear-sky shape, the three lags carry yesterday's and
-last week's solar, the dew point, pressure, and precipitation are cloud proxies, and the 14-day
-correction absorbs a persistent level error.
+![C3, C4, and C6 by lead band](figure_2_by_lead_band.svg)
 
-**The explicit shift sits on `d1l`, not on `d0`, because `d0` already contains part of the
-anomaly.** A preview on the stored `n1_refit_cs` forecast (seed 0, five series, daylight April to
-September rows, not blind) regressed the median's residual on the oracle shift, capacity times CAMS
-anomaly over effective capacity. The slope was -0.52 at leads under 1 day, -0.57 at 1 to 2 days,
--0.67 at 2 to 6 days, and -0.81 at 6 to 10 days, against -1 for a forecast that held no solar
-information beyond climatology. A shift on `d0` would partly count the anomaly twice, by a
-lead-dependent amount that no fixed coefficient can state. The preview slopes are for the
-`d0`-equivalent forecast. No slope has been measured on `d1l`, so the coefficient of 1 is untested
-there. `d1l` holds less solar information than `d0`, which makes a slope nearer -1 plausible but
-does not show it. The write-up therefore reports the slope on `d1l` before it reports any verdict
-(see the coefficient diagnostic below).
+## Fragility of the small gains
 
-**The shift is well defined, in capacity units.** Experiment 00040's C is in MW. It is the
-no-confound capacity, the least-squares combination of the six arm estimates against the six recovery
-ratios R of the injected farms (`C = (R . c) / (R . R)` in `e00040_detector.py`). C is the 99th
-percentile of the fitted solar output of a generic fleet whose unit shape `u` has a 99th percentile
-of 1 over the half-hours with a solar zenith under 75 degrees, which experiment 00039's validation
-prints as 1.0 for both the farm and the substation frames, and for each of the 20 sites. The shift
-of one forecast value is `-C x (u(t) - u_clim(month, half-hour)) / effective_capacity_mw`, in the same
-units as the forecast, which is power over effective capacity. The preview gave standard deviations
-of the shift of 6.2 to 9.1 points of capacity at the five series, which a self-test checks.
+- **Without Trusthorpe (D9), the series with the largest bound on its capacity, C3 is -0.113 (-0.230
+  to -0.000) at 97.5%.** The rule would then give `small gain`, but the upper end sits at zero, so
+  the reading is fragile and the pre-registered verdict, which includes D9, stands.
+- **C3 is not the same sign in every valid month.** It is negative in April (-0.204), May (-0.232),
+  and September (-0.262), and positive in June (+0.117), July (+0.183), and August (+0.024). C4 is
+  negative in all six months. The experiment resamples 7 blocks of run initialisation month, not
+  the 6 the plan expected.
+- **C3 varies by series and sky.** It is -0.382 (-0.588 to -0.182) at D16 and positive at D5 and D9
+  (+0.278 and +0.173). By sky it is -0.719 in cloudy rows, +0.225 (+0.076 to +0.329) in middle rows,
+  and -0.135 in sunny rows, all exploratory at 95%.
+- **A week-block bootstrap (29 blocks) gives the same answer:** C3 -0.056 (-0.197 to +0.084) and C4
+  -0.966 (-1.248 to -0.663) at 97.5%.
 
-**C is not the headline estimate multiplied by a recovery ratio, and the two differ by up to 22%.**
-Experiment 00040's `real_scores.parquet` also holds `headline`, which is the estimate of its single
-`M1D` arm divided by that arm's recovery ratio. For 2023/24 the ratio C over `headline` is 1.22 at
-D10 (2.42 against 1.98 MW), 1.10 at D11, 1.03 at D14, 1.06 at D16, 1.17 at D9, and 0.77 at D5. A
-reviewer's reading of D10 as a conflict between C and the headline is therefore correct, and the
-cause is the choice of estimator. The plan keeps C because experiment 00040's advice is to report C,
-and adds a sensitivity read, in the exploratory section, that repeats the two shift arms with
-`headline` in place of C.
+![The sign of each contrast by valid month](figure_4_by_month.svg)
 
-## Rows, scores, and who is in
+## The fixed coefficient of 1 was too large
 
-**The scored rows are the daylight half-hours of April to September in the validation year.** Months
-are local calendar months (Europe/London) throughout this plan, in the scored rows, the climatology,
-and the folds. Daylight means that the month-by-half-hour mean of `u`, over the training window,
-exceeds 0.02. A row is scored only when the series has an observed power and a CAMS `u` (CAMS
-reliability at least 0.9), which drops about 10% of April to September half-hours. Every arm is
-scored on the same rows. In the preview the rows made up 0.277 of all half-hours of the five series.
-The validation months in the scored rows are July to September 2025 and April to June 2026, six
-months.
+**The residual of `d1l`'s median has a slope of -0.771 on the oracle shift, not the -1 that a forecast
+with no solar information would show.** The slope is -0.626 at 0 to 24 hours, -0.632 at 1 to 2
+days, -0.709 at 2 to 6 days, -0.818 at 6 to 10 days, and -0.848 from 10 days, and it holds on odd and
+even months alike (-0.780 and -0.762). By series it runs from -0.615 (D9) to -1.044 (D16). The
+inference is that `d1l` probably already captures about a quarter of the anomaly through its cloud
+proxies (dew point, precipitation, and the lagged power columns). The capacity of 2023/24 is
+probably 5% to 15% out of date per year, from the plan's reading of experiment 00040's headline
+estimator, and a capacity that is too small would push the slope past -1, not towards zero. The
+slope therefore probably does not come from a stale capacity.
 
-**Five series carry the verdicts: D9, D10, D11, D14, and D16.** These are the Primaries metered in MW
-with an experiment 00040 capacity for 2023/24, the latest season-year (September to August) that ends
-before the July 2025 validation start, and that are not flagged. A later capacity would use
-validation-period power in its fit.
+A coefficient fitted on the training window, applied only in the three bands where the pooled
+slope exceeded -0.8, gives an exploratory C3 of -0.143 (-0.231 to -0.057) and a C4 of -1.057 (-1.401
+to -0.784) at 95%. Even the fitted version lies well above -0.35.
 
-| Series | Primary or status | C for 2023/24 (MW) | Bound B | Role |
+## Coverage
+
+**The ENS shift moves the 0.05 quantile of sunny rows from 0.151 to 0.045, and the 0.95 quantile of
+cloudy rows from 0.846 to 0.954, with almost no change in the score.** The table gives the share of
+actuals below each quantile; a calibrated quantile gives 0.05 and 0.95. Sunny rows (CAMS clear-sky
+index of 0.7 or more) number 107,169 and cloudy rows (under 0.3) number 20,706, across the 5 series
+and 3 seeds.
+
+| Arm | Sunny, 0.05 | Sunny, 0.95 | Cloudy, 0.05 | Cloudy, 0.95 |
 |---|---|---|---|---|
-| D10, D11, D14 | Spilsby, Horncastle, Mount Bridge Boston (in the order of experiment 00040's table, not matched here) | 2.42, 3.38, 3.71 | 0.19 to 0.21 | clean, in the verdicts |
-| D16 | Donington | 2.80 | 0.18 | clean, in the verdicts |
-| D9 | Trusthorpe | 2.96 | 0.90 | low power, in the verdicts; the write-up reports the verdict with and without it |
-| D5 | Kirton | 2.54, flagged; library range 1.99 to 3.97 | | exploratory only, at both ends of the range |
-| D15 | Wrangle T1 | none | | left out: no 2023/24 capacity, no detector power |
-| D18 | Wrangle T2 | none | | left out: no 2023/24 capacity (its record starts in 2024/25) |
+| `d0` | 0.152 | 0.990 | 0.006 | 0.848 |
+| `d1l` | 0.151 | 0.990 | 0.005 | 0.846 |
+| `d1l` + ensemble-mean shift (no member spread) | 0.118 | 0.987 | 0.011 | 0.890 |
+| `d1l` + ENS shift | 0.045 | 0.987 | 0.010 | 0.954 |
 
-## Planned contrasts
+![Share of actuals below the 0.05 and 0.95 quantiles](figure_3_coverage.svg)
 
-Each contrast is the first arm's quantile score minus the second's, so a negative value means the
-first arm is better. C3 and C4 decide the verdict and are read at 97.5%. C5 and C6 are exploratory,
-read at 95%, with no correction for multiple comparisons. C6 does not decide the verdict, but it
-decides what PVDIS-5 tests.
+## Summer midday read (exploratory, post hoc)
 
-| Id | Contrast | Question | Predicted |
-|---|---|---|---|
-| C3 | `d1l_ens_shift` minus `d1l` | Does the solar term built from the ENS weather forecast lower the error? (decides the verdict) | -0.3 (-0.7 to 0.0) |
-| C4 | `d1l_cams_shift` minus `d1l` | How much does knowing the true sunshine lower the error? (validity gate, decides the verdict) | -1.2 (-2.0 to -0.7) |
-| C5 | `d1l_cams_shift` minus `d1l_ens_shift` | How much of the CAMS gain is lost to the ENS weather forecast? (exploratory) | -0.9 (-1.5 to -0.4) |
-| C6 | `d1l_ens_shift` minus `d0` | Does the solar term beat the model's own use of its radiation inputs? (exploratory; sets the PVDIS-5 test; a solar term no worse than `d0` is a useful finding even if C3 misses 0.35) | -0.05 (-0.4 to +0.3) |
+**At midday on day+1 the ENS shift lowers the score by 0.33 to 0.55 points in all four reads, but no
+interval lies wholly below the 0.35 threshold, and the later lead days disagree between reads.** The
+maintainer asked, after the verdict, for a read of the rows where solar matters most. It decides
+nothing. The rows are valid times 09:00 to 15:00 UTC inclusive (the stamps are period-ending), read
+twice: June to August (3 blocks of run initialisation month, so the intervals are rough) and April
+to September (6 blocks). Each read is given for the 5 verdict series and without D9. Lead days run
+from each run's forecast origin, with day+1 meaning 24 to 48 hours, day+2 48 to 72 hours, and day+3
+72 to 96 hours. The edges of the main bands (0-24 h, 1-2 d, 2-6 d) do not match day+2 and day+3, so
+the script defines its own. The tables give the quantile score of five arms, then the contrasts at
+95%.
 
-**The calibrated ENS anomaly is built from the training window only, and it treats the ensemble
-mean and the spread differently.** The ENS anomaly of a member is that member's ENS `u`, computed
-from `shortwave` by the same chain as CAMS (`studies.pv_physics`), minus the ENS source's own
-month-by-half-hour mean of `u`. Subtracting each source's own mean removes the mean bias between
-the products. Two parts then follow, both fixed here:
+| Rows, series | Lead day | `d0` | `d1l` | `d1l` + ENS shift | `d1l` + CAMS shift | `d1l` + ENS shift, fitted |
+|---|---|---|---|---|---|---|
+| Apr-Sep, 5 series | day+1 | 4.692 | 5.082 | 4.648 | 4.225 | 4.387 |
+| Apr-Sep, 5 series | day+2 | 4.503 | 4.815 | 4.556 | 3.967 | 4.253 |
+| Apr-Sep, 5 series | day+3 | 5.270 | 5.492 | 5.290 | 4.363 | 4.913 |
+| Apr-Sep, without D9 | day+1 | 4.725 | 5.139 | 4.601 | 4.187 | 4.409 |
+| Apr-Sep, without D9 | day+2 | 4.522 | 4.838 | 4.477 | 3.889 | 4.241 |
+| Apr-Sep, without D9 | day+3 | 5.357 | 5.587 | 5.199 | 4.157 | 4.939 |
+| Jun-Aug, 5 series | day+1 | 4.571 | 4.923 | 4.590 | 4.170 | 4.352 |
+| Jun-Aug, 5 series | day+2 | 3.910 | 4.115 | 4.387 | 3.911 | 3.914 |
+| Jun-Aug, 5 series | day+3 | 4.829 | 5.159 | 5.000 | 4.519 | 4.603 |
+| Jun-Aug, without D9 | day+1 | 4.701 | 5.078 | 4.524 | 4.145 | 4.422 |
+| Jun-Aug, without D9 | day+2 | 3.978 | 4.185 | 4.307 | 3.876 | 3.940 |
+| Jun-Aug, without D9 | day+3 | 4.926 | 5.241 | 5.025 | 4.457 | 4.702 |
 
-- **The ensemble mean gets an attenuating slope.** For each series and lead band (the five bands
-  of experiment 00033), a slope through the origin of the CAMS anomaly on the ensemble-mean ENS
-  anomaly is fitted on rows up to 2025-06-30. The ensemble mean is a noisy and smoothed predictor
-  of the CAMS anomaly, so the fitted slope is below 1 and falls with lead. That attenuation is
-  correct for the mean: it is the best linear guess of the CAMS anomaly given the ensemble mean.
-- **Each member's deviation from the ensemble mean is added unscaled.** The shift of member `m` is
-  minus the capacity times (the slope times the ensemble-mean anomaly, plus the member's anomaly
-  minus the ensemble-mean anomaly), divided by the effective capacity. Scaling the deviations by
-  the slope would shrink the spread of the pooled forecast, and the attenuation is wrong for
-  spread, because the spread of the members is the forecast's statement of its own uncertainty.
-  A scaled version, with the deviations multiplied by a training-window spread-skill ratio, is not
-  run; the unscaled choice is fixed before any contrast is read.
+| Rows, series | Lead day | C3 (ENS shift minus `d1l`) | C6 (ENS shift minus `d0`) | C4 (oracle minus `d1l`) |
+|---|---|---|---|---|
+| Apr-Sep, 5 series | day+1 | -0.434 (-0.559 to -0.283) | -0.044 (-0.176 to +0.083) | -0.857 (-1.297 to -0.394) |
+| Apr-Sep, 5 series | day+2 | -0.259 (-0.651 to +0.102) | +0.052 (-0.293 to +0.358) | -0.848 (-1.511 to -0.226) |
+| Apr-Sep, 5 series | day+3 | -0.203 (-0.541 to +0.098) | +0.020 (-0.242 to +0.262) | -1.129 (-1.679 to -0.485) |
+| Apr-Sep, without D9 | day+1 | -0.538 (-0.731 to -0.302) | -0.124 (-0.251 to +0.007) | -0.952 (-1.279 to -0.587) |
+| Apr-Sep, without D9 | day+2 | -0.362 (-0.775 to -0.009) | -0.046 (-0.425 to +0.269) | -0.950 (-1.659 to -0.345) |
+| Apr-Sep, without D9 | day+3 | -0.388 (-0.733 to -0.049) | -0.158 (-0.506 to +0.139) | -1.430 (-2.105 to -0.725) |
+| Jun-Aug, 5 series | day+1 | -0.333 (-0.510 to -0.092) | +0.019 (-0.072 to +0.099) | -0.753 (-1.608 to +0.036) |
+| Jun-Aug, 5 series | day+2 | +0.272 (+0.194 to +0.383) | +0.477 (+0.290 to +0.620) | -0.205 (-0.709 to +0.423) |
+| Jun-Aug, 5 series | day+3 | -0.158 (-0.474 to +0.264) | +0.172 (+0.066 to +0.217) | -0.640 (-1.150 to +0.349) |
+| Jun-Aug, without D9 | day+1 | -0.553 (-0.804 to -0.055) | -0.177 (-0.338 to +0.075) | -0.933 (-1.551 to -0.205) |
+| Jun-Aug, without D9 | day+2 | +0.122 (+0.004 to +0.254) | +0.329 (+0.114 to +0.478) | -0.310 (-0.730 to +0.185) |
+| Jun-Aug, without D9 | day+3 | -0.216 (-0.671 to +0.274) | +0.099 (-0.136 to +0.206) | -0.784 (-1.396 to +0.115) |
 
-The ensemble-mean-only shift stays as the exploratory twin: every member receives the same shift,
-the slope times the ensemble-mean anomaly, so the spread of the pooled forecast is that of `d1l`.
-The write-up reports, for `d1l_ens_shift` and for `d1l`, the coverage of the 0.05 and 0.95
-quantiles (the fraction of scored actuals below each), in sunny and in cloudy daylight rows
-separately. Sunny is a CAMS clear-sky index of 0.7 or more and cloudy is under 0.3, as in
-experiment 00031. Coverage near 5% and 95% in both groups shows that the spread is right.
+![Contrasts by lead day at summer midday](figure_5_midday.svg)
 
-**The ENS chain gives a `u` for every half-hour, including those between ENS steps.** ENS `shortwave`
-is a step value, with 3-hour steps early in a run and 6-hour steps later. The step's clear-sky index,
-the ratio of the step value to the clear-sky irradiance at the step's midpoint, is held across every
-half-hour of the step. The half-hour's `u` is then the clear-sky `u` of that half-hour times a fitted
-function of the held clear-sky index (the fallback route in the implementation outline), unless the
-direct route passes check 5. The month-by-half-hour climatology of the ENS `u` comes from the control
-member's training-window values at the same half-hours, so a half-hour between steps has a
-climatology and therefore an anomaly. The implementation confirms the step convention (mean over the
-preceding or following interval) against the served data before check 5 is read.
+- **The gain at day+1 has the same sign in all four reads, and no interval lies wholly below -0.35.**
+  C3 at day+1 is -0.434 (upper end -0.283), -0.538 (-0.302), -0.333 (-0.092), and -0.553 (-0.055)
+  in the four reads. C6 at day+1 stays at or near zero: -0.044 and -0.124 in April to
+  September, and +0.019 and -0.177 in June to August.
+- **The later lead days disagree between reads.** C3 at day+2 is negative in April to September and
+  positive in June to August (+0.272, +0.122), where C6 is +0.477 and +0.329. With 3 blocks, the
+  June-to-August intervals are probably too narrow, and the read supports no claim at day+2.
+- **The ensemble-mean ENS anomaly keeps its correlation with the CAMS anomaly at midday.** It is
+  0.75, 0.67, and 0.76 at day+1 to day+3 in June to August, and 0.76, 0.74, and 0.70 in April to
+  September (5 series); without D9 the values are 0.79, 0.69, and 0.76, and 0.78, 0.75, and 0.71.
+  Over all daylight hours the training-window correlation is 0.56 to 0.60 at 2 to 6 days, so the
+  midday rows hold a stronger forecast of the anomaly than the all-day average, though the row sets
+  differ and the two figures are not directly comparable.
+- **Calibration at midday moves from too narrow to too wide.** The share of actuals below the 0.05
+  quantile of sunny rows falls from 0.187, 0.188, and 0.250 for `d1l` to 0.020, 0.016, and 0.022
+  with the shift (day+1 to day+3, April to September, 5 series), against a target of 0.05. The
+  share below the 0.95 quantile of cloudy rows rises from 0.787, 0.856, and 0.817 to 0.973, 0.969,
+  and 1.000, against 0.95. June to August gives the same pattern. The log prints the coverage of
+  every read, and each cell holds 195 to 3,624 rows over 3 seeds.
 
-**The month-by-half-hour climatology has few days per cell on a short training window, so each cell
-mixes few independent weather days.** The self-test prints the smallest number of days in any
-cell, and if any cell holds fewer than 30 days, the climatology pools the neighbouring local
-month's half-hours with the same weights for every source.
+**Better-calibrated uncertainty and an explanation of the forecast count as wins even at a level
+score.** At midday on day+1 the term does both: C6 shows the forecast with an explicit capacity
+scoring no worse than the best guess (upper ends +0.083 and +0.007 in April to September, +0.099 and
++0.075 in June to August), and the quantiles move from covering too little in sunny rows to
+covering slightly too much. A second weather forecast beside ENS may give a better irradiance
+forecast than ENS alone. That is a candidate follow-up the project has not committed to.
 
-**The 14-day correction is computed on the shifted forecasts.** The correction takes the mean error
-of the previous 14 days' median forecasts, so a shifted arm corrects its own past errors, as
-PVDIS-5's Arm B would. The spread factor of 1.15 follows.
+## How the experiment departed from its plan, and what it could not show
 
-## Exploratory reads
+- **Check 1 is relaxed to the GPU noise floor, post hoc.** The plan's 0.05-point match between the
+  refitted `d0` and experiment 00033's `n1_refit` became 0.2 points, because two identical fits of
+  D10 differ by 0.127 points. The 18 comparisons printed 0.020 to 0.185 points. Check 7 (all arms hold
+  the same 909,414 keys) passed. The stored ENS anomaly equals the recomputed slope times the
+  ensemble-mean anomaly on all 307,476 validation rows.
+- **Fit noise does not enter C3 and C4, and does enter C6 and `d0` minus `d1l`.** C3 and C4 compare
+  shifts of one `d1l` booster, so they carry no fit noise. C6 and `d0` minus `d1l` compare different
+  fits. An Opus review of this write-up checks this reading.
+- **The ENS climatology rests on one summer of training data.** The anomaly is each forecast
+  minus the month-by-half-hour mean of its own source, so a summer that differs from the
+  training summer shifts the whole anomaly. On the scored rows the mean CAMS anomaly is +0.0245 of
+  unit output, and the mean calibrated ENS anomaly is +0.0116, which as shifts are 0.884 and 0.416
+  points of capacity. By month, the mean CAMS shift runs from +2.877 points in April to -1.016 in July,
+  and the mean ENS shift from 0.091 to 0.678.
+- **The 2023/24 capacity is probably out of date**, so the oracle is conservative.
+- **Not supported by the logs:** the printed output holds no result for plan checks 2 to 6 (column
+  counts, a zero shift, the size of the oracle shift, the ENS chain, and the training-window cut-off)
+  beyond the stored-anomaly check above.
 
-These are post hoc, read at 95% with no correction for multiple comparisons, labelled exploratory in
-the write-up, and decide nothing. Each is a table or a figure.
+## What the next experiment should answer
 
-- **The coefficient diagnostic, reported before the verdict.** The residual of the median of `d1l`,
-  regressed on the oracle shift, fitted on odd months and scored on even months (cross-fitted by
-  month, then swapped), by lead band, clear-sky-index bin, and series. A slope far from -1 says the
-  capacity, or the assumption that demand falls one for one with the anomaly, is wrong. The write-up
-  prints these slopes before it states the verdict, because they say whether the coefficient of 1
-  was reasonable on `d1l`, where it is untested. **If the pooled slope in any lead band is above
-  -0.8 (closer to zero, well short of -1), C3 and C4 are also reported as exploratory reads with
-  the coefficient set to the slope fitted in the training window.** The coefficient for a series
-  and lead band is minus the slope of the training-window residual of `d1l`'s median on the oracle
-  shift, applied in the bands where the trigger fires and left at 1 elsewhere. The training-window
-  residuals are in-sample, so they understate the error and the fitted slope leans towards zero;
-  the write-up says so. The two reads are labelled exploratory, at 95%, and the verdict rule above
-  does not use them. The slope also absorbs any demand that rises or
-  falls with sunshine, which the capacity fit cannot tell from solar, so the oracle gain is an upper
-  bound on the solar share and not an estimate of it.
-- **The headline-capacity sensitivity.** C3 and C4 repeated with `headline` of experiment 00040 in
-  place of C, and the arms stored as `d1l_ens_shift_headline` and `d1l_cams_shift_headline`.
-- **The ensemble-mean shift.** C3 repeated with every member shifted by the slope times the
-  ensemble-mean anomaly alone (the twin described above), and its quantile coverage.
-- **The coverage of the 0.05 and 0.95 quantiles** of `d1l_ens_shift` and `d1l`, in sunny and in
-  cloudy daylight rows separately.
-- **Splits of C3 to C6** by lead band, by clear-sky-index bin, by series, and by month, and the same
-  contrasts with D9 left out.
-- **Kirton (D5)** at the two ends of its library range.
-- **`d0` minus `d1l`**, and all four contrasts on the daylight rows of all 12 validation months.
-- **A week-block bootstrap** in place of month blocks, for the contrasts that month blocks cannot
-  resolve (see the power note below).
-
-## Checks that must pass before any contrast is read
-
-1. **The refit `d0` matches `n1_refit` of experiment 00033.** The mean absolute difference of the
-   raw median over the scored rows is under 0.2 points at every series. Post hoc, the planned
-   threshold of 0.05 points is replaced by this measured noise floor: GPU fits with a fixed seed are
-   not reproducible, and two identical fits of D10 differ by 0.127 points. The contrast of `d0` with
-   `d1l` carries this noise, averaged over three seeds.
-2. **The column lists are exactly 13 + 1 + 3 for `d0` and two fewer for `d1l`.**
-3. **A shift of zero returns the unshifted quantiles bit for bit.**
-4. **The standard deviation of the oracle shift on the scored rows is 5 to 10 points of capacity at
-   every one of the five series.** This tests the units.
-5. **The ENS-derived `u` agrees with the CAMS `u` on the training window, as anomalies.** The check
-   has two parts. First, the ENS chain is applied to CAMS irradiance (CAMS hourly values presented
-   at the ENS valid times), and the resulting anomaly must correlate at 0.95 or more with the
-   CAMS-route anomaly: this tests the chain. Second, the real ENS control member's anomaly is
-   correlated with the CAMS anomaly at the same valid times, by lead band, and the correlations are
-   printed: this tests the product, and no threshold is set because the values are the forecast
-   skill itself. Correlating `u` and not the anomalies is not accepted, because both share the same
-   daily cycle and would correlate near 1. If the first part fails, the experiment uses the
-   clear-sky-index route in the implementation outline (`u_clear` times a fitted function of the
-   ratio of irradiance to clear-sky irradiance).
-6. **Every climatology, calibration slope, and the daylight mask use valid times up to 2025-06-30
-   only,** asserted in code.
-7. **All arms hold the same scored keys,** which `experiment_store.losses_for_bootstrap` enforces.
-
-## Leakage and bias risks
-
-- **Capacity for 2023/24 is a year and a half old at the validation midpoint.** The fleet grew by
-  about 5% to 15% a year at the clean Primaries in experiment 00040's headline estimator, so the
-  shift is probably 10% to 20% too small. The result is therefore conservative for the solar term,
-  and the write-up says so.
-- **Capacity is a point estimate with a bound.** Experiment 00040's bound B of 0.18 to 0.21 (0.90 at
-  D9) is the undetected-load error of the capacity, and the shift inherits it. The write-up quotes B
-  beside C3 and C4.
-- **The scored rows overlap the CAMS record that fitted C, but not in time.** C used power from
-  September 2023 to August 2024. The validation rows are July 2025 to June 2026.
-- **Month blocks leave six blocks.** With six months, the 97.5% interval nearly spans the range of
-  the month means. A contrast therefore counts only if every month has the same sign, which the
-  by-month figure shows. The week-block read is the sensitivity check.
-
-## Compute
-
-**The refits are cheap enough for 4 cores, because experiment 00033's logs put one fit and its
-prediction at about 19 seconds on the GPU.** Experiment 00033's `n1_refit` arm fitted 60 models (20
-series, three seeds) at 16 to 21 seconds each, 18.8 on average, and its monthly refits took 11 seconds
-each for the fit and a 73-run prediction. Six series and three seeds give 18 fits per arm, about 6
-minutes, and the two arms about 12 minutes on one GPU stream. The log does not record CPU-only
-times, so a CPU fallback is unmeasured; the implementation outline asks for one timed fit on 4 threads
-before any fallback is chosen, and the plan does not rely on a fallback until that time is in hand.
-The 73 validation runs of the shift variants add prediction passes but no fits, because the member
-quantiles of one prediction pass serve both shifts. GPU memory stays inside the 8 GB share if one
-worker uses under 2.5 GB, which the first fit's `nvidia-smi` reading confirms.
-
-## Stop rule
-
-The experiment stops without a verdict, and the result says why, if any of checks 1 to 4 or 6 fails
-and the cause is not fixed within one revision of the code. It also stops if a fit fails twice.
-Nothing is tuned after the contrasts are read: the capacity, the coefficient of 1, the threshold of
-0.35, the daylight mask, and the calibration bands are fixed here. If the first part of check 5
-fails, the clear-sky-index route replaces the physical route before any contrast is read, and the
-write-up says so.
-
-## Advice items followed and departed from
-
-**Followed:**
-
-- Report C and keep the daily-fit capacity as a cross-check only (experiments 00040 and its Opus
-  review); this experiment uses C and never the daily fit.
-- Leave Wrangle T1 out of any claim that a Primary is free of a cloud load, report Kirton only as a
-  range, and leave out the 8 Primaries metered in MVA (experiments 00040 and 00039).
-- Calibrate ENS irradiance to CAMS before applying a fitted PV capacity to ENS forecasts (experiment
-  00031), by lead band and on the training window.
-- Score any irradiance-input change by lead band as well as in total (experiment 00009).
-- Take a threshold's resolution from a contrast between arms trained alike (experiment 00009): the
-  two refitted arms share seeds and rows.
-- Do not add the capacity as a column to N1 (experiment 00031): the capacity enters only as a fixed
-  shift.
-
-**Departed from:**
-
-- Experiment 00031 compared every capacity arm with a shuffled-capacity twin, because trained
-  columns can act as a proxy for calendar position. The shift here has no fitted coefficient and no
-  trained column, so a shuffled twin could only add noise, and it is left out. PVDIS-5 keeps its
-  shuffled twins, where a column is trained.
-- The research plan's proposal shifts every arm. This experiment shifts only `d1l`, for the double
-  counting shown above.
-- The research plan's proposal tests shortwave first (experiment 00022). This experiment removes both
-  radiation columns in one arm and defers the single-column arm (`d1`) and the observed-shortwave arm
-  (`d0_obs_sw`).
+**The oracle shows that about 1 point of quantile score is available, and the ENS term collects only
+the part within 2 days.** A next experiment could take one of three routes, and the project has not
+committed to any. The first is a lead-banded term, used only within 2 days, with a coefficient fitted
+on the training window per lead band, so the term fades where ENS has no skill. PVDIS-5 would then
+be a non-inferiority and explanation test overall, plus a gain test pre-registered for 0 to 48 hours
+only, with PVDIS-4's weekly capacity vintages in place of the 2023/24 capacity. The second is a
+better short-range solar forecast, because the irradiance forecast is the bottleneck and not the
+capacity: a satellite-based nowcast for 0 to 6 hours is one candidate, and a second weather
+forecast beside ENS is another. The third is to stop, since
+the gain is confined to short leads, where the lagged power columns of `d1l` probably already
+carry some of the signal.
