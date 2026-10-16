@@ -18,8 +18,9 @@ member only, for 23 dates, and checks that the values decode exactly and are phy
   in the report is printed by the script.
 
 The constants, the HTTP code, and the one-date fetch that both scripts share live in
-`packages/studies/src/studies/ens_backfill_fetch.py`. The decoding, sidecar parsing, and de-accumulation live in `packages/studies/src/studies/`
-(`grib1_simple.py`, `ens_grib_source.py`, `deaccumulation.py`), where they have unit tests.
+`packages/studies/src/studies/ens_backfill_fetch.py`. The decoding, sidecar parsing, and
+de-accumulation live in the same folder (`grib1_simple.py`, `ens_grib_source.py`,
+`deaccumulation.py`), where they have unit tests.
 
 ## Commands
 
