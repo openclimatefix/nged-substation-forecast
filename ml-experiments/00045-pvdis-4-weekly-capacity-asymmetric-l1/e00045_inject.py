@@ -370,11 +370,15 @@ def _rng(*, unit: Unit) -> np.random.Generator:
     )
 
 
+class UnbuildableUnitError(ValueError):
+    """No week of the farm's record can hold the unit's injection."""
+
+
 def _pick(*, rng: np.random.Generator, candidates: np.ndarray, fallback: np.ndarray) -> int:
     """Return a random candidate week, or a random fallback week when there is no candidate."""
     pool = candidates if candidates.size else fallback
     if not pool.size:
-        raise ValueError("no week can hold the injection")
+        raise UnbuildableUnitError("no week can hold the injection")
     return int(rng.choice(pool))
 
 
@@ -692,6 +696,7 @@ def run_unit_job(
     fits: tuple[FitSpec, ...],
     out_dir: Path,
     variant: VariantType = "semi_synthetic",
+    skip_unbuildable: bool = False,
 ) -> Path:
     """Fit every unit of one Primary and one farm, and write the units and paths atomically.
 
@@ -704,6 +709,8 @@ def run_unit_job(
         fits: The fits to run on every unit.
         out_dir: Directory for the two output files.
         variant: Baseline variant.
+        skip_unbuildable: Leave out a unit whose injection no week of the farm's short record can
+            hold (`UnbuildableUnitError`) instead of raising; the caller counts the missing units.
 
     Returns:
         The path of the paths file.
@@ -729,15 +736,20 @@ def run_unit_job(
     for seed in SEEDS_BY_SPLIT[split]:
         for case in (*CASES, *RATIO_CASES):
             unit = Unit(primary=primary, farm=farm, seed=seed, case=case)
-            result = fit_unit(
-                unit=unit,
-                base=base,
-                inputs=inputs,
-                farm_rows=farm_rows,
-                fits=fits,
-                variant=variant,
-                shared_baseline=shared_baseline,
-            )
+            try:
+                result = fit_unit(
+                    unit=unit,
+                    base=base,
+                    inputs=inputs,
+                    farm_rows=farm_rows,
+                    fits=fits,
+                    variant=variant,
+                    shared_baseline=shared_baseline,
+                )
+            except UnbuildableUnitError:
+                if skip_unbuildable:
+                    continue
+                raise
             unit_rows_out.append(
                 {
                     "primary": primary,

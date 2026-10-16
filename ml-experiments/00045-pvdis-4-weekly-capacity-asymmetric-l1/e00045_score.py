@@ -204,6 +204,7 @@ def _unit_job(args: tuple[str, str, inject.SplitType, inject.VariantType, Path, 
         fits=frozen.fits(),
         out_dir=out_dir,
         variant=variant,
+        skip_unbuildable=True,
     )
     return f"units {variant} {primary} {farm}"
 
@@ -555,9 +556,12 @@ def vintage_job(*, primary: str, run: Run, frozen: Frozen) -> Path:
         for seed in inject.SEEDS_BY_SPLIT[run.split]:
             for case in VINTAGE_CASES:
                 unit = inject.Unit(primary=primary, farm=farm, seed=seed, case=case)
-                injection = inject.build_injection(
-                    unit=unit, base=base, farm_rows=rows, inputs=inputs
-                )
+                try:
+                    injection = inject.build_injection(
+                        unit=unit, base=base, farm_rows=rows, inputs=inputs
+                    )
+                except inject.UnbuildableUnitError:
+                    continue
                 power = rows["baseline_power"].to_numpy().astype(float) + injection.delta_for(rows)
                 design = design_for(rows=rows, power=power)
                 truth = base.capacity + injection.increment
@@ -954,6 +958,27 @@ def build_report(*, run: Run, frozen: Frozen, scores: pl.DataFrame) -> Report:  
         f"Primaries. Intervals: 95% cluster bootstrap, {N_DRAWS} draws, Primaries resampled and "
         "then farm-seeds within each drawn Primary."
     )
+    expected = {
+        (u.primary, u.farm, u.seed, u.case)
+        for u in inject.units_for(split=run.split)
+        if u.primary in run.primaries and u.farm in run.farms
+    }
+    scored = set(
+        scores.filter((pl.col("variant") == "semi_synthetic") & (pl.col("fit") == "asymmetric"))
+        .select("primary", "farm", "seed", "case")
+        .iter_rows()
+    )
+    absent = sorted(expected - scored)
+    report.line(
+        f"Units scored: {len(scored & expected)} of {len(expected)}; {len(absent)} could not be "
+        "built because the farm's record is too short for the injection (listed by Primary, farm, "
+        "case counts below)."
+    )
+    by_group: dict[tuple[str, str, str], int] = {}
+    for primary, farm, _, case in absent:
+        by_group[(primary, farm, case)] = by_group.get((primary, farm, case), 0) + 1
+    for (primary, farm, case), count in sorted(by_group.items()):
+        report.line(f"  missing: {primary} farm {farm} {case}: {count} seeds")
     missing = int(scores["n_missing_observed"].sum())
     report.line(f"Observed weeks with no fitted value (should be 0): {missing}.")
 

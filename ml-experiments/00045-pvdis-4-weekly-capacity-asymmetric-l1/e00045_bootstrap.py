@@ -242,17 +242,21 @@ def bootstrap_job(
     for case in COVERAGE_CASES:
         started = time.monotonic()
         unit = inject.Unit(primary=primary, farm=farm, seed=seed, case=case)
-        tables.append(
-            bootstrap_unit(
-                unit=unit,
-                base=base,
-                inputs=inputs,
-                farm_rows=farm_rows,
-                frozen=frozen,
-                ratio=1.0 if case == "constant_path" else ratios[(primary, "asymmetric")],
-                n_draws=n_draws,
+        try:
+            tables.append(
+                bootstrap_unit(
+                    unit=unit,
+                    base=base,
+                    inputs=inputs,
+                    farm_rows=farm_rows,
+                    frozen=frozen,
+                    ratio=1.0 if case == "constant_path" else ratios[(primary, "asymmetric")],
+                    n_draws=n_draws,
+                )
             )
-        )
+        except inject.UnbuildableUnitError:
+            print(f"{primary} {farm} {case}: skipped, the record is too short", flush=True)
+            continue
         print(f"{primary} {farm} {case}: {time.monotonic() - started:.0f} s", flush=True)
     score.atomic_write(frame=pl.concat(tables), path=out_file)
     return out_file
