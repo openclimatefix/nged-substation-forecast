@@ -1,7 +1,7 @@
 ---
 id: "00049"
 slug: vp1-screening-reference-under-p-roll-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For the 16 Primary substation demand series, once the XGBoost quantile model N1 is refitted every
@@ -51,89 +51,168 @@ row_set_id: fold_a_every5d_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity;
   MAE of the median and the exceedance rate of the 0.95 quantile are reported and decide nothing
-production_status: not-for-production
+verdict: supported
+best_arm: >-
+  The blend of five XGBoost models (monthly, weekly, weekly-analogue, pooled, and the stack) with
+  one weight vector per month, 4.968 points of capacity against 5.044 for the best single model,
+  weekly refits (difference -0.076, 99.17% interval -0.135 to -0.023)
+headline: >-
+  B1, the blend minus its best member: -0.076 points (99.17% interval -0.135 to -0.023). D0, the
+  re-tuned spread factor minus 1.15: -0.0001 (-0.012 to +0.018). F1, fingerprints in the pooled
+  model: +0.009 (-0.037 to +0.050). C1, C2, and C3 (drop-one arms): -0.017, +0.0002, and -0.003.
+lessons: >-
+  Averaging the quantiles of XGBoost models still lowers the Primary demand score by about 0.08
+  points once the models are retrained, so retraining and blending add. The spread factor does not
+  need re-tuning for a retrained model. The fingerprints do nothing under retraining either. The
+  COVID indicator is constant inside a 12-month window, so P-roll cannot test it.
+advice:
+  - >-
+    Keep the spread factor at 1.15 for retrained Primary demand models without the correction,
+    because choosing it on earlier months scored 0.0001 points lower than the fixed value (D0).
+  - >-
+    Treat a blend of the weekly-retrained N1, the weekly-analogue model, and the stack as the
+    Primary demand candidate to port, because it scored 0.076 points below the weekly N1 alone, and
+    the weights were 0.5, 0.25, and 0.25 in 10 of 11 months (B1).
+  - >-
+    Do not test the COVID indicator under P-roll, because the 12-month window holds no lockdown
+    days and the indicator is constant 0 there (C2).
+  - >-
+    Test the Christmas column on at least two winters before dropping it, because dropping it
+    scored 0.017 points lower on one winter (-0.058 to +0.007) (C1).
+  - >-
+    Do not add substation fingerprints to a pooled model that has the series identifier, whether
+    the model is retrained or not (F1, experiment 32).
+production_status: candidate
 adopted_in: none
 code: ml-experiments/00049-vp1-screening-reference-under-p-roll-demand/
 ---
 
 # Experiment 49: which Primary demand components still improve the score under monthly retraining?
 
-**We ask which parts of the Primary substation demand forecast still improve the score once the
-XGBoost model is refitted every month.** Experiment 34 found that refitting monthly lowered the
-forecast error, that the 14-day correction stopped helping, and that a cheap stand-in for monthly
-refitting (refit monthly on the latest 12 months of data, "P-roll") gives the same answers at a
-third of the cost. Every input the forecast uses was chosen on an XGBoost model trained once. We
-therefore (1) re-choose the spread factor, which widens the uncertainty band, on earlier months
-only, (2) re-run the experiment 35 blend with retrained XGBoost models, and (3) drop each adopted
-input in turn, and add the substation fingerprints of experiment 32 to a pooled XGBoost model, all
-under P-roll. Stage 0 uses only predictions that experiments 33 and 34 stored. Stage 1 refits the
-XGBoost models.
+**We asked which parts of the Primary substation demand forecast still improve the score once the
+XGBoost model is refitted every month.** The only change that clearly helped is averaging the
+forecasts of several XGBoost models: the average scored 0.08 points of capacity below the best
+single model. Re-tuning the spread factor that widens the forecast's uncertainty band, adding
+substation fingerprints to a shared model, and dropping the Christmas column or the half-life each
+moved the score by under 0.05 points, which this experiment could not tell from zero. The COVID
+indicator could not be tested at all, because the 12-month training window holds no lockdown days.
+The next experiments could test the blend in its weekly-refit form, and the Christmas column on a
+second winter.
 
-## Plan
+**Supported, on the blend alone.** Scores are the quantile score over all leads, in points of
+capacity (1 point is 1% of a series' effective capacity), for 16 Primary substations, 73 runs
+started 5 days apart from July 2025 to June 2026, ENS weather, seed 0, the spread factor 1.15
+included, and no 14-day correction. ENS is the ECMWF ensemble weather forecast. P-roll is the cheap
+stand-in for monthly refitting of experiment 34: refit monthly on the latest 12 months, 150 rounds,
+`eta` 0.15. Stage 0 re-used predictions that experiments 33 and 34 stored, and stage 1 refitted
+P-roll. The manager asked that the screening reference stay monthly P-roll, and that a weekly result
+from experiment 48 would not change the stage 0 findings. The code is in `ml-experiments/00049-*/`,
+and `e00049_stage0.py` and `e00049_stage1.py` print every number below.
 
-**Sizing.** The experiment stores new prediction tables under `data/ml-experiments/`, which are
-private and never committed. It does not touch the serving path or a degradation rule. More than
-one design would test the blend (this plan fixes five members) and the fingerprints (this plan uses
-both blocks). No code has callers that could not be named without searching, because the scripts
-are copies of those of experiments 34 and 35. The size is medium. The experiment gets a Sonnet plan
-review, a Sonnet code review, a Sonnet write-up review, and one Opus review of the result, as the
-manager's brief sets.
+![The six pre-registered contrasts](figure_1.svg)
 
-**Earlier advice followed.** Screen on P-roll, not a frozen XGBoost model, and leave the 14-day
-correction out of every arm (experiment 34). Report absolute scores. The plan departs from
-experiment 32's advice not to add fingerprints to a pooled model that has the series identifier,
-because experiment 34 left that contrast (R4) untested under retraining.
+| Id | Contrast | Difference | 99.17% interval | State |
+|---|---|---|---|---|
+| D0 | spread factor chosen on earlier months minus fixed 1.15, monthly refits | -0.0001 | -0.012 to +0.018 | null; no gain |
+| B1 | five-model blend minus best single model | -0.076 | -0.135 to -0.023 | port (threshold -0.05) |
+| C1 | P-roll without the Christmas column minus P-roll | -0.017 | -0.058 to +0.007 | unresolved |
+| C2 | P-roll without the COVID indicator minus P-roll | +0.0002 | -0.003 to +0.003 | no effect, by construction |
+| C3 | P-roll with a half-life of 2 years minus 0.5 years | -0.003 | -0.034 to +0.027 | unresolved |
+| F1 | pooled P-roll with fingerprints minus without | +0.009 | -0.037 to +0.050 | not worth porting |
 
-**Rows and files.** Every arm is restricted to seed 0 and to the 768,073 Primary cases in
-experiment 33's `metrics/Primary/shared_keys.parquet` that every arm holds, with valid time before
-2026-07-01. Stage 0 reads experiment 34's `work/arms/` files `monthly`, `weekly`, and `roll12`
-(spread factor 1.00, no correction), their `_s` files (factor 1.15), `a7_monthly_s`,
-`type_id_monthly_s`, `type_id_roll12_s`, and from `work/reference/` `n1_cs` (the stack),
-`manual_heuristic`, and `climatology`. The fixed factor 1.15 was chosen in experiment 19 on
+## Absolute scores
+
+| Arm | Score | 95% interval (months resampled) |
+|---|---|---|
+| Blend of five models, one weight vector per month | 4.968 | 4.634 to 5.329 |
+| Weekly refits, all history (best single model) | 5.044 | 4.688 to 5.430 |
+| Weekly-analogue model, monthly refits | 5.084 | 4.715 to 5.503 |
+| Monthly refits, all history | 5.118 | 4.724 to 5.575 |
+| P-roll, no Christmas column | 5.134 | 4.742 to 5.588 |
+| P-roll, half-life 2 years | 5.148 | 4.751 to 5.602 |
+| **P-roll (the screening reference)** | **5.150** | 4.760 to 5.604 |
+| P-roll, no COVID indicator | 5.151 | 4.760 to 5.604 |
+| Pooled by type, monthly refits, all history | 5.288 | 4.933 to 5.678 |
+| Pooled P-roll | 5.307 | 4.955 to 5.690 |
+| Pooled P-roll with fingerprints | 5.316 | 4.973 to 5.695 |
+| Stack (frozen N1, 14-day correction, spread 1.15) | 5.318 | 4.943 to 5.686 |
+| `manual_heuristic` | 5.888 | 5.392 to 6.389 |
+| `climatology` | 7.462 | 6.556 to 8.341 |
+
+The intervals on each score span months and are about plus or minus 0.4 points. The contrasts are
+paired and much tighter. Refitting P-roll with this experiment's code reproduced experiment 34's
+stored scores to within 0.0004 points for both references, so the drop-one contrasts are not noise
+from the refit.
+
+## Stage 0: stored predictions
+
+**The spread factor needs no re-tuning for a retrained model.** The score is flat from 1.05 to 1.15:
+monthly refits score 5.113 at their best factors, 1.075 and 1.10, and 5.118 at 1.15. The factor
+chosen on earlier months ranged from 1.025 to 1.125 over the months, and moved the score by -0.0001
+(D0). Weekly refits gave -0.002 and P-roll +0.0004. The factor 1.15 was chosen in experiment 19 on
 validation months that overlap these, so D0 is not fully out of sample.
 
-**Stage 0 (CPU, stored predictions).**
+![Quantile score against spread factor](figure_2.svg)
 
-- **D0.** For the monthly, weekly, and P-roll arms, apply factors 1.000 to 1.300 in steps of 0.025
-  about the median. The rolling-origin factor for runs started in month m is the factor that
-  minimises the all-lead score on cases whose run started before month m and whose valid time is
-  before month m's first day (experiment 35's rule). July 2025 has no history and uses 1.15. D0 is
-  the monthly arm; weekly and P-roll are descriptive. The report gives the score curve over the
-  factors and the in-sample best factor.
-- **B1.** The members are `monthly_s`, `weekly_s`, `a7_monthly_s` (weekly analogues, monthly
-  refits), `type_id_monthly_s` (pooled by type), and the stack `n1_cs`. One weight vector per
-  month, on a grid of quarters, is chosen on earlier months by the same rule. July 2025 uses equal
-  weights. Experiment 35's corner-cell stop rule is not applied. Descriptive arms: weights per lead
-  band, equal weights, and experiment 35's three members with the retrained N1 (`monthly_s`,
-  `a7_monthly_s`, `n1_cs`).
+**Blending still helps after retraining, by about as much as before.** B1 averages the quantiles of
+five XGBoost models: weekly refits, monthly refits, the weekly-analogue model, the pooled model, and
+the stack. In 10 of the 11 months with history the weights were 0.5 for weekly refits, 0.25 for the
+weekly-analogue model, and 0.25 for the stack, with zero for monthly refits and the pooled model; in
+October 2025 the weekly-analogue model took 0.5 and weekly refits 0.25. The gain, -0.076, is smaller
+than experiment 35's -0.097, as predicted. Descriptive contrasts at 95%: weights per lead band
+-0.062 (-0.100 to -0.025) against the weekly refits, equal weights -0.060 (-0.115 to -0.012), and
+experiment 35's three members with a retrained N1 (monthly refits, the weekly-analogue model, the
+stack) -0.096 (-0.139 to -0.058) against its best member, the weekly-analogue model. The five-model
+blend minus that three-model blend is -0.021 (-0.051 to +0.005), so the two extra models add nothing
+resolvable. Weekly minus monthly refits is -0.074 (-0.146 to -0.018), and monthly refits minus the
+stack -0.201 (-0.379 to -0.004), the experiment 34 figures on this row set.
 
-**Stage 1 (GPU, seed 0, `eta` 0.15, 150 rounds, 12-month window, spread factor 1.15).**
+## Stage 1: P-roll drop-one arms and fingerprints
 
-- **C0 and C0b (references).** Refit P-roll (C0) and the pooled-by-type P-roll model with the
-  series identifier (C0b) with the same code as the other arms. Every stage 1 contrast uses these
-  refits as its reference, so that GPU non-determinism cannot pass for a component effect. Each
-  refit's score is also compared with the stored `roll12_s` and `type_id_roll12_s`; a difference
-  above 0.03 points is reported as non-reproducible.
-- **C1.** P-roll without `days_to_christmas`. **C2.** P-roll without `covid_indicator`. **C3.**
-  P-roll with a half-life of 2 years.
-- **F1.** C0b plus 7 training-window statistics and 3 recent-window statistics, defined as in
-  experiment 32 except for the window. The training-window statistics of a refit use actuals in
-  the refit's 12-month window, strictly before the refit's cutoff (3.5 hours before the refit
-  time). The recent-window statistics of a case use the 14 days of actuals ending 2 days before the
-  case's run start, as experiment 32 does, so they respect the 3.5-hour publication delay. Training
-  rows apply the same rule at each training run. No statistic is weighted by the half-life.
-- GPU: about 5 arms at 0.2 hours each plus the pooled arms at about 0.3 to 0.5 each; at most 8 GB;
-  2 cores, two workers of one thread each.
+**P-roll could not resolve whether the Christmas column or the longer half-life matters.** Dropping
+the Christmas column lowered the score by 0.017 points (-0.058 to +0.007), which is the opposite
+sign to the prediction that the column stays worth keeping. The column is set only within 14 days of
+25 December, and the validation year holds one winter. A half-life of 2 years changed the score by
+-0.003 (-0.034 to +0.027). Neither interval fits inside the plus or minus 0.03 margin set in
+advance, so both are unresolved.
 
-**Interval method.** Whole validation months are resampled with
-`studies.bootstrap.bootstrap_difference_at_level`. Seeds add nothing, because the arms use seed 0.
-Experiment 34 found that months, not seeds, set the interval width, which is about plus or minus
-0.1 to 0.3 points for a structural change and under 0.05 for a column drop.
+**The COVID indicator cannot be tested under P-roll.** The 12-month training window holds no
+lockdown days, so the indicator is 0 in every training row and in every forecast, and C2 is +0.0002
+by construction. The finding says nothing about full-history models that still train on 2020 and
+2021.
 
-**Where the evidence is thin.** P-roll passed a rank test of three contrasts, and this experiment
-uses it for four more. One validation year with 12 months sets every interval. The blend rests on
-one experiment's members.
+**Substation fingerprints did not help the pooled model.** F1 is +0.009 points (-0.037 to +0.050),
+well inside experiment 32's finding on a frozen model, and far from the -0.10 needed to port a
+recent-window statistic. Experiment 34's fourth rank-test contrast (R4) was not run with full
+monthly refits, so whether P-roll matches full refits on fingerprints is untested.
 
-## Results
+## Failures and limits
 
-Not yet run.
+- **No fit failed.** The two reference refits reproduced the stored scores.
+- **One validation year with 12 months sets every interval,** and the seed is 0 for every arm.
+- **B1's best member is chosen with hindsight,** which makes the contrast stricter, never looser.
+  The blend's weights are chosen on earlier months only.
+- **D0 is not fully out of sample,** because the factor 1.15 came from experiment 19's
+  validation months, which overlap these.
+- **The stage 1 arms are P-roll, not full monthly refits,** so a contrast that experiment 34's
+  rank test did not cover (the COVID indicator, the half-life under a 12-month window) may differ
+  under full refits.
+- **Five members at weights in steps of a quarter** give 70 weight vectors per month. The stop rule
+  of experiment 35 was not applied.
+
+## What the next experiment should answer
+
+**Test the blend in its serving form: weekly-retrained N1, the weekly-analogue model refitted
+weekly, and the stack, with fixed weights 0.5, 0.25, and 0.25.** The weights settled there in 10 of
+11 months, and the weekly-analogue model has only been refitted monthly so far. Separately, test the
+Christmas column on a second winter, using the second validation year that the ENS backfill allows
+(R11). Experiments that screen a level-following input take P-roll (5.150 here) as their reference
+row.
+
+## Reviews
+
+**Plan review (Sonnet), triaged.** Accepted: take every drop-one contrast against a fresh refit of
+P-roll and add a pooled reference refit; state the fingerprint cutoffs; name the stored files and
+the 768,073 shared cases; one weight vector per month throughout, and the first-month weights;
+remove the unreachable "small gain" for the spread factor and the unusable "refuted" verdict; fix
+prose faults. Rejected: none.
