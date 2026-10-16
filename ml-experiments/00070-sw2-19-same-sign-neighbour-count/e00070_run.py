@@ -61,7 +61,7 @@ from e00070_detect import (
 )
 from e00070_detectors import alarms, prepare
 from e00070_endrule import first_return_intervals
-from e00070_inject import BLOCK, HEADLINE_BAND, Event, draw_events, events_frame
+from e00070_inject import BLOCK, HEADLINE_BAND, Event, Injection, draw_events, events_frame
 from e00070_intervals import build_intervals, relative_residual
 from e00070_long import draw_long_events
 from e00070_profile import SHAPES, Shape, fit_profile_shares, inject_shaped, shares_json
@@ -145,7 +145,7 @@ def build_detectors(
     return out
 
 
-def injected_inputs(*, seed: int, batch: list[Event], shape: Shape) -> tuple[dict, object]:
+def injected_inputs(*, seed: int, batch: list[Event], shape: Shape) -> tuple[dict, Injection]:
     """The injected residual of one batch and shape, and the injection."""
     panel = _STATE["panel"]
     injection = inject_shaped(

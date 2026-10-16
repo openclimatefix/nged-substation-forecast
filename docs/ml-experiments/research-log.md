@@ -1364,8 +1364,8 @@ verdict is `inconclusive`.
 ### 00070: does counting the neighbours that step the same way find more of the moved load? (SW2-19)
 
 **Counting how many neighbouring substations step in the same direction as the alarming substation
-finds more of the moved load on injected transfers, so the common-mode evidence the neighbour veto
-uses is worth keeping as a score input. The 35 labelled real transfers cannot confirm it.** A
+finds more of the moved load on injected transfers, so the count is worth testing again on more real
+transfers. The 35 labelled real transfers are too few to confirm the gain.** A
 logistic alarm score on the substation's own 24-hour step, the largest opposite neighbour step, the
 number of neighbours, and the same-sign neighbour count found 0.712 of the moved MW on 615 fresh
 headline-band transfers per injection shape that start in even months, against 0.665 for the
@@ -1373,8 +1373,9 @@ single-series detector with the PF14 end rule, a difference of +0.048 (97.5% int
 +0.096) at 80 odd-month unexplained alarms for both. The verdict is `supported`.
 
 - **Finding for later experiments:** the gain sits in transfers with no metered receiver and a
-  donor step of 2 to 4 noise units (68 of 537 found by PF14, 167 by the score). Long transfers gain
-  nothing (0.000). On the 35 labelled real transfers the score found 7 against PF14's 8.
+  donor step of 2 to 4 noise units (68 of 537 found by PF14, against 167 of 537 found by
+  LOGIT_SAME). Long transfers gain nothing (0.000). On the 35 labelled real transfers the score
+  found 7 against PF14's 8.
 - **Write-up and pull request:** [the full result
   page](00070-sw2-19-same-sign-neighbour-count/result.md), PR PRNUMBER.
 

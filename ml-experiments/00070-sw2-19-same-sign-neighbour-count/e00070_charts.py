@@ -133,11 +133,11 @@ def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
                         "n": n,
                     }
                 )
-    steps = list(dict.fromkeys(r["step"] for r in rows))
+    steps = [str(step) for step in dict.fromkeys(r["step"] for r in rows)]
     chart = (
         alt.Chart(pl.DataFrame(rows))
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "step:N", sort=steps, title="Donor step (noise units)", axis=alt.Axis(labelAngle=0)
             ),
