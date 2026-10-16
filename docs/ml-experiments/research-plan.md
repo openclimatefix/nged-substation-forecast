@@ -19,8 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
-| [SW2-14](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does a single score that adds single-series step evidence and neighbour opposite-step evidence beat both the gate (D1) and the veto (experiment 55) at the same alarm rate? | 2 | Nothing (experiments 58 and 59 are done) | Proposed |
-| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-14 and SW2-9 | Proposed; the heaviest of the three |
+| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-16](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Does experiment 61's end rule (the interval ends at the strongest opposite step within a cap) also find more of the moved MW at the 4-hour window, and with a cap longer than 14 days? | 2 | Nothing | Proposed; its winner becomes the baseline detector for later SW2 experiments |
 | [SW2-17](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their onset, and does an onset rule that a later return step confirms recover them? | 2 | SW2-16 | Proposed |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
@@ -207,13 +206,10 @@ transfers whose shapes the detector does not assume (a constant MW, a share of t
 profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
 day.
 
-- **SW2-14, one combined score.** Add the single-series step evidence and the neighbour
-  opposite-step evidence into one score, so that strong evidence on either side can raise an alarm
-  and neither side acts as a gate. Two versions, fixed before any fit: a likelihood-ratio sum of
-  the two calibrated statistics, and a small logistic regression on both statistics plus topology
-  (the number of metered neighbours, and whether any neighbour is metered in MVA). The logistic
-  regression trains on odd-month injections only. The benchmarks are D1 and experiment 55's veto
-  at the same alarm rate.
+- **SW2-14 (done, [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)):**
+  a likelihood-ratio sum and a logistic regression of own and neighbour opposite steps gained +0.005
+  and +0.019 over the single-series detector (neither interval excludes zero). A post hoc arm that
+  adds the count of same-sign neighbour steps gained +0.034.
 - **SW2-15, the joint edge-flow estimator** from approach 3 on the [switching
   events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
   a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
