@@ -326,7 +326,10 @@ first proposal in four ways:
   and not -1, because the forecast already holds part of the anomaly. The slope on `d1l` is unmeasured
   and is reported before the verdict. The shift is minus the capacity times the solar anomaly over the
   effective capacity, with the coefficient fixed at 1. One version uses CAMS at the valid time (the
-  oracle) and one uses the ENS forecast, calibrated to CAMS by lead band on the training window.
+  oracle) and one uses the ENS forecast. The ENS version fits, by series and lead band on the training
+  window, a slope of the CAMS anomaly on the ensemble-mean ENS anomaly, applies it to the ensemble
+  mean, and adds each member's deviation from the mean unscaled, because attenuation is right for
+  the mean and wrong for the spread.
 - **The capacity is experiment 00040's C for season-year 2023/24,** which exists for 6 of the 8
   Primaries metered in MW. The verdict uses the five that are not flagged, with Trusthorpe (D9)
   reported with and without. A sensitivity read repeats the shift with the headline estimate in
@@ -336,7 +339,9 @@ first proposal in four ways:
   current), and the maintainer may change it. Two contrasts decide the verdict, read at 97.5%.
   PVDIS-5 is a gain test only if the ENS solar term also lies wholly below the best guess (C6).
   A supported verdict is unlikely: experiment 00031's linear offset (A4) scored +0.012 (-0.051 to
-  +0.081).
+  +0.081). The expected half-width of C3 is about 0.4 points, so inconclusive is the likely
+  verdict. C6 stays a finding in its own right, because a solar term no worse than the best guess
+  is useful even if C3 misses 0.35.
 
 #### PVDIS-4: a capacity series that rises easily and falls reluctantly
 
