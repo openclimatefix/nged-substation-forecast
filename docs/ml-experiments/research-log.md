@@ -1092,7 +1092,7 @@ changed the error by +0.003 (-0.071 to +0.084, post hoc), so clipping is not dis
 scale error. The members of the European Centre for Medium-Range Weather Forecasts ensemble forecast
 (ENS) add 0.129 points (0.057 to 0.212) to the correction's quantile score at 2 and 3 days ahead.
 
-- **Finding for later experiments:** fit the solar coefficient per lead band and season, test
+- **Findings that bear on later experiments:** fit the solar coefficient per lead band and season, test
   dropping the member spread, and test non-inferiority against `d0` with a margin the PVDIS-5 plan
   confirms or halves (0.10 points was set here), judged on at least 25 weeks of forecast start.
 - **Open cause:** the page does not say why the coefficient is below 1. Overstated capacity, error
