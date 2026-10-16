@@ -29,6 +29,7 @@ the maintainer to confirm.
 | [00035 - Quantile blend of stored models](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
 | [00049 - Screening reference under monthly retraining](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Serve an average of the quantiles of five XGBoost models for Primary demand (weekly refits, monthly refits, the weekly-analogue model, the pooled model, the stack) | Lowers the quantile score by 0.08 points (-0.14 to -0.02) against the weekly-retrained N1 on one validation year; needs five models; the spread factor and the fingerprints do not change the score |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction | Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again |
+| [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Give the XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the calibrated ENS sunshine anomaly, with a weight fitted per series, lead band, and season, and zero beyond 10 days) | Lowers the quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess; the live service cannot yet supply the inputs, the capacity held is stale, and the weights rest on one summer |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
 
 ## The experiments so far
@@ -99,6 +100,7 @@ the maintainer to confirm.
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
 | [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
 | [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as an upper limit: -0.198 (-0.316 to -0.069) points of capacity against a 0.15 target; the UKV data are a research archive, not the live feed | Not for production | 2026-10-16 |
+| [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Does a Primary demand forecast with an explicit solar term (capacity times a calibrated forecast of the sunshine anomaly) match the best guess by 0.10 points of capacity, and beat its placebo twin? | Supported: the base-margin arm `am` is -0.152 (-0.199 to -0.111) against the best guess at 98.75% | Candidate | Pending |
 | [00063 - SW2-10 joint fit, v2 in miniature](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) | Does one linear fit per Primary, holding a weather baseline without radiation, embedded solar capacity times the CAMS sunshine shape, and a share term per labelled transfer, beat the frozen v1 baseline outside switching, and recover injected solar and transfers? | Inconclusive: C1 is -0.322 points of capacity (-0.437 to -0.207) at 5 Primaries, close to the 0.35-point threshold, but both injection gates failed for reasons of test design | Not for production | Pending |
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
@@ -391,6 +393,12 @@ correction (row set `fold_a_every5d_v1`, 16 Primary substations).
   CRPS.** CAMS-trained solar lowered the member-average error by 0.14 points (00012) and the
   mixture's CRPS by 0.009 (00020), and a stage 0 mapping widened the member spread by a quarter. A
   power-curve base margin lowered the wind CRPS by 0.055 (00020).
+- **Attach the forecast solar term to the XGBoost model as a base margin, with a weight fitted on
+  the training window and zero beyond 10 days.** The base-margin arm lowered the Primary demand
+  quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess `d0` and
+  0.256 against `d1l`, where the fixed-coefficient shift of 00046 lowered `d1l` by 0.056, and
+  subtracting the forecast solar from a model trained on gross demand was not shown to match the
+  best guess (00064).
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -1598,6 +1606,37 @@ service could get.
 - **Write-up:** [result](00054-product-trained-xgboost-wind-farms/result.md).
 
 ![Contrasts between the arms](00054-product-trained-xgboost-wind-farms/figure_1.svg)
+
+### 00064: does demand minus forecast solar match the best guess? (PVDIS-5)
+
+**Giving the XGBoost model the forecast solar output as a starting offset (a fixed amount added to
+every tree prediction) beat `d0`, the best-guess recipe of experiment 33, by 0.15 points of
+capacity.** Subtracting the forecast solar from an XGBoost model trained on gross demand (metered
+power plus the panels' output) was not shown to score within 0.10 points of `d0`. The verdict is
+`supported`. We built four Primary demand forecasts that each carry an explicit solar term. The
+solar term is the panels' capacity times a calibrated forecast of the sunshine anomaly from the
+European Centre for Medium-Range Weather Forecasts ensemble (ENS). We scored the forecasts on 5
+Primary substations over daylight half-hours of April to September. The starting-offset arm `am`
+scores -0.152 points (98.75% interval -0.199 to -0.111) against the best guess `d0` and -0.300
+(-0.407 to -0.198) against its placebo twin, which is the same arm given the solar shape of another
+date. At leads under 48 hours the gain is -0.272 (-0.420 to -0.145).
+
+- **Finding for later experiments:** the fitted weight on the ENS shift is -0.60 to -0.29, well
+  short of -1, and the slope on the true-sunshine shift stays at about -0.73 when the lagged-power
+  and cloud-proxy columns are removed, which points to noise in the Copernicus Atmosphere Monitoring
+  Service (CAMS) sunshine estimate or a mismatch between its shape and the panels' output; the
+  diagnostic does not separate the two, and the cloud-proxy columns absorb about 0.15 of the slope
+  at leads under 2 days. The weight was set to zero beyond 10 days, where the ENS anomaly has a
+  correlation of 0.03 with CAMS.
+- **Arm `b`:** training on gross demand and subtracting the forecast solar scores +0.105 (-0.090 to
+  +0.292) against `d0`, so it is not shown to match, and it is worse than `d0` from 6 days.
+- **What is untested:** a capacity table current for the validation year (the capacity held is 5% to
+  19% below experiment 45's 2025/26 constants), more than one summer in the weights, and the live
+  service supplying a base margin.
+- **Write-up:** [result](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md),
+  [PR #1294](https://github.com/openclimatefix/nged-substation-forecast/pull/1294).
+
+![Quantile score of each arm, and the planned contrasts](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/figure_1_headline.svg)
 
 ### 00063: does a linear joint fit of baseline, solar, and transfers beat the Flexpectation v1 baseline? (SW2-10)
 

@@ -109,9 +109,9 @@ without one substation (see the limits). Weekly refitting also beat monthly refi
 0.13 points. Neither the 7-day nor the 14-day error correction helped a weekly-refitted model,
 although neither was shown to hurt it at the strict level. At the 2 bulk supply point (BSP) and 2
 grid supply point (GSP) substations, which sit above the Primary substations, weekly refitting
-scored 0.66 points below the stack, more than we predicted. For 6 solar farms and 3 wind farms, refitting the weather-to-power
-model monthly changed the score by 0.04 points or less, so this experiment found no accuracy reason
-to refit generation models. The verdict is **supported**, and the open test is a second validation
+scored 0.66 points below the stack, more than we predicted. For 6 solar farms and 3 wind farms,
+refitting the weather-to-power model monthly changed the score by 0.04 points or less, so this
+experiment found no accuracy reason to refit generation models. The verdict is **supported**, and the open test is a second validation
 year, because the 292 runs share their months and weather with the 73 that experiment 34 scored.
 
 **Terms used below.** The stack uses a spread factor of 1.15 that widens its forecast uncertainty;
