@@ -76,10 +76,11 @@ the maintainer to confirm.
 | [00043 - Switching detector scoreboard](00043-sw2-1-detector-scoreboard/result.md) | How well do experiment 37's detectors find injected transfers when both start and end must be right? | Refuted at the 24-hour window: D1 minus D0 is -0.081 (-0.130 to -0.037); the 4-hour window reverses (+0.087) | Not for production | 2026-10-16 |
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
+| [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
+| [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
-
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
 **Stage 1a trained on ERA5 forecasts solar and wind power better than the same columns trained on
@@ -1123,6 +1124,45 @@ scale error. The members of the European Centre for Medium-Range Weather Forecas
 - **Write-up:** [result](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md).
 
 ![Residual of the best guess against the oracle shift](00051-pvdis-3b-midday-loss-of-the-solar-term/figure_4_residual_against_shift.svg)
+
+### 00052: do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?
+
+**We asked whether averaging the wind best guess with the same ERA5-trained wind-power model fed
+ICON-EU's and IFS 0.25 degree's forecast wind lowers the quantile score at 1 to 2 days ahead.** The
+test covered the three metered wind farms. The average scored 0.055 points of capacity better at
+lead days 1 and 2 (95% interval -0.200 to +0.072), against a threshold of 0.15, so the verdict is
+`inconclusive`. Over all leads it scored 0.018 worse (-0.020 to +0.054).
+
+- **Finding for later experiments:** the products fed were runs about half a day older than the ENS
+  run, with no bias correction. The blend scored worse at lead days 3 to 6 (+0.122; 95% interval
+  +0.028 to +0.221) only because of a spread factor fitted on earlier blends, since its weights
+  equal the best guess from August (+0.005 without the factor). One farm scored -0.233 (-0.447 to
+  -0.035) at days 1 and 2 and another +0.151 (+0.028 to +0.287); both reads are exploratory. The
+  placebo passed: weight selection rejected the shuffled forecasts.
+- **Write-up:** [result](00052-more-nwp-products-for-wind-farms/result.md).
+
+![Each blend minus the best guess](00052-more-nwp-products-for-wind-farms/figure_1.svg)
+
+### 00047: does a bank-holiday column in the demand model help the switching detector?
+
+**Adding the days to the nearest bank holiday to the demand model did not measurably raise the share
+of simulated load transfers the 24-hour single-series detector finds, so the verdict is
+inconclusive.** The share found rose from 0.348 to 0.360 (+0.011, 98.75% interval -0.010 to +0.044)
+on 89 simulated transfers of 25% to 40% of the receiving load lasting over 1 day, with both models
+matched to raise the same number of alarms in odd months that the switching log does not explain. The
+experiment cannot resolve a gain below about 0.04.
+
+- **Finding for later experiments:** the column cut unexplained alarms within 1 day of a bank holiday
+  from 26 to 9 or 10 and the demand model's error on bank holidays by about 1.15 points of capacity,
+  but the matched threshold rose by 0.22 instead of falling, probably because the residual became
+  more persistent, so the detector gained nothing. Matching on odd months left the new model at 64
+  to 67 unexplained alarms in even months against 71 to 80 for the baseline.
+- **Series status:** experiment 43 was refuted at the 24-hour window and this experiment is
+  inconclusive; neither found a detector improvement.
+- **Write-up and pull request:** [the full result page](00047-sw2-4-better-residual-switching-detector/result.md),
+  [PR #1268](https://github.com/openclimatefix/nged-substation-forecast/pull/1268).
+
+![Unexplained 24-hour alarms by days to the nearest bank holiday](00047-sw2-4-better-residual-switching-detector/figure_6_alarms_by_holiday_distance.svg)
 
 ### 00053: does the UKV forecast the solar anomaly better than ENS? (PVDIS part 8b)
 
