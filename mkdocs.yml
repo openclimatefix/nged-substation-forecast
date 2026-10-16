@@ -178,6 +178,8 @@ nav:
       - "Is detecting a switching event worth anything to the forecast?": ml-experiments/00038-switching-mask-value/result.md
       - "Can a CAMS-driven fit separate embedded solar from Primary substation demand?": ml-experiments/00039-pv-disaggregation-cams-injection/result.md
       - "How far can the capacity fitted to embedded solar be trusted?": ml-experiments/00040-pv-capacity-error-bars/result.md
+      - "Can a labeller pass a known-answer gate on switching events?": ml-experiments/00041-sw2-0a-labeller-gate/result.md
+      - "Which logged switching jobs show up in the power readings?": ml-experiments/00041-sw2-0a-labeller-gate/labelled-set.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
