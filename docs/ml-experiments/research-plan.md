@@ -21,7 +21,6 @@ sooner.
 | [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-18](#sw2-18-and-sw2-19-onsets-lost-to-refits-and-gaps-and-the-same-sign-neighbour-count) | Does removing the monthly-refit suppression and bridging data gaps recover the real transfers whose onset PF14 misses, without raising the alarm rate? | 2 | Nothing | Proposed; 9 of the 24 unalarmed real transfers in experiment 69 |
-| [SW2-19](#sw2-18-and-sw2-19-onsets-lost-to-refits-and-gaps-and-the-same-sign-neighbour-count) | Does adding the count of neighbours that step the same way to the logistic score of experiment 65 find more of the moved MW than PF14 alone, pre-registered? | 2 | Nothing | Proposed; confirms experiment 65's post hoc +0.034 |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
@@ -233,8 +232,6 @@ labelled start.
   gap with the 24 hours after it. The benchmark is PF14 at the same alarm rate. Onset tolerances
   that scale with the transfer's duration are reported as a scoring sensitivity for every arm and
   decide nothing.
-- **SW2-19** repeats experiment 65's post hoc arm as a pre-registered contrast: the logistic score
-  with the count of neighbours that step the same way, against PF14, on a fresh injection draw.
 
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 
