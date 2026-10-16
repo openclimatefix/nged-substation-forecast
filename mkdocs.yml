@@ -182,6 +182,7 @@ nav:
       - "Can a labeller pass a known-answer gate on switching events?": ml-experiments/00041-sw2-0a-labeller-gate/result.md
       - "Which logged switching jobs show up in the power readings?": ml-experiments/00041-sw2-0a-labeller-gate/labelled-set.md
       - "How much of the best guess's daylight error is embedded solar?": ml-experiments/00046-embedded-solar-share-of-primary-forecast-error/result.md
+      - "Why does the solar term lose at sunny summer middays?": ml-experiments/00051-pvdis-3b-midday-loss-of-the-solar-term/result.md
       - "How well do the two existing switching detectors find transfers?": ml-experiments/00043-sw2-1-detector-scoreboard/result.md
       - "How much do labelled switching events hurt the best guess?": ml-experiments/00044-sw2-2-switching-share-of-best-guess-score/result.md
       - "Do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?": ml-experiments/00052-more-nwp-products-for-wind-farms/result.md
