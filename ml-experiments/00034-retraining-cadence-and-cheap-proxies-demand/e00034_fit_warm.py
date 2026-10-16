@@ -20,14 +20,18 @@ Output: `work/anchor_preds/warm<k>_<regime>/`, in the format of `e00034_fit.py`.
 
 import argparse
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Final
 
 import e00034_common as common
 import e00034_fit as fitting
 import e00034_regimes as regimes
 import polars as pl
 import xgboost as xgb
+
+DAILY_START: Final[datetime] = regimes.MONTHLY[0].replace(hour=9) + timedelta(days=1)
+"""Daily updates run at the origin time of day, 09:00 UTC, from 2025-07-02."""
 
 
 def update_times(*, regime: str) -> list[datetime]:
@@ -36,6 +40,8 @@ def update_times(*, regime: str) -> list[datetime]:
         return list(regimes.MONTHLY[1:])
     if regime == "weekly":
         return list(regimes.WEEKLY[1:])
+    if regime == "daily":
+        return [DAILY_START + timedelta(days=i) for i in range(364)]
     msg = f"unknown regime {regime}"
     raise ValueError(msg)
 
@@ -46,11 +52,14 @@ def served_origins(*, regime: str, origins: list[datetime]) -> dict[datetime, li
     The monthly and weekly chains forecast the origins their refit times serve in the cold
     regimes.
     """
+    if regime == "daily":
+        return {o: [o] for o in regimes.daily_refits(origins=origins)}
     return regimes.served(name=regime, origins=origins)
 
 
 def write_atomic(*, frame: pl.DataFrame, seed: int, target: Path) -> None:
     """Write a refit's predictions through a temporary file."""
+    target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(".tmp")
     frame.with_columns(seed=pl.lit(seed).cast(pl.Int8)).write_parquet(tmp)
     tmp.rename(target)
@@ -59,7 +68,7 @@ def write_atomic(*, frame: pl.DataFrame, seed: int, target: Path) -> None:
 def main() -> None:
     """Run the warm-start chains and write their predictions."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--regime", choices=("monthly", "weekly"), required=True)
+    parser.add_argument("--regime", choices=("monthly", "weekly", "daily"), required=True)
     parser.add_argument("--rounds", type=int, nargs="+", default=[20])
     parser.add_argument("--groups", nargs="+", default=["Primary"])
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])

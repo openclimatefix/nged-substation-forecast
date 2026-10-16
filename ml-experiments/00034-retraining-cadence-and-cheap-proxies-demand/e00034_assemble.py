@@ -57,11 +57,18 @@ ARMS: Final[dict[str, Arm]] = {
     "daily": Arm("n1h_daily", "daily", (0,), history="weekly"),
     "monthly_2y": Arm("n1_2y", "monthly", (0,)),
     "roll12": Arm("roll12", "monthly", (0,)),
+    "a7_monthly": Arm("a7", "monthly", (0,)),
+    "a7_three_a_year": Arm("a7", "three_a_year", (0,)),
+    "a7_roll12": Arm("a7_roll12", "monthly", (0,)),
+    "type_id_monthly": Arm("type_id_n1h", "monthly", (0,)),
+    "type_id_three_a_year": Arm("type_id_n1h", "three_a_year", (0,)),
+    "type_id_roll12": Arm("type_id_roll12", "monthly", (0,)),
     **{
         f"warm{k}_{regime}": Arm(f"warm{k}_{regime}", regime, (0,))
         for k in (20, 50)
         for regime in ("monthly", "weekly")
     },
+    "warm20_daily": Arm("warm20_daily", "daily", (0,), history="warm20_weekly"),
 }
 
 

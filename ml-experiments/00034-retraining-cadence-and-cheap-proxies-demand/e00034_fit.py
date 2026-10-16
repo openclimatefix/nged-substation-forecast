@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Final
 
 import e00034_common as common
+import e00034_lags as lags
 import e00034_regimes as regimes
 import numpy as np
 import polars as pl
@@ -58,6 +59,7 @@ class Config:
             `None` for the whole history.
         rounds: Boosting rounds.
         eta: Learning rate.
+        a7: Add experiment 00030's weekly-analogue mean and median as input columns.
     """
 
     name: str
@@ -65,34 +67,48 @@ class Config:
     window_days: float | None
     rounds: int
     eta: float
+    a7: bool = False
 
 
 CONFIGS: Final[dict[str, Config]] = {
     "n1h": Config("n1h", common.SHORT_HALF_LIFE_DAYS, None, common.N_ROUNDS, 0.05),
     "n1_2y": Config("n1_2y", common.RECENCY_HALF_LIFE_DAYS, None, common.N_ROUNDS, 0.05),
     "roll12": Config("roll12", common.SHORT_HALF_LIFE_DAYS, 365.0, 150, 0.15),
+    "a7": Config("a7", common.SHORT_HALF_LIFE_DAYS, None, common.N_ROUNDS, 0.05, a7=True),
+    "a7_roll12": Config("a7_roll12", common.SHORT_HALF_LIFE_DAYS, 365.0, 150, 0.15, a7=True),
 }
 
 
-def input_columns() -> list[str]:
+def input_columns(*, a7: bool = False) -> list[str]:
     """Return the input columns in matrix order."""
     return [
         *common.feature_columns(calendar=True),
         *common.N1_EXTRA_COLUMNS,
         *common.LAG_COLUMNS,
+        *(lags.A7_COLUMNS if a7 else ()),
     ]
 
 
-def add_lags(*, frame: pl.DataFrame, power: np.ndarray) -> pl.DataFrame:
-    """Add the three origin lags to a frame with a run's origin and valid times."""
-    lags = common.origin_lags(
-        power=power,
-        target=np.asarray(common.grid_index(times=frame["valid_time"])),
-        origin=np.asarray(common.grid_index(times=frame["power_fcst_init_time"])),
+def add_lags(*, frame: pl.DataFrame, power: np.ndarray, a7: bool = False) -> pl.DataFrame:
+    """Add the three origin lags (and the A7 summaries if `a7`) to a frame of runs."""
+    target = np.asarray(common.grid_index(times=frame["valid_time"]))
+    origin = np.asarray(common.grid_index(times=frame["power_fcst_init_time"]))
+    out = frame.with_columns(
+        pl.DataFrame(
+            common.origin_lags(power=power, target=target, origin=origin),
+            schema=list(common.LAG_COLUMNS),
+            orient="row",
+        ).cast(pl.Float32)
     )
-    return frame.with_columns(
-        pl.DataFrame(lags, schema=list(common.LAG_COLUMNS), orient="row").cast(pl.Float32)
-    )
+    if a7:
+        out = out.with_columns(
+            pl.DataFrame(
+                lags.a7_lags(power=power, target=target, origin=origin),
+                schema=list(lags.A7_COLUMNS),
+                orient="row",
+            ).cast(pl.Float32)
+        )
+    return out
 
 
 def mixture_quantiles(*, member_quantiles: np.ndarray) -> np.ndarray:
@@ -108,7 +124,7 @@ def mixture_quantiles(*, member_quantiles: np.ndarray) -> np.ndarray:
     return np.sort(pooled, axis=1).astype(np.float32)
 
 
-def training_rows(*, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
+def training_rows(*, row: dict, arrays: common.SeriesArrays, a7: bool = False) -> pl.DataFrame:
     """Return one series' control-member rows to 2026-06-29 with derived columns and lags.
 
     The power of the rows after 2025-06-30 is filled from the dense grid. Every row's refit
@@ -141,7 +157,7 @@ def training_rows(*, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
     rows = rows.with_columns(
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
     )
-    return add_lags(frame=rows, power=arrays.power)
+    return add_lags(frame=rows, power=arrays.power, a7=a7)
 
 
 def known_rows(*, rows: pl.DataFrame, refit: datetime, window_days: float | None) -> pl.DataFrame:
@@ -156,12 +172,12 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime, window_days: float | None
 
 
 def train_matrix(
-    *, rows: pl.DataFrame, row: dict, refit: datetime, half_life_days: float
+    *, rows: pl.DataFrame, row: dict, refit: datetime, half_life_days: float, a7: bool = False
 ) -> xgb.DMatrix:
     """Return the weighted training matrix of one series' rows, weights anchored at `refit`."""
     age_days = (refit - rows["valid_time"]).dt.total_seconds() / 86_400
     return xgb.DMatrix(
-        rows.select(input_columns()).to_numpy().astype(np.float32),
+        rows.select(input_columns(a7=a7)).to_numpy().astype(np.float32),
         label=(rows["power"] / row["effective_capacity_mw"]).to_numpy(),
         weight=0.5 ** (age_days.to_numpy() / half_life_days),
     )
@@ -177,7 +193,7 @@ def fit(*, matrix: xgb.DMatrix, seed: int, config: Config) -> xgb.Booster:
 
 
 def prepared_runs(
-    *, row: dict, arrays: common.SeriesArrays, origins: set[datetime]
+    *, row: dict, arrays: common.SeriesArrays, origins: set[datetime], a7: bool = False
 ) -> dict[datetime, tuple[pl.DataFrame, np.ndarray, int]]:
     """Return each needed validation run's keys, input matrix, and member count for one series."""
     out = {}
@@ -187,14 +203,14 @@ def prepared_runs(
         if origin not in origins:
             continue
         run = common.with_derived(frame=run, latitude=row["latitude"], longitude=row["longitude"])
-        run = add_lags(frame=run, power=arrays.power).sort("valid_time", "ensemble_member")
+        run = add_lags(frame=run, power=arrays.power, a7=a7).sort("valid_time", "ensemble_member")
         members = run["ensemble_member"].n_unique()
         if run.height != run.select(*common.KEYS).n_unique() * members:
             msg = "every valid time must hold every member"
             raise ValueError(msg)
         out[origin] = (
             run.select(*common.KEYS).unique(maintain_order=True),
-            run.select(input_columns()).to_numpy().astype(np.float32),
+            run.select(input_columns(a7=a7)).to_numpy().astype(np.float32),
             members,
         )
     return out
@@ -291,14 +307,18 @@ def main() -> None:
         ]
         if not todo:
             continue
-        rows = training_rows(row=row, arrays=site)
-        prepared = prepared_runs(row=row, arrays=site, origins=needed)
+        rows = training_rows(row=row, arrays=site, a7=config.a7)
+        prepared = prepared_runs(row=row, arrays=site, origins=needed, a7=config.a7)
         for group, seed, refit in todo:
             started = time.monotonic()
             known = known_rows(rows=rows, refit=refit, window_days=config.window_days)
             model = fit(
                 matrix=train_matrix(
-                    rows=known, row=row, refit=refit, half_life_days=config.half_life_days
+                    rows=known,
+                    row=row,
+                    refit=refit,
+                    half_life_days=config.half_life_days,
+                    a7=config.a7,
                 ),
                 seed=seed,
                 config=config,

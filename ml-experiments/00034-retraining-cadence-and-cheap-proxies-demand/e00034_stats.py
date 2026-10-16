@@ -10,6 +10,7 @@ contrast keeps the cases its two arms share and the seeds both hold.
     uv run python ml-experiments/00034-*/e00034_stats.py
 """
 
+import argparse
 from pathlib import Path
 from typing import Final
 
@@ -27,6 +28,10 @@ SCOPES: Final[tuple[tuple[str, float, float], ...]] = (
 )
 N_RESAMPLES: Final[int] = 20_000
 PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 8)
+SKIP_ABSOLUTE: Final[frozenset[str]] = frozenset(
+    {"production_c", "production_cs", "climatology_c", "climatology_cs", "manual_heuristic_c"}
+)
+"""Reference arms whose forms add nothing to the page."""
 GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
 
 # id: (group, treatment, reference)
@@ -43,10 +48,18 @@ PLANNED: Final[dict[str, tuple[str, str, str]]] = {
 EXPLORATORY: Final[dict[str, tuple[str, str, str]]] = {
     "X_daily_vs_weekly": ("Primary", "daily_s", "weekly_s"),
     "X_daily_vs_monthly": ("Primary", "daily_s", "monthly_s"),
-    "X_daily_c": ("Primary", "daily_cs", "daily_s"),
+    "X_daily_correction": ("Primary", "daily_cs", "daily_s"),
+    "X_warm_daily_vs_weekly": ("Primary", "warm20_daily_s", "warm20_weekly_s"),
+    "X_warm_daily_vs_monthly": ("Primary", "warm20_daily_s", "warm20_monthly_s"),
+    "X_warm_daily_correction": ("Primary", "warm20_daily_cs", "warm20_daily_s"),
+    **{
+        f"X_stack_{arm}_{form}": ("Primary", f"{arm}_{form}", "n1_cs")
+        for arm in ("yearly", "half_yearly", "quarterly", "monthly", "weekly")
+        for form in ("s", "cs")
+    },
     "X_half_yearly": ("Primary", "half_yearly_s", "yearly_s"),
     "X_quarterly_vs_half": ("Primary", "quarterly_s", "half_yearly_s"),
-    "X_monthly_vs_frozen_22": ("Primary", "monthly_s", "w22_ens_s"),
+    "X_monthly_vs_frozen_22": ("Primary", "monthly", "w22_ens"),
     "X_monthly_vs_n1": ("Primary", "monthly_s", "n1"),
     "X_bsp_monthly_vs_frozen": ("BSP", "monthly_s", "yearly_s"),
     "X_gsp_monthly_vs_frozen": ("GSP", "monthly_s", "yearly_s"),
@@ -172,6 +185,8 @@ def absolute_rows() -> list[dict[str, object]]:
     """Return every arm's mean metrics per group and scope, with intervals on the headline three."""
     rows = []
     for path in sorted(METRICS_DIR.glob("*.parquet")):
+        if path.stem in SKIP_ABSOLUTE:
+            continue
         frame = pl.read_parquet(path)
         for group in GROUPS:
             part_group = frame.filter(pl.col("group") == group)
@@ -202,24 +217,40 @@ def absolute_rows() -> list[dict[str, object]]:
 
 def main() -> None:
     """Write the absolute and contrast tables."""
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    pl.DataFrame(absolute_rows(), infer_schema_length=None).write_parquet(
-        RESULTS_DIR / "absolute.parquet"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--parts",
+        nargs="+",
+        choices=("absolute", "planned", "exploratory", "rank"),
+        default=["absolute", "planned", "exploratory", "rank"],
     )
+    parser.add_argument("--ids", nargs="+", help="read only these contrast ids")
+    args = parser.parse_args()
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    if "absolute" in args.parts:
+        pl.DataFrame(absolute_rows(), infer_schema_length=None).write_parquet(
+            RESULTS_DIR / "absolute.parquet"
+        )
     rows = []
     for family, specs, planned in (
         ("planned", PLANNED, True),
         ("exploratory", EXPLORATORY, False),
         ("rank", rank_contrasts(), False),
     ):
+        if family not in args.parts:
+            continue
         for contrast_id, spec in specs.items():
+            if args.ids and contrast_id not in args.ids:
+                continue
             rows += [
                 {**r, "family": family}
                 for r in contrast(contrast_id=contrast_id, spec=spec, planned=planned)
             ]
             print(f"{contrast_id} done", flush=True)
     result = pl.DataFrame(rows, infer_schema_length=None)
-    result.write_parquet(RESULTS_DIR / "contrasts.parquet")
+    result.write_parquet(
+        RESULTS_DIR / f"contrasts_{'_'.join(args.parts)}{'_ids' if args.ids else ''}.parquet"
+    )
     with pl.Config(tbl_rows=200, tbl_cols=12, fmt_str_lengths=40):
         print(
             result.filter((pl.col("scope") == "all leads") & (pl.col("metric") == "qs")).select(
