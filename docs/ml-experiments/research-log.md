@@ -84,6 +84,7 @@ the maintainer to confirm.
 | [00058 - Switching event detector, part 5b](00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md) | Is the gap in recall between injected transfers with and without a metered receiver a step-size effect of the injection, and does a veto stronger than 1.5 noise units find more transfers? | Partly supported: step size explains at least half the gap; the stronger veto gained +0.013 (98.33% interval 0.000 to +0.029) | Not for production | 2026-10-16 |
 | [00059 - Switching event detector, part 6](00059-sw2-13-several-windows-in-one-detector/result.md) | Does one detector that combines the step statistic at windows of 4, 12, 24, and 48 hours find more injected transfers, by MW moved, than the best single window at the same unexplained-alarm count? | Refuted: the 24-hour window finds 0.473 of the moved MW and the maximum of four windows 0.423 (difference -0.050, 97.5% interval -0.094 to -0.022) | Not for production | 2026-10-16 |
 | [00060 - Switching event detector, part 6](00060-sw2-7-profile-weighted-step-detector/result.md) | Does a step statistic that weights each half-hour by the daily profile find more of the moved MW than the constant step, on injection shapes it does not assume? | Refuted: the pooled gain in the share of moved MW found is below 0.001 (98.33% interval -0.006 to +0.008) | Not for production | 2026-10-16 |
+| [00061 - Switching event detector, part 7](00061-sw2-6-paired-step-intervals/result.md) | Does scoring an onset step and its return step as one pair find more of the moved MW than the single-step detector? | Refuted: the paired score finds 0.13 less (98.33% interval -0.233 to -0.007); keeping the single-step alarms and taking the end from the strongest return step finds 0.19 more (+0.148 to +0.237) | Not for production | 2026-10-16 |
 | [00062 - Switching event detector, part 7](00062-sw2-9-whitened-residual-step-detector/result.md) | Does filtering out the residual's half-hour-to-half-hour memory raise the share of moved MW the 24-hour detector finds? | Refuted: the pooled change in the share of moved MW found is -0.097 (98.33% interval -0.132 to -0.057) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
@@ -1233,6 +1234,27 @@ experiment cannot resolve a gain below about 0.04.
   [PR #1268](https://github.com/openclimatefix/nged-substation-forecast/pull/1268).
 
 ![Unexplained 24-hour alarms by days to the nearest bank holiday](00047-sw2-4-better-residual-switching-detector/figure_6_alarms_by_holiday_distance.svg)
+
+### 00061: does pairing an onset step with its return step find more of the moved load? (SW2-6)
+
+**Taking each alarm interval's end from the strongest opposite step finds 0.19 more of the moved
+power than D0M, the single-step detector, while scoring the onset and return steps as one pair finds
+0.13 to 0.21 less.** We added known load transfers to the power history. The paired-step alarm
+score, with or without a prior on the duration taken from the labelled real transfers, found 0.13
+and 0.21 less of the moved MW than the single-step detector D0M at the same number of unexplained
+alarms (98.33% intervals -0.233 to -0.007 and -0.310 to -0.092), because holding their unexplained
+alarms to D0M's count needed a lone onset step of 8.8 noise units. The arm that kept D0M's alarms
+and moved only the end found 0.63 to 0.65 of the moved MW against 0.44 to 0.47, a gain of 0.19
+(+0.148 to +0.237), and still misses 0.35 to 0.37.
+
+- **Finding for later experiments:** that arm finds 7 of the 35 labelled real transfers of more than
+  1 day against D0M's 2, and 24 of the 35 still have no alarm at the start under D0M, so the onset
+  now limits the real transfers. The arm's end rule needs a check on the 4-hour window and with a
+  cap longer than 14 days.
+- **Write-up and pull request:** [the full result page](00061-sw2-6-paired-step-intervals/result.md),
+  [PR #1291](https://github.com/openclimatefix/nged-substation-forecast/pull/1291).
+
+![Gain over D0M by arm and shape](00061-sw2-6-paired-step-intervals/figure_1_gain_by_arm.svg)
 
 ### 00062: does removing the residual's half-hour-to-half-hour memory help the switching detector? (SW2-9)
 

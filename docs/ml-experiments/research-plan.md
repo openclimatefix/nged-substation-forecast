@@ -167,8 +167,10 @@ confirm:
 
 - **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
   XGBoost model without the detected intervals.
-- **SW2-6:** paired-step intervals, which find the onset and its opposite return step as one
-  interval with an end, with a prior on duration from the labelled set.
+- **SW2-6 (done, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** pairing the
+  onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
+  the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
+  the moved MW.
 - **SW2-7 (done, [experiment 60](00060-sw2-7-profile-weighted-step-detector/result.md)):** a
   step statistic that weights each half-hour by the expected power found the same transfers as the
   constant step on five injection shapes, so the step's shape does not limit the 24-hour detector.
