@@ -69,6 +69,7 @@ the maintainer to confirm.
 | [00037](00037-switching-first-look/result.md) | Does a neighbour-balance detector find logged switching in the telemetry at a lower false-alarm rate than a single-series detector? | Inconclusive: size-weighted recall 0.326 (0.093 to 0.579) against the 0.35 bar | Not for production | Not yet merged |
 | [00038](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | Not yet merged |
 | [00039](00039-pv-disaggregation-cams-injection/result.md) | Can a CAMS-driven fit separate embedded solar from Primary substation demand, recovering injected solar-farm output within 25% and passing four checks on the real series? | Partly supported: recovery passes (0.854, 0.815 to 0.866), real checks pass at 6 of 8 Primaries | Not for production | Not yet merged |
+| [00040](00040-pv-capacity-error-bars/result.md) | Can a cross-arm misfit test detect a cloud-driven demand load that biases the capacity fitted to embedded solar, and how many directional Primaries are free of one in 2025/26? | Partly supported: calibrated (median capacity over truth 0.992, 0.951 to 1.032), but a day-long cloud load is flagged in only 0.35 of draws at 25% of capacity, so the verdict is `underpowered` | Not for production | Not yet merged |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -914,3 +915,24 @@ term, day type) on the real series.
   [PR #1248 (Experiment 39: can a CAMS-driven fit separate embedded solar from Primary substation demand?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1248).
 
 ![Median recovery ratio by model and irradiance point](00039-pv-disaggregation-cams-injection/figure_01.svg)
+
+### 00040: how far the capacity fitted to embedded solar can be trusted
+
+**A cross-arm misfit test is calibrated and detects four of five cloud-driven loads at 25% of the
+true capacity, but it detects a day-long cloud load in only 0.35 of draws, so the verdict is
+`underpowered`.** The test compares the capacity that six least-squares fits assign to the same
+series, using known injected solar-farm output and eight known loads in the real series of the 8
+directional Primary substations.
+
+- **Headline result:** pure injected solar output gives a median capacity over truth of 0.992 (95%
+  interval 0.951 to 1.032) and a false-positive rate of 0.055. Kirton is flagged in 6 of 7
+  season-years and no other Primary is flagged in any. The bound on the capacity at the other seven
+  is 0.18 to 0.23 at five, 0.47 at Trusthorpe, and 0.71 at Wrangle T1, where the test has almost
+  no power.
+- **Finding for later experiments:** the two loads that the misfit test cannot see, a day-long cloud
+  load and a load that rises with sunshine, set the bound. Evening demand after dark responds to
+  cloud at some Primaries and offers a measurement of the first.
+- **Write-up and pull request:** [result](00040-pv-capacity-error-bars/result.md),
+  [PR #1249 (Experiment 40: how far can the capacity fitted to embedded solar be trusted?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1249).
+
+![Capacity per Primary in 2025/26 with its interval and bound](00040-pv-capacity-error-bars/figure_01.svg)
