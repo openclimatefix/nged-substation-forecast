@@ -134,7 +134,7 @@ def matched_gap(
     valid = np.isfinite(gap)
     total = np.where(valid, weight, 0).sum(axis=1)
     value = np.where(valid, gap, 0).sum(axis=1) / total
-    return float(value[0]) if picks is None else value  # ty: ignore[invalid-return-type]
+    return float(value[0]) if picks is None else value
 
 
 def print_recut(*, data: pl.DataFrame, step: str) -> None:
@@ -148,7 +148,7 @@ def print_recut(*, data: pl.DataFrame, step: str) -> None:
             f"unmetered {unmetered.len()}"
         )
         print(
-            "  donor step (noise units) quantiles 10/50/90: metered "
+            f"  {step} (noise units) quantiles 10/50/90: metered "
             f"{metered.quantile(0.1):.1f}/{metered.median():.1f}/{metered.quantile(0.9):.1f}, "
             f"unmetered {unmetered.quantile(0.1):.1f}/{unmetered.median():.1f}/"
             f"{unmetered.quantile(0.9):.1f}"
@@ -212,6 +212,25 @@ def logistic(*, rows: pl.DataFrame, step: str) -> dict[str, float]:
     return {"intercept": float(beta[0]), "log_step": float(beta[1]), "metered": float(beta[2])}
 
 
+def print_step_summary(*, data: pl.DataFrame) -> None:
+    """Print how many transfers sit below the 24-hour threshold, and recall above it."""
+    rows = population(data=data, setting="D0M_48")
+    print("\nD0M 24 h, largest step in noise units (threshold 4.0)")
+    print(f"  transfers that move no MW: {rows.filter(pl.col('largest_step_z') < 1e-9).height}")
+    for name, mask in (
+        ("metered", pl.col("metered_receivers") > 0),
+        ("unmetered", pl.col("metered_receivers") == 0),
+    ):
+        part = rows.filter(mask)
+        below = part.filter(pl.col("largest_step_z") < 4.0)
+        above = part.filter(pl.col("largest_step_z") >= 4.0)
+        print(
+            f"  {name}: {below.height} of {part.height} step under 4.0 "
+            f"(found {below['found'].sum()}); {above.height} step 4.0 or more "
+            f"(found {above['found'].sum()})"
+        )
+
+
 def print_contrasts(*, out: Path, veto_z: float) -> tuple[float, float, float]:
     """Print C2 and C3 and return C2's mean and interval."""
     data = results(out=out, veto_z=veto_z)
@@ -269,6 +288,7 @@ def main() -> None:
     data = results(out=out, veto_z=veto_z)
     for step in ("largest_step_z", "donor_step_z"):
         print_recut(data=data, step=step)
+    print_step_summary(data=data)
     c2 = print_contrasts(out=out, veto_z=veto_z)
     wide = population(data=data, setting="D2_48").join(
         population(data=data, setting="D0M_48"), on="event_id", suffix="_ref"

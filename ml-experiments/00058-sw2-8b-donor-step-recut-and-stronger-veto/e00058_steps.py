@@ -53,9 +53,12 @@ def donor_steps(*, out: Path) -> pl.DataFrame:
                 }
             )
     steps = pl.DataFrame(rows)
+    zero = steps.filter(pl.col("donor_step_z").abs() < 1e-9).height
+    print(f"{steps.height} transfers; {zero} move no MW (donor power zero or missing there)")
     if (
         steps.height != len(original) + len(extra) + len(holiday)
-        or float(steps["donor_step_z"].min()) <= 0  # ty: ignore[invalid-argument-type]
+        or steps["donor_step_z"].is_nan().any()
+        or steps["largest_step_z"].is_nan().any()
     ):
         raise SystemExit("STOP: re-drawn injection does not match the scored events")
     return steps
