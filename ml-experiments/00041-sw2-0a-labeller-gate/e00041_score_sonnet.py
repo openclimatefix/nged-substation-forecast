@@ -1,6 +1,6 @@
 """Merge a labeller's JSONL batches and score them on a known-answer set.
 
-uv run python e00041_score_sonnet.py <set> <labels folder name>
+`uv run python e00041_score_sonnet.py SET LABELS_FOLDER_NAME`
 """
 
 from __future__ import annotations
