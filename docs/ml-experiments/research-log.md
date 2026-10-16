@@ -1236,14 +1236,15 @@ experiment cannot resolve a gain below about 0.04.
 
 ### 00061: does pairing an onset step with its return step find more of the moved load? (SW2-6)
 
-**Keeping the detector's alarms and finding each interval's end from the strongest opposite step
-finds 0.19 more of the moved power, but folding the return step into the alarm itself finds less.**
-We added known load transfers to the power history. The paired-step alarm score, with or without a
-prior on the duration taken from the labelled real transfers, found 0.13 and 0.21 less of the moved
-MW than the single-step detector D0M at the same number of unexplained alarms (98.33% intervals
--0.233 to -0.007 and -0.310 to -0.092), because a lone onset step then needs about 8.8 noise units to
-alarm. The arm that kept D0M's alarms and moved only the end found 0.63 to 0.65 of the moved MW
-against 0.44 to 0.47, a gain of 0.19 (+0.148 to +0.237), and still misses 0.35.
+**Taking each alarm interval's end from the strongest opposite step finds 0.19 more of the moved
+power than D0M, the single-step detector, while scoring the onset and return steps as one pair finds
+0.13 to 0.21 less.** We added known load transfers to the power history. The paired-step alarm
+score, with or without a prior on the duration taken from the labelled real transfers, found 0.13
+and 0.21 less of the moved MW than the single-step detector D0M at the same number of unexplained
+alarms (98.33% intervals -0.233 to -0.007 and -0.310 to -0.092), because holding their unexplained
+alarms to D0M's count needed a lone onset step of 8.8 noise units. The arm that kept D0M's alarms
+and moved only the end found 0.63 to 0.65 of the moved MW against 0.44 to 0.47, a gain of 0.19
+(+0.148 to +0.237), and still misses 0.35 to 0.37.
 
 - **Finding for later experiments:** that arm finds 7 of the 35 labelled real transfers of more than
   1 day against D0M's 2, and 24 of the 35 still have no alarm at the start under D0M, so the onset
