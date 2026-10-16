@@ -21,6 +21,8 @@ sooner.
 | [SW2-3](#sw2-3-the-label-exclusion-ceiling) | Does excluding labelled switching from the lagless XGBoost model's training target lower its error outside switching, against a random exclusion of equal volume? | 2 | SW2-0b (done: experiment 41, part 2) | Proposed |
 | [SW2-4 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which changes to the detector raise its event-level F1: a better residual, a retrain loop, paired-step intervals, a shape-aware step, node balance, or whitening? | 3 | SW2-1 | Proposed; one hypothesis per experiment, run in order |
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
+| [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With NGED's logged switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | SW2-3, and RT2 (experiment 48) for the architecture | Proposed; picks the v1 NRA candidate |
+| [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11; rerun after SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-3](#pvdis-3-how-much-forecast-error-comes-from-embedded-solar) | What does the irradiance input add to the best demand forecast, and how much of the remaining error does embedded solar explain? | 2 | The maintainer's review of this plan | Proposed; part 3 of the PVDIS series |
 | [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | The maintainer's review of this plan | Proposed; part 4 of the PVDIS series; can run beside PVDIS-3 |
@@ -209,6 +211,37 @@ linear. The result tells the project whether to start the v2 differentiable-phys
 - **Scoring** is on held-out months outside switching against the v1 baseline, and on experiment
   00039's injection harness extended with injected transfers that carry the donor's PV, where the
   true capacity and the true shares are known.
+
+#### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
+
+**Retrain the best-guess architecture so that it never learns to predict an abnormal running
+arrangement, and pick the v1 NRA candidate from three arms.** SW2-11 uses NGED's switching logs,
+and SW2-12 repeats the experiment with the detector's labels, which is what Flexpectation v2 will
+have. The gap between the two runs is the skill lost without logged switching.
+
+- **The architecture** is the winner of RT2 (experiment 00048). Weekly retraining without the
+  error correction is the leading candidate. If the winner keeps an error correction, the
+  correction's history leaves out switching half-hours and looks back far enough to hold 14
+  unmasked days, and the write-up reports the unmasked days per window and how often the fallback
+  to the last full correction fired.
+- **The arms:** the plain architecture with nothing removed; the NRA arm, with logged switching
+  removed from the training targets; and the NRA arm plus, for each lagged power input, the signed
+  MW moved by any switching event at that lag. A fourth arm replaces each lag by the lag minus that
+  MW, because a tree model cannot easily subtract one column from another.
+- **The labels in SW2-11.** The target mask removes every logged closure, visible or not, because
+  NGED's log says the substation was not in its normal arrangement. The magnitudes come from
+  experiment 00041's labels, with 0 for closures the labeller could not see. The logs give times,
+  not MW.
+- **The labels in SW2-12** come from the best detector at the time, run first with experiment
+  00043's D0 and again after SW2-8.
+- **Scoring** uses the same rows in every arm and in both runs: half-hours outside NGED's logged
+  closures, where the metered target is the NRA target. A secondary metered view scores every
+  half-hour and decides nothing.
+- **Threshold.** The target mask needs a detector at training time only, so the NRA arm is adopted
+  when its interval does not show it worse than the plain arm. The magnitude arms need a detector
+  on the serving path, so they need a gain whose interval excludes zero. Experiment 00044 bounded a
+  perfect detector's gain at 0.34% of the best guess's quantile score under the NRA view, so the
+  gains are expected to be small.
 
 ### PVDIS: separating embedded solar from Primary demand
 
