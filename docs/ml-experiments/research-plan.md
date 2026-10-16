@@ -18,7 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
+| [SW2-5](00068-sw2-5-train-detect-retrain-loop/result.md) | Does refitting the lagless XGBoost model without the detected switching intervals, for three rounds, raise the detector's recall of the moved MW and lower the forecast error outside switching? | 3 | Nothing | Planned (experiment 68) |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-16](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Does experiment 61's end rule (the interval ends at the strongest opposite step within a cap) also find more of the moved MW at the 4-hour window, and with a cap longer than 14 days? | 2 | Nothing | Proposed; its winner becomes the baseline detector for later SW2 experiments |
 | [SW2-17](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their onset, and does an onset rule that a later return step confirms recover them? | 2 | SW2-16 | Proposed |
@@ -165,8 +165,9 @@ scored on even months, with recall weighted by the MW moved as the headline from
 The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
 confirm:
 
-- **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
-  XGBoost model without the detected intervals.
+- **SW2-5 (planned, [experiment 68](00068-sw2-5-train-detect-retrain-loop/result.md)):** the
+  train, detect, retrain loop, with three rounds of refitting the lagless XGBoost model without the
+  detected intervals.
 - **SW2-6 (done, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** pairing the
   onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
   the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
