@@ -185,7 +185,8 @@ confirm:
   the neighbour test as a gate, finding almost none of the injected transfers without a metered
   receiver. The sum of the neighbourhood's residuals and a subset-sum over neighbours for a split
   feed the confidence score.
-- **SW2-9:** whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
+- **SW2-9 (in progress, [experiment 62](00062-sw2-9-whitened-residual-step-detector/result.md)):**
+  whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per
   series and hour of day fitted to the residual.
 
 #### SW2-13 to SW2-15: combining evidence across windows and neighbours
