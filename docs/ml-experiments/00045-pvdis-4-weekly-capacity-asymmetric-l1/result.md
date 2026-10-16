@@ -242,10 +242,15 @@ check against DESNZ.
   days is `unobserved`: the fit has no data term there, the penalty interpolates, and the output
   marks the row and widens its interval.
 - **Switching mask.** The logged closures, padded by 24 hours, are removed from every fit. The
-  intervals come from the private table `data/ml-experiments/00038-switching-mask-value/
-  intervals_d0.parquet` if its columns hold a start, an end, and a series, and otherwise from a
-  copy of experiment 00037's log reader. SW2-0b's labels replace the logs once they exist. Unlogged
-  transfers stay in the data and are injected as a case.
+  intervals come from experiment 00037's `intervals.parquet`, and the log ends on 2026-03-25.
+  SW2-0b's labels replace the logs once they exist. Unlogged transfers stay in the data and are
+  injected as a case. The first unit (U1) found four facts that the design must handle:
+    - The logged-closure mask removes 40 to 48% of the daylight half-hours at Mount Bridge Boston,
+      Wrangle T1, and Wrangle T2.
+    - 871 of the 2,166 farm-weeks drop out of injection, mostly at Solar farm E.
+    - Kirton's correlation of power with `u` peaks at 08:00 UTC, not near 12:00 UTC.
+    - The weekly fits must therefore tolerate weeks in which most daylight half-hours are masked,
+      and Kirton is reported without a pass or fail.
 - **Polygons.** The check already run in `e00045_polygon_check.py` found 16 valid Primary polygons,
   overlaps under 0.3% of the smaller polygon, Mount Bridge Boston's point 95 m outside its
   polygon, and Wrangle T1 and T2 sharing one polygon. Wrangle T1 and T2 keep separate fits and are
@@ -372,29 +377,53 @@ MVA and outside this experiment.
 
 ### Outside checks and tolerances, stated before any comparison
 
-**Two outside checks and one internal check are run, in order of strength. None alters the verdict.**
+**Three outside checks and one internal check are run, in order of strength. None alters the verdict.**
 
-1. **DESNZ sub-regional statistics of small-scale solar by lower-layer super output area (LSOA).**
-   Capacity and installation counts by LSOA are summed over each Primary's polygon, using the
-   share of each LSOA's area inside the polygon (a population-weighted centroid assignment is the
-   sensitivity check). The implementer confirms the exact DESNZ table, its snapshot date or dates,
-   and whether it carries size bands, at download time. Installations of 1 MW or more are metered
-   by NGED and already removed from the Disaggregated Demand series, so the sum uses the size
-   bands below 1 MW where the table has them, and otherwise subtracts the register's connected
-   solar of 1 MW or more in the same Primary. The expected peak AC output is the DC capacity
-   times 0.70, with a range of 0.60 to 0.80 (experiment 00029 fitted farm DC-to-AC ratios of 1.12 to
-   1.42, an AC-to-DC ratio of 0.70 to 0.89, and a fleet of mixed orientations peaks lower than one
-   farm). **Tolerance:** the ratio of the series' mean over the 12 months to the snapshot date to
-   the expected peak lies in [0.67, 1.5] at 5 or more of the 6 comparisons (Spilsby, Horncastle,
-   Mount Bridge Boston, Donington, Trusthorpe, and Wrangle T1 plus T2 against the shared polygon).
-   Kirton is compared and reported without a pass or fail. The factor of 1.5 is the root of the
+**None of the outside photovoltaic datasets is complete.** The DESNZ tables, the Ofgem Feed-in
+Tariff (FiT) register, and the Embedded Capacity Register (ECR) each count a subset of the installed
+capacity, and the FiT database has not been updated for several years. Each outside figure is
+therefore a floor or a partial count. A mismatch between an outside figure and the weekly series
+does not show that the series is wrong, so every outside check is descriptive and cannot decide
+the verdict. The measured coverage gaps are these. The FiT report covers accreditations from 1
+April 2010 to 31 March 2025, and its latest photovoltaic commissioning date is 24 March 2021 (the
+scheme closed to new applicants on 31 March 2019). The DESNZ constituency table is published for
+August 2026 and covers domestic installations only. The DESNZ local-authority table is at the end
+of 2025. The ECR as-of date is printed by the check, and the check reports it beside its result.
+
+1. **DESNZ small-scale solar, at constituency and local-authority level.** DESNZ publishes no table
+   by lower-layer super output area (LSOA). We searched the DESNZ "Solar photovoltaics deployment"
+   workbook (Energy Trends table 6.3), the "Renewable electricity by local authority" workbook, and
+   the DESNZ sub-regional statistics pages, and found tables by parliamentary constituency
+   (domestic installations only) and by local authority (all sizes, end of 2025). The LSOA files
+   were downloaded for the area shares of the Primary polygons but are not joined to the DESNZ
+   figures. Each Primary polygon meets 1 to 4 constituencies, and a constituency or local
+   authority is scaled by the share of its area inside the polygon, so the check is coarse. The
+   tolerance is wide and is fixed here, before any comparison. The expected peak AC output is the
+   DC capacity times 0.70, with a range of 0.60 to 0.80 (experiment 00029 fitted farm DC-to-AC
+   ratios of 1.12 to 1.42, an AC-to-DC ratio of 0.70 to 0.89, and a fleet of mixed orientations
+   peaks lower than one farm). **Tolerance:** the ratio of the series' mean over the 12 months to
+   the snapshot date to the expected peak lies in [0.67, 1.5], read at the constituency level for
+   domestic capacity and at the local-authority level for all sizes. The comparison is reported for
+   Spilsby, Horncastle, Mount Bridge Boston, Donington, Trusthorpe, and Wrangle T1 plus T2 against
+   the shared polygon, and Kirton is reported without a range. The factor of 1.5 is the root of the
    summed squares of the stated uncertainties: sampling (15%), farm to rooftop (10%), undetected
-   load (25%), and conversion (14%), about 33%. The check can catch only a gross failure. DESNZ
-   also under-counts installations after the feed-in tariff closed in 2019, so a ratio above 1 is
-   less alarming than a ratio below 1. Where the table gives two snapshot dates, the growth between
-   them is compared with the series' growth over the same dates: the signs must agree and the
-   ratio must lie within a factor of 2.
-2. **The Embedded Capacity Register (ECR) as a soft prior, not a floor.** The check uses only
+   load (25%), and conversion (14%), about 33%. The check can catch only a gross failure, and
+   because the tables are partial counts, a ratio above 1 is less alarming than a ratio below 1.
+   Installations of 1 MW or more are metered by NGED and already removed from the Disaggregated
+   Demand series, so the local-authority figure for all sizes is the less direct comparison.
+2. **The Ofgem FiT register, as a second descriptive check.** Each postcode district is allocated
+   to the Primary polygons by the share of its postcode units that lie inside the polygon
+   (Ordnance Survey Code-Point Open gives the unit positions, and no open polygon boundary for
+   postcode districts was found). The register has three uses. First, a dated baseline of
+   small-scale capacity before April 2019, summed over the districts of each polygon by commissioning
+   date. Second, a growth curve of cumulative declared net capacity (the Ofgem name for AC capacity)
+   up to 2019, compared with the weekly series over the same weeks: the signs of the growth must
+   agree and the ratio must lie within a factor of 2. Third, the share of FiT capacity in
+   installations under 50 kW, which the Embedded Capacity Register misses. There are two caveats.
+   The FiT took no new installations after 2019, so the register is a floor from then on. Postcode
+   districts do not align with the polygons, so the allocation adds error. The check has no pass
+   or fail range of its own and is reported beside check 1.
+3. **The Embedded Capacity Register (ECR) as a soft prior, not a floor.** The check uses only
    connected solar sites of 50 kW to under 1 MW, dated before each week, and first prints which date
    columns the register holds and what each records (the reader lists a `Last Updated` column,
    which is not a connection date). **Tolerance:** the register's total for a Primary does not
@@ -405,11 +434,11 @@ MVA and outside this experiment.
    the rise at 1,000 random placebo dates. It is run only if the register holds a connection date
    and at least 5 sites qualify across the six comparisons, and otherwise is reported as not
    testable.
-3. **The season-year anchor (internal, A0).** The mean of the weekly series over each season-year
+4. **The season-year anchor (internal, A0).** The mean of the weekly series over each season-year
    lies inside experiment 00040's 95% interval of C at the clean Primaries in at least 80% of
    Primary-years.
 
-**The DESNZ files need maintainer attention only on licence and size.**
+**The outside files need maintainer attention only on licence and size.**
 
 - **LSOA boundaries:** Office for National Statistics (ONS) LSOA (2021) generalised-clipped
   boundaries and population-weighted centroids for England and Wales, from the ONS Open Geography
@@ -417,7 +446,10 @@ MVA and outside this experiment.
   megabytes (to be confirmed at download). The plan requests only the LSOAs that intersect the
   union of the 16 polygons (a few hundred features, under 5 MB) through the portal's feature
   service, and falls back to the full file.
-- **DESNZ table:** a spreadsheet of a few megabytes.
+- **DESNZ tables:** two spreadsheets of a few megabytes.
+- **Ofgem FiT report:** three workbooks of about 35 MB each, and the Code-Point Open archive of
+  about 14 MB. Ofgem's copyright page releases its material under the Open Government Licence, and
+  the files download with no login or terms click-through.
 - **Licence:** both are published under the Open Government Licence v3.0, which needs an
   acknowledgement and no account or signature. The ONS boundaries add "Contains OS data (c) Crown
   copyright and database right". The cost is nil, well under the £30 cap. The maintainer decides
@@ -490,13 +522,13 @@ sub-agent.
 
 | Unit | What it builds | Files | Needs |
 |---|---|---|---|
-| W0 | A separate pull request that moves the Embedded Capacity Register loader into `packages/studies`: the workbook reader without a spreadsheet library, the column renames, the Primary-name normalisation, and the connected-solar filter. The register path stays a parameter. Tests build a small workbook with `zipfile` and check the columns, the status filter, and the name normalisation. Experiment 00031's folder is switched to the import only if its saved register table is byte-identical afterwards. It gets its own pull request with an adversarial review and, by the maintainer's direct word (2026-10-16), may merge autonomously once the findings are triaged, the branch contains origin/main, CI is green, and the merge is a merge commit with no closing keyword. | `packages/studies/src/studies/ecr.py`, `packages/studies/tests/test_ecr.py` | nothing |
+| W0 | The Embedded Capacity Register loader in `packages/studies` (merged in PR 1267). The file holds only the workbook reader. The Primary-name normalisation and the connected-solar filter are not in it, so U5b writes them in `e00045_outside.py`. | `packages/studies/src/studies/ecr_reader.py` (merged in PR 1267) | nothing |
 | U1 | Inputs, weeks, masks, validation, and the raw-data figures 1 to 4 | `ml-experiments/00045-.../e00045_common.py`, `e00045_inputs.py`, `e00045_raw_charts.py` | nothing |
 | U2 | The weekly design, the demand-cell projection, the ADMM solver for asymmetric L1 with non-negativity, the five fits (free, symmetric, asymmetric, strictly non-decreasing, season-year constant), and the self-tests | `e00045_model.py`, `e00045_selftest.py` | U1's common module |
 | U3 | The injection builder (cases, semi-synthetic baseline, hold-out split), tuning, the frozen file, scoring, the contrasts, the coverage bootstrap, and vintages on injections | `e00045_inject.py`, `e00045_tune.py`, `e00045_score.py`, `e00045_bootstrap.py` | U2 |
 | U4 | Real-series fits, recovery-ratio correction, the 500-draw bootstrap, weekly-origin vintages, the placebo sky, the gap diagnostic, and the two output files | `e00045_real.py`, `e00045_placebo.py`, `e00045_outputs.py` | U2, U3's recovery ratios |
-| U5a | The download script for the LSOA files and the DESNZ table, following the `data-download` skill, with a generated README | `e00045_fetch_lsoa.py` | the maintainer's licence decision |
-| U5b | The outside checks (DESNZ, register through `studies.ecr`, the season-year anchor) | `e00045_outside.py` | U4, U5a, W0 |
+| U5a | The download scripts for the LSOA files, the DESNZ tables, and the Ofgem FiT report with Code-Point Open, following the `data-download` skill, with a generated README | `e00045_fetch_lsoa.py`, `e00045_fetch_fit.py` | the maintainer's licence decision |
+| U5b | The outside checks (DESNZ, FiT, register through `studies.ecr_reader`, the season-year anchor) | `e00045_outside.py` | U4, U5a, W0 |
 | U6 | The printed report (every number the page quotes) and figures 5 to 17 | `e00045_report.py`, `e00045_charts.py` | U3, U4, U5b |
 | U7 | The write-up with its plain-language opening, the research-plan row and research-log entry, and the `mkdocs.yml` line | `docs/ml-experiments/00045-.../result.md`, `docs/ml-experiments/research-plan.md`, `docs/ml-experiments/research-log.md`, `mkdocs.yml` | U6 |
 
@@ -572,9 +604,12 @@ with `svgo`). Farm output is normalised and labelled Solar farm A to F. Substati
    overdue and is a separate reviewed change, outside this experiment.
 8. **Only three scoring farms.** The farm margin of the two-way bootstrap is coarse. The write-up
    reports results with and without Solar farm E and the seed-level spread.
-9. **The outside checks are weak.** The DESNZ tolerance of a factor of 1.5 catches only gross
-   failure, the table undercounts installations after 2019, the LSOA boundaries are not the
-   electrical network, and the register's date field may not be a connection date.
+9. **The outside checks are weak and partial.** None of the DESNZ, FiT, and ECR datasets is
+   complete, so each is a floor and a mismatch does not show the series is wrong. The DESNZ
+   tolerance of a factor of 1.5 catches only gross failure, the DESNZ tables are constituency
+   level (domestic only) and local-authority level and so need area scaling, the FiT took no new
+   installations after 2019, postcode districts do not align with the polygons, and the register's
+   date field may not be a connection date.
 10. **The vintage end-of-record problem.** Penalised fits are least constrained at the end. The
     ERA5 temperature that production would use arrives about 5 days late, which the vintage scoring
     ignores; dropping the temperature term moved C by 0.006 of capacity in experiment 00039.
