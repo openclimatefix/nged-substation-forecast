@@ -184,6 +184,17 @@ def print_contrasts(*, out: Path, veto_z: float) -> tuple[float, float, float]:
         )
         if name == "C1":
             c1 = (mean, low, high)
+    wide = base.pivot(on="setting", index="event_id", values="found")
+    print(
+        "C1 population: D0M found",
+        int(wide["D0M_48"].sum()),
+        "D2 found",
+        int(wide["D2_48"].sum()),
+        "lost to the veto",
+        wide.filter(pl.col("D0M_48"), ~pl.col("D2_48")).height,
+        "gained",
+        wide.filter(~pl.col("D0M_48"), pl.col("D2_48")).height,
+    )
     return c1
 
 
