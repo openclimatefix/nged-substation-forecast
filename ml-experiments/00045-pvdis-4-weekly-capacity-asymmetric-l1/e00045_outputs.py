@@ -23,6 +23,7 @@ never a real fall.
         uv run python ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/e00045_outputs.py
 """
 
+import argparse
 import json
 from dataclasses import dataclass
 from typing import Final
@@ -66,7 +67,82 @@ COLUMN_DOCS: Final[dict[str, str]] = {
 }
 
 
-def metadata() -> dict[str, str]:
+POST_HOC_COVERAGE_PATH: Final = score.SCORES_DIR / "coverage_summary_post_hoc.parquet"
+NOTES_MARKER: Final[str] = "Notes on the intervals and the recommendation:"
+"""Heading of the closing section of `real_report.txt`, which `--notes-only` replaces."""
+
+
+def clipped_table(*, final: pl.DataFrame) -> pl.DataFrame:
+    """Count the observed weeks whose bootstrap interval was clipped to include the point.
+
+    `e00045_real.fit_variant` replaces a bootstrap percentile that falls on the wrong side of the
+    point by the point itself, so a clipped end of an observed week equals `capacity_mw` exactly.
+    Unobserved weeks are widened afterwards and are left out.
+
+    Args:
+        final: `capacity_weekly.parquet`.
+
+    Returns:
+        One row per variant: the observed weeks with an interval, the weeks whose lower end, upper
+        end, and either end equal the point, and the share of weeks with either end clipped.
+    """
+    seen = final.filter(
+        ~pl.col("unobserved") & pl.col("capacity_mw").is_not_null() & pl.col("low_mw").is_not_null()
+    ).with_columns(
+        low_clipped=pl.col("low_mw") == pl.col("capacity_mw"),
+        high_clipped=pl.col("high_mw") == pl.col("capacity_mw"),
+    )
+    return (
+        seen.group_by("variant")
+        .agg(
+            observed_weeks=pl.len(),
+            low_end_clipped=pl.col("low_clipped").sum(),
+            high_end_clipped=pl.col("high_clipped").sum(),
+            either_end_clipped=(pl.col("low_clipped") | pl.col("high_clipped")).sum(),
+        )
+        .with_columns(share_of_weeks=pl.col("either_end_clipped") / pl.col("observed_weeks"))
+        .sort("variant")
+    )
+
+
+def post_hoc_coverage_text() -> str:
+    """Return the coverage of the post hoc pair's 90% interval, from the post hoc scoring run."""
+    coverage = pl.read_parquet(POST_HOC_COVERAGE_PATH).filter(pl.col("group") == "all")
+    by_kind = {r["weeks"]: r["coverage_90"] for r in coverage.iter_rows(named=True)}
+    return (
+        f"non-step weeks {by_kind['non-step']:.3f} and step weeks {by_kind['step']:.3f} "
+        "(target 0.90; the plan's condition (vi) asks for 0.85 to 0.95 and at least 0.60)"
+    )
+
+
+def interval_notes(*, final: pl.DataFrame) -> str:
+    """Return the statements about the intervals and the recommendation that both outputs carry.
+
+    Args:
+        final: `capacity_weekly.parquet`.
+
+    Returns:
+        The statements: when the pair was scored, how the interval is clipped, and when the
+        recommendation was made.
+    """
+    clipped = clipped_table(final=final)
+    shares = ", ".join(
+        f"{r['variant']} {r['share_of_weeks']:.1%}" for r in clipped.iter_rows(named=True)
+    )
+    return (
+        "The interval of alt_post_hoc (a=2, r=10) was scored only post hoc: after the frozen "
+        "pair failed the injection test, the 90% residual block bootstrap of alt_post_hoc was run "
+        "on the same scoring units and 100 draws per unit, and covered the known path in "
+        + post_hoc_coverage_text()
+        + ". The frozen configuration, tuning code, limits, and verdict logic were not changed. "
+        "Every interval is clipped to include the point estimate (a bootstrap percentile on the "
+        "wrong side of the point is replaced by the point); the share of observed weeks with at "
+        f"least one clipped end is {shares}. The recommendation of alt_post_hoc was made after "
+        "seeing the scoring results, not before."
+    )
+
+
+def metadata(*, final: pl.DataFrame) -> dict[str, str]:
     """Return the parquet file metadata: the recommendation, its reason, and the column notes."""
     return {
         "recommended_variant": real.RECOMMENDED,
@@ -74,6 +150,7 @@ def metadata() -> dict[str, str]:
         "columns": json.dumps(COLUMN_DOCS),
         "uncertainty": "low_mw/high_mw is sampling only; the rooftop and scenario columns are "
         "separate systematic scenarios and are never merged into it",
+        "interval_and_recommendation_notes": interval_notes(final=final),
     }
 
 
@@ -296,13 +373,45 @@ def vintage_ratios(*, final: pl.DataFrame, vintages: pl.DataFrame) -> pl.DataFra
     )
 
 
+def notes_section(*, final: pl.DataFrame) -> str:
+    """Return the closing section of the report: the interval notes and the clipped-week counts."""
+    return (
+        NOTES_MARKER
+        + "\n"
+        + interval_notes(final=final)
+        + "\n\nObserved weeks whose bootstrap interval was clipped to include the point "
+        "(the interval ends of unobserved weeks are widened and not counted):\n"
+        + score.table_text(clipped_table(final=final))
+    )
+
+
+def rewrite_notes_only() -> None:
+    """Rewrite the two files' metadata and the report's notes, without refitting anything."""
+    final = pl.read_parquet(CAPACITY_PATH)
+    vintages = pl.read_parquet(VINTAGES_PATH)
+    final.write_parquet(CAPACITY_PATH, metadata=metadata(final=final))
+    vintages.write_parquet(VINTAGES_PATH, metadata=metadata(final=final))
+    text = REPORT_PATH.read_text().split("\n\n" + NOTES_MARKER)[0].rstrip("\n")
+    REPORT_PATH.write_text(text + "\n\n" + notes_section(final=final) + "\n")
+    print(notes_section(final=final))
+
+
 def main() -> None:
-    """Write the two parquet files and the report."""
+    """Write the two parquet files and the report (`--notes-only`: only the metadata and notes)."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--notes-only",
+        action="store_true",
+        help="rewrite the metadata and the report's notes from the existing files",
+    )
+    if parser.parse_args().notes_only:
+        rewrite_notes_only()
+        return
     final = read_parts(prefix="final")
     vintages = read_parts(prefix="vintage")
     check_final(final=final)
-    final.write_parquet(CAPACITY_PATH, metadata=metadata())
-    vintages.write_parquet(VINTAGES_PATH, metadata=metadata())
+    final.write_parquet(CAPACITY_PATH, metadata=metadata(final=final))
+    vintages.write_parquet(VINTAGES_PATH, metadata=metadata(final=final))
     placebo_tables = pl.concat(
         [pl.read_parquet(f) for f in sorted(placebo.PLACEBO_DIR.glob("placebo_*.parquet"))]
     )
@@ -352,6 +461,7 @@ def main() -> None:
             + score.table_text(all_vintage)
             + "\nPooled:\n"
             + score.table_text(pooled),
+            notes_section(final=final),
         ]
     )
     REPORT_PATH.write_text(text + "\n")

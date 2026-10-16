@@ -297,9 +297,15 @@ The design has five parts.
       summer-weighted yearly cycle, once independent of the weather and once scaled by the clear-sky
       index (a load that rises with sunshine). The truth is the unchanged baseline, so the score
       is the seasonal swing that creeps into the capacity path.
-    - Constant path: a constant capacity equal to the baseline, injected from a solar farm. Its
-      false steps and ratchet drift are scored, together with the placebo sky. The farm and the
-      path seed matter here, because the injected output carries the farm's own weather noise.
+    - Constant path: a constant capacity equal to the baseline. Its false steps and ratchet drift
+      are scored, together with the placebo sky. **Design change: the constant-path unit is built on
+      the placebo sky, not from a farm's injected output.** The PV shape `u` is permuted among the
+      days of each calendar month, and the baseline capacity times the permuted shape is subtracted
+      from the real power. The real series' own growth is then uncorrelated with the permuted shape,
+      so the true path is constant. The recovery ratio of the constant-path unit is fixed at 1,
+      because the unit is built from the PV shape itself and not from a farm's output. The farm and
+      the path seed still change the rows that the farm's gaps leave, and the path seed also
+      changes the permutation.
 - **Hold-out.** The tuning units use Solar farms A, B, and C and path seeds 0 to 3. The scoring
   units use Solar farms D, E, and F and path seeds 1000 to 1003, at all 8 Primaries. The unit count
   is 3 farms times 4 seeds times 8 Primaries times 14 cases (2 ramps, 4 steps, 3 temporary falls,
@@ -323,13 +329,13 @@ age of the week (1, 2, 4, 8, 13, and 26 weeks).
 whole 7-day blocks of the penalised fit's residuals, taken from the same calendar month of any
 year of the Primary's record (so that winter noise stays winter-sized), adds them to the fitted
 values, and refits the path with the frozen penalties. Missing half-hours take a residual of zero.
-Each Primary gets 500 draws for the real series and 200 for each injection unit. The 5th and 95th
-percentiles give the 90% interval, and the 25th and 75th and the 10th and 90th give the calibration
-curve. The coverage of the truth is scored on 96 scoring units (the case families with a step,
-a ramp, a fall, and a constant path), separately at weeks with no true step and at weeks within
-2 weeks of a true step. A bootstrap of a penalised fit at a boundary tends to under-cover, and
-the decision rule counts that as a finding. If coverage at non-step weeks is under 0.85, the
-write-up reports an inflation factor chosen on tuning units, labelled post hoc.
+Each Primary and variant gets 200 draws for the real series, and each injection unit gets 100.
+The 5th and 95th percentiles give the 90% interval, and the 25th and 75th and the 10th and 90th
+give the calibration curve. The coverage of the truth is scored on 96 scoring units (the case
+families with a step, a ramp, a fall, and a constant path), separately at weeks with no true step
+and at weeks within 2 weeks of a true step. A bootstrap of a penalised fit at a boundary tends to
+under-cover, and the decision rule counts that as a finding. If coverage at non-step weeks is under
+0.85, the write-up reports an inflation factor chosen on tuning units, labelled post hoc.
 
 **False steps are counted on two skies.** One is experiment 00039's placebo sky, which permutes
 the PV shape `u` across days within each month (200 permutations per Primary) and leaves the
@@ -503,26 +509,33 @@ itself), for the season-years in which the series holds at least 40 weeks.
 ### What SW2-10 reads
 
 **Two private parquet files, with the columns below.** The folder is
-`data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/`.
+`data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/`. Both files hold one row per
+Primary, variant, and week, and both carry the same file metadata, which names the recommended
+variant and defines each column.
 
-- `capacity_weekly.parquet`, the final fit on all data, one row per `time_series_id` and
-  `week_start`: `time_series_id` (Int32), `primary_name` (String), `week_start` (Date, Monday,
-  Europe/London), `capacity_mw` (Float64, the 99th percentile of the half-hourly AC output of the
-  embedded solar, divided by the recovery ratio), `capacity_low_mw` and `capacity_high_mw` (the 5th
-  and 95th percentiles of the bootstrap), `capacity_raw_mw` (before the division),
-  `recovery_ratio`, `n_usable_days` (Int32), `observed` (Boolean), `step_flag` (Boolean, a rise of
-  10% or more within 4 weeks centred on the week), `status` (`clean`, `low-power`, `flagged`, or
-  `left-out`), `bound_dayL_relative` (experiment 00040's B for the Primary's season-year), and
-  `scenario_dayL_mw` and `scenario_sunload_mw` (the capacity under each named systematic
-  scenario, never merged into the interval).
+- `capacity_weekly.parquet`, the final fit on all data, with the columns `week_start` (Date, Monday,
+  Europe/London), `time_series_id` (Int32), `primary_name` (String), `variant` (`frozen`,
+  `alt_post_hoc`, `season_year_constant`, or `free_weekly`), `capacity_mw` (Float64, the 99th
+  percentile of the half-hourly AC output of the embedded solar, divided by the variant's recovery
+  ratio), `low_mw` and `high_mw` (the 5th and 95th percentiles of the 200-draw residual block
+  bootstrap, clipped to include the point estimate, and widened in unobserved weeks), `status`,
+  `unobserved` (Boolean, true when the week has fewer than 3 usable days), `recovery_ratio`,
+  `rooftop_low_mw` and `rooftop_high_mw` (the capacity minus and plus 10%), `scenario_dayL_mw` and
+  `scenario_sunload_mw` (the capacity under each named systematic scenario, never merged into the
+  interval), and `recommended` (Boolean, true for the one variant SW2-10 should read).
 - `capacity_weekly_vintages.parquet`, the same columns plus `origin_monday` (Date): the fit at each
-  weekly origin using only data before that Monday. **A forecast date `d` reads the rows whose
-  `origin_monday` is the last Monday on or before `d` and whose `week_start` is the latest week**
+  origin using only data before that Monday, for the variants `frozen` and `alt_post_hoc`.
+  Origins fall every 4 weeks over the last 3 years of the record, plus the final origin, so
+  `low_mw` and `high_mw` are null in this file. **A forecast date `d` reads the rows whose
+  `origin_monday` is the last origin on or before `d` and whose `week_start` is the latest week**
   (the Monday seven days before the origin), and holds that value flat for the days after it.
 
-SW2-10 uses rows with status `clean` or `low-power`, uses the vintage file for any held-out
-scoring, and treats `flagged` rows as unavailable. The path of the finished file goes to the
-"Design: Switching event detection experiments" session when it exists.
+**The `status` column carries one label per Primary, as it appears in the file.** The labels are
+`clean`, `low-power`, `range-only`, and `not-clean`. SW2-10 uses rows with status `clean` or
+`low-power`, reads `range-only` rows as a range (`low_mw` to `high_mw`) and never as a value, treats
+`not-clean` rows as unavailable, and skips rows with `unobserved` true when it needs a measured
+week. SW2-10 uses the vintage file for any held-out scoring. The path of the finished file goes to
+the "Design: Switching event detection experiments" session when it exists.
 
 ### Cores, time, and parallel work
 

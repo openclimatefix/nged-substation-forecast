@@ -117,6 +117,11 @@ LIMIT_C5: Final[float] = 2.0
 LIMIT_DETECTION: Final[float] = 0.25
 N_DRAWS: Final[int] = 2000
 """Cluster-bootstrap draws of every interval in the report."""
+POST_HOC_PAIR: Final[tuple[float, float]] = (2.0, 10.0)
+"""The post hoc pair `(a, r)` of `alt_post_hoc`, chosen after the scoring results were seen."""
+POST_HOC_DIR_NAME: Final[str] = "post_hoc"
+"""Sub-directory of the scores that holds the post hoc fits; its top-level outputs end in
+`_post_hoc`."""
 FLAGGED_PRIMARIES: Final[tuple[str, ...]] = ("D5", "D15")
 """Kirton and Wrangle T1, which the report flags in every per-Primary table."""
 
@@ -354,7 +359,11 @@ def score_row(
         real_mean: Mean capacity of the unpermuted real series under this fit, MW.
 
     Returns:
-        The unit's scores. Scores that do not apply to the case are `None`.
+        The unit's scores. Scores that do not apply to the case are `None`. The constant-path unit
+        carries false-step rates on two thresholds: `steps_10` and `steps_05` use 10% and 5% of
+        `real_mean` (the placebo sky's threshold), and `steps_10_inj` and `steps_05_inj` use the
+        same shares of the injected constant capacity. `path_error_flat` is the path error of an
+        estimator that detects nothing (flat at the baseline capacity, or zero increment).
     """
     observed = np.array(row["observed"], dtype=bool)
     increment = np.array(row["increment"], dtype=float)
@@ -383,10 +392,20 @@ def score_row(
             estimate=estimate, truth=truth, weeks=observed, scale=scale
         ),
         "peak_error": float(np.nanmax(np.abs(estimate - truth)[observed]) / scale),
+        "path_error_flat": metrics.path_error(
+            estimate=inject.true_path(
+                increment=np.zeros_like(increment), base_capacity=base_capacity, variant=variant
+            ),
+            truth=truth,
+            weeks=observed,
+            scale=scale,
+        ),
         "n_missing_observed": int((~np.isfinite(estimate[observed])).sum()),
         "fall_recovered": None,
         "steps_10": None,
         "steps_05": None,
+        "steps_10_inj": None,
+        "steps_05_inj": None,
         "drift_per_5y": None,
         "swing": None,
         "step_start": None,
@@ -407,6 +426,9 @@ def score_row(
         n_weeks = int(np.isfinite(estimate).sum())
         for label, share_of_mean in (("steps_10", 0.10), ("steps_05", 0.05)):
             found = metrics.count_steps(path=estimate, threshold=share_of_mean * real_mean)
+            out[label] = metrics.steps_per_year(steps=found, n_weeks=n_weeks)
+        for label, share_of_capacity in (("steps_10_inj", 0.10), ("steps_05_inj", 0.05)):
+            found = metrics.count_steps(path=estimate, threshold=share_of_capacity * base_capacity)
             out[label] = metrics.steps_per_year(steps=found, n_weeks=n_weeks)
         out["drift_per_5y"] = metrics.ratchet_drift_per_5_years(
             path=estimate, reference=float(np.nanmean(truth))
@@ -1169,11 +1191,167 @@ def build_report(*, run: Run, frozen: Frozen, scores: pl.DataFrame) -> Report:  
     ]
     report.line("Clauses that hold: " + ("; ".join(holding) or "none") + ".")
 
+    _add_flat_reference(report=report, scores=scores)
+    _add_false_step_thresholds(report=report, run=run, frozen=frozen, scores=scores)
+    _add_exempt_weeks(report=report, run=run, frozen=frozen)
     _add_comparison_tables(report=report, scores=scores, placebo=placebo, draws=draws)
     _add_breakdowns(report=report, scores=scores, placebo=placebo, detection=detection)
     _add_vintages(report=report, run=run)
     _add_coverage(report=report, run=run)
+    _add_post_hoc_block(report=report, run=run)
     return report
+
+
+def _add_flat_reference(*, report: Report, scores: pl.DataFrame) -> None:
+    """Add the path error of an estimator that detects nothing, beside condition (i)."""
+    report.section("Reference for condition (i): an estimator that detects nothing")
+    parts = []
+    for variant in VARIANTS:
+        flat = median_of_medians(
+            tensor_of(
+                frame=scores,
+                fit="asymmetric",
+                cases=CONDITION_I_CASES,
+                column="path_error_flat",
+                variant=variant,
+            )
+        )
+        fitted = median_of_medians(
+            tensor_of(
+                frame=scores,
+                fit="asymmetric",
+                cases=CONDITION_I_CASES,
+                column="path_error",
+                variant=variant,
+            )
+        )
+        parts.append(f"{variant}: flat {flat:.3f}, frozen asymmetric fit {fitted:.3f}")
+    report.line(
+        "Median path error on ramps and steps (the cases of condition (i)) of a path flat at the "
+        "baseline capacity (zero increment in the real-plus-injection variant), beside the frozen "
+        "asymmetric fit: " + "; ".join(parts) + "."
+    )
+
+
+def false_step_threshold_table(*, scores_by_pair: dict[str, pl.DataFrame]) -> pl.DataFrame:
+    """Return the constant-path false-step rate on both thresholds for each penalty pair.
+
+    The thresholds are 10% of the unpermuted real series' raw mean capacity (the placebo sky's
+    threshold) and 10% of the injected constant capacity.
+
+    Args:
+        scores_by_pair: `unit_scores` of each penalty pair, keyed by the pair's label.
+
+    Returns:
+        One row per pair and threshold: the median over Primaries of each Primary's mean rate, the
+        worst Primary's mean rate, and the worst Primary's code.
+    """
+    rows = []
+    for label, scores in scores_by_pair.items():
+        for threshold, column in (
+            ("10% of the real raw mean capacity", "steps_10"),
+            ("10% of the injected constant capacity", "steps_10_inj"),
+        ):
+            values = tensor_of(
+                frame=scores, fit="asymmetric", cases=("constant_path",), column=column
+            )
+            primaries = [p for p in common.PRIMARIES if p in set(scores["primary"])]
+            means = [_safe(np.mean, values[index].ravel()) for index in range(len(primaries))]
+            rows.append(
+                {
+                    "pair": label,
+                    "threshold": threshold,
+                    "median_primary": median_of_means(values),
+                    "worst_primary": worst_of_means(values),
+                    "worst_primary_code": primaries[int(np.nanargmax(means))],
+                }
+            )
+    return pl.DataFrame(rows)
+
+
+def _add_false_step_thresholds(
+    *, report: Report, run: Run, frozen: Frozen, scores: pl.DataFrame
+) -> None:
+    """Add the constant-path false-step rate on both thresholds, frozen and post hoc."""
+    scores_by_pair = {f"frozen (a={frozen.a:g}, r={frozen.r:g})": scores}
+    post_hoc_path = run.out_dir / "unit_scores_post_hoc.parquet"
+    if post_hoc_path.exists():
+        a, r = POST_HOC_PAIR
+        scores_by_pair[f"post hoc (a={a:g}, r={r:g})"] = pl.read_parquet(post_hoc_path)
+    report.section("Constant-path false steps per Primary-year on both thresholds")
+    report.table(
+        "false_step_thresholds",
+        false_step_threshold_table(scores_by_pair=scores_by_pair),
+        note=(
+            "The condition (iii) number uses the first threshold. The second threshold is 10% of "
+            "the injected constant capacity, the step size the constant-path unit is built "
+            "around. Median and worst are over Primaries of each Primary's mean rate."
+        ),
+    )
+
+
+def exempt_week_counts(*, run: Run, specs: dict[str, inject.FitSpec]) -> pl.DataFrame:
+    """Count the weeks exempt from the placebo-sky false-step count, per Primary and fit.
+
+    A week is exempt when it lies within 4 weeks of a rise of 10% of the real series' mean raw
+    capacity under the same fit, so that real growth is not counted as a false step.
+
+    Args:
+        run: What is scored.
+        specs: Label to fit specification.
+
+    Returns:
+        One row per Primary and fit: the exempt weeks and the weeks that hold a path value.
+    """
+    inputs = inject.load_inputs()
+    rows = []
+    for primary in run.primaries:
+        design = model.design_from_rows_table(
+            table=model.usable_rows_table(
+                half_hourly=inputs.half_hourly, weeks=inputs.weeks, site=primary
+            )
+        )
+        for label, spec in specs.items():
+            path = model.FITS[spec[0]](design=design, a=spec[1], r=spec[2])
+            exempt = metrics.rise_weeks(path=path, threshold=0.10 * float(np.nanmean(path)))
+            rows.append(
+                {
+                    "primary": primary,
+                    "fit": label,
+                    "exempt_weeks": int(exempt.sum()),
+                    "n_weeks": int(np.isfinite(path).sum()),
+                }
+            )
+    return pl.DataFrame(rows)
+
+
+def _add_exempt_weeks(*, report: Report, run: Run, frozen: Frozen) -> None:
+    """Add the exempt-week counts of the placebo-sky false-step count."""
+    specs = {FIT_LABELS[spec[0]]: spec for spec in frozen.fits()}
+    specs[f"post hoc (a={POST_HOC_PAIR[0]:g}, r={POST_HOC_PAIR[1]:g})"] = (
+        "asymmetric",
+        *POST_HOC_PAIR,
+    )
+    report.section("Weeks exempt from the placebo-sky false-step count")
+    report.table(
+        "exempt_weeks",
+        exempt_week_counts(run=run, specs=specs).sort("primary", "fit"),
+        note=(
+            "A placebo step starting in an exempt week is not counted; an exempt week lies within "
+            "4 weeks of a rise of 10% of the real series' mean capacity under the same fit. Weeks "
+            "are counted on the whole week grid, including weeks where the fit has no path value, "
+            "so a count can exceed n_weeks."
+        ),
+    )
+
+
+def _add_post_hoc_block(*, report: Report, run: Run) -> None:
+    """Append the post hoc block that `e00045_post_hoc.py` wrote, when it exists."""
+    path = run.out_dir / "score_report_post_hoc.txt"
+    if not path.exists():
+        return
+    report.line()
+    report.line(path.read_text().rstrip("\n"))
 
 
 def verdict_of(  # noqa: PLR0911

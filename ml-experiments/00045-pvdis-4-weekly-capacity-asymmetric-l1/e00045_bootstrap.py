@@ -214,7 +214,13 @@ def bootstrap_unit(
 
 
 def bootstrap_job(
-    *, primary: str, farm: str, split: inject.SplitType, out_dir: Path, n_draws: int
+    *,
+    primary: str,
+    farm: str,
+    split: inject.SplitType,
+    out_dir: Path,
+    n_draws: int,
+    pair: score.Frozen | None = None,
 ) -> Path:
     """Bootstrap the 4 units of one Primary and one farm, and write the table atomically.
 
@@ -224,6 +230,7 @@ def bootstrap_job(
         split: Which split's farms and path seed to use (the first path seed).
         out_dir: Directory of the scores (the ratios are read from it).
         n_draws: Number of bootstrap draws per unit.
+        pair: The penalty pair to bootstrap; the frozen pair when `None`.
 
     Returns:
         The path of the output file.
@@ -232,7 +239,7 @@ def bootstrap_job(
     if out_file.exists():
         return out_file
     inject.assert_split(farm=farm, seeds=inject.SEEDS_BY_SPLIT[split], split=split)
-    frozen = score.load_frozen()
+    frozen = score.load_frozen() if pair is None else pair
     ratios = score.read_ratios(out_dir=out_dir)
     inputs = inject.load_inputs()
     base = inject.primary_base(inputs=inputs, site=primary)
