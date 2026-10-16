@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
-
 from studies.capacity_posthoc import hysteresis_level
 
 MIN_STEP: Final[float] = 0.05
@@ -26,6 +25,9 @@ WINSOR_ROBUST_SDS: Final[float] = 3.0
 
 ROLLING_MEDIAN_VALID_DAYS: Final[int] = 28
 """The rolling median reads this many valid days, centred on the day."""
+
+MIN_ROBUST_SD: Final[float] = 0.01
+"""A floor on the robust standard deviation, which keeps a noiseless test signal fittable."""
 
 MAD_TO_SD: Final[float] = 1.4826
 """Scale from a median absolute deviation to a standard deviation of a normal distribution."""
@@ -73,7 +75,9 @@ def winsorise(*, values: np.ndarray, sd: float) -> np.ndarray:
     for index in range(len(values)):
         window = values[max(0, index - WINSOR_HALF_WINDOW) : index + WINSOR_HALF_WINDOW + 1]
         centre = np.median(window)
-        out[index] = np.clip(values[index], centre - WINSOR_ROBUST_SDS * sd, centre + WINSOR_ROBUST_SDS * sd)
+        out[index] = np.clip(
+            values[index], centre - WINSOR_ROBUST_SDS * sd, centre + WINSOR_ROBUST_SDS * sd
+        )
     return out
 
 
@@ -115,7 +119,9 @@ def optimal_partition(*, values: np.ndarray, penalty: float, min_length: int) ->
     return sorted(starts_found)
 
 
-def change_point_alarms(*, signal: np.ndarray, penalty_scale: float) -> list[Alarm]:
+def change_point_alarms(
+    *, signal: np.ndarray, penalty_scale: float, min_segment: int = MIN_SEGMENT_VALID_DAYS
+) -> list[Alarm]:
     """Return the downward changes of at least `MIN_STEP` found by the L0 change-point fit.
 
     The penalty is `penalty_scale` times the robust variance times the logarithm of the number of
@@ -124,20 +130,19 @@ def change_point_alarms(*, signal: np.ndarray, penalty_scale: float) -> list[Ala
     Args:
         signal: One farm's daily signal (logarithmic ratio), NaN on a day without one.
         penalty_scale: The multiplier that the tuning draw sets.
+        min_segment: The fewest valid days in a segment.
 
     Returns:
         The alarms, in day order.
     """
     days = np.flatnonzero(np.isfinite(signal))
-    if len(days) < 2 * MIN_SEGMENT_VALID_DAYS:
+    if len(days) < 2 * min_segment:
         return []
     values = signal[days]
-    sd = robust_sd(values=values)
-    if sd == 0.0:
-        return []
+    sd = max(robust_sd(values=values), MIN_ROBUST_SD)
     clipped = winsorise(values=values, sd=sd)
     penalty = penalty_scale * sd**2 * np.log(len(days))
-    starts = optimal_partition(values=clipped, penalty=penalty, min_length=MIN_SEGMENT_VALID_DAYS)
+    starts = optimal_partition(values=clipped, penalty=penalty, min_length=min_segment)
     levels = [
         float(np.mean(clipped[start:stop]))
         for start, stop in zip(starts, [*starts[1:], len(clipped)], strict=True)
@@ -165,7 +170,7 @@ def fitted_level(*, signal: np.ndarray, penalty_scale: float) -> np.ndarray:
     if len(days) < 2 * MIN_SEGMENT_VALID_DAYS:
         return out
     values = signal[days]
-    sd = robust_sd(values=values)
+    sd = max(robust_sd(values=values), MIN_ROBUST_SD)
     clipped = winsorise(values=values, sd=sd)
     penalty = penalty_scale * sd**2 * np.log(len(days))
     starts = optimal_partition(values=clipped, penalty=penalty, min_length=MIN_SEGMENT_VALID_DAYS)
@@ -195,15 +200,13 @@ def rolling_median_alarms(*, signal: np.ndarray, threshold: float) -> list[Alarm
         return []
     values = signal[days]
     half = ROLLING_MEDIAN_VALID_DAYS // 2
-    level = np.array(
-        [np.median(values[max(0, i - half) : i + half + 1]) for i in range(len(values))]
-    )
-    baseline = np.median(values)
-    drop = 1.0 - np.exp(level - baseline)
+    level = np.array([np.median(values[max(0, i - half) : i + half]) for i in range(len(values))])
+    # The signal is centred on the unmodified record's median, so 0 is the normal level.
+    drop = 1.0 - np.exp(level)
     alarms = []
     alarmed = False
     for index in range(len(values)):
-        if not alarmed and drop[index] >= threshold:
+        if not alarmed and drop[index] >= max(threshold, MIN_STEP):
             alarmed = True
             alarms.append(Alarm(day=int(days[index]), size=float(drop[index])))
         elif alarmed and drop[index] < threshold / 2:
@@ -223,8 +226,8 @@ def hysteresis_alarms(*, ratio: np.ndarray, drop: float) -> list[Alarm]:
         The alarms, in day order.
     """
     level = hysteresis_level(ratio=ratio, drop=drop)
-    alarms = []
-    for day in range(1, len(level)):
-        if level[day - 1] == 1.0 and level[day] < 1.0 - drop:
-            alarms.append(Alarm(day=day, size=float(1.0 - level[day])))
-    return alarms
+    return [
+        Alarm(day=day, size=float(1.0 - level[day]))
+        for day in range(1, len(level))
+        if level[day - 1] == 1.0 and level[day] < 1.0 - drop and 1.0 - level[day] >= MIN_STEP
+    ]
