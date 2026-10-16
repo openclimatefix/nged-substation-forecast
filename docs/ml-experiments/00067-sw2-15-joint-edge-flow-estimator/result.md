@@ -22,19 +22,22 @@ decision_rule: >-
   experiment 58's 620 headline-band transfers that start in even months, equal weight over S2, S3,
   and S4. LOGIT_SAME is experiment 65's post hoc logistic score with the count of same-sign
   neighbour steps (PE end rule), a benchmark chosen after seeing its result and labelled so. EF is
-  held to at most 80 unexplained odd-month alarms, counted per series (an edge run counts once for
-  each of its two series), and to no more than 10 above D0M's unexplained alarms on even months.
+  held to at most 80 unexplained odd-month alarms, counted per series (each run counts twice per
+  series metered in MW, at its onset and at its end), and to no more than 10 above D0M's unexplained alarms on
+  even months. An EF that breaks the even-month cap is `inconclusive` whatever its recall.
   EF is `supported` when C1's interval lies wholly above zero and its point value is at least
   +0.05. EF is `small gain` when C1's interval lies wholly above zero and its point value is under
   +0.05. EF is `refuted` when C1's upper end lies below +0.02. Otherwise it is `inconclusive`. C2
-  is read without a verdict and says whether EF also beats the best neighbour score. The threshold
+  is read without a verdict and says whether EF also beats the best neighbour score. The verdict
+  arm is fixed here as D0M (PE) from experiment 65. If experiment 66 (SW2-16) merges first, its
+  winner is reported as a descriptive third contrast (C3) and does not change the verdict. All
+  intervals are two-sided and resample whole calendar year-months. The threshold
   of +0.05 is set by the cost of porting: the estimator adds a graph, a CVXPY solve per window, and
   three tuned penalty weights to a detector that has one threshold, and the estimator serves only
   training-time masks and the NGED event table, so a gain under +0.05 does not repay that.
 benchmark: >-
-  D0M with the PE end rule (experiment 61), 80 unexplained odd-month alarms, as in experiment 65.
-  Experiment 66 (SW2-16) is still running; its winner replaces D0M if it merges before this
-  experiment's write-up, and both are reported.
+  D0M with the PE end rule (experiment 61), 80 unexplained odd-month alarms, as in experiment 65,
+  read from experiment 65's stored per-transfer results (same transfers, seeds, and shapes).
 row_set_id: >-
   none (this experiment scores detector alarms against injected transfers, as experiments 43, 55,
   58, 59, 61, and 65 do, not forecasts)
@@ -74,28 +77,55 @@ own onset and end.
   divided by each series' robust standard deviation on odd months. No whitening (experiment 62).
 - **Fit, per window of 70 days.** Minimise a Huber loss (threshold 3 noise units) of the residual
   minus the flows into and out of each metered node minus the slack, plus `lambda` times the
-  absolute value of the flows and slack (the sparsity penalty), plus `rho * lambda` times a group
-  fused penalty (the sum over time of the Euclidean norm of the one-hour changes in the flows and
-  slack at each node), with the slack's level penalty multiplied by `m`. The fit is a CVXPY convex
-  problem solved with Clarabel.
-- **Read-out.** A run is a stretch of one flow or slack that stays above 0.25 noise units, with
-  gaps of up to 3 hours bridged. Runs under 24 hours are dropped, the same duration the 24-hour
-  detectors cannot see below. A run on a boundary gives an interval on both of its series; a slack
-  run gives one on its own series. An interval's onset and end are the run's.
+  absolute value of the flows and slack (the sparsity penalty), plus `rho * lambda` times a fused
+  penalty (the sum over time of the absolute one-hour change of each flow and each slack), with
+  the slack's level penalty multiplied by `m`. The fit is a CVXPY convex problem solved with
+  Clarabel. A group version of the fused penalty, which ties the changes at one node together
+  (roadmap approach 3), solved 25 times slower in a trial on a 28-day window (55 s against 2.2 s),
+  so each flow changes on its own here. This choice was made before any scored fit.
+- **Read-out.** A run is a stretch of one flow or slack that stays above 0.1 hourly noise standard
+  deviations, with gaps of up to 3 hours bridged. Runs under 24 hours are dropped, the same
+  duration the 24-hour detectors cannot see below. A run on a boundary gives an interval on each of
+  its series that is metered in MW. A series metered only in MVA gets an interval only from its own
+  slack, since the fit has no evidence at that end. A slack run gives one on its own series. An
+  interval's onset is the first stamp of the run's first hourly bin, and its end is the first stamp
+  after its last bin. A run whose onset lies within 24 hours of a monthly refit of the residual
+  model is dropped, as the benchmark skips alarms that straddle a refit. The run stops on any
+  solver status other than `optimal` and `optimal_inaccurate`, and reports the count of
+  `optimal_inaccurate` fits.
+- **Alarms and explained alarms.** D0M raises one alarm on the onset step and one on the return
+  step of a block of load, so each EF run counts as two alarms per series, one at its onset and one
+  at its end. An alarm is explained when a logged closure touches its series within 24 hours of
+  its own stamp, the benchmark's rule. Missing hourly bins drop out of the loss.
 - **Injected transfers** are experiment 58's 1,900, in its batches and with its seeds, injected
-  with experiment 60's shapes. For each transfer the fit uses the window from 21 days before its
-  onset to 49 days after, cut from the batch's injected residual. The real-residual fit uses
-  windows of 70 days at a stride of 28 days and keeps runs whose onset lies in the middle 28 days.
-- **Tuning, on odd months only.** `lambda` is set so that the fit on the real residual has at most
-  80 unexplained odd-month alarms, the count of D0M, where an alarm is explained when a logged
-  closure touches its series within 24 hours. Then `rho` (1, 3, 10) and `m` (1.5, 3) are chosen to
-  maximise MW-weighted recall on 300 odd-month headline-band transfers, one shape per transfer
-  (S2, S3, or S4 by event number), at the matched `lambda`. The grid is fixed here, before any
-  fit.
+  with experiment 60's shapes. For each transfer the fit uses the window from 35 days before its
+  onset to 35 days after, cut from the batch's injected residual. The real-residual fit uses
+  windows of 70 days at a stride of 28 days and keeps runs whose onset lies in the middle 28 days
+  (21 to 49 days after the window start), so a run has 21 to 49 days of context on each side in
+  both fits. Both fits see more hindsight than the benchmark's 14-day end search. The write-up says
+  so, and the estimator serves only training-time masks and the event table.
+- **Tuning, on odd months only.** For each cell of the grid `rho` (1, 3, 10) by `m` (1.5, 3),
+  `lambda` is re-matched by bisection on its logarithm to the largest count of unexplained
+  odd-month alarms that does not exceed 80, the count of D0M, on the real residual. The cell with
+  the highest MW-weighted recall on 300 odd-month headline-band transfers (one shape per transfer,
+  S2, S3, or S4 by event number) wins, with ties going to the larger `lambda`. Every cell's alarm
+  count and recall are reported. The grid is fixed here, before any fit.
 - **Scored on even months.** The 620 headline-band, even-month transfers under S2, S3, and S4, with
   the benchmark arms from experiment 65's code: D0M with the PE end rule and LOGIT_SAME. The
-  labelled real transfers over 1 day are scored too (35 of them), and recall by donor step in
-  noise units is split by metered receiver.
+  labelled real transfers over 1 day are scored too (35 of them), split by odd and even onset
+  month, with the even-month ones as the headline. Recall by donor step in noise units (bins [0,
+  2.5), [2.5, 4), [4, 6), [6, 10), and 10 or more) is split by metered receiver for EF, D0M, and
+  LOGIT_SAME, and the share of moved MW missed is tabulated for every arm.
+
+## Checks before scoring
+
+- **Known answer:** a planted flow and a planted slack, noise-free, are recovered by the fit at the
+  right onset and end.
+- **Harness:** the injected `moved_mw` of every transfer and shape equals experiment 65's stored
+  value, and D0M's pooled even-month PE recall reads 0.646 from the stored results.
+- **Size of the job:** about 1,860 scoring fits (620 transfers by 3 shapes), 6 cells by about 8
+  bisection steps by about 58 windows of real-residual fits, and 6 by 300 tuning fits, each
+  solved in a few seconds with 4 workers.
 
 ## Planned contrasts
 
