@@ -24,8 +24,8 @@ decision_rule: >-
   the largest step in noise units over the donor and the metered receivers (a transfer counts as
   found when an alarm on any of those series matches it, so a transfer with a metered receiver has
   more chances to alarm at one donor step). There are four bins of equal count over the range both
-  groups share, with the bin gaps averaged with the unmetered count as weight. The raw gap is 0.33. The step size
-  explains at least half the gap when the upper end of the C1 interval lies below 0.165, and
+  groups share, with the bin gaps averaged with the unmetered count as weight. The raw gap is
+  0.33. The step size explains at least half the gap when the upper end of the C1 interval lies below 0.165, and
   explains less than half when the lower end lies above 0.165; otherwise the result is mixed.
   C2 is D2 at the veto strength chosen on odd months among 1.0, 1.25, and 1.5, minus D0M, in the
   share of transfers found, paired by transfer, exactly as experiment 55's C1. `supported` when the
