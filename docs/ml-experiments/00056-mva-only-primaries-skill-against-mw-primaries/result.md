@@ -36,104 +36,121 @@ verdict: inconclusive
 best_arm: >-
   Not applicable (a re-scoring of one forecast). At sunny middays the best guess's skill against
   `manual_heuristic` is 15.9% at the 8 MW Primaries and 10.3% at the 8 MVA Primaries; the gap is
-  5.6 points (95% interval -5.0 to 14.6, resampling months).
+  5.6 percentage points (95% interval -5.0 to 14.6, resampling months).
 lessons: >-
-  Nothing in the data says v1 needs special handling at the MVA Primaries at sunny middays, but
-  8 series against 8 cannot rule a gap of up to 14 points out. The MVA Primaries' skill is lower
-  all year (a gap of 10.5 points, 2.1 to 17.5), and at sunny middays it is higher than in other
-  hours. One MW Primary with 30% skill carries most of the all-hours gap. Near-zero flow, the
-  case an MVA meter hides, is rare at the MVA Primaries (12 sunny-midday half-hours in the year).
+  Nothing in the data shows that Flexpectation v1 needs special handling at the Primary substations
+  metered only in MVA, but 8 time series against 8 cannot rule out a loss of up to about 15
+  percentage points of skill at sunny middays. The MVA group's skill is lower all year (a gap of
+  10.5 percentage points, 2.1 to 17.5), and at sunny middays it is higher than in other hours. One
+  MW substation with 31% skill accounts for most of the all-hours gap. Near-zero flow, the case an
+  MVA meter hides, is 1.5% of the MVA group's half-hours against 2.5% of the MW group's, and the
+  best guess's skill there is lower in the MVA group (18.8% against 46.1%).
 production_status: not-for-production
 advice:
   - >-
-    Do not build special handling for the MVA-only Primaries into v1 on the strength of this
-    result: at sunny middays the best guess's skill is not lower than at the MW Primaries beyond
-    the interval (gap 5.6 points, -5.0 to 14.6; figure 1).
+    Do not build special handling for the MVA-only Primaries into Flexpectation v1 on the strength
+    of this result, and do not treat it as proof that none is needed: at sunny middays the gap in
+    skill is 5.6 percentage points (-5.0 to 14.6; figure 1).
   - >-
-    Compare unit groups with one MW Primary's skill removed, or by series, because one MW Primary
-    with 30% skill carries most of the all-hours gap (3.8 points without it; leave-one-out table).
+    Compare unit groups with each series' skill shown, or with the highest-skill series left out,
+    because one MW Primary with 31% skill accounts for most of the all-hours gap (3.8 percentage
+    points without it; post hoc section).
   - >-
-    Treat PVDIS-7 (MW at the MVA-only Primaries) as motivated by the solar disaggregation, not by
-    forecast skill: near-zero flow at sunny middays is under 1.1% of half-hours at 7 of the 8 MVA
-    Primaries (figure 3).
+    Look for the cost of MVA metering in the half-hours near zero flow: the best guess's skill
+    there is 18.8% in the MVA group against 46.1% in the MW group, but those half-hours are 1.5%
+    of the MVA group's, so test it on more series before building anything (near-zero section).
 ---
 
-# Experiment 56: do the Primaries metered only in MVA need special handling in v1?
+# Experiment 56: does Flexpectation v1 need special handling at MVA-only Primaries?
 
-**The best guess forecasts the 8 trial Primary substations metered only in MVA no worse at sunny
-middays than the 8 metered in MW, within what 8 series can show, so v1 can ignore the problem for
-now; the experiment could not rule out a gap of up to 14 points.** Eight of the 16 trial
-substations record only the size of the power (MVA), with no direction of flow, so a substation
-where embedded solar pushes the net flow through zero could look odd to a forecast that predicts
-that size. We took experiment 33's stored forecasts, measured how much better the best guess is
-than a simple rule-based forecast (`manual_heuristic`) at each group of 8 substations, and split
-the result by sunny midday and by near-zero flow. At sunny middays the best guess scored 15.9%
-lower (better) than `manual_heuristic` at the MW substations and 10.3% lower at the MVA
-substations, a 5.6-point gap whose 95% interval runs from -5.0 to 14.6 points.
+**At sunny middays the best-guess forecast has 5.6 percentage points less skill at the 8 Primary
+substations metered only in MVA than at the 8 metered in MW, but the 95% interval (-5.0 to 14.6)
+includes zero, so 8 time series against 8 cannot say whether MVA metering hurts the forecast.** The
+experiment found no evidence that Flexpectation v1 needs special handling, and could not rule out a
+loss of up to about 15 percentage points. A Primary substation steps the voltage down to 11 kV or
+33 kV. Eight of the 16 trial-area Primaries have a meter that records signed real power in megawatts
+(MW). The other 8 record only the magnitude of apparent power in megavolt-amperes (MVA), with no
+sign. When embedded solar pushes a substation's net flow through zero, an MVA reading no longer
+shows which way the power went. We took the forecasts that experiment 33 stored for every
+half-hour from July 2025 to June 2026. They come from its best-guess forecast of Primary-substation
+demand (an XGBoost model with a 14-day error correction and a 1.15 spread factor) and from a simple
+rule-based forecast, `manual_heuristic`. Skill is the percentage by which the best guess's
+quantile score, the standard error measure for a probabilistic forecast, is lower than
+`manual_heuristic`'s. At sunny middays (April to September, 10:00 to 13:30 UTC) the skill is 15.9%
+at the MW substations and 10.3% at the MVA substations. Nothing was fitted.
 
 ## Result
 
 **The verdict is `inconclusive`, by the rule fixed before the run.** The rule called MVA clearly
-worse when the interval's lower end was above zero and the gap was 5 points or more, and called v1
-safe to ignore when the upper end was under 5 points. The gap is 5.6 points, but its lower end is
-below zero and its upper end is above 5.
+worse when the interval's lower end was above zero and the gap was 5 percentage points or more, and
+called Flexpectation v1 safe to ignore when the upper end was under 5. The gap is 5.6, but the
+lower end is below zero and the upper end is above 5. Each interval resamples whole months.
 
-**Skill is lower at the MVA Primaries all year, and not specifically at sunny middays.** Skill is
-the percentage by which the best guess's quantile score is lower than `manual_heuristic`'s, pooled
-over a group's cases (figure 1). In all hours, the MW group scores 14.97% and the MVA group 4.50%,
-a gap of 10.5 points (2.1 to 17.5). Outside sunny middays the gap is 11.2 points (2.7 to 18.3), and at
-sunny middays 5.6 points (-5.0 to 14.6). The MVA group's skill is higher at sunny middays (10.3%)
+**Skill is lower at the MVA substations all year, not specifically at sunny middays.** Skill is
+pooled over a group's cases (figure 1). In all hours the MW group's skill is 15.0% and the MVA
+group's 4.5%, a gap of 10.5 percentage points (2.1 to 17.5). Outside sunny middays the gap is 11.2
+(2.7 to 18.3). At sunny middays it is 5.6 (-5.0 to 14.6), and the MVA group's skill is higher (10.3%)
 than in other hours (3.7%).
 
-| Hours | Best guess, MW | `manual_heuristic`, MW | Best guess, MVA | `manual_heuristic`, MVA |
+| Hours | Best guess, MW group | `manual_heuristic`, MW group | Best guess, MVA group | `manual_heuristic`, MVA group |
 |---|---|---|---|---|
 | All hours | 5.22 | 6.13 | 5.41 | 5.67 |
 | Sunny midday | 7.23 | 8.60 | 7.47 | 8.34 |
 | Other hours | 5.03 | 5.90 | 5.22 | 5.42 |
 
-*Mean quantile score in points of capacity, July 2025 to June 2026, 16 Primaries.*
+*Pooled mean quantile score in points of capacity, July 2025 to June 2026, 16 Primary substations.*
 
 ![Skill by unit group](figure_1_skill_by_unit.svg)
 
-**The series are too few to separate the groups.** Resampling the series within each group, instead
-of the months, gives a sunny-midday gap of 5.6 points with an interval of -2.8 to 14.0 (figure 2
-shows each Primary). The all-hours gap's interval then runs from -2.0 to 20.2, which includes zero.
+**The substations are too few to separate the groups.** Resampling the time series within each
+group, instead of the months, gives a sunny-midday gap of 5.6 percentage points with an interval of
+-2.8 to 14.0 (figure 2 shows each substation). The all-hours gap's interval then runs from -2.0 to
+20.2, and includes zero.
 
 ![Skill of each Primary at sunny midday](figure_2_skill_per_series.svg)
 
-**Near-zero flow is rare at the MVA Primaries, so the worry has little to act on.** Only 106 of
-403,712 MVA half-hours are within 10% of capacity of zero, 12 of them at sunny middays, against
-2,392 of 364,361 for the MW group, 514 at sunny middays. At sunny middays the share of half-hours
-with power under 10% of the series' 99th percentile is 0% at 5 of the 8 MVA Primaries and 8.7% at
-the highest (series 26), against 22.9% and 19.8% at 2 MW Primaries (figure 3). The best guess's
-skill at near-zero flow is 29.5% at the MVA group and 50.6% at the MW group (the MVA interval, 4.2
-to 39.4, rests on 106 half-hours).
+**Half-hours near zero flow are few, and the best guess's skill there is lower in the MVA group.**
+Of the 403,712 half-hours scored across the 8 MVA time series, 5,904 (1.5%) have the magnitude of
+the power within 10% of capacity of zero, and 500 of those are at sunny middays (1.5% of 34,176).
+For the 8 MW time series the figures are 8,954 of 364,361 (2.5%) and 2,167 of 31,044 (7.0%). On
+those half-hours the best guess's skill is 18.8% in the MVA group (4.1 to 30.2) and 46.1% in the MW
+group (25.2 to 58.7), a gap of 27.4 percentage points (-0.3 to 48.2). Away from zero flow the gap
+is 7.8 (1.0 to 13.8). At sunny middays, leaving out the near-zero half-hours cuts the gap from 5.6
+to 2.0 percentage points (-4.6 to 8.0). So the near-zero half-hours account for part of the
+sunny-midday gap, but every interval on them includes values near zero or is wide, so the data do
+not settle it. A second measure is the share of a substation's sunny-midday half-hours in which the
+magnitude of the power is under 10% of its own 99th percentile. It is 0% at 5 of the 8 MVA
+substations, at most 1.5% at 7 of them, and 9.0% at the highest (series 26), against 26.1% and
+23.7% at 2 MW substations, series 10 and 12 (figure 3).
 
 ![Share of sunny-midday half-hours near zero flow](figure_3_near_zero_midday.svg)
 
-## Post hoc check: one MW Primary
+## Check added after seeing the results: one MW substation
 
-**One MW Primary (series 12, with 31% skill over all hours and 29.9% at sunny middays) carries
-most of the MW group's edge.** Leaving it out, and nothing else, moves the sunny-midday gap from
-5.6 points to -0.3 and the all-hours gap from 10.5 to 3.8. No other series moves the sunny-midday
-gap by more than 1.4 points. This check was added after seeing the numbers, and the verdict does not
-use it.
+**One MW substation (series 12, with 31% skill over all hours and 29.9% at sunny middays) accounts
+for most of the MW group's advantage.** Leaving series 12 out of the MW group, and changing nothing
+else, moves the sunny-midday gap from 5.6 percentage points to -0.3 and the all-hours gap from 10.5
+to 3.8. Leaving out any other single substation moves the sunny-midday gap by no more than 1.4. The
+verdict does not use this check.
 
 ## Failures and caveats
 
-- Eight series against eight cannot tell the groups apart beyond about 14 points at sunny middays,
-  and the groups differ in size, solar capacity, and switching exposure as well as in meter unit.
-- Skill is against `manual_heuristic`, which also forecasts the magnitude at the MVA Primaries, so
-  the result measures the relative disadvantage of MVA metering and not an absolute one.
-- Experiment 41's labeller recall on MVA-side against MW-side pairs, listed as optional in the
-  brief, was not run.
-- Series 7, 12, and 13 have shorter histories, so the all-history counts of low-magnitude
-  half-hours (stored in the experiment's private folder) cover different periods; the figure uses
-  the scored year only.
+- Eight time series against 8 cannot exclude a skill gap of up to about 15 percentage points at
+  sunny middays, and the groups differ in more than meter unit, such as the substations' size and
+  solar capacity.
+- Skill is measured against `manual_heuristic`, which also forecasts the magnitude at the MVA
+  substations, so the result measures a relative disadvantage.
+- Experiment 41's labeller (the tool that finds switching events in the telemetry) was to be scored
+  on how often it found events at MVA-side against MW-side substation pairs. That optional
+  comparison was not run.
+- Time series 7, 12, 13, and 18 have shorter histories than the other 12, so the counts of
+  low-magnitude half-hours over each time series' whole history, which sit in the experiment's
+  private folder, cover different periods. The figure counts only the scored year.
 
 ## Lessons for later experiments
 
-**The MVA Primaries are no reason to delay v1, and no support for PVDIS-7 on forecast-skill
-grounds.** The case for recovering MW at the MVA-only Primaries rests on separating solar from
-demand, which the PVDIS series tests. A later comparison of unit groups should use more than 8
-series or report each series, and should say which series carry the gap.
+**The experiment found no case for special handling of the MVA-only Primaries in Flexpectation v1,
+and no strong evidence against one; the half-hours near zero flow are the place to look next.** PVDIS-7 is the planned work to recover signed MW at the
+MVA-only Primaries. The case for it rests on separating solar from demand, which the PVDIS series
+tests, and not on forecast skill. A later comparison of unit groups should use more than 8 time
+series or show each series, and should say which series account for the gap.

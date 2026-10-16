@@ -168,7 +168,10 @@ def figure_low_magnitude(*, counts: pl.DataFrame) -> alt.Chart:
             width=WIDTH_PX - 120,
             height=170,
             title=alt.TitleParams(
-                ["Midday near-zero flow is rare at MVA Primaries", "and common at 2 MW Primaries"],
+                [
+                    "Low midday flow is common at 2 MW Primaries",
+                    "and at 1 MVA Primary, rare at the other 7",
+                ],
                 subtitle=[
                     "Bar: share of one Primary's half-hours (April to September, 10:00 to",
                     "13:30 UTC, July 2025 to June 2026) with |power| under 10% of its P99.",

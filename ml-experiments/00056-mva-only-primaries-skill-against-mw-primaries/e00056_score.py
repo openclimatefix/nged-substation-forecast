@@ -27,6 +27,10 @@ METRICS_DIR: Final[Path] = (
 OBSERVED_PATH: Final[Path] = (
     study_dir_for(study="stage1_pilot") / "demand" / "inputs" / "observed.parquet"
 )
+SERIES_PATH: Final[Path] = (
+    study_dir_for(study="stage1_pilot") / "demand" / "inputs" / "series.parquet"
+)
+"""Experiment 00003's series table, which holds `effective_capacity_mw`."""
 METADATA_PATH: Final[Path] = ML_EXPERIMENTS_DATA_DIR.parent / "NGED" / "metadata.parquet"
 BEST_GUESS: Final[str] = "n1_cs"
 BENCHMARK: Final[str] = "manual_heuristic"
@@ -87,19 +91,27 @@ def load_aggregates() -> pl.DataFrame:
     metadata = pl.read_parquet(METADATA_PATH, columns=["time_series_id", "units"]).with_columns(
         pl.col("units").cast(pl.String)
     )
+    capacity = pl.read_parquet(SERIES_PATH, columns=["time_series_id", "effective_capacity_mw"])
     observed = pl.read_parquet(OBSERVED_PATH, columns=["time_series_id", "valid_time", "power"])
     joined = (
         cases.join(metadata, on="time_series_id", how="left", validate="m:1")
+        .join(capacity, on="time_series_id", how="left", validate="m:1")
         .join(observed, on=["time_series_id", "valid_time"], how="left", validate="m:1")
         .with_columns(
             month=pl.col("valid_time").dt.year() * 12 + pl.col("valid_time").dt.month(),
             sunny=pl.col("valid_time").dt.month().is_in(SUNNY_MONTHS)
             & pl.col("valid_time").dt.hour().is_in(SUNNY_HOURS),
-            near_zero=pl.col("power").abs() <= NEAR_ZERO_OF_CAPACITY,
+            near_zero=(pl.col("power") / pl.col("effective_capacity_mw")).abs()
+            <= NEAR_ZERO_OF_CAPACITY,
         )
     )
-    if joined["power"].null_count() or joined["units"].null_count():
-        msg = "some cases have no observed power or no meter unit"
+    if (
+        joined["power"].null_count()
+        or joined["power"].is_nan().any()
+        or joined["units"].null_count()
+        or joined["effective_capacity_mw"].null_count()
+    ):
+        msg = "some cases have no observed power, meter unit, or capacity"
         raise ValueError(msg)
     return joined.group_by("time_series_id", "units", "month", "sunny", "near_zero").agg(
         n=pl.len(),
@@ -228,7 +240,7 @@ def per_series(*, aggregates: pl.DataFrame) -> pl.DataFrame:
 def low_magnitude_counts() -> pl.DataFrame:
     """Return, per series, the sunny-midday half-hours whose magnitude is under 10% of its P99.
 
-    The P99 is the series' own 99th percentile of the magnitude of the observed power over capacity
+    The P99 is the series' own 99th percentile of the magnitude of the observed power
     across all its history. Counts are given for the scored year (valid time from 2025-07-01) and
     for all history.
     """
@@ -241,6 +253,7 @@ def low_magnitude_counts() -> pl.DataFrame:
         pl.read_parquet(OBSERVED_PATH, columns=["time_series_id", "valid_time", "power"])
         .filter(pl.col("time_series_id").is_in(primaries))
         .drop_nulls("power")
+        .filter(pl.col("valid_time") < pl.lit(HOLDOUT).str.to_datetime("%Y-%m-%d", time_zone="UTC"))
         .with_columns(magnitude=pl.col("power").abs())
         .with_columns(
             p99=pl.col("magnitude").quantile(0.99).over("time_series_id"),
