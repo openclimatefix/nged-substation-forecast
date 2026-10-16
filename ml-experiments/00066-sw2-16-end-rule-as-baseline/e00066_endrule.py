@@ -54,3 +54,37 @@ def end_rule_intervals(
         end = int(iv.onset + MIN_DURATION + np.argmax(usable))
         out.append(replace(iv, end=end, known_from=end + BLOCK))
     return out
+
+
+FIRST_SHARE: Final[float] = 0.5
+"""A first-return step must reach this share of the onset step's size (post hoc arm)."""
+
+
+def first_return_intervals(
+    *, intervals: list[Interval], inputs: DetectorInputs, cap_days: int
+) -> list[Interval]:
+    """Post hoc: end each interval at the first strong return step instead of the strongest one.
+
+    The first stamp from 24 hours to `cap_days` after the onset where the opposite step reaches
+    `FIRST_SHARE` of the onset step (and `RETURN_Z_MIN` noise units) fixes where the return begins.
+    The end is then the stamp of the largest opposite step within one detector window after that
+    stamp. When no stamp qualifies, the interval keeps its tracked end.
+    """
+    out: list[Interval] = []
+    for iv in intervals:
+        z = inputs.shift[iv.series] / inputs.scale[iv.series]
+        sign = np.sign(z[iv.onset])
+        stop = min(iv.onset + cap_days * BLOCK + 1, GRID_LENGTH)
+        ret = -sign * z[iv.onset + MIN_DURATION : stop]
+        blocked = near_refit()[iv.onset + MIN_DURATION : stop]
+        need = max(RETURN_Z_MIN, FIRST_SHARE * abs(z[iv.onset]))
+        usable = np.where(np.isfinite(ret) & (ret >= need) & ~blocked, ret, -np.inf)
+        hits = np.flatnonzero(np.isfinite(usable))
+        if hits.size == 0:
+            out.append(iv)
+            continue
+        first = int(hits[0])
+        best = first + int(np.argmax(usable[first : first + inputs.window + 1]))
+        end = int(iv.onset + MIN_DURATION + best)
+        out.append(replace(iv, end=end, known_from=end + BLOCK))
+    return out

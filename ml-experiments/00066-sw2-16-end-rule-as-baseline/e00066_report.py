@@ -1,11 +1,11 @@
 """Print every number the write-up of experiment 66 quotes, and the verdict the decision rule gives.
 
-Reads the tables that `e00066_run.py` wrote: MW-weighted recall of D0M, PE, PL and PF for each
-injection shape with month-resampled intervals (C1: PL minus D0M and C2: PF minus D0M, pooled over
-S2, S3 and S4), recall by donor step in noise units and metered receiver, the labelled real
-transfers (C3), and alarm counts.
+Reads the tables that `e00066_run.py` wrote: MW-weighted recall of D0M and the end rule at caps of
+14, 30, and 60 days, for the 24-hour window and two 4-hour alarm settings, on experiment 58's 620
+even-month transfers and on the long set, by injection shape, with month-resampled intervals; the
+planned contrasts C1 to C5; recall by donor step, by duration, and on the labelled real transfers.
 
-    uv run python ml-experiments/00060-*/e00066_report.py
+    uv run python ml-experiments/00066-*/e00066_report.py
 """
 
 from __future__ import annotations
@@ -18,46 +18,47 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from e00066_common import (
-    ML_EXPERIMENTS_DATA_DIR,
-    WORK_DIR,
-    load_panel,
-    stamp_months,
-    stamp_year_months,
-)
-from e00066_detectors import prepare
+from e00066_common import ML_EXPERIMENTS_DATA_DIR, WORK_DIR, stamp_months, stamp_year_months
 from e00066_inject import HEADLINE_BAND
-from e00066_paired import GRID, flat_prior, labelled_duration_prior, paired_alarms
-from e00066_profile import NON_MATCHING, SHAPE_NAMES, SHAPES
+from e00066_profile import NON_MATCHING, SHAPE_NAMES
+from e00066_run import ALARM_SETTINGS, SETTINGS
 
-EXPERIMENT_58_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00058-sw2-8b-donor-step-recut-and-stronger-veto"
-)
+EXPERIMENT_61_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00061-sw2-6-paired-step-intervals"
 N_RESAMPLES: Final[int] = 20_000
-LEVEL: Final[float] = 1 - 0.05 / 3
-"""Two-sided level of the intervals: Bonferroni across the three contrasts C1 to C3 (98.33%)."""
-SEED: Final[int] = 6000
-SUPPORT_AT_LEAST: Final[float] = 0.02
-ALARM_TOLERANCE: Final[float] = 1.10
+LEVEL: Final[float] = 1 - 0.05 / 5
+"""Two-sided level of the intervals: Bonferroni across the five planned contrasts (99%)."""
+SEED: Final[int] = 6600
+THRESHOLD: Final[float] = 0.01
+GUARD: Final[float] = -0.01
 STEP_EDGES: Final[tuple[float, ...]] = (0.0, 2.0, 4.0, 6.0, 10.0, float("inf"))
-DETECTORS: Final[tuple[str, ...]] = ("D0M_48", "PE_48", "PL_48", "PF_48")
-ARMS: Final[dict[str, str]] = {"D0M_48": "f0", "PE_48": "fe", "PL_48": "fl", "PF_48": "ff"}
-NAMES: Final[dict[str, str]] = {"f0": "D0M", "fe": "PE", "fl": "PL", "ff": "PF"}
+DAY_EDGES: Final[tuple[float, ...]] = (1.0, 2.0, 7.0, 14.0, 15.6, 30.0, 61.0)
+BENCHMARK: Final[str] = "PE14_48"
+REAL_LONG_SHARE: Final[float] = 25 / 151
+"""Labelled real operations of 15.6 days or more, as a share of those over 1 day."""
 
 
-def population(*, out: Path) -> pl.DataFrame:
-    """The 620 headline-band even-month transfers, a row per transfer, shape, and detector.
+def populations(*, out: Path) -> pl.DataFrame:
+    """A row per transfer, shape, and arm: the 620-style base transfers and the long set.
 
-    The weight of a transfer is its mean moved MW under S1.
+    The weight of a transfer is its mean moved MW under S1. `population` is `base` (headline band,
+    not the holiday set) or `long`; `parity` is `even` or `odd` by the UTC month of the onset.
     """
-    events = pl.read_parquet(EXPERIMENT_58_DIR / "events.parquet")
+    events = pl.read_parquet(out / "events.parquet")
     onset = events["onset"].to_numpy()
+    month = stamp_months()[onset]
     events = events.with_columns(
-        month=pl.Series(stamp_months()[onset]),
         year_month=pl.Series(stamp_year_months()[onset]),
-        headline=(pl.col("size_band") == HEADLINE_BAND[0])
-        & (pl.col("duration_band") == HEADLINE_BAND[1]),
-    ).filter(pl.col("headline"), pl.col("month") % 2 == 0, pl.col("set") != "holiday")
+        parity=pl.Series(np.where(month % 2 == 0, "even", "odd")),
+        population=pl.when(pl.col("set") == "long")
+        .then(pl.lit("long"))
+        .when(
+            (pl.col("size_band") == HEADLINE_BAND[0])
+            & (pl.col("duration_band") == HEADLINE_BAND[1])
+            & (pl.col("set") != "holiday")
+        )
+        .then(pl.lit("base"))
+        .otherwise(pl.lit("other")),
+    ).filter(pl.col("population") != "other")
     results = pl.read_parquet(out / "event_results.parquet")
     weight = (
         results.filter(pl.col("shape") == "S1", pl.col("setting") == "D0M_48")
@@ -71,19 +72,30 @@ def population(*, out: Path) -> pl.DataFrame:
     )
 
 
-def wide(*, data: pl.DataFrame, shape: str) -> pl.DataFrame:
-    """One row per transfer with every arm's `found` for one shape."""
-    one = data.filter(pl.col("shape") == shape)
-    frame = one.filter(pl.col("setting") == "D0M_48").select(
-        "event_id", "weight", "year_month", "metered_receivers", "donor_step_z", f0="found"
+def wide(*, data: pl.DataFrame, shape: str, population: str, parity: str) -> pl.DataFrame:
+    """One row per transfer with every arm's `found` (columns named by setting) for one shape."""
+    one = data.filter(
+        pl.col("shape") == shape, pl.col("population") == population, pl.col("parity") == parity
     )
-    for setting, column in ARMS.items():
-        if setting != "D0M_48":
-            frame = frame.join(
-                one.filter(pl.col("setting") == setting).select("event_id", **{column: "found"}),
-                on="event_id",
-                validate="1:1",
-            )
+    frame = one.filter(pl.col("setting") == "D0M_48").select(
+        "event_id",
+        "weight",
+        "year_month",
+        "metered_receivers",
+        "donor_step_z",
+        "hours",
+        D0M_48="found",
+        onset_D0M_48="onset_found",
+    )
+    for setting in SETTINGS:
+        if setting == "D0M_48":
+            continue
+        part = one.filter(pl.col("setting") == setting)
+        frame = frame.join(
+            part.select("event_id", **{setting: "found", f"onset_{setting}": "onset_found"}),
+            on="event_id",
+            validate="1:1",
+        )
     return frame.sort("event_id")
 
 
@@ -105,14 +117,19 @@ def month_sums(*, frame: pl.DataFrame, found: str) -> tuple[np.ndarray, np.ndarr
     return grouped["wf"].to_numpy(), grouped["weight"].to_numpy()
 
 
-def diffs(
-    *, frames: list[pl.DataFrame], arm: str, base: str, picks: np.ndarray | None
+def stat(
+    *, frames: list[pl.DataFrame], arm: str, base: str | None, picks: np.ndarray | None
 ) -> np.ndarray:
-    """MW-weighted recall of `arm` minus `base`, averaged over shapes; `picks` resamples months."""
+    """MW-weighted recall of `arm` (minus `base`), averaged over shapes; `picks` resamples months.
+
+    Every frame must have the same months, so one set of picks serves all shapes.
+    """
     total = 0.0
     for frame in frames:
         wf_a, w = month_sums(frame=frame, found=arm)
-        wf_b, _ = month_sums(frame=frame, found=base)
+        if len(w) != len(np.unique(frames[0]["year_month"].to_numpy())):
+            raise ValueError("the shapes cover different months")
+        wf_b = month_sums(frame=frame, found=base)[0] if base else np.zeros_like(wf_a)
         if picks is None:
             total = total + (wf_a.sum() - wf_b.sum()) / w.sum()
         else:
@@ -123,26 +140,15 @@ def diffs(
 
 
 def contrast(
-    *, frames: list[pl.DataFrame], arm: str = "fl", base: str = "f0"
+    *, frames: list[pl.DataFrame], arm: str, base: str | None = None
 ) -> tuple[float, float, float]:
-    """Point value and interval of the shape-averaged MW-weighted recall difference."""
+    """Point value and interval of the shape-averaged MW-weighted recall (difference)."""
     months = np.unique(frames[0]["year_month"].to_numpy())
     rng = np.random.default_rng(SEED)
     picks = rng.integers(0, len(months), size=(N_RESAMPLES, len(months)))
-    point = float(diffs(frames=frames, arm=arm, base=base, picks=None)[0])
-    low, high = interval(resampled=diffs(frames=frames, arm=arm, base=base, picks=picks))
+    point = float(stat(frames=frames, arm=arm, base=base, picks=None)[0])
+    low, high = interval(resampled=stat(frames=frames, arm=arm, base=base, picks=picks))
     return point, low, high
-
-
-def recall_rows(*, frame: pl.DataFrame) -> dict[str, float]:
-    """Weighted and unweighted recall of every arm for one set of transfers."""
-    w = frame["weight"].to_numpy()
-    out = {}
-    for name in NAMES:
-        found = frame[name].to_numpy().astype(float)
-        out[f"{name}_mw"] = float((w * found).sum() / w.sum())
-        out[f"{name}_n"] = float(found.mean())
-    return out
 
 
 def fmt(point: float, low: float, high: float) -> str:
@@ -150,129 +156,216 @@ def fmt(point: float, low: float, high: float) -> str:
     return f"{point:+.3f} ({low:+.3f} to {high:+.3f})"
 
 
-def print_shapes(*, data: pl.DataFrame) -> dict[str, dict[str, tuple[float, float, float]]]:
-    """Per-shape table; returns each shape's differences from D0M and from PF, with intervals."""
-    found: dict[str, dict[str, tuple[float, float, float]]] = {}
-    print("\nMW-weighted recall (share of the moved MW in found transfers), even months")
-    for shape in SHAPES:
-        frame = wide(data=data, shape=shape)
-        rec = recall_rows(frame=frame)
-        found[shape] = {
-            "PL-D0M": contrast(frames=[frame], arm="fl", base="f0"),
-            "PF-D0M": contrast(frames=[frame], arm="ff", base="f0"),
-            "PE-D0M": contrast(frames=[frame], arm="fe", base="f0"),
-            "PL-PF": contrast(frames=[frame], arm="fl", base="ff"),
-        }
-        recalls = " ".join(f"{NAMES[n]} {rec[f'{n}_mw']:.3f}" for n in NAMES)
-        unweighted = " ".join(f"{NAMES[n]} {rec[f'{n}_n']:.3f}" for n in NAMES)
-        print(f"{shape} {SHAPE_NAMES[shape]:22s} n={frame.height} {recalls}")
-        print("   missed MW: " + " ".join(f"{NAMES[n]} {1 - rec[f'{n}_mw']:.3f}" for n in NAMES))
-        print(f"   unweighted: {unweighted}")
-        print("   " + "; ".join(f"{k} {fmt(*v)}" for k, v in found[shape].items()))
-        metered = frame.filter(pl.col("metered_receivers") > 0)
-        rec = recall_rows(frame=metered)
-        print(
-            f"   metered receiver only n={metered.height} "
-            + " ".join(f"{NAMES[n]} {rec[f'{n}_mw']:.3f}" for n in NAMES)
+def pooled(*, data: pl.DataFrame, population: str, parity: str) -> list[pl.DataFrame]:
+    """The three non-matching shapes' wide frames."""
+    return [wide(data=data, shape=s, population=population, parity=parity) for s in NON_MATCHING]
+
+
+def print_recall(*, data: pl.DataFrame, population: str, parity: str) -> dict[str, float]:
+    """Absolute MW-weighted recall per arm and shape, with the pooled interval and the missed MW."""
+    frames = pooled(data=data, population=population, parity=parity)
+    print(f"\n== {population} transfers, {parity} months: MW-weighted recall (S2, S3, S4 pooled)")
+    expected = {("base", "even"): 620, ("long", "even"): None}.get((population, parity))
+    if expected is not None and frames[0].height != expected:
+        raise ValueError(f"{frames[0].height} transfers, the plan says {expected}")
+    if frames[0]["weight"].null_count():
+        raise ValueError("a transfer has no weight")
+    print(f"transfers per shape: {frames[0].height}; MW weight {frames[0]['weight'].sum():.1f}")
+    point: dict[str, float] = {}
+    for setting in SETTINGS:
+        value, low, high = contrast(frames=frames, arm=setting)
+        point[setting] = value
+        by_shape = " ".join(
+            f"{s} {contrast(frames=[f], arm=setting)[0]:.3f}"
+            for s, f in zip(NON_MATCHING, frames, strict=True)
         )
-    return found
+        no_start = np.mean(
+            [
+                float((f["weight"] * (~f[f"onset_{setting}"]).cast(pl.Float64)).sum())
+                / float(f["weight"].sum())
+                for f in frames
+            ]
+        )
+        wrong_end = np.mean(
+            [
+                float((f["weight"] * (f[f"onset_{setting}"] & ~f[setting]).cast(pl.Float64)).sum())
+                / float(f["weight"].sum())
+                for f in frames
+            ]
+        )
+        unweighted = np.mean([f[setting].cast(pl.Float64).mean() for f in frames])
+        wrong_end_n = np.mean([(f[f"onset_{setting}"] & ~f[setting]).sum() for f in frames])
+        print(
+            f"{setting:9s} {value:.3f} ({low:.3f} to {high:.3f}) [{by_shape}] "
+            f"missed {1 - value:.3f} = no start {no_start:.3f} + wrong end {wrong_end:.3f}; "
+            f"unweighted {unweighted:.3f}; start found, end wrong: {wrong_end_n:.1f} transfers"
+        )
+    return point
 
 
-def print_by_step(*, data: pl.DataFrame) -> None:
-    """Standard table: recall by donor step in noise units, split by metered receiver."""
-    print("\nRecall by donor step in noise units (count found / transfers), D0M | PE | PL | PF")
-    for shape in SHAPES:
-        frame = wide(data=data, shape=shape)
-        for flag, label in ((True, "metered"), (False, "unmetered")):
-            part = frame.filter((pl.col("metered_receivers") > 0) == flag)
+def print_all_shapes(*, data: pl.DataFrame, population: str, parity: str) -> None:
+    """Recall of the benchmark and the chosen arms on S1 and S5 too (outside the headline)."""
+    for shape in ("S1", "S5"):
+        frame = wide(data=data, shape=shape, population=population, parity=parity)
+        print(
+            f"{population} {parity} {shape} {SHAPE_NAMES[shape]}: "
+            + " ".join(f"{s} {contrast(frames=[frame], arm=s)[0]:.3f}" for s in SETTINGS)
+        )
+
+
+def print_by_step(*, data: pl.DataFrame, population: str) -> None:
+    """Standard table: recall by donor step in noise units, split by metered receiver (S2-S4)."""
+    print(
+        f"\nRecall by donor step ({population}, even months): found/transfers, shapes S2-S4 summed"
+    )
+    arms = [a for a in SETTINGS if a.endswith(("_48", "_8m"))]
+    for flag, label in ((True, "metered"), (False, "unmetered")):
+        for low, high in itertools.pairwise(STEP_EDGES):
             cells = []
-            for low, high in itertools.pairwise(STEP_EDGES):
-                bin_ = part.filter(pl.col("donor_step_z").abs().is_between(low, high, "left"))
-                counts = "|".join(str(bin_[c].sum()) for c in NAMES)
-                cells.append(f"[{low:g},{high:g}) {counts}/{bin_.height}")
-            print(f"{shape} {label:9s} " + "; ".join(cells))
+            n = 0
+            counts = dict.fromkeys(arms, 0)
+            for frame in pooled(data=data, population=population, parity="even"):
+                part = frame.filter(
+                    (pl.col("metered_receivers") > 0) == flag,
+                    pl.col("donor_step_z").abs().is_between(low, high, "left"),
+                )
+                n += part.height
+                for arm in arms:
+                    counts[arm] += int(part[arm].sum())
+            cells = " ".join(f"{a} {counts[a]}" for a in arms)
+            print(f"{label:9s} [{low:g},{high:g}) n={n}: {cells}")
 
 
-def print_big_steps(*, data: pl.DataFrame) -> None:
-    """Among transfers with a donor step of 6 noise units or more: found, wrong end, no start."""
-    print("\nTransfers whose donor step is 6 noise units or more (post hoc)")
-    for shape in SHAPES:
-        for setting in DETECTORS:
-            part = data.filter(
-                pl.col("shape") == shape,
-                pl.col("setting") == setting,
-                pl.col("donor_step_z").abs() >= 6,
+def recall_by_duration(*, data: pl.DataFrame, arms: list[str]) -> list[dict]:
+    """MW-weighted recall by duration bin, both populations pooled, S2-S4 averaged, even months."""
+    frames = [
+        pl.concat([wide(data=data, shape=s, population=p, parity="even") for p in ("base", "long")])
+        for s in NON_MATCHING
+    ]
+    rows = []
+    for low, high in itertools.pairwise(DAY_EDGES):
+        for arm in arms:
+            vals = []
+            n = 0
+            for frame in frames:
+                part = frame.filter((pl.col("hours") / 24).is_between(low, high, "left"))
+                n = part.height
+                w = part["weight"].to_numpy()
+                vals.append(
+                    (w * part[arm].cast(pl.Float64).to_numpy()).sum() / w.sum()
+                    if len(w)
+                    else np.nan
+                )
+            rows.append(
+                {"low": low, "high": high, "arm": arm, "n": n, "recall": float(np.mean(vals))}
             )
-            n, found = part.height, part["found"].sum()
-            wrong_end = part.filter(pl.col("onset_found") & ~pl.col("found")).height
-            print(
-                f"{shape} {setting}: {n} transfers, found {found}, onset found but end wrong "
-                f"{wrong_end}, no alarm at the onset {n - found - wrong_end}"
-            )
+    return rows
+
+
+def print_by_duration(*, data: pl.DataFrame) -> None:
+    """MW-weighted recall by duration in days, both populations pooled, S2-S4, even months."""
+    print("\nRecall by duration in days (base and long transfers together, even months)")
+    arms = [a for a in SETTINGS if a.endswith(("_48", "_8m"))]
+    frames = [
+        pl.concat([wide(data=data, shape=s, population=p, parity="even") for p in ("base", "long")])
+        for s in NON_MATCHING
+    ]
+    for low, high in itertools.pairwise(DAY_EDGES):
+        cells = []
+        n = 0
+        for arm in arms:
+            vals = []
+            for frame in frames:
+                part = frame.filter((pl.col("hours") / 24).is_between(low, high, "left"))
+                n = part.height
+                w = part["weight"].to_numpy()
+                vals.append(
+                    (w * part[arm].cast(pl.Float64).to_numpy()).sum() / w.sum()
+                    if len(w)
+                    else np.nan
+                )
+            cells.append(f"{arm} {np.mean(vals):.3f}")
+        print(f"[{low:g},{high:g}) days n={n} per shape: " + " ".join(cells))
 
 
 def print_real(*, out: Path) -> None:
-    """C3: the labelled real transfers of more than 1 day, found by each arm."""
+    """The labelled real transfers of more than 1 day, found by each arm."""
     real = pl.read_parquet(out / "real_results.parquet").filter(pl.col("hours") > 24)
     n = real.filter(pl.col("setting") == "D0M_48").height
-    print(f"\nC3: labelled real transfers of more than 1 day: {n}")
-    for setting in DETECTORS:
+    print(f"\nLabelled real transfers of more than 1 day: {n}")
+    for setting in SETTINGS:
         part = real.filter(pl.col("setting") == setting)
         w = part["moved_mw_p50"].fill_null(0).to_numpy()
         f = part["found"].to_numpy().astype(float)
+        longer = part.filter(pl.col("hours") > 14 * 24)
         print(
-            f"  {setting}: found {int(f.sum())}, onset found {part['onset_found'].sum()}, "
-            f"MW-weighted recall {(w * f).sum() / w.sum():.3f}"
+            f"  {setting:9s} found {int(f.sum())}, onset found {part['onset_found'].sum()}, "
+            f"MW-weighted recall {(w * f).sum() / w.sum():.3f}; over 14 days: "
+            f"{longer['found'].sum()} of {longer.height}"
         )
-        for vis in ("conserved", "one_sided"):
-            sub = part.filter(pl.col("visibility") == vis)
-            print(f"      {vis}: {sub.height}, found {sub['found'].sum()}")
-    base = real.filter(pl.col("setting") == "D0M_48").sort("card_id")
-    pl_ = real.filter(pl.col("setting") == "PL_48").sort("card_id")
-    print(
-        f"  only D0M {base.filter(pl.col('found') & ~pl_['found']).height}, "
-        f"only PL {pl_.filter(pl.col('found') & ~base['found']).height}"
-    )
 
 
-def print_alarms(*, out: Path) -> dict[str, tuple[int, int]]:
-    """Unexplained alarm counts by even and odd month, with the composition counts."""
+def print_alarms(*, out: Path) -> None:
+    """Unexplained alarm counts by even and odd month for each alarm setting."""
     alarms = pl.read_parquet(out / "alarms.parquet")
-    thresholds = json.loads((out / "thresholds.json").read_text())
-    panel = load_panel()
-    plain = prepare(residuals=panel["residual"], window=48)
-    candidates = sum(len(c) for c in paired_alarms(inputs=plain, prior=flat_prior()).values())
-    print(f"\nthresholds {thresholds}; candidate onsets at or above 2.5 noise units: {candidates}")
-    counts = {}
-    for setting in DETECTORS:
-        part = alarms.filter(pl.col("setting") == setting)
-        unexplained = part.filter(~pl.col("logged_matched"))
-        counts[setting] = (
-            unexplained.filter(pl.col("month") % 2 == 0).height,
-            unexplained.filter(pl.col("month") % 2 == 1).height,
-        )
+    print(f"\nthresholds {json.loads((out / 'thresholds.json').read_text())}")
+    odd_limits = {"48": 80, "8": 120, "8m": 80}
+    for tag in ALARM_SETTINGS:
+        part = alarms.filter(pl.col("setting") == f"D0M_{tag}", ~pl.col("logged_matched"))
+        even = part.filter(pl.col("month") % 2 == 0).height
+        odd = part.filter(pl.col("month") % 2 == 1).height
+        print(f"D0M_{tag}: unexplained alarms even months {even}, odd {odd}")
+        if odd > odd_limits[tag]:
+            raise ValueError(f"D0M_{tag} has {odd} odd-month unexplained alarms")
+
+
+def compare_with_61(*, data: pl.DataFrame) -> None:
+    """The 14-day end rule at 24 hours must equal experiment 61's PE on every shape."""
+    old = pl.read_parquet(EXPERIMENT_61_DIR / "event_results.parquet").filter(
+        pl.col("setting") == "PE_48"
+    )
+    mine = data.filter(pl.col("setting") == BENCHMARK, pl.col("population") == "base")
+    joined = mine.join(old, on=["event_id", "shape"], suffix="_61", validate="1:1")
+    different = joined.filter(pl.col("found") != pl.col("found_61")).height
+    print(f"\n{BENCHMARK} against experiment 61's PE: {joined.height} rows, {different} differ")
+
+
+def print_mixture(*, long: list[pl.DataFrame], base: list[pl.DataFrame]) -> None:
+    """Post hoc: the gain over PE14_48 if transfers over 15.6 days were as common as in the logs.
+
+    Of the 151 labelled real operations lasting more than 1 day, 25 last 15.6 days or more
+    (`REAL_LONG_SHARE`). The point values of the long-set and base contrasts are mixed at that
+    share.
+    """
+    print(f"\nPOST HOC mixture: share of transfers over 15.6 days {REAL_LONG_SHARE:.3f}")
+    for arm in ("PE30_48", "PE60_48", "PF14_48", "PF30_48", "PF60_48"):
+        on_long = contrast(frames=long, arm=arm, base=BENCHMARK)[0]
+        on_base = contrast(frames=base, arm=arm, base=BENCHMARK)[0]
+        mixed = REAL_LONG_SHARE * on_long + (1 - REAL_LONG_SHARE) * on_base
         print(
-            f"{setting}: unexplained alarms even months {counts[setting][0]}, "
-            f"odd {counts[setting][1]}; "
-            f"all alarms {part.height}, near a logged closure {part['logged_matched'].sum()}"
+            f"  {arm} minus {BENCHMARK}: long {on_long:+.3f}, base {on_base:+.3f}, mix {mixed:+.3f}"
         )
-    return counts
 
 
-def verdict(
-    *,
-    shapes: dict[str, dict[str, tuple[float, float, float]]],
-    pooled: dict[str, tuple[float, float, float]],
-    alarms: dict[str, tuple[int, int]],
-) -> str:
-    """Apply the pre-registered decision rule."""
-    point, low, high = pooled["PL-D0M"]
-    if high < SUPPORT_AT_LEAST:
+def decide(*, c: dict[str, tuple[float, float, float]], long_recall: dict[str, float]) -> str:
+    """Apply the pre-registered decision rule to the five contrasts."""
+    window4 = c["C5"][1] > 0 and c["C5"][0] >= THRESHOLD
+    passes = {
+        30: c["C1"][1] > 0 and c["C1"][0] >= THRESHOLD and c["C3"][0] >= GUARD,
+        60: c["C2"][1] > 0 and c["C2"][0] >= THRESHOLD and c["C4"][0] >= GUARD,
+    }
+    cap = 14
+    if passes[30]:
+        cap = 30
+    if passes[60] and (
+        not passes[30] or long_recall["PE60_48"] - long_recall["PE30_48"] >= THRESHOLD
+    ):
+        cap = 60
+    print(f"window changes to 4 hours: {window4}; caps passing: {passes}; cap chosen: {cap}")
+    if window4 or cap != 14:
+        return "supported"
+    if all(c[k][2] < THRESHOLD for k in ("C1", "C2", "C5")):
         return "refuted"
-    base = alarms["D0M_48"][0]
-    quiet = all(alarms[s][0] <= ALARM_TOLERANCE * base for s in ("PL_48", "PF_48"))
-    if low > 0 and point >= SUPPORT_AT_LEAST and quiet:
-        return "supported" if pooled["PF-D0M"][1] > 0 else "partly supported"
     return "inconclusive"
 
 
@@ -281,34 +374,60 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path, default=WORK_DIR)
     out = parser.parse_args().out
-    data = population(out=out)
-    one = data.filter(pl.col("shape") == "S1", pl.col("setting") == "D0M_48")
-    print(f"{one.height} transfers; {one.filter(pl.col('weight') <= 0).height} move no MW")
-    full = labelled_duration_prior()
-    held = labelled_duration_prior(
-        exclude_cards=frozenset(pl.read_parquet(out / "real_results.parquet")["card_id"].to_list())
-    )
-    for hours in (24, 48, 72, 168, 336):
-        print(f"PL prior at {hours} hours: {full[int(hours * 2 - GRID[0])]:+.3f}")
-    print(
-        f"largest change of the prior without the scored transfers: {np.abs(full - held).max():.3f}"
-    )
-    shapes = print_shapes(data=data)
-    frames = [wide(data=data, shape=s) for s in NON_MATCHING]
-    pooled = {
-        "PL-D0M": contrast(frames=frames, arm="fl", base="f0"),
-        "PF-D0M": contrast(frames=frames, arm="ff", base="f0"),
-        "PE-D0M": contrast(frames=frames, arm="fe", base="f0"),
-        "PL-PF": contrast(frames=frames, arm="fl", base="ff"),
+    data = populations(out=out)
+    compare_with_61(data=data)
+    recalls = {}
+    for population, parity in itertools.product(("base", "long"), ("even", "odd")):
+        recalls[(population, parity)] = print_recall(
+            data=data, population=population, parity=parity
+        )
+    for population in ("base", "long"):
+        print_all_shapes(data=data, population=population, parity="even")
+    base = pooled(data=data, population="base", parity="even")
+    long = pooled(data=data, population="long", parity="even")
+    c = {
+        "C1": contrast(frames=long, arm="PE30_48", base=BENCHMARK),
+        "C2": contrast(frames=long, arm="PE60_48", base=BENCHMARK),
+        "C3": contrast(frames=base, arm="PE30_48", base=BENCHMARK),
+        "C4": contrast(frames=base, arm="PE60_48", base=BENCHMARK),
+        "C5": contrast(frames=base, arm="PE14_8m", base=BENCHMARK),
     }
-    print(f"\nPooled over {NON_MATCHING}:")
-    for name, value in pooled.items():
+    print("\nPlanned contrasts (99% interval, even months, S2-S4 pooled)")
+    for name, value in c.items():
         print(f"  {name}: {fmt(*value)}")
-    print_by_step(data=data)
-    print_big_steps(data=data)
+    print("Descriptive contrasts")
+    for label, frames, arm, ref in (
+        ("long, PE60_48 - PE30_48", long, "PE60_48", "PE30_48"),
+        ("long, PE30_48 - D0M_48", long, "PE30_48", "D0M_48"),
+        ("base, PE14_48 - D0M_48", base, BENCHMARK, "D0M_48"),
+        ("base, PE14_8 - PE14_48 (4 h at 6.0)", base, "PE14_8", BENCHMARK),
+        ("base, D0M_8m - D0M_48", base, "D0M_8m", "D0M_48"),
+        ("long, PE30_8m - PE14_8m", long, "PE30_8m", "PE14_8m"),
+        ("long, PE60_8m - PE14_8m", long, "PE60_8m", "PE14_8m"),
+        ("POST HOC long, PF14_48 - PE14_48", long, "PF14_48", BENCHMARK),
+        ("POST HOC long, PF30_48 - PE14_48", long, "PF30_48", BENCHMARK),
+        ("POST HOC long, PF60_48 - PE14_48", long, "PF60_48", BENCHMARK),
+        ("POST HOC long, PF60_48 - PE30_48", long, "PF60_48", "PE30_48"),
+        ("POST HOC base, PF14_48 - PE14_48", base, "PF14_48", BENCHMARK),
+        ("POST HOC base, PF30_48 - PE14_48", base, "PF30_48", BENCHMARK),
+        ("POST HOC base, PF60_48 - PE14_48", base, "PF60_48", BENCHMARK),
+        ("base, PE30_8m - PE14_8m", base, "PE30_8m", "PE14_8m"),
+        ("base, PE60_8m - PE14_8m", base, "PE60_8m", "PE14_8m"),
+    ):
+        print(f"  {label}: {fmt(*contrast(frames=frames, arm=arm, base=ref))}")
+    print_mixture(long=long, base=base)
+    print("POST HOC odd-month check of PF against PE14_48 (not used to choose)")
+    for population in ("base", "long"):
+        frames = pooled(data=data, population=population, parity="odd")
+        for arm in ("PF14_48", "PF30_48", "PE30_48"):
+            value = contrast(frames=frames, arm=arm, base=BENCHMARK)
+            print(f"  {population} odd, {arm} - {BENCHMARK}: {fmt(*value)}")
+    print_by_step(data=data, population="base")
+    print_by_duration(data=data)
     print_real(out=out)
-    alarms = print_alarms(out=out)
-    print(f"\nVERDICT: {verdict(shapes=shapes, pooled=pooled, alarms=alarms)}")
+    print_alarms(out=out)
+    verdict = decide(c=c, long_recall=recalls[("long", "even")])
+    print(f"\nVERDICT: {verdict}")
 
 
 if __name__ == "__main__":

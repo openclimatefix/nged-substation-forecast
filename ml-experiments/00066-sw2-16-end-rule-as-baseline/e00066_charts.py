@@ -4,7 +4,7 @@ Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newl
 
 The series are Primary substations, not NGED generators.
 
-    uv run python ml-experiments/00060-*/e00066_charts.py
+    uv run python ml-experiments/00066-*/e00066_charts.py
 """
 
 from __future__ import annotations
@@ -17,8 +17,8 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from e00066_common import WORK_DIR
-from e00066_profile import SHAPE_NAMES, SHAPES
-from e00066_report import ARMS, NAMES, contrast, population, recall_rows, wide
+from e00066_profile import NON_MATCHING
+from e00066_report import BENCHMARK, contrast, pooled, populations, recall_by_duration
 
 OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -28,15 +28,18 @@ OUT_DIR: Final[Path] = (
 )
 WIDTH: Final[int] = 520
 WRAP: Final[int] = 80
-STEP_EDGES: Final[list[float]] = [0.0, 2.0, 4.0, 6.0, 10.0, 1000.0]
-STEP_LABELS: Final[list[str]] = ["0-2", "2-4", "4-6", "6-10", "10+"]
 LABELS: Final[dict[str, str]] = {
-    "f0": "D0M: tracked end",
-    "fe": "PE: D0M alarms, new end",
-    "fl": "PL: pairs, labelled prior",
-    "ff": "PF: pairs, flat prior",
+    "D0M_48": "D0M: tracked end",
+    "PE14_48": "End rule, 14-day cap (benchmark)",
+    "PE30_48": "End rule, 30-day cap",
+    "PE60_48": "End rule, 60-day cap",
+    "PF14_48": "First-return rule, 14-day cap (post hoc)",
 }
-COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN, "#888888"]
+COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN, "#888888", "#7A3E9D"]
+POPULATIONS: Final[dict[str, str]] = {
+    "base": "620 transfers of experiment 58 (1.5% last over 14 days)",
+    "long": "215 long transfers (15.6 to 60 days)",
+}
 
 
 def _title(*, text: str, lines: list[str]) -> alt.TitleParams:
@@ -52,141 +55,150 @@ def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     print("wrote", name)
 
 
-def _label(shape: str) -> str:
-    return f"{shape}: {SHAPE_NAMES[shape]}"
-
-
-def figure_difference(*, data: pl.DataFrame) -> alt.TopLevelMixin:
-    """Gain in MW-weighted recall of PE, PL and PF over D0M for each shape, with intervals."""
+def figure_recall(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """MW-weighted recall of each 24-hour arm on the two populations, with intervals."""
     rows = []
-    for shape in SHAPES:
-        for arm in ("fe", "fl", "ff"):
-            point, low, high = contrast(frames=[wide(data=data, shape=shape)], arm=arm, base="f0")
+    for population, label in POPULATIONS.items():
+        frames = pooled(data=data, population=population, parity="even")
+        for arm, name in LABELS.items():
+            point, low, high = contrast(frames=frames, arm=arm)
             rows.append(
-                {
-                    "shape": _label(shape),
-                    "arm": LABELS[arm],
-                    "point": point,
-                    "low": low,
-                    "high": high,
-                }
+                {"population": label, "arm": name, "point": point, "low": low, "high": high}
             )
-    base = alt.Chart(pl.DataFrame(rows))
-    y = alt.Y("shape:N", sort=[_label(s) for s in SHAPES], title=None)
-    color = alt.Color(
-        "arm:N",
-        title=None,
-        scale=alt.Scale(domain=[LABELS[a] for a in ("fe", "fl", "ff")], range=COLOURS[1:]),
-        legend=alt.Legend(orient="top", columns=1),
-    )
-    grey = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888888")
-    bars = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("low:Q", title="Gain in MW-weighted recall over D0M (larger is better)"),
-        x2="high:Q",
-        y=y,
-        yOffset="arm:N",
-        color=color,
-    )
-    dots = base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
-        x="point:Q", y=y, yOffset="arm:N", color=color
-    )
-    return (grey.encode(x="x:Q") + bars + dots).properties(  # ty: ignore[unresolved-attribute]
-        width=WIDTH,
-        height=330,
-        title=_title(
-            text="Finding the end from the return step helps; pairing the alarm itself hurts",
-            lines=[
-                (
-                    "Dot: estimate. Line: 98.33% interval from resampling whole calendar months. "
-                    "Grey rule: no gain. 620 injected transfers of 25% to 40% of the receiving "
-                    "load, over 1 day, starting in even months, all arms at the same number of "
-                    "unexplained alarms on odd months."
-                )
-            ],
-        ),
-    )
-
-
-def figure_absolute(*, data: pl.DataFrame) -> alt.TopLevelMixin:
-    """MW-weighted recall of every arm for each shape."""
-    rows = []
-    for shape in SHAPES:
-        rec = recall_rows(frame=wide(data=data, shape=shape))
-        rows.extend(
-            {"shape": _label(shape), "arm": LABELS[arm], "recall": rec[f"{arm}_mw"]}
-            for arm in NAMES
-        )
     base = alt.Chart(pl.DataFrame(rows)).encode(
-        y=alt.Y("shape:N", sort=[_label(s) for s in SHAPES], title=None),
-        x=alt.X("recall:Q", title="Share of moved MW found", scale=alt.Scale(domain=[0, 1])),
+        y=alt.Y("arm:N", sort=list(LABELS.values()), title=None, axis=alt.Axis(labelLimit=320)),
         color=alt.Color(
             "arm:N",
-            title=None,
-            scale=alt.Scale(domain=[LABELS[a] for a in NAMES], range=COLOURS),
-            legend=alt.Legend(orient="top", columns=1),
+            legend=None,
+            scale=alt.Scale(domain=list(LABELS.values()), range=COLOURS),
         ),
-        yOffset="arm:N",
     )
-    text = base.mark_text(align="left", dx=4, fontSize=9).encode(  # ty: ignore[unresolved-attribute]
-        text=alt.Text("recall:Q", format=".2f")
+    chart = (
+        base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("low:Q", title="Share of moved MW found", scale=alt.Scale(domain=[0, 1])),
+            x2="high:Q",
+        )
+        + base.mark_point(filled=True, size=70).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
+    ).properties(width=WIDTH, height=130)
+    return (
+        chart.facet(
+            row=alt.Row(
+                "population:N",
+                title=None,
+                sort=list(POPULATIONS.values()),
+                header=alt.Header(
+                    labelOrient="top", labelAngle=0, labelLimit=520, labelFontSize=12
+                ),
+            )
+        )
+        .properties(
+            title=_title(
+                text="A 14-day cap fails on long transfers; a 30-day cap loses a little elsewhere",
+                lines=[
+                    (
+                        "MW-weighted recall, 24-hour window, shapes S2, S3, and S4 averaged, "
+                        "transfers starting in even months. Dot: estimate. Line: 99% interval "
+                        "from resampling whole calendar months. The first-return rule is post hoc."
+                    )
+                ],
+            )
+        )
+        .resolve_scale(y="independent")
     )
-    return (base.mark_bar() + text).properties(
+
+
+def figure_contrasts(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """The five planned contrasts and the post hoc contrasts, with intervals."""
+    base = pooled(data=data, population="base", parity="even")
+    long = pooled(data=data, population="long", parity="even")
+    items = [
+        ("C1: 30-day cap, long transfers", long, "PE30_48", BENCHMARK, "Planned"),
+        ("C2: 60-day cap, long transfers", long, "PE60_48", BENCHMARK, "Planned"),
+        ("C3: 30-day cap, 620 transfers", base, "PE30_48", BENCHMARK, "Planned"),
+        ("C4: 60-day cap, 620 transfers", base, "PE60_48", BENCHMARK, "Planned"),
+        ("C5: 4-hour window, 620 transfers", base, "PE14_8m", BENCHMARK, "Planned"),
+        ("First-return rule, long transfers", long, "PF14_48", BENCHMARK, "Post hoc"),
+        ("First-return rule, 620 transfers", base, "PF14_48", BENCHMARK, "Post hoc"),
+    ]
+    rows = []
+    for label, frames, arm, ref, kind in items:
+        point, low, high = contrast(frames=frames, arm=arm, base=ref)
+        rows.append({"contrast": label, "kind": kind, "point": point, "low": low, "high": high})
+    chart = alt.Chart(pl.DataFrame(rows)).encode(
+        y=alt.Y(
+            "contrast:N",
+            sort=[str(r["contrast"]) for r in rows],
+            title=None,
+            axis=alt.Axis(labelLimit=320),
+        ),
+        color=alt.Color(
+            "kind:N",
+            title=None,
+            scale=alt.Scale(domain=["Planned", "Post hoc"], range=[ocf.DATA_BLUE, "#7A3E9D"]),
+            legend=alt.Legend(orient="top"),
+        ),
+    )
+    rule = (
+        alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888888").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
+    return (
+        rule
+        + chart.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("low:Q", title="Change in MW-weighted recall"), x2="high:Q"
+        )
+        + chart.mark_point(filled=True, size=70).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
+    ).properties(
         width=WIDTH,
-        height=420,
+        height=220,
         title=_title(
-            text="The best arm still misses about a third of the moved MW",
+            text="The 4-hour window loses recall; longer caps gain on long transfers only",
             lines=[
                 (
-                    "MW-weighted recall, 24-hour window, 620 injected transfers starting in even "
-                    "months. Larger is better; the missed share is one minus the bar."
+                    "Change from the 24-hour window with a 14-day cap, S2, S3, and S4 averaged, "
+                    "even months. Line: 99% interval. Grey rule: no change."
                 )
             ],
         ),
     )
 
 
-def figure_outcomes(*, data: pl.DataFrame) -> alt.TopLevelMixin:
-    """How the transfers with a donor step of 6 noise units or more end up, shape S2."""
-    rows = []
-    for setting, arm in ARMS.items():
-        part = data.filter(
-            pl.col("shape") == "S2",
-            pl.col("setting") == setting,
-            pl.col("donor_step_z").abs() >= 6,
-        )
-        n = part.height
-        found = int(part["found"].sum())
-        wrong = part.filter(pl.col("onset_found") & ~pl.col("found")).height
-        for outcome, count in (
-            ("Found", found),
-            ("Right start, wrong end", wrong),
-            ("No alarm at the start", n - found - wrong),
-        ):
-            rows.append({"arm": LABELS[arm], "outcome": outcome, "count": count})
-    order = ["Found", "Right start, wrong end", "No alarm at the start"]
+def figure_duration(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """MW-weighted recall by transfer duration for the 24-hour arms."""
+    rows = recall_by_duration(data=data, arms=list(LABELS))
+    labelled = [
+        {**r, "bin": f"{r['low']:g} to {min(r['high'], 60):g}", "arm": LABELS[r["arm"]]}
+        for r in rows
+    ]
+    frame = pl.DataFrame(labelled)
+    order = list(dict.fromkeys(r["bin"] for r in labelled))
     return (
-        alt.Chart(pl.DataFrame(rows))
-        .mark_bar()
+        alt.Chart(frame)
+        .mark_line(point=True)
         .encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("arm:N", sort=[LABELS[a] for a in NAMES], title=None),
-            x=alt.X("count:Q", title="Transfers (constant-MW shape S2)"),
-            color=alt.Color(
-                "outcome:N",
-                title=None,
+            x=alt.X(
+                "bin:N",
                 sort=order,
-                scale=alt.Scale(domain=order, range=[ocf.DATA_GREEN, ocf.BRAND_ORANGE, "#888888"]),
-                legend=alt.Legend(orient="top"),
+                title="Duration of the transfer (days)",
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y("recall:Q", title="Share of moved MW found", scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color(
+                "arm:N",
+                title=None,
+                scale=alt.Scale(domain=list(LABELS.values()), range=COLOURS),
+                legend=alt.Legend(orient="top", columns=1, labelLimit=400),
             ),
         )
         .properties(
             width=WIDTH,
-            height=170,
+            height=260,
             title=_title(
-                text="Pairing the alarm loses starts; the return step repairs ends",
+                text="The 14-day cap finds almost nothing beyond 15.6 days",
                 lines=[
                     (
-                        "The 215 injected constant-MW transfers whose donor step is 6 noise "
-                        "units or more, scored on even months."
+                        f"Both populations together, shapes {', '.join(NON_MATCHING)} averaged, "
+                        "even months, 24-hour window. Few transfers last over 14 days in the "
+                        "620-transfer set, so the bins from 14 days upward are mostly the long set."
                     )
                 ],
             ),
@@ -196,10 +208,10 @@ def figure_outcomes(*, data: pl.DataFrame) -> alt.TopLevelMixin:
 
 def main() -> None:
     """Write the three figures."""
-    data = population(out=WORK_DIR)
-    _save(figure_difference(data=data), name="figure_1_gain_by_arm.svg")
-    _save(figure_absolute(data=data), name="figure_2_recall_by_arm.svg")
-    _save(figure_outcomes(data=data), name="figure_3_outcomes_big_steps.svg")
+    data = populations(out=WORK_DIR)
+    _save(figure_recall(data=data), name="figure_1_recall_by_arm.svg")
+    _save(figure_contrasts(data=data), name="figure_2_contrasts.svg")
+    _save(figure_duration(data=data), name="figure_3_recall_by_duration.svg")
 
 
 if __name__ == "__main__":

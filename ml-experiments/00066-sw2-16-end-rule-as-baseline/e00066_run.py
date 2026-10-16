@@ -1,15 +1,17 @@
-r"""Match PL's and PF's thresholds on odd months, then score D0M, PE, PL and PF.
+r"""Match the 4-hour threshold on odd months, then score D0M and the end rule at three caps.
 
 The injected transfers use five shapes; the real ones are the labelled transfers.
 
 Stages, in order. Each writes files to the private output folder.
 
-- `tune`: PL's and PF's matched thresholds (and D0M's, which must come back as 4.0).
-- `harness-check`: with shape S1, D0M must reproduce experiment 58's outcome for every transfer.
-- `score`: the outcome of every injected transfer for every arm and every shape.
+- `tune`: the thresholds of the three alarm settings (24 h at 4.0, 4 h at 6.0, 4 h matched to 80).
+- `harness-check`: with shape S1, D0M and the 14-day end rule at 24 hours must reproduce
+  experiments 58 and 61 for every transfer of experiment 58's injection set.
+- `score`: the outcome of every injected transfer for every arm and every shape, including the
+  long set.
 - `real`: the labelled real transfers' outcomes and the real alarm counts.
 
-    uv run python ml-experiments/00061-*/e00066_run.py tune harness-check score real
+    uv run python ml-experiments/00066-*/e00066_run.py tune harness-check score real
 """
 
 from __future__ import annotations
@@ -31,8 +33,8 @@ from e00066_detect import (
     SEED_NEW,
     explained_flags,
     load,
+    log_masks,
     new_events,
-    odd_unexplained,
     original_events,
     real_alarm_rows,
     real_events,
@@ -40,52 +42,59 @@ from e00066_detect import (
     seeded_batches,
     tune_d2,
 )
-from e00066_detectors import DetectorInputs, alarms, prepare
-from e00066_inject import BLOCK, Event
+from e00066_detectors import alarms, prepare
+from e00066_endrule import CAPS_DAYS, end_rule_intervals, first_return_intervals
+from e00066_inject import BLOCK, Event, events_frame
 from e00066_intervals import build_intervals, relative_residual
-from e00066_paired import (
-    alarm_table,
-    cut,
-    end_only_intervals,
-    flat_prior,
-    labelled_duration_prior,
-    paired_alarms,
-    paired_intervals,
-)
+from e00066_long import SEED_LONG, draw_long_events
 from e00066_profile import SHAPES, Shape, fit_profile_shares, inject_shaped, shares_json
 from e00066_score import by_series, match_event
 
-WINDOW: Final[int] = 48
-D0M_THRESHOLD: Final[float] = 4.0
 EXPERIMENT_58_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00058-sw2-8b-donor-step-recut-and-stronger-veto"
 )
+EXPERIMENT_61_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00061-sw2-6-paired-step-intervals"
 N_WORKERS: Final[int] = 4
-SETTINGS: Final[tuple[str, ...]] = ("D0M_48", "PE_48", "PL_48", "PF_48")
+ALARM_SETTINGS: Final[dict[str, int]] = {"48": 48, "8": 8, "8m": 8}
+"""Alarm setting tag to window in half-hours: 24 h at 4.0, 4 h at 6.0, 4 h matched to 80 alarms."""
+TARGETS: Final[dict[str, int]] = {"48": 80, "8": 120, "8m": 80}
+"""Odd-month unexplained-alarm counts the thresholds are matched to."""
+EXPECTED_THRESHOLDS: Final[dict[str, float]] = {"48": 4.0, "8": 6.0}
+"""Experiments 43 and 58 matched these; `tune` stops if the search disagrees."""
+SETTINGS: Final[tuple[str, ...]] = tuple(
+    name
+    for tag in ALARM_SETTINGS
+    for name in (
+        f"D0M_{tag}",
+        *(f"PE{c}_{tag}" for c in CAPS_DAYS),
+        *(f"PF{c}_{tag}" for c in CAPS_DAYS if tag == "48"),
+    )
+)
+"""PF is the post hoc first-return end rule, 24-hour window only."""
 _STATE: dict = {}
 
 
-def build_detectors(
-    *, residual: dict, expected: dict, scale: dict, thresholds: dict, priors: dict
-) -> dict:
-    """Alarms and intervals of D0M, PE, PL and PF on one residual panel."""
+def build_detectors(*, residual: dict, expected: dict, scales: dict, thresholds: dict) -> dict:
+    """Alarms and intervals of D0M and the three end rules at each alarm setting."""
     relative = {s: relative_residual(residual=residual[s], expected=expected[s]) for s in residual}
-    inputs = prepare(residuals=residual, window=WINDOW, scale=scale)
-    table = alarms(inputs=inputs, detector="D0", threshold=thresholds["D0M_48"])
-    d0m = build_intervals(alarm_table=table, relative=relative, window=WINDOW, detector="D0")
-    out = {
-        "D0M_48": (table, d0m),
-        "PE_48": (table, end_only_intervals(intervals=d0m, inputs=inputs)),
-    }
-    for name in ("PL", "PF"):
-        kept = cut(
-            scored=paired_alarms(inputs=inputs, prior=priors[name]),
-            threshold=thresholds[f"{name}_48"],
+    inputs = {w: prepare(residuals=residual, window=w, scale=scales[w]) for w in (8, 48)}
+    out: dict = {}
+    for tag, window in ALARM_SETTINGS.items():
+        table = alarms(inputs=inputs[window], detector="D0", threshold=thresholds[tag])
+        tracked = build_intervals(
+            alarm_table=table, relative=relative, window=window, detector="D0"
         )
-        out[f"{name}_48"] = (
-            alarm_table(kept=kept, shift=inputs.shift),
-            paired_intervals(kept=kept, residual=residual, expected=expected, window=WINDOW),
-        )
+        out[f"D0M_{tag}"] = (table, tracked)
+        for cap in CAPS_DAYS:
+            out[f"PE{cap}_{tag}"] = (
+                table,
+                end_rule_intervals(intervals=tracked, inputs=inputs[window], cap_days=cap),
+            )
+            if tag == "48":
+                out[f"PF{cap}_{tag}"] = (
+                    table,
+                    first_return_intervals(intervals=tracked, inputs=inputs[window], cap_days=cap),
+                )
     return out
 
 
@@ -112,11 +121,10 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
     results = build_detectors(
         residual=injection.fast_residual(panel["residual"]),
         expected=panel["expected"],
-        scale=_STATE["scale"],
+        scales=_STATE["scales"],
         thresholds=_STATE["thresholds"],
-        priors=_STATE["priors"],
     )
-    plain_scale = _STATE["scale"]
+    plain_scale = _STATE["scales"][48]
     rows = []
     for setting, (_, intervals) in results.items():
         grouped = by_series(intervals=intervals)
@@ -133,6 +141,7 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
                     "shape": shape,
                     "found": match.found,
                     "onset_found": match.onset_found,
+                    "end_error": match.end_error,
                     "corr_expected": profile_correlation(
                         moved=-injection.delta[event.donor][event.onset : event.end],
                         expected=panel["expected"][event.donor][event.onset : event.end],
@@ -141,10 +150,6 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
                         -np.mean(injection.delta[event.donor][event.onset : event.end])
                     ),
                     "donor_step_z": donor_mw / plain_scale[event.donor],
-                    "largest_step_z": max(
-                        abs(float(np.mean(injection.delta[s][span]))) / plain_scale[s]
-                        for s in event.series
-                    ),
                 }
             )
     return rows
@@ -163,71 +168,38 @@ def run_shapes(*, shapes: tuple[Shape, ...], groups: list, state: dict) -> pl.Da
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
-def priors() -> dict:
-    """The log duration priors of PL (labelled durations) and PF (flat)."""
-    return {"PL": labelled_duration_prior(), "PF": flat_prior()}
-
-
 def read_thresholds(*, out: Path) -> dict[str, float]:
     """The thresholds `tune` wrote."""
     return json.loads((out / "thresholds.json").read_text())
 
 
-def tune_paired(
-    *, inputs: DetectorInputs, prior: np.ndarray, logged: dict
-) -> tuple[float, list[tuple[float, int]]]:
-    """Return the lowest threshold on a 0.05 grid whose odd-month unexplained count is at most 80.
-
-    The scan moves down from 8 in steps of 0.25 to the first count above the target, then up in
-    steps of 0.05 to the first count at or under it. The second value holds every pair evaluated.
-    """
-    scored = paired_alarms(inputs=inputs, prior=prior)
-    curve: dict[float, int] = {}
-
-    def count(threshold: float) -> int:
-        key = round(threshold, 2)
-        if key not in curve:
-            kept = cut(scored=scored, threshold=key)
-            curve[key] = odd_unexplained(
-                table=alarm_table(kept=kept, shift=inputs.shift), logged=logged
-            )
-        return curve[key]
-
-    threshold = 8.0
-    while threshold > 0.5 and count(threshold) <= TARGET:
-        threshold = round(threshold - 0.25, 2)
-    while count(threshold) > TARGET:
-        threshold = round(threshold + 0.05, 2)
-    print(f"  odd-month unexplained alarms at {threshold}: {count(threshold)} (target {TARGET})")
-    return threshold, sorted(curve.items())
-
-
-TARGET: Final[int] = 80
-"""D0M's odd-month unexplained-alarm count, which PL and PF are matched to."""
+def scales_of(*, panel: dict) -> dict[int, dict[int, float]]:
+    """The odd-month noise scale of every series, for both windows."""
+    return {w: prepare(residuals=panel["residual"], window=w).scale for w in (8, 48)}
 
 
 def tune(*, out: Path) -> None:
-    """Confirm D0M's threshold (4.0, 80 alarms), and match PL's and PF's to its count."""
+    """Match the three alarm settings' thresholds to their odd-month unexplained-alarm counts."""
     panel, _ = load()
     logged = near_log_masks(pad_stamps=EXPLAIN_PAD)
-    plain = prepare(residuals=panel["residual"], window=WINDOW)
-    d0m, d0m_curve = tune_d2(inputs=plain, veto_z=NO_VETO, logged=logged)
-    print(f"matched thresholds: D0M {d0m}")
-    if d0m != D0M_THRESHOLD:
-        raise SystemExit("STOP: D0M's matched threshold is not experiment 58's 4.0")
-    thresholds = {"D0M_48": d0m}
-    curves = [{"detector": "D0M", "threshold": t, "odd_unexplained": c} for t, c in d0m_curve]
-    for name, prior in priors().items():
-        threshold, curve = tune_paired(inputs=plain, prior=prior, logged=logged)
-        print(f"{name}: threshold {threshold}")
-        thresholds[f"{name}_48"] = threshold
-        curves += [{"detector": name, "threshold": t, "odd_unexplained": c} for t, c in curve]
+    thresholds: dict[str, float] = {}
+    curves = []
+    for tag, window in ALARM_SETTINGS.items():
+        plain = prepare(residuals=panel["residual"], window=window)
+        threshold, curve = tune_d2(inputs=plain, veto_z=NO_VETO, logged=logged, target=TARGETS[tag])
+        print(f"alarm setting {tag}: threshold {threshold}")
+        if tag in EXPECTED_THRESHOLDS and threshold != EXPECTED_THRESHOLDS[tag]:
+            raise SystemExit(
+                f"STOP: setting {tag} matched {threshold}, not {EXPECTED_THRESHOLDS[tag]}"
+            )
+        thresholds[tag] = threshold
+        curves += [{"setting": tag, "threshold": t, "odd_unexplained": c} for t, c in curve]
     (out / "thresholds.json").write_text(json.dumps(thresholds))
     pl.DataFrame(curves).write_parquet(out / "curves.parquet")
 
 
-def event_groups(*, panel: dict) -> tuple[list, list[tuple[int, list[Event]]]]:
-    """Experiment 58's original, extra, and holiday events in its batches, so S1 reproduces it."""
+def base_groups(*, panel: dict) -> tuple[list, list[tuple[int, list[Event]]]]:
+    """Experiment 58's original, extra, and holiday events in its batches."""
     original = original_events(power=panel["power"])
     extra, holiday = new_events(power=panel["power"])
     groups = seeded_batches(events=original, seed=SEED_43) + seeded_batches(
@@ -236,83 +208,86 @@ def event_groups(*, panel: dict) -> tuple[list, list[tuple[int, list[Event]]]]:
     return original + extra + holiday, groups
 
 
-def make_state(*, out: Path) -> tuple[dict, list]:
-    """Panel, scales, thresholds, and fitted shares for the workers, with the event batches."""
-    panel, _ = load()
-    _, groups = event_groups(panel=panel)
-    shares = fit_profile_shares(panel=panel)
+def long_groups(*, panel: dict) -> tuple[list, list[tuple[int, list[Event]]]]:
+    """The long set in its batches."""
+    events = draw_long_events(quiet=log_masks(), power=panel["power"])
+    return events, seeded_batches(events=events, seed=SEED_LONG + 1000)
+
+
+def make_state(*, out: Path, panel: dict) -> dict:
+    """Panel, scales, thresholds, and fitted shares for the workers."""
     return {
         "panel": panel,
-        "scale": prepare(residuals=panel["residual"], window=WINDOW).scale,
-        "priors": priors(),
+        "scales": scales_of(panel=panel),
         "thresholds": read_thresholds(out=out),
-        "shares": shares,
-    }, groups
+        "shares": fit_profile_shares(panel=panel),
+    }
 
 
 def harness_check(*, out: Path) -> None:
-    """With shape S1, D0M must give experiment 58's outcome for every one of the 1,900 transfers."""
-    state, groups = make_state(out=out)
-    scored = run_shapes(shapes=("S1",), groups=groups, state=state).filter(
-        pl.col("setting") == "D0M_48"
-    )
-    stored = pl.read_parquet(EXPERIMENT_58_DIR / "event_results_1.parquet").filter(
-        pl.col("setting") == "D0M_48"
-    )
-    joined = scored.join(stored, on="event_id", suffix="_58", validate="1:1")
-    different = joined.filter(pl.col("found") != pl.col("found_58")).height
-    print(f"{joined.height} transfers, {different} differ from experiment 58's D0M")
-    if joined.height != 1900 or different:
-        raise SystemExit("STOP: the harness does not reproduce experiment 58's D0M")
+    """With S1, D0M and PE14 (24 h) must match experiments 58 and 61 for 1,900 transfers."""
+    panel, _ = load()
+    state = make_state(out=out, panel=panel)
+    _, groups = base_groups(panel=panel)
+    scored = run_shapes(shapes=("S1",), groups=groups, state=state)
+    for mine, reference, path, their in (
+        ("D0M_48", "D0M_48", EXPERIMENT_58_DIR / "event_results_1.parquet", "D0M_48"),
+        ("PE14_48", "PE_48", EXPERIMENT_61_DIR / "event_results.parquet", "PE_48"),
+    ):
+        stored = pl.read_parquet(path).filter(pl.col("setting") == their)
+        if "shape" in stored.columns:
+            stored = stored.filter(pl.col("shape") == "S1")
+        joined = scored.filter(pl.col("setting") == mine).join(
+            stored, on="event_id", suffix="_ref", validate="1:1"
+        )
+        different = joined.filter(pl.col("found") != pl.col("found_ref")).height
+        print(f"{mine} vs {reference}: {joined.height} transfers, {different} differ")
+        if joined.height != 1900 or different:
+            raise SystemExit(f"STOP: the harness does not reproduce {reference}")
     print("harness reproduced")
 
 
 def score(*, out: Path) -> None:
-    """Score every transfer under all five shapes with every arm."""
-    state, groups = make_state(out=out)
+    """Score every transfer, including the long set, under all five shapes with every arm."""
+    panel, _ = load()
+    state = make_state(out=out, panel=panel)
     shares = state["shares"]
-    print(f"{len(shares)} fitted profile shares: {shares_json(shares=shares)}", flush=True)
     (out / "profile_shares.json").write_text(shares_json(shares=shares))
-    scored = run_shapes(shapes=SHAPES, groups=groups, state=state)
+    base_events, groups = base_groups(panel=panel)
+    long_events, long_batches = long_groups(panel=panel)
+    events = pl.concat(
+        [
+            events_frame(events=base_events).join(
+                pl.read_parquet(EXPERIMENT_58_DIR / "events.parquet").select("event_id", "set"),
+                on="event_id",
+                validate="1:1",
+            ),
+            events_frame(events=long_events).with_columns(set=pl.lit("long")),
+        ]
+    )
+    events.write_parquet(out / "events.parquet")
+    print(f"{len(base_events)} base and {len(long_events)} long events", flush=True)
+    scored = run_shapes(shapes=SHAPES, groups=groups + long_batches, state=state)
     scored.write_parquet(out / "event_results.parquet")
     print(f"{scored.height} event rows", flush=True)
 
 
 def real(*, out: Path) -> None:
-    """Score the labelled real transfers and count the real alarms of every arm.
-
-    PL's scores on the real transfers use a cross-fitted prior: the transfers are split into two
-    halves by the parity of their rank in card id, and each half is scored with a prior fitted
-    without that half's cards.
-    """
+    """Score the labelled real transfers and count the real alarms of every arm."""
     panel, _ = load()
-    kwargs = {
-        "residual": panel["residual"],
-        "expected": panel["expected"],
-        "scale": prepare(residuals=panel["residual"], window=WINDOW).scale,
-        "thresholds": read_thresholds(out=out),
-    }
-    results = build_detectors(priors=priors(), **kwargs)
+    results = build_detectors(
+        residual=panel["residual"],
+        expected=panel["expected"],
+        scales=scales_of(panel=panel),
+        thresholds=read_thresholds(out=out),
+    )
     logged = near_log_masks(pad_stamps=EXPLAIN_PAD)
     real_alarm_rows(results=results, logged=logged).write_parquet(out / "alarms.parquet")
-    events = real_events(power=panel["power"]).sort("card_id").with_row_index("rank")
+    events = real_events(power=panel["power"])
+    scored = score_real(results=results, real=events)
     moved = pl.read_parquet(LABELLED_PATH).select("card_id", "moved_mw_p50")
-    scored = score_real(results=results, real=events.drop("rank")).filter(
-        pl.col("setting") != "PL_48"
-    )
-    pieces = [scored]
-    for half in (0, 1):
-        held = events.filter(pl.col("rank") % 2 == half)
-        held_out = frozenset(held["card_id"].to_list())
-        cross = build_detectors(
-            priors={"PL": labelled_duration_prior(exclude_cards=held_out), "PF": flat_prior()},
-            **kwargs,
-        )
-        pieces.append(score_real(results={"PL_48": cross["PL_48"]}, real=held.drop("rank")))
-    pl.concat(pieces).join(moved, on="card_id", validate="m:1").write_parquet(
-        out / "real_results.parquet"
-    )
-    print({s: explained_flags(table=t, logged=logged).sum() for s, (t, _) in results.items()})
+    scored.join(moved, on="card_id", validate="m:1").write_parquet(out / "real_results.parquet")
+    print({s: int(explained_flags(table=t, logged=logged).sum()) for s, (t, _) in results.items()})
 
 
 def main() -> None:
