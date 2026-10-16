@@ -843,7 +843,8 @@ columns. The pre-registered verdict is inconclusive.
   5.58 and 3.42 points below N1 at the two BSPs.
 - **Finding for later experiments:** the oracle's gain is not headroom for a forecast of the
   children, because the forecast columns gained nothing. The ERA5-trained N1 gained 0.41 points
-  (95% interval 0.15 to 0.66, exploratory) at Boston up to day 6.
+  over all leads (95% interval 0.15 to 0.66, exploratory) at Boston, and 0.66 to 0.88 points up to
+  day 6.
 - **Write-up and pull request:** [result](00036-hierarchy-aware-bsp-gsp-forecasts/result.md),
   [PR #1245 (Experiment 36: do forecasts of the series beneath a BSP or GSP lower its error?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1245).
 

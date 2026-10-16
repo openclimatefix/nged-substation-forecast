@@ -49,25 +49,26 @@ headline: >-
   Bicker Fen. B4 minus B0: -0.02 (-0.06 to +0.03) and -0.04 (-0.13 to +0.07). The oracle that sees
   the observed children scores 5.6 and 3.4 points below N1 at the two BSPs.
 lessons: >-
-  The children's forecasts carried no information N1 lacked: B1 and B2 did not beat N1 although
-  the oracle with observed children gains 3.4 to 5.6 points. The ERA5-trained N1 gained 0.41 points
-  (95% interval 0.15 to 0.66, exploratory) at Boston up to day 6 and was unresolved at the other
-  three series.
+  The children's forecasts added no measurable skill (B1 minus B0 +0.04 and +0.19 at the BSPs)
+  although the oracle with observed children gains 3.4 to 5.6 points. The ERA5-trained N1 gained
+  0.41 points over all leads (95% interval 0.15 to 0.66, exploratory) at Boston, 0.66 to 0.88 points
+  up to day 6, and was unresolved at the other three series.
 advice:
   - >-
     Do not add the summed median forecasts of the Primary substations and metered generators
     beneath a BSP to its N1 model, because B1 minus B0 was +0.04 and +0.19 points (C1, C2).
   - >-
     Do not add a generic wind power curve and a PV_Live solar forecast as columns to a GSP's N1
-    model, because B4 minus B0 was -0.02 and -0.04 points with intervals under 0.2 wide (C5, C6).
+    model, because B4 minus B0 was -0.02 and -0.04 points with intervals about 0.1 and 0.2 wide
+    (C5, C6).
   - >-
     Do not read the oracle's gain from observed children as the headroom a forecast of the
     children can capture, because the oracle gained 3.4 to 5.6 points and the forecast columns
     gained none (O minus B0, B1 minus B0).
   - >-
     Test an ERA5-trained N1 at more than 2 GSPs and 2 BSPs before porting it, because the planned
-    GSP intervals span -1.8 to +1.0 points and only Boston resolved a gain, up to day 6
-    (B3 minus B0, exploratory).
+    GSP intervals span -1.8 to +1.0 points and only Boston resolved a gain, of 0.66 to
+    0.88 points up to day 6 (B3 minus B0, exploratory).
   - >-
     Do not replace a BSP's N1 by a regression on the median forecasts of its children, because B2
     minus B0 was +0.25 and +0.29 points (exploratory).
@@ -79,17 +80,25 @@ code: ml-experiments/00036-hierarchy-aware-bsp-gsp-forecasts/
 
 # Experiment 36: do forecasts of the series beneath a BSP or GSP lower its error?
 
-**Verdict: inconclusive.** Adding forecasts of the series beneath a bulk supply point (BSP) did not
-lower its quantile score, and adding wind and solar columns to a grid supply point (GSP) did not
-either. The ERA5-trained N1 lowered the GSP scores by 0.36 and 0.40 points of capacity, but its
-99.17% intervals span -1.8 to +1.0 points. Scores are in points of capacity (1% of a series'
-effective capacity) on 73 forecast runs, one every 5 days, July 2025 to June 2026, with ENS
-weather, for four series: the BSPs Boston and Skegness and the GSPs Walpole and Bicker Fen. The
-intervals describe these four series only. Attribution: Sheffield Solar PV_Live, CC BY 4.0.
+**Verdict: inconclusive.** Adding forecasts of the series beneath a bulk supply point (BSP) to N1
+(the single-stage XGBoost quantile model trained on ENS, the ECMWF ensemble weather forecast) did
+not lower its quantile score, and adding wind and solar columns to a grid supply point (GSP) did not
+either. The N1 trained on ERA5 (a reanalysis, an estimate of past weather) lowered the GSP scores by
+0.36 and 0.40 points of capacity, but its 99.17% intervals span -1.8 to +1.0 points. Scores are in
+points of capacity (1% of a series' effective capacity) on 73 forecast runs, one every 5 days, July
+2025 to June 2026, with ENS weather, for four series: the BSPs Boston and Skegness and the GSPs
+Walpole and Bicker Fen. The intervals describe these four series only. Attribution: Sheffield Solar
+PV_Live, CC BY 4.0.
 
 ![The planned contrasts and B3 at the BSPs](figure_1.svg)
 
 ## Results
+
+**The arms.** B0 is N1. B1 adds the summed median forecasts of the Primary substations and metered
+generators beneath a BSP (the generators only at a GSP). B2 regresses the BSP on its children's
+median forecasts. B3 trains N1 on ERA5 and applies it to the ENS members. B4 adds a generic wind
+power curve and a PV_Live solar forecast as columns at the GSPs. O is B1 with the observed values of
+the children. C1 to C6 are the six planned contrasts, in the order below.
 
 **Per family, by the pre-registered rule: the BSP family is refuted, the GSP wind and solar family
 is refuted, and the GSP ERA5-trained family is inconclusive.** All three families are not
@@ -109,13 +118,19 @@ within 0.003 points at every series.
 - **C1 and C2, B1 minus B0 (BSPs):** +0.04 (99.17% interval -0.18 to +0.25) at Boston and +0.19
   (-0.10 to +0.73) at Skegness. Both lower bounds exceed -0.5, so the BSP family is refuted.
 - **C3 and C4, B3 minus B0 (GSPs):** -0.36 (-1.60 to +0.43) at Walpole and -0.40 (-1.84 to +0.97)
-  at Bicker Fen. The point estimates are inside the predicted -0.5 to -1.5 range, and the intervals
-  are too wide to exclude zero or the -0.5 bar.
+  at Bicker Fen. The point estimates are smaller than the predicted 0.5 to 1.5, and the intervals
+  are too wide to exclude zero or the -0.5 bar. By lead band the estimates are +0.37 (0 to 24
+  hours), then -0.53, -0.51, -0.54, and -0.21 at Walpole, and +0.61, -0.31, -0.54, -0.58, and -0.36
+  at Bicker Fen, every interval including zero (exploratory).
 - **C5 and C6, B4 minus B0 (GSPs):** -0.02 (-0.06 to +0.03) at Walpole and -0.04 (-0.13 to +0.07)
   at Bicker Fen. Both lower bounds exceed -0.5, so the family is refuted.
 - **The oracle (exploratory, 95%):** O minus B0 is -5.58 (-6.56 to -4.55) at Boston and -3.42
   (-4.30 to -2.62) at Skegness, and O minus B1 is -5.62 and -3.61. The share of oracle child values
-  filled from forecasts is about 10% in the validation rows of both BSPs.
+  filled from forecasts is 9.8% at Boston and 9.5% at Skegness in the validation rows (11.6% and
+  1.5% in the training rows), printed by `e00036_fit.py`.
+- **B1 at the GSPs (exploratory, generator column only):** -0.05 (-0.14 to +0.02) at Walpole and
+  -0.04 (-0.12 to +0.05) at Bicker Fen over all leads. At Bicker Fen the 0 to 24 hour band is -0.30
+  (-0.44 to -0.15), which excludes zero.
 - **B2 (exploratory):** B2 minus B1 is +0.21 (-0.15 to +0.59) at Boston and +0.10 (-0.68 to +0.63)
   at Skegness, inside the predicted 0.5. B2 minus B0 is +0.25 (-0.11 to +0.63) and +0.29 (-0.16 to
   +0.67).
@@ -132,8 +147,8 @@ within 0.003 points at every series.
 - **Missed:** B1 minus B0 was predicted at -0.5 to -1.5 and was +0.04 and +0.19.
 - **Met:** B2 within 0.5 of B1, and O below B1 at both BSPs.
 - **Not resolved:** B3 minus B0 at the GSPs was predicted at -0.5 to -1.5, largest beyond day 2.
-  The estimates are -0.36 and -0.40, larger beyond day 1 at Walpole, with intervals that include
-  zero.
+  The estimates, -0.36 and -0.40, fall short of the range, are worse than N1 at 0 to 24 hours, and
+  have intervals that include zero, so the lead pattern is untested.
 - **Missed:** B4 minus B0 was predicted at -0.2 to -0.8 and was -0.02 and -0.04.
 
 ## Lessons
@@ -184,8 +199,8 @@ generator to a BSP and a GSP. The series are:
 
 | Type | Series | Beneath it |
 |---|---|---|
-| BSP | Boston | 9 Primary substations; solar farms B, D, and F; wind farm W1 |
-| BSP | Skegness | 7 Primary substations; solar farms A and E; wind farms W2 and W3 |
+| BSP | Boston | 9 Primary substations; 3 solar farms and 1 wind farm |
+| BSP | Skegness | 7 Primary substations; 2 solar farms and 2 wind farms |
 | GSP | Walpole | Boston and the series beneath Boston |
 | GSP | Bicker Fen | Skegness and the series beneath Skegness |
 

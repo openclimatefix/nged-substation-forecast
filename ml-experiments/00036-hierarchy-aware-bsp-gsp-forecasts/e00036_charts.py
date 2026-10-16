@@ -192,9 +192,9 @@ def figure_3() -> alt.TopLevelMixin:
         x=alt.X("difference:Q", title="B3 minus B0, quantile score (points of capacity)")
     )
     bars = base.mark_rule().encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
-    zero = base.mark_rule(strokeWidth=1).encode(
+    zero = base.mark_rule(strokeWidth=1).encode(  # ty: ignore[unresolved-attribute]
         x=alt.datum(0), y=alt.value(0), y2=alt.value(110), color=alt.value("#999999")
-    )  # ty: ignore[unresolved-attribute]
+    )
     return (
         alt.layer(zero, bars, points)
         .properties(width=PLOT_WIDTH, height=110)

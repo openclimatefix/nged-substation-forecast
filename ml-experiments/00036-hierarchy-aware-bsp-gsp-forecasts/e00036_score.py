@@ -101,7 +101,7 @@ def actual_table(*, series: pl.DataFrame, power: dict[str, np.ndarray]) -> pl.Da
         index = common.grid_index(times=keys["valid_time"])
         pieces.append(
             keys.with_columns(
-                actual=pl.Series(common.take(values=power[row["site"]], index=index)),
+                actual=pl.Series(common.take(values=power[row["site"]], index=np.asarray(index))),
                 label=pl.lit(row["site"]),
             )
         )
