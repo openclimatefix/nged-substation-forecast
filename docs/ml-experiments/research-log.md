@@ -65,6 +65,7 @@ the maintainer to confirm.
 | [00032](00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints of each substation improve a by-type pooled demand model, and carry a substation held out of the pool? | Inconclusive: no fingerprint helped | Not for production | 2026-10-15 |
 | [00033](00033-best-guess-architecture-vs-production/result.md) | Does the best-guess architecture beat production, N1, and `manual_heuristic` on the quantile score, twCRPS, and exceedance metrics, and how much would perfect weather add? | Supported: 4.89, 3.81, and 6.27 points below production | Candidate | 2026-10-15 |
 | [00035](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted average of the quantiles of already-scored models beat the best single model for Primary demand, solar, and wind? | Supported for Primary demand (-0.10 points); null for solar and wind | Candidate (Primary demand) | 2026-10-15 |
+| [00036](00036-hierarchy-aware-bsp-gsp-forecasts/result.md) | Do forecasts of the series beneath a BSP or GSP, and an ERA5-trained N1 applied to ENS members, lower the BSP and GSP quantile score? | Inconclusive: child forecasts and wind and solar columns gave no gain; the ERA5-trained N1 gained 0.36 to 0.40 points at the GSPs with intervals including zero | Not for production | 2026-10-16 |
 | [00037](00037-switching-first-look/result.md) | Does a neighbour-balance detector find logged switching in the telemetry at a lower false-alarm rate than a single-series detector? | Inconclusive: size-weighted recall 0.326 (0.093 to 0.579) against the 0.35 bar | Not for production | Not yet merged |
 | [00038](00038-switching-mask-value/result.md) | If the half-hours of detected switching events are left out of the stack's error correction, does the forecast improve on half-hours outside logged switching? | Refuted: +57.1% (+0.4% to +133.5%) threshold-weighted error against the 7-day correction | Not for production | Not yet merged |
 
@@ -826,6 +827,28 @@ supported, on Primary demand alone.
   [PR #1244 (Experiment 35: does a lead-weighted blend of quantiles beat the best single model?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1244).
 
 ![Blends minus the best single member](00035-lead-weighted-quantile-blend-of-stored-models/figure_1.svg)
+
+### 00036: forecasts of the series beneath a BSP or GSP
+
+**Adding forecasts of the series beneath a bulk supply point (BSP) did not lower its quantile
+score, and the ERA5-trained N1 gained 0.36 to 0.40 points of capacity at the grid supply points
+(GSPs) with intervals that include zero.** The experiment gave the N1 model of Boston, Skegness,
+Walpole, and Bicker Fen the summed median forecasts of the Primary substations and metered
+generators beneath, a regression on those forecasts, an N1 trained on ERA5, and wind and solar
+columns. The pre-registered verdict is inconclusive.
+
+- **Headline result:** B1 minus B0 over all leads is +0.04 (99.17% interval -0.18 to +0.25) at
+  Boston and +0.19 (-0.10 to +0.73) at Skegness, and B3 minus B0 is -0.36 (-1.60 to +0.43) at
+  Walpole and -0.40 (-1.84 to +0.97) at Bicker Fen. An oracle that sees the observed children scores
+  5.58 and 3.42 points below N1 at the two BSPs.
+- **Finding for later experiments:** the oracle's gain is not headroom for a forecast of the
+  children, because the forecast columns gained nothing. The ERA5-trained N1 gained 0.41 points
+  over all leads (95% interval 0.15 to 0.66, exploratory) at Boston, and 0.66 to 0.88 points up to
+  day 6.
+- **Write-up and pull request:** [result](00036-hierarchy-aware-bsp-gsp-forecasts/result.md),
+  [PR #1245 (Experiment 36: do forecasts of the series beneath a BSP or GSP lower its error?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1245).
+
+![The planned contrasts and B3 at the BSPs](00036-hierarchy-aware-bsp-gsp-forecasts/figure_1.svg)
 
 ### 00037: logged switching in the telemetry
 
