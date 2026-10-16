@@ -186,6 +186,13 @@ that a split across 1 to 3 receivers is visible.
   kappa. In any size and duration band where the labeller's recall on injections is under 0.8, a
   "not visible" label cannot be trusted, and later scoring treats that band as neither a hit nor a
   miss.
+- **Each visible event carries a rough magnitude.** The moved load is not constant during an
+  event, so the labeller gives the median MW moved over the event with a 10th-to-90th percentile
+  range, from the donor's and receivers' excess over the reference. Python divides that median by
+  the donor's usual range, the 99th minus the 1st percentile of the donor's half-hourly power over
+  the 365 days before the event with logged closures left out, a robust stand-in for maximum minus
+  minimum. The gate's check on magnitude is a median relative error of 25% or less on injected
+  transfers.
 
 #### SW2-0b: the labelled reference set
 
