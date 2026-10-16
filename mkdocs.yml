@@ -198,6 +198,7 @@ nav:
       - "Is the recall gap without a metered receiver a step-size effect, and does a stronger veto help?": ml-experiments/00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md
       - "Does one detector over several windows find more transfers than the best single window?": ml-experiments/00059-sw2-13-several-windows-in-one-detector/result.md
       - "Does a step that weights each half-hour by the daily profile find more of the moved load?": ml-experiments/00060-sw2-7-profile-weighted-step-detector/result.md
+      - "Does removing the residual's half-hour-to-half-hour memory help the switching detector?": ml-experiments/00062-sw2-9-whitened-residual-step-detector/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
