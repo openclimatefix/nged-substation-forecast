@@ -438,6 +438,50 @@ of 2025. The ECR as-of date is printed by the check, and the check reports it be
    lies inside experiment 00040's 95% interval of C at the clean Primaries in at least 80% of
    Primary-years.
 
+**Growth-rate tolerances, fixed after the outside growth rates were extracted and before any
+comparison with the weekly series.** The script `e00045_outside.py` first writes
+`outside_growth.parquet`, which holds each outside source's fractional growth per year, and only
+then compares it with the series. A fractional growth per year is the least-squares slope of the
+cumulative capacity in MW per year, divided by its mean level over the window, with both curves
+sampled at every Monday. The window is the overlap of the source's coverage with the Primary's
+series, and a growth rate over a window shorter than 1 year is reported but never tested. Wrangle
+T1 and Wrangle T2 are summed against the shared polygon. The extraction showed that three of the
+four sources cannot be tested for growth, and the rules below say so in advance.
+
+- **Ofgem FiT: no growth test.** The weekly series starts in September 2019 or later, after the
+  scheme closed to new applicants, so the register's cumulative curve is flat over the whole
+  overlap (growth 0.00 per year at every Primary, and under 0.2 years at Donington). The plan's
+  comparison of growth up to 2019 has no weekly series to compare against. The register's use is
+  therefore limited to the pre-2019 baseline against the series' first 8 weeks (reported with no
+  pass or fail range, as in check 2) and the share of capacity under 50 kW.
+- **DESNZ local authority (all sizes, year ends 2014 to 2025): growth test with the factor of 2.**
+  Let g_s be the series' growth and g_o the source's, both over the same window of at least 1 year.
+  The check **passes** if g_o is positive and 0.5 ≤ g_s / g_o ≤ 2. It **fails** if g_s / g_o > 2.
+  It is **inconclusive** if g_s / g_o < 0.5 or g_s ≤ 0, because the authority total includes the
+  farms of 1 MW or more that NGED meters and that the Disaggregated Demand series does not hold, so
+  the source can grow faster than the series for a reason that does not impugn the series. The
+  authority is allocated to a polygon by the share of the authority's FiT capacity inside it,
+  because no authority boundaries are held, so the allocation is coarse. Wrangle's window is under
+  1 year and is not tested.
+- **DESNZ constituency (domestic only): no growth test.** The workbook holds the August 2026 table
+  and the July 2026 table, one month apart, and DESNZ revises recent months upward, so a growth
+  rate from them is not a growth rate. The table is used for the level check only.
+- **Embedded Capacity Register: no growth test.** The register's only date column, `Last Updated`,
+  holds one value, 6 August 2026 (Excel serial 46240), for all 7,211 rows. It records the release
+  date of the register and not a connection date, so the step-date check in check 3 is not
+  testable, and the register is used for the level comparison only.
+
+**The level checks keep the tolerances stated above.** The domestic constituency check uses the 12
+months ending 31 July 2026. The local-authority check uses the 12 months ending 31 December 2025
+and the year-end 2025 figure, and a Primary with fewer than 26 weeks of series in that period is
+not tested. Both pass if the ratio lies in [0.67, 1.5] at an AC-to-DC ratio of 0.70, and both
+report the ratio at 0.60 and 0.80. Kirton (status range-only) and Wrangle T1 (status not-clean) are
+never scored. Wrangle T1 is still added to Wrangle T2, because T2 alone against the whole polygon
+would compare unlike things, and that sum is reported with its not-clean component flagged. The
+season-year anchor uses experiment 00040's 95% bootstrap interval of the headline capacity
+(`headline_low` to `headline_high`; that experiment publishes no interval on the six-arm C
+itself), for the season-years in which the series holds at least 40 weeks.
+
 **The outside files need maintainer attention only on licence and size.**
 
 - **LSOA boundaries:** Office for National Statistics (ONS) LSOA (2021) generalised-clipped
