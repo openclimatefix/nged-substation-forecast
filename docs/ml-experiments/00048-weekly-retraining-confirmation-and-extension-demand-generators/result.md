@@ -36,7 +36,8 @@ decision_rule: >-
   the pipeline and adds a scheduled job, and experiment 34 already read monthly retraining as
   worth porting at any gain. C3 is read like C1, supported when its interval lies wholly below zero and
   refuted when wholly above, because 16 refits a week cost seconds of compute in production; it is
-  expected to resolve only if the gain is near the upper end of the prediction. The correction is judged still helping when C4 or C5 lies wholly below zero and
+  expected to resolve only if the gain is near the upper end of the prediction.
+  The correction is judged still helping when C4 or C5 lies wholly below zero and
   no longer helping when it lies wholly above zero. C8s and C8w are read as no change when the
   interval lies inside plus or minus 0.05, and as a change when it excludes zero; with 6 solar and 3
   wind farms the wind interval will probably be too wide to read as no change, and the page says so.
@@ -100,7 +101,8 @@ columns (experiment 33 holds only the 53 Tuesday runs).
 - **Baselines:** `manual_heuristic` and `climatology` on the same 292 runs.
 
 **Resources.** About 5 to 7 GPU hours inside slot A (10 cores, at most 24 GB): weekly Primaries
-2.4, monthly 0.6, BSP and GSP weekly 0.6, generators 1 to 2, P-roll 0.2. The 292 new demand frames add about 8 GB of disk, and the generator frames some more; each
+2.4, monthly 0.6, BSP and GSP weekly 0.6, generators 1 to 2, P-roll 0.2.
+The 292 new demand frames add about 8 GB of disk, and the generator frames some more; each
 worker loads the runs of one refit at a time, so memory stays inside 24 GB, and the fits run as
 parallel workers, one output file per refit written atomically, so a run resumes. The GPU is shared with
 other sessions, so the timings are not reproducible; the numbers are, because seeds are fixed per job.
