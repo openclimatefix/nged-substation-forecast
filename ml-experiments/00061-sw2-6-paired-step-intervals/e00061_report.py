@@ -254,7 +254,6 @@ def print_alarms(*, out: Path) -> dict[str, tuple[int, int]]:
         print(
             f"{setting}: unexplained alarms even months {counts[setting][0]}, "
             f"odd {counts[setting][1]}; "
-            f"odd {counts[setting][1]}; "
             f"all alarms {part.height}, near a logged closure {part['logged_matched'].sum()}"
         )
     return counts

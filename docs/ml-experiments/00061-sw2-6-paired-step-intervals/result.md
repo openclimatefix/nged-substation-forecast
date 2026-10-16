@@ -1,7 +1,7 @@
 ---
 id: "00061"
 slug: sw2-6-paired-step-intervals
-status: planned
+status: done
 size: medium
 hypothesis: >-
   A detector that looks for an onset step and its opposite return step together, scoring the pair
@@ -42,100 +42,169 @@ metric: >-
   hours and ends within the larger of 6 hours and 10% of the duration. Unweighted recall is
   secondary.
 code: ml-experiments/00061-sw2-6-paired-step-intervals/
+verdict: refuted
+best_arm: >-
+  Of the pre-registered arms, none: PL (paired score, labelled-duration prior) minus D0M in
+  MW-weighted recall, pooled over S2, S3 and S4, is -0.133 (98.33% interval -0.233 to -0.007), and
+  PF (flat prior) is -0.214 (-0.310 to -0.092). The descriptive arm PE (D0M's alarms with the end
+  taken from the strongest return step) is +0.191 (+0.148 to +0.237): 0.63 to 0.65 of the moved MW
+  found against D0M's 0.44 to 0.47.
+lessons: >-
+  The end of D0M's interval was the main limit on recall: keeping D0M's alarms and moving only the
+  end to the strongest opposite step in the next 14 days finds 0.19 more of the moved MW, with
+  unexplained alarms unchanged by construction. Pairing the onset and return step into one alarm
+  score loses far more onsets than it repairs ends, because at the same number of unexplained alarms
+  a single step then needs about 8.8 noise units to alarm. On the 35 labelled real transfers of more
+  than 1 day, PE finds 7 against D0M's 2.
+advice:
+  - >-
+    Take the interval end from the strongest opposite step in the next 14 days, not from D0M's
+    level tracker, and make that the baseline for the next detector experiment (PE, figure 1).
+  - >-
+    Keep the onset alarm single-step at D0M's threshold of 4.0 noise units; do not fold the return
+    step into the alarm score, because a threshold that keeps the unexplained-alarm count at 80
+    then needs a single step of about 8.8 noise units (figure 3).
+  - >-
+    Test PE's end rule on the 4-hour window and with a cap longer than 14 days before adopting it;
+    PE cannot repair transfers longer than 14 days and may take another transfer's step as the end
+    (limits).
+  - >-
+    Look at the 24 of 35 labelled real transfers of more than 1 day that have no alarm at the start
+    under D0M; the onset, not the end, now limits the real transfers (C3).
+production_status: not-for-production
+adopted_in: none
 ---
 
 # Experiment 61: does pairing an onset step with its return step find more of the moved load?
 
-*Planned. The sections below are the plan; the write-up replaces them when the experiment has run.*
+**Keeping the detector's alarms and finding each interval's end from the strongest opposite step
+finds about 0.19 more of the moved power, but folding the return step into the alarm itself loses
+more transfers than it repairs.** A load transfer is a switching operation that moves part of one
+Primary substation's demand onto neighbouring substations for some hours or days. The detector
+D0M raises an alarm when the 24-hour average of a substation's residual (measured power minus the
+power the lagless XGBoost weather model predicted) steps away from the average of the previous 24
+hours. A noise unit is the typical size of that step on a quiet day.
 
-## Question
+We added known load transfers to the power history, and asked how much of the moved power each of
+four detectors finds. A transfer is found when an alarm's interval starts within 2 hours of the
+true start and ends within the larger of 6 hours and 10% of the true duration. D0M found 0.44 to
+0.47 of the moved power. The arm PE kept D0M's alarms and took each end from the strongest opposite
+step in the next 14 days, and found 0.63 to 0.65. The arms PL and PF scored an onset and a return
+step as one pair, and found 0.23 to 0.33, because a single step then needs about 8.8 noise units to
+alarm. The best arm still misses 0.35 of the moved power.
 
-**Experiment 60 found that the shape of the step does not limit the 24-hour detector, and that the
-end of the alarm's interval does.** A load transfer is a switching operation that moves part of one
-Primary substation's demand onto neighbouring substations for some hours or days. D0M raises an
-alarm when the 24-hour average of a substation's residual (measured power minus the power the
-lagless XGBoost weather model predicted) steps away from the average of the previous 24 hours. D0M
-then follows the level of the residual for as long as it keeps at least half its starting size, and
-calls that the interval. Among transfers with a donor step of 6 noise units or more, about a third
-have an alarm at the right start and a wrong end. A noise unit is the typical size of the step on a
-quiet day. Only 2 of the 35 labelled real transfers of more than 1 day are found.
+![Gain in MW-weighted recall over D0M, by arm and shape](figure_1_gain_by_arm.svg)
 
-## Plan
+## What we tested
 
-**The paired-step detector scores an onset and a return step together.** At a candidate onset `s`
-with step `z(s)` in noise units, and a candidate return stamp `e`, at least 24 hours later and
-within 60 days, the pair score is `(|z(s)| + r(e)) / sqrt(2)`. Here `z` is D0's 24-hour level shift
-(the mean of the next 24 hours minus the mean of the previous 24 hours, at each stamp) divided by
-the series' odd-month noise scale, and `r(e) = -sign(z(s)) * z(e)` is the return step, positive when
-the level steps back. An onset of +5 and a return of -4 scores 6.4. The interval's end is `e`, the
-first stamp at the old level, the same convention as D0M's `end`; the alarm is known 24 hours later
-(`e` + 48 half-hours), so every arm here is a retrospective interval estimator, scored on the
-interval alone, as D0M is. The detector
-takes every local peak of `|z|` of 2.5 noise units or more as a candidate onset, picks the `e` with
-the largest score plus a log prior on the duration `e - s`, and keeps the alarm when that total
-reaches a threshold. A candidate with no return step of at least 1.5 noise units keeps D0M's
-tracked end and scores `|z(s)| / sqrt(2)` plus the lowest prior value.
+**Four arms, all scored at the same number of unexplained alarms on odd months.** An unexplained
+alarm is one more than 24 hours from every logged closure on its series. The arms differ only in
+how an alarm is raised and where its interval ends.
 
-- **PE** (the simplest test of the end estimate) keeps D0M's alarms exactly (threshold 4.0, so the
-  unexplained alarms are identical by construction) and replaces D0M's tracked end by the stamp `e`
-  between 24 hours and 14 days after the onset with the largest return step `r(e)`, when that step
-  is 1.5 noise units or more, else D0M's tracked end. PE has no prior. It is reported beside C1 and C2
-  as a descriptive contrast (PE minus D0M) with the same interval level, and adds no verdict.
-- **PL** takes the prior from a kernel density of the log durations of the labelled real transfers
-  (experiment 41's set, 2 hours to 30 days), a Gaussian kernel (Silverman bandwidth) on the log duration in hours, evaluated at each
-  half-hour duration searched, as a log ratio to the density's peak, floored at -1 and added to the
-  pair score with weight 1. A candidate with no return step takes the floor.
-- **PF** has a flat prior, and is the guard against PL's prior leaking information about the injected
-  durations (see Limits).
-- **Thresholds** of PL and PF are each set on odd months so that the unexplained-alarm count (alarms
-  more than 24 hours from any logged closure on the series) equals D0M's 80, as in experiment 60.
-  Even months are scored only.
-- **Candidates** are local peaks of `|z|` within +/- 24 hours, as D0 uses, skipping peaks within 24
-  hours of a monthly refit. The return stamp `e` may be any stamp, not only a peak.
-- **A return step does not raise a new alarm:** a candidate on a series, of the opposite sign, within
-  24 hours of an accepted pair's end is dropped.
-- **Shapes and population** are experiment 60's: 620 headline-band transfers (25% to 40% of the
-  receiving load, over 1 day) starting in even months, in shapes S1 (a share of the donor's
-  profile), S2 (a constant MW), S3 (a share of each receiver's profile), S4 (a mix fitted to real
-  transfers), and S5 (the guard, profile shifted 12 hours). The detector assumes none of the
-  shapes, so C1 and C2 pool S2, S3 and S4, as experiment 60 did; S1 and S5 are reported alone.
+- **D0M** is experiment 60's detector: alarm at 4.0 noise units, end from a tracker that follows the
+  residual for as long as it keeps half its starting size.
+- **PE** has D0M's alarms, so its unexplained alarms are identical by construction, and takes each
+  end from the stamp between 24 hours and 14 days after the onset where the step back is largest,
+  when that step is at least 1.5 noise units.
+- **PL** scores each candidate onset (a local peak of 2.5 noise units or more) together with the
+  best return stamp as `(|onset step| + return step) / sqrt(2)`, plus a log prior on the duration
+  taken from the labelled real transfers. The alarm threshold, 5.2, gives 80 unexplained alarms on
+  odd months.
+- **PF** is PL with a flat prior. Its threshold, 6.0, gives 78 on odd months.
 
-**The match on alarm count is a match on count, not on composition,** and the maximum over up to
-2,800 return stamps inflates the score of noise candidates; the odd-month calibration absorbs the
-average inflation. The report therefore also prints, for each arm, the odd-month and even-month
-alarm counts, the share of alarms near a logged closure, and the number of candidate onsets above
-the 2.5 floor.
+The population is experiment 60's: 620 injected transfers of 25% to 40% of the receiving load,
+lasting over 1 day, starting in even months, in five daily shapes. The harness reproduces experiment
+58's D0M outcome for all 1,900 transfers. S1 moves a share of the donor's profile, S2 a constant
+MW, S3 a share of each receiver's own profile, S4 a mix fitted to real transfers, and S5 shifts S1
+by 12 hours. The detectors assume no shape, so the contrasts pool S2, S3, and S4. Intervals are
+98.33% (Bonferroni across the three planned contrasts), from 20,000 resamples of whole calendar
+months.
 
-**Standard tables, as experiments 55, 58 and 60 print them:** recall by donor step in noise units,
-split by metered receiver; MW-weighted recall as the headline with unweighted recall second; and
-the share of the moved MW missed, stated in the take-home message. A post hoc table (no predicted values) counts, among
-transfers with a donor step of 6 noise units or more, those found, those with the right start and a
-wrong end, and those with no alarm at the start.
+## Verdict
 
-## Sizing (the five triggers)
+**Refuted for the pre-registered arms.** The upper end of C1's interval, -0.007, lies below the +0.02
+the decision rule required. The table gives the gain in MW-weighted recall (the share of the moved
+MW that sits in found transfers) over D0M, pooled over S2, S3, and S4.
 
-- **What gets stored:** only the private tables under `data/ml-experiments/00061-*`; nothing that
-  production reads.
-- **Production serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes (the score, the prior, the candidate floor), which
-  is why the prior is tested in two arms and the other choices are fixed here before any fit.
-- **Code whose callers cannot be named without searching:** no; the experiment copies experiment
-  60's folder and changes the detector and the report.
+| Contrast | Gain over D0M | Reading |
+|---|---|---|
+| C1, PL (labelled prior) | -0.133 (-0.233 to -0.007) | Refuted: PL finds less |
+| C2, PF (flat prior) | -0.214 (-0.310 to -0.092) | PF finds less |
+| PE, descriptive (no verdict) | +0.191 (+0.148 to +0.237) | PE finds more |
+| PL minus PF | +0.081 (+0.062 to +0.107) | The prior helps PL, on injected durations drawn from the same labelled set |
 
-That is a medium experiment: a Sonnet plan review, a Sonnet code review, a Sonnet numbers review,
-and a Sonnet prose review.
+![MW-weighted recall by arm and shape](figure_2_recall_by_arm.svg)
 
-## Earlier advice followed
+Absolute MW-weighted recall on S2, S3, and S4 is 0.44 to 0.47 for D0M, 0.63 to 0.65 for PE, 0.32 for
+PL, and 0.23 to 0.25 for PF. Unweighted recall on S2 is 0.345, 0.482, 0.240, and 0.171. On S1 and
+S5 the pattern is the same (PE 0.658 and 0.649). Among transfers with a metered receiver, PE finds
+0.79 to 0.82 of the moved MW.
 
-- Experiment 60: work on the interval end before the step statistic (this experiment); report recall
-  by donor step in noise units, split by metered receiver (standard tables above).
-- Experiment 60: look at why only 2 of 35 labelled real transfers are found; C3 and the
-  real-transfer start counts report it, and this experiment does not claim to explain it.
+## Why pairing loses and the return step alone wins
+
+**Pairing probably turns the alarm budget into noise pairs.** Maximising over up to 2,800 return
+stamps should raise the score of noise candidates (we did not measure this), so holding the
+unexplained-alarm count at 80 forces a high threshold. A lone onset step with no return then needs
+about 8.8 noise units (PL) or 8.5 (PF), against D0M's 4.0. Of the 215 constant-MW transfers with a
+donor step of 6 noise units or more, D0M has no alarm at the start for 15, PE for 15 (the same
+alarms), PL for 105, and PF for 114.
+
+**The return step repairs ends.** Of the same 215, D0M finds 128 and has the right start and a wrong
+end for 72. PE finds 185 and has the right start and a wrong end for 15. PE finds more than D0M in every
+donor-step bin from 2 noise units upwards for transfers with a metered receiver (the printed report
+has the counts for the others).
+
+![Outcomes of the transfers with a donor step of 6 noise units or more](figure_3_outcomes_big_steps.svg)
+
+## Labelled real transfers (C3)
+
+**PE and PL find more of the 35 labelled real transfers of more than 1 day than D0M, but all arms
+find under a quarter.** D0M finds 2 (0.054 of the labelled MW), PE 7 (0.126), PL 8 (0.148, with a
+prior fitted without the scored half of the transfers), and PF 4 (0.064). An alarm at the right
+start exists for 11 of the 35 under D0M and PE, 8 under PL, and 6 under PF. The onset therefore now
+limits the real transfers more than the end does.
+
+## What held in the prediction and what did not
+
+- **Not held: PL gained -0.133,** against a predicted +0.03 to +0.08.
+- **Not held: PF gained -0.214,** against a predicted +0.02 to +0.06.
+- **Not predicted: PE,** added to the plan after the plan review, found 0.19 more than D0M.
 
 ## Limits
 
-- **The injected durations come from the same labelled set as the prior,** so PL's gain on injected
-  transfers is an upper bound; C2 (PF) and C3 (a cross-fitted prior for the real transfers: the
-  prior for each half of the 35 comes from the other half) are the honest reads.
-- **The 620 transfers were used in experiments 55, 58 and 60.** The shapes share the same events.
+- **The injected durations come from the same labelled set as PL's prior,** so PL's gain over PF is
+  optimistic on injected transfers. The cross-fitted prior for the real transfers differs from the
+  full prior by at most 0.18 in log density ratio, so the real-transfer count for PL tests the prior
+  only weakly.
+- **Injected transfers are clean boxcars,** so PE's return step is easier to find than a real
+  transfer's. The 35 real transfers are too few for an interval.
+- **PE's search stops at 14 days,** so it cannot repair transfers longer than that, and it may take
+  another transfer's larger opposite step as the end. We did not split PE's gain by duration.
+- **PE is an interval estimator that needs 24 hours after the end,** as D0M's tracker does. It
+  cannot run before the transfer has ended.
+- **The match is on the count of unexplained alarms, not on their composition.** The printed report
+  shows 70 even-month unexplained alarms for PL and PF against 80 for D0M and PE. PL and PF drop the
+  return-step alarm of each pair, which D0M keeps as a separate alarm, so the matched count holds
+  more distinct onsets for D0M. We did not run D0M with the same dropping.
+- **The 620 transfers were used in experiments 55, 58, and 60,** and the shapes share the same
+  events.
+
+## Reviews
+
+- **Plan review (Sonnet):** accepted a worked score formula, a table of fixed constants, the PE arm
+  that keeps D0M's alarms, alarm-composition counts, and removing the numbers predicted for the
+  wrong-end share; rejected a 97.5% level and a separate arm with a prior fitted on other durations.
+- **Code review (Sonnet):** accepted using the prior's lowest value for a candidate with no return
+  step in every arm, excluding return stamps within 24 hours of a monthly refit, and printing the
+  achieved odd-month counts and the prior values; rejected a D0M arm with the pairs' dropping rule.
+  No leakage or off-by-one errors were found.
+
+## What the next experiment should answer
+
+**The next experiment should combine PE's end rule with a better onset.** Of the 35 labelled real
+transfers, 24 have no alarm at the start in any arm, so the onset now limits them. Candidates: a
+second alarm path for pairs, run only on top of D0M's alarms and capped at a few extra alarms; the
+4-hour window with PE's end rule; and SW2-13 (several windows in one detector).
+
+Code: `ml-experiments/00061-sw2-6-paired-step-intervals/`, with every number printed by
+`e00061_report.py`.
