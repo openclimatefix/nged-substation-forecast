@@ -21,9 +21,9 @@ decision_rule: >-
   0.15 points, because the blend adds two weather feeds and two pipeline steps to the serving path,
   and a smaller gain does not justify the added feeds and pipeline steps. C1 is `supported` when
   its interval lies wholly below -0.15, `small gain` when it lies wholly below zero but not wholly
-  below -0.15, `refuted` when it lies wholly above zero, and `inconclusive` otherwise. C2, the same difference over all leads, is
-  reported beside C1 at 95% and does not change the verdict. All other reads (per product, per farm,
-  per lead day, solar) are exploratory, labelled so, and read at 95%.
+  below -0.15, `refuted` when it lies wholly above zero, and `inconclusive` otherwise. C2, the same
+  difference over all leads, is reported beside C1 at 95% and does not change the verdict. All other
+  reads (per product, per farm, per lead day, solar) are exploratory, labelled so, and read at 95%.
 benchmark: >-
   The experiment 33 wind best guess (`bg_full`) on the same cases, read from its stored table.
 row_set_id: fold_a_tuesdays_v1
