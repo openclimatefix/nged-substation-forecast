@@ -67,9 +67,10 @@ headline: >-
   0.072 less than ENS at 0 to 24 hours (95% interval -0.100 to -0.039) and the blend 0.002 more
   (-0.001 to +0.006). The demand contrasts C7 and C7s (defined in the decision rule) were not run.
 lessons: >-
-  A second global ensemble weather forecast adds no skill to the sunshine anomaly that ENS has: the
-  fitted blend gives GEFS about 0.1 of its weight inside 2 days and none from 2 to 10 days, so the
-  errors of the two forecasts are strongly shared. GEFS's raw anomaly is about 15% too large and
+  GEFS adds under 1% over 0 to 48 hours (the blend's correlation gain is at most +0.007, and its
+  cross-validated squared error is not lower than ENS's): the fitted blend gives GEFS about 0.1 of
+  its weight inside 2 days and none from 2 to 10 days, so the errors of the two forecasts are
+  strongly shared. GEFS's raw anomaly is about 15% too large and
   needs calibration that ENS does not. The 10+ day band has too little skill (correlation 0.25 for
   ENS) for any blend to help. The sunshine forecast stays the bottleneck that experiment 46 found.
 advice:
@@ -160,10 +161,12 @@ about 15% too large, while the slope for ENS is 0.98 to 1.07.
 
 ![The CAMS anomaly against the raw ENS and GEFS anomalies, in bins](figure_3_raw.svg)
 
-**The blend learns to ignore GEFS.** The mean fitted weight on GEFS is 0.107 at 0 to 24 hours and
-0.080 at 1 to 2 days, and -0.012 and -0.008 at 2 to 6 and 6 to 10 days, where the blend is ENS
-alone. At 10+ days the weights (0.24 on GEFS, 0.01 on ENS) are fitted on little skill. Ten of the 30
-weight pairs have a negative weight; they were kept and flagged. An equal-weight average of the two
+**The blend learns to ignore GEFS.** Over the five verdict series, the mean fitted weight on GEFS is
+0.107 at 0 to 24 hours, 0.080 at 1 to 2 days, -0.012 at 2 to 6 days, and -0.005 at 6 to 10 days
+(3 of the 5 weights negative), where the blend is ENS alone. At 10+ days the weights (0.24 on GEFS,
+0.01 on ENS) are fitted on little skill. Across all bands, 8 of the verdict series' 25 weight pairs
+have a negative weight (10 of 30 over all six sites, and -0.008 for the 6 to 10 day mean over all
+six); they were kept and flagged. An equal-weight average of the two
 calibrated anomalies (exploratory) correlates 0.814 at 0 to 24 hours, below ENS, and 0.357 at 6 to
 10 days, above it (0.337); neither difference was tested.
 
@@ -201,28 +204,36 @@ crop covers 0.898 of the cell, and the weights were renormalised.
 
 ## Lessons
 
-**ENS stays the source of the solar anomaly.** A second global ensemble shares the errors of ENS at
-the leads that matter. The first 2 days hold nearly all of the skill (correlation 0.75 to 0.82), and
-there GEFS is worse and the blend adds at most 0.007. GEFS's raw anomaly needs a calibration slope
-of about 0.87 where ENS's slope is 0.98 to 1.07.
+**ENS stays the source of the solar anomaly.** GEFS adds under 1% over 0 to 48 hours: the blend's
+correlation gain is +0.002 at 0 to 24 hours and +0.007 at 1 to 2 days (interval +0.000 to +0.010),
+and its cross-validated squared error is 1.002 times ENS's. The first 2 days hold nearly all of the
+skill (correlation 0.75 to 0.82), and there GEFS is worse and the blend adds at most 0.007. GEFS's
+raw anomaly needs a calibration slope of about 0.87 where ENS's slope is 0.98 to 1.07.
 
 ## What the next experiment should answer
 
 **Does a product of a different kind than a global ensemble, such as a high-resolution regional
 model at the substations' own points or a satellite-based nowcast of the next few hours, raise the
-correlation with the CAMS anomaly above ENS's 0.82 at 0 to 24 hours?** This experiment found that a
-second global ensemble adds nothing there, so the next test should use a source with independent
+correlation with the CAMS anomaly above ENS's 0.82 at 0 to 24 hours?** This experiment found that GEFS
+adds under 1% there, so the next test should use a source with independent
 errors at short range, calibrated in-fold as here and scored first without any demand fit. The live
 UKV differs statistically from the CEDA UKV archive, so the product must be the same in training and
 serving. Beyond 6 days, none of the products on disk that we considered is likely to beat ECMWF, so
-a gain there is not worth a test.
+a gain there is unlikely, and the equal-weight blend, untested, is the one hint otherwise (0.357
+against ENS's 0.337 at 6 to 10 days).
+
+**Suggestions for that experiment (not commitments).** First, add noise to the CAMS anomaly to reach
+correlations of 0.85 and 0.90, and push those anomalies through `e00050_predict.py`, to map anomaly
+correlation to demand score and show how much a better anomaly could be worth. Second, blend ENS
+with the CAMS anomaly at the forecast origin, to bound what a nowcast could add. GFS is not worth
+testing, because it shares GEFS's model physics.
 
 ## Not done
 
-The demand contrasts C7, C7s, C3b, and C6b were not run, because the pre-registered gate stopped the
-experiment. `e00050_predict.py` and `e00050_stats.py` are written, are tested against experiment
-46's stored arm (a rebuild matches to 1.2e-7), and stay unrun. No prediction set was written, since
-no demand arm exists.
+The demand contrasts C7 and C7s, and the repeats of experiment 46's contrasts, C3b and C6b, did not
+run, because the stage 1 gate stopped the experiment. `e00050_predict.py` and `e00050_stats.py` are
+written, are tested against experiment 46's stored arm (a rebuild matches to 1.2e-7), and stay
+unrun. No prediction set was written, since no demand arm exists.
 
 ## Plan
 
@@ -370,6 +381,11 @@ take minutes.
 clip; add "neither wholly below zero" to `refuted`, so that `small gain` and `refuted` cannot both
 hold; fit the ENS calibration, each climatology, and the blend weights inside each fold; check the
 publication time of the GEFS run; and verify the D16 crop coverage in the private store.
+**Changes at code review, made before the run.** The gate scores April-to-September rows only, like
+the validation scoring, and drops training rows of runs initialised in the held-out month. Scored on
+all months, the gate gives GEFS 1.141 and the blend 1.002 times ENS's error, so neither change
+decides the verdict.
+
 **Rejected:** skipping the demand stage, because the brief requires repeating experiment 46's C3 and
 C6, and a fixed 50/50 blend as the only blend, because the fitted blend is one of the three
 pre-registered arms (the fixed blend is added as an exploratory arm). **Open:** the Bonferroni
