@@ -141,10 +141,10 @@ raise an alarm.
 
 **The veto raises the precision of the real alarms by about 3 points.** In even months, the lower
 precision bound (alarms within 24 hours of a logged closure over all alarms) of the 24-hour detector
-rises from 0.441 to 0.474 and event F1 from 0.393 to 0.411. At 4 hours the bounds rise from 0.471 and
-0.528 to 0.538 and 0.588, and F1 from 0.310 and 0.321 to 0.329 and 0.338. D2 raises 137
-24-hour alarms in even months against 143 for D0M, and 72 unexplained ones against 80, so D2 sits at a slightly
-stricter operating point, which biases the comparison against D2.
+rises from 0.441 to 0.474 and event F1 from 0.393 to 0.411. At 4 hours the bounds rise from 0.471
+and 0.528 to 0.538 and 0.588, and F1 from 0.310 and 0.321 to 0.329 and 0.338. D2 raises 137 24-hour
+alarms in even months against 143 for D0M, and 72 unexplained ones against 80, so D2 sits at a
+slightly stricter operating point, which biases the comparison against D2.
 
 **The confirmed tier is not more often a visible transfer.** Of experiment 41's 148 labelled alarms,
 5 of the 79 confirmed, 4 of the 49 unconfirmed, and 0 of the 20 vetoed were labelled visible

@@ -77,6 +77,7 @@ the maintainer to confirm.
 | [00044 - Switching events and the best guess's score](00044-sw2-2-switching-share-of-best-guess-score/result.md) | What share of experiment 33's best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | Refuted: a perfect switching detector would lower the quantile score by 0.42% (95% interval -0.47% to 1.96%), under the 3% threshold, counting only transfers of 25% or more of the receiving load lasting over 24 hours | Not for production | 2026-10-16 |
 | [00046 - Embedded solar share of Primary forecast error, PVDIS part 3](00046-embedded-solar-share-of-primary-forecast-error/result.md) | Does a solar term built from the ENS forecast of sunshine lower the error of a Primary demand forecast without radiation inputs by at least 0.35 points of capacity? | Refuted: -0.056 (-0.191 to +0.064) at 97.5%; the oracle built from the true sunshine gains -0.966 (-1.431 to -0.595) | Not for production | Pending |
 | [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
+| [00055 - Switching event detector, part 5](00055-sw2-8-neighbour-veto-single-series-detector/result.md) | Does vetoing the single-series detector's alarms that the neighbouring substations show as a common-mode miss let the threshold fall at the same rate of unexplained alarms and find more injected transfers? | Inconclusive: the share found rose by +0.008 (98.75% interval -0.003 to +0.022) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1163,3 +1164,24 @@ experiment cannot resolve a gain below about 0.04.
   [PR #1268](https://github.com/openclimatefix/nged-substation-forecast/pull/1268).
 
 ![Unexplained 24-hour alarms by days to the nearest bank holiday](00047-sw2-4-better-residual-switching-detector/figure_6_alarms_by_holiday_distance.svg)
+
+### 00055: does a neighbour veto help the single-series switching detector?
+
+**A neighbour veto makes the single-series detector slightly more precise but cannot make it find
+many more transfers: the most it adds is about 2 points of the share found, so the next gain has to
+come from the transfers that have no metered receiver.** With the veto the 24-hour threshold fell
+from 4.00 to 3.70 noise units at the same rate of unexplained alarms, and the detector found 0.363 of
+620 injected transfers against 0.355 without it (+0.008, 98.75% interval -0.003 to +0.022). The
+verdict is inconclusive.
+
+- **Finding for later experiments:** the veto removes 35% of the unexplained 24-hour alarms and 20%
+  of the alarms a logged closure explains, a ratio of 1.8. It loses 2 of the 220 transfers found
+  without it and gains 7, raises the precision of the real alarms by about 3 points, and loses 6
+  and gains 2 of 300 transfers that start near a bank holiday. The gain sits in the transfers with
+  no metered receiver, which the detector finds at 0.19 against 0.50 for the others.
+- **Series status:** experiments 43, 47, and 55 found no detector change that raises recall by more
+  than about 2 points at the 24-hour window.
+- **Write-up and pull request:** [the full result page](00055-sw2-8-neighbour-veto-single-series-detector/result.md),
+  [PR #1282](https://github.com/openclimatefix/nged-substation-forecast/pull/1282).
+
+![Share found with and without the veto, by set of transfers](00055-sw2-8-neighbour-veto-single-series-detector/figure_4_found_by_set.svg)
