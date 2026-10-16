@@ -33,8 +33,6 @@ from e00059_windows import (
 ReasonType = Literal[
     "found", "end_outside_tolerance", "absorbed", "onset_outside_tolerance", "no_alarm"
 ]
-LARGE_STEP_Z: Final[float] = 4.0
-"""A donor step of this many 24-hour noise units counts as large, as in experiment 58."""
 NEAR_ONSET: Final[int] = ONSET_TOLERANCE
 WIDE_ONSET: Final[int] = BLOCK
 """An alarm this close to the onset but outside the 2-hour tolerance has the wrong onset."""
@@ -72,6 +70,7 @@ def detect_all(
     expected: Arrays,
     scales: dict[int, dict[int, float]],
     thresholds: Thresholds,
+    fixed: bool = False,
 ) -> dict[DetectorNameType, Detection]:
     """Alarms, intervals, and scores of all six detectors on one residual."""
     relative = {s: relative_residual(residual=residual[s], expected=expected[s]) for s in residual}
@@ -82,16 +81,22 @@ def detect_all(
         table = alarms(inputs=inputs[window], threshold=thresholds.single[window])
         out[name] = Detection(
             table=table,
-            intervals=by_series(intervals=build_intervals(alarm_table=table, relative=relative)),
+            intervals=by_series(
+                intervals=build_intervals(alarm_table=table, relative=relative, fixed=fixed)
+            ),
             scores=single_scores(inputs=inputs, window=window),
             threshold=thresholds.single[window],
         )
     for name in COMBINED_NAMES:
         scores = combined_scores(steps=steps, name=name)
-        table = combined_alarms(scores=scores, steps=steps, threshold=thresholds.combined[name])
+        table = combined_alarms(
+            scores=scores, steps=steps, threshold=thresholds.combined[name], name=name
+        )
         out[name] = Detection(
             table=table,
-            intervals=by_series(intervals=build_intervals(alarm_table=table, relative=relative)),
+            intervals=by_series(
+                intervals=build_intervals(alarm_table=table, relative=relative, fixed=fixed)
+            ),
             scores=scores,
             threshold=thresholds.combined[name],
         )
@@ -144,6 +149,7 @@ def rows_for_events(
     detections: dict[DetectorNameType, Detection],
     scale_24h: dict[int, float],
     shape: str,
+    variant: str,
 ) -> list[dict]:
     """One row per transfer and detector: found, reason, and the transfer's step."""
     rows: list[dict] = []
@@ -160,6 +166,7 @@ def rows_for_events(
                 {
                     "event_id": event.event_id,
                     "shape": shape,
+                    "variant": variant,
                     "detector": name,
                     "onset_found": match.onset_found,
                     "found": match.found,

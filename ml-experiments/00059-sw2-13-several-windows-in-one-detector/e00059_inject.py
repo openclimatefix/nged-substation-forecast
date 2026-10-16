@@ -6,8 +6,9 @@ transfers. `Injection.fast_residual` is the shortcut `residual + moved MW`, vali
 lagless weather model that was not trained on the injected period (the fast path of this
 experiment).
 
-A transfer takes a share of the donor's own power (so it follows the donor's daily shape), splits it
-across 1 to 3 receivers, and the share drifts slowly between 0.5 and 2 times its start. Durations
+A transfer takes a drifting share of the donor's own power (so it follows the donor's daily
+shape), a constant MW, or a drifting share of the receivers' power, splits it across 1 to 3
+receivers, and the share drifts slowly between 0.5 and 2 times its start. Durations
 and sheet sides come from the real logged operations.
 """
 
@@ -15,12 +16,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Final, Literal
 
 import numpy as np
 import polars as pl
-from e00059_common import ADJACENCY, BLOCK, GRID_LENGTH, GRID_START, LABELLED_PATH
+from e00059_common import ADJACENCY, BLOCK, GRID_LENGTH, LABELLED_PATH
 
 ShapeType = Literal["donor_profile", "constant_mw", "receiver_profile"]
 SHAPES: Final[tuple[ShapeType, ...]] = ("donor_profile", "constant_mw", "receiver_profile")
@@ -288,9 +288,3 @@ def events_frame(*, events: list[Event]) -> pl.DataFrame:
             for e in events
         ]
     )
-
-
-def stamp_of_month(stamp: int) -> int:
-    """Year and month of a grid stamp as an integer such as 202203."""
-    moment = GRID_START + timedelta(minutes=30 * stamp)
-    return moment.year * 100 + moment.month

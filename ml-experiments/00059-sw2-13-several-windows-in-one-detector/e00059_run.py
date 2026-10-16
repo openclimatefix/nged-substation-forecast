@@ -48,8 +48,9 @@ from e00059_inject import (
     events_frame,
     inject_power,
 )
-from e00059_score import by_series, match_event
+from e00059_score import match_event
 from e00059_windows import (
+    TARGET_COUNT,
     calibrate_combined,
     calibrate_singles,
     calibrated_steps,
@@ -60,6 +61,8 @@ from e00059_windows import (
 N_WORKERS: Final[int] = 4
 HARNESS_ALARM_COUNTS: Final[dict[int, int]] = {8: 432, 48: 297}
 HARNESS_THRESHOLDS: Final[dict[int, float]] = {8: 6.0, 24: 4.0, 48: 4.0, 96: 4.0}
+"""Experiment 43's thresholds for 4 and 24 hours. The 12-hour and 48-hour entries and
+`HARNESS_COMBINED` are arbitrary, and only let `detect_all` run; the check reads W8 and W48."""
 HARNESS_COMBINED: Final[float] = 1.5
 HARNESS_FOUND_D0_48: Final[int] = 47
 """Of the 160 headline-band transfers in experiment 43's draw, D0 at 24 hours finds 47."""
@@ -99,7 +102,9 @@ def harness_check(*, out: Path) -> None:
     stored = pl.read_parquet(EXPERIMENT_43_DIR / "event_results.parquet").filter(
         pl.col("variant") == "plain", pl.col("setting") == "alarms_D0_48_4.0"
     )
-    ours = rows.filter(pl.col("detector") == "W48").select("event_id", "found", "onset_found")
+    ours = rows.filter(pl.col("detector") == "W48", pl.col("variant") == "plain").select(
+        "event_id", "found", "onset_found"
+    )
     joined = ours.join(stored, on="event_id", suffix="_43", validate="1:1")
     different = joined.filter(
         (pl.col("found") != pl.col("found_43"))
@@ -143,13 +148,10 @@ def tune(*, out: Path) -> None:
                 explained=pl.Series(explained, dtype=pl.Boolean),
             )
         )
-        print(
-            name,
-            table.height,
-            "alarms; odd unexplained",
-            odd_unexplained(table=table, logged=logged),
-            flush=True,
-        )
+        achieved = odd_unexplained(table=table, logged=logged)
+        print(name, table.height, "alarms; odd unexplained", achieved, flush=True)
+        if achieved > TARGET_COUNT:
+            raise SystemExit(f"STOP: {name} odd-month unexplained count {achieved} is over target")
     pl.concat(pieces).write_parquet(out / "real_alarms.parquet")
 
 
@@ -162,23 +164,32 @@ def init_worker(state: dict) -> None:
 
 
 def score_batch(args: tuple[int, list[Event], ShapeType]) -> list[dict]:
-    """Inject one batch in one shape with the fast residual, detect, and return one row each."""
+    """Inject one batch in one shape with the fast residual, detect, and return one row each.
+
+    The `plain` variant builds intervals as experiment 43 does. The `fixed` variant is the post hoc
+    arm that tracks the transfer's end more patiently.
+    """
     seed, batch, shape = args
     panel = _STATE["panel"]
     injection = inject_power(power=panel["power"], events=batch, seed=seed, shape=shape)
-    detections = detect_all(
-        residual=injection.fast_residual(panel["residual"]),
-        expected=panel["expected"],
-        scales=_STATE["scales"],
-        thresholds=_STATE["thresholds"],
-    )
-    return rows_for_events(
-        batch=batch,
-        injection=injection,
-        detections=detections,
-        scale_24h=_STATE["scales"][WINDOW_24_HOURS],
-        shape=shape,
-    )
+    rows: list[dict] = []
+    for variant in ("plain", "fixed"):
+        detections = detect_all(
+            residual=injection.fast_residual(panel["residual"]),
+            expected=panel["expected"],
+            scales=_STATE["scales"],
+            thresholds=_STATE["thresholds"],
+            fixed=variant == "fixed",
+        )
+        rows += rows_for_events(
+            batch=batch,
+            injection=injection,
+            detections=detections,
+            scale_24h=_STATE["scales"][WINDOW_24_HOURS],
+            shape=shape,
+            variant=variant,
+        )
+    return rows
 
 
 def score_groups(
@@ -237,7 +248,7 @@ def real(*, out: Path) -> None:
     events = real_events(power=panel["power"])
     rows = []
     for name, detection in detections.items():
-        grouped = by_series(intervals=[i for v in detection.intervals.values() for i in v])
+        grouped = detection.intervals
         for row in events.iter_rows(named=True):
             series = tuple(int(s) for s in row["series"].split(","))
             match = match_event(

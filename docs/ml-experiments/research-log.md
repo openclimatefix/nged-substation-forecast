@@ -81,6 +81,7 @@ the maintainer to confirm.
 | [00047 - Switching event detector, part 4](00047-sw2-4-better-residual-switching-detector/result.md) | Does adding the days to the nearest bank holiday to the demand model raise the share of simulated load transfers the 24-hour single-series detector finds, when both models raise the same number of unexplained alarms in odd months? | Inconclusive: the share found rose by +0.011 (98.75% interval -0.010 to +0.044) | Not for production | 2026-10-16 |
 | [00055 - Switching event detector, part 5](00055-sw2-8-neighbour-veto-single-series-detector/result.md) | Does vetoing the single-series detector's alarms that the neighbouring substations show as a common-mode miss let the threshold fall at the same rate of unexplained alarms and find more injected transfers? | Inconclusive: the share found rose by +0.008 (98.75% interval -0.003 to +0.022) | Not for production | 2026-10-16 |
 | [00058 - Switching event detector, part 5b](00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md) | Is the gap in recall between injected transfers with and without a metered receiver a step-size effect of the injection, and does a veto stronger than 1.5 noise units find more transfers? | Partly supported: step size explains at least half the gap; the stronger veto gained +0.013 (98.33% interval 0.000 to +0.029) | Not for production | 2026-10-16 |
+| [00059 - Switching event detector, part 6](00059-sw2-13-several-windows-in-one-detector/result.md) | Does one detector that combines the step statistic at windows of 4, 12, 24, and 48 hours find more injected transfers, by MW moved, than the best single window at the same unexplained-alarm count? | Refuted: the 24-hour window finds 0.473 of the moved MW and the maximum of four windows 0.423 (difference -0.050, 97.5% interval -0.094 to -0.022) | Not for production | 2026-10-16 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1192,6 +1193,28 @@ experiment cannot resolve a gain below about 0.04.
   [PR #1268](https://github.com/openclimatefix/nged-substation-forecast/pull/1268).
 
 ![Unexplained 24-hour alarms by days to the nearest bank holiday](00047-sw2-4-better-residual-switching-detector/figure_6_alarms_by_holiday_distance.svg)
+
+### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
+
+**Neither of two ways of combining four window lengths found more of the moved MW than the 24-hour
+window alone, and most misses of large transfers are an interval end placed outside tolerance.** On
+injected transfers that start in even months, with every detector set to the same count of
+unexplained alarms on odd months, the 24-hour window finds 0.473 of the MW moved (95% interval 0.410
+to 0.511). The maximum of the four windows' scores finds 0.423, and their sum finds 0.451. The
+maximum minus the 24-hour window is -0.050 (97.5% interval -0.094 to -0.022), so the 24-hour window
+still misses 0.527 of the moved MW.
+
+- **Finding for later experiments:** of the 541 rows of transfers with a metered receiver and a donor
+  step of 4.0 noise units or more, the 24-hour window misses 223, and 170 of those have a found start
+  and an end placed outside tolerance, against 4 with no alarm. The missed ends are off by 7.5 hours
+  at the median, against a tolerance of 6 hours for the median 32-hour transfer (the larger of 6 hours
+  and 10% of the duration). The 24-hour window is the single-window benchmark for SW2-7, SW2-14, and
+  SW2-15, and the share found by start alone is worth reporting beside the share found by start and
+  end.
+- **Write-up and pull request:** [the full result page](00059-sw2-13-several-windows-in-one-detector/result.md),
+  [PR #1289](https://github.com/openclimatefix/nged-substation-forecast/pull/1289).
+
+![Share of the moved MW found by each detector](00059-sw2-13-several-windows-in-one-detector/figure_1_share_found.svg)
 
 ### 00058: is the recall gap without a metered receiver a step-size effect, and does a stronger veto help? (SW2-8b)
 

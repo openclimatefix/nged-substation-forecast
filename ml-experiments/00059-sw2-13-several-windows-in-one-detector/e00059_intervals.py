@@ -59,6 +59,8 @@ def level_track(
     onset: int,
     window: int,
     excluded: np.ndarray | None = None,
+    step_from_block: bool = False,
+    patience: int = 1,
 ) -> tuple[float, int, int]:
     """Return the onset step `rho`, the end stamp, and the stamp from which that end is known.
 
@@ -66,7 +68,9 @@ def level_track(
     stamps. The event continues in 24-hour blocks while the block mean minus the pre-level keeps
     the sign of `rho` and at least half its size. A block with under half its stamps present is
     skipped, since it says nothing. If the first block fails, the event ends at `onset + window`.
-    `rho` is the mean over the first `window` half-hours.
+    `rho` is the mean over the first `window` half-hours. With `step_from_block`, `rho` is the mean
+    over the first 24-hour block, which averages out the daily shape of the moved load. The event
+    ends after `patience` consecutive failing blocks.
     """
     lo = max(onset - PRE_STAMPS, 0)
     before = q[lo:onset].copy()
@@ -76,8 +80,12 @@ def level_track(
     after = q[onset : onset + window]
     if not np.isfinite(after).any():
         return float("nan"), onset + window, onset + window
+    first_block = q[onset : onset + BLOCK]
+    if step_from_block and np.isfinite(first_block).any():
+        after = first_block
     rho = float(np.nanmean(after)) - pre
     last_good = onset
+    failures = 0
     failed_end = onset + BLOCK
     start = onset
     while start - onset < CAP_STAMPS and start < GRID_LENGTH:
@@ -85,10 +93,12 @@ def level_track(
         if np.isfinite(mean):
             step = mean - pre
             if np.sign(step) == np.sign(rho) and abs(step) >= 0.5 * abs(rho):
-                last_good = start + BLOCK
+                last_good, failures = start + BLOCK, 0
             else:
-                failed_end = start + BLOCK
-                break
+                failures += 1
+                if failures >= patience:
+                    failed_end = start + BLOCK
+                    break
         start += BLOCK
     if last_good == onset:
         return rho, onset + window, onset + BLOCK
@@ -98,20 +108,32 @@ def level_track(
 
 
 def build_intervals(
-    *, alarm_table: pl.DataFrame, relative: dict[int, np.ndarray]
+    *, alarm_table: pl.DataFrame, relative: dict[int, np.ndarray], fixed: bool = False
 ) -> list[Interval]:
     """Build one interval per alarm, using the window that raised each alarm.
 
     Each alarm row carries its own `window` (in half-hours), which sets how far the interval's end
     falls back if the first 24-hour block fails. Alarms are processed in time order, and stamps
     inside an earlier interval of the series are left out of its pre-level.
+
+    With `fixed` (the post hoc variant), `rho` comes from the first 24-hour block, the event ends
+    only after two consecutive failing blocks (the daily level is noisy), and an alarm that falls
+    inside an earlier interval of its series, or within one block after its end, is skipped
+    because it is the return step of that event and not a new event.
     """
     excluded = {s: np.zeros(GRID_LENGTH, dtype=bool) for s in relative}
     out: list[Interval] = []
     for row in alarm_table.sort("stamp").iter_rows(named=True):
         series, onset = row["series"], row["stamp"]
+        if fixed and any(iv.series == series and iv.onset < onset <= iv.end + BLOCK for iv in out):
+            continue
         rho, end, known = level_track(
-            q=relative[series], onset=onset, window=row["window"], excluded=excluded[series]
+            q=relative[series],
+            onset=onset,
+            window=row["window"],
+            excluded=excluded[series],
+            step_from_block=fixed,
+            patience=2 if fixed else 1,
         )
         if not np.isfinite(rho):
             continue

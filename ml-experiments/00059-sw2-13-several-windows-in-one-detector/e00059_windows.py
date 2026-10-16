@@ -126,7 +126,7 @@ def single_scores(*, inputs: dict[int, DetectorInputs], window: int) -> Arrays:
 
 
 def combined_alarms(
-    *, scores: Arrays, steps: dict[int, np.ndarray], threshold: float
+    *, scores: Arrays, steps: dict[int, np.ndarray], threshold: float, name: CombinedNameType
 ) -> pl.DataFrame:
     """Alarms at the local peaks of a combined score above `threshold`.
 
@@ -141,7 +141,9 @@ def combined_alarms(
     for series, score in scores.items():
         for stamp in local_peaks(z=score, threshold=threshold, window=SUPPRESSION_WINDOW):
             column = steps[series][:, stamp]
-            sign = np.sign(column.sum()) or 1.0
+            sign = (
+                np.sign(column[np.abs(column).argmax()] if name == "MAX" else column.sum()) or 1.0
+            )
             index = int(np.argmax(np.where(np.sign(column) == sign, np.abs(column), -1.0)))
             window = WINDOWS[index]
             if window >= REFIT_PERIOD_WINDOW and (np.abs(refits - stamp) < window).any():
@@ -167,8 +169,9 @@ def calibrate_combined(
     for name in ("MAX", "SUM"):
         scores = combined_scores(steps=steps, name=name)
         out[name] = match_threshold(
-            count=lambda t, scores=scores: odd_unexplained(
-                table=combined_alarms(scores=scores, steps=steps, threshold=t), logged=logged
+            count=lambda t, scores=scores, name=name: odd_unexplained(
+                table=combined_alarms(scores=scores, steps=steps, threshold=t, name=name),
+                logged=logged,
             ),
             scan=COMBINED_SCAN,
             target=TARGET_COUNT,
