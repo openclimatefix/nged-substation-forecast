@@ -13,8 +13,11 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from e00056_score import WORK_DIR
 
-CHART_DIR: Final[Path] = Path(
-    "docs/ml-experiments/00056-mva-only-primaries-skill-against-mw-primaries"
+CHART_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2]
+    / "docs"
+    / "ml-experiments"
+    / "00056-mva-only-primaries-skill-against-mw-primaries"
 )
 WIDTH_PX: Final[int] = 640
 GROUP_COLOURS: Final[dict[str, str]] = {"MW": ocf.DATA_BLUE, "MVA": ocf.BRAND_ORANGE}
