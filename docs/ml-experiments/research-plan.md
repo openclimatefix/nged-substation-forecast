@@ -18,7 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-0a](#sw2-0a-an-agent-labeller-gated-on-known-answers) | Does an agent labeller, built on log-timed features that use no forecasting model, pass a pre-registered gate on injected transfers and placebo windows, and does Sonnet beat a rules-only labeller on the same features? | 1 | Nothing | Proposed; the maintainer asked for it to start soon |
+| [SW2-0a](#sw2-0a-an-agent-labeller-gated-on-known-answers) | Does an agent labeller, built on log-timed features that use no forecasting model, pass a pre-registered gate on injected transfers and placebo windows, and does Sonnet beat a rules-only labeller on the same features? | 1 | Nothing | Planned as experiment [41](00041-sw2-0a-labeller-gate/result.md) |
 | [SW2-0b](#sw2-0b-the-labelled-reference-set) | Which logged closures since 2022 are visible in the telemetry, with what onset, end, receivers, and MW moved? | 1 | SW2-0a passing its gate | Proposed |
 | [SW2-1](#sw2-1-a-fixed-scoreboard-and-an-injection-harness) | What event-level F1 do experiment 00037's detectors D0 and D1 reach on the labelled set and on injected transfers, by duration and size band? | 2 | SW2-0b | Proposed |
 | [SW2-2](#sw2-2-how-much-the-visible-events-hurt-the-best-guess) | What share of the best guess's quantile score and tail score falls in labelled switching half-hours, and in half-hours whose lagged power falls inside one? | 2 | SW2-0b | Proposed |
