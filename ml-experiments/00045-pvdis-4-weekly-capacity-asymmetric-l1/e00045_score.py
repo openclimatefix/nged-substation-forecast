@@ -1077,7 +1077,7 @@ def build_report(*, run: Run, frozen: Frozen, scores: pl.DataFrame) -> Report:  
             else LIMIT_COVERAGE_NON_STEP[0] <= non_step <= LIMIT_COVERAGE_NON_STEP[1]
             and step >= LIMIT_COVERAGE_STEP
         )
-        number = f"non-step weeks {non_step}, step weeks {step}"
+        number = f"non-step weeks {non_step:.3f}, step weeks {step:.3f}"
     else:
         passed_vi, number = None, "coverage bootstrap has not run"
     conditions.append(
