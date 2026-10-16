@@ -32,7 +32,9 @@ GRID_R: Final[tuple[float, ...]] = (10.0, 30.0)
 PAIRS: Final[tuple[inject.FitSpec, ...]] = tuple(
     ("asymmetric", a, r) for a in GRID_A for r in GRID_R
 )
-VARIANTS: Final[tuple[inject.VariantType, ...]] = ("semi_synthetic", "real_plus_injection")
+VARIANTS: Final[tuple[inject.VariantType, ...]] = ("semi_synthetic",)
+"""The tuning scores use the semi-synthetic variant, whose truth is known. The paired difference of
+the real-plus-injection variant is only a secondary additivity measure, taken at scoring."""
 MAX_STEPS_MEDIAN: Final[float] = 0.5
 MAX_STEPS_WORST: Final[float] = 1.0
 MIN_FALL_RECOVERED: Final[float] = 0.5
@@ -66,8 +68,6 @@ class PairRow(TypedDict):
     a: float
     r: float
     path_error_mixture: float
-    path_error_mixture_semi_synthetic: float
-    path_error_mixture_real_plus_injection: float
     path_error_ramps: float
     path_error_steps: float
     path_error_constant: float
@@ -177,9 +177,10 @@ def unit_scores(
         increment = np.array(row["increment"], dtype=float)
         estimate = inject.estimate_path(
             with_injection=np.array(row["with_injection"], dtype=float),
-            baseline=np.array(row["baseline"], dtype=float),
+            baseline=None if row["baseline"] is None else np.array(row["baseline"], dtype=float),
             ratio=ratio,
             variant=variant,
+            base_capacity=row["base_capacity"],
         )
         truth = inject.true_path(
             increment=increment, base_capacity=row["base_capacity"], variant=variant
@@ -306,12 +307,6 @@ def tuning_table(*, scores: pl.DataFrame, placebo: pl.DataFrame) -> list[PairRow
             "a": a,
             "r": r,
             "path_error_mixture": _worse_of_variants(mine, mixture),
-            "path_error_mixture_semi_synthetic": _median(
-                _by_primary(mine.filter(pl.col("variant") == VARIANTS[0]), mixture)
-            ),
-            "path_error_mixture_real_plus_injection": _median(
-                _by_primary(mine.filter(pl.col("variant") == VARIANTS[1]), mixture)
-            ),
             "path_error_ramps": _worse_of_variants(mine, ["ramp_25", "ramp_50"]),
             "path_error_steps": _worse_of_variants(
                 mine, ["step_05", "step_10", "step_20", "step_30"]
@@ -434,6 +429,13 @@ def main() -> None:
         "tuning_farms": list(inject.TUNING_FARMS),
         "tuning_seeds": list(inject.TUNING_SEEDS),
         "placebo_seeds": [inject.TUNING_PLACEBO_SEEDS.start, inject.TUNING_PLACEBO_SEEDS.stop - 1],
+        "supersedes": (
+            "The earlier frozen config (a=2, r=10, commit 75005575) was superseded: its baseline "
+            "subtracted the full-record free weekly fit, which removed the weekly noise correlated "
+            "with the PV shape, and it scored paired differences of two fits sharing one noise "
+            "draw. This config subtracts the season-year constant fit and scores the fit of "
+            "baseline plus injection against the known path."
+        ),
         "tuning_script_commit": commit,
         "frozen_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }

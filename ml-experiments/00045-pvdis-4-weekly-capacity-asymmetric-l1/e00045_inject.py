@@ -1,11 +1,13 @@
 """The known-answer injection builder of experiment 00045.
 
 Every unit is one Primary, one solar farm, one path seed, and one of 14 cases. The unit's power is a
-semi-synthetic baseline (the Primary's real power, minus its fitted PV, plus a known constant PV
-path) plus a known change: scaled farm output for ramps, steps, falls, and the constant path, a
-share of another Primary's power for transfers, and a daytime load for the seasonal-load cases.
-The true weekly capacity path of every unit is known by construction. A variant that adds the same
-change to the real power instead of the semi-synthetic baseline is also built.
+semi-synthetic baseline (the Primary's real power, minus its smooth fitted PV, plus a known
+constant PV path) plus a known change: scaled farm output for ramps, steps, falls, and the
+constant path, a share of another Primary's power for transfers, and a daytime load for the
+seasonal-load cases. The true weekly capacity path of every unit is known by construction, and
+each fit of baseline plus injection is scored against it. A variant that adds the same change to
+the real power instead of the semi-synthetic baseline is also built; its truth is the paired
+difference of two fits.
 
 Farms A to C and path seeds 0 to 3 are the tuning units; farms D to F and seeds 1000 to 1003 are
 the scoring units. This module only builds units and runs fits on the units it is told to run; the
@@ -243,10 +245,12 @@ def unconstrained_weekly_fit(*, design: model.Design) -> np.ndarray:
 def primary_base(*, inputs: Inputs, site: str) -> PrimaryBase:
     """Build the semi-synthetic baseline of one Primary.
 
-    The baseline power is the real power minus the PV of the full-record free weekly fit
-    (`fitted * u`) plus the known baseline PV (`capacity * u`), in this model's sign convention
-    where PV lowers power. The free fit here has no non-negativity bound, so a free fit of the
-    baseline returns the baseline capacity exactly in every observed week.
+    The baseline power is the real power minus the PV of the full-record season-year constant
+    fit (`smooth * u`) plus the known baseline PV (`capacity * u`), in this model's sign
+    convention where PV lowers power. Only a smooth PV path is removed, so the week-to-week noise
+    of the real series that is correlated with `u` stays in the baseline: a free weekly fit of
+    the baseline scatters around the known capacity by the weekly standard error. The known
+    baseline path is the constant `capacity`.
 
     Args:
         inputs: The loaded tables.
@@ -256,7 +260,7 @@ def primary_base(*, inputs: Inputs, site: str) -> PrimaryBase:
         The Primary's baseline.
     """
     table = model.usable_rows_table(half_hourly=inputs.half_hourly, weeks=inputs.weeks, site=site)
-    fitted = unconstrained_weekly_fit(design=model.design_from_rows_table(table=table))
+    fitted = model.fit_season_year_constant(design=model.design_from_rows_table(table=table))
     capacity = inputs.base_capacity[site]
     weeks = table["week"].to_numpy()
     baseline = table["power"].to_numpy() + (fitted[weeks] - capacity) * table["u"].to_numpy()
@@ -558,7 +562,10 @@ class UnitFit:
         increment: True weekly increment, MW.
         observed: Mask of the weeks that hold rows in the fitted design.
         paths: Fitted path of every requested fit, MW (raw: no recovery-ratio division).
-        baseline_paths: The same fits on the baseline alone (no injection), same design.
+        baseline_paths: The same fits on the real power alone (no injection), same design; only
+            for the real-plus-injection variant, whose truth is the paired difference. Empty for
+            the semi-synthetic variant, which is scored as the fit of baseline plus injection
+            against the known path.
         fall: First week and duration of a temporary fall, or `None`.
     """
 
@@ -610,11 +617,12 @@ def fit_unit(
     column = "baseline_power" if variant == "semi_synthetic" else "power"
     power0 = rows[column].to_numpy().astype(float)
     power1 = power0 + injection.delta_for(rows)
-    baseline_paths = (
-        shared_baseline
-        if shared_baseline is not None and injection.masked_window is None
-        else _fit_all(design=_design(rows=rows, power=power0), fits=fits)
-    )
+    if variant == "semi_synthetic":
+        baseline_paths: dict[FitSpec, np.ndarray] = {}
+    elif shared_baseline is not None and injection.masked_window is None:
+        baseline_paths = shared_baseline
+    else:
+        baseline_paths = _fit_all(design=_design(rows=rows, power=power0), fits=fits)
     return UnitFit(
         increment=injection.increment,
         observed=observed_weeks(table=rows),
@@ -668,9 +676,13 @@ def run_unit_job(
     inputs = load_inputs()
     base = primary_base(inputs=inputs, site=primary)
     farm_rows = unit_rows(base=base, inputs=inputs, farm=farm)
-    column = "baseline_power" if variant == "semi_synthetic" else "power"
-    shared_baseline = _fit_all(
-        design=_design(rows=farm_rows, power=farm_rows[column].to_numpy().astype(float)), fits=fits
+    shared_baseline = (
+        _fit_all(
+            design=_design(rows=farm_rows, power=farm_rows["power"].to_numpy().astype(float)),
+            fits=fits,
+        )
+        if variant == "real_plus_injection"
+        else None
     )
     path_rows, unit_rows_out = [], []
     for seed in SEEDS_BY_SPLIT[split]:
@@ -709,7 +721,11 @@ def run_unit_job(
                     "a": spec[1],
                     "r": spec[2],
                     "with_injection": result.paths[spec].astype(np.float32),
-                    "baseline": result.baseline_paths[spec].astype(np.float32),
+                    "baseline": (
+                        result.baseline_paths[spec].astype(np.float32)
+                        if spec in result.baseline_paths
+                        else None
+                    ),
                 }
                 for spec in fits
             )
@@ -742,27 +758,37 @@ def run_unit_job(
 
 
 def estimate_path(
-    *, with_injection: np.ndarray, baseline: np.ndarray, ratio: float, variant: VariantType
+    *,
+    with_injection: np.ndarray,
+    baseline: np.ndarray | None,
+    ratio: float,
+    variant: VariantType,
+    base_capacity: float,
 ) -> np.ndarray:
     """Return the recovery-ratio-corrected estimate of a unit's capacity path.
 
-    Only the part of the path that the injection added is divided by the Primary's recovery ratio,
-    so the semi-synthetic baseline PV (which the fit recovers at a ratio near 1) is not rescaled.
-    The semi-synthetic estimate is the baseline fit plus the rescaled increment of the fit. The
-    real-plus-injection estimate is the rescaled increment alone, which is compared with the true
-    increment.
+    The semi-synthetic estimate comes from one fit, of the baseline plus the injection, and is
+    compared with the known baseline capacity plus the injected path. Only the part above the
+    known baseline capacity is divided by the Primary's recovery ratio, so the baseline PV (which
+    the fit recovers at a ratio near 1) is not rescaled. The real-plus-injection estimate is the
+    paired difference of two fits, divided by the ratio; it is compared with the true increment
+    and measures additivity, because the real series' own capacity is not known.
 
     Args:
         with_injection: Raw fitted path with the injection, MW.
-        baseline: Raw fitted path without the injection, same design, MW.
+        baseline: Raw fitted path of the real power without the injection, same design, MW
+            (real-plus-injection variant only).
         ratio: The Primary's recovery ratio.
         variant: Baseline variant.
+        base_capacity: The known baseline capacity, MW.
 
     Returns:
         The estimated path, MW (NaN where the fit has no path).
     """
-    increment = (with_injection - baseline) / ratio
-    return baseline + increment if variant == "semi_synthetic" else increment
+    if variant == "semi_synthetic":
+        return base_capacity + (with_injection - base_capacity) / ratio
+    assert baseline is not None
+    return (with_injection - baseline) / ratio
 
 
 def true_path(*, increment: np.ndarray, base_capacity: float, variant: VariantType) -> np.ndarray:
@@ -773,9 +799,10 @@ def true_path(*, increment: np.ndarray, base_capacity: float, variant: VariantTy
 def recovery_ratio(*, units: pl.DataFrame, paths: pl.DataFrame, spec: FitSpec) -> float:
     """Return a Primary's recovery ratio of one fit from its constant-path units.
 
-    The ratio of a unit is the mean over observed weeks of the fitted increment (path with
-    injection minus path without) divided by the injected constant capacity. The ratio of the
-    Primary is the median over its farms and seeds.
+    The ratio of a unit is the mean over observed weeks of the fitted increment divided by the
+    injected constant capacity. The increment is the fit minus the known baseline capacity
+    (semi-synthetic variant), or the fit minus the fit without the injection (real-plus-injection
+    variant). The ratio of the Primary is the median over its farms and seeds.
 
     Args:
         units: `units` table rows of one Primary (any cases).
@@ -799,8 +826,10 @@ def recovery_ratio(*, units: pl.DataFrame, paths: pl.DataFrame, spec: FitSpec) -
     ratios = []
     for row in joined:
         observed = np.array(row["observed"], dtype=bool)
-        fitted = np.array(row["with_injection"], dtype=float) - np.array(
-            row["baseline"], dtype=float
+        fitted = np.array(row["with_injection"], dtype=float) - (
+            row["base_capacity"]
+            if row["baseline"] is None
+            else np.array(row["baseline"], dtype=float)
         )
         ratios.append(float(np.nanmean(fitted[observed]) / row["base_capacity"]))
     return float(np.median(ratios))

@@ -65,26 +65,49 @@ def test_split_guard() -> None:
     )
 
 
-def test_baseline_recovers_capacity(*, inputs: inject.Inputs) -> None:
-    """The free weekly fit of the semi-synthetic baseline returns the baseline capacity."""
-    worst = 0.0
+def test_baseline_keeps_weekly_noise(*, inputs: inject.Inputs) -> None:
+    """The baseline's smooth PV is the known capacity and its weekly projection onto `u` is not 0.
+
+    A baseline built by subtracting a free weekly fit would pass the first half and fail the
+    second: every weekly capacity would sit exactly on the known value, and the known-answer test
+    would hold none of the weekly noise that it exists to measure.
+    """
+    smooth_worst, noise_floor = 0.0, np.inf
+    detail = []
     for site in SITES:
         base = inject.primary_base(inputs=inputs, site=site)
-        design = model.design_from_rows_table(
-            table=base.table.with_columns(power=pl.col("baseline_power"))
-        )
-        path = model.fit_path(design=design, a=0.0, r=1.0)
-        gap = np.abs(path[np.isfinite(path)] - base.capacity)
-        worst = max(worst, float(gap.max()))
+        for farm in (None, "B"):
+            rows = (
+                base.table
+                if farm is None
+                else inject.unit_rows(base=base, inputs=inputs, farm=farm)
+            )
+            design = model.design_from_rows_table(
+                table=rows.with_columns(power=pl.col("baseline_power"))
+            )
+            if farm is None:
+                smooth = model.fit_season_year_constant(design=design)
+                smooth_worst = max(smooth_worst, float(np.nanmax(np.abs(smooth - base.capacity))))
+            free = inject.unconstrained_weekly_fit(design=design)
+            spread = float(np.nanmedian(np.abs(free - base.capacity)) / base.capacity)
+            noise_floor = min(noise_floor, spread)
+            detail.append(f"{site}{'' if farm is None else farm} {spread:.3f}")
     report(
-        name="semi-synthetic baseline holds the known capacity",
-        passed=worst < 1e-6,
-        detail=f"largest |free fit - baseline capacity|, worst Primary: {worst:.1e} MW",
+        name="baseline keeps weekly noise around the known capacity",
+        passed=smooth_worst < 1e-6 and noise_floor > 0.01,
+        detail=(
+            f"season-year fit of the baseline is the known capacity (largest gap "
+            f"{smooth_worst:.1e} MW); median |free weekly fit - capacity| / capacity: "
+            f"{', '.join(detail)}"
+        ),
     )
 
 
 def _noise_free_error(*, inputs: inject.Inputs, site: str, case: inject.CaseName) -> float:
-    """Inject `case` with the PV shape `u` as the farm shape; return the largest increment error."""
+    """Inject `case` with `u` as the farm shape; return the largest increment error.
+
+    The paired difference of two unconstrained fits is exact here because the injected shape is `u`.
+    """
     base = inject.primary_base(inputs=inputs, site=site)
     rows = inject.unit_rows(base=base, inputs=inputs, farm="A").with_columns(
         farm_norm=pl.col("u") / pl.col("u").quantile(0.99)
@@ -95,16 +118,17 @@ def _noise_free_error(*, inputs: inject.Inputs, site: str, case: inject.CaseName
     with_injection = base_power + injection.delta_for(rows)
 
     def fit(power: np.ndarray) -> np.ndarray:
-        return model.fit_path(
-            design=model.design_from_rows_table(table=rows.with_columns(power=pl.Series(power))),
-            a=0.0,
-            r=1.0,
-        )
+        design = model.design_from_rows_table(table=rows.with_columns(power=pl.Series(power)))
+        return inject.unconstrained_weekly_fit(design=design)
 
     c1, c0 = fit(with_injection), fit(base_power)
     observed = inject.observed_weeks(table=rows)
     increment = inject.estimate_path(
-        with_injection=c1, baseline=c0, ratio=1.0, variant="real_plus_injection"
+        with_injection=c1,
+        baseline=c0,
+        ratio=1.0,
+        variant="real_plus_injection",
+        base_capacity=base.capacity,
     )
     return float(np.abs(increment[observed] - injection.increment[observed]).max())
 
@@ -120,24 +144,6 @@ def test_noise_free_recovery(*, inputs: inject.Inputs) -> None:
         name="noise-free known path in, recovered path out (free fit, farm shape = u)",
         passed=max(worst.values()) < 1e-6,
         detail=", ".join(f"{case} {err:.1e} MW" for case, err in worst.items()),
-    )
-
-
-def test_baseline_on_farm_rows(*, inputs: inject.Inputs) -> None:
-    """On the rows that survive a farm's gaps, the baseline path is close to the known capacity."""
-    base = inject.primary_base(inputs=inputs, site="D10")
-    rows = inject.unit_rows(base=base, inputs=inputs, farm="B")
-    design = model.design_from_rows_table(table=rows.with_columns(power=pl.col("baseline_power")))
-    path = inject.unconstrained_weekly_fit(design=design)
-    gap = np.abs(path[np.isfinite(path)] - base.capacity) / base.capacity
-    quantiles = np.quantile(gap, [0.5, 0.9, 1.0])
-    report(
-        name="baseline on a farm's surviving rows stays near the known capacity",
-        passed=quantiles[0] < 1e-3,
-        detail=(
-            "share of capacity: median {:.1e}, 90th percentile {:.1e}, largest {:.1e} "
-            "(the rows that the farm's gaps remove were part of the full-record fit)"
-        ).format(*quantiles),
     )
 
 
@@ -337,9 +343,8 @@ def main() -> None:
     inputs = inject.load_inputs()
     test_unit_counts()
     test_split_guard()
-    test_baseline_recovers_capacity(inputs=inputs)
+    test_baseline_keeps_weekly_noise(inputs=inputs)
     test_noise_free_recovery(inputs=inputs)
-    test_baseline_on_farm_rows(inputs=inputs)
     test_farm_gaps(inputs=inputs)
     test_transfers(inputs=inputs)
     test_steps_and_seeds(inputs=inputs)
