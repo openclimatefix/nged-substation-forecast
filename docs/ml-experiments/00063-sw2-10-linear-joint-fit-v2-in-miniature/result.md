@@ -166,4 +166,3 @@ only test of the transfer terms outside the injection harness is the descriptive
   labels its gain as a ceiling for that reason.
 - Experiment 00041: labelled events are scored as given, with the don't-care bands for transfers
   under 25% of the receiving load named in the write-up.
-
