@@ -251,6 +251,18 @@ exist until the release is cut. A later experiment that overturns an adopted res
 
 ## The write-up
 
+**Lead with the single most useful take-home message of the experiment, in plain language, in the
+write-up and in every report to the maintainer.** The take-home message says what the experiment
+taught us, and it matters most when the hypothesis failed. A bare verdict word such as "refuted"
+tells the reader what did not work and nothing about what to do next. State what the result rules
+out, what it narrows the search to, and what the next experiment should therefore try. For example,
+write "A second weather forecast adds almost nothing to the solar forecast, so the limit is the
+quality of the sunshine forecast itself, and a source of a different kind is the next thing to try",
+and give the verdict word after that sentence. A refuted hypothesis still shrinks the space of ideas
+worth testing, and the take-home message is where the experiment says by how much. Keep the message
+honest: do not turn an inconclusive result into a finding, and say plainly when the experiment could
+not tell.
+
 **Open `result.md` with a few plain sentences that say what question the experiment asked, how it
 went about answering the question, and what it concluded.** Write them for a reader who has not seen
 the experiment, the plan, or the research log. The opening uses no jargon: it names what was tested
@@ -288,8 +300,9 @@ with status `planned`. The overnight session:
   text, and continues with the next experiment.
 - **Stops between experiments, never mid-fit,** when the night's budget (hours or experiments) is
   spent.
-- **Ends with a morning report as its final message:** one line per experiment with its verdict and
-  link, what failed, and the hypotheses it proposes for the next plan.
+- **Ends with a morning report as its final message:** one line per experiment that opens with its
+  take-home message, then its verdict and link, what failed, and the hypotheses it proposes for the
+  next plan.
 
 ## Merging
 
