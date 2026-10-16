@@ -107,9 +107,9 @@ own errors over the last 14 days. The 0.20-point gap is wholly below zero at the
 fixed in advance, but the gap is fragile: it crosses zero with a t-interval over the 12 months or
 without one substation (see the limits). Weekly refitting also beat monthly refitting (5.57) by
 0.13 points. Neither the 7-day nor the 14-day error correction helped a weekly-refitted model,
-although neither was shown to hurt it at the strict level. At the 2 bulk supply point (BSP) and 2 grid supply point (GSP)
-substations, which sit above the Primary substations, weekly refitting scored 0.66 points below the
-stack, more than we predicted. For 6 solar farms and 3 wind farms, refitting the weather-to-power
+although neither was shown to hurt it at the strict level. At the 2 bulk supply point (BSP) and 2
+grid supply point (GSP) substations, which sit above the Primary substations, weekly refitting
+scored 0.66 points below the stack, more than we predicted. For 6 solar farms and 3 wind farms, refitting the weather-to-power
 model monthly changed the score by 0.04 points or less, so this experiment found no accuracy reason
 to refit generation models. The verdict is **supported**, and the open test is a second validation
 year, because the 292 runs share their months and weather with the 73 that experiment 34 scored.
