@@ -36,7 +36,7 @@ def main() -> None:
         lines.append(
             f"Year-to-year change in shares, arm {arm}: median total-variation distance "
             f"{boot.as_float(s['tv'].median()):.3f} over {s.height} consecutive-year pairs "
-            f"(known-answer median error of this arm is about 0.1)"
+            f"(the pooled arm holds its mix fixed across years, so this test does not apply to it)"
         )
     pooled = real.filter(pl.col("arm") == "O3_0.0")
     width = np.mean(

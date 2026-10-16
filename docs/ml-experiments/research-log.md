@@ -29,6 +29,7 @@ the maintainer to confirm.
 | [00035 - Quantile blend of stored models](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
 | [00049 - Screening reference under monthly retraining](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Serve an average of the quantiles of five XGBoost models for Primary demand (weekly refits, monthly refits, the weekly-analogue model, the pooled model, the stack) | Lowers the quantile score by 0.08 points (-0.14 to -0.02) against the weekly-retrained N1 on one validation year; needs five models; the spread factor and the fingerprints do not change the score |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction | Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again |
+| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Use a per-Primary blend of east, south, and west shapes as the solar shape of the explicit solar term, if PVDIS-5 confirms it | Lowers held-out error by 1.3% in a fit with known weather; the shares are not identified and no forecast has used the blend yet |
 
 ## The experiments so far
 
@@ -99,7 +100,7 @@ the maintainer to confirm.
 | [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as an upper limit: -0.198 (-0.316 to -0.069) points of capacity against a 0.15 target; the UKV data are a research archive, not the live feed | Not for production | 2026-10-16 |
 | [00063 - SW2-10 joint fit, v2 in miniature](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) | Does one linear fit per Primary, holding a weather baseline without radiation, embedded solar capacity times the CAMS sunshine shape, and a share term per labelled transfer, beat the frozen v1 baseline outside switching, and recover injected solar and transfers? | Inconclusive: C1 is -0.322 points of capacity (-0.437 to -0.207) at 5 Primaries, close to the 0.35-point threshold, but both injection gates failed for reasons of test design | Not for production | Pending |
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
-| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Refuted: found on known answers, not stable on the real series | Not for production | 2026-10-17 |
+| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Candidate | 2026-10-17 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1413,26 +1414,29 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
 
 ### 00073: can the mix of solar panel orientations and the DC to AC ratio be read from a Primary's power? (PVDIS-6)
 
-**The explicit solar forecast should keep one south-facing shape and a fixed DC:AC ratio of 1.15,
-because neither parameter can be read from a Primary's power well enough to carry.** We added
-made-up east-south-west output, and real solar-farm output, to the real power of 8 Primary
-substations and checked what each fit recovered. The orientation fit found the shares with a median
-error of 0.088 where guessing the usual mix gives 0.300 (C1 -0.181, 98.75% interval -0.228 to
--0.122). On the real power the fitted shares changed by a median 0.24 between consecutive
-season-years, and the fitted mix changed held-out error by +0.8% (-0.9% to +2.8%) against
-all-south panels. The DC:AC search had a median absolute error of 0.055 on a farm's own output and
-0.195 once the farm sat in a Primary's power, so it was dropped before any real-series fit. The
-verdict is `refuted`, read from the plan's purpose because its rule had no clause for this outcome.
+**A blend of east, south, and west shapes predicts held-out power 1.3% better than all-south panels
+at all 8 Primary substations, but the shares in the blend are not identified, and the DC:AC ratio
+cannot be read at all.** We added made-up east-south-west output, and real solar-farm output, to the
+real power of the 8 Primaries and checked what each fit recovered. Without noise the orientation fit
+found the shares with a median error of 0.088 where guessing the fleet mix (0.2 east, 0.6 south,
+0.2 west) gives 0.300. With the real series' noise added the error was 0.200, and the shares of the
+free fit changed by a median 0.24 between consecutive September-to-August years. On held-out
+28-day blocks the blend lowered the root mean square error of daylight power by 1.3% (98.75%
+interval -2.4% to -0.5%). The DC:AC search had a median absolute error of 0.055 on a farm's own
+output and 0.195 once the farm sat in a Primary's power, so it was dropped before any real-series
+fit. The verdict is `partly supported`, read by the pre-registered rule.
 
-- **Finding for later experiments:** a known-answer test that passes is necessary and not
-  sufficient. The share error rose from 0.09 to 0.20 when the injected panels sat at 15° tilt and
-  the fit at 25°. Five of 8 Primaries lean west (a pooled west share of 0.46 to 0.58), and the
-  next experiment could test whether that lean is evening demand by fitting rows after dark.
+- **Finding for later experiments:** use the blend as a flexible solar shape and do not publish its
+  shares as panel orientations. A known-answer test of a linear fit must add noise, because the
+  noise-free version cannot fail (median error 0.09 without noise, 0.20 with it). Five of 8
+  Primaries have a pooled west share of 0.46 to 0.58, and a fit to rows after dark would show
+  whether that lean is evening demand.
 - **Write-up and pull request:** [the full result
-  page](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md), [PR #1304 (Experiment 73:
-  orientation mix and DC:AC ratio (PVDIS-6), plan)](https://github.com/openclimatefix/nged-substation-forecast/pull/1304).
+  page](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md), [PR #1304 (Experiment 73: can
+  the mix of solar panel orientations and the DC to AC ratio be
+  recovered?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1304).
 
-![Error of the recovered shares by true mix](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/figure_03.svg)
+![Error of the recovered shares by true mix, with and without noise](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/figure_03.svg)
 
 ### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
 

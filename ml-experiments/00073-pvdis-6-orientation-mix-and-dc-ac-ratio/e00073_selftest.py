@@ -32,6 +32,10 @@ def run() -> None:
     assert np.allclose(south, [0, 2.0, 0], atol=1e-6), f"all-south {south}"
     pooled = fit.fit_pooled(designs=[design], ys=[y], shapes=[shapes], ridge=0.0)
     assert abs(pooled.sum() - truth.sum()) < 0.3, f"pooled total {pooled}"
+    east_truth = np.array([1.0, 0.0, 0.0])
+    y_east = base - shapes @ east_truth
+    pooled_east = fit.fit_pooled(designs=[design], ys=[y_east], shapes=[shapes], ridge=0.0)
+    assert pooled_east[0] > 0.8 * pooled_east.sum(), f"pooled east-only {pooled_east}"
     # A linear increment: fit(y + injection) - fit(y) returns the injection.
     inj = shapes @ np.array([0.3, 0.3, 0.3])
     inc = fit.fit_orientation(design=design, y=y - inj, shapes=shapes) - estimate

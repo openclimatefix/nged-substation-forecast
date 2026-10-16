@@ -66,9 +66,64 @@ def orientation(*, lines: list[str]) -> str:
     lines.append(f"  chosen arm {boot.as_float(mine['bound'].mean()):.3f}")
     lines.append("Robustness tilts (all farm locations), median error by arm:")
     lines.append(str(units.group_by("tilt", "arm").agg(pl.col("tv").median()).sort("tilt", "arm")))
-    identified = median_error <= 0.15 and high < -0.10
-    lines.append(f"\nO identified: {identified}  (median <= 0.15 and C1 upper < -0.10)")
+    by_primary = boot.cluster_interval(values=diff, clusters=mine["site"].to_numpy())
+    lines.append(
+        f"Sensitivity, C1 with Primaries as clusters: mean {by_primary[0]:+.3f}, "
+        f"interval {by_primary[1]:+.3f} to {by_primary[2]:+.3f}"
+    )
+    identified_increment = median_error <= 0.15 and high < -0.10
+    lines.append(
+        f"\nIncrement test passed: {identified_increment}  (median <= 0.15 and C1 upper < -0.10)"
+    )
+    noisy_identified = noisy(lines=lines, chosen=chosen)
+    lines.append(
+        f"O identified (increment test and noisy test both passed): "
+        f"{identified_increment and noisy_identified}"
+    )
     return chosen
+
+
+def noisy(*, lines: list[str], chosen: str) -> bool:
+    """Score the noisy known answer; return whether the chosen arm passes it."""
+    table = pl.read_parquet(common.WORK_DIR / "known_noisy.parquet")
+    units = table.group_by("site", "farm", "tilt", "mix_id", "arm", "seed").agg(pl.col("tv").mean())
+    main = units.filter(pl.col("tilt") == common.MAIN_TILT)
+    scoring = main.filter(pl.col("farm").is_in(common.SCORING_FARMS)).with_columns(
+        guess=pl.col("mix_id").map_elements(
+            lambda m: guess_error(mix_id=m, guess=common.FLEET_MIX), return_dtype=pl.Float64
+        )
+    )
+    lines.append("\nNoisy known answer (day-shuffled residuals), scoring units, tilt 25")
+    lines.append(str(scoring.group_by("arm").agg(pl.col("tv").median()).sort("arm")))
+    mine = scoring.filter(pl.col("arm") == chosen).sort("site", "farm", "mix_id", "seed")
+    diff = (mine["tv"] - mine["guess"]).to_numpy()
+    mean, low, high = boot.cluster_interval(
+        values=diff, clusters=(mine["site"] + mine["farm"]).to_numpy()
+    )
+    median_error = boot.as_float(mine["tv"].median())
+    lines.append(f"Chosen arm {chosen}: median error {median_error:.3f} (guess 0.300)")
+    lines.append(f"Noisy C1, mean {mean:+.3f}, interval {low:+.3f} to {high:+.3f}")
+    sens = boot.cluster_interval(values=diff, clusters=mine["site"].to_numpy())
+    lines.append(
+        f"Noisy C1 with Primaries as clusters: {sens[0]:+.3f}, {sens[1]:+.3f} to {sens[2]:+.3f}"
+    )
+    per_mix = (
+        mine.group_by("mix_id").agg(pl.col("tv").median(), pl.col("guess").first()).sort("mix_id")
+    )
+    lines.append("Noisy, by true mix:\n" + str(per_mix))
+    lines.append("Noisy, robustness tilts, median error by arm:")
+    lines.append(str(main.group_by("arm").agg(pl.col("tv").median()).sort("arm")))
+    lines.append(
+        str(
+            units.filter(pl.col("tilt") != common.MAIN_TILT)
+            .group_by("tilt", "arm")
+            .agg(pl.col("tv").median())
+            .sort("tilt", "arm")
+        )
+    )
+    passed = median_error <= 0.15 and high < -0.10
+    lines.append(f"Noisy test passed: {passed}  (median <= 0.15 and C1 upper < -0.10)")
+    return passed
 
 
 def dcac(*, lines: list[str]) -> None:
@@ -100,6 +155,11 @@ def dcac(*, lines: list[str]) -> None:
     gate = alone.group_by("farm").agg(pl.col("knee_rows").median())
     lines.append("\nKnee gate: median clear-day half-hours at or above the knee (ratio 1.15)")
     lines.append(str(gate.sort("farm")))
+    below = alone.filter(pl.col("knee_rows") < common.KNEE_GATE_HALF_HOURS)
+    lines.append(
+        f"Farm-years below the threshold: {below.height} of {alone.height} "
+        f"(minimum {alone['knee_rows'].min()})"
+    )
     median_knee = boot.as_float(gate["knee_rows"].median())
     lines.append(
         f"Gate threshold {common.KNEE_GATE_HALF_HOURS}: "

@@ -160,12 +160,17 @@ def known_orientation() -> alt.Chart:
         (pl.col("tilt") == common.MAIN_TILT) & pl.col("farm").is_in(common.SCORING_FARMS)
     )
     rows = []
-    for arm, label in (
-        ("O1", "Free fit, each season-year"),
-        ("O3_0.0", "Pooled over season-years"),
+    noisy = pl.read_parquet(common.WORK_DIR / "known_noisy.parquet").filter(
+        (pl.col("tilt") == common.MAIN_TILT)
+        & pl.col("farm").is_in(common.SCORING_FARMS)
+        & (pl.col("arm") == "O3_0.0")
+    )
+    for source, label in (
+        (scoring.filter(pl.col("arm") == "O3_0.0"), "Pooled fit, injection only"),
+        (noisy, "Pooled fit, with noise"),
     ):
-        part = scoring.filter(pl.col("arm") == arm).group_by("mix_id").agg(pl.col("tv").median())
-        rows += [(common.MIXES.index(common.MIXES[m]), label, v) for m, v in part.iter_rows()]
+        part = source.group_by("mix_id").agg(pl.col("tv").median())
+        rows += [(m, label, v) for m, v in part.iter_rows()]
     for m, mix in enumerate(common.MIXES):
         rows.append(
             (m, "Guess: the fleet mix", 0.5 * np.abs(np.array(common.FLEET_MIX) - mix).sum())
@@ -186,8 +191,8 @@ def known_orientation() -> alt.Chart:
                 "arm:N",
                 scale=alt.Scale(
                     domain=[
-                        "Free fit, each season-year",
-                        "Pooled over season-years",
+                        "Pooled fit, injection only",
+                        "Pooled fit, with noise",
                         "Guess: the fleet mix",
                         "Guess: all south",
                     ],
@@ -201,7 +206,7 @@ def known_orientation() -> alt.Chart:
             width=WIDTH,
             height=200,
             title=_title(
-                text="Injected east-south-west mixes are recovered far better than a guess",
+                text="With noise added, the pooled fit still beats a guess but misses by about 0.2",
                 lines=[
                     (
                         "Made-up output added to the real power of 8 Primary substations. Dot: "
@@ -392,7 +397,7 @@ def heldout() -> alt.Chart:
                 "change:Q",
                 title="Change in held-out error (0 = same as south-only; negative is better)",
                 axis=alt.Axis(format="%"),
-                scale=alt.Scale(domain=[-0.04, 0.06]),
+                scale=alt.Scale(domain=[-0.05, 0.01]),
             ),
         )
     )
@@ -400,7 +405,7 @@ def heldout() -> alt.Chart:
         width=WIDTH - 140,
         height=220,
         title=_title(
-            text="The fitted mix does not predict held-out weeks better than all-south panels",
+            text="The fitted mix predicts held-out weeks better than all-south panels",
             lines=[
                 (
                     "Dot: relative change in root mean square error of daylight power, pooled mix "

@@ -161,7 +161,7 @@ def tv_error(*, increment: np.ndarray, truth: np.ndarray) -> tuple[float, bool]:
     `NO_INCREMENT_ERROR`.
     """
     positive = np.clip(increment, 0.0, None)
-    bound = bool((increment < 0.0).any()) or positive.sum() < common.MIN_INCREMENT_MW
+    bound = bool((increment < -1e-6 * max(positive.sum(), 1.0)).any())
     if positive.sum() < common.MIN_INCREMENT_MW:
         return common.NO_INCREMENT_ERROR, True
     return float(0.5 * np.abs(positive / positive.sum() - truth).sum()), bound

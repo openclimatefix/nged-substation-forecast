@@ -89,7 +89,8 @@ def heldout_primary(*, windows: list[inputs.YearWindow]) -> list[dict[str, objec
             train = blocks[w.year] == fold
             test = ~train
             rmse = {}
-            for name, c in (("mix", s * m), ("south", np.array([0.0, s, 0.0]))):
+            mix_capacities = s * m / m.sum() if m.sum() > 0 else np.array([0.0, s, 0.0])
+            for name, c in (("mix", mix_capacities), ("south", np.array([0.0, s, 0.0]))):
                 pred, obs = refit_and_predict(w=w, train=train, test=test, u=u, c=c)
                 rmse[name] = float(np.sqrt(np.mean((pred - obs) ** 2)))
             out.append(
