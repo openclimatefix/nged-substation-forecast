@@ -8,11 +8,11 @@ hypothesis: >-
   clean solar-capacity estimate, when the XGBoost model is refitted every month on the latest 12
   months of data (P-roll), an explicit forecast of the unmetered solar output, given to the model as
   a starting offset (experiment 64's arm `am`), lowers the daylight April-to-September quantile
-  score by more than K same-time-of-day analogues do. An analogue is a recent day, at the same
+  score by more than same-time-of-day analogues do. An analogue is a recent day, at the same
   half-hour of the day and of the same day type (working day, weekend, or bank holiday), whose
-  satellite-based sunshine was closest to the sunshine forecast for the target, and the model
-  receives the observed power on those days as input columns. Once the explicit offset is in the
-  model, the analogue columns add less than 0.05 points of capacity.
+  satellite-based sunshine was closest to the sunshine forecast for the target. The model receives
+  the observed power on the K nearest such days (K is 1, 3, or 5) as input columns. Once the
+  explicit offset is in the model, the analogue columns add less than 0.05 points of capacity.
 prediction: >-
   Against the P-roll reference without radiation inputs (`R0`), the explicit forecast (`E`) scores
   -0.10 to -0.25 points, because experiment 64's `am` scored -0.256 against the frozen `d1l` and
@@ -32,19 +32,21 @@ decision_rule: >-
   minus `E`, which asks whether the analogues add anything once the explicit offset is in. C5 is `E`
   minus its placebo twin `E_twin`, which takes the forecast sunshine from another date (the
   construction of experiment 64). C6 is `A3` minus `A3S`, which asks whether matching on sunshine
-  and day type matters, with the recency of the candidates held equal. The verdict is `refuted`
+  and day type together matters, with the pool of candidate days held equal. C6 does not separate
+  the two kinds of matching. The verdict is `refuted`
   when C3's upper end is below zero (the analogues beat the explicit forecast) or C4's upper end is
-  below -0.05 (the analogues add a porting-worthy gain on top of it). Otherwise the verdict is
-  `supported` when C1's upper end is below zero, C3's lower end is above zero, and C4's interval
-  includes values at or above -0.05 and its upper end is not below zero. It is `small gain` when
-  the same three reads hold except that C4's upper end is below zero but at or above -0.05 (the
-  analogues help a little and the gain falls short of the threshold). The verdict is `inconclusive`
-  otherwise, including when C1 does not exclude zero. The threshold of -0.05 on C4 is set by the
+  below -0.05 (the analogues add a porting-worthy gain on top of it). Otherwise, when C1's upper
+  end is below zero and C3's lower end is above zero, the verdict is `small gain` if C4's upper end
+  is below zero (the analogues help a little on top of the offset, and the gain does not clear
+  -0.05 with certainty), and `supported` if C4's lower end is at or above -0.05 (a gain of 0.05
+  points is ruled out). The verdict is `inconclusive` in every other case, including when C1 does
+  not exclude zero and when C4's interval runs from below -0.05 to above zero. The threshold of -0.05 on C4 is set by the
   cost of porting: an analogue builder needs the last 3 to 16 days of telemetry, an irradiance
   estimate of those days, and a day-type calendar at every forecast, whereas the explicit offset
-  needs a table of capacities and weights. The paired contrast of a comparable pair of arms had a
-  half-width of 0.06 to 0.08 points at this level in experiment 64, so the threshold of -0.05 may
-  not be resolvable; the write-up then says so and does not claim a null. C5 and C6 decide no
+  needs a table of capacities and weights. In experiment 64 the paired contrasts had half-widths of
+  0.044 (`am` against `d0`) to 0.105 points (`am` against its placebo twin) at 98.75%, so the
+  threshold of -0.05 may be unresolvable for C4. When C4's half-width exceeds 0.05, the write-up
+  says that the experiment could not rule out a gain of that size and does not claim a null. C5 and C6 decide no
   verdict. Every other read is exploratory, labelled so, at 95%: `A1` and `A5` against `A3`, the
   night rows (April-to-September rows after dark) for `A3` against `A3S`, the leads under 48 hours,
   the sunniest tenth of rows, each valid month, and each series. Absolute scores are reported for
@@ -68,7 +70,7 @@ code: ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-de
 
 # Experiment 74: do same-time analogues add anything once the solar forecast is explicit? (AN1)
 
-**This page is the plan, committed before any code runs.** It is replaced by the write-up when the
+**The plan on this page was committed before any code ran.** The write-up replaces the plan when the
 experiment finishes.
 
 We ask two questions about the forecast of the power that a Primary substation draws. Substations
@@ -92,7 +94,7 @@ of power, and analogue columns follow that level.
 |---|---|
 | `R0` | Nothing (the P-roll reference). |
 | `E` | A starting offset (base margin): the weight times the capacity times the calibrated sunshine anomaly of the ENS ensemble mean. The weights and capacities are experiment 64's, fixed on data to 2025-06-30. |
-| `E_twin` | The same offset with the sunshine anomaly taken from another forecast run (a seeded cyclic shift within series, month, half-hour, and lead band). |
+| `E_twin` | The same offset with the sunshine anomaly taken from another forecast run (a seeded cyclic shift within series, month, half-hour, and lead band). Training and scoring both use the shifted anomaly, with `E`'s weights. |
 | `A1` | 3 columns built from the nearest analogue (K = 1): the power on that day, the gap in sunshine, and the number of analogues found (0 or 1). |
 | `A3` | 4 columns built from the 3 nearest analogues: the mean power, the standard deviation of power, the mean gap in sunshine, and the number found. |
 | `A5` | The same 4 columns from the 5 nearest analogues. |
@@ -104,7 +106,7 @@ the forecast sunshine at the target.** Candidates are the 14 days from 3 to 16 d
 of the forecast origin, so every candidate's telemetry is at least 57 hours old. This gap exceeds the
 48 hours that experiment 21 found sufficient for lagged power, and it is longer than CAMS's
 delivery delay, which has been assumed (under 48 hours) and not measured. A candidate must have the
-same day type as the target (working day, Saturday or Sunday, or bank holiday in England, from the
+same day type as the target (working day, weekend, or bank holiday in England, from the
 `holidays` package, applied to the Europe/London date) and an observed power. The distance is the
 absolute difference between the candidate's CAMS unit PV shape and the target's calibrated ENS unit
 PV shape (the climatology plus the calibrated anomaly of experiment 46), both on the CAMS scale.
@@ -114,7 +116,8 @@ that XGBoost handles natively. In training the target shape uses the ensemble me
 arm `a` does, and at inference each of the 51 members uses its own calibrated shape.
 
 **Leakage rules.** A candidate's power and CAMS shape are at least 57 hours old at the forecast
-origin. The target shape comes from the ENS run that issued the forecast. The refit at time `t` sees
+origin, given the 9-hour publication delay of the 00:00 UTC run, whose earliest origin on a day is
+09:00. The target shape comes from the ENS run that issued the forecast. The refit at time `t` sees
 only valid times up to `t` minus 3.5 hours and runs initialised by `t`, as in experiment 49. Climatology,
 calibration slopes, weights, and capacities are fixed on data to 2025-06-30, which lies before every
 validation row. The refit window slides, so the training rows after 2025-06-30 need the ensemble-mean
@@ -122,11 +125,26 @@ sunshine of their ENS runs: these are built from the archive with experiment 46'
 climatology and slopes stay at their 2025-06-30 values. No calendar column is added; the frozen
 column set holds hour and weekday, as every earlier experiment's `d1l` does, and each arm shares it.
 
+**Every arm starts from the same level.** Each arm's training and inference matrices carry a base
+margin. The margin of `R0` and of the analogue arms is the median of the refit's training labels.
+The margin of `E`, `E_twin`, and `A3E` is that median plus the offset. Without this, the arms with
+an offset would start from zero and the others from XGBoost's estimated base score, a confound that
+experiment 64 listed. All arms use `colsample` 1.0, so the wider matrices of the analogue arms
+gain nothing from column subsampling. `A3S` keeps the gap column, so it still carries a signal about
+how far the sunshine of its candidates differs from the target's.
+
+**Rebuilt inputs.** The P-roll window slides past 2025-06-30, so four inputs of experiment 64 are
+rebuilt for every training row of the window: the ensemble-mean sunshine, the calibrated anomaly,
+the CAMS shape of the valid time, and the placebo twin. The twin is a cyclic shift drawn over the
+whole window's rows, a different pool from experiment 64's. Experiment 64's guard against rows after
+2025-06-30 is replaced by a check that no refit sees a valid time later than its own cutoff.
+The climatology, calibration slopes, and weights stay at their 2025-06-30 values.
+
 **Costs and limits, stated now.** The capacity table is experiment 64's, which is 5% to 19% below
-experiment 45's 2025/26 values; this works against `E` and `A3E`, and the analogue arms do not use a
-capacity. The weights and the calibration are not refitted monthly. Only seed 0 decides the verdict;
-if time remains, seeds 1 and 2 are added and labelled post hoc. The ±1 half-hour tolerance and
-time-of-day-free arms of the earlier AN1 design are dropped to keep the arm count at eight.
+experiment 45's 2025/26 values. The shortfall works against `E` and `A3E`, and the analogue arms use
+no capacity. `E`'s weights were fitted for a model without analogues, so in `A3E` the offset and the
+analogues may count the same sunshine twice. The weights and the calibration are not refitted monthly. Only seed 0 decides the verdict;
+if time remains, seeds 1 and 2 are added and labelled post hoc.
 
 ## Size
 
