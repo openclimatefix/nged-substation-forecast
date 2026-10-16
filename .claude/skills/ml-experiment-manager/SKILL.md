@@ -15,7 +15,7 @@ description: >-
 queue in `docs/ml-experiments/research-plan.md`, starts one Claude Code session per experiment,
 allocates compute between the sessions, merges their PRs, archives the finished sessions, and tells
 the maintainer about new science results and blockers. Each experiment session follows the
-`ml-experiment` skill. This skill covers only what sits above one experiment.
+`ml-experiment` skill. This skill covers what a manager does when more than one experiment is running.
 
 ## The state the manager keeps
 
@@ -38,8 +38,10 @@ slot.
 
 **Split the machine into named slots, each a share of cores and GPU memory, and keep a ledger.** The
 workstation has one 48 GB GPU and 32 cores. Five slots (A to E), with 2 cores reserved for the
-system, let several sessions fit at once. A ledger row holds the slot, the holder's session id, the
-GPU share, the cores, and the start date.
+system, let several sessions fit at once. The cores of the slots and the reserve should sum to the
+machine's 32 cores. The ledger at the time of writing books 40, which works only because the slots
+rarely run flat out together, so check `uptime` before starting a large fit. A ledger row holds the
+slot, the holder's session id, the GPU share, the cores, and the start date.
 
 - **A session stays inside its slot.** It sets `n_jobs` and `nthread` to its core quota, runs one GPU
   fit at a time, and asks the manager before exceeding either.
@@ -51,7 +53,8 @@ GPU share, the cores, and the start date.
 - **Look at `nvidia-smi` and `uptime` before a large fit.** One process spinning a core oversubscribes
   an all-core XGBoost fit, so find the process before blaming the code. A GPU reading of 0% between
   two jobs is not a stall; look for the fit process.
-- **A CPU-only experiment needing 2 cores can use the reserved share** when every slot is held.
+- **A CPU-only experiment needing 2 cores can use the reserved share** when every slot is held and the
+  maintainer agrees.
 
 ## Ordering the queue
 
@@ -76,11 +79,12 @@ merge rules, and the local CI checks.
   `ml-experiment`. Record its id in the ledger and in the state log.
 - **Ask for four reports:** the plan PR is open, the fits have started, the fits have finished (the
   slot is free), and the PR has merged. The session sends each as one line.
-- **Models.** Sonnet implements, runs, and writes up. Opus is for the steps where a mistake is
-  expensive: the design of an exploratory step, the review of a plan or of risky code, the synthesis
-  of many results, and the review of a result that decides what happens next. An Opus code
-  review found a real bug in the oracle of a switching detector, so do not drop the reviews for the
-  steps that decide what to build. The maintainer may lift the limit for a named task.
+- **Use Sonnet for the work and Opus where a mistake is expensive.** Sonnet implements, runs, and
+  writes up. Opus is for the steps where a mistake is expensive: the design of an exploratory step,
+  the review of a plan or of risky code, the synthesis of many results, and the review of a result
+  that decides what happens next. An Opus code review of experiment 00037 found a real bug in the
+  oracle of a switching detector, so do not drop the reviews for the steps that decide what to
+  build. The maintainer may lift the limit for a named task.
 - **Let a session finish.** Ask the session to keep working until its PR is merged. A session that
   opens a plan PR and goes idle holds its slot and delays the series.
 
@@ -104,12 +108,13 @@ state with `gh pr view`, and the log files in the experiment's data folder.
 **A session merges its own PR under the `ml-experiment` skill's "Merging" rules, and the manager
 merges it when the session cannot.** The conditions are: the diff touches only `ml-experiments/`,
 `docs/ml-experiments/`, and the experiment's line in `mkdocs.yml`; the reviews are done and triaged;
-`ci` is green; no closing keyword appears in the PR body or the commit messages; the branch contains
-`main`; and the merge is a merge commit and never a squash (`gh pr merge --merge`, without
-`--delete-branch`). Read the PR body and the commit messages for a closing keyword before merging,
+`ci` is green; the research log is updated; no `data/` or `.env` file is in the diff; no closing
+keyword appears in the PR body or the commit messages; the branch contains `main`; and the merge is
+a merge commit and never a squash (`gh pr merge --merge`, without `--delete-branch`). Read the PR body and the commit messages for a closing keyword before merging,
 because `closingIssuesReferences` is empty until the merge lands.
 
-- **A change under `src/` or `packages/` stops at a reviewed PR for the maintainer.** Tell a session
+- **A diff outside those paths, such as a change under `src/` or `packages/`, stops at a reviewed PR
+  for the maintainer.** Tell a session
   that wants shared code in `packages/studies` to keep the code inside its own experiment folder
   and to say in `result.md` that moving it needs the maintainer's review.
 - **A permission denial is not a puzzle to solve.** Report it to the maintainer and wait. The
@@ -142,8 +147,9 @@ identifier.
 
 **Give an Opus agent a brief file and ask it to write its answer to a file.** The brief says which
 files to read, what it may run (a few small analyses on two cores and no GPU, because the machine is
-busy), that it edits nothing under git, and what the output file holds. It ends its run with a short
-summary. Use these reviews for three jobs:
+busy), that it edits nothing under git, and what the output file holds. The agent ends its run with a
+short summary. Use these reviews for three jobs, and only while the maintainer's current instruction
+allows Opus:
 
 - **A synthesis of the evidence so far** into a best-guess recipe, including the comparison arms
   for a single large experiment against production.
@@ -159,7 +165,7 @@ summary. Use these reviews for three jobs:
   overwrite its evidence.
 - **Keep the plan and the log current.** Each experiment's PRs update `research-plan.md` and
   `research-log.md`; a stale "Not yet merged" cell misleads the next reader.
-- **Run the local CI checks before every push.** Lint failures cost a rerun of about 6 minutes each,
+- **Run the local CI checks before every push.** Each lint failure adds a rerun of about 6 minutes,
   and a quarter of the CI runs on experiment branches failed before the sessions did this.
 - **Anonymise NGED's metered generators** in every message, chart, and PR body. Substations may be
   named.
