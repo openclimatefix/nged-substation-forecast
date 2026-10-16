@@ -9,7 +9,7 @@ Stages, in order. Each writes files to the private output folder.
 - `score`: the outcome of every injected transfer for both detectors and every shape.
 - `real`: the labelled real transfers' outcomes and the real alarm counts.
 
-    uv run python ml-experiments/00060-*/e00062_run.py tune harness-check score real
+    uv run python ml-experiments/00062-*/e00062_run.py tune harness-check score real
 """
 
 from __future__ import annotations

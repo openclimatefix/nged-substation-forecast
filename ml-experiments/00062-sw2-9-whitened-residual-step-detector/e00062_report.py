@@ -238,21 +238,22 @@ def print_filter_effect() -> None:
 
 
 def print_big_steps(*, data: pl.DataFrame) -> None:
-    """Whether D0M's misses at donor steps of 6 noise units or more lack an alarm or an end."""
-    print("\nD0M on transfers whose donor step is 6 noise units or more")
-    for shape in SHAPES:
-        part = data.filter(
-            pl.col("shape") == shape,
-            pl.col("setting") == "D0M_48",
-            pl.col("donor_step_z").abs() >= 6,
-        )
-        n = part.height
-        found = part["found"].sum()
-        wrong_end = part.filter(pl.col("onset_found") & ~pl.col("found")).height
-        print(
-            f"{shape}: {n} transfers, found {found}, onset found but end wrong {wrong_end}, "
-            f"no alarm at the onset {n - found - wrong_end}"
-        )
+    """Whether misses at donor steps of 6 noise units or more lack an alarm or an end."""
+    print("\nTransfers whose donor step is 6 noise units or more (24-hour D0M noise units)")
+    for setting in ("D0M_48", "W0_48"):
+        for shape in SHAPES:
+            part = data.filter(
+                pl.col("shape") == shape,
+                pl.col("setting") == setting,
+                pl.col("donor_step_z").abs() >= 6,
+            )
+            n = part.height
+            found = part["found"].sum()
+            wrong_end = part.filter(pl.col("onset_found") & ~pl.col("found")).height
+            print(
+                f"{setting} {shape}: {n} transfers, found {found}, onset found but end wrong "
+                f"{wrong_end}, no alarm at the onset {n - found - wrong_end}"
+            )
 
 
 def print_real(*, out: Path, window: int = HEADLINE_WINDOW) -> None:
@@ -327,6 +328,8 @@ def main() -> None:
     out = parser.parse_args().out
     data = population(out=out)
     one = data.filter(pl.col("shape") == "S1", pl.col("setting") == "D0M_48")
+    if one.height != 620:
+        raise SystemExit(f"STOP: {one.height} transfers, the plan has 620")
     print(f"{one.height} transfers; {one.filter(pl.col('weight') <= 0).height} move no MW")
     pooled_by_window = {}
     shapes_by_window = {}
