@@ -85,11 +85,13 @@ code: ml-experiments/00039-pv-disaggregation-cams-injection/
 We asked whether the output of solar farms embedded in the distribution network can be separated
 from the demand at a Primary substation (a substation that steps power down to the local
 distribution network) by fitting a model to the demand and a satellite estimate of sunlight. We
-added the recorded output of real solar farms to the demand of 8 Primary substations and checked how
-much of the added capacity the fit found again, then ran the same fit on the real series with four
-further checks. The fit found a median of 77% of the added capacity, and its daily version found
-85%. The real series passed the four checks at only 6 of the 8 substations, and our rule needed all
-8.
+added the recorded output of real solar farms to the demand of the 8 Primary substations that meter
+power in one direction, and checked how much of the added capacity the fit found again. The fit
+found a median of 77% of the added capacity, and its daily version found 85%, over 218 units (every
+Primary, solar farm, and season-year). We then ran the same fit on the real series with four further
+checks. Our rule needed 6 of the 8 substations to pass all four checks and the first check, which
+fits a placebo sky, to pass at all 8. Six of the 8 passed all four, but the placebo-sky check failed
+at one substation (Wrangle T1).
 
 **Verdict `recovers-but-confounded`: injected solar-farm output is recovered to within 25%, but the
 real series pass the four checks at 6 of 8 Primaries, and the pre-registered rule needs K1 to pass

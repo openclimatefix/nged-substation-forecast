@@ -86,22 +86,24 @@ advice:
 
 We asked how far the solar capacity fitted to the demand at a Primary substation (a substation that
 steps power down to the local distribution network) can be trusted. We built a test that compares
-the capacity found by six different fits of the same series, and checked it on solar-farm output
-added to demand and on loads that mimic cloud. The test raised a false alarm in 0.055 of cases and
-detected four of five cloud-like loads at 25% of the true capacity, but it detected a day-long
-cloud-like load in only 0.35 of draws, so it failed the power rule we set.
+the capacity found by six fits of the same series. The six fits differ in how much cloud-driven
+demand each allows. We checked the test on solar-farm output added to demand and on extra demand
+shaped like a response to cloud. The test raised a false alarm in 5.5% of the simulated trials in
+which the added load was pure solar-farm output. It detected four of five cloud-shaped loads at 25%
+of the true capacity. It detected a day-long cloud-shaped load in only 35% of simulated trials, so
+it failed our rule that the test must detect such loads in at least 80% of trials.
 
 **Verdict `underpowered`: the misfit test is calibrated and detects four of five cloud-driven loads
-at 25% of the true capacity, but it detects a day-long cloud load in only 0.35 of draws, so the
-pre-registered power rule fails.** The test compares the capacity that six least-squares fits assign
-to the same series. Pure injected solar-farm output gives a median capacity over truth of 0.992 (95%
-interval 0.951 to 1.032) with a false-positive rate of 0.055. Kirton is the one directional Primary
-substation flagged in 2025/26, and the other seven are unflagged. The capacity at those seven
-carries a bound B of 0.18 to 0.71, and the test has almost no power at Wrangle T1, so the bound is
-wider than the 0.10 predicted. The aim is explanation and capacity estimation, not forecast skill.
-CAMS irradiance is the only weather input at the lag times and it arrives too late to drive a live
-forecast, so the fits describe past data. CAMS is the Copernicus Atmosphere Monitoring Service's
-satellite estimate of sunlight.
+at 25% of the true capacity, but it detects a day-long cloud load in only 0.35 of simulated trials,
+so the pre-registered rule that the test must detect such loads in at least 80% of trials fails.**
+The test compares the capacity that six least-squares fits assign to the same series. Pure injected
+solar-farm output gives a median capacity over truth of 0.992 (95% interval 0.951 to 1.032) with a
+false-positive rate of 0.055. Kirton is the one directional Primary substation flagged in 2025/26,
+and the other seven are unflagged. The capacity at those seven carries a bound B of 0.18 to 0.71,
+and the test has almost no power at Wrangle T1, so the bound is wider than the 0.10 predicted. The
+aim is explanation and capacity estimation, not forecast skill. CAMS irradiance is the only weather
+input at the lag times and it arrives too late to drive a live forecast, so the fits describe past
+data. CAMS is the Copernicus Atmosphere Monitoring Service's satellite estimate of sunlight.
 
 ![Figure 1: capacity per Primary in 2025/26 with its interval and bound](figure_01.svg)
 

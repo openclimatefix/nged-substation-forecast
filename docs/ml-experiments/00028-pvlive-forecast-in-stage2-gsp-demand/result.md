@@ -73,10 +73,10 @@ code: ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/
 
 We asked whether a forecast of the solar generation feeding a grid supply point helps the demand
 forecast for that point. We gave the second step of the demand forecast a forecast of Sheffield
-Solar's PV_Live solar generation and, as an upper limit, the true PV_Live value, and compared the
-errors at two grid supply points over 73 forecast runs. The solar forecast lowered the error by 0.14
-points of capacity, short of the 0.30 points we required, and the interval included zero. The true
-value would have lowered it by 0.50.
+Solar's PV_Live solar generation and, as an upper limit, the true PV_Live value (an oracle, which a
+live forecast would not have), and compared the errors at two grid supply points over 73 forecast
+runs. The solar forecast lowered the error by 0.14 points of capacity, short of the 0.30 points we
+required, and the interval included zero. The true value would have lowered it by 0.50.
 
 **Verdict: inconclusive.** Giving the stage 2 calibrator a forecast of the grid supply point's
 (GSP's) solar generation lowered the quantile score by 0.14 points of capacity, short of the
@@ -87,8 +87,8 @@ and most of the gain is at leads of 7 to 15 days (-0.71), with 3 to 6 days at -0
 +0.07). Scores are in points of capacity (1% of the series' effective capacity) on 73 forecast runs,
 one every 5 days, July 2025 to June 2026, with ENS weather, for Walpole and Bicker Fen. Attribution:
 Sheffield Solar PV_Live, CC BY 4.0. The stage 2 calibrator is a second model that corrects the
-forecast quantiles that stage 1a produces. The quantile score measures how well the forecast range
-fits what happened, and smaller is better.
+forecast quantiles that stage 1a produces. The quantile score measures how well the forecast
+quantiles fit what happened, and smaller is better.
 
 ![Stage 2 arms with a solar forecast and with the true value, against none](figure_1.svg)
 

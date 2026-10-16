@@ -81,21 +81,21 @@ the correction helps at bulk supply points and grid supply points. We compared s
 such series and on 16 Primary substations (substations that step power down to the local
 distribution network), over 73 forecast runs from July 2025 to June 2026. The 14-day additive
 correction stayed the best variant. It did not lower the error at the 4 bulk and grid supply points,
-but it lowered the Primary error by the same amount as in experiment 19.
+but it lowered the Primary error by the same amount as in experiment 00019.
 
 **Verdict: inconclusive for bulk supply points (BSP) and grid supply points (GSP), and the 14-day
 additive correction stays the best variant.** N1 is the single-stage quantile model trained on the
 control member of the ensemble weather forecast (ENS) of the European Centre for Medium-Range
 Weather Forecasts. The correction does not lower the BSP and GSP quantile score: C1 is +0.36 points
 of capacity (99.375% interval -0.19 to +0.98) on 4 series. It does lower the Primary score with
-power 2 days old: C3 is -0.99 (-1.82 to -0.18), the same size as the -0.99 that experiment 19 found
-with power 3.5 hours old. Against `manual_heuristic` the corrected forecast scores -0.68 on BSP and
-GSP (C2, -1.57 to +0.26; mean absolute error of the median -1.47, -2.36 to -0.63). No variant beat
-the 14-day additive correction. A point is 1% of the series' effective capacity. Scores are on 73
-forecast runs, one every 5 days, from July 2025 to June 2026, with ENS weather. The generators are
-not named. The quantile score measures how well the forecast range fits what happened, and smaller
-is better. `manual_heuristic` is a stored baseline that forecasts from the power at the same time of
-day in earlier weeks and years.
+power 2 days old: C3 is -0.99 (-1.82 to -0.18), the same size as the -0.99 that experiment 00019
+found with power 3.5 hours old. Against `manual_heuristic` the corrected forecast scores -0.68 on
+BSP and GSP (C2, -1.57 to +0.26; mean absolute error of the median -1.47, -2.36 to -0.63). No
+variant beat the 14-day additive correction. A point is 1% of the series' effective capacity. Scores
+are on 73 forecast runs, one every 5 days, from July 2025 to June 2026, with ENS weather. The
+generators are not named. The quantile score measures how well the forecast quantiles fit
+what happened, and smaller is better. `manual_heuristic` is a stored baseline that forecasts from the
+power at the same time of day in earlier weeks and years.
 
 ![The eight planned contrasts](figure_1.svg)
 

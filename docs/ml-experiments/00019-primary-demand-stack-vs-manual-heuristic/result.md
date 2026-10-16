@@ -90,9 +90,9 @@ interval -0.93 to -0.26), and the mean absolute error of the median agrees (-0.8
 C2, the stack minus N1, is -1.00 (-1.88 to -0.14), which meets the -0.3 threshold. The stack's
 quantile score is 5.32, N1's is 6.33, and `manual_heuristic`'s is 5.89. Up to 48 hours the stack
 scores 4.61 against 5.68 (C1, 95% interval -1.38 to -0.79), and from 3 days on 5.49 against 5.94.
-The quantile score measures how well the forecast range fits what happened, and smaller is better.
-`manual_heuristic` is a stored baseline that forecasts from the power at the same time of day in
-earlier weeks and years.
+The quantile score measures how well the forecast quantiles fit what happened, and smaller is
+better. `manual_heuristic` is a stored baseline that forecasts from the power at the same time of
+day in earlier weeks and years.
 
 ![Quantile score by arm](figure_1.svg)
 

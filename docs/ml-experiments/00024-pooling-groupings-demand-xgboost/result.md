@@ -90,22 +90,22 @@ We asked how many separate XGBoost models are needed to forecast demand: one per
 group of similar substations, or a single model for all. We compared groupings by substation type
 and by size, with one model per series as the reference, on 16 Primary substations (substations that
 step power down to the local distribution network) and 4 bulk and grid supply points over 73
-forecast runs. Sharing one model across a group cost 0.15 points of capacity, and one model for all
-series cost 0.29.
+forecast runs. Sharing one model across a group raised the error by 0.15 points of capacity, and one
+model for all series raised it by 0.29.
 
-**Supported: pooling the series into 3 or 4 models costs 0.15 points of capacity against one model
-per series, and one model across all series costs 0.29.** Scores are the quantile score over all
-leads, in points of capacity (1 point is 1% of a series' effective capacity), after the 14-day error
-correction and the spread factor of 1.15 (the stack of experiment 19), with ENS weather, on 73
-forecast runs from July 2025 to June 2026. On the 16 Primary substations, one model per substation
-type with the series identifier (4 models) scores 5.47 against 5.32 for 20 per-series models, and C1
-is +0.15 (99.44% interval +0.03 to +0.26), inside the 0.30 margin. One model per size band (3
-models) scores the same (C3, +0.15, +0.05 to +0.26). One model across all series (1 model) does not
-meet the margin (C2, +0.29, +0.19 to +0.42). By the pre-registered rule the winner is the size
-bands, because it has the fewest models among the arms inside the margin, but the size-band and
-by-type pools score the same to two decimal places. ENS is the European Centre for Medium-Range
-Weather Forecasts' ensemble forecast, which has 51 members. The quantile score measures how well the
-forecast range fits what happened, and smaller is better.
+**Supported: pooling the series into 3 or 4 models raised the error by 0.15 points of capacity
+against one model per series, and one model across all series raised it by 0.29.** Scores are the
+quantile score over all leads, in points of capacity (1 point is 1% of a series' effective
+capacity), after the 14-day error correction and the spread factor of 1.15 (the stack of experiment
+00019), with ENS weather, on 73 forecast runs from July 2025 to June 2026. On the 16 Primary
+substations, one model per substation type with the series identifier (4 models) scores 5.47 against
+5.32 for 20 per-series models, and C1 is +0.15 (99.44% interval +0.03 to +0.26), inside the 0.30
+margin. One model per size band (3 models) scores the same (C3, +0.15, +0.05 to +0.26). One model
+across all series (1 model) does not meet the margin (C2, +0.29, +0.19 to +0.42). By the
+pre-registered rule the winner is the size bands, because it has the fewest models among the arms
+inside the margin, but the size-band and by-type pools score the same to two decimal places. ENS is
+the European Centre for Medium-Range Weather Forecasts' ensemble forecast, which has 51 members. The
+quantile score measures how well the forecast quantiles fit what happened, and smaller is better.
 
 ![The nine planned contrasts](figure_1.svg)
 

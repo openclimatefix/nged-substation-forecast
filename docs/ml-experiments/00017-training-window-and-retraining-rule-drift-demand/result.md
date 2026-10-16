@@ -66,7 +66,8 @@ often, or corrected using its recent errors. We tested these rules on 16 Primary
 (substations that step power down to the local distribution network), with monthly forecasts from
 January 2022 to June 2026. Every rule that follows recent data beat training on all history, and a
 correction using the previous 14 days of errors beat all of them. The tests used estimates of past
-weather in place of weather forecasts, so the scores are the best that these rules could reach.
+weather in place of weather forecasts, so the scores are a ceiling on what these rules would
+reach with weather available at forecast time.
 
 **Supported: every rule that follows recent data beat all history, and the 14-day correction beat
 all of them.** Scores are the mean absolute error of the median in points of capacity (1 point is 1%

@@ -63,19 +63,23 @@ adopted_in: none
 # Experiment 7: does a static CAMS correction remove the stage 1a daytime residual?
 
 We asked whether the daytime error of a demand forecast comes from a fixed error in its estimate of
-sunlight, or from changes in how much rooftop solar is installed. We fitted a fixed correction,
-using a second estimate of sunlight, to one year of the forecast's errors, and checked how much of
-the next year's daytime error it removed. The correction removed 46.6% of the squared daytime error,
-but a fixed bias alone removed 39.1% and one substation set the pooled figure, so the test could not
+sunlight, or from changes in how much embedded solar generation (solar panels connected to the
+distribution network, such as rooftop panels) is installed. We fitted a fixed correction, using the
+Copernicus Atmosphere Monitoring Service (CAMS) satellite-based estimate of sunlight as a second
+estimate, to one year of the forecast's errors. We then checked how much of the next year's daytime
+error the correction removed. The correction removed 46.6% of the squared daytime error, but a
+fixed bias alone removed 39.1% and one substation set the pooled figure, so the test could not
 separate the two explanations.
 
-**This is the cheap first test that gates the second stage of P2 and the rest of P2 in the [research
+**This is the cheap first test that decides whether to carry out the later steps of proposal P2 (the
+embedded-solar-capacity proposal) in the [research
 plan](../research-plan.md#p2-embedded-solar-capacity-from-lagged-residuals).** The result says
 whether the daytime residual of the stage 1a demand model tracks a fixed error in the ERA5
-irradiance input, or a change in embedded solar capacity that a correction with fixed coefficients
-cannot follow. The plan was committed before the code ran; the Results section reports the run. ERA5
-is a reanalysis, an estimate of past weather. Stage 1a is an XGBoost model per series that turns
-weather into power.
+irradiance input (the sunlight estimate that stage 1a was trained on), or a change in embedded solar
+capacity that a correction with fixed coefficients cannot follow. The plan was committed before the
+code ran; the Results section reports the run. ERA5 is a reanalysis, an estimate of past weather.
+Stage 1a is an XGBoost model per series that turns weather into power. In the body below, "P2" also
+names one of the 13 substations.
 
 ## Size
 

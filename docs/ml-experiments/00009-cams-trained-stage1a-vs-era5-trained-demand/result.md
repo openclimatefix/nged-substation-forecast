@@ -82,7 +82,8 @@ better forecasts than training it on a reanalysis estimate of sunlight. We train
 each, applied both to the same 51 weather forecasts, and compared their errors for the Primary
 substations (substations that step power down to the local distribution network). The model trained
 on the satellite estimate was better by only 0.035 points of capacity, far short of the 0.2 points
-we had predicted.
+we had predicted. A point of capacity is 1% of a series' effective capacity, roughly its usual
+maximum output.
 
 **This experiment is the second stage of P2 in the [research plan](../research-plan.md).**
 Experiment 00007 found that a fixed correction on CAMS irradiance removes 46.6% of the next year's

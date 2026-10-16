@@ -80,11 +80,12 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 # Does a correction bring the pooled mixture's 5% to 95% band to 90% coverage for solar and wind?
 
 We asked whether a small correction can make the 5% to 95% band of a solar or wind forecast contain
-the measured output 90% of the time. We widened or narrowed the band by a factor, in several
-variants, and measured how often it contained the output in five groups of lead times. For solar,
-one factor brought the share from 94% to 95% down to about 90% in every group with no change in
-accuracy. For wind, no planned variant worked in the first two groups, and only a variant added
-after seeing the data did.
+the measured output 90% of the time. That share is the band's coverage. We widened or narrowed the
+band by a factor, in several variants, and measured the coverage in five groups of lead times (0 to
+24 hours, 1 to 2 days, and so on). For solar, one factor brought the share of outputs inside the
+band, which was 94% or 95%, down to about 90% in every group with no change in accuracy. For wind,
+no planned variant worked in the first two groups, and only a variant added after seeing the data
+did.
 
 **Verdict: partly supported.** For solar, the planned spread factor brings the 5% to 95% band of the
 pooled mixture from 94% to 95% coverage to about 90% in every lead band, at no change in the CRPS.

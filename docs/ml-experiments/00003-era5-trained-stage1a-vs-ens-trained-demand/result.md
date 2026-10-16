@@ -49,10 +49,11 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/11
 
 We asked whether a model that turns weather into electricity demand is more accurate when it is
 trained on estimates of past weather than when it is trained on archived weather forecasts. This
-repeats for demand the test that experiment 1 ran for solar and wind farms. We trained the model
-both ways on 22 series that are not wind or solar farms, scored both on the same 51 weather
-forecasts, and repeated the comparison after adding the calendar and recent power to both. Training
-on estimates of past weather gave the larger error.
+repeats for demand the test that experiment 00001 ran for solar and wind farms. We trained the model
+both ways on 22 series that are not wind or solar farms (16 Primary substation demand series, 4
+flows at bulk supply points and grid supply points, a battery, and a biofuel generator), scored both
+on the same 51 weather forecasts, and repeated the comparison after adding the calendar and recent
+power to both. Training on estimates of past weather gave the larger error.
 
 **Verdict: not supported.** The ERA5-trained model has a larger error than the ENS-trained model for
 these 22 series, both with weather only and with the calendar added. The plan below was written

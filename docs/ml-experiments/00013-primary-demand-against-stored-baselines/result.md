@@ -79,7 +79,9 @@ code: ml-experiments/00013-primary-demand-against-stored-baselines/
 We asked how well our best demand model forecasts Primary substations (substations that step power
 down to the local distribution network) compared with a stored baseline that uses the power at the
 same time in earlier weeks, and why the model now in production loses to that baseline. We scored an
-upgraded model, the production recipe, and the baseline on 16 Primary substations. The upgraded
+upgraded model (N1, an XGBoost quantile model trained on ensemble weather forecasts, with recent
+power as inputs), the production recipe (the stored `xgboost_baseline`), and the baseline on 16
+Primary substations. The upgraded
 model was level with the baseline, with an interval that includes zero, and the production recipe
 lost to the baseline by 1.69 points of capacity.
 

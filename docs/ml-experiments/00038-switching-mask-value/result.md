@@ -89,13 +89,16 @@ interval +0.4% to +133.5%), where we had asked for a reduction of 5%, so the ide
 
 **Refuted: leaving the half-hours that the neighbour-balance detector D1 flags out of the stack's
 error correction made the forecast worse, not better, on half-hours outside logged switching.** The
-pre-registered primary contrast, `d1_mask7` against `plain7` (threshold-weighted absolute error at
-each series' P99, proxy stack, lead 4 to 48 hours, half-hours outside logged closures), is +57.1%
-(95% interval +0.4% to +133.5%, from resampling whole calendar months), against the bar of -5% or
-better. The oracle mask built from the logs lowers the same error by 8.9% for the 14-day window
-(-21.8% to +0.0%), so the ceiling is small, and 95% of it is one month. A random mask of equal
-volume changes the error by +0.1% (-0.7% to +0.5%). P99 is the power that a series exceeds 1% of the
-time. All numbers are from `e00038_report.py` and are in points of capacity unless stated.
+pre-registered primary contrast, `d1_mask7` against `plain7` (the threshold-weighted absolute error,
+which counts errors only where the load exceeds each series' P99, on the proxy stack of experiment
+00017 plus a correction, at leads of 4 to 48 hours, on half-hours outside logged closures), is
++57.1% (95% interval +0.4% to +133.5%, from resampling whole calendar months), against the bar of
+-5% or better. The oracle mask built from the logs lowers the same error by 8.9% for the 14-day
+window (-21.8% to +0.0%), so the ceiling is small, and 95% of it is one month. A random mask of
+equal volume changes the error by +0.1% (-0.7% to +0.5%). P99 is the power that a series exceeds 1%
+of the time. The `d1_mask7` arm leaves D1's flagged half-hours out of the 7-day correction, and
+`plain7` is the same correction with nothing left out. All numbers are from `e00038_report.py` and
+are in points of capacity unless stated.
 
 ![Per-event and aggregate change in the threshold-weighted error](figure_1_headline.svg)
 

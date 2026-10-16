@@ -79,8 +79,9 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 We asked whether telling a solar or wind forecast each farm's recent effective capacity lowers its
 error. We added a feature stating that capacity to the forecast and compared the error with and
 without it, for 6 solar farms and 3 wind farms. The feature moved the error by -0.018 points of
-capacity for solar and +0.013 for wind. The data could not tell either change from no effect, and
-could not rule out the 0.03-point gain that would justify using the feature.
+capacity (1% of a farm's effective capacity, roughly its usual maximum output) for solar and +0.013
+for wind. The data could not tell either change from no effect, and could not rule out the
+0.03-point gain that would justify using the feature.
 
 **Verdict: inconclusive.** A feature stating each farm's recent effective capacity moved the
 continuous ranked probability score (CRPS) by -0.018 points of capacity for solar and +0.013 for

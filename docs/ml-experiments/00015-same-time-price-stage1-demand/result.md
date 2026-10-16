@@ -66,16 +66,16 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 We asked whether the electricity price at the same time as each demand reading helps a
 weather-to-power model explain demand. We added that price to the model and compared its error with
-the same model without it and with a control that used a price from another week, on 17 series in a
-selection year and 18 in a confirmation year. The price lowered the error in the selection year, but
-a price from another week gave most of the same gain, and the gain did not repeat in the
-confirmation year.
+the same model without it and with a control that used the price from a different week, on 17 series
+in a selection year and 18 in a confirmation year. The price lowered the error in the selection
+year, but the control gave most of the same gain, and the gain did not repeat in the confirmation
+year.
 
 **Verdict: inconclusive.** The same-time price lowered the pooled error (the error averaged over all
 fitted series) in the selection year, but a price from another week reproduced most of that gain,
 and the gain did not repeat in the confirmation year. Follows [experiment
-10](../00010-elexon-price-lags-stage1a-demand/result.md), which tested the price from 7 days earlier
-at two battery sites and was inconclusive.
+00010](../00010-elexon-price-lags-stage1a-demand/result.md), which tested the price from 7 days
+earlier at two battery sites and was inconclusive.
 
 **Absolute scores** (mean absolute error of the median, points of capacity, 3 seeds, pooled over
 17 fitted series in the selection year and 18 in the confirmation year):

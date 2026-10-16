@@ -94,10 +94,10 @@ code: ml-experiments/00032-substation-fingerprints-pooled-demand/
 
 We asked whether giving one shared demand model a short numerical description of each substation,
 such as its location or its recent power statistics, improves forecasts for substations of the same
-type. We added each description to the shared model of experiment 24, scored 16 Primary substations
-(substations that step power down to the local distribution network) over 73 forecast runs, and also
-scored a substation held out of training. No description helped by more than 0.02 points of
-capacity, and the descriptions made the forecast worse for the held-out substation.
+type. We added each description to the shared model of experiment 00024, scored 16 Primary
+substations (substations that step power down to the local distribution network) over 73 forecast
+runs, and also scored a substation held out of training. No description helped by more than 0.02
+points of capacity, and the descriptions made the forecast worse for the held-out substation.
 
 **Inconclusive by the pre-registered rule, and no fingerprint helped: adding location,
 training-window statistics, or recent-window statistics to the by-type pooled model changed the

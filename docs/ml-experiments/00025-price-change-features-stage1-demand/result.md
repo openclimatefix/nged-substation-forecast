@@ -82,7 +82,7 @@ the 0.1 points we had set as worth using.
 level alone and beat other-week changes in both years, with intervals wholly below zero, but by 0.04
 to 0.05 points of capacity against the pre-registered 0.1. The system price gained 0.05 to 0.08 over
 the level. National demand and wind, with no price, scored 0.22 and 0.40 points below the price
-change arm. Follows [experiment 15](../00015-same-time-price-stage1-demand/result.md).
+change arm. Follows [experiment 00015](../00015-same-time-price-stage1-demand/result.md).
 
 **Absolute scores, Primary substations** (mean absolute error of the median, points of capacity, 3
 seeds, 13 series in the selection year and 14 in the confirmation year):

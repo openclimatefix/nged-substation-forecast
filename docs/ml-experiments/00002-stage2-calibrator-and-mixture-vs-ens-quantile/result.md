@@ -42,12 +42,13 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/11
 
 # Does a stage 2 calibrator beat the pooled stage 1a mixture?
 
-We asked whether a second model, which corrects the forecast range produced by a first
-weather-to-power model, makes solar and wind farm forecasts better than simply pooling the first
-model's output over the 51 weather forecasts. We compared both with a model trained directly on
-archived weather forecasts, for 6 solar farms and 3 wind farms over 53 weekly forecast runs in one
-held-out year. Pooling the first model's output beat the model trained on archived forecasts. The
-second model gave no improvement over pooling, and made the solar forecasts worse.
+We asked whether a second model, which corrects the spread of the forecast (its 5% to 95% band)
+produced by a first weather-to-power model, makes solar and wind farm forecasts better than simply
+pooling the first model's output over the 51 weather forecasts. We compared both with a model
+trained directly on archived weather forecasts, for 6 solar farms and 3 wind farms over 53 weekly
+forecast runs in one held-out year. Pooling the first model's output beat the model trained on
+archived forecasts. The second model gave no improvement over pooling, and made the solar forecasts
+worse.
 
 **Verdict: the pooled ERA5-trained mixture beats the ENS-trained quantile model, and the stage 2
 calibrator and learned blend did not improve on it, and were worse for solar.** Study 2b ran in one

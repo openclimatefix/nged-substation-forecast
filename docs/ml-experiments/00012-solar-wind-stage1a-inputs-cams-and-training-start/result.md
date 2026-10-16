@@ -83,10 +83,11 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 
 We asked which inputs and which training start date give the most accurate weather-to-power model
 for solar and wind farms. We tried four changes, which were training on a satellite estimate of
-sunlight, a first step that maps forecast sunlight onto that estimate, predicting solar output as a
-share of clear-sky output, and starting the wind model from the turbine power curve, together with
-later training start dates. None lowered the error by the 0.15 points of capacity that we counted as
-a gain.
+sunlight, a first step (stage 0) that maps forecast sunlight onto that estimate, predicting solar
+output as a share of the output the farm would give under a cloudless sky, and starting the wind
+model from the turbine power curve, together with later training start dates. None lowered the error
+by the 0.15 points of capacity that we counted as a gain. A point of capacity is 1% of a farm's
+effective capacity, roughly its usual maximum output.
 
 **Verdict: inconclusive.** None of the four planned input changes (CAMS-trained stage 1a, the stage
 0 model, the clear-sky-ratio target for solar, and the power-curve base margin for wind) lowered the
