@@ -23,7 +23,6 @@ sooner.
 | [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b and SW2-3 | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-3](#pvdis-3-how-much-forecast-error-comes-from-embedded-solar) | What does the irradiance input add to the best demand forecast, and how much of the remaining error does embedded solar explain? | 2 | The maintainer's review of this plan | Proposed; part 3 of the PVDIS series |
-| [PVDIS-4](#pvdis-4-a-capacity-series-that-rises-easily-and-falls-reluctantly) | Can a weekly capacity series, with rises penalised lightly and falls heavily, recover injected changes in capacity, with calibrated sampling intervals, at the Primaries metered in MW? | 2 | Nothing | Planned as experiment 00045 ([plan](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md)); part 4 of the PVDIS series; runs beside PVDIS-3 |
 | [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-3 and PVDIS-4 | Proposed |
 | [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations) | Can the share of east-, south-, and west-facing solar behind each Primary be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
@@ -322,60 +321,6 @@ asks how that room divides between the solar itself and the forecast of the weat
 - **The decision rule**, which the plan fixes with its reasons, is stated in quantile-score points
   on daylight rows from April to September, at the Bonferroni level for its contrasts. The plan
   derives its thresholds from experiment 00022's 0.10 points and experiment 00009's diagnostic.
-
-#### PVDIS-4: a capacity series that rises easily and falls reluctantly
-
-**Estimate capacity on a weekly grid, with weekly increments under an asymmetric L1 penalty: a light
-penalty on rises and a heavy penalty on falls.** Weeks then share information, and the series steps
-only where the evidence supports a step. A free capacity per week would be too noisy: the
-season-year standard error of about 1.2% of capacity implies about 8.7% per week on average (1.2% ×
-√52), and far more in a winter week, when the sun is low. The part reports the standard error of a
-week by season and the smallest step it can detect at each Primary.
-
-- **Why falls are allowed at all.** The fit estimates the solar that the Primary's meter sees, not
-  the installed capacity. That apparent solar can fall when home batteries charge from midday solar,
-  when a feeder is permanently reconfigured, or when a solar site is switched off for repairs. A
-  strict constraint that never lets the series fall would lower past capacity to fit a fall instead.
-  The fit with no constraint is reported beside the asymmetric fit, and the gap between them is a
-  diagnostic with a threshold that the plan sets.
-- **The estimand on the injections is the injected change.** A penalised, constrained fit is not
-  linear, and the real series already carries unknown solar. So the score is the path fitted with an
-  injection minus the path fitted without it, compared with the injected path. The plan also
-  injects the same path at several baseline levels to check how far the fit departs from
-  additivity, or injects into a semi-synthetic baseline whose solar is known.
-- **The injections add four cases to experiment 00039's harness:** capacity ramps, capacity steps,
-  temporary falls of weeks to months, and transfers that carry the donor's solar. A fifth case is a
-  seasonal cycle in daytime demand, like the coastal visitor season or irrigation, which measures
-  how far a seasonal load creeps into the capacity series. The penalties are tuned on the
-  injections and scored on held-out injections.
-- **The estimate production reads is scored as a real-time vintage.** The fit is repeated at rolling
-  origins, each truncated at its origin, and the latest week of each vintage is scored against the
-  truth. The part reports how far the first estimate of a week moves by the final fit. Penalised
-  fits are least constrained at the end of the record, which is the week production reads.
-- **False steps on the real series** are counted with experiment 00039's placebo sky, which shuffles
-  days within a month, as a measure of steps that weather noise alone produces.
-- **A probabilistic capacity has two separate parts.** The first part, sampling uncertainty, is an
-  ensemble of capacity paths from a bootstrap over blocks of 7 days or more, refitting the whole
-  path each time. A bootstrap of a penalised fit at a boundary tends to under-cover, so the part
-  checks the ensemble's coverage on the injections separately at weeks with no true step and at
-  weeks with a step. The second part, systematic uncertainty, is reported as named scenarios and
-  never merged into the ensemble: the farm-to-rooftop difference in solar shape, an undetected
-  day-long load (which pushes capacity up), and a load that rises with sunshine (which pushes it
-  down).
-- **Outside checks, in order of strength:**
-    - The Department for Energy Security and Net Zero's sub-regional statistics of small-scale solar
-      installations, by lower-layer super output area, summed over each Primary's polygon and
-      converted to expected peak AC output, are the strongest check. The plan states the tolerance
-      before the comparison.
-    - The Embedded Capacity Register is a soft prior check, not a floor. NGED's Primary series is
-      "Disaggregated Demand", from which metered generation has already been removed, and experiment
-      00031 found the register's median at 0.08 of effective capacity against 0.33 from the data.
-      The check uses only connected solar sites of 50 kW to under 1 MW, dated before each week, and
-      first confirms what the register's date field records. A step-date check uses only sites
-      larger than the Primary's detectable step, against randomly placed placebo dates.
-    - Solar mapped in OpenStreetMap inside each polygon is descriptive only, because its rooftop
-      coverage is uneven.
-    - Experiment 00039's comparison with each BSP's fitted capacity is repeated weekly.
 
 #### PVDIS-5: forecasting net demand as demand minus forecast solar
 

@@ -1,7 +1,7 @@
 ---
 id: "00045"
 slug: pvdis-4-weekly-capacity-asymmetric-l1
-status: planned
+status: finished
 size: complex
 hypothesis: >-
   On the 8 Primary substations (substations that feed 11 kV circuits from the 33 kV network)
@@ -37,7 +37,9 @@ prediction: >-
   Security and Net Zero (DESNZ) small-scale solar statistics agree with the series within the stated
   tolerance at 4 to 6 of the 6 comparisons. These numbers are priors from the argument that a
   season-year standard error of 1.2% implies about 8.7% per week, and from experiments 00039 and
-  00040. No weekly fit has been run. decision_rule: >- Scores are medians over farms and path seeds
+  00040. No weekly fit has been run.
+decision_rule: >-
+  Scores are medians over farms and path seeds
   within each Primary, then medians over the 8 Primaries. Every interval is a 95% cluster-bootstrap
   interval that resamples the 8 Primaries (the main interval), with a two-way interval (Primaries
   and farms resampled independently) reported beside it. Only contrast C2 decides the verdict, so
@@ -80,30 +82,311 @@ prediction: >-
   reported and never alter the verdict. The penalty pair is chosen on tuning units only (farms A to
   C), frozen in a committed file, and scored once on scoring units (farms D to F). There is no
   threshold on the effort of porting, because the series is an offline table and the production
-  forecast does not read it. benchmark: >- The capacity of experiment 00040 held constant within
+  forecast does not read it.
+benchmark: >-
+  The capacity of experiment 00040 held constant within
   each season-year (the six-arm capacity C, and the half-hourly fit M1 divided by its recovery
   ratio, which is the share of an injected capacity that the fit recovers, for like-for-like paths),
   and the free weekly fit with no penalty. The known injected path is the truth, so there is no
-  forecast benchmark. row_set_id: none metric: >- Path error: the mean absolute difference between
+  forecast benchmark.
+row_set_id: none
+metric: >-
+  Path error: the mean absolute difference between
   the recovered and the true weekly capacity path, as a share of the true path's mean. Also the
   false steps of 10% of capacity per Primary-year, the ratchet drift, the share of a temporary fall
   recovered, the smallest detectable step by season, the 90% interval coverage at step and non-step
-  weeks, and the latest-week error of a real-time vintage. production_status: not-for-production
-  adopted_in: none code: ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/
+  weeks, and the latest-week error of a real-time vintage.
+verdict: refuted
+verdict_note: >-
+  No pair of penalties on the grid met the pre-registered tuning limits, so the asymmetric design is
+  refuted on this grid. The plan's literal clause order also reads inconclusive, because the
+  detection clause was evaluated on a degenerate pair (the frozen placeholder, which equals the
+  strictly non-decreasing fit). The body of the page says why refuted is the verdict that applies.
+best_arm: >-
+  The capacity held constant within each season-year, which scored a median path error of 0.027 of
+  the mean capacity on injected ramps and steps (semi-synthetic baseline). No weekly arm beat it. The
+  frozen asymmetric fit (a=4, r=30) scored 0.040 and the free weekly fit 0.159.
+headline: >-
+  Frozen asymmetric fit against the season-year constant: path error 0.040 against 0.027, and C2
+  (relative change in path error) +0.400 (95% interval -0.078 to +0.773). Constant-path false steps
+  per Primary-year: median 0.66 and worst 1.43 against limits of 0.5 and 1.0. A 26-week fall of 30%
+  was recovered at 0.000 of its depth. The post hoc pair (a=2, r=10) recovered 0.576 but gave a
+  median of 1.22 and a worst of 3.32 false steps. The 90% bootstrap interval covered 0.620 of
+  non-step weeks and 0.347 of step weeks (post hoc pair: 0.708 and 0.470). The latest week of a
+  real-time vintage had 3.63 times the path error of the same week in the final fit.
+lessons: >-
+  One global pair of penalties cannot be both quiet on noise and responsive to a real fall. The
+  weekly series did not beat a capacity held constant within each season-year on injected changes.
+  The smallest step the weekly series detects reliably is above 25% of capacity. Intervals from a
+  residual block bootstrap under-cover badly. The outside checks are partial counts and cannot
+  confirm or refute the series. The recommended series for SW2-10 is the season-year constant.
+production_status: not-for-production
+adopted_in: none
+code: ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/
+advice:
+  - >-
+    Use the capacity held constant within each season-year as the solar capacity input to SW2-10,
+    and read it as a range at Kirton and not at all at Wrangle T1 (report.txt, recommended_variant;
+    figure 14).
+  - >-
+    Do not tune one global pair of penalties on weekly capacity increments. Tune a penalty per
+    Primary scaled by that Primary's weekly noise, or keep the season-year constant and add step
+    detection only above 25% to 30% of capacity (tuning table; figure 6).
+  - >-
+    Build any constant-path false-step unit on the placebo sky, and subtract a fit with the
+    season-year constant (not the real series) when making a semi-synthetic baseline, because a
+    baseline built from the real series keeps weekly noise or real growth that the fit then counts as
+    false steps (the two tuning attempts; figure 6).
+  - >-
+    Score a penalised capacity fit against an estimator that detects nothing, because a flat path
+    scores 0.097 on ramps and steps and a fit has to beat that before a low path error means
+    anything (condition (i) reference in report.txt).
+  - >-
+    Expect the latest week of a real-time capacity vintage to have about 3.6 times the path error of
+    the same week in the final fit, falling to 1.6 times after 26 weeks, and do not read the latest
+    week as a measurement (real-time vintages on injections; figure 12).
+  - >-
+    Do not report a residual block bootstrap interval for a penalised capacity path as a 90%
+    interval, because it covered 0.62 of non-step weeks and 0.35 of step weeks, and 0.71 and 0.47
+    for the post hoc pair (bootstrap coverage; figure 13).
+  - >-
+    Treat the DESNZ, FiT, and ECR outside figures as floors or partial counts. Only the DESNZ
+    local-authority growth check and the register's upper bound are testable, so do not expect
+    outside data to decide a capacity series (outside checks; figure 16).
 ---
 
 # Experiment 45 (PVDIS-4): a weekly capacity series that rises easily and falls reluctantly
 
-**Plan status.** This page is the plan, committed with status `planned`. Nothing has been run: no
-weekly fit exists, and every number below is a prediction or a design choice. The sections after
-"Plan" are placeholders for the write-up.
+**A solar-capacity estimate that may change every week did not follow injected changes better than a
+capacity held constant within each season-year, and no single pair of penalty settings was both
+quiet enough on noise and quick enough to follow a real fall.** We asked whether the amount of
+embedded solar behind each of 8 Primary substations (substations that feed 11 kV circuits from the
+33 kV network) can be tracked week by week. Embedded solar is solar connected inside the
+distribution network, mostly unmetered by NGED, and its capacity here means the 99th percentile of
+its half-hourly AC output, in MW. To test this, we added the recorded output of real solar farms
+to each substation's demand in known amounts on known dates (steps up, ramps, and temporary
+falls), and measured how far each method's weekly capacity lay from the known amount. The
+measure is the path error: the mean absolute gap between the fitted and the true weekly capacity,
+as a share of the true mean capacity. The median path error on ramps and steps was 0.027 for the
+season-year constant (a season-year is one 12-month period), 0.040 for the frozen weekly fit
+with penalties, and 0.159 for a weekly fit with no penalty.
 
-**The experiment asks whether the solar capacity behind each Primary substation can be tracked week
-by week.** Solar capacity here means the 99th percentile of the half-hourly AC output of the
-embedded solar (solar connected inside the distribution network that NGED does not meter), in MW.
-To test this, the experiment injects known capacity changes into a semi-synthetic power series
-and checks whether the weekly fit finds them, and finds no changes that were not injected. A
-Primary substation is a substation that feeds 11 kV circuits from the 33 kV network.
+**The result rules out one global pair of penalties, and it narrows the search to two designs.** The
+penalty pair that stayed quiet on noise (the frozen pair, a=4 and r=30, defined below) never let
+the capacity fall: it recovered 0.000 of a 30% fall lasting 26 weeks. It still produced a median of
+0.66 false steps of 10% per Primary-year on a constant capacity, against a limit of 0.5. A looser
+pair chosen after the scoring run (a=2 and r=10) recovered 0.576 of that fall, but produced a
+median of 1.22 false steps per Primary-year. The designs left to try are a penalty chosen per
+Primary and scaled by that Primary's weekly noise, or the season-year constant plus detection of
+steps only above about 25% to 30% of capacity.
+
+**Four further findings limit what the series can be used for.** The smallest step that any
+weekly fit detected in 80% of injections is above 25% of capacity at all 8 Primaries in both
+seasons. The latest week of a real-time estimate had 3.63 times the path error of the same week in
+the final fit. The 90% intervals covered 0.62 of the weeks without a step and 0.35 of the weeks with
+one. The three outside checks (national statistics, the Feed-in Tariff register, and the Embedded
+Capacity Register) each count only part of the installed solar, so they can neither confirm nor
+refute the series. The experiment could not tell whether a real fall in capacity, such as a feeder
+reconfigured permanently, would be seen by a better-tuned penalty, because the one pair that
+followed falls was chosen after the fact.
+
+**The verdict is `refuted`: no pair of penalties on the grid met the pre-registered tuning limits,
+so the asymmetric design is refuted on this grid.** The plan's decision rule tests its clauses in a
+fixed order, and read literally that order gives `inconclusive`, because the first clause (the
+smallest detectable step exceeds 25% of capacity at 5 or more Primaries in every season) holds. The
+clause was evaluated on a degenerate pair. With no feasible pair, the frozen configuration fell
+back to the pair nearest the limits (a=4, r=30), which scores the same as the strictly
+non-decreasing fit and detects 0.28 of steps from April to September and 0.23 from October to
+March. `refuted` applies for two reasons. The plan says that when no pair on the grid meets both
+tuning limits, the verdict is `refuted` for the asymmetric design and the limits are not relaxed.
+And the detection failure belongs to the penalty, not to the data: the free weekly fit detected
+0.85 of steps from April to September and 0.75 from October to March, at the price of a median of
+11.6 false steps per Primary-year.
+
+## What was fitted, and how the tuning went wrong once
+
+**Each weekly fit explains daylight power as a demand term minus one capacity per week times a solar
+shape from the Copernicus Atmosphere Monitoring Service (CAMS), and the penalised fits charge for
+each weekly change.** The frozen pair is a=4 and r=30: `a` scales the penalty on a weekly rise in
+capacity (in units of one weekly standard error), and `r` is the factor by which a fall costs more
+than a rise. The comparison fits are a weekly capacity with no penalty (free weekly), a symmetric
+penalty (r=1), a strictly non-decreasing capacity (r=infinity), and the season-year constant. The
+penalty pair was chosen on tuning units (Solar farms A to C) and scored once on scoring units
+(Solar farms D to F, 1,320 of the 1,344 planned units, because Solar farm E's record is too short
+for 24 injections at Mount Bridge Boston).
+
+**The first tuning attempt was invalid and was redone.** Its semi-synthetic baseline subtracted the
+real series' fitted weekly capacity, which removed the weekly noise that is correlated with the
+solar shape, so the baseline was too clean. The second attempt subtracts the season-year constant
+fit, which keeps that noise, and scores the fit of baseline plus injection against the known path.
+The constant-path unit was also redefined after the first attempt's tuning results were seen. It
+first injected a constant capacity into a baseline that still held real growth within each year, so
+real rises counted as false steps. It now permutes the solar shape among the days of each calendar
+month (the placebo sky), so the true path is constant. The change was made on tuning units only,
+and the scoring units were never fitted before the pair was frozen. Neither attempt found a pair
+that met the limits, as the table shows.
+
+| a | r | Path error, mixture (second attempt) | Constant-path false steps, median (second attempt) | 26-week fall recovered (second attempt) | Largest excess over a limit (second attempt) | Constant-path false steps, median (first attempt) | Largest excess over a limit (first attempt) |
+|---|---|---|---|---|---|---|---|
+| 0.5 | 10 | 0.119 | 4.800 | 1.132 | 7.182 | 4.630 | 7.239 |
+| 0.5 | 30 | 0.083 | 1.696 | 0.903 | 4.149 | 1.691 | 3.806 |
+| 1 | 10 | 0.096 | 2.500 | 1.006 | 5.751 | 2.677 | 5.866 |
+| 1 | 30 | 0.054 | 0.841 | 0.657 | 1.975 | 0.636 | 1.975 |
+| 2 | 10 | 0.066 | 1.043 | 0.787 | 2.719 | 0.915 | 2.662 |
+| 2 | 30 | 0.046 | 0.511 | 0.135 | 1.517 | 0.499 | 1.377 |
+| 4 | 10 | 0.045 | 0.620 | 0.476 | 1.117 | 0.529 | 1.141 |
+| 4 | 30 | 0.045 | 0.382 | 0.000 | 0.888 | 0.414 | 1.141 |
+
+**The limits are at most 0.5 false steps at the median Primary, at most 1.0 at the worst Primary,
+and at least 0.5 of a 26-week fall recovered.** The excess column gives the largest amount by which
+a pair misses any limit, in the units of that limit. Pairs that follow a fall (the r=10 rows with
+`a` up to 2) are far too noisy, and pairs that stay quiet (the a=4 rows) do not follow a fall.
+The pair a=4, r=30 had the smallest excess in the second attempt, so the configuration was frozen
+there as a fallback, and it is the pair called "frozen" below. The pair a=2, r=10 (the pair the
+first attempt had frozen) was scored afterwards on the same scoring units, so every number for it is
+post hoc, and it is not part of the verdict.
+
+![The tuning grid for both attempts](figure_06.svg)
+
+**Figure 6 shows that no cell of the grid is green in both rows of false steps and fall recovery.**
+The frozen pair is marked F and the post hoc pair is marked P.
+
+## Scores on held-out injections
+
+**No weekly fit beat the season-year constant on ramps and steps in the semi-synthetic baseline,
+and the free weekly fit was the worst.** The table gives each fit's absolute score on the scoring
+units. Scores are medians over farm-seeds and cases within a Primary, then medians over the 8
+Primaries. False steps are of 10% of capacity per Primary-year on the constant path, as median and
+worst Primary. Drift is the rise of the path over 5 years on a constant path, as a share of
+capacity. The fall column is the share of a 30% fall lasting 26 weeks that the path shows (0 means
+the path ignores the fall and 1 means it follows the fall fully).
+
+| Fit | Path error, ramps and steps (semi-synthetic) | Path error, ramps and steps (real series plus injection) | False steps, constant path (median, worst) | Drift on constant path | 26-week fall recovered |
+|---|---|---|---|---|---|
+| Season-year constant | 0.027 | 0.020 | 0.17, 0.25 | -0.037 | -0.043 |
+| Frozen asymmetric (a=4, r=30) | 0.040 | 0.017 | 0.66, 1.43 | +0.137 | 0.000 |
+| Strictly non-decreasing | 0.040 | 0.016 | 0.66, 1.43 | +0.137 | 0.000 |
+| Symmetric (r=1) | 0.102 | 0.012 | 3.01, 6.29 | -0.026 | 0.920 |
+| Free weekly | 0.159 | 0.014 | 11.60, 12.27 | -0.019 | 1.250 |
+| Post hoc (a=2, r=10) | 0.064 | 0.013 | 1.22, 3.32 | +0.055 | 0.576 |
+
+**The frozen pair fails five of the six pre-registered conditions.** Condition (i), a median path
+error of at most 0.15 on ramps and steps, passes at 0.040. A flat path that detects nothing scores
+0.097 there, so condition (i) is nearly trivial. Condition (ii), the relative change in path error
+against the season-year constant (C2), is +0.400 (95% interval -0.078 to +0.773) and needed an
+upper limit below -0.20. Condition (iii), false steps, fails at a median of 0.66 and a worst of
+1.43 on the constant path (the placebo sky gives 0.07 and 0.54). Condition (iv), the drift, is
++0.137 on the constant path and +0.090 on the placebo sky against a limit of 0.05. Condition (v),
+the fall, recovers 0.000 of a 26-week fall and 0.000 of an 8-week fall. Condition (vi), interval
+coverage, is 0.620 of non-step weeks and 0.347 of step weeks.
+
+![Path error by case family and fit, with 95% intervals](figure_07.svg)
+
+**Figure 7 shows the path error by family of injected change.** For ramps the season-year constant
+scores 0.032 (95% interval 0.027 to 0.053), the frozen fit 0.041 (0.034 to 0.053), and the free
+weekly fit 0.151 (0.104 to 0.239). For steps the scores are 0.024 (0.018 to 0.043), 0.037 (0.026 to
+0.052), and 0.164 (0.107 to 0.251). On the real series plus injection every fit scores between
+0.009 and 0.026 on ramps and steps, because that scoring compares paths fitted with and without the
+injection. The verdict uses the worse of the two scorings.
+
+**The penalty does most of its work against noise: the frozen fit cut the free weekly fit's path
+error by 0.12.** On steps of 10% or more, the frozen fit's path error minus the free weekly fit's
+is -0.120 (95% interval -0.212 to -0.069), and on ramps -0.110 (-0.198 to -0.066). The frozen fit
+and the strictly non-decreasing fit differ by 0.000 (-0.002 to 0.000) on temporary falls. The
+frozen pair is the strictly non-decreasing fit in practice.
+
+![Share of a temporary fall shown by each fit](figure_09.svg)
+
+**Figure 9 shows that only the symmetric, free weekly, and post hoc fits follow a fall.** The post
+hoc pair recovered 0.576 of a 30% fall lasting 26 weeks and 0.518 of one lasting 8 weeks, so it
+also follows a short fall, which the plan wanted held back (below 0.5).
+
+**The smallest detectable step is above 25% of capacity.** At the frozen pair, 6 of the 8 Primaries
+have no step size (5%, 10%, 20%, or 30%) detected in 80% of injections in either season, and 2
+Primaries (Donington and Wrangle T2) reach 30% from April to September only. A 10% step, which was
+the step the series was meant to show, is detected in 0.00 to 0.33 of injections at every Primary.
+The detection curves are in [figure 8](figure_08.svg).
+
+**A real-time estimate is worse than the final fit.** On injections, the latest completed week of a
+real-time vintage has a path error of 0.122, against 0.027 for the same week in the final fit
+(ratio 3.63, limit 2.0). The ratio falls to 2.43 at 8 weeks of age, 1.95 at 13 weeks, and 1.63 at 26
+weeks ([figure 12](figure_12.svg)).
+
+**The intervals under-cover.** The 90% residual block bootstrap refits the whole path and covered
+0.620 of non-step weeks and 0.347 of step weeks for the frozen pair, and 0.708 and 0.470 for the
+post hoc pair, against the plan's 0.85 to 0.95 and at least 0.60 ([figure 13](figure_13.svg)).
+Every interval is clipped to include the point estimate, and the clipping touched 12.0% of observed
+weeks for the post hoc pair, 3.4% for the frozen pair, 1.4% for the free weekly fit, and 0.0% for the
+season-year constant.
+
+## On the real series
+
+**On the real series the free weekly fit swings too much to read, and the season-year constant is
+the series to read.** The count of weekly changes of 2% of capacity or more at Kirton is 105 rises
+and 113 falls for the free weekly fit over 359 weeks, 12 rises and 17 falls for the post hoc pair, 1
+rise and 0 falls for the frozen pair, and 3 rises and 3 falls for the season-year constant. The
+season-year constant rises from 2.294 to 4.400 MW at Donington and from 2.080 to 4.241 MW at Mount
+Bridge Boston (means of the first and last 4 observed weeks). The recommended series for SW2-10 is
+the season-year constant, chosen after the held-out scoring results were seen.
+
+![Weekly capacity at each Primary: the season-year constant and the post hoc path](figure_14.svg)
+
+**Figure 14 shows that the two series agree on level and differ within each year.** Mount Bridge
+Boston has 198 unobserved weeks of 354 (weeks with fewer than 3 usable days), and its season-year
+constant falls to about 0 MW from 2023-09-04 to 2025-08-25 (104 weeks, all unobserved). Those weeks
+must not be read.
+
+**The outside checks are partial counts and are descriptive.** Of the 14 level comparisons against
+the national small-scale solar statistics (DESNZ), 3 pass, 9 fail, and 2 are report-only. Of the 27
+Primary-years, the season-year constant lies inside experiment 00040's interval in 18, below the
+plan's 80% bar. The Embedded Capacity Register total is at or below the series' upper bound at 6 of
+6 comparisons. Only the DESNZ local-authority series could be tested for growth (1 pass and 5
+inconclusive), and the Feed-in Tariff register and the constituency table could not. Every source
+is a floor or a partial count,
+so a ratio below 1 is expected and a mismatch does not show the series is wrong
+([figure 16](figure_16.svg)).
+
+## Limits that remain
+
+The review of the code left these limits in place. Each affects how far a number can be trusted.
+
+- **The detection metric has no false-alarm control.** A fit that rises at every week would count
+  as detecting every step.
+- **Condition (i) is nearly trivial.** A flat estimator scores 0.097 on ramps and steps, against
+  the limit of 0.15.
+- **Path error and false steps are scored on observed weeks only.** Mount Bridge Boston has 198 of
+  354 weeks unobserved.
+- **The post hoc intervals are clipped to the point estimate in 12.0% of weeks.**
+- **The constant-path false-step threshold is reported on two bases.** The median at the frozen pair
+  is 0.66 when a step is 10% of the real series' mean capacity and 0.36 when it is 10% of the
+  injected capacity. The post hoc pair gives 1.22 and 0.77. The condition uses the first basis.
+- **The season-year constant's own sampling error cancels by construction,** because the baseline
+  subtracts the season-year constant fit, which favours that arm on the semi-synthetic baseline.
+- **The drift limit has a floor for short series,** and Wrangle T1 and T2 have only 76 and 74 weeks.
+- **The post hoc pair was chosen and scored after the frozen pair failed.** No number for it
+  carries the weight of a pre-registered score.
+
+## Figures
+
+The four figures above carry the argument. The others are linked here.
+
+- Figure 1: [Raw: the model-free trend of the midday clear-minus-overcast gap](figure_01.svg)
+- Figure 2: [Raw: one clear and one overcast week, in summer and winter](figure_02.svg)
+- Figure 3: [Raw: usable daylight half-hours per Primary-week](figure_03.svg)
+- Figure 4: [Raw: the free weekly capacity and its standard error by month](figure_04.svg)
+- Figure 5: [Method: one injected path through five fits](figure_05.svg)
+- Figure 8: [The detection curve by step size and season](figure_08.svg)
+- Figure 10: [Transfers and seasonal load](figure_10.svg)
+- Figure 11: [False steps on the placebo sky and the constant path, and the drift](figure_11.svg)
+- Figure 12: [Real-time vintages](figure_12.svg)
+- Figure 13: [Interval calibration](figure_13.svg)
+- Figure 15: [The gap between the asymmetric and symmetric paths on the real series](figure_15.svg)
+- Figure 16: [Outside checks](figure_16.svg)
+- Figure 17: [Additivity of the fit](figure_17.svg)
+
+The experiment's printed reports and every number on this page are in the private folder
+`data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/` (`report.txt` is the combined
+report).
 
 ## Plan
 
@@ -682,10 +965,14 @@ with `svgo`). Farm output is normalised and labelled Solar farm A to F. Substati
     failed self-test.
 14. **CPU contention.** The slot's 4 cores are shared with PVDIS-3. Check `uptime` before each stage.
 
-## Results
-
-To be written after the run.
-
 ## What the next experiment should answer
 
-To be written after Opus reads the results.
+**The next experiment should ask whether a penalty set per Primary from that Primary's own weekly
+noise, together with a rule that holds a fall for a stated number of weeks, can keep constant-path
+false steps at or below 0.5 per Primary-year while recovering at least 0.5 of a 26-week fall and
+less than 0.5 of an 8-week fall.** It should test this alongside the season-year constant plus
+step detection that fires only for steps above 25% to 30% of capacity, on tuning and scoring units
+fixed in advance and with the false-step limit scored on both bases of the constant-path
+threshold. The comparison fits and the placebo-sky constant path should be reused, and the
+interval should be rebuilt and checked for coverage on the tuning units before it is reported.
+PVDIS-5 reads the season-year constant for now.
