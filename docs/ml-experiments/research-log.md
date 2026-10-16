@@ -83,6 +83,7 @@ the maintainer to confirm.
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
 | [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
 | [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as an upper limit: -0.198 (-0.316 to -0.069) points of capacity against a 0.15 target; the UKV data are a research archive, not the live feed | Not for production | 2026-10-16 |
+| [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.117 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1243,3 +1244,25 @@ service could get.
 - **Write-up:** [result](00054-product-trained-xgboost-wind-farms/result.md).
 
 ![Contrasts between the arms](00054-product-trained-xgboost-wind-farms/figure_1.svg)
+
+### 00057: does UKV, learned from its own history, help the solar-farm forecast?
+
+**Giving the Met Office's UKV forecast of sunshine, cloud, and temperature to a solar-farm forecast
+that already uses the European Centre's ensemble (ENS) lowered the error by only about 0.03 points
+of the farms' capacity at 1 to 2 days ahead, which the data cannot tell from zero, so the verdict
+is `inconclusive`.** The error is the quantile score, and 1 point is 1% of a farm's capacity. We
+trained XGBoost models for six metered solar farms, each on its own forecast history, and the
+difference at 24 to 54 hours after the ENS run's 00 UTC start is -0.035 points (95% interval -0.117
+to +0.037), against a decision threshold of 0.10. The UKV data come from the CEDA research archive,
+not the live feed, so any gain would be an upper limit.
+
+- **Finding for later experiments:** UKV helps the solar farms far less than the wind farms, and a
+  gain above 0.12 points is ruled out. UKV alone scores 0.40 points worse than ENS alone, and the
+  shuffled-UKV placebo and the 3-hourly UKV control differ from the plain arms by under 0.02
+  points. The gain is larger after UKV's upgrade of 2026-01-21 (-0.133, -0.262 to -0.017;
+  exploratory).
+- **A next experiment could:** try a source of a different kind, such as a satellite-based nowcast
+  at lead day 0, since a second numerical forecast adds little at these leads.
+- **Write-up:** [result](00057-product-trained-xgboost-solar-farms/result.md).
+
+![Contrasts between the arms](00057-product-trained-xgboost-solar-farms/figure_1.svg)
