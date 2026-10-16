@@ -195,6 +195,7 @@ nav:
       - "Does a bank-holiday column in the demand model help the switching detector find transfers?": ml-experiments/00047-sw2-4-better-residual-switching-detector/result.md
       - "Does a neighbour veto help the single-series switching detector?": ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/result.md
       - "Is the recall gap without a metered receiver a step-size effect, and does a stronger veto help?": ml-experiments/00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md
+      - "Does one detector over several windows find more transfers than the best single window?": ml-experiments/00059-sw2-13-several-windows-in-one-detector/result.md
       - "Does a step that weights each half-hour by the daily profile find more of the moved load?": ml-experiments/00060-sw2-7-profile-weighted-step-detector/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
