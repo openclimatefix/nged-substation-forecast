@@ -1,11 +1,11 @@
 """Draw experiment 00057's figures from the saved results, as SVG, into the docs folder.
 
 1. Each arm minus the ENS-only arm (or the named reference), at 24 to 54 hours and at lead day 0.
-2. The ENS-plus-UKV arm minus the ENS-only arm, per wind farm.
+2. The ENS-plus-UKV arm minus the ENS-only arm, per solar farm.
 
 Afterwards optimise with `npx svgo@4 --multipass --precision=1 --final-newline`.
 
-    uv run python ml-experiments/00057-product-trained-xgboost-wind-farms/e00057_charts.py
+    uv run python ml-experiments/00057-product-trained-xgboost-solar-farms/e00057_charts.py
 """
 
 import json
@@ -25,10 +25,11 @@ PLOT_WIDTH: Final[int] = 380
 WRAP: Final[int] = 80
 GREY: Final[str] = "#999999"
 SCOPE: Final[str] = (
-    "3 wind farms, 52 Tuesday runs, 3 seeds, July 2025 to June 2026; UKV from the CEDA archive."
+    "6 solar farms, 52 Tuesday runs, 3 seeds, July 2025 to June 2026; UKV from the CEDA archive."
 )
 CONTRASTS: Final[dict[tuple[str, str], str]] = {
     ("b", "a"): "ENS + UKV minus ENS only",
+    ("b", "b_3h"): "ENS + UKV minus ENS + 3-hourly UKV",
     ("c", "a"): "UKV only minus ENS only",
     ("b_placebo", "a"): "ENS + shuffled UKV minus ENS only",
     ("b", "ref_best_guess"): "ENS + UKV minus ERA5-trained best guess",
@@ -63,7 +64,7 @@ def _layers(*, data: pl.DataFrame, y: alt.Y, height: int) -> alt.TopLevelMixin:
     bars = base.mark_rule().encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color=GREY).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     threshold = (
-        alt.Chart(pl.DataFrame({"x": [-0.15]}))
+        alt.Chart(pl.DataFrame({"x": [-common.THRESHOLD]}))
         .mark_rule(color=GREY, strokeDash=[4, 3])
         .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
@@ -101,7 +102,7 @@ def figure_1(*, results: dict) -> alt.TopLevelMixin:
             text="Contrasts between arms trained on ENS, UKV, and both",
             lines=[
                 "Quantile score of the first arm minus the second (smaller is better). Solid grey "
-                "line: no difference. Dashed line: the 0.15-point threshold. Dot: estimate. Line: "
+                "line: no difference. Dashed line: the 0.10-point threshold. Dot: estimate. Line: "
                 "95% interval from re-drawing whole months. " + SCOPE
             ],
         )
@@ -109,16 +110,16 @@ def figure_1(*, results: dict) -> alt.TopLevelMixin:
 
 
 def figure_2(*, results: dict) -> alt.TopLevelMixin:
-    """The ENS-plus-UKV arm minus the ENS-only arm, per wind farm."""
+    """The ENS-plus-UKV arm minus the ENS-only arm, per solar farm."""
     rows = [e for e in results["exploratory"] if "site" in e and e["band"] in BANDS]
     data = pl.DataFrame(rows).with_columns(scope_label=pl.col("band").replace_strict(BANDS))
-    chart = _layers(data=data, y=alt.Y("site:N", title="Wind farm"), height=140)
+    chart = _layers(data=data, y=alt.Y("site:N", title="Solar farm"), height=140)
     return chart.properties(
         title=_title(
-            text="Per wind farm: ENS plus UKV minus ENS only",
+            text="Per solar farm: ENS plus UKV minus ENS only",
             lines=[
                 "Quantile score of the ENS-plus-UKV arm minus the ENS-only arm (smaller is "
-                "better). Solid grey line: no difference. Dashed line: the 0.15-point threshold. "
+                "better). Solid grey line: no difference. Dashed line: the 0.10-point threshold. "
                 "Dot: estimate. Line: 95% interval from re-drawing whole months. " + SCOPE
             ],
         )

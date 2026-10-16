@@ -10,7 +10,7 @@ hypothesis: >-
   trained on the same window, rows, and seeds. UKV is read from the CEDA archive, which is not the
   live product, so the contrast is a ceiling read.
 prediction: >-
-  The ENS-plus-UKV arm scores -0.05 to -0.20 points of capacity against the ENS-only arm at lead
+  The ENS-plus-UKV arm scores -0.03 to -0.12 points of capacity against the ENS-only arm at lead
   hours 24 to 54 after the ENS run's 00 UTC. The sources for that range are experiment 53, whose
   fitted ENS and UKV blend lowered the mean squared error of the solar anomaly by 4% to 14% within
   54 hours but raised the correlation with CAMS by only 0.01 to 0.03, and experiment 54, where UKV
@@ -18,23 +18,26 @@ prediction: >-
   experiment 50 found that a second global ensemble (GEFS) added nothing to the solar anomaly at
   day 1 to 2. The UKV-alone arm
   scores worse than the ENS-only arm. The shuffled-UKV placebo scores within 0.04 points of the
-  ENS-only arm. A `supported` verdict (interval wholly below -0.15) needs a point estimate near
-  -0.25 or better, so `small gain` and `inconclusive` are the likeliest verdicts.
+  ENS-only arm. A `supported` verdict (interval wholly below -0.10) needs a point estimate near
+  -0.17 or better, so `small gain` and `inconclusive` are the likeliest verdicts.
 decision_rule: >-
   One decisive contrast, C1: the ENS-plus-UKV arm minus the ENS-only arm on the quantile score for
   cases with a valid time 24 to 54 hours after the 00 UTC start of the ENS run's date (lead day 1,
   and the first 6 hours of lead day 2), pooled over the six farms and read at 95% with whole months
   and the three seeds resampled, 50,000 resamples. The interval is conditional on the six farms.
-  The threshold is 0.15 points, about 3% of the ENS-only arm's expected score of 5 points. It is
-  the same relative size as experiment 54's wind threshold (2.5% of 6.1 points), so that the two
-  technologies are read on one scale; an added weather feed and three added model input columns
-  are a pipeline step each, and a smaller gain does not justify them. C1 is `supported` when its
-  interval lies wholly below -0.15, `small gain` when it lies wholly below zero but not wholly
-  below -0.15, `refuted` when it lies wholly above zero, and `inconclusive` otherwise. Because the
+  The threshold is 0.10 points, about 3% of 3.28 points, the pooled score of
+  experiment 33's ENS-trained reference model on the same cases (night cases, which score near zero
+  for every arm, are included in the pooled score, so the threshold is on the pooled scale). It is
+  about the same relative size as experiment 54's wind threshold (2.5% of 6.1 points), so that
+  the two technologies are read on one scale; an added weather feed and three added model input
+  columns are a pipeline step each, and a smaller gain does not justify them. C1 is `supported`
+  when its interval lies wholly below -0.10, `small gain` when it lies wholly below zero but not wholly
+  below -0.10, `refuted` when it lies wholly above zero, and `inconclusive` otherwise. Because the
   CEDA archive is not the live UKV product, a `supported` C1 is reported as `small gain` for
   production and `supported` as a ceiling, and the verdict line says both. Every other read (all
-  leads within UKV's range, the UKV-alone arm, the placebo, the 3-hourly control, per farm,
-  daylight-only, against the ERA5-trained best guess) is exploratory, labelled so, and read at 95%.
+  leads within UKV's range, lead day 0, the UKV-alone arm, the placebo, the 3-hourly control, per
+  farm, daylight-only, before and after UKV's upgrade of 2026-01-21, without July 2025, against
+  the ERA5-trained best guess) is exploratory, labelled so, and read at 95%.
 benchmark: >-
   The ENS-trained XGBoost arm with the same training protocol (arm A), on the same cases. The
   ERA5-trained best guess of experiment 33 is a reference row, not the benchmark.
@@ -75,8 +78,9 @@ weather product it is given, so a model is never trained on one product and fed 
     - **Placebo:** B with the UKV columns shuffled among rows of the same farm, month, hour of day,
       and lead day.
     - **B3h (control):** B with the UKV columns rebuilt from UKV's steps at multiples of 3 hours
-      and joined linearly. UKV is hourly and ENS is 3-hourly, so this separates a gain from UKV's
-      time resolution from a gain from its different forecast.
+      and joined linearly. UKV is hourly and ENS is 3-hourly, so B minus B3h (exploratory) shows
+      how much of a gain comes from UKV's hourly steps. UKV's steps are already 3-hourly beyond
+      48 hours, so B and B3h can differ only at 24 to 48 hours.
     - **Reference rows:** experiment 33's ERA5-trained best guess and its ENS-trained model, on the
       same cases.
 - **Scoring.** The 6 solar farms (anonymised labels), `fold_a_tuesdays_v1`, valid times 2025-07-01
@@ -85,6 +89,17 @@ weather product it is given, so a model is never trained on one product and fed 
 - **Clear-sky features.** Experiment 33's best guess for solar contains no clear-sky feature
   (experiment 12's clear-sky-ratio target gained -0.048, -0.093 to +0.024), so this experiment
   adds none.
+- **Dropped runs.** A UKV run with any non-finite native step in one of the three variables is
+  dropped for that farm, from every arm alike, so the arms share rows. The check script counts
+  dropped runs per farm and variable. Experiment 33's ENS-trained reference model was not trained
+  on exactly these rows.
+- **Time convention.** UKV's shortwave is instantaneous and ENS's is a window mean. The check
+  script compares the hour-of-day profiles of UKV shortwave, ENS shortwave, and farm power, and
+  checks that UKV shortwave is non-negative and near zero when the sun is below the horizon.
+- **Known limit of the UKV columns.** Beyond 48 hours UKV's steps are 3-hourly, and the linear
+  join between them gives a positive shortwave flux (up to 57 W/m2 in the check) after sunset.
+  Up to 48 hours it is at most 3.4 W/m2. This affects the last 6 of the 30 scored hours, and all
+  hours of arm B3h.
 - **UKV source.** The CEDA archive's 00 UTC run of the ENS run's date at each farm's nearest 2 km
   cell. The assumption that the run is available by 09:00 UTC is not measured.
 

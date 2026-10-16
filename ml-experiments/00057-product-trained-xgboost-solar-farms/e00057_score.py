@@ -6,7 +6,7 @@ multiplied by 100). A case's band is set by the hours from the 00 UTC start of t
 to its valid time: lead day 0 (under 24 hours) is outside the contrast, and 24 to 54 hours is the
 scored range of the contrast C1.
 
-    uv run python ml-experiments/00057-product-trained-xgboost-wind-farms/e00057_score.py
+    uv run python ml-experiments/00057-product-trained-xgboost-solar-farms/e00057_score.py
 """
 
 import json
@@ -17,7 +17,7 @@ import numpy as np
 import polars as pl
 from e00057_common import LEVEL_COLUMNS
 
-from studies import bootstrap, experiment_store
+from studies import bootstrap, experiment_store, solar
 
 ARMS_DIR = common.WORK_DIR / "arms"
 RESULTS_DIR = common.WORK_DIR / "results"
@@ -26,9 +26,24 @@ POINTS: Final[float] = 100.0
 LEVEL_DECISIVE: Final[float] = 95.0
 N_RESAMPLES: Final[int] = 50_000
 N_RESAMPLES_EXPLORATORY: Final[int] = 10_000
-THRESHOLD: Final[float] = 0.15
+THRESHOLD: Final[float] = common.THRESHOLD
 BAND_NAMES: Final[tuple[str, str]] = ("lead day 0 (0-24 h)", "days 1-2 (24-54 h)")
 SCORED_BAND: Final[int] = 1
+SUN_UP_ZENITH_DEGREES: Final[float] = 90.0
+
+
+def daylight(*, frame: pl.DataFrame) -> np.ndarray:
+    """Return whether the sun is above the horizon at the farm for each case's valid time."""
+    out = np.zeros(frame.height, dtype=bool)
+    for row in common.site_table().iter_rows(named=True):
+        mask = (frame["time_series_id"] == row["time_series_id"]).to_numpy()
+        angle = solar.zenith(
+            stamps=frame["valid_time"].filter(pl.Series(mask)),
+            latitude=row["latitude"],
+            longitude=row["longitude"],
+        )
+        out[mask] = angle < SUN_UP_ZENITH_DEGREES
+    return out
 
 
 def read_arm(*, name: str) -> pl.DataFrame:
@@ -42,6 +57,7 @@ def read_arm(*, name: str) -> pl.DataFrame:
         ).alias("hours")
     )["hours"]
     return frame.select(*KEYS).with_columns(
+        daylight=pl.Series(daylight(frame=frame)),
         band=(hours >= common.SCORED_FROM_HOURS).cast(pl.Int8),
         qs=pl.Series(POINTS * common.quantile_score(quantiles=quantiles, actual=actual)),
         covered=pl.Series(common.covered(quantiles=quantiles, actual=actual).astype(np.float64)),
@@ -97,7 +113,7 @@ def contrast(
 
 
 def verdict(*, row: dict[str, Any]) -> str:
-    """Return the pre-registered label for a contrast against the 0.15-point threshold."""
+    """Return the pre-registered label for a contrast against the 0.10-point threshold."""
     if row["upper"] < -THRESHOLD:
         return "supported"
     if row["upper"] < 0:
@@ -154,6 +170,8 @@ def exploratory_contrasts(
         ("b", "ref_best_guess"),
         ("a", "ref_best_guess"),
         ("ref_n1", "a"),
+        ("b_3h", "a"),
+        ("b", "b_3h"),
     ]
     out = [
         contrast(arms=arms, treatment=t, reference=r, n=N_RESAMPLES_EXPLORATORY, band=b, level=95.0)
@@ -164,6 +182,7 @@ def exploratory_contrasts(
         ("before the UKV upgrade", ~upgrade),
         ("after the UKV upgrade", upgrade),
         ("without July 2025", ~first_month),
+        ("daylight only", pl.col("daylight")),
     ):
         row = contrast(
             arms=arms,

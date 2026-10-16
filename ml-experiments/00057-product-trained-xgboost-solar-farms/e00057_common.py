@@ -116,6 +116,8 @@ XGBOOST_PARAMETERS: Final[dict[str, object]] = {
     "device": "cuda",
     "nthread": 6,
 }
+THRESHOLD: Final[float] = 0.10
+"""The smallest gain worth a pipeline step, in points of capacity (see the plan)."""
 TARGET_COVERAGE: Final[float] = 0.90
 PLACEBO_SEED: Final[int] = 57
 

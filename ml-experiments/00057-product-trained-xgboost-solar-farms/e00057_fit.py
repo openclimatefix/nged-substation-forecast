@@ -280,7 +280,17 @@ def validation_part(
     return common.add_lags(frame=frame, power=power)
 
 
-def main() -> None:
+def merge_seeds(*, cases: pl.DataFrame, checks: dict[str, Any]) -> None:
+    """Merge the tables each `--seed` process saved and write the arms."""
+    checks["training_rows"] = json.loads((SEED_DIR / "training_rows.json").read_text())
+    tables = {
+        arm: [pl.read_parquet(path) for path in sorted(SEED_DIR.glob(f"{arm}_seed*.parquet"))]
+        for arm in common.ARM_COLUMNS
+    }
+    write_all(tables=tables, cases=cases, checks=checks)
+
+
+def main() -> None:  # noqa: PLR0915
     """Fit every arm for every seed and write the arm tables."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke", action="store_true", help="20 rounds, 2 runs, no output")
@@ -332,12 +342,7 @@ def main() -> None:
     tables: dict[str, list[pl.DataFrame]] = {arm: [] for arm in common.ARM_COLUMNS}
     seeds = common.SEEDS[:1] if smoke else common.SEEDS if args.seed is None else (args.seed,)
     if args.merge:
-        checks["training_rows"] = json.loads((SEED_DIR / "training_rows.json").read_text())
-        tables = {
-            arm: [pl.read_parquet(path) for path in sorted(SEED_DIR.glob(f"{arm}_seed*.parquet"))]
-            for arm in common.ARM_COLUMNS
-        }
-        write_all(tables=tables, cases=cases, checks=checks)
+        merge_seeds(cases=cases, checks=checks)
         return
     for seed in seeds:
         for series in cells:
