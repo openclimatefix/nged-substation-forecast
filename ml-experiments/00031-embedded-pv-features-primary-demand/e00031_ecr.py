@@ -12,10 +12,11 @@ solar row below the substation is a floor on the PV in the series.
 from pathlib import Path
 from typing import Final
 
-import e00031_ecr_reader as reader
 import polars as pl
 from studies.name_matching import normalise
 from studies.sources import REPO_DATA_DIR
+
+from studies import ecr_reader as reader
 
 HIERARCHY_DIR: Final[Path] = REPO_DATA_DIR / "NGED" / "substation_hierarchy_2026-10-15"
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
