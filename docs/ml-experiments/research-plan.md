@@ -231,9 +231,9 @@ baseline, and the onset becomes the main remaining loss.** The end rule needs up
 hindsight, so a detector built on the end rule serves training-time masks (SW2-12) and the event
 table for NGED, not a live input to the forecast.
 
-- **SW2-16** tests the end rule at the 4-hour window as well as the 24-hour window, and with caps
-  of 14, 30, and 60 days, against D0M with the 14-day cap. The labelled closures run up to 60 days, so a
-  14-day cap ends every longer closure early. The winning window and cap become the benchmark for
+- **SW2-16** tests the end rule at the 4-hour window as well as the 24-hour window, and with caps of
+  14, 30, and 60 days, against D0M with the 14-day cap. The labelled closures run up to 60 days, so
+  a 14-day cap ends every longer closure early. The winning window and cap become the benchmark for
   every later SW2 detector experiment, SW2-14 included if its benchmark is not yet fixed.
 - **SW2-17** first classifies the 24 of 35 labelled real transfers over 1 day that raise no alarm
   at their onset: a donor step under the threshold, a step spread over several hours, an onset
