@@ -425,6 +425,48 @@ def print_diagnostics(*, out: Path) -> None:
         )
 
 
+def print_scored_operating_points(*, out: Path, names: list[str], events: pl.DataFrame) -> None:
+    """Print even-month alarm counts, odd-month recall, and event F1 of every arm.
+
+    Matching fixes only the odd-month count, so the even months the contrasts are scored on can
+    hold a different number of unexplained alarms for each arm.
+    """
+    print("\n== Unexplained D0 24 h alarms in even months (scored) and odd months (matched)")
+    for name in names:
+        alarms = pl.read_parquet(out / f"alarms_matched_{name}.parquet").filter(
+            pl.col("setting") == "D0_48", ~pl.col("logged_matched")
+        )
+        even = alarms.filter(pl.col("month") % 2 == 0).height
+        print(f"  {name:8s} even months {even}, odd months {alarms.height - even}")
+    print("\n== Event F1, D0 24 h, headline band, even months (mean over the arm's seeds)")
+    for arm, seeds in (("H0.5", SEEDS), ("HOL", SEEDS), ("PLA", (0,)), ("H0.5", (0,))):
+        values = [
+            mean_f1(
+                out=out,
+                arm=arm,
+                events=events,
+                setting="D0_48",
+                seeds=seeds,
+                bound=bound,
+                population=pl.col("headline") & pl.col("even"),
+            )
+            for bound in (0, 1)
+        ]
+        print(f"  {arm:5s} seeds {seeds}: {values[0]:.3f} at the lower and {values[1]:.3f} upper")
+    print("\n== Odd-month share found, D0 24 h, headline band: new arm minus H0.5")
+    odd = events.filter(pl.col("headline"), ~pl.col("even"))
+    new = seed_mean_found(out=out, arm="HOL", events=events, setting="D0_48")
+    reference = seed_mean_found(out=out, arm="H0.5", events=events, setting="D0_48")
+    odd_diff = odd.join(new, on="event_id").join(reference, on="event_id", suffix="_ref")
+    odd_change = float((odd_diff["found"] - odd_diff["found_ref"]).mean())  # ty: ignore[invalid-argument-type]
+    print(f"  odd months ({odd.height} transfers): {odd_change:+.3f}")
+    even = events.filter(pl.col("headline"), pl.col("even"))
+    even_diff = even.join(new, on="event_id").join(reference, on="event_id", suffix="_ref")
+    even_change = float((even_diff["found"] - even_diff["found_ref"]).mean())  # ty: ignore[invalid-argument-type]
+    pooled = (odd_change * odd.height + even_change * even.height) / (odd.height + even.height)
+    print(f"  pooled over {odd.height + even.height} transfers: {pooled:+.3f}")
+
+
 def main() -> None:
     """Print all the sections."""
     parser = argparse.ArgumentParser()
@@ -439,6 +481,7 @@ def main() -> None:
     print_reported(out=out, events=events)
     print_precision(out=out, names=names)
     print_real(out=out, names=names)
+    print_scored_operating_points(out=out, names=names, events=events)
     print_diagnostics(out=out)
 
 

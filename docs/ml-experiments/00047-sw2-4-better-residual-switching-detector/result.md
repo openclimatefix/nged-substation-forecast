@@ -1,7 +1,7 @@
 ---
 id: "00047"
 slug: sw2-4-better-residual-switching-detector
-status: planned
+status: done
 size: medium
 hypothesis: >-
   Adding one column, the signed days to the nearest bank holiday in England, to experiment 17's
@@ -39,168 +39,184 @@ metric: >-
   Event F1 as in experiment 43: the share of injected transfers found (start within 2 hours, end
   within the larger of 6 hours and 10% of the duration) combined with the alarms' precision bounds;
   the share found decides, with F1, the precision bounds, and the end error beside it.
-pull_request: none yet
+verdict: inconclusive
+best_arm: >-
+  No arm wins. H0.5 plus the bank-holiday column finds 0.360 of the 89 headline-band injected
+  transfers in even months with the 24-hour single-series detector D0 against 0.348 for H0.5, a
+  difference (C1) of +0.011 (98.75% interval -0.010 to +0.044), matched on odd months. The
+  pre-registered rule needs an interval wholly above zero.
+lessons: >-
+  The column does what it was meant to do on bank holidays: the demand model's error on bank
+  holidays falls by about 1.15 points of capacity and the unexplained 24-hour alarms within 1 day of
+  a bank holiday fall from 26 to 9 or 10. The detector gains nothing, because the matched threshold
+  rises by 0.22 instead of falling, probably because the residual became more persistent. At most 26
+  of 160 unexplained alarms could be removed by any holiday fix, which caps this route, and 89
+  transfers cannot resolve a gain below about 0.04.
+advice:
+  - >-
+    Do not expect a calendar column to help the 24-hour D0 through a lower threshold, since the
+    matched threshold rose by 0.22, the odd-month share found changed by -0.019, and only 26 of 160
+    unexplained alarms lie within 1 day of a bank holiday (alarms by distance to a bank holiday);
+    this applies to this design, which cannot resolve differences below about 0.04.
+  - >-
+    Match thresholds by refitting the arm and recounting unexplained alarms on odd months, not by
+    reusing experiment 43's thresholds, because the new arm needed D0 24-hour thresholds 0.2 higher
+    (the thresholds paragraph of the verdict section).
+  - >-
+    Report the even-month unexplained-alarm count of every arm, since matching on odd months left the
+    new arm at 64 to 67 against 71 to 80 for H0.5 (the operating-point section).
+  - >-
+    Score a change to the detector's residual on at least several hundred headline-band transfers,
+    because a change must raise the share found by more than about 0.04 to be visible with 89
+    transfers (C1).
+production_status: not-for-production
+adopted_in: none
+pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1268
 code: ml-experiments/00047-sw2-4-better-residual-switching-detector/
 ---
 
-# Experiment 47: does a weather model that knows bank holidays help the switching detector find transfers?
+# Experiment 47: does a bank-holiday column in the demand model help the switching detector find transfers?
 
-**Plan, written before any fit.** A switching detector compares the power measured at each of 16
-Primary substations (substations that step power down to the local distribution network) with what
-a weather-driven XGBoost model expected, and raises an alarm when the average difference over 4 or
-24 hours steps up or down. Demand drops for a day on a bank holiday, the model does not expect the
-drop, and the drop looks like load moved away to another substation. Before writing this plan we
-counted that 26 of the 160 alarms of the best detector setting that no logged switching explains
-fall within 1 day of a bank holiday outside Christmas and New Year. We will refit the model with one
-extra column, the days to the nearest bank holiday, set each detector to raise the same number of
-unexplained alarms as before, and count how many of the same 600 known transfers, added to the real
-readings, each detector then finds.
+**The result is inconclusive: adding a bank-holiday column to the demand model raised the share of
+simulated load transfers the detector found by +0.011 (98.75% interval -0.010 to +0.044), and the
+experiment is too small to tell that from zero.** The demand model is an XGBoost model (a
+gradient-boosted decision-tree model) that predicts the power drawn at each of 16 Primary substations
+(substations that step power down to the local distribution network) from the weather. The detector
+raises an alarm when the average difference between measured and predicted power over 24 hours steps
+up or down, which can mean that load moved to or from another substation. Demand drops on bank
+holidays, the model did not expect the drop, and the drop looks like such a step. We refitted the
+model with one extra column, the number of days to the nearest bank holiday, and added 600 simulated
+transfers to the real readings. We set each model's alarm threshold so that both raised about the same
+number of alarms in odd-numbered months that the switching log (the operators' record of planned
+network switching) does not explain. We then counted how many of the 89 simulated transfers that
+start in even-numbered months, move 25% to 40% of the receiving substation's load, and last over 1 day
+the detector found. A transfer counts as found when the detector places its start within 2 hours and
+its end within the larger of 6 hours and 10% of its duration. The result covers only the route
+through the threshold: the injected transfers lie at least 2 days from any alarm of the baseline
+model, so the column could help only by letting the threshold fall.
 
-## Which model, and why one column
+![Alarms that the switching log does not explain, by distance to a bank holiday](figure_6_alarms_by_holiday_distance.svg)
 
-**The best lagless model available is H0.5 itself, so the change under test is a column, not a
-model.** "Lagless" means the model reads no recent power, so a transfer cannot leak into its inputs.
-The candidates the SW2-4 proposal named fail as follows:
+## Verdict
 
-- **Experiment 17's arms:** H0.5 has the lowest mean absolute error of the lagless arms (6.70
-  points of capacity) and is already the baseline.
-- **Experiment 33's N1 without its lags:** its input set is the 13 columns of experiment 6, the
-  same columns H0.5 uses, so it is H0.5 with a 2-year half-life and no monthly refit, which
-  experiment 17 found worse.
-- **Experiment 42's lagless fits:** they cover July 2025 to June 2026 on runs every 5 days, and
-  the harness needs every half-hour from January 2022 to June 2026.
-- **Experiment 33's stack:** it reads lagged power and the 14-day error correction, which would
-  follow a long transfer and shrink its step, so it is not lagless.
+**C1, the new model minus the baseline model in the share of the 89 transfers found, is +0.011
+(98.75% interval -0.010 to +0.044), so the verdict is inconclusive.** The baseline is H0.5, the
+demand model of experiment 17 (trained on ERA5 estimates of past weather, with a half-life of 0.5
+years, refitted every month). The detector is D0, which watches one substation's residual (measured
+minus predicted power). D1 also requires an opposite step at a neighbouring substation. The share
+found is the mean of three random seeds, 0.360 for the new model and 0.348 for H0.5. The interval
+resamples whole calendar months 20,000 times, at 98.75% because of a Bonferroni correction across the
+four contrasts C1 to C4. The decision rule asked for an interval wholly above zero and a higher
+event F1 at both precision bounds. Event F1 is the harmonic mean of the share found and the alarms'
+precision. The F1 rose by 0.010 (0.389 to 0.399) at both bounds, which are the same here. The
+share found for H0.5 is 0.348 here and 0.29 in experiment 43, because this figure covers even months
+only, takes the mean of three seeds, and experiment 43's 47 of 160 covers all months.
 
-**H0.5 already fits the median with absolute error (`reg:absoluteerror`), so the robust-loss part of
-the proposal is already in the baseline.** Pseudo-Huber and Huber losses are quadratic near zero,
-which makes them less resistant to a shifted target than absolute error, so the refit keeps
-absolute error. The refit excludes no logged or labelled switching from its training target,
-because excluding switching is SW2-3 and SW2-5, and SW2-4 tests one change.
+**The experiment is too small to detect a gain below about 0.04.** The C1 interval has a
+half-width of about 0.027, and +0.011 is about one transfer net out of 89. Transfers whose receiving
+substation is metered (48) give +0.007 (-0.019 to +0.054), and the other 41 give +0.016 (0.000 to
++0.042).
 
-**The bank-holiday column has a measured mechanism.** Days within 1 day of a non-Christmas bank
-holiday are about 4% of all days and hold 16% of the 24-hour D0 detector's unexplained alarms
-(counted from experiment 43's stored alarm tables). The column is `days_to_nearest_holiday`:
-signed days to the nearest bank holiday in England from the `holidays` package (`GB`, `ENG`), on the
-local date, clipped to 7 either side, computed as experiment 33's `holiday_gaps` computes it. The
-forecasting pipeline computes the same column from the timestamp alone.
-
-**Weather is ERA5 at the valid time, which arrives about 5 days late, so the detector stays
-retrospective.** The new model's inputs exist at forecast time only as ENS forecasts, and this
-experiment does not test a detector on forecast weather.
-
-## Design
-
-- **Arms.** H0.5 (seeds 0, 1, and 2; seed 0 is experiment 17's stored fit), the new arm H0.5 plus
-  the holiday column (seeds 0, 1, and 2), and the placebo: H0.5 plus the same column built from
-  holiday dates moved 28 days later, which keeps each date's weekday (seed 0). Everything else is
-  experiment 17's `e00017_fit.py` for arm H0.5: the 13 columns, 500 rounds, `eta` 0.05, depth 6,
-  subsample 0.8, half-life 0.5 years, a refit for each month from January 2022 to June 2026 on
-  rows ending 7 days before the month starts.
-- **Harness, unchanged.** Experiment 43's 600 injected transfers (`events.parquet`), its 20
-  batches and per-batch seeds, `inject_power`, the detectors D0 and D1 at 4-hour and 24-hour
-  windows, the interval builder (the plain variant decides; the fixed variant is reported), the
-  matching rule, and the precision bounds. Real events: experiment 43's 14 primary and 35
-  secondary labelled transfers.
-- **Injection.** The training data of every arm is the real power, without injections. A lagless
-  model's prediction does not read observed power, so an injected transfer shifts the residual by
-  exactly the injected MW, and `fast_residual` is valid for a model trained on uninjected power,
-  for both arms alike. This departs from experiment 43's advice to call `inject_power` whenever
-  the model is refitted, and a check bounds the error. The check takes the batch with the most
-  headline-band transfers and refits, on injected power, the new arm's seed-0 models for every
-  month that contains one of the batch's transfers. The check passes when the found and start-found
-  outcomes agree with `fast_residual` for at least 95% of the batch's transfer-and-setting pairs.
-  If the check fails, the page reports the disagreement as a limit shared by both arms.
-- **Tuning on odd months, scoring on even months.** For each arm and seed, the noise scale of each
-  series is the odd-month robust scale of its uninjected residual, as the harness computes it. The
-  threshold of each of the four settings is the lowest value, on a grid of 0.05, whose count of
-  unexplained alarms in odd months (alarms more than 24 hours from a logged closure on their
-  series) does not exceed H0.5 seed 0's count at experiment 43's threshold: 120 (D0, 4 h), 118
-  (D1, 4 h), 80 (D0, 24 h), and 36 (D1, 24 h). Frozen: windows, neighbour z of 2.0, balance range,
-  interval builder, matching tolerances, transfers. Odd-month transfers tune nothing and are
-  reported as a check. Recall and precision are scored on transfers starting in even months and on
-  even-month alarms: 89 of the 160 headline-band transfers, 48 of them with a metered receiver and 41
-  without one.
-- **Precision.** As in experiment 43, from the even-month real alarms: the lower bound counts the
-  alarms within 24 hours of a logged closure, and the upper bound adds the unmatched alarms times
-  the visible share from the SW2-0b sample for that setting. The sample was drawn from H0.5's alarms,
-  so the upper bound is an assumption for the new arm, and the page says so.
-
-## Contrasts
-
-| Contrast | Detector, window | Population | Role |
+| Contrast | Detector, window | Change in share found | 98.75% interval |
 |---|---|---|---|
-| C1 | D0, 24 h | headline band, even months | decides the verdict |
-| C2 | D0, 4 h | headline band, even months | reported |
-| C3 | D1, 24 h | headline band, even months | reported |
-| C4 | D1, 4 h | headline band, even months | reported |
+| C1 | D0, 24 h | +0.011 | -0.010 to +0.044 |
+| C2 | D0, 4 h | +0.011 | -0.030 to +0.077 |
+| C3 | D1, 24 h | +0.004 | -0.011 to +0.033 |
+| C4 | D1, 4 h | +0.015 | 0.000 to +0.041 |
 
-**Every contrast is the new arm minus H0.5, paired by transfer, with each transfer's outcome averaged
-over the three seeds and whole calendar months resampled 20,000 times at 98.75%.** The headline band
-is transfers of 25% to 40% of the receiving load lasting over 1 day, as in experiment 43. Each
-contrast is also split by whether a metered receiver exists. Reported beside them, deciding nothing:
-the placebo minus H0.5 and the new arm minus the placebo on seed 0, all nine bands, all months, and
-the real-event counts. With 89 transfers the 98.75% interval on C1 is expected to be about 0.2 wide,
-so a gain under about 0.10 may well come out `inconclusive`; that is the expected outcome if the
-predicted gain is real but small.
+![The four contrasts with intervals](figure_8_contrasts.svg)
 
-**Diagnostics** (plots first, with the raw power before any residual): the measured power and both
-residuals around three bank holidays at one Primary; the residual's median absolute deviation per
-series and arm; the lag-1 and lag-48 autocorrelation of the residual and the lag-1 autocorrelation
-of its daily mean; the share of the residual's squared sum inside logged closures and inside
-labelled visible transfers, against their share of half-hours; the odd-month unexplained-alarm
-count against threshold for each arm (the operating-point figure); unexplained alarms by distance
-to the nearest bank holiday; recall by band; and the four contrasts with intervals. The mean
-absolute error of the median is reported over the whole period and on bank holidays and the day
-either side, as experiment 6's advice asks.
+**The detector found few real transfers with either model.** The 14 labelled real transfers that
+move 25% or more of the receiving load for over 1 day are the headline-band counterpart. The
+24-hour D0 finds 1, 2, and 3 of them with the new model (seeds 0 to 2) and 1, 1, and 2 with H0.5. The
+35 labelled transfers over 1 day include those 14 and 21 smaller or unsized ones; the counts there
+are 2, 3, and 4 against 2, 2, and 3. These counts carry no verdict.
 
-## Compute and checks
+## What held in the prediction and what did not
 
-**About 5,200 monthly fits on 4 CPU cores, an estimated 2 to 4 hours.** The fits are 864 (16 series
-times 54 months) for each of six arm-seeds that are not stored (H0.5 seeds 1 and 2, the new arm's
-three seeds, the placebo), plus about 45 for the injection check. One job is one arm, seed, and
-series, run by 4 workers with 1 thread each, no graphics card, each job writing its own file
-atomically. The first series is timed; at over 15 seconds a fit, the run waits for a re-plan.
+**The column fixed the bank-holiday errors, but the detector did not gain from it.**
 
-**Stop before detection when a check fails:** H0.5 seed 0 refitted for one series must match
-experiment 17's stored predictions to 1e-4; the H0.5 panel through the new code must reproduce
-experiment 43's alarm counts (432, 444, 297, and 110) and its 47 of 160 found by the 24-hour D0.
-**Stop and look for a bug** when the new arm's mean absolute error is worse than H0.5's by more than
-0.10 points of capacity.
+- **Held: fewer unexplained alarms lie near bank holidays.** Of H0.5's 160 unexplained 24-hour D0
+  alarms, 26 lie within 1 day of a bank holiday outside Christmas and New Year. With the new model
+  at the matched threshold there are 141, 147, and 138 unexplained alarms (seeds 0 to 2), of which
+  10, 10, and 9 lie within 1 day. The prediction was 13 or fewer.
+- **Held: the demand model's error moved as predicted.** The mean absolute error of the median
+  rose by 0.04 points of capacity over the whole period (prediction: under 0.05) and fell by 1.13 to
+  1.19 points on bank holidays (prediction: at least 0.5). H0.5's own errors are 6.70 points over the
+  whole period and 8.88 on bank holidays, and the changes are measured against H0.5 seed 0.
+- **Held: event F1 rose.** It rose by 0.010 at both precision bounds.
+- **Failed: the share found did not rise by 0.03 to 0.10.** C1 is +0.011.
+- **Failed: the matched threshold rose instead of falling.** The prediction was a fall of 0.1 to
+  0.4. The D0 24-hour threshold rose by 0.217 on average, in units of the noise scale (4.00 to 4.05
+  for H0.5, 4.20 to 4.25 for the new model). That is about 2.5% in residual units, because the noise
+  scale fell by about 3%. The 4-hour D0 threshold rose by 0.133, the 4-hour D1 by 0.067, and the
+  24-hour D1 by 0.000.
+- **Borderline: the 24-hour noise scale sits at the edge of the 3% band.** The odd-month noise
+  scale fell by 3.0%, 3.2%, and 2.9% for seeds 0, 1, and 2 at the 24-hour window, so one seed is
+  inside the band and two are just outside it. The 4-hour window fell by 1.3% to 1.7%, within 3%.
+- **Failed: the placebo changed C1 by more than 0.02.** The placebo column moves the holiday dates
+  28 days later and keeps each date's weekday. On share found alone, the shifted column did as well
+  as the real one, within single-seed noise: placebo minus H0.5 is +0.022 (0.000 to +0.068) and the
+  new model minus the placebo is -0.022 (-0.068 to 0.000), about 2 transfers of 89. On event F1 the
+  placebo is worse than H0.5 (0.356 against 0.389 on seed 0), because its 24-hour D0 precision is 0.34
+  against 0.44 to 0.46 for the other models: more of its alarms fall away from logged closures.
 
-## Size and process
+## Why the threshold rose
 
-- **Stored:** residual panels and alarm tables under `data/ml-experiments/00047-*`, never committed.
-- **Serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes; which better residual to test is a choice, made above.
-- **Callers:** none outside the experiment; the scripts copy experiment 17's fit code and copy
-  experiment 43's harness modules into this folder unchanged.
+**The column probably made the residual more persistent, which makes the 24-hour step test fire more
+often away from holidays.** This is a likely explanation, not a proven one. The residual's lag-48
+autocorrelation (half-hours, one day apart) rose from 0.520 to 0.529 and the autocorrelation of its
+daily mean from 0.760 to 0.770, while the median absolute deviation fell from 5.55 to 5.46 to 5.51
+points of capacity. A more persistent residual over a smaller noise scale crosses a threshold fixed
+in noise-scale units more often, which cancels the roughly 16 alarms near holidays that the column
+removed. The placebo shows the same signs (whole-period error +0.136 points, lag-48 autocorrelation
+0.535). The persistence matters for SW2-9, the planned whitening step that removes a residual's
+autocorrelation before detection.
 
-Medium, run as part of the SW2 exploratory series: Opus writes the plan, Sonnet implements, a
-second Sonnet reviews the code, Sonnet runs and writes up, Sonnet reviews the prose, and Opus reviews
-the result and writes the paragraph on what the next experiment should answer. **Series stop
-rule:** experiment 43 refuted its own hypothesis, so a refuted or inconclusive result here is the
-second negative result in the detector line; SW2-8 is already approved to run next, and if it is
-negative too, the series stops under the skill's rule.
+![Unexplained alarms against threshold, odd months](figure_5_operating_points.svg)
 
-## Earlier advice
+## Checks and limits
 
-Followed: experiment 17's half-life of 0.5 years and monthly refit; experiment 37's comparison at
-equal unexplained-alarm rates and its 24-hour single-series window; experiment 41's headline band;
-experiment 43's split by metered receiver, end delay, and precision bracket; experiment 44's
-recomputed share of the receiving load (through experiment 43's real-event code); experiment 11's
-placebo calendar; experiment 6's scoring of a calendar column on its special days. Departed from:
-experiment 43's `inject_power` rule (reason and check above); experiment 34's screening recipe of
-150 rounds, because the baseline must be H0.5 exactly; experiment 6's half-year flag control,
-because the column is constant beyond 7 days and the placebo covers the concern.
+- **Matching fixes only the odd-month count, so the scored even months differ.** In even months the
+  new model raises 66, 67, and 64 unexplained 24-hour D0 alarms (seeds 0 to 2) against 80, 76, and
+  71 for H0.5 and 77 for the placebo. The new model is therefore scored at a stricter operating point,
+  which biases the comparison against it.
+- **The odd months show no gain.** On the 71 headline-band transfers in odd months, which set the
+  thresholds through alarm counts and not through recall, the new model minus H0.5 is -0.019 (0.188
+  against 0.207), and pooled over all 160 headline-band transfers it is -0.002.
+- **The ceiling on the threshold route is low.** Only 4.8% of half-hours lie within 1 day of a
+  qualifying bank holiday, and removing 26 of 160 unexplained alarms cannot lower the matched
+  threshold far. We could have computed this ceiling from the operating-point figure before the run.
+- **The injection check agrees with the fast residual.** The new model's seed-0 fits were refitted
+  on injected power for the months holding a transfer of one batch, the batch with the most
+  headline-band transfers. All 316 pairs of a transfer and a detector setting from that batch agree
+  (1.000, bar 0.95). The 600 transfers are not all checked.
+- **The residual is otherwise similar.** Logged closures hold 0.342 of H0.5's squared residual and
+  0.349 of the new model's, against 0.252 of the half-hours.
+- **Reproduction of experiment 43.** H0.5 seed 0 at experiment 43's thresholds gives its 120, 118,
+  80, and 36 unexplained odd-month alarms and its 160 unexplained 24-hour D0 alarms.
+- **The threshold search takes the lowest value of a run.** On a 0.05 grid the search stops at the
+  lowest threshold whose count does not exceed 80 (the 24-hour D0 target), so the new model's odd-month
+  counts are 75, 80, and 74 against 80, 80, and 78 for H0.5, which handicaps the new model slightly.
+- **The precision upper bound is an assumption for the new model.** It adds the unmatched alarms
+  times the visible share from experiment 41's hand-labelled sample of 37 alarms per setting, drawn
+  from H0.5's alarms. The 24-hour D0 precision is 0.44 for H0.5 and 0.44 to 0.46 for the new model.
 
-## Risks
+The remaining figures sit beside this page: the raw power around bank holidays (`figure_1`), the
+residual's spread (`figure_2`) and autocorrelation (`figure_3`), the squared-residual shares inside
+logged closures (`figure_4`), the share found by size and length band (`figure_7`), and the demand
+model's error on bank holidays (`figure_9`). Code:
+`ml-experiments/00047-sw2-4-better-residual-switching-detector/`, with every number printed by
+`e00047_report.py`.
 
-- **The transfers avoid H0.5's real alarms.** Experiment 43 drew transfers at least 2 days from
-  any H0.5 alarm, so none sits on a bank-holiday alarm, and the new column can help only through a
-  lower threshold.
-- **Power.** 89 headline transfers in even months resolve only a large gain.
-- **Seeds.** Subsampling makes each fit's residual depend on its seed, so a transfer near the
-  threshold can flip; averaging three seeds per arm and the placebo bound this.
-- **D1 at 24 hours** has only 36 odd-month unexplained alarms to match, so its threshold is coarse.
+## What the next experiment should answer
+
+**SW2-8 should run next, as already approved.** Its neighbour veto targets the alarms this experiment
+could not turn into recall: 26 of H0.5's 160 unexplained 24-hour D0 alarms lie within 1 day of a bank
+holiday, and a calendar miss shows as a same-sign step on the neighbours. A veto raises the share of
+transfers found only by letting the matched threshold fall, so the SW2-8 plan should predict the size
+of that fall from H0.5's odd-month alarm counts before running. SW2-8 changes the detector and not
+the residual model, so its injections need no refit. SW2-8 should therefore score several hundred
+headline-band transfers in the even months, not 89, and place some near bank holidays to count real
+transfers the veto wrongly removes. SW2-8 should also report its even-month unexplained-alarm count,
+which matching on odd months does not hold fixed.

@@ -40,7 +40,7 @@ OUT_DIR: Final[Path] = (
 )
 WIDTH: Final[int] = 680
 PLOT_WIDTH: Final[int] = 520
-WRAP: Final[int] = 100
+WRAP: Final[int] = 80
 ARMS: Final[dict[str, str]] = {
     "H0.5": "H0.5 (baseline)",
     "HOL": "H0.5 + days to nearest bank holiday",
