@@ -96,6 +96,7 @@ the maintainer to confirm.
 | [00071 - Switching event detector, part 12](00071-sw2-18-refit-offset-and-gap-bridging/result.md) | Does taking the step statistic from two residual models refitted half a month apart, so that no alarm is suppressed at a refit, find more of the moved MW than the benchmark detector PF14? | Supported: +0.050 of the moved MW (98.33% interval +0.012 to +0.107) at no more than 80 odd-month unexplained alarms, all of it in transfers within 24 hours of a refit. Lifting the suppression alone gives +0.056, and gap bridging changes no outcome | Candidate | 2026-10-16 |
 | [00072 - Step-loss monitor for the solar farms, P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a monitor find a loss of generating capacity at the 5 long-record solar farms from their daily power telemetry? | Refuted: it found 0.45 of 25% losses lasting 30 days (the plan required 0.80), 0.84 of 25% losses lasting 90 days, 0.26 of 10% losses lasting 90 days, and 3% losses barely above chance; false alarms 0.29 per farm-year on a placebo | Not for production | 2026-10-16 |
 | [00068 - Switching event detector, part 13](00068-sw2-5-train-detect-retrain-loop/result.md) | Does refitting the lagless XGBoost model without the detected switching intervals, for three rounds, raise the share of moved MW the detector finds and lower the forecast error? | Inconclusive, and no gain worth porting: recall gains +0.011 (97.5% interval +0.000 to +0.034) and the forecast's mean absolute error changes -0.175% (-1.145% to +0.603%); a random mask of about equal volume does as well | Not for production | 2026-10-16 |
+| [00067 - Switching event detector, part 14](00067-sw2-15-joint-edge-flow-estimator/result.md) | Does one convex fit of load flows across all boundaries between the 16 Primaries find more of the moved MW than the single-series 24-hour step detector? | Refuted: the joint estimator finds 0.108 of the moved MW against 0.646 (difference -0.538, 97.5% interval -0.605 to -0.421); a post hoc loss change lifts it to 0.527 (-0.120, -0.190 to -0.084) | Not for production | 2026-10-17 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -1298,6 +1299,26 @@ single-series detector finds 0.646 (0.354 missed). The logistic regression finds
   [PR #1296](https://github.com/openclimatefix/nged-substation-forecast/pull/1296).
 
 ![Gain in MW-weighted recall over the single-series detector](00065-sw2-14-combined-single-series-and-neighbour-score/figure_1_gain_over_d0m.svg)
+
+### 00067: does one convex fit of load flows across all boundaries find more of the moved load? (SW2-15)
+
+**Fitting block-shaped flows to the hourly residual of all 16 Primary substations at once found
+far less of the moved load than the single-series 24-hour step detector. The cause is the hourly
+noise model, not the conservation of power, so a joint fit would have to start from the 24-hour
+step statistics.** We injected 620 known load transfers (power moved between substations for over 1
+day) and counted the share of the moved megawatts (MW) found, with every detector held to about 80
+unexplained alarms on odd months. The step detector finds 0.646 (0.354 missed). The joint
+estimator finds 0.108 (0.892 missed), a difference of -0.538 (97.5% interval -0.605 to -0.421).
+
+- **Finding for later experiments:** a post hoc change of the loss lifts the estimator to 0.527
+  (-0.120 against the step detector, -0.190 to -0.084). With that change it matches the step
+  detector for transfers with a metered receiver and a donor step of 10 noise units or more (0.92
+  against 0.89 of transfers found) and finds almost nothing where no receiver is metered and the
+  step is under 6. On the 35 labelled real transfers of over 1 day it finds 4, against 7.
+- **Write-up and pull request:** [the full result page](00067-sw2-15-joint-edge-flow-estimator/result.md),
+  [PR #1298 (Experiment 67: one convex fit of load flows across all boundaries (SW2-15))](https://github.com/openclimatefix/nged-substation-forecast/pull/1298).
+
+![Gain in MW-weighted recall of the joint estimator](00067-sw2-15-joint-edge-flow-estimator/figure_2_gain_over_d0m.svg)
 
 ### 00062: does removing the residual's half-hour-to-half-hour memory help the switching detector? (SW2-9)
 
