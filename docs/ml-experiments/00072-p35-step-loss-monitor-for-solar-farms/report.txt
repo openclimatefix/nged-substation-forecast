@@ -1,0 +1,145 @@
+Signal: valid days, robust standard deviation of the signal, and valid days per week by half-year
+farm A: 898 valid days, robust SD 0.114, per week {'apr_sep': 3.11, 'oct_mar': 2.0}
+farm B: 916 valid days, robust SD 0.100, per week {'apr_sep': 3.16, 'oct_mar': 2.05}
+farm C: 899 valid days, robust SD 0.065, per week {'apr_sep': 3.14, 'oct_mar': 1.97}
+farm D: 791 valid days, robust SD 0.087, per week {'apr_sep': 2.74, 'oct_mar': 2.0}
+farm E: 175 valid days, robust SD 0.071, per week {'apr_sep': 2.51, 'oct_mar': 1.57}
+farm F: 893 valid days, robust SD 0.061, per week {'apr_sep': 3.13, 'oct_mar': 1.95}
+
+Detection rate by monitor, size, duration, and half-year (pooled over farms, draws)
+apr_sep days= 30 size=0.00  changepoint=0.02(n=100)  rolling_median=0.02(n=100)  hyst=0.01(n=100)
+apr_sep days= 30 size=0.03  changepoint=0.02(n=100)  rolling_median=0.04(n=100)  hyst=0.05(n=100)
+apr_sep days= 30 size=0.10  changepoint=0.04(n=100)  rolling_median=0.05(n=100)  hyst=0.13(n=100)
+apr_sep days= 30 size=0.25  changepoint=0.45(n=100)  rolling_median=0.30(n=100)  hyst=0.86(n=100)
+apr_sep days= 90 size=0.00  changepoint=0.01(n=100)  rolling_median=0.01(n=100)  hyst=0.00(n=100)
+apr_sep days= 90 size=0.03  changepoint=0.03(n=100)  rolling_median=0.04(n=100)  hyst=0.07(n=100)
+apr_sep days= 90 size=0.10  changepoint=0.26(n=100)  rolling_median=0.16(n=100)  hyst=0.07(n=100)
+apr_sep days= 90 size=0.25  changepoint=0.84(n=100)  rolling_median=0.72(n=100)  hyst=0.82(n=100)
+apr_sep days= -1 size=0.10  changepoint=0.38(n=100)  rolling_median=0.12(n=100)  hyst=0.13(n=100)
+apr_sep days= -1 size=0.25  changepoint=0.80(n=100)  rolling_median=0.70(n=100)  hyst=0.78(n=100)
+oct_mar days= 30 size=0.00  changepoint=0.06(n=100)  rolling_median=0.03(n=100)  hyst=0.02(n=100)
+oct_mar days= 30 size=0.03  changepoint=0.04(n=100)  rolling_median=0.04(n=100)  hyst=0.02(n=100)
+oct_mar days= 30 size=0.10  changepoint=0.07(n=100)  rolling_median=0.06(n=100)  hyst=0.11(n=100)
+oct_mar days= 30 size=0.25  changepoint=0.27(n=100)  rolling_median=0.14(n=100)  hyst=0.57(n=100)
+oct_mar days= 90 size=0.00  changepoint=0.09(n=100)  rolling_median=0.09(n=100)  hyst=0.02(n=100)
+oct_mar days= 90 size=0.03  changepoint=0.14(n=100)  rolling_median=0.03(n=100)  hyst=0.04(n=100)
+oct_mar days= 90 size=0.10  changepoint=0.17(n=100)  rolling_median=0.09(n=100)  hyst=0.06(n=100)
+oct_mar days= 90 size=0.25  changepoint=0.66(n=100)  rolling_median=0.31(n=100)  hyst=0.43(n=100)
+oct_mar days= -1 size=0.10  changepoint=0.31(n=100)  rolling_median=0.10(n=100)  hyst=0.09(n=100)
+oct_mar days= -1 size=0.25  changepoint=0.68(n=100)  rolling_median=0.35(n=100)  hyst=0.45(n=100)
+
+Smallest loss found in at least 80% of April-September injections
+days=30 changepoint: none of 3%, 10%, 25%
+days=30 rolling_median: none of 3%, 10%, 25%
+days=30 hyst: 0.25
+days=90 changepoint: 0.25
+days=90 rolling_median: none of 3%, 10%, 25%
+days=90 hyst: 0.25
+
+Per-farm detection rate of 10% losses lasting 90 days, April-September
+changepoint {'A': 0.1, 'B': 0.2, 'C': 0.25, 'D': 0.15, 'F': 0.6}
+rolling_median {'A': 0.2, 'B': 0.1, 'C': 0.05, 'D': 0.1, 'F': 0.35}
+hyst {'A': 0.15, 'B': 0.05, 'C': 0.0, 'D': 0.0, 'F': 0.15}
+
+Per-farm detection rate of 25% losses lasting 30 days, April-September
+changepoint {'A': 0.25, 'B': 0.25, 'C': 0.55, 'D': 0.55, 'F': 0.65}
+rolling_median {'A': 0.25, 'B': 0.1, 'C': 0.35, 'D': 0.35, 'F': 0.45}
+hyst {'A': 0.9, 'B': 0.8, 'C': 0.95, 'D': 0.75, 'F': 0.9}
+
+Median delay (days) and size error (points) of detected 25% losses, April-September
+changepoint delay 1.0 size error 0.2
+rolling_median delay 3.0 size error -9.8
+hyst delay 14.5 size error -0.7
+
+Contrasts on 10% losses lasting 30 and 90 days starting April-September
+C1 changepoint minus rolling_median: +0.045 (97.5% interval -0.015 to +0.090) {'A': -0.05, 'B': 0.05, 'C': 0.1, 'D': 0.03, 'F': 0.1}
+C2 changepoint minus hyst: +0.050 (97.5% interval -0.010 to +0.105) {'A': 0.0, 'B': 0.03, 'C': 0.12, 'D': -0.03, 'F': 0.12}
+
+False alarms per farm-year
+scored placebo changepoint: 193 alarms in 670.0 farm-years = 0.288
+scored placebo hyst: 237 alarms in 670.0 farm-years = 0.354
+scored placebo rolling_median: 191 alarms in 670.0 farm-years = 0.285
+unmodified record changepoint: 18 alarms away from farm A's low months, 2 near them
+unmodified record rolling_median: 12 alarms away from farm A's low months, 1 near them
+unmodified record hyst: 14 alarms away from farm A's low months, 2 near them
+unmodified record changepoint: 0.537 per farm-year over 33.5 farm-years
+unmodified record rolling_median: 0.358 per farm-year over 33.5 farm-years
+unmodified record hyst: 0.418 per farm-year over 33.5 farm-years
+
+Unmodified-record alarms of the change-point monitor
+  farm A 2024-07-21 size 0.25 near farm A low months: False
+  farm A 2025-03-08 size 0.53 near farm A low months: True
+  farm A 2026-03-26 size 0.19 near farm A low months: True
+  farm B 2020-02-06 size 0.15 near farm A low months: False
+  farm B 2020-09-24 size 0.11 near farm A low months: False
+  farm B 2021-08-02 size 0.13 near farm A low months: False
+  farm B 2023-12-01 size 0.18 near farm A low months: False
+  farm C 2019-11-06 size 0.24 near farm A low months: False
+  farm C 2020-03-25 size 0.12 near farm A low months: False
+  farm C 2025-10-26 size 0.06 near farm A low months: False
+  farm D 2020-12-01 size 0.22 near farm A low months: False
+  farm D 2021-11-17 size 0.28 near farm A low months: False
+  farm D 2022-11-04 size 0.21 near farm A low months: False
+  farm D 2023-11-17 size 0.28 near farm A low months: False
+  farm D 2024-11-21 size 0.30 near farm A low months: False
+  farm D 2025-06-10 size 0.18 near farm A low months: False
+  farm D 2025-11-25 size 0.29 near farm A low months: False
+  farm E 2025-03-28 size 0.10 near farm A low months: False
+  farm F 2020-03-25 size 0.14 near farm A low months: False
+  farm F 2022-02-01 size 0.13 near farm A low months: False
+  farm F 2025-02-05 size 0.12 near farm A low months: False
+
+Farm A's low months
+shape: (9, 5)
+┌─────────┬────────────────┬────────────┬─────────────┬───────┐
+│ month   ┆ method         ┆ valid_days ┆ share_below ┆ found │
+│ ---     ┆ ---            ┆ ---        ┆ ---         ┆ ---   │
+│ str     ┆ str            ┆ i64        ┆ f64         ┆ bool  │
+╞═════════╪════════════════╪════════════╪═════════════╪═══════╡
+│ 2024-12 ┆ changepoint    ┆ 4          ┆ 1.0         ┆ true  │
+│ 2024-12 ┆ rolling_median ┆ 4          ┆ null        ┆ false │
+│ 2024-12 ┆ hyst           ┆ 4          ┆ null        ┆ false │
+│ 2025-03 ┆ changepoint    ┆ 17         ┆ 0.823529    ┆ true  │
+│ 2025-03 ┆ rolling_median ┆ 17         ┆ null        ┆ false │
+│ 2025-03 ┆ hyst           ┆ 17         ┆ null        ┆ true  │
+│ 2026-04 ┆ changepoint    ┆ 22         ┆ 1.0         ┆ true  │
+│ 2026-04 ┆ rolling_median ┆ 22         ┆ null        ┆ true  │
+│ 2026-04 ┆ hyst           ┆ 22         ┆ null        ┆ true  │
+└─────────┴────────────────┴────────────┴─────────────┴───────┘
+
+Chance detection (0% control windows, April-September) {'changepoint': 0.015, 'rolling_median': 0.015, 'hyst': 0.005}
+
+Stop rules {'25% 30-day detection under 80%': True, 'upper limit of C1 or C2 at or below 0': False, 'placebo false alarms above 1 per farm-year': False, "none of farm A's low months found": False}
+Supported conditions {'10% 90-day detection at least 80%': False, 'lower limit of C1 above 0': False, 'lower limit of C2 above 0': False, 'placebo false alarms at most 0.5': True, 'all three low months found': True, 'unmodified record at most 1 per farm-year': True}
+
+VERDICT by the decision rule: refuted
+
+POST HOC 1: detection window from 14 days before the loss to 28 days after (April-September)
+days= 30 size=0.10 {'changepoint': 0.06, 'rolling_median': 0.05, 'hyst': 0.14}
+days= 30 size=0.25 {'changepoint': 0.64, 'rolling_median': 0.43, 'hyst': 0.87}
+days= 90 size=0.10 {'changepoint': 0.33, 'rolling_median': 0.18, 'hyst': 0.08}
+days= 90 size=0.25 {'changepoint': 0.88, 'rolling_median': 0.87, 'hyst': 0.84}
+days= -1 size=0.10 {'changepoint': 0.48, 'rolling_median': 0.15, 'hyst': 0.15}
+days= -1 size=0.25 {'changepoint': 0.85, 'rolling_median': 0.83, 'hyst': 0.79}
+
+POST HOC 2: change-point monitor with a minimum segment of 7 valid days
+penalty 6.0
+scored placebo false alarms: 0.309 per farm-year
+apr_sep days= 30 size=0.00  detection 0.02 (n=100)
+apr_sep days= 30 size=0.10  detection 0.05 (n=100)
+apr_sep days= 30 size=0.25  detection 0.64 (n=100)
+apr_sep days= 90 size=0.00  detection 0.01 (n=100)
+apr_sep days= 90 size=0.10  detection 0.25 (n=100)
+apr_sep days= 90 size=0.25  detection 0.84 (n=100)
+apr_sep days= -1 size=0.10  detection 0.37 (n=100)
+apr_sep days= -1 size=0.25  detection 0.82 (n=100)
+oct_mar days= 30 size=0.00  detection 0.07 (n=100)
+oct_mar days= 30 size=0.10  detection 0.08 (n=100)
+oct_mar days= 30 size=0.25  detection 0.44 (n=100)
+oct_mar days= 90 size=0.00  detection 0.08 (n=100)
+oct_mar days= 90 size=0.10  detection 0.16 (n=100)
+oct_mar days= 90 size=0.25  detection 0.65 (n=100)
+oct_mar days= -1 size=0.10  detection 0.33 (n=100)
+oct_mar days= -1 size=0.25  detection 0.70 (n=100)
+C1 (short segment minus rolling_median): +0.045 (97.5% interval +0.000 to +0.085) {'A': -0.03, 'B': 0.05, 'C': 0.07, 'D': 0.03, 'F': 0.1}
+C2 (short segment minus hyst): +0.050 (97.5% interval -0.005 to +0.105) {'A': 0.03, 'B': 0.03, 'C': 0.1, 'D': -0.03, 'F': 0.12}
