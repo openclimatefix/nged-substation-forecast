@@ -18,12 +18,10 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-6b](#pvdis-6b-the-fitted-solar-shape-in-arm-am) | Does a fitted east-south-west solar shape, with shares fixed across training years, lower the score of experiment 64's arm `am` by more than 0.5%? | 2 | Experiment 64's gain beyond 10 days checked for leakage; the weekly-capacity check of `am` | Planned as experiment 77; fits wait for the manager |
-| [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
 ## Deferred until the first results are in
@@ -187,34 +185,6 @@ confirm:
   hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
   24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
 
-#### SW2-13 to SW2-15: combining evidence across windows and neighbours
-
-**Three experiments replace the detectors' hard rules with combined evidence: across window sizes
-first (SW2-13, finished as [experiment 59](00059-sw2-13-several-windows-in-one-detector/result.md)),
-then across neighbours, then across the whole electricity network at once.** Experiment 43
-found that the better detector depends on the window, D1 at 4 hours and D0 at 24 hours, and
-experiment 55 found that the neighbour test helps little as a veto. Each experiment is scored on the
-experiment 43 scoreboard at matched unexplained-alarm rates, with recall weighted by the MW moved as
-the headline and unweighted recall second, because a small transfer matters less than a large
-transfer. Each take-home message states the share of the moved MW that the detector misses. Each
-reports recall by donor step in noise units, split by metered receiver. Each scores injected
-transfers whose shapes the detector does not assume (a constant MW, a share of the receiver's
-profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
-day.
-
-- **SW2-14 (done, [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)):**
-  a likelihood-ratio sum and a logistic regression of own and neighbour opposite steps gained +0.005
-  and +0.019 over the single-series detector (neither interval excludes zero). A post hoc arm that
-  adds the count of same-sign neighbour steps gained +0.034.
-- **SW2-15, the joint edge-flow estimator** from approach 3 on the [switching
-  events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
-  a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
-  at once with a sparsity penalty and a penalty on changes, in CVXPY. Each Primary also gets a
-  slack term for load moved to a neighbour that is not metered. The 8 Primaries metered only in MVA
-  carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
-  injections. The benchmark is the best sequential detector from experiment 59 (the 24-hour single
-  window) or SW2-14.
-
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 
 **Retrain the best-guess architecture so that it never learns to predict an abnormal running
@@ -297,7 +267,8 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   daylight cloud load was flagged in 6 of 7 season-years; Wrangle T1 is excluded from any claim that
   a Primary is free of a confound; Trusthorpe is marked low-power. The 8 Primaries metered only in
   MVA fold solar into the magnitude of the flow, and experiment 00039 fitted a negative capacity at
-  Stickney in every year. PVDIS-7 treats them separately.
+  Stickney in every year. [Experiment
+  00079](00079-pvdis-7-mw-at-mva-only-primaries/result.md) (PVDIS-7) treats them separately.
 - **Service areas.** `TimeSeriesMetadata.area_wkt` holds one polygon per Primary. Wrangle T1 and
   Wrangle T2 are two transformers at one substation, feeding different circuits, and share one
   polygon. Each transformer keeps its own capacity fit, and any comparison against an outside count
@@ -332,18 +303,6 @@ the same rows.** The plan is
 [experiment 77](00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md). The shares are fitted on
 the training window only and held fixed across training years. The controls are the all-south shape
 at the blend's tilt, a placebo twin, and a shuffled-shares placebo.
-
-#### PVDIS-7: MW at the Primaries metered only in MVA
-
-**Fit the magnitude of demand minus solar, so that the reading bounces off zero instead of going
-negative, and test on the Primaries metered in MW whether the fit recovers the direction of flow and
-the solar capacity.** The 8 MVA Primaries have MVA meters only, and NGED cannot supply real and
-reactive power there, so recovering MW from MVA is the only route to forecasting MW at every
-Primary. The model assumes a power factor of 1, which is weakest exactly where the flow passes
-through zero, because reactive power then dominates the reading. The known-answer test takes the
-absolute value of the MW readings at the 8 Primaries metered in MW and scores the recovered sign
-and capacity against the real ones. A fit that passes that test is then applied to the 8 MVA
-Primaries. NGED would like MW at every Primary, and accepts that the result is research.
 
 #### PVDIS-T: the capacity table, a study
 
