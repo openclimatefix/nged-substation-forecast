@@ -31,7 +31,8 @@ them up:
    running beyond its limit. NGED procures flexibility conservatively as a safeguard against
    forecast uncertainty, so a sharper forecast needs less flexibility for the same security. Metric
    1 measures NGED's own spend on flexibility.
-2. **Curtailment of generation.** Generators are curtailed to keep exports within network limits.
+2. **Curtailment of generation.** Generators are curtailed to keep a substation's export within
+   its limit.
    Curtailment avoided is generation sold, priced as a whole-system cost rather than a saving to
    NGED or the connected generator specifically — see [curtailment price
    basis](#curtailment-price-basis).
@@ -144,66 +145,98 @@ series, split by which contract type covered each half-hour.
 
 ## Metric 2 — curtailment cost
 
-Curtailment is not decided per meter: a generation constraint typically binds above the primary,
-driven by the aggregated flow across several substations rather than by any single meter in
-isolation. Scoring each `time_series_id` independently, as Metric 1 does for flexibility, would
-misrepresent how curtailment actually gets triggered. We instead define **three tiers of increasing
-realism**, each documented separately with its own scope and caveats, all keeping the "these numbers
-rank models, they do not cost anything" disclaimer above — none is a validated £-saved figure
-without a real case study behind it.
+**Curtailment is not decided per meter: a generation constraint binds at a substation, driven by
+the aggregated flow through a bulk supply point (BSP) or grid supply point (GSP).** Scoring each
+`time_series_id` independently, as Metric 1 does for flexibility, would misrepresent how
+curtailment gets triggered. Metric 2 therefore scores forecasts against the limit of each BSP and
+GSP, in two tiers of increasing realism. Both keep the "these numbers rank models, they do not cost
+anything" disclaimer above. Neither is a validated £-saved figure without a real case study behind
+it.
 
-### Tier 1 — per-primary netting
+### Tier 1 — substation limits, no power-flow
 
-At one primary, net the local generation forecasts against the local demand forecasts before
-comparing the result to the primary's export limit, instead of scoring each meter independently.
-Otherwise identical to the Metric 1 arithmetic, with the export-side limit and the curtailment price
-$p_{\text{curt}}$ (£/MWh of network access) charged against total volume curtailed, since curtailed
-generation is lost whether or not the constraint was real. There is no hierarchy in this tier: each
-primary is scored in isolation.
+**The node metric asks one question per half-hour: will a BSP or GSP export more than its firm
+limit, and if so, which generators beneath it must be capped, and what does that cost in pounds?**
+A generator is capped only when the forecast says the substation's export would exceed the
+substation's limit. Two tables hold every fact about the electricity network. The node table has
+one row per BSP or GSP, with its parent, its export sign, and its limits in each season. The
+generator table has one row per generator, with its capacity, connection date, and whether a
+forecast exists. Scoring the ~2,500 series due in January 2027 therefore needs longer tables and no
+new code. Primaries are out of scope until NGED supplies the topology.
 
-**Worked example.** A generation-dominated feeder with an export limit of 8.5 MW. The netted
-forecast at its calibrated quantile says 9.6 MW, so 0.55 MWh is curtailed; actual net export is 8.7
-MW, so 0.1 MWh needed curtailing. At £100/MWh that is £55 against £10 of real constraint — £45 of
-generation curtailed for nothing.
+**The limit is the firm (N-1) limit: the smaller of the per-transformer pre-event limits of the
+substation's redundant transformer pair.** One transformer carries the full load when the other is
+out. The limit is set per NGED season, and each season is a set of whole calendar months: Winter is
+December to February, Intermediate Cool is March, April, and November, Intermediate Warm is May,
+September, and October, and Summer is June to August. The import limit follows the same rule and is
+used only to count import exceedances.
 
-**Caveat.** This tier is only valid where a primary's export is electrically isolated from its
-neighbours. Where primaries share a constraint — operate "in parallel" — curtailment must be
-assessed jointly across the group, not per primary. Which primaries in the trial area operate in
-parallel is an **open per-site question**, not a question this tier can assume away. Treating every
-primary as isolated will overstate how much curtailment Tier 1 avoids at any site that actually
-shares a constraint.
+**Net export is an explicit sign times our own metered flow.** The sign `export_sign` is +1 where a
+positive flow is export, -1 where a positive flow is import, and null where the sign is unconfirmed.
+A node with a null sign is excluded and counted, never guessed. Our own cleaned power data is
+authoritative for flows and signs. NGED's public portal supplies only the published limits and the
+season boundaries, because the portal's flows are sums of several meters and can carry the wrong
+sign.
 
-### Tier 2 — substation hierarchy, no power-flow
+**The rule plans a cut from the forecast, shares the cut among generators, and charges what the
+forecast got wrong.** For each half-hour with a forecast lead of at least 12 hours and under 36
+hours:
 
-Sum active-power forecasts (generation minus demand) up the known substation hierarchy, one node at
-a time, and compare each node's summed forecast against a limit for that node. This is Tier 1 with
-the netting extended from one primary to every node above it.
+1. **Planned node curtailment** is
+   $v_{\text{node}} = \max(0, q_\tau(\text{export}) - L) \times 0.5$ h, in MWh, where $L$ is the
+   limit in MW and $q_\tau(\text{export})$ is the $\tau$ quantile of net export in MW. For a node
+   with sign -1 that is minus the $1 - \tau$ quantile of the metered flow. The breach ratio $r$ is
+   fixed at 20, so $\tau = 1 - 1/r = 0.95$, and the manual heuristic is scored at the same $\tau$.
+2. **The generators with a forecast share $v_{\text{node}}$ pro rata by capacity.** A share larger
+   than a generator's forecast energy is clamped to that energy, and the excess goes to the
+   unclamped generators by capacity, repeating until nothing is clamped. Any remainder is
+   unallocated and shows up as residual breach. A generator with no forecast is never capped,
+   because capping it from its actual output would leak the outcome. The allocation order is a
+   stated assumption. Last-in-first-out by connection date is a sensitivity only where connection
+   dates exist.
+3. **A generator with a share is capped at its forecast median minus its share**, $\text{cap}_g =
+   \max(0, f_g - v_g / 0.5\text{ h})$ in MW, and loses $c_g = \max(0, a_g - \text{cap}_g) \times
+   0.5$ h in MWh against its metered output $a_g$. The generator forecasts enter the score here.
+4. **The residual breach** is $\max(0, \text{actual export} - \sum_g c_g / 0.5\text{ h} - L)
+   \times 0.5$ h, in MWh.
 
-The limit at each node is a **synthetic toy limit**: the same `historical_p99`-style
-percentile-of-history device already used per series (see [choosing the
-limit](#choosing-the-limit)), applied at the node level instead — the percentile of that node's own
-historical summed power. Where NGED supply a real rating for a node, we use that instead.
+**Import-side exceedances are counted, not priced.** Capping generators cannot relieve an import
+constraint. [Metric 1](#metric-1-flexibility-procurement-cost) prices that side. The output reports
+import-exceedance half-hours per node and season.
+
+**Two limits are reported, as co-equal headlines.** The real firm limit is what NGED enforces, and
+it binds on very few half-hours, so a score at the real limit demonstrates the arithmetic more than
+it ranks forecasts. The scaled limit is defined for every node, including those with no known real
+limit: $L = f \times$ the node's maximum observed export (the negative tail for a node whose
+positive flow is import), computed only from history before the scored period. The fraction $f$ is
+0.9 by default, with 0.75 and 0.5 swept. "p90" here means 0.9 times the maximum, not the 90th
+percentile of the node's flow, because a percentile of a node's own flow is exceeded on 10% of
+half-hours by construction. A scaled-limit figure is a calibration to history, not a saving. An
+event census of export and import exceedances at the real limit and at each $f$ comes first, and it
+decides whether a ranking of forecasts is possible.
 
 **Caveats.**
 
-- **No reactive power, voltage drop, or N-1 contingency modelling.** A hierarchy sum of active power
-  is not a load-flow study; Tier 3 is where that modelling belongs.
-- **Coverage gap.** Only some of a node's children have a forecast in the trial area; the rest need
-  a metered-actuals or historical-baseline stand-in, which adds a second error source on top of
-  forecast error at every node above the trial-area leaves. This gap shrinks as trial coverage
-  scales towards the ~2,500-series v2 rollout — it is a limitation of the trial's current coverage,
-  not a fixed limitation of the tier.
+- **No reactive power, voltage drop, or N-1 contingency modelling beyond the firm limit.** A sum of
+  active power is not a load-flow study; Tier 2 is where that modelling belongs.
+- **Nesting is not modelled.** A GSP whose BSPs also have limits is scored node by node. Passing a
+  cut from a parent to its children waits for confirmed signs at both levels.
+- **Coverage gap.** Only some of the generators beneath a node have a forecast in the trial area.
+  This gap shrinks as trial coverage scales towards the ~2,500-series v2 rollout.
+- **The capacity of each generator is an estimate.** The forecasts are fractions of capacity,
+  converted to MW with each series' effective capacity, so the error in that estimate carries into
+  every cap.
 
-### Tier 3 — full power-flow modelling
+### Tier 2 — full power-flow modelling
 
-Out of scope for Flexpectation, including v2. Tier 3 is documented as the eventual correct approach
+Out of scope for Flexpectation, including v2. Tier 2 is documented as the eventual correct approach
 — modelling reactive power, voltage drop, and N-1 contingencies explicitly — but it is gated on
 power-flow integration work that sits outside this project.
 
-Tier 3 is also where a **real curtailment case study** becomes possible. Tiers 1 and 2 can each be
-computed and can rank models without Tier 3. What they cannot yet do is be validated against a real
-curtailment event, because no existing site maps a curtailment case to a specific series or a single
-hierarchy node — see [case studies](#case-studies) below.
+Tier 2 is also where a **real curtailment case study** becomes possible. Tier 1 can be computed and
+can rank models without Tier 2. What Tier 1 cannot yet do is be validated against a real curtailment
+event, because no existing site maps a curtailment case to a specific series or a single hierarchy
+node — see [case studies](#case-studies) below.
 
 **NGED derives upstream limits by combining substation forecasts in a power-flow model, so the
 forecasts must stay consistent across substations.** Percentiles cannot be added across substations:
@@ -214,10 +247,10 @@ reason to keep delivering the [ensemble of deterministic
 forecasts](delivery-tables.md#representation-1-ensemble-of-deterministic-forecasts) alongside the
 percentile representations.
 
-**Tier 3 is not gated on the speed of the power-flow solve.** [Nguyen et al.
+**Tier 2 is not gated on the speed of the power-flow solve.** [Nguyen et al.
 (2026)](https://doi.org/10.48550/arXiv.2608.25095) train a self-supervised surrogate for multiphase
 alternating-current (AC) optimal power flow. That is the dispatch optimisation layered on top of a
-power-flow solve, and Tier 3 needs only the solve. The surrogate still shows how fast the harder of
+power-flow solve, and Tier 2 needs only the solve. The surrogate still shows how fast the harder of
 the two problems can run. On feasible, in-distribution test cases it stays within 0.2% of the cost
 the interior-point solver IPOPT reaches. It runs one to three orders of magnitude faster than
 IPOPT, reaching 780 and 1,121 times on the two largest IEEE test feeders it was tried on, which
@@ -236,7 +269,7 @@ Flexpectation forecasts is unscoped work.
 
 **[Fractal Flow](https://smarter.energynetworks.org/projects/npg_sif_026/), a Northern Powergrid
 project building a shared cross-operator digital twin, is not a route to that model.** The twin is
-wider in scope than Tier 3 needs, and arrives later. The project's Strategic Innovation Fund Beta
+wider in scope than Tier 2 needs, and arrives later. The project's Strategic Innovation Fund Beta
 registration describes a shared, near-real-time digital twin across the transmission-distribution
 boundary. Every GB distribution system operator (NGED included) and the National Energy System
 Operator (NESO) are Beta partners. The Beta phase runs from September 2026 to September 2028. That
@@ -251,12 +284,46 @@ the settlement period".
 
 ### Curtailment price basis
 
-£100/MWh is a **whole-system cost**: the cost to all electricity users from re-dispatching
-generation up the merit order to relieve the constraint, not a cost borne specifically by NGED as
-network operator or by the curtailed generator. This is the basis Metric 2 is priced on throughout.
-It may change: the network operator could in future need to pay a flexibility counterfactual cost to
-curtail generators directly, at which point curtailment would carry a network-operator-borne price
-alongside the whole-system one.
+**The headline prices the energy actually lost, in pounds per MWh, and sweeps three prices for what
+NGED might pay because no published figure fixes that price.** A fourth, lower price of £100 is an
+illustrative balancing-style constraint price and not a payment by NGED (see the prices below). The
+headline is labelled "energy proxy" wherever it appears. It is `price × (Σ c_g + r × residual
+breach)`, with the breach priced at $r$ times the price. Two reasons favour the energy proxy:
+$\tau = 1 - 1/r$ minimises it, and the payment rule's own figure depends on how NGED's active
+network management expresses a set-point, which is unknown.
+
+**The payment rule is DCUSA Schedule 2D (version 15.3), and the DCUSA-form figure is reported beside
+the headline.** Clause 3.2 measures Full Export Curtailment Hours as the sum of duration times
+Curtailment Instruction Value, divided by the Curtailable Export Capacity. The Curtailment
+Instruction Value is the instructed reduction of the generator's Maximum Export Capacity, not the
+energy actually lost. Clause 3.4 pays (hours minus the Export Curtailment Limit) times capacity times
+the Exceeded Curtailment Price. The DCUSA form takes the instruction value to be $\text{capacity}_g -
+\text{cap}_g$ in MW on every half-hour where the generator's
+share is above zero. Under that form an instruction to a generator running well below capacity is
+charged for the whole headroom, so the two forms can rank forecasts differently. The DCUSA-form
+figure adds the same residual-breach term as the energy proxy, $r \times$ breach $\times$ price. The
+Curtailment Limit enters only the DCUSA-form figure, and the metric applies it to the scored period
+as given, so a caller scoring part of a year pro-rates an annual limit to that part. Megavolt-amperes
+are taken as MW at unity power factor, and all capacity as curtailable.
+
+**The four prices are £100, £380, £2,000 (the headline), and £11,100 per MWh.** The £100 price is an
+illustrative balancing-style constraint price. It is a whole-system cost: the cost to all electricity
+users of re-dispatching generation up the merit order to relieve the constraint, not a cost borne
+specifically by NGED as network operator or by the curtailed generator. The other three prices are
+the ends and the geometric middle of the £380 to £11,100 per MVAh range reconstructed from April
+2025 contract data, which is not a published figure. Results are reported as total pounds over the
+scored period and as pounds per MW of curtailable generator capacity per year.
+
+**Ranking uses the energy proxy, which does not depend on the Curtailment Limit.** At any limit
+$\tau = 1 - 1/r$ is the cost-minimising quantile for the energy proxy, so the score is proper
+(exactly so when the generator forecasts are perfect; otherwise the generator forecasts are an
+operating rule that every forecast shares). The price scales every forecast alike, so the ranking
+does not depend on the price, though the pound figure does. The DCUSA-form figure is reported at a
+Curtailment Limit of 0 for ranking. A Curtailment Limit of 100 or 500 hours a year is shown, if at
+all, as a restatement of the DCUSA-form figure for the same plans, never ranked. The avoidable cost
+of a forecast is its cost minus the cost of a perfect forecast on the same rows, which uses actual
+node flow and actual generator output. The metric does not subtract the perfect forecast; the
+caller scores it as one more forecast and subtracts.
 
 **A published annual curtailment-saving figure may use a capacity-based method, in which case the
 published figure is not directly comparable with this metric.** This metric prices MWh curtailed,
@@ -268,8 +335,8 @@ or a label saying the comparison is order-of-magnitude only.
 
 There is no single sign rule — see [sign convention](forecast-building-blocks.md#sign-convention).
 The trial area contains both conventions, plus battery sites that both charge and discharge.
-Constraint-side direction is therefore resolved **per `time_series_type`**, reusing the mapping the
-[tail and exceedance
+Metric 1's constraint-side direction is therefore resolved **per `time_series_type`**, reusing the mapping
+the [tail and exceedance
 metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 already need, with the ambiguous types to be confirmed with NGED.
 
@@ -277,7 +344,8 @@ A series constrained in both directions gets **a limit in each**, so the thresho
 `(time_series_id, direction)` rather than per series alone. Each metric is computed only where its
 direction is constrained: a demand primary with no connected generation gets no curtailment cost,
 and a solar meter gets no flexibility procurement cost. Applying one global rule instead would
-silently score £0 for every generator meter in the trial area.
+silently score £0 for every generator meter in the trial area. Metric 2 does not use this mapping:
+each BSP and GSP carries an explicit export sign.
 
 ## What each number is compared against
 
@@ -315,30 +383,32 @@ discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-p
 description, about half of generators have their limit at the next substation up (the bulk supply
 point or grid supply point). In other cases the limit is on a circuit and only binds after the next
 fault. It is set by power-flow and N-1 contingency analysis: simulate one fault, run a power flow,
-simulate the next credible fault, and repeat over all credible faults. The single-series synthetic
-limit below is a crude stand-in for that analysis.
+simulate the next credible fault, and repeat over all credible faults.
 
-We use a **synthetic limit**: the **99th percentile of each series' own full observation history**,
-in the constrained direction, labelled `historical_p99` to keep it distinct from the
+**Metric 1 uses a synthetic limit: the 99th percentile of each series' own full observation
+history,** in the constrained direction, labelled `historical_p99` to keep it distinct from the
 forecast-quantile label `p99` — one is a fixed power level derived from history, the other a level
-of the forecast distribution.
-
-This mirrors a percentile-of-history convention already used for capacity setting, treating winter
-as close to the limit throughout, and it is the same single rung the [tail and exceedance
+of the forecast distribution. This mirrors a percentile-of-history convention already used for
+capacity setting, treating winter as close to the limit throughout, and it is the same single rung
+the [tail and exceedance
 metrics](metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
-use, so the leaderboard carries one threshold concept rather than several. The percentile sets the
-absolute size of every £ figure on this page — a lower rung would multiply them — which is another
-reason to read these numbers as a ranking instrument rather than a total.
+use, so the leaderboard carries one threshold concept for those metrics. The percentile sets the
+absolute size of every £ figure of Metric 1 — a lower rung would multiply them — which is another
+reason to read these numbers as a ranking instrument rather than a total. `historical_p99` is a
+closer proxy to a real network rating than an arbitrary percentile would be, because comparable
+network ratings are typically derived in a similar way.
 
-`historical_p99` is a closer proxy to a real network rating than an arbitrary percentile would be:
-this is methodologically consistent with how comparable network ratings are typically derived, so
-the synthetic limit is close to the practice it stands in for, not just a convenient round number.
+**Metric 2 does not use `historical_p99`.** It uses the firm limit of each BSP and GSP, and a scaled
+limit of 0.9 times the node's maximum observed export before the scored period, both described under
+[Tier 1](#tier-1-substation-limits-no-power-flow). A percentile of a node's own flow is exceeded on
+10% of half-hours by construction, so it cannot stand in for a limit that a node almost never
+reaches. Metric 2 holds every forecast to the same $\tau = 1 - 1/r$, not to equal risk, so the
+leaderboard's `historical_p99` rung is not shared with it.
 
-Where NGED supply a real firm or flex rating we will compute the same metrics against it, as a case
-study. A rating never breached during the scored window is not useless here — procurement volume is
-driven by the *forecast* crossing the limit, so models still rank — but the unmet fraction goes
-undefined, and ratings are not available for every series and sit at different points of each
-series' distribution, so they cannot carry the cross-series leaderboard.
+**A rating never breached during the scored period is not useless.** Procurement and curtailment
+volume are driven by the *forecast* crossing the limit, so forecasts still rank, but Metric 1's
+unmet fraction goes undefined. Ratings are not available for every series and sit at different points
+of each series' distribution, so they cannot carry the cross-series leaderboard.
 
 ## Case studies
 
@@ -358,13 +428,14 @@ series' distribution, so they cannot carry the cross-series leaderboard.
   resource, across all zones, feed the volume-weighted average prices in [what the volumes
   cost](#what-the-volumes-cost).
 
-- **The curtailment *case study* is blocked, not the curtailment metric.** Tiers 1 and 2 need
-  nothing that does not already exist, so each can rank models as soon as it is implemented. Tier 2
-  does not wait on Tier 3. What is blocked is validating either tier against a real curtailment
-  event: mapping such an event to a specific series or hierarchy node needs Tier 3 power-flow
-  modelling — see [Tier 3](#tier-3-full-power-flow-modelling). The trial area has two nominal
-  flexibility zones with an export-side constraint, but neither has enough dispatch history to stand
-  in as a case study.
+- **The curtailment *case study* is blocked, not the curtailment metric.** Tier 1 needs no new data
+  for the bulk supply points whose export sign our own data establishes. The grid supply points'
+  signs are unconfirmed. Tier 1 can therefore rank models on those bulk supply points as soon as it
+  is implemented, and does not wait on Tier 2. What is blocked is validating Tier 1 against a real
+  curtailment event: mapping such an event to a specific series or hierarchy node needs Tier 2
+  power-flow modelling — see [Tier 2](#tier-2-full-power-flow-modelling). The trial area has two
+  nominal flexibility zones with an export-side constraint, but neither has enough dispatch history
+  to stand in as a case study.
 
 ## What these numbers do not capture
 
@@ -398,7 +469,7 @@ series' distribution, so they cannot carry the cross-series leaderboard.
   exceedance leaves the unmet fraction undefined.
 - **Nothing is validated against real spend**, except the Tavistock flex-procurement [case
   study](#case-studies). The curtailment metric has no equivalent validation yet, and cannot until
-  Tier 3 exists.
+  Tier 2 exists.
 - **Asset failure and outage costs are excluded.** Outage quantification is valuable but harder, and
   is not in this design.
 - **Some procurement does not depend on the forecast.** Procurement that serves wider aims, such as
@@ -413,14 +484,14 @@ series' distribution, so they cannot carry the cross-series leaderboard.
   and utilisation rate, we compute volume-weighted average prices separately for long-term and
   short-term contracts from National Grid's published flexibility-trades data; see [what the volumes
   cost](#what-the-volumes-cost).
-- **Curtailment price basis and who bears it** — £100/MWh is a whole-system cost, not one borne
-  specifically by NGED or by the curtailed generator; see [curtailment price
-  basis](#curtailment-price-basis).
+- **Curtailment price basis and who bears it** — Metric 2 sweeps four prices, £100 (a whole-system
+  cost, not one borne specifically by NGED or by the curtailed generator), £380, £2,000, and £11,100
+  per MWh; see [curtailment price basis](#curtailment-price-basis).
 - **Case-study data availability** — Tavistock Primary (`CMZ_T9A_SWE_0050`) has real procurement
   history and a seasonal transformer rating, and anchors the flexibility-procurement metric against
   a real site; see [case studies](#case-studies).
 - **Whether curtailment can be validated against a real event today** — no, not below [Tier
-  3](#tier-3-full-power-flow-modelling).
+  2](#tier-2-full-power-flow-modelling).
 
 **Still open:**
 
@@ -457,8 +528,8 @@ is a business judgement rather than a property of a forecast.
   common risk target, and is interpretable on its own). Both need resolving with the contract
   change.
 - Costs are stored **per `time_series_id`**, summed over time only, so they fit the existing primary
-  key. Only $\tau$ and the unmet target are pooled across series. **Curtailment Tiers 1 and 2 net
-  across series before pricing**, so their cost belongs to a primary or hierarchy node, not a single
+  key. Only $\tau$ and the unmet target are pooled across series. **Curtailment Tier 1 nets
+  across series before pricing**, so its cost belongs to a hierarchy node, not a single
   `time_series_id` — this needs its own key, still to be resolved with the contract change.
 - **Flexibility-price computation is a data pipeline task**, not hardcoded: pull National Grid's
   published flexibility-trades resources (see [case studies](#case-studies)), split by contract
