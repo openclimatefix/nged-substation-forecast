@@ -691,7 +691,8 @@ def event_census(
     Returns:
         One row per `(node_id, season, direction, limit_kind, limit_mw)` with `n_half_hours` and
         `n_exceedances`. `direction` is "export" or "import" and `limit_kind` is "real" or
-        "scaled f=<fraction>". An exceedance is a flow strictly above the limit in that direction.
+        "scaled f=0.9" (with the fraction used). An exceedance is a flow strictly above the limit in
+        that direction.
     """
     exports = (
         flows.join(
