@@ -18,7 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-12](#sw2-12-a-v1-forecast-under-the-normal-running-arrangement-with-the-detectors-labels) | How much of the NRA skill of experiment 75 is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-8 | Proposed |
+| [SW2-12](#sw2-12-a-v1-forecast-under-the-normal-running-arrangement-with-the-detectors-labels) | How much of the NRA skill of experiment 75 is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-8 | [Experiment 86](00086-sw2-12-detector-labels-for-nra-forecast/result.md), planned |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
