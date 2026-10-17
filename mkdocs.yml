@@ -204,7 +204,7 @@ nav:
       - "Does experiment 64's gain beyond 10 days come from a leak?": ml-experiments/00076-pvdis-5-leak-check-beyond-10-days/result.md
       - "Does a re-estimated solar capacity lower the error of experiment 64's best forecast?": ml-experiments/00078-pvdis-5-current-capacity-vintages/result.md
       - "Can the direction of flow be recovered at Primaries metered only in MVA?": ml-experiments/00079-pvdis-7-mw-at-mva-only-primaries/result.md
-      - "Do the weekly-retraining and Christmas-column findings hold on a second set of forecast runs?": ml-experiments/00081-r11-control-member-second-validation-year-demand/result.md
+      - "Do the weekly-retraining findings hold on July-to-March forecast runs the project has not scored?": ml-experiments/00081-r11-control-member-second-validation-year-demand/result.md
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
       - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
       - "Does removing the residual's half-hour-to-half-hour memory help the switching detector?": ml-experiments/00062-sw2-9-whitened-residual-step-detector/result.md
