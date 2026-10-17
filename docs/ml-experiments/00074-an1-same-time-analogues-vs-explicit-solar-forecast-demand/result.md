@@ -90,7 +90,7 @@ to beat analogues. A model refitted monthly on the latest year (P-roll, from exp
 reference, because a frozen model overstates the benefit of any input that follows the recent level
 of power, and analogue columns follow that level.
 
-**The eight arms share one recipe and differ in what the solar information is.**
+**Eight arms (and one context arm) share one recipe and differ in what the solar information is.**
 
 | Arm | What the XGBoost model receives beyond `d1l`'s 15 input columns |
 |---|---|
@@ -102,6 +102,7 @@ of power, and analogue columns follow that level.
 | `A5` | The same 4 columns from the 5 nearest analogues. |
 | `A3E` | `A3`'s columns and `E`'s offset together. |
 | `A3S` | `A3`'s columns, built from 3 candidate days drawn at random from the same window, ignoring sunshine and day type. |
+| `R0_rad` | Context only, in no contrast: `R0` plus the `shortwave` and `longwave` columns, which shows what radiation inputs add under P-roll. |
 
 **An analogue is a past day, at the same UTC half-hour as the target, whose sunshine was closest to
 the forecast sunshine at the target.** Candidates are the 14 days from 3 to 16 days before the day
@@ -146,7 +147,10 @@ The climatology, calibration slopes, and weights stay at their 2025-06-30 values
 experiment 45's 2025/26 values. The shortfall works against `E` and `A3E`, and the analogue arms use
 no capacity. `E`'s weights were fitted for a model without analogues, so in `A3E` the offset and the
 analogues may count the same sunshine twice. The weights and the calibration are not refitted
-monthly. Only seed 0 decides the verdict;
+monthly. Analogues are matched in training to the ensemble-mean shape and at inference to each
+member's own shape, as experiment 64's arm `a` does, which widens the pooled spread of the analogue
+arms. Candidates share a UTC half-hour, so the 14-day window straddling a clock change shifts a
+local-time profile by an hour. Only seed 0 decides the verdict;
 if time remains, seeds 1 and 2 are added and labelled post hoc.
 
 ## Size
