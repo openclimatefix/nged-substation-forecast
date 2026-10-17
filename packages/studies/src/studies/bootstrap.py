@@ -252,6 +252,48 @@ def bootstrap_difference_at_level(
     return _resample_bounds(values=differences, months=months, level=level, n_resamples=n_resamples)
 
 
+def bootstrap_month_totals(
+    *, month_sums: np.ndarray, month_counts: np.ndarray, level: float = 95.0
+) -> tuple[float, float]:
+    """Bound a mean from each month's total, resampling whole months and a seed.
+
+    Drawing whole months and averaging their rows gives the sum of the drawn months' totals over
+    the sum of their row counts, so a caller with millions of rows can total each month once and
+    resample those few numbers. The random stream and the draw order match `_resample_bounds`, so
+    the bounds equal what `bootstrap_absolute` returns for the same rows, up to floating-point
+    summation order.
+    A paired difference needs no row-level pairing: the month total of a difference is the
+    difference of the arms' month totals when both arms hold the same rows.
+
+    Args:
+        month_sums: Each seed's sum of the per-row value in each month, shape (n_seeds, n_months),
+            months in sorted order.
+        month_counts: The number of rows in each month, shape (n_months,), the same for every seed.
+        level: The interval's coverage in percent, above 1 and below 100.
+
+    Returns:
+        The lower and upper percentiles of the resampled mean.
+
+    Raises:
+        ValueError: If `level` is not above 1 and below 100, or the shapes disagree.
+    """
+    if not 1.0 < level < 100.0:
+        msg = f"level is a coverage in percent, above 1 and below 100 (95.0, not 0.95): {level}"
+        raise ValueError(msg)
+    if month_sums.ndim != 2 or month_sums.shape[1] != month_counts.shape[0]:
+        msg = f"month_sums {month_sums.shape} and month_counts {month_counts.shape} disagree"
+        raise ValueError(msg)
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    n_months = month_counts.shape[0]
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, month_sums.shape[0])
+        drawn = generator.integers(0, n_months, size=n_months)
+        resampled[resample] = month_sums[seed_index, drawn].sum() / month_counts[drawn].sum()
+    tail = (100.0 - level) / 2.0
+    return float(np.percentile(resampled, tail)), float(np.percentile(resampled, 100.0 - tail))
+
+
 def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarray, np.ndarray]:
     """Return one arm's per-seed, per-row metric values, and each row's month.
 
