@@ -218,7 +218,7 @@ def figure_by_lead_band() -> alt.TopLevelMixin:
         width=PLOT_WIDTH,
         height=330,
         title=_title(
-            text="Both gains sit within 6 days; the offset wins at the shortest leads",
+            text="Both gains fade with lead time; the offset wins at the shortest leads",
             lines=[
                 "Each contrast in each lead band. Dot: estimate. Line: 95% interval from "
                 "re-drawing whole weeks of forecast start. Line at 0: same score. Exploratory. "
