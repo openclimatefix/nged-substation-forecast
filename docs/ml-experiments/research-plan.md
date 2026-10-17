@@ -18,6 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [00076 - PVDIS-5 leak check](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain beyond 10 days, where its solar term is zero, come from a leak, or from the offset cleaning the training target? | 1 | Nothing | Planned |
 | [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
