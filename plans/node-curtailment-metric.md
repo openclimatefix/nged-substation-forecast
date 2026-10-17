@@ -166,25 +166,29 @@ DCUSA figure depends on how NGED's active network management expresses a setpoin
 Export Capacity, which is unknown.
 
 **The DCUSA-form figure is reported beside the headline.** With instruction value `capacity_g -
-cap_g` (clamped to `[0, capacity_g]`) on every half-hour where `v_g > 0`, Full Export Curtailment
+cap_g` on every half-hour where `v_g > 0`, Full Export Curtailment
 Hours are `sum(0.5 h x (capacity_g - cap_g)) / capacity_g`, and the payment is that minus the
 Curtailment Limit, times `capacity_g x price`. Under this form an instruction to a generator running
 well below capacity is charged for the whole headroom, so the two figures can rank arms differently.
 Megavolt-amperes (MVA) are taken as MW at unity power factor, and all capacity as curtailable.
 
-**Three prices, one headline:** GBP 380, 2,000 (headline), and 11,100 per MWh, the ends and the
-geometric middle of the GBP 380 to 11,100 per MVAh range reconstructed from April 2025 contract data
-(not a published figure). The breach is priced at `r x price`. Results are reported as total GBP
+**Four prices, one headline:** GBP 100, 380, 2,000 (headline), and 11,100 per MWh. GBP 380, 2,000
+and 11,100 are the ends and the geometric middle of the GBP 380 to 11,100 per MVAh range
+reconstructed from April 2025 contract data (not a published figure). GBP 100 is an illustrative
+balancing-style constraint price, a whole-system cost and not a payment by NGED; the maintainer
+approved adding it. The breach is priced at `r x price`. Results are reported as total GBP
 over the scored window and as GBP per MW of curtailable generator capacity per year.
 
-**Ranking is done only at a Curtailment Limit of 0.** There tau = 1 - 1/r is the cost-minimising
-quantile for the energy proxy, so the score is proper (exactly so when the generator forecasts are
-perfect; otherwise it is the operating rule every arm shares). At a Curtailment Limit of 0 the price
-scales every arm alike, so the ranking is price-free but the GBP figure is not. A Curtailment Limit
-of 100 or 500 hours a year is shown, if at all, as a restatement of the same plans, never ranked.
+**Ranking uses the energy proxy, which does not depend on the Curtailment Limit.** tau = 1 - 1/r is
+the cost-minimising quantile for the energy proxy, so the score is proper (exactly so when the
+generator forecasts are perfect; otherwise it is the operating rule every arm shares). The price
+scales every arm alike, so the ranking is price-free but the GBP figure is not. The Curtailment Limit
+enters only the DCUSA-form figure, which is ranked at a limit of 0; a limit of 100 or 500 hours a
+year is shown, if at all, as a restatement of the DCUSA form for the same plans, never ranked.
 
 **Avoidable cost** is arm cost minus perfect-forecast cost on the same rows; the perfect forecast
-uses actual node flow and actual generator output. **Avoided reinforcement** is named in the
+uses actual node flow and actual generator output. The module does not compute it: the caller
+scores the perfect arm in the same call and subtracts it with `avoidable_cost`. **Avoided reinforcement** is named in the
 write-up as the alternative framing and not built.
 
 ## 4. Code (stage 1)
@@ -225,10 +229,27 @@ series' `effective_capacity_mw`, an estimate whose error carries into every cap.
 - node-only mode equals full mode with one generator forecast perfectly, **when** that generator is
   the only one and its actual output is at least `v_node / 0.5 h` MW.
 
-**Roadmap rewrite, in the same PR:** `docs/roadmap/cost-savings-metrics.md` Metric 2 loses Tier 1
-(per-Primary netting); Tier 2 becomes the node metric described here, with the firm limits, the
-explicit sign, and the DCUSA price structure; "Curtailment price basis" and "Choosing the limit"
-are rewritten to match, the latter keeping its heading text.
+**Decisions the output does not show, stated in the module docstring.**
+
+- The DCUSA-form figure adds `r x breach x price` to the payment, the same breach term as the
+  energy proxy.
+- `curtailment_limit_hours` is applied to the scored window as given, and the caller pro-rates an
+  annual limit to it (the daily-gap fold holds 292 daily runs, not a year).
+- `month_totals` use the month of `power_fcst_init_time`, while the season comes from `valid_time`.
+- GBP per MW-year divides by the forecast generators under scored nodes, and is null in node-only
+  mode.
+- `align_arms` intersects on the seed, so `node_curtailment` raises when the arms hold different
+  seeds, and when an arm repeats a row key.
+- The table's `capacity_mw` and the effective capacity given to `scale_to_megawatts` must be the
+  same number; `node_curtailment` raises on a generator forecast above `capacity_mw`, and
+  `capacity_forecast` builds the NGED baseline arm from the table.
+- Only node rows that plan curtailment are allocated, which keeps memory in step with the number of
+  exceedances rather than with rows times generators.
+
+**Roadmap rewrite, in the same PR:** `docs/roadmap/cost-savings-metrics.md` Metric 2 loses the
+per-Primary netting tier; the node metric described here becomes Tier 1 and power-flow modelling
+Tier 2, with the firm limits, the explicit sign, and the DCUSA price structure; "Curtailment price
+basis" and "Choosing the limit" are rewritten to match, the latter keeping its heading text.
 
 ## 5. The pilot worked example
 
@@ -239,7 +260,7 @@ node and generator arms: best guess (`weekly` + `gen_monthly`), best-guess stack
 generator output, and the NGED baseline: the manual heuristic's substation-flow forecast at tau 0.95
 with no generator forecast. NGED forecasts substation flow only with the manual heuristic today
 (the maintainer's account, not yet confirmed by NGED), so the baseline passes each generator's
-capacity as its forecast: every generator is assumed to run at full capacity and is capped at its
+capacity as its forecast (`capacity_forecast`): every generator is assumed to run at full capacity and is capped at its
 capacity minus its pro rata share of the planned cut. A cap above a generator's actual output
 relieves nothing, so the shortfall is charged as breach, and the DCUSA form charges the whole
 instruction. Set names are checked against experiment 48's
