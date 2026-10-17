@@ -86,6 +86,9 @@ def local_columns(*, frame: pl.DataFrame) -> pl.DataFrame:
 def training_frame() -> pl.DataFrame:
     """Return the verdict series' frame rows up to the last training valid time.
 
+    Returns:
+        The rows of the five verdict series with the local calendar columns.
+
     Raises:
         AssertionError: If the frame has an unexpected number of rows or a row is too late.
     """
@@ -140,6 +143,11 @@ def fit_pooled(*, designs: list[Design], ys: list[np.ndarray], shapes: list[np.n
 
     Each year's scale `s_y` comes from a south-only fit; the stack fits `m >= 0` to
     `y_y = ... - s_y * (u_y @ m)` with no prior.
+
+    Args:
+        designs: One `Design` per season-year.
+        ys: The observed power of each season-year, MW.
+        shapes: The east, south, and west unit shapes of each season-year, `(n, 3)`.
 
     Returns:
         The shares as capacities in units of `s_y` and the list of `s_y`, MW.

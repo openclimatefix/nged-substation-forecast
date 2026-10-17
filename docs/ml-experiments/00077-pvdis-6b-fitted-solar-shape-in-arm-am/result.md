@@ -70,9 +70,9 @@ headline: >-
   worse (-0.441 to -0.212).
 lessons: >-
   The shape of the solar term is not what limits arm `am`. Any average mix of orientations, even
-  another Primary's, gives the same forecast, because the sunshine forecast, the capacity, and the
-  weight on the solar term set the result. The 1.3% gain of experiment 73 on a fit with known weather
-  did not carry through to the forecast.
+  another Primary's, gives the same forecast, because the weight on the solar term rescales the
+  capacity, so arms with different capacities score the same. The 1.3% gain of experiment 73 on a
+  fit with known weather did not carry through to the forecast.
 production_status: not-for-production
 adopted_in: none
 advice:
@@ -80,13 +80,14 @@ advice:
     Keep the all-south shape in the explicit solar term, because the fitted east-south-west shape
     scores 0.001 points (-0.018 to +0.014) from `am` and the threshold is 0.022 points (C1).
   - >-
-    Do not spend further experiments on the orientation or tilt of the solar shape, because the
+    Do not run further experiments on the orientation or tilt of the solar shape, because the
     shape of another Primary and all-south panels at a tilt of 25 degrees both score within 0.007 and
-    0.011 points of the fitted shape (exploratory reads E2 and C2).
+    0.011 points of the fitted shape (the shuffled-shares contrast, and C2).
   - >-
-    Put effort into the sunshine forecast and the capacity table, because the sunshine of another
-    date costs 0.323 points (-0.441 to -0.212, C3) and a season-year capacity vintage lowers the score
-    by 0.017 points (0.002 to 0.033) more than the fitted shape does (E4).
+    Improve the sunshine forecast and the capacity table, because the sunshine of another date
+    worsens the score by 0.323 points (the reverse of C3, -0.441 to -0.212) and a season-year capacity
+    vintage lowers the score by 0.017 points (0.002 to 0.033) more than the fitted shape does (the
+    contrast against `am_sy`).
   - >-
     Test a known-answer gain from a fit against the forecast before porting it, because experiment
     73's 1.3% lower held-out fit error gave no forecast gain here (C1).
@@ -94,23 +95,28 @@ advice:
 
 # Experiment 77: does the fitted solar shape lower the error of arm am? (PVDIS-6b)
 
-**Take-home message: the shape of the solar term does not limit experiment 64's arm `am`.** Replacing
-its south-facing panel shape with a blend of east-, south-, and west-facing shapes fitted to each
-substation's own power left the score unchanged, and so did using another substation's blend. What
-did matter was the forecast of the sunshine itself: giving the same arm the sunshine of another date
-raised the score by 0.32 points. The next work on the solar term should go into the sunshine forecast
-and the capacity table, not into the panel shape. The verdict is `refuted`.
+**Take-home message: the shape of the solar panels in the solar term does not limit experiment 64's
+best forecast.** Experiment 64 forecast a substation's power with an XGBoost model (a gradient-
+boosted tree model) that starts from an explicit solar term: the substation's solar capacity times a
+forecast of how sunny the day will be. We call that forecast arm `am`. Replacing its south-facing
+panel shape with a blend of east-, south-, and west-facing shapes, fitted to each substation's own
+power, left the error unchanged, and so did using another substation's blend. What did matter was
+the forecast of the sunshine itself: giving the same arm the sunshine of another date worsened the
+score by 0.32 points (the quantile score, an error measure in which lower is better). The next work
+on the solar term should go into the sunshine forecast and the capacity table, not into the panel
+shape. The verdict is `refuted`, which here means that the fitted shape does not lower the error by
+0.5% or more.
 
 We asked whether a forecast of the power drawn at a Primary substation improves when its solar term
 is built from a blend of east-, south-, and west-facing panel output instead of south-facing panels
 only. A Primary substation is a 33/11 kV or 66/11 kV substation in the electricity distribution
-network. Experiment 73 (PVDIS-6) found that such a blend fits the half-hourly power of Primary
-substations 1.3% better than south-facing panels do, although its shares are not identified. We fitted
-one set of shares per substation on rows up to 30 June 2025, rebuilt the solar term of experiment
-64's best arm `am` with the blend, and scored the forecasts on the same rows as experiment 64: five
-Primaries, 68,903 daylight half-hours per seed in April to September, with 3 seeds. The score is the
-quantile score, an error measure in which lower is better, and 1 point is 1% of a substation's
-capacity. The blend scored 4.466 points and `am` 4.467.
+network. Experiment 73 (PVDIS-6) found that the blend fits the half-hourly power of Primary
+substations 1.3% better than south-facing panels do, although the shares of the blend (the fraction
+of capacity assigned to each orientation) are not identified. We fitted one set of shares per
+substation on rows up to 30 June 2025, rebuilt the solar term of arm `am` with the blend, and scored
+the forecasts on the same rows as experiment 64: 5 Primaries, 68,903 daylight half-hours per seed in
+April to September, and 3 seeds (repeated fits with different random numbers). One point of the
+score is 1% of a substation's capacity. The blend scored 4.466 points and `am` 4.467.
 
 **The verdict is `refuted`, read by the rule written before any arm was scored.** The rule uses
 three contrasts, each an arm's score minus another arm's, at a 98.33% interval from 50,000 resamples
@@ -151,14 +157,14 @@ resampling:
 
 The fitted shape minus the shuffled shape is +0.001 points (95% interval -0.006 to +0.007,
 exploratory). If the shares carried information about a Primary's panels, the shape fitted to the
-Primary's own power would score below the shape fitted to another Primary's. That matches experiment
-73's finding that the shares are not identified, and here it also holds for the forecast.
+Primary's own power would score below the shape fitted to another Primary's. This agrees with
+experiment 73's finding that the shares are not identified, and the same holds for the forecast.
 
 **The forecast sunshine carries the gain.** The fitted shape scores 0.173 points (95% interval
--0.227 to -0.121) below `am0`, the same arm without a solar term, and 0.323 points below the same arm
-given the sunshine of another date. The fitted shape scores 0.153 points (-0.193 to -0.116) below
-`d0`, as `am` does in experiment 64. A season-year capacity vintage does more than the fitted shape:
-the fitted shape scores 0.017 points (+0.002 to +0.033) above experiment 78's `am_sy`.
+-0.227 to -0.121) below `am0`, the same arm without a solar term, and 0.323 points below the same
+arm given the sunshine of another date. The fitted shape scores 0.153 points (-0.193 to -0.116)
+below `d0`, as `am` does in experiment 64. A season-year capacity vintage does more than the fitted
+shape: the fitted shape scores 0.017 points (+0.002 to +0.033) above experiment 78's `am_sy`.
 
 ## Lead time, series, and month show no gain either
 
@@ -174,44 +180,48 @@ April to +0.019 in August with no pattern, on 29,715 to 39,663 rows per month ov
 
 ![Figure 2: the fitted solar shape of each Primary through a June day](figure_2_shapes.svg)
 
-**The five fitted shapes differ little from all-south panels at a tilt of 25 degrees.** They have a
-lower midday peak and a larger afternoon and evening share, by amounts small beside the error of
-the sunshine forecast. The shares behind them are a flexible shape and not a
-measurement of panel orientation: the south share is 0.06 to 0.15 at three of the five Primaries and
-0.34 to 0.57 at the other two.
+**The five fitted shapes differ little from all-south panels at a tilt of 25 degrees.** As Figure 2
+shows, the five fitted shapes have a lower midday peak and a larger afternoon and evening share, by
+amounts small beside the error of the sunshine forecast. The shares behind them are a flexible shape
+and not a measurement of panel orientation: the south share is 0.06 to 0.15 at three of the five
+Primaries and 0.34 to 0.57 at the other two.
 
 ![Figure 4: after-dark demand response against the fitted west capacity](figure_4_evening.svg)
 
 **The evening-west check does not settle whether the west share is evening demand.** For each
-Primary we removed the calendar cell and heating degree-days from the after-dark half-hours of April
-to September (18:00 to 23:30 local time) and regressed the remainder on that day's mean daytime
-cloud. The change from a clear to a fully cloudy day is +0.29 MW at D9 (95% interval +0.04 to +0.59),
-which has the largest fitted west capacity (3.04 MW), and between +0.01 and +0.10 MW at the other
-four, with intervals that include zero. Five Primaries cannot show a relation, and D9 is a
-low-power Primary with two training years. The check is descriptive and no verdict reads it.
+Primary we removed the mean of each calendar cell (month, half-hour, and weekday or holiday) and the
+heating degree-days from the after-dark half-hours of April to September (18:00 to 23:30 local time)
+and regressed the remainder on that day's mean daytime cloud. The change from a clear to a fully
+cloudy day is +0.29 MW at D9 (95% interval +0.04 to +0.59), which has the largest fitted west
+capacity (3.04 MW), and between +0.01 and +0.10 MW at the other four, with intervals that include
+zero. Five Primaries give too few points to show a relation, and D9 is a low-power Primary with two
+training years. The check is descriptive and no verdict reads it.
 
 ## Caveats
 
 - **Weights differ by arm only through the shape.** Each arm refits the weight `w` on its own
   cross-fit of the same XGBoost model without a solar term. GPU fits are not exactly repeatable, so
   `w` carries a small amount of noise that differs between arms. The mean weights are -0.32 to -0.48
-  (blend) and -0.38 to -0.52 (all-south at tilt 25).
-- **The capacity of D14 is scaled, not fitted.** D14 has no 2024/25 weeks, so its capacity is
-  experiment 64's capacity times the median ratio of the shape's capacity to experiment 64's at the
-  other four series.
-- **D9's shares rest on two training years.** The other four Primaries have five or six.
-- **The result is for ensemble-forecast sunshine at five Primaries in one trial area.** A different
-  weather forecast with less error could make the panel shape matter more.
+  (blend) and -0.38 to -0.52 (all-south at tilt 25). - **The capacity of the Primary D14 is scaled,
+  not fitted.** D14 has no 2024/25 weeks, so its capacity is experiment 64's capacity times the
+  median ratio of the shape's capacity to experiment 64's at the other four series. - **The capacity
+  keeps the recovery ratio of the all-south shape.** Each shape's capacity is divided by experiment
+  45's recovery ratio, which was measured with the all-south fleet shape and not with the blend. The
+  weight `w` is refitted per arm and absorbs a constant scale error, so the effect is expected to be
+  small, but it was not tested. - **The shares of the Primary D9 rest on two training years.** The
+  other four Primaries have five or six. - **The result is for ensemble-forecast sunshine at five
+  Primaries in one trial area.** A different weather forecast with less error could make the panel
+  shape matter more.
 
-## What the next experiment should answer
+## Candidate next experiments
 
 The solar term of arm `am` is limited by its inputs, not its panel shape. The candidates that the
-evidence supports are a better sunshine forecast (experiment 50 and experiment 53 compared
-other weather forecasts) and a capacity table that is current (experiment 78 found a gain of 0.018
-points from a season-year vintage). This experiment does not propose an order.
+evidence supports are a better sunshine forecast (experiment 50 and experiment 53 compared other
+weather forecasts) and a capacity table that is current (experiment 78 found a gain of 0.018 points
+from a season-year vintage).
 
-**The sections from here to the end are the plan as committed before any code ran, apart from the
-last section, which lists the changes made after the plan and before any arm was scored.**
+**The sections from here to the end are the plan as committed before any code ran.** The last
+section lists the changes made after the plan and before any arm was scored.
 
 ## What is held fixed and what changes
 
@@ -220,7 +230,8 @@ Experiment 73's pooled fit (one set of east, south, and west shares per Primary,
 season-year) is refitted on summer half-hours up to 2025-06-30 only, on experiment 73's
 plane-of-array shapes at a tilt of 25 degrees and a DC to AC ratio of 1.15. Experiment 73's own
 shares used rows up to 2026 and are not reused. The shares are held fixed across training years,
-which removes the year-to-year swing of 0.24 that experiment 73 found.
+which removes the median swing of 0.24 in the shares between consecutive season-years that
+experiment 73 found.
 
 **The blend replaces the all-south shape everywhere that the solar term is built.** The CAMS shape,
 the CAMS and ENS climatologies, the ENS anomaly and its calibration slope per lead band, the
@@ -228,8 +239,8 @@ capacity, and the weight `w` fitted on the training window are all rebuilt for t
 code of experiments 46 and 64 with the plant output replaced by the blend of the three orientations'
 output. The per-member ENS anomaly is computed from the shortwave radiation of each of the 51
 members, as in experiment 46. The weight `w` absorbs a scale error in the capacity, so the capacity
-keeps experiment 45's recovery ratio of the fleet shape; the effect of that choice is a caveat of
-the write-up.
+keeps experiment 45's recovery ratio of the fleet shape; the Caveats section says what that choice
+does to the comparison.
 
 ## Arms
 
@@ -246,7 +257,7 @@ the write-up.
   `climatology`, and `manual_heuristic`.
 
 Each XGBoost arm has 5 series and 3 seeds, 15 fits, with experiment 64's settings and column list.
-Each model is trained on its own history.
+Each XGBoost model is trained on its own history.
 
 ## No fitted quantity sees the validation period
 
@@ -291,17 +302,16 @@ descriptive, and no verdict uses it.
 
 - **The flat-timing control `am_blend_flat` is dropped.** A reviewer of the code showed that a
   single scale on the south shape cancels: the calibration slope, the capacity, and the weight `w`
-  absorb it, so the arm would equal `am_s25`. A per-cell version was not built.
-- **The evening-west check regresses on the day's mean daytime cloud and heating degree-days.**
-  The frame holds no cloud measure after dark, because irradiance is zero then, so the cloud
-  variable of the plan's "that evening" is the same day's daylight cloud.
-- **The fallback capacity of the series with no 2024/25 constant (D14) is scaled by the shape.** It
-  is experiment 64's capacity times the median ratio of the shape's capacity to experiment 64's at
-  the other four series.
-- **Exploratory contrasts against `am0` and `am_sy` are added,** at the request of the manager,
-  because experiment 78 found that a zero base margin alone lowers `d0`'s score. `am0` is
-  experiment 76's `am` without the solar term, and `am_sy` is experiment 78's `am` with a
-  season-year capacity vintage.
+  absorb it, so the arm would equal `am_s25`. A per-cell version was not built. - **The evening-west
+  check regresses on the day's mean daytime cloud and heating degree-days.** The frame holds no
+  cloud measure after dark, because irradiance is zero then, so the cloud variable of the plan's
+  "that evening" is the same day's daylight cloud. - **The fallback capacity of the series with no
+  2024/25 constant (D14) is scaled by the shape.** It is experiment 64's capacity times the median
+  ratio of the shape's capacity to experiment 64's at the other four series. - **Exploratory
+  contrasts against `am0` and `am_sy` are added,** at the request of the experiment-manager session,
+  because experiment 78 found that a zero base margin alone lowers `d0`'s score. `am0` is experiment
+  76's `am` without the solar term, and `am_sy` is experiment 78's `am` with a season-year capacity
+  vintage.
 
 ## Earlier advice followed and departed from
 

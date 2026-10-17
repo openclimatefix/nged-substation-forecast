@@ -1600,19 +1600,21 @@ supported`, read by the pre-registered rule.
 
 ### 00077: does a fitted solar shape lower the error of experiment 64's best arm? (PVDIS-6b)
 
-**The shape of the solar term does not limit arm `am`: a blend of east-, south-, and west-facing
-shapes fitted to each Primary left the score at 4.466 points, against 4.467 for south-facing
-panels.** We fitted one set of shares per Primary on rows up to 30 June 2025, rebuilt the solar term
-with the blend, and scored the forecasts on experiment 64's rows (five Primaries, three seeds). The
-difference was -0.001 points of capacity (98.33% interval -0.018 to +0.014), which excludes the gain
-of 0.5% (0.022 points) that would justify a table of shares. The shape of another Primary scored the
-same (+0.001, -0.006 to +0.007), as did all-south panels at the blend's tilt (-0.001, -0.014 to
-+0.011). The forecast sunshine mattered: the same arm given the sunshine of another date scored 0.323
-points worse (-0.441 to -0.212). The verdict is `refuted`.
+**A blend of east-, south-, and west-facing solar shapes fitted to each Primary left the score of
+arm `am` unchanged.** A Primary is a 33/11 kV or 66/11 kV substation. Arm `am` is experiment 64's best
+forecast, an XGBoost model that starts from an explicit solar term, the substation's solar capacity
+times a forecast of how sunny the day will be. The blend scored 4.466 points, against 4.467 for
+south-facing panels (1 point is 1% of a substation's capacity). We fitted one set of shares per
+Primary on rows up to 30 June 2025 and scored the forecasts on experiment 64's rows: 5 Primaries and
+3 seeds. The difference was -0.001 points (98.33% interval -0.018 to +0.014), which excludes a gain
+of 0.5% of `am`'s score (0.022 points). The shape of another Primary scored the same (+0.001, -0.006
+to +0.007), as did all-south panels at the blend's tilt (-0.001, -0.014 to +0.011). The forecast
+sunshine mattered: the same arm given the sunshine of another date scored 0.323 points worse (-0.441
+to -0.212). The verdict is `refuted`.
 
-- **Finding for later experiments:** put effort into the sunshine forecast and the capacity table,
-  not the panel shape. A gain of 1.3% in a fit with known weather (experiment 73) did not carry into
-  the forecast.
+- **Finding for later experiments:** improve the sunshine forecast and the capacity table, not the
+  panel shape. A gain of 1.3% in a fit with known weather (experiment 73) did not carry into the
+  forecast.
 - **Write-up and pull request:** [the full result
   page](00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md), [PR #1308 (Experiment 77: does the
   fitted solar shape lower the error of arm am? (PVDIS-6b))](https://github.com/openclimatefix/nged-substation-forecast/pull/1308).
