@@ -17,18 +17,18 @@ prediction: >-
   zero, because only 22 labelled events fall in the scored year.
 decision_rule: >-
   Three planned contrasts on the NRA rows (the scored half-hours outside NGED's logged closures
-  and outside the labelled events), quantile score over all leads, read at 98.33% (Bonferroni across
-  three), whole validation months resampled. C1, the masked arm minus the plain arm: the mask is
-  adopted (non-inferior) when the interval's upper end is at most +0.02 points, 0.34% of the
-  plain arm's score, which is the most that experiment 44 says a perfect detector could gain, and so the size of
-  harm worth worrying about; only the upper end of the two-sided interval is read, which is
-  conservative; C1 is a gain when the interval lies wholly below zero. C2, the arm with signed MW columns minus
-  the masked arm, and C3, the arm with lags minus MW minus the masked arm: each is supported when
-  its interval lies wholly below zero, because either arm needs a detector on the serving path.
-  The v1 NRA candidate is the supported magnitude arm; when both are supported, the one with the
-  lower score on the NRA rows, and the page reports `plain` minus that arm descriptively. With no magnitude arm supported, the masked
-  arm is the candidate when C1 is non-inferior and the plain arm otherwise. Every other comparison
-  is descriptive.
+  and outside the labelled events), quantile score over all leads, read at 98.33% (Bonferroni
+  across three), whole validation months resampled. C1, the masked arm minus the plain arm: the
+  mask is adopted (non-inferior) when the interval's upper end is at most +0.02 points, 0.34% of
+  the plain arm's score, which is the most that experiment 44 says a perfect detector could gain,
+  and so the size of harm worth worrying about; only the upper end of the two-sided interval is
+  read, which is conservative; C1 is a gain when the interval lies wholly below zero. C2, the arm
+  with signed MW columns minus the masked arm, and C3, the arm with lags minus MW minus the masked
+  arm: each is supported when its interval lies wholly below zero, because either arm needs a
+  detector on the serving path. The v1 NRA candidate is the supported magnitude arm; when both are
+  supported, the one with the lower score on the NRA rows, and the page reports `plain` minus that
+  arm descriptively. With no magnitude arm supported, the masked arm is the candidate when C1 is
+  non-inferior and the plain arm otherwise. Every other comparison is descriptive.
 benchmark: >-
   The plain weekly arm on the same rows, experiment 48's weekly row (5.44 on all rows), the 14-day
   corrected stack (5.64), `manual_heuristic`, and `climatology`, each from experiment 48's stored
@@ -41,7 +41,7 @@ metric: >-
 code: ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/
 ---
 
-# Experiment 75 (SW2-11): can a forecast learn the normal running arrangement from labelled switching?
+# Experiment 75: can a forecast learn the normal running arrangement from labelled switching?
 
 **The question.** An electricity network operator sometimes closes a normally open switch, so that
 one Primary substation (a substation that steps down to the local distribution network) carries
@@ -57,7 +57,8 @@ switching without NGED's log (SW2-12).
 
 - **Architecture.** Weekly refits of the one-XGBoost-model-per-substation N1 recipe, no error
   correction, trained on the ENS control member, the winner of
-  [experiment 48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md).
+  [experiment 48](../00048-weekly-retraining-confirmation-and-extension-demand-
+  generators/result.md).
   The refits, the 292 runs, the seed 0, the 16 Primary series, and the scoring code are copied from
   that experiment, and the plain arm is rebuilt in this experiment so that every arm shares one
   code path. Each series trains on its own history.
@@ -86,7 +87,8 @@ switching without NGED's log (SW2-12).
   sum to less than 1. A receiver outside the 16 Primary series is ignored. A one-sided event with
   no metered receiver still marks and signs its donor. The events are the 82 visible ones (conserved
   or one-sided, kinds real and alarm), not the synthetic sentinel cards.
-- **NRA rows.** The row set is fixed before any arm is scored. A scored case is kept when its valid time is outside every labelled event of its
+- **NRA rows.** The row set is fixed before any arm is scored. A scored case is kept when its valid
+  time is outside every labelled event of its
   series and outside the logged closure interval of any card that names the series as a side.
   Every arm is scored on identical rows.
 - **Not run.** The `base_margin` forecast-solar arm of
@@ -97,7 +99,8 @@ switching without NGED's log (SW2-12).
 - **Reproduction check.** The `plain` arm on all 292 runs must match experiment 48's stored
   weekly score (5.44) to 0.01, and its per-case scores to 0.001 where the graphics-card fit is
   repeatable.
-- **Descriptive extras.** `plain` minus each other arm on the NRA rows; Experiment 48's `manual_heuristic`, `climatology`, and stack rows on the
+- **Descriptive extras.** `plain` minus each other arm on the NRA rows; Experiment 48's
+  `manual_heuristic`, `climatology`, and stack rows on the
   same cases; experiment 49's P-roll 5.150 only where its rows match; each series on its own; the
   lag-in-event subset (NRA rows whose lag falls in an event), where the magnitude arms can act.
 
