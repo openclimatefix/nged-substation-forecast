@@ -1,8 +1,8 @@
-"""Print every number the write-up of experiment 70 quotes, and the verdict the decision rule gives.
+"""Print every number the write-up of experiment 82 quotes, and the verdict the decision rule gives.
 
-Reads the tables that `e00082_run.py` wrote: MW-weighted recall of PF14, LOGIT, and LOGIT_SAME on
+Reads the tables that `e00082_run.py` wrote: MW-weighted recall of PF14, X, LOGIT_SAME, and XL on
 the fresh headline-band and long draws, by injection shape, with month-resampled intervals; the
-planned contrasts C1 and C2; recall by donor step; the labelled real transfers; and the alarm
+planned contrasts C1, C2, and C3; recall by donor step; the labelled real transfers; and the alarm
 counts.
 
     uv run python ml-experiments/00070-*/e00082_report.py
@@ -23,11 +23,10 @@ from e00082_profile import NON_MATCHING, SHAPE_NAMES, SHAPES
 from e00082_run import ARMS, TARGET
 
 N_RESAMPLES: Final[int] = 20_000
-LEVEL: Final[float] = 1 - 0.05 / 2
-"""Two-sided level of the intervals: Bonferroni across the two planned contrasts (97.5%)."""
-SEED: Final[int] = 7100
+LEVEL: Final[float] = 1 - 0.05 / 3
+"""Two-sided level of the intervals: Bonferroni across the three planned contrasts (98.33%)."""
+SEED: Final[int] = 8200
 THRESHOLD: Final[float] = 0.02
-GUARD: Final[float] = -0.02
 STEP_EDGES: Final[tuple[float, ...]] = (0.0, 2.0, 4.0, 6.0, 10.0, float("inf"))
 DAY_EDGES: Final[tuple[float, ...]] = (1.0, 2.0, 7.0, 14.0, 15.6, 30.0, 61.0)
 EXPECTED_ROWS: Final[dict[str, int]] = {"base": 1160, "long": 400}
@@ -277,13 +276,18 @@ def print_alarms(*, out: Path) -> None:
             raise ValueError(f"{arm} has {odd} odd-month unexplained alarms")
 
 
-def decide(*, c1: tuple[float, float, float], c2: tuple[float, float, float]) -> str:
-    """Apply the pre-registered verdict rule to C1 and C2 (point, lower end, upper end)."""
-    if c1[1] > 0 and c1[0] >= THRESHOLD and c2[0] >= GUARD:
-        return "supported"
+def decide(
+    *,
+    c1: tuple[float, float, float],
+    c2: tuple[float, float, float],
+    c3: tuple[float, float, float],
+) -> str:
+    """Apply the pre-registered verdict rule to C1, C2, and C3 (point, lower end, upper end)."""
     if c1[2] < THRESHOLD:
         return "refuted"
-    if c1[1] > 0 and c1[0] < THRESHOLD and c2[0] >= GUARD:
+    if c1[1] > 0 and c1[0] >= THRESHOLD and c2[0] > 0 and c3[0] > 0:
+        return "supported"
+    if c1[1] > 0:
         return "small gain"
     return "inconclusive"
 
@@ -301,36 +305,38 @@ def main() -> None:
     base = pooled(data=data, population="base", parity="even")
     long = pooled(data=data, population="long", parity="even")
     c = {
-        "C1": contrast(frames=base, arm="LOGIT_SAME", base="PF14"),
-        "C2": contrast(frames=long, arm="LOGIT_SAME", base="PF14"),
+        "C1": contrast(frames=base, arm="XL", base="PF14"),
+        "C2": contrast(frames=base, arm="XL", base="X"),
+        "C3": contrast(frames=base, arm="XL", base="LOGIT_SAME"),
     }
-    print("\nPlanned contrasts (97.5% interval, even months, S2-S4 pooled)")
+    print("\nPlanned contrasts, XL minus PF14 / X / LOGIT_SAME (98.33% interval, even months)")
     for name, value in c.items():
         print(f"  {name}: {fmt(*value)}")
     print("Descriptive contrasts")
     for label, frames, arm, ref in (
-        ("base, LOGIT minus PF14", base, "LOGIT", "PF14"),
-        ("long, LOGIT minus PF14", long, "LOGIT", "PF14"),
-        ("base, LOGIT_SAME minus LOGIT", base, "LOGIT_SAME", "LOGIT"),
-        ("long, LOGIT_SAME minus LOGIT", long, "LOGIT_SAME", "LOGIT"),
+        ("base, X minus PF14", base, "X", "PF14"),
+        ("base, LOGIT_SAME minus PF14", base, "LOGIT_SAME", "PF14"),
+        ("long, XL minus PF14", long, "XL", "PF14"),
+        ("long, XL minus X", long, "XL", "X"),
+        ("long, XL minus LOGIT_SAME", long, "XL", "LOGIT_SAME"),
     ):
         print(f"  {label}: {fmt(*contrast(frames=frames, arm=arm, base=ref))}")
-    print("LOGIT_SAME minus PF14 by shape, base, even months")
+    print("XL minus PF14 by shape, base, even months")
     for shape in SHAPES:
         frame = wide(data=data, shape=shape, population="base", parity="even")
-        print(f"  {shape}: {fmt(*contrast(frames=[frame], arm='LOGIT_SAME', base='PF14'))}")
+        print(f"  {shape}: {fmt(*contrast(frames=[frame], arm='XL', base='PF14'))}")
     print("Odd-month check (not used for any decision)")
     for population in ("base", "long"):
         frames = pooled(data=data, population=population, parity="odd")
         print(
-            f"  {population} odd, LOGIT_SAME minus PF14: "
-            f"{fmt(*contrast(frames=frames, arm='LOGIT_SAME', base='PF14'))}"
+            f"  {population} odd, XL minus PF14: "
+            f"{fmt(*contrast(frames=frames, arm='XL', base='PF14'))}"
         )
     print_by_step(data=data, population="base")
     print_by_duration(data=data)
     print_real(out=out)
     print_alarms(out=out)
-    print(f"VERDICT: {decide(c1=c['C1'], c2=c['C2'])}")
+    print(f"VERDICT: {decide(c1=c['C1'], c2=c['C2'], c3=c['C3'])}")
 
 
 if __name__ == "__main__":

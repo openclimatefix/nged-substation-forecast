@@ -1,4 +1,4 @@
-"""Draw experiment 70's figures as SVG.
+"""Draw experiment 82's figures as SVG.
 
 Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newline`.
 
@@ -24,16 +24,17 @@ OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
     / "docs"
     / "ml-experiments"
-    / "00070-sw2-19-same-sign-neighbour-count"
+    / "00082-sw2-18-19-combined-refit-offset-and-same-sign-count"
 )
 WIDTH: Final[int] = 520
 WRAP: Final[int] = 80
 LABELS: Final[dict[str, str]] = {
     "PF14": "PF14: the single-series detector (benchmark)",
-    "LOGIT": "LOGIT: own step and opposite neighbour step",
-    "LOGIT_SAME": "LOGIT_SAME: also the same-sign neighbour count",
+    "X": "X: refit-offset step statistic (experiment 71)",
+    "LOGIT_SAME": "LOGIT_SAME: same-sign neighbour count (experiment 70)",
+    "XL": "XL: both together",
 }
-COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]
+COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN, ocf.DATA_PURPLE]
 POPULATIONS: Final[dict[str, str]] = {
     "base": "Fresh headline-band transfers (25% or more of the receiving load, over 1 day)",
     "long": "Fresh long transfers (15.6 to 60 days)",
@@ -89,12 +90,12 @@ def figure_recall(*, data: pl.DataFrame) -> alt.TopLevelMixin:
         )
         .properties(
             title=_title(
-                text="The same-sign neighbour count raises recall on headline-band transfers only",
+                text="Using both fixes finds 0.770 of the moved MW, against 0.656 for PF14",
                 lines=[
                     (
                         "MW-weighted recall at 80 odd-month unexplained alarms, shapes S2, S3, and "
                         "S4 averaged, transfers starting in even months, first-return end rule. "
-                        "Dot: estimate. Line: 97.5% interval from resampling whole calendar months."
+                        "Dot: estimate. Line: 98.33% interval, resampling whole calendar months."
                     )
                 ],
             )
@@ -162,7 +163,7 @@ def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
         )
         .properties(
             title=_title(
-                text="The gain sits in transfers with no metered receiver and a step of 2 to 4",
+                text="The gain is mostly in unmetered-receiver transfers with a step of 2 to 4",
                 lines=[
                     (
                         "Share of fresh headline-band transfers found, by the size of the donor "

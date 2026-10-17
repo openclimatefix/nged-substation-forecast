@@ -13,7 +13,9 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00082-sw2-18-19-combined-refit-offset-and-same-sign-count"
+WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00082-sw2-18-19-combined-refit-offset-and-same-sign-count"
+)
 """Private tables; never committed."""
 EXPERIMENT_43_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00043-sw2-1-detector-scoreboard"
 """Experiment 43's stored events, alarm tables, and event results, which this experiment re-uses."""

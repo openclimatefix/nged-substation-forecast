@@ -1,16 +1,21 @@
-r"""Train the two logistic scores, then score them and PF14 on fresh draws and the real transfers.
+r"""Train the logistic scores, then score four detectors on a fresh draw and the real transfers.
+
+PF14 is the benchmark (experiment 69). X takes its step statistic from two residual models refitted
+half a month apart (experiment 71). LOGIT_SAME scores PF14's candidates with a logistic regression
+that includes the same-sign neighbour count (experiment 70). XL fits and applies the same logistic
+score to the candidates of X.
 
 Stages, in order. Each writes files to the private output folder.
 
-- `tune`: D0M's threshold (must come back as 4.0).
-- `train`: LOGIT and LOGIT_SAME from odd-month injections of experiment 58's draw, and each one's
-  threshold at 80 unexplained odd-month alarms on the real residual.
-- `harness-check`: PF14 must reproduce experiment 69's `found` flags on a sample of its fresh
-  draw, and the combined arms must differ from PF14 only through their alarms.
+- `tune`: the thresholds of PF14 (must come back as 4.0) and X.
+- `train`: LOGIT_SAME on PF14's candidates and XL on X's candidates, from odd-month injections of
+  experiment 58's draw, and each one's threshold at 80 unexplained odd-month alarms.
+- `harness-check`: on experiment 71's draw, PF14 and X must reproduce experiment 71's `found` flags
+  and LOGIT_SAME experiment 70's.
 - `score`: the outcome of every fresh injected transfer for every arm under all five shapes.
 - `real`: the labelled real transfers' outcomes and the real alarm counts.
 
-    uv run python ml-experiments/00070-*/e00082_run.py tune train harness-check score real
+    uv run python ml-experiments/00082-*/e00082_run.py tune train harness-check score real
 """
 
 from __future__ import annotations
@@ -27,7 +32,6 @@ from typing import Final
 import numpy as np
 import polars as pl
 from e00082_combined import (
-    FEATURES,
     FEATURES_SAME,
     candidates,
     fit_logistic,
@@ -48,7 +52,6 @@ from e00082_detect import (
     SEED_43,
     SEED_NEW,
     explained_flags,
-    load,
     log_masks,
     new_events,
     original_events,
@@ -59,41 +62,59 @@ from e00082_detect import (
     seeded_batches,
     tune_d2,
 )
-from e00082_detectors import alarms, prepare
+from e00082_detectors import alarms
 from e00082_endrule import first_return_intervals
 from e00082_inject import BLOCK, HEADLINE_BAND, Event, Injection, draw_events, events_frame
-from e00082_intervals import build_intervals, relative_residual
+from e00082_intervals import build_intervals
 from e00082_long import draw_long_events
 from e00082_profile import SHAPES, Shape, fit_profile_shares, inject_shaped, shares_json
 from e00082_score import by_series, match_event
+from e00082_variants import (
+    Variant,
+    check_variants,
+    load_both,
+    scales_for,
+    tracked_relative,
+    variant_inputs,
+)
 
 EXPERIMENT_69_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00069-sw2-17-missed-onsets-of-the-end-rule"
+)
+EXPERIMENT_70_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00070-sw2-19-same-sign-neighbour-count"
+EXPERIMENT_71_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00071-sw2-18-refit-offset-and-gap-bridging"
 )
 N_WORKERS: Final[int] = 4
 WINDOW: Final[int] = 48
 CAP_DAYS: Final[int] = 14
 TARGET: Final[int] = 80
-"""D0M's odd-month unexplained-alarm count, which every arm is held to."""
-D0M_THRESHOLD: Final[float] = 4.0
 HOLIDAY_FIRST_ID: Final[int] = 3000
-SEED_FRESH_BASE: Final[int] = 7100
+SEED_FRESH_BASE: Final[int] = 8200
 """Seed of the fresh headline-band draw; batch `i` is injected with `SEED_FRESH_BASE + 1000 + i`."""
-SEED_FRESH_LONG: Final[int] = 8100
-"""Seed of the fresh long draw; batch `i` is injected with `SEED_FRESH_LONG + 1000 + i`."""
+SEED_FRESH_LONG: Final[int] = 8300
 FRESH_BASE_EVENTS: Final[int] = 1160
-FRESH_BASE_FIRST_ID: Final[int] = 20_000
-FRESH_LONG_FIRST_ID: Final[int] = 25_000
-EXPERIMENT_69_BASE_SEED: Final[int] = 6900
-EXPERIMENT_69_BASE_FIRST_ID: Final[int] = 10_000
+FRESH_BASE_FIRST_ID: Final[int] = 40_000
+FRESH_LONG_FIRST_ID: Final[int] = 45_000
+SEED_71_BASE: Final[int] = 7100
+SEED_71_LONG: Final[int] = 8100
+FIRST_ID_71_BASE: Final[int] = 20_000
 CHECK_ROWS: Final[int] = 400
-SCORES: Final[tuple[str, ...]] = ("LOGIT", "LOGIT_SAME")
-ARMS: Final[tuple[str, ...]] = ("PF14", *SCORES)
+CHECK_SHAPES: Final[tuple[Shape, ...]] = ("S1", "S4")
+BASIS: Final[dict[str, Variant]] = {
+    "PF14": "PF14",
+    "X": "X",
+    "LOGIT_SAME": "PF14",
+    "XL": "X",
+}
+"""Each arm's step statistic: the stored residual's (PF14) or the refit-offset splice's (X)."""
+SCORED: Final[tuple[str, ...]] = ("LOGIT_SAME", "XL")
+ARMS: Final[tuple[str, ...]] = tuple(BASIS)
 _STATE: dict = {}
 
 
 def init_worker(state: dict) -> None:
-    """Pool initializer: share the panel, scale, thresholds, and fitted scores."""
+    """Pool initializer: share the panels, scales, thresholds, and fitted scores."""
     _STATE.update(state)
 
 
@@ -108,35 +129,58 @@ def run_pool(*, function: Callable, jobs: list, state: dict) -> list:
         return list(pool.map(function, jobs))
 
 
+def all_scales(*, panel: dict, offset_panel: dict) -> dict[Variant, dict[int, float]]:
+    """The odd-month noise scale of every series for both step statistics."""
+    return {
+        v: scales_for(variant=v, residual=panel["residual"], offset=offset_panel["residual"])
+        for v in ("PF14", "X")
+    }
+
+
 def build_detectors(
-    *, residual: dict, expected: dict, scale: dict, thresholds: dict, models: dict
+    *,
+    panel: dict,
+    offset_panel: dict,
+    residual: dict,
+    offset: dict,
+    scales: dict,
+    thresholds: dict,
+    models: dict,
 ) -> dict:
-    """Alarm tables and PF14 intervals of PF14, LOGIT, and LOGIT_SAME on one residual panel."""
-    relative = {s: relative_residual(residual=residual[s], expected=expected[s]) for s in residual}
-    inputs = prepare(residuals=residual, window=WINDOW, scale=scale)
-    tables = {"PF14": alarms(inputs=inputs, detector="D0", threshold=thresholds["D0M"])}
-    cand = candidates(inputs=inputs)
-    for name in SCORES:
-        keep = cand.filter(
-            pl.Series(models[name].score(table=cand) > thresholds[name]) if cand.height else []
-        )
-        tables[name] = keep.select(
-            "series",
-            "stamp",
-            "step_mw",
-            z=pl.struct("series", "stamp").map_elements(
-                lambda r: float(inputs.shift[r["series"]][r["stamp"]] / inputs.scale[r["series"]]),
-                return_dtype=pl.Float64,
-            ),
-            partners=pl.lit(""),
-        )
+    """Alarm tables and first-return intervals of every arm on one residual panel."""
     out = {}
-    for arm, table in tables.items():
+    for arm, variant in BASIS.items():
+        inputs = variant_inputs(
+            variant=variant, residual=residual, offset=offset, scale=scales[variant]
+        )
+        relative = tracked_relative(
+            variant=variant,
+            panel=panel,
+            offset_panel=offset_panel,
+            residual=residual,
+            offset=offset,
+        )
+        if arm in SCORED:
+            cand = candidates(inputs=inputs)
+            keep = cand.filter(
+                pl.Series(models[arm].score(table=cand) > thresholds[arm]) if cand.height else []
+            )
+            table = keep.select(
+                "series",
+                "stamp",
+                "step_mw",
+                z=pl.struct("series", "stamp").map_elements(
+                    lambda r, s=inputs: float(
+                        s.shift[r["series"]][r["stamp"]] / s.scale[r["series"]]
+                    ),
+                    return_dtype=pl.Float64,
+                ),
+                partners=pl.lit(""),
+            )
+        else:
+            table = alarms(inputs=inputs, detector="D0", threshold=thresholds[arm])
         tracked = build_intervals(
-            alarm_table=table.with_columns(partners=pl.lit("")) if arm == "PF14" else table,
-            relative=relative,
-            window=WINDOW,
-            detector="D0",
+            alarm_table=table, relative=relative, window=WINDOW, detector="D0"
         )
         out[arm] = (
             table,
@@ -145,13 +189,17 @@ def build_detectors(
     return out
 
 
-def injected_inputs(*, seed: int, batch: list[Event], shape: Shape) -> tuple[dict, Injection]:
-    """The injected residual of one batch and shape, and the injection."""
-    panel = _STATE["panel"]
+def injected(*, seed: int, batch: list[Event], shape: Shape) -> tuple[Injection, dict, dict]:
+    """The injection of one batch and shape, and the injected residuals of both models."""
+    panel, offset_panel = _STATE["panel"], _STATE["offset_panel"]
     injection = inject_shaped(
         power=panel["power"], events=batch, seed=seed, shape=shape, shares=_STATE["shares"]
     )
-    return injection.fast_residual(panel["residual"]), injection
+    return (
+        injection,
+        injection.fast_residual(panel["residual"]),
+        injection.fast_residual(offset_panel["residual"]),
+    )
 
 
 def is_training_event(*, event: Event, months: np.ndarray) -> bool:
@@ -164,30 +212,40 @@ def is_training_event(*, event: Event, months: np.ndarray) -> bool:
 
 
 def positives_batch(args: tuple[int, list[Event], Shape]) -> pl.DataFrame:
-    """The candidates within 2 hours of the onset of a training transfer in one injected batch."""
+    """Candidates within 2 hours of the onset of a training transfer, for both step statistics."""
     seed, batch, shape = args
     training = [e for e in batch if is_training_event(event=e, months=stamp_months())]
     if not training:
         return pl.DataFrame()
-    residual, _ = injected_inputs(seed=seed, batch=batch, shape=shape)
-    cand = candidates(inputs=prepare(residuals=residual, window=WINDOW, scale=_STATE["scale"]))
-    return cand.filter(pl.Series(positive_flags(table=cand, events=training))).with_columns(
-        shape=pl.lit(shape)
-    )
+    _, residual, offset = injected(seed=seed, batch=batch, shape=shape)
+    parts = []
+    for variant in ("PF14", "X"):
+        inputs = variant_inputs(
+            variant=variant, residual=residual, offset=offset, scale=_STATE["scales"][variant]
+        )
+        cand = candidates(inputs=inputs)
+        parts.append(
+            cand.filter(pl.Series(positive_flags(table=cand, events=training))).with_columns(
+                shape=pl.lit(shape), variant=pl.lit(variant)
+            )
+        )
+    return pl.concat(parts)
 
 
 def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
-    """Inject one batch with one shape, detect with every arm, return one row per event."""
+    """Inject one batch with one shape, detect with every arm, return one row per event and arm."""
     seed, batch, shape = args
-    panel = _STATE["panel"]
-    residual, injection = injected_inputs(seed=seed, batch=batch, shape=shape)
+    injection, residual, offset = injected(seed=seed, batch=batch, shape=shape)
     results = build_detectors(
+        panel=_STATE["panel"],
+        offset_panel=_STATE["offset_panel"],
         residual=residual,
-        expected=panel["expected"],
-        scale=_STATE["scale"],
+        offset=offset,
+        scales=_STATE["scales"],
         thresholds=_STATE["thresholds"],
         models=_STATE["models"],
     )
+    plain_scale = _STATE["scales"]["PF14"]
     rows = []
     for arm, (_, intervals) in results.items():
         grouped = by_series(intervals=intervals)
@@ -208,7 +266,7 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
                         -np.mean(injection.delta[event.donor][event.onset : event.end])
                     ),
                     "donor_step_z": float(-np.mean(injection.delta[event.donor][span]))
-                    / _STATE["scale"][event.donor],
+                    / plain_scale[event.donor],
                 }
             )
     return rows
@@ -220,11 +278,12 @@ def read_json(*, out: Path, name: str) -> dict:
 
 
 def make_state(*, out: Path, trained: bool = True) -> dict:
-    """Panel, scales, thresholds, and fitted scores for the workers."""
-    panel, _ = load()
+    """Panels, scales, thresholds, fitted scores, and fitted shares for the workers."""
+    panel, offset_panel = load_both()
     return {
         "panel": panel,
-        "scale": prepare(residuals=panel["residual"], window=WINDOW).scale,
+        "offset_panel": offset_panel,
+        "scales": all_scales(panel=panel, offset_panel=offset_panel),
         "shares": fit_profile_shares(panel=panel),
         "thresholds": read_json(out=out, name="thresholds.json") if trained else {},
         "models": pickle.loads((out / "models.pkl").read_bytes()) if trained else {},
@@ -240,39 +299,49 @@ def training_groups(*, panel: dict) -> list[tuple[int, list[Event]]]:
     )
 
 
-def fresh_events(
-    *, panel: dict, base_seed: int, base_first_id: int, long_seed: int, long_first_id: int
+def draw_fresh(
+    *, panel: dict, seed_base: int, seed_long: int, base_first_id: int, long_first_id: int
 ) -> tuple[list[Event], list[Event]]:
     """A headline-band draw and a long draw."""
     base = draw_events(
         quiet=quiet_masks(),
         power=panel["power"],
-        seed=base_seed,
+        seed=seed_base,
         headline_only=FRESH_BASE_EVENTS,
         first_id=base_first_id,
     )
     long = draw_long_events(
-        quiet=log_masks(), power=panel["power"], seed=long_seed, first_id=long_first_id
+        quiet=log_masks(), power=panel["power"], seed=seed_long, first_id=long_first_id
     )
     return base, long
 
 
 def tune(*, out: Path) -> None:
-    """Check that D0M's matched threshold is 4.0."""
-    panel, _ = load()
+    """Match PF14 and X to the largest count not above 80 odd-month unexplained alarms."""
+    panel, offset_panel = load_both()
     logged = near_log_masks(pad_stamps=EXPLAIN_PAD)
-    plain = prepare(residuals=panel["residual"], window=WINDOW)
-    d0m, _ = tune_d2(inputs=plain, veto_z=NO_VETO, logged=logged, target=TARGET)
-    print(f"D0M threshold {d0m}")
-    if d0m != D0M_THRESHOLD:
-        raise SystemExit(f"STOP: D0M matched {d0m}, not {D0M_THRESHOLD}")
-    (out / "thresholds.json").write_text(json.dumps({"D0M": d0m}))
+    scales = all_scales(panel=panel, offset_panel=offset_panel)
+    thresholds: dict[str, float] = {}
+    for variant in ("PF14", "X"):
+        inputs = variant_inputs(
+            variant=variant,
+            residual=panel["residual"],
+            offset=offset_panel["residual"],
+            scale=scales[variant],
+        )
+        threshold, curve = tune_d2(inputs=inputs, veto_z=NO_VETO, logged=logged, target=TARGET)
+        print(f"{variant}: threshold {threshold}, count {dict(curve)[round(threshold, 2)]}")
+        thresholds[variant] = threshold
+    if thresholds["PF14"] != 4.0:
+        raise SystemExit(f"STOP: PF14 matched {thresholds['PF14']}, not 4.0")
+    (out / "thresholds.json").write_text(json.dumps(thresholds))
 
 
 def train(*, out: Path) -> None:
-    """Fit LOGIT and LOGIT_SAME and set each one's threshold on the real odd months."""
+    """Fit LOGIT_SAME on PF14's candidates and XL on X's, and set each one's threshold."""
     state = make_state(out=out, trained=False)
-    panel = state["panel"]
+    state["thresholds"] = read_json(out=out, name="thresholds.json")
+    panel, offset_panel = state["panel"], state["offset_panel"]
     jobs = [
         (seed, batch, shape) for shape in SHAPES for seed, batch in training_groups(panel=panel)
     ]
@@ -280,63 +349,79 @@ def train(*, out: Path) -> None:
         [p for p in run_pool(function=positives_batch, jobs=jobs, state=state) if p.height]
     )
     logged = near_log_masks(pad_stamps=EXPLAIN_PAD)
-    cand = candidates(
-        inputs=prepare(residuals=panel["residual"], window=WINDOW, scale=state["scale"])
-    )
-    odd = np.isin(stamp_months()[cand["stamp"].to_numpy()], list(TUNING_MONTHS))
-    negative = cand.filter(pl.Series(odd & ~explained_flags(table=cand, logged=logged)))
-    print(f"{positive.height} positive and {negative.height} negative candidates")
-    models = {
-        "LOGIT": fit_logistic(positive=positive, negative=negative, features=FEATURES),
-        "LOGIT_SAME": fit_logistic(positive=positive, negative=negative, features=FEATURES_SAME),
-    }
-    thresholds = read_json(out=out, name="thresholds.json")
-    for name, model in models.items():
+    models, thresholds = {}, read_json(out=out, name="thresholds.json")
+    for arm in SCORED:
+        variant = BASIS[arm]
+        cand = candidates(
+            inputs=variant_inputs(
+                variant=variant,
+                residual=panel["residual"],
+                offset=offset_panel["residual"],
+                scale=state["scales"][variant],
+            )
+        )
+        odd = np.isin(stamp_months()[cand["stamp"].to_numpy()], list(TUNING_MONTHS))
+        negative = cand.filter(pl.Series(odd & ~explained_flags(table=cand, logged=logged)))
+        arm_positive = positive.filter(pl.col("variant") == variant)
+        print(f"{arm}: {arm_positive.height} positive and {negative.height} negative candidates")
+        model = fit_logistic(positive=arm_positive, negative=negative, features=FEATURES_SAME)
         scores = model.score(table=negative)
-        thresholds[name] = threshold_for_count(scores=scores, target=TARGET)
+        thresholds[arm] = threshold_for_count(scores=scores, target=TARGET)
         coef = dict(zip(model.features, np.round(model.coef, 3).tolist(), strict=True))
-        print(f"{name}: threshold {thresholds[name]:.4f}, kept {(scores > thresholds[name]).sum()}")
+        print(f"{arm}: threshold {thresholds[arm]:.4f}, kept {(scores > thresholds[arm]).sum()}")
         print(f"  standardised coefficients {coef}")
+        models[arm] = model
+        arm_positive.write_parquet(out / f"positives_{arm}.parquet")
+        negative.write_parquet(out / f"negatives_{arm}.parquet")
     (out / "models.pkl").write_bytes(pickle.dumps(models))
     (out / "thresholds.json").write_text(json.dumps(thresholds))
-    positive.write_parquet(out / "positives.parquet")
-    negative.write_parquet(out / "negatives.parquet")
 
 
 def harness_check(*, out: Path) -> None:
-    """PF14 must reproduce experiment 69's flags on a sample of its fresh headline-band draw."""
+    """PF14, X, and LOGIT_SAME must reproduce experiments 71 and 70 on experiment 71's draw."""
+    check_variants()
     state = make_state(out=out)
     panel = state["panel"]
     base = draw_events(
         quiet=quiet_masks(),
         power=panel["power"],
-        seed=EXPERIMENT_69_BASE_SEED,
+        seed=SEED_71_BASE,
         headline_only=FRESH_BASE_EVENTS,
-        first_id=EXPERIMENT_69_BASE_FIRST_ID,
+        first_id=FIRST_ID_71_BASE,
     )
     kept: list[tuple[int, list[Event]]] = []
     total = 0
-    for seed, batch in seeded_batches(events=base, seed=EXPERIMENT_69_BASE_SEED + 1000):
+    for seed, batch in seeded_batches(events=base, seed=SEED_71_BASE + 1000):
         if total >= CHECK_ROWS:
             break
         kept.append((seed, batch))
         total += len(batch)
-    jobs = [(seed, batch, shape) for shape in ("S2", "S4") for seed, batch in kept]
+    jobs = [(seed, batch, shape) for shape in CHECK_SHAPES for seed, batch in kept]
     scored = pl.DataFrame(
         [r for part in run_pool(function=score_batch, jobs=jobs, state=state) for r in part],
         infer_schema_length=None,
-    ).filter(pl.col("setting") == "PF14")
-    stored = pl.read_parquet(EXPERIMENT_69_DIR / "event_results.parquet").filter(
-        pl.col("setting") == "PF14_48"
     )
-    joined = scored.join(stored, on=["event_id", "shape"], suffix="_69", validate="1:1")
-    different = joined.filter(
-        (pl.col("found") != pl.col("found_69"))
-        | (pl.col("onset_found") != pl.col("onset_found_69"))
-    ).height
-    print(f"{joined.height} rows, {different} differ from experiment 69's PF14")
-    if joined.height != scored.height or different:
-        raise SystemExit("STOP: the harness does not reproduce experiment 69's PF14")
+    stored_71 = pl.read_parquet(EXPERIMENT_71_DIR / "event_results.parquet").with_columns(
+        setting=pl.col("setting").str.replace("_48", "")
+    )
+    stored_70 = pl.read_parquet(EXPERIMENT_70_DIR / "event_results.parquet")
+    failed = False
+    for arm, stored in (("PF14", stored_71), ("X", stored_71), ("LOGIT_SAME", stored_70)):
+        mine = scored.filter(pl.col("setting") == arm)
+        joined = mine.join(
+            stored.filter(pl.col("setting") == arm),
+            on=["event_id", "shape"],
+            suffix="_old",
+            validate="1:1",
+        )
+        different = joined.filter(
+            (pl.col("found") != pl.col("found_old"))
+            | (pl.col("onset_found") != pl.col("onset_found_old"))
+        ).height
+        print(f"{arm}: {joined.height} rows, {different} differ from the earlier experiment")
+        failed |= joined.height != mine.height or bool(different)
+    if failed:
+        raise SystemExit("STOP: the harness does not reproduce the earlier experiments")
     print("harness reproduced")
 
 
@@ -345,11 +430,11 @@ def score(*, out: Path) -> None:
     state = make_state(out=out)
     panel = state["panel"]
     (out / "profile_shares.json").write_text(shares_json(shares=state["shares"]))
-    base, long = fresh_events(
+    base, long = draw_fresh(
         panel=panel,
-        base_seed=SEED_FRESH_BASE,
+        seed_base=SEED_FRESH_BASE,
+        seed_long=SEED_FRESH_LONG,
         base_first_id=FRESH_BASE_FIRST_ID,
-        long_seed=SEED_FRESH_LONG,
         long_first_id=FRESH_LONG_FIRST_ID,
     )
     events = pl.concat(
@@ -372,11 +457,13 @@ def score(*, out: Path) -> None:
 
 def real(*, out: Path) -> None:
     """Score the labelled real transfers and count the real alarms of every arm."""
-    panel, _ = load()
+    panel, offset_panel = load_both()
     results = build_detectors(
+        panel=panel,
+        offset_panel=offset_panel,
         residual=panel["residual"],
-        expected=panel["expected"],
-        scale=prepare(residuals=panel["residual"], window=WINDOW).scale,
+        offset=offset_panel["residual"],
+        scales=all_scales(panel=panel, offset_panel=offset_panel),
         thresholds=read_json(out=out, name="thresholds.json"),
         models=pickle.loads((out / "models.pkl").read_bytes()),
     )
