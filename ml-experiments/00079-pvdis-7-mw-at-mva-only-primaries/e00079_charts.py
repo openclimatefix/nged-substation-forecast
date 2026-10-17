@@ -51,7 +51,7 @@ def raw_profile() -> alt.Chart:
         .sort("name", "sky", "hour")
     )
     return (
-        alt.Chart(profile)
+        alt.Chart(profile)  # ty: ignore[unresolved-attribute]
         .mark_line(clip=True)
         .encode(
             x=alt.X(
@@ -105,7 +105,7 @@ def capacity_recovery(*, known: pl.DataFrame) -> alt.Chart:
     )
     top = float(max(rows["c_signed"].max(), rows["c_fitted"].max()))  # ty: ignore[invalid-argument-type]
     diagonal = (
-        alt.Chart(pl.DataFrame({"x": [0.0, top], "y": [0.0, top]}))
+        alt.Chart(pl.DataFrame({"x": [0.0, top], "y": [0.0, top]}))  # ty: ignore[unresolved-attribute]
         .mark_line(color="#666666", strokeDash=[4, 3])
         .encode(x="x:Q", y="y:Q")
     )
@@ -114,7 +114,7 @@ def capacity_recovery(*, known: pl.DataFrame) -> alt.Chart:
         sub = rows.filter(pl.col("level") == level)
         panels.append(
             alt.layer(
-                alt.Chart(sub)
+                alt.Chart(sub)  # ty: ignore[unresolved-attribute]
                 .mark_circle(size=22, opacity=0.5)
                 .encode(
                     x=alt.X(
@@ -134,7 +134,7 @@ def capacity_recovery(*, known: pl.DataFrame) -> alt.Chart:
                 diagonal,
             ).properties(width=WIDTH - 100, height=170, title=f"Injected solar: level {level}")
         )
-    return alt.vconcat(*panels).properties(
+    return alt.vconcat(*panels).properties(  # ty: ignore[invalid-return-type]
         title=_title(
             text="The unfolding fit recovers the capacity; the naive fit misses it",
             lines=[
@@ -169,15 +169,15 @@ def direction(*, known: pl.DataFrame) -> alt.Chart:
                     "Primary": common.PRIMARY_NAMES[str(site[0])],
                     "balanced_accuracy": 0.5
                     * (
-                        g["tp_unfold"].sum() / g["truth_negative"].sum()
-                        + g["tn_unfold"].sum() / g["truth_positive"].sum()
+                        g["tp_unfold"].sum() / g["truth_negative"].sum()  # ty: ignore[unsupported-operator]
+                        + g["tn_unfold"].sum() / g["truth_positive"].sum()  # ty: ignore[unsupported-operator]
                     ),
                 }
             )
     frame = pl.DataFrame(rows)
     order = list(scenarios)
     dots = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_circle(size=60)
         .encode(
             x=alt.X("scenario:N", sort=order, title=None, axis=alt.Axis(labelAngle=-20)),
@@ -205,7 +205,7 @@ def direction(*, known: pl.DataFrame) -> alt.Chart:
         )
     )
     rules = (
-        alt.Chart(
+        alt.Chart(  # ty: ignore[unresolved-attribute]
             pl.DataFrame(
                 {"y": [0.5, 0.8], "label": ["0.5: all-positive guess", "0.8: pre-registered limit"]}
             )
@@ -213,7 +213,7 @@ def direction(*, known: pl.DataFrame) -> alt.Chart:
         .mark_rule(strokeDash=[4, 3], color="#666666")
         .encode(y="y:Q")
     )
-    return alt.layer(rules, dots).properties(
+    return alt.layer(rules, dots).properties(  # ty: ignore[invalid-return-type]
         width=WIDTH - 80,
         height=230,
         title=_title(
@@ -252,24 +252,24 @@ def real_mva() -> alt.Chart:
         )
     )
     base = alt.Chart(summary).encode(y=alt.Y("Primary:N", sort="-x", title=None))
-    bars = base.mark_rule(color=ocf.DATA_BLUE).encode(
+    bars = base.mark_rule(color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("low:Q", title="Fitted solar capacity (MW), median over season-years"), x2="high:Q"
     )
-    dots = base.mark_circle(size=70, color=ocf.DATA_BLUE).encode(x="capacity:Q")
-    text = base.mark_text(align="left", dx=8, color="#444444").encode(
+    dots = base.mark_circle(size=70, color=ocf.DATA_BLUE).encode(x="capacity:Q")  # ty: ignore[unresolved-attribute]
+    text = base.mark_text(align="left", dx=8, color="#444444").encode(  # ty: ignore[unresolved-attribute]
         x="high:Q", text="share_label:N"
     )
-    return alt.layer(bars, dots, text).properties(
+    return alt.layer(bars, dots, text).properties(  # ty: ignore[invalid-return-type]
         width=WIDTH - 160,
         height=220,
         title=_title(
-            text="No reverse flow is found at any Primary metered only in MVA",
+            text="The fit finds almost no reverse flow at the Primaries metered only in MVA",
             lines=[
                 (
                     "Dot: median over season-years. Line: 5th to 95th percentile of fits that "
                     "resample "
                     "whole weeks. Text: median share of half-hours with fitted negative flow. "
-                    "Unfolding and naive fits agree except at Stickney, whose capacity is 0."
+                    "Unfolding and naive fits agree except at Stickney, whose fitted capacity is 0."
                 )
             ],
         ),

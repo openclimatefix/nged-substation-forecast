@@ -110,6 +110,10 @@ def aligned_injection(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the window rows that have a farm reading, and the farm's normalised output there.
 
+    Args:
+        window: The Primary's window.
+        farm: The farm's sorted times and normalised output.
+
     Returns:
         A boolean mask over the window's rows, and the normalised output on the masked rows.
     """

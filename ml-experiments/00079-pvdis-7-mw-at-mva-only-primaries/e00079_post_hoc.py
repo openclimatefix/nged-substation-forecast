@@ -35,9 +35,9 @@ def main() -> None:
             best = (c_naive, m_naive, loss_naive)
             for tau in THRESHOLDS:
                 sign = np.where(u >= tau, -1.0, 1.0)
-                (c, m, loss), _ = fit._run(design=design, a=a, u=u, sign=sign)  # noqa: SLF001
-                if loss < best[2]:
-                    best = (c, m, loss)
+                found, _ = fit._run(design=design, a=a, u=u, sign=sign)
+                if found.loss < best[2]:
+                    best = (found.capacity, found.mean, found.loss)
             rows.append(
                 {
                     "site": site, "year": w.year, "c_naive": c_naive, "c_best": best[0],

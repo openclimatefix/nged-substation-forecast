@@ -14,6 +14,7 @@ The unfolding fit sees `|power|` and fits `|m|`: it alternates between fitting t
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import e00079_common as common
 import holidays
@@ -65,10 +66,10 @@ def clip_shape(*, g: np.ndarray, ratio: float) -> np.ndarray:
 def fleet_shape(*, g_e: np.ndarray, g_s: np.ndarray, g_w: np.ndarray) -> np.ndarray:
     """Return the fleet-mix unit shape: the 0.2, 0.6, 0.2 blend of east, south, and west output."""
     mix = common.FLEET_MIX
-    return sum(
-        mix[o] * clip_shape(g=g, ratio=common.RATIO)
-        for o, g in (("E", g_e), ("S", g_s), ("W", g_w))
-    )
+    shape = np.zeros_like(g_s, dtype=float)
+    for o, g in (("E", g_e), ("S", g_s), ("W", g_w)):
+        shape += mix[o] * clip_shape(g=g, ratio=common.RATIO)
+    return shape
 
 
 @dataclass(frozen=True)
@@ -150,23 +151,35 @@ class Unfolded:
     loss_gap: float
 
 
-def _run(
-    *, design: Design, a: np.ndarray, u: np.ndarray, sign: np.ndarray
-) -> tuple[float, np.ndarray, float]:
+class Pass(NamedTuple):
+    """One signed fit: capacity, fitted mean, and loss against the magnitude reading."""
+
+    capacity: float
+    mean: np.ndarray
+    loss: float
+
+
+def _run(*, design: Design, a: np.ndarray, u: np.ndarray, sign: np.ndarray) -> tuple[Pass, Pass]:
     """Alternate the signed fit and the sign update from `sign` until the signs stop changing.
+
+    Args:
+        design: The window's design.
+        a: The magnitude readings, MW.
+        u: The unit solar shape.
+        sign: The starting sign of each row, plus or minus 1.
 
     Returns:
         The lowest-loss pass, and the first pass (the fit to `sign x a` with the given signs).
     """
-    best: tuple[float, np.ndarray, float] | None = None
-    first: tuple[float, np.ndarray, float] | None = None
+    best: Pass | None = None
+    first: Pass | None = None
     for _ in range(common.MAX_ITERATIONS):
         c, m = signed_fit(design=design, y=sign * a, u=u)
         loss = abs_loss(a=a, m=m)
         if first is None:
-            first = (c, m, loss)
-        if best is None or loss < best[2]:
-            best = (c, m, loss)
+            first = Pass(c, m, loss)
+        if best is None or loss < best.loss:
+            best = Pass(c, m, loss)
         new = np.where(m >= 0.0, 1.0, -1.0)
         if np.array_equal(new, sign):
             break
@@ -202,15 +215,15 @@ def unfold_fit(*, design: Design, a: np.ndarray, u: np.ndarray, scale: float) ->
         for s in start_signs(design=design, a=a, u=u, scale=scale)
     ]
     positive = results[0][1]
-    best = min((r[0] for r in results), key=lambda r: r[2])
-    if best[2] > (1.0 - common.TIE_MARGIN) * positive[2]:
+    best = min((r[0] for r in results), key=lambda r: r.loss)
+    if best.loss > (1.0 - common.TIE_MARGIN) * positive.loss:
         best = positive
-    losses = sorted(r[0][2] for r in results)
-    distinct = len({round(r[0][0], 6) for r in results})
+    losses = sorted(r[0].loss for r in results)
+    distinct = len({round(r[0].capacity, 6) for r in results})
     return Unfolded(
-        capacity=best[0],
-        mean=best[1],
-        loss=best[2],
+        capacity=best.capacity,
+        mean=best.mean,
+        loss=best.loss,
         n_starts_distinct=distinct,
         loss_gap=losses[1] - losses[0],
     )

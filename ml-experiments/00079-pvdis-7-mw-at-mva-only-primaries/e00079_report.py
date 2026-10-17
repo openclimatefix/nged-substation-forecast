@@ -47,6 +47,11 @@ def two_stage_draws(
     return float(point), float(low), float(high)
 
 
+def as_float(value: object) -> float:
+    """Return a Polars scalar (typed as a wide union) as a float."""
+    return float(value)  # ty: ignore[invalid-argument-type]
+
+
 def injected(*, known: pl.DataFrame, level: float, q_share: float = 0.0) -> pl.DataFrame:
     """Return the windows of one injection level with their relative capacity errors."""
     return known.filter(
@@ -121,7 +126,9 @@ def main() -> None:  # noqa: PLR0915
             f"  C2 balanced accuracy - 0.5: unfold={ba[0]:+.3f} [{ba[1]:+.3f}, {ba[2]:+.3f}]; "
             f"naive point={ba_naive[0]:+.3f}"
         )
-        capacity_ok = frame["err_unfold"].median() <= common.CAPACITY_ERROR_LIMIT and c1[2] < 0.0
+        capacity_ok = (
+            as_float(frame["err_unfold"].median()) <= common.CAPACITY_ERROR_LIMIT and c1[2] < 0.0
+        )
         direction_ok = (ba[0] + 0.5) >= common.BALANCED_ACCURACY_LIMIT and ba[
             1
         ] >= common.C2_LOWER_LIMIT
@@ -146,7 +153,7 @@ def main() -> None:  # noqa: PLR0915
     base = known.filter(
         (pl.col("level") == 0.0) & pl.col("site").is_in(common.ALMOST_NEVER_NEGATIVE)
     )
-    false_share = float(base["fitted_negative_share"].median())
+    false_share = as_float(base["fitted_negative_share"].median())
     out(
         f"[null check] almost-never-negative Primaries, no injection: windows={base.height}, "
         f"median fitted negative share={false_share:.4f}"
@@ -171,11 +178,9 @@ def main() -> None:  # noqa: PLR0915
             f"[{ba[1] + 0.5:.3f}, {ba[2] + 0.5:.3f}] over {rest['site'].n_unique()} Primaries"
         )
         pooled = injected(known=known, level=level).filter(pl.col("site") != "D15")
-        out(
-            f"  pooled recall of reverse flow="
-            f"{pooled['tp_unfold'].sum() / pooled['truth_negative'].sum():.3f}, "
-            f"specificity={pooled['tn_unfold'].sum() / pooled['truth_positive'].sum():.3f}"
-        )
+        recall = as_float(pooled["tp_unfold"].sum()) / as_float(pooled["truth_negative"].sum())
+        specificity = as_float(pooled["tn_unfold"].sum()) / as_float(pooled["truth_positive"].sum())
+        out(f"  pooled recall of reverse flow={recall:.3f}, specificity={specificity:.3f}")
     d15 = injected(known=known, level=1.0).filter(pl.col("site") == "D15")
     out(
         f"[post hoc] D15 level 1.0: median signed-fit capacity={d15['c_signed'].median():.2f}, "
