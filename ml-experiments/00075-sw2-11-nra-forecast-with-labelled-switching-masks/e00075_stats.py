@@ -150,7 +150,10 @@ def compute_metrics(*, smoke: bool) -> None:
                 power=labels[site].in_event.astype(np.float32), target=index, origin=origin_index
             )
             threshold = common.historical_thresholds(power=arrays[site].power)["p99"]
-            keep = np.isfinite(actual) & (sorted_q["valid_time"] < common.HOLDOUT).to_numpy()
+            finite = np.isfinite(sorted_q.select(common.LEVEL_COLUMNS).to_numpy()).all(axis=1)
+            keep = (
+                finite & np.isfinite(actual) & (sorted_q["valid_time"] < common.HOLDOUT).to_numpy()
+            )
             sorted_q = sorted_q.filter(pl.Series(keep))
             actual = actual[keep]
             index = index[keep]
@@ -263,10 +266,53 @@ def contrast_rows(
     return rows
 
 
+def verdicts(*, contrasts: pl.DataFrame) -> list[dict[str, object]]:
+    """Return the pre-registered reading of C1 to C3 from their Bonferroni-level intervals."""
+    out = []
+    for contrast_id in PLANNED:
+        row = contrasts.filter(
+            (pl.col("id") == contrast_id)
+            & (pl.col("level_label") == "planned")
+            & (pl.col("site") == "pooled")
+            & (pl.col("scope") == "all leads")
+        ).row(0, named=True)
+        gain = row["upper"] < 0.0
+        if contrast_id == "C1":
+            reading = (
+                "gain"
+                if gain
+                else (
+                    "non-inferior"
+                    if row["upper"] <= NON_INFERIORITY_MARGIN
+                    else "not shown non-inferior"
+                )
+            )
+        else:
+            reading = "supported" if gain else "not supported"
+        out.append(
+            {
+                "id": contrast_id,
+                "reading": reading,
+                "difference": row["difference"],
+                "lower": row["lower"],
+                "upper": row["upper"],
+            }
+        )
+    return out
+
+
 def compute_results(*, smoke: bool) -> None:
     """Write the contrasts, the absolute scores, the benchmarks, and the reproduction check."""
     _, _, results_dir = _dirs(smoke=smoke)
     results_dir.mkdir(parents=True, exist_ok=True)
+    key_sets = {
+        arm: read_arm(arm=arm, smoke=smoke).select(*common.KEYS).sort(*common.KEYS)
+        for arm in ARM_NAMES
+    }
+    for arm, keys in key_sets.items():
+        if not keys.equals(key_sets["plain"]):
+            msg = f"arm {arm} does not hold the same cases as the plain arm"
+            raise ValueError(msg)
     rows: list[dict[str, object]] = []
     for family, specs in (("planned", PLANNED), ("descriptive", DESCRIPTIVE)):
         for contrast_id, contrast in specs.items():
@@ -278,7 +324,9 @@ def compute_results(*, smoke: bool) -> None:
                     smoke=smoke,
                 )
             )
-    pl.DataFrame(rows).write_parquet(results_dir / "contrasts.parquet")
+    contrasts = pl.DataFrame(rows)
+    contrasts.write_parquet(results_dir / "contrasts.parquet")
+    pl.DataFrame(verdicts(contrasts=contrasts)).write_parquet(results_dir / "verdicts.parquet")
     nra_keys = subset_of(frame=read_arm(arm="plain", smoke=smoke), subset="nra").select(
         *common.KEYS
     )
@@ -322,7 +370,10 @@ def compute_results(*, smoke: bool) -> None:
             )
         if name == "weekly_s":
             joined = plain.join(
-                other.select(*common.KEYS, theirs=pl.col("qs")), on=list(common.KEYS), how="inner"
+                other.select(*common.KEYS, theirs=pl.col("qs")),
+                on=list(common.KEYS),
+                how="inner",
+                validate="1:1",
             ).with_columns(gap=(pl.col("plain") - pl.col("theirs")).abs())
             reproduction.append(
                 {
@@ -348,6 +399,7 @@ def main() -> None:
     with pl.Config(tbl_rows=200, tbl_cols=20, fmt_str_lengths=60):
         print(pl.read_parquet(results_dir / "absolute.parquet"))
         print(pl.read_parquet(results_dir / "reproduction.parquet"))
+        print(pl.read_parquet(results_dir / "verdicts.parquet"))
         print(
             pl.read_parquet(results_dir / "contrasts.parquet").filter(
                 (pl.col("site") == "pooled") & (pl.col("scope") == "all leads")
