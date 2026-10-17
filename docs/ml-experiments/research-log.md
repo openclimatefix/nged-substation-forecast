@@ -30,6 +30,7 @@ the maintainer to confirm.
 | [00049 - Screening reference under monthly retraining](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Serve an average of the quantiles of five XGBoost models for Primary demand (weekly refits, monthly refits, the weekly-analogue model, the pooled model, the stack) | Lowers the quantile score by 0.08 points (-0.14 to -0.02) against the weekly-retrained N1 on one validation year; needs five models; the spread factor and the fingerprints do not change the score |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction | Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again |
 | [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Give the XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the calibrated ENS sunshine anomaly, with a weight fitted per series, lead band, and season, and zero beyond 10 days) | Lowers the quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess; the live service cannot yet supply the inputs, the capacity held is stale, and the weights rest on one summer |
+| [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
 
 ## The experiments so far
 
@@ -102,6 +103,7 @@ the maintainer to confirm.
 | [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Does a Primary demand forecast with an explicit solar term (capacity times a calibrated forecast of the sunshine anomaly) match the best guess by 0.10 points of capacity, and beat its placebo twin? | Supported: the base-margin arm `am` is -0.152 (-0.199 to -0.111) against the best guess at 98.75% | Candidate | Pending |
 | [00063 - SW2-10 joint fit, v2 in miniature](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) | Does one linear fit per Primary, holding a weather baseline without radiation, embedded solar capacity times the CAMS sunshine shape, and a share term per labelled transfer, beat the frozen v1 baseline outside switching, and recover injected solar and transfers? | Inconclusive: C1 is -0.322 points of capacity (-0.437 to -0.207) at 5 Primaries, close to the 0.35-point threshold, but both injection gates failed for reasons of test design | Not for production | Pending |
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
+| [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1687,3 +1689,28 @@ come from the CEDA research archive, not the live feed, so any gain would be an 
 - **Write-up:** [result](00057-product-trained-xgboost-solar-farms/result.md).
 
 ![Contrasts between the arms](00057-product-trained-xgboost-solar-farms/figure_1.svg)
+
+### 00048: weekly retraining of the demand model, checked on the runs experiment 34 left out
+
+**Refitting the Primary demand model weekly, with no error correction, scored 0.20 points of
+capacity below the best setup tested earlier (5.44 against 5.64) on 292 daily forecast runs that
+experiment 34 had not scored.** Scores are the quantile score in percentage points of capacity, and
+the earlier setup, called the stack, is a model fitted once with a 14-day error correction. The
+experiment refitted the XGBoost demand model (N1) weekly and monthly for 16 Primary substations and
+for 2 bulk supply point (BSP) and 2 grid supply point (GSP) substations. It refitted the weather-to-
+power model monthly for 6 solar and 3 wind farms. The verdict is supported. A 7-day or 14-day error
+correction was not shown to help a refitted model, and monthly refitting changed solar and wind
+scores by 0.04 points or less.
+
+- **Headline result:** weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly
+  minus monthly -0.13 (-0.24 to -0.03); the 7-day correction on the weekly model +0.16 (-0.06 to
+  +0.36, worse, unresolved).
+- **Finding for later experiments:** at the 2 BSP and 2 GSP substations weekly retraining gained
+  0.66 points over the stack (-1.23 to -0.27), more than predicted, on 4 series. The 7-day
+  correction window was 0.09 worse than the 14-day window. The Primary gain is fragile: it rests on
+  12 months, three series carry most of it (without D8 the interval includes zero), and the 292
+  runs share their months with experiment 34's 73, so a second validation year is the open test.
+- **Write-up and pull request:** [result](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md),
+  [PR #1269 (Experiment 48: does weekly retraining still win on the runs experiment 34 left out?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1269).
+
+![Planned contrasts](00048-weekly-retraining-confirmation-and-extension-demand-generators/figure_1.svg)
