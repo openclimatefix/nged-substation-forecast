@@ -1,7 +1,7 @@
 ---
 id: "00075"
 slug: sw2-11-nra-forecast-with-labelled-switching-masks
-status: planned
+status: done
 size: complex
 hypothesis: >-
   On the 292 daily ENS forecast runs of experiment 48, a weekly-refitted Primary substation demand
@@ -38,93 +38,99 @@ metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity,
   on the NRA rows; the metered view (all half-hours) and the lag-in-event subset are reported and
   decide nothing
+verdict: inconclusive
+best_arm: >-
+  None separable from the others: on the 2,928,842 NRA cases the plain arm scored 5.257, the masked
+  arm 5.261, the arm with signed MW columns 5.274, and the arm with corrected lags 5.264 points of
+  capacity.
+headline: >-
+  C1, masked minus plain: +0.004 points (98.33% interval -0.026 to +0.025). C2, signed MW columns
+  minus masked: +0.013 (-0.013 to +0.052). C3, corrected lags minus masked: +0.004 (-0.019 to
+  +0.019).
+lessons: >-
+  Outside switching, a forecast trained without the labelled switching half-hours scores the same
+  as one trained on everything, to within 0.03 points, and neither magnitude input helped. Only
+  1.3% of scored half-hours have a lag inside an event, so the data cannot show a gain even if one
+  exists.
+advice:
+  - >-
+    Do not spend effort on a switching detector to improve the Primary forecast's score outside
+    switching: an oracle mask and oracle MW columns left it within 0.06 points (C1 to C3, figure 1).
+  - >-
+    Test lag-corrected inputs together with the MW columns before ruling the corrected-lag idea out,
+    because on the 37,394 half-hours with a lag inside an event the corrected lags cut the score by
+    0.42 (-1.51 to +0.02) while the MW columns alone raised it by 1.07 (D8, D9, figure 2).
+  - >-
+    Score a masking experiment on a longer history than one validation year, because only 22
+    labelled events fall in the 292 runs and 8 months hold any lag inside an event (figure 2).
+  - >-
+    Judge a refit arm against a same-code repeat of the plain arm, because per-case scores of the
+    same refit differ between graphics-card runs: only 9% of cases matched experiment 48 to 0.001
+    (reproduction check).
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/
 ---
 
-# Experiment 75: can a forecast learn the normal running arrangement from labelled switching?
+# Experiment 75: can a Primary demand forecast learn the normal running arrangement from labelled switching?
 
-**The question.** An electricity network operator sometimes closes a normally open switch, so that
-one Primary substation (a substation that steps down to the local distribution network) carries
-load that belongs to a neighbour. The metered power then differs from the power the substation
-carries in its normal running arrangement (NRA). We ask whether a demand model trained without
-those half-hours forecasts the NRA as well as one trained on everything, and whether telling the
-model how much load switching moved lowers the error further. We use the 82 switching events that
-[experiment 41](../00041-sw2-0a-labeller-gate/result.md) found in the power readings at the times
-NGED logged. The result does not need a detector, so it is the ceiling for a model that must find
-switching without NGED's log (SW2-12).
+**Take-home message: outside switching, the Primary demand forecast was already close to the normal
+running arrangement, so neither removing the labelled switching from training nor telling the model
+how much load switching moved changed the score by more than 0.06 points of capacity.** The
+experiment cannot show that masking is harmless to within its own margin of 0.02 points, and it
+cannot show a gain from either extra input. The plain weekly-refitted model stays the v1 candidate.
+The corrected lags did help on the few half-hours whose lag sits inside an event, so SW2-12 should
+test them first. The verdict is **inconclusive**.
 
-## Design
+An electricity network operator sometimes closes a normally open switch, so that one Primary
+substation (a substation that steps down to the local distribution network) carries load that
+belongs to a neighbour. We asked whether an XGBoost demand model forecasts the normal running
+arrangement (NRA) as well when its training targets leave out the labelled switching half-hours,
+and whether giving the model the signed MW that switching moved at each lagged power input, or
+subtracting that MW from each lag, lowers the error further.
 
-- **Architecture.** Weekly refits of the one-XGBoost-model-per-substation N1 recipe, no error
-  correction, trained on the ENS control member, the winner of
-  [experiment 48](../00048-weekly-retraining-confirmation-and-extension-demand-
-  generators/result.md).
-  The refits, the 292 runs, the seed 0, the 16 Primary series, and the scoring code are copied from
-  that experiment, and the plain arm is rebuilt in this experiment so that every arm shares one
-  code path. Each series trains on its own history.
-- **Arms (all weekly, seed 0).**
-    - `plain`: nothing removed.
-    - `nra`: training rows whose valid time lies inside a labelled event of the series, as donor or
-      as metered receiver, are dropped.
-    - `nra_mw`: `nra` plus three columns, the signed MW that switching moved at each of the three
-      lagged power inputs (newest usable observation, same time on the latest day, same time on the
-      latest week), as a fraction of capacity. The sign is positive for a receiver and negative for
-      a donor. A receiver's MW is the event's median moved MW times the receiver's share.
-    - `nra_lag`: `nra` with each lagged power input replaced by the lag minus its signed MW.
-- **Labels.** The visible events (conserved or one-sided) of experiment 41's labelled set, with
-  the onset, end, donor, receivers, and median moved MW it stored. Events before the labelled set's
-  start (January 2022) are not masked, and the training history runs from September 2019.
-- **What the labels are.** The labels, onsets, ends, and moved MW are hindsight values that NGED
-  would not have at the forecast origin: each event has one median moved MW for its whole length,
-  estimated from telemetry that may follow the origin. This experiment is therefore an oracle
-  ceiling for the masks and the MW columns, and SW2-12 measures what a detector loses. The mask
-  drops only training rows already inside the refit's cutoff (valid time at least 3.5 hours before
-  the refit), and the MW at each lag is looked up at the lag's own time, not the valid time. The
-  labelled events of the other visibility classes (not visible, unassessable) stay in training,
-  and logged closures without a labelled event are not masked.
-- **Event sign and size.** The MW is divided by the series' effective capacity. A donor gets minus
-  the event's median moved MW, a metered receiver gets plus that MW times its share, and shares may
-  sum to less than 1. A receiver outside the 16 Primary series is ignored. A one-sided event with
-  no metered receiver still marks and signs its donor. The events are the 82 visible ones (conserved
-  or one-sided, kinds real and alarm), not the synthetic sentinel cards.
-- **NRA rows.** The row set is fixed before any arm is scored. A scored case is kept when its valid
-  time is outside every labelled event of its
-  series and outside the logged closure interval of any card that names the series as a side.
-  Every arm is scored on identical rows.
-- **Not run.** The `base_margin` forecast-solar arm of
-  [experiment 64](../00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) is left out.
-- **Calendar columns.** Every arm uses experiment 48's N1 columns, which include hour and weekday,
-  so a model that memorises the calendar does so in all four arms alike. The contrasts are paired
-  across arms with identical columns, and no separate control is run.
-- **Reproduction check.** The `plain` arm on all 292 runs must match experiment 48's stored
-  weekly score (5.44) to 0.01, and its per-case scores to 0.001 where the graphics-card fit is
-  repeatable.
-- **Descriptive extras.** `plain` minus each other arm on the NRA rows; Experiment 48's
-  `manual_heuristic`, `climatology`, and stack rows on the
-  same cases; experiment 49's P-roll 5.150 only where its rows match; each series on its own; the
-  lag-in-event subset (NRA rows whose lag falls in an event), where the magnitude arms can act.
+We refitted the model weekly for 16 Primary substations on four arms and scored them on the 292
+daily forecast runs of experiment 48, on half-hours outside labelled switching and logged closures.
+The labels are experiment 41's 82 visible events, which are hindsight values, so the result is an
+oracle ceiling for a detector.
 
-## Sizing
+![Planned contrasts](figure_1.svg)
 
-- **What gets stored:** four arms' predictions in the private data folder; nothing in `src/`.
-- **Serving path:** untouched.
-- **Degradation rule:** untouched. The magnitude arms would need a detector in production, which
-  SW2-12 prices.
-- **More than one defensible design:** yes, which is why there are three non-plain arms.
-- **Callers not nameable without searching:** no; the code is a copy of experiment 48's.
-- **Size:** complex, because the experiment stores a new prediction set and admits more than one
-  design. Reviews: Sonnet plan, Sonnet code, Sonnet write-up, and Sonnet prose.
+![Contrasts where a lag sits inside an event](figure_2.svg)
 
-## Earlier advice followed
+![Absolute score of every arm](figure_3.svg)
 
-- **Followed:** retrain weekly with no correction (experiment 48, C1 and C4 to C6), and score a
-  daily row set (experiment 48).
-- **Departure:** none.
-- **Limit carried forward:** experiment 48's weekly gain rests on one validation year, so the
-  plain arm's absolute score is reported beside every contrast.
-
-## Compute
-
-Slot A, 10 cores and at most 24 GB of GPU memory: 5 worker processes of 2 threads, one refit per
-job, one file per refit, series and arm, written atomically. Utilisation is checked in the first
-minutes of the fit.
+- **Arms (all weekly, seed 0, N1 recipe of experiment 48).** `plain`: nothing removed. `nra`:
+  training rows whose valid time lies inside a labelled event are dropped. `nra_mw`: `nra` plus
+  the signed MW at each of the 3 lags. `nra_lag`: `nra` with each lag replaced by the lag minus
+  that MW.
+- **Row set.** `fold_a_daily_gap_v1`, 16 Primary series, 3,199,243 cases, of which 2,928,842 are
+  NRA rows (outside labelled events and logged closures). Every arm holds identical cases.
+- **Score of each arm on the NRA rows (quantile score, points of capacity).** `plain` 5.257, `nra`
+  5.261, `nra_mw` 5.274, `nra_lag` 5.264. Benchmarks on the same rows: experiment 48 weekly with
+  the 14-day correction 5.334, the stack 5.448, `manual_heuristic` 6.121, `climatology` 7.479. The
+  absolute scores on all half-hours are 5.440, 5.446, 5.473, and 5.450.
+- **C1, masked minus plain: +0.004 (98.33% interval -0.026 to +0.025).** The upper end exceeds the
+  +0.02 non-inferiority margin, so the mask is not shown to be harmless, and not shown to be
+  harmful either. By the decision rule the plain arm is the v1 NRA candidate.
+- **C2, signed MW columns minus masked: +0.013 (-0.013 to +0.052). C3, corrected lags minus masked:
+  +0.004 (-0.019 to +0.019).** Neither interval lies below zero, so neither arm is supported.
+- **Descriptive, plain minus each arm.** Minus `nra_mw` -0.017 (95% interval -0.035 to +0.001),
+  minus `nra_lag` -0.007 (-0.028 to +0.018). Corrected lags minus MW columns -0.010 (-0.037 to
+  +0.008).
+- **Half-hours with a lag inside an event.** Only 37,394 NRA half-hours (1.3%), in 8 months. There
+  the mask lowered the score by 0.50 (95% interval -2.08 to +0.35), the corrected lags lowered it
+  by a further 0.42 (-1.51 to +0.02), and the MW columns raised it by 1.07 (-0.19 to +3.31).
+  These intervals are not corrected for several comparisons.
+- **Metered view.** Over all half-hours, C1 is +0.006 (-0.014 to +0.025), C2 +0.027 (-0.001 to
+  +0.073), and C3 +0.004 (-0.010 to +0.016). The view decides nothing.
+- **Reproduction check.** The plain arm's mean score on all cases, 5.4403, matches experiment 48's
+  stored weekly score, 5.4402. Only 9% of per-case scores match to 0.001, and the largest gap is
+  4.39 points, because repeated graphics-card fits are not bit-for-bit identical. The 0.004
+  difference in C1 is therefore at the level of fit-to-fit noise.
+- **Caveats.** Labels, onsets, ends, and the moved MW are hindsight values. Only 22 of the 82
+  labelled events fall in the scored year. Events before January 2022 are not masked in training.
+  One validation year, one seed.
+- **What the next experiment should answer.** SW2-12 repeats the arms with the detector's labels.
+  Its first addition is the corrected lags plus the MW columns together, which this experiment did
+  not run. The corrected lags were the one input that helped where a lag sits inside an event.

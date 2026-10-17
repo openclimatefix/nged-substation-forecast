@@ -16,6 +16,7 @@ Steps, each skipped when its output is newer than its input:
 
 import argparse
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 import e00075_common as common
@@ -82,7 +83,7 @@ DESCRIPTIVE: Final[dict[str, Contrast]] = {
 }
 
 
-def _dirs(*, smoke: bool) -> tuple[object, object, object]:
+def _dirs(*, smoke: bool) -> tuple[Path, Path, Path]:
     """Return the predictions, metrics, and results folders."""
     suffix = "_smoke" if smoke else ""
     return (
@@ -187,7 +188,7 @@ def compute_metrics(*, smoke: bool) -> None:
 
 def _mean(values: pl.Series) -> float:
     """Return the mean, NaN for an empty series."""
-    return float(values.mean()) if values.len() else float("nan")
+    return float(np.mean(values.to_numpy())) if values.len() else float("nan")
 
 
 def read_arm(*, arm: str, smoke: bool) -> pl.DataFrame:
@@ -378,10 +379,10 @@ def compute_results(*, smoke: bool) -> None:
             reproduction.append(
                 {
                     "cases": joined.height,
-                    "mean_plain": float(joined["plain"].mean()),
-                    "mean_experiment_48": float(joined["theirs"].mean()),
-                    "max_abs_gap": float(joined["gap"].max()),
-                    "share_within_0_001": float((joined["gap"] <= 0.001).mean()),
+                    "mean_plain": _mean(joined["plain"]),
+                    "mean_experiment_48": _mean(joined["theirs"]),
+                    "max_abs_gap": float(np.max(joined["gap"].to_numpy())),
+                    "share_within_0_001": _mean(joined["gap"] <= 0.001),
                 }
             )
     pl.DataFrame(absolute).write_parquet(results_dir / "absolute.parquet")

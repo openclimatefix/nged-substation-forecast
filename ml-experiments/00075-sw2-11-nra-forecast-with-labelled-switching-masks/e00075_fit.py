@@ -239,7 +239,9 @@ def job_path(*, root: Path, arm: str, site: str, refit: datetime) -> Path:
 _CACHE: dict[str, object] = {}
 
 
-def _context() -> tuple[pl.DataFrame, dict[str, common.SeriesArrays], dict[str, object]]:
+def _context() -> tuple[
+    pl.DataFrame, dict[str, common.SeriesArrays], dict[str, labelling.SeriesLabels]
+]:
     """Return the Primary series table, arrays, and labels, loaded once per worker process."""
     if "series" not in _CACHE:
         series = common.series_table().filter(pl.col("substation_type").is_in(common.GROUPS))
