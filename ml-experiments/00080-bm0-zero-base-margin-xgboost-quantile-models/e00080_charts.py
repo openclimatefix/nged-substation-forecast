@@ -169,7 +169,7 @@ def figure_2() -> None:
         panels.append((rules + dots + zero).properties(width=100, height=220, title=label))
     chart = alt.hconcat(*panels).properties(
         title=title(
-            text="More rounds do not help the zero start; early stopping is unreliable",
+            text="More rounds do not close the gap between the two starts",
             subtitle=(
                 "Frozen models, uncorrected, 292 daily runs. Dot: difference in mean quantile "
                 "score. Line: 95% interval from resampling whole months of forecast start."

@@ -1518,9 +1518,9 @@ is `inconclusive`.
 
 - **Finding for later experiments:** do not test the starting value again for demand or solar. Four
   times as many rounds raised the Primary score by 0.211 points (0.100 to 0.352), so the fixed 500
-  rounds are not too few, and early stopping on the last 90 days of the training window picked
-  between 241 and 2,000 rounds and cannot be trusted. The next experiment is the number of rounds
-  (about 250 against 500).
+  rounds are not too few, and early stopping on the last 90 days of the training window stopped
+  between 90 and 1,292 rounds at the demand series and gained nothing detectable. The next
+  experiment is the number of rounds (about 250 against 500).
 - **Noise floor:** GPU fits are not bit-reproducible. A refit of the estimated-start frozen model
   scored 0.004 to 0.007 points from the stored one.
 - **Write-up:** [the full result page](00080-bm0-zero-base-margin-xgboost-quantile-models/result.md).

@@ -84,7 +84,8 @@ lessons: >-
   so the starting value is not worth another experiment for demand or solar. Four times as many
   rounds raised the Primary score by 0.211 points (0.100 to 0.352) with the estimated start, so
   the fixed 500 rounds are not too few, and early stopping on the last 90 days of the training
-  window stopped at 241 to 2,000 rounds and scored worse than the fixed 500.
+  window gave no detectable gain over the matched 500 rounds and stopped anywhere from 90 to 1,292
+  rounds at the demand series.
 production_status: not-for-production
 adopted_in: none
 advice:
@@ -162,9 +163,10 @@ capacity.
   +0.243) at 2000, so more rounds do not close the gap. The rule "removed by more rounds" is not met
   for any class. For the estimated start, 2000 rounds scored 0.211 points worse than 500
   (+0.100 to +0.352) at Primary substations.
-- **Early stopping (exploratory):** the stopping round ranged from 241 to 2,000; the held-out
-  loss kept falling past 1,000 rounds while the scored year worsened beyond 500, because the
-  held-out block is the three months before the training end and the scored year spans all seasons.
+- **Early stopping (exploratory):** on the last 90 days before the training end, the stopping
+  round ranged from 90 to 1,292 for the demand series. Against its own matched 500-round prefix it
+  gained -0.011 (-0.032 to +0.008) at the Primary substations, which is not detectable. The
+  held-out block covers one season, and the scored year covers all of them.
 - **Noise floor:** GPU fits are not bit-reproducible. A refit of the estimated-start frozen model
   scored +0.004 (Primary) and -0.007 (grid supply points) points from experiment 48's stored
   predictions, above the planned tolerance of 0.001 and well below the intervals. Single quantiles
