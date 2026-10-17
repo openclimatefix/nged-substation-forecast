@@ -31,6 +31,28 @@ Hours above the Curtailment Limit. See
 <https://openclimatefix.github.io/nged-substation-forecast/roadmap/cost-savings-metrics/> for the
 reasoning.
 
+Decisions the numbers rest on, stated here because nothing in the output shows them:
+
+- The DCUSA-form figure adds `r * breach * price` to the payment, the same breach term as the energy
+  proxy, so the two forms differ only in what they charge a capped generator.
+- `curtailment_limit_hours` is applied as given to the whole scored window. The caller pro-rates an
+  annual limit to the window: a daily-gap fold holds 292 daily runs, not a year.
+- `month_totals` are keyed by the month of `power_fcst_init_time`, while the season that picks a
+  node's limit comes from `valid_time`. A forecast made on 28 February for 1 March uses the
+  Intermediate Cool limit and is filed under February.
+- `energy_proxy_gbp_per_mw_year` divides by the capacity of the forecast generators beneath the
+  scored nodes (generators with `is_forecast` false and generators under excluded nodes do not
+  count). It is null in node-only mode.
+- The module does not compute avoidable cost. `avoidable_cost` subtracts a perfect arm's figures,
+  which the caller must have scored in the same call so that all arms share their rows.
+- Every arm must hold the same seeds, because `align_arms` intersects on the seed and an arm with
+  fewer seeds would trim every other arm; `node_curtailment` raises instead.
+- The capacity in `GeneratorRow.capacity_mw` and the effective capacity given to
+  `scale_to_megawatts` must be the same number. A generator forecast above `capacity_mw` would give
+  a generator that is instructed a cap above its capacity, charged nothing under the DCUSA form, so
+  `node_curtailment` raises on it. `capacity_forecast` builds the NGED baseline arm, in which every
+  generator is assumed to run at `capacity_mw`.
+
 Everything runs as Polars expressions over `(node, valid_time)` with no loop over nodes. The one
 loop is the progressive filling in `allocate_pro_rata_by_capacity`, which runs once per round of
 clamping over the whole frame, and a round is needed at most once per generator under one node.
@@ -45,7 +67,7 @@ import numpy as np
 import patito as pt
 import polars as pl
 
-from studies.tail_calibration import align_arms, level_column
+from studies.tail_calibration import ROW_KEYS, align_arms, level_column
 
 SeasonType = Literal["Winter", "Intermediate Cool", "Intermediate Warm", "Summer"]
 """NGED's four seasons, each a set of whole calendar months."""
@@ -123,6 +145,9 @@ REASON_UNKNOWN_SIGN: Final[str] = "unknown_sign"
 
 REASON_INCOMPLETE_LIMITS: Final[str] = "incomplete_limits"
 """Why a node without an export limit in each of the four seasons is excluded."""
+
+REASON_NO_CAPACITY: Final[str] = "no_capacity"
+"""Why a node series missing from the capacity map of `scale_to_megawatts` is excluded."""
 
 REASON_NO_FORECAST_ROWS: Final[str] = "no_forecast_rows"
 """Why a node whose time series has no forecast row in the lead window is excluded."""
@@ -264,9 +289,12 @@ class NodeCurtailmentResult:
             by a price to get pounds.
         excluded: One row per excluded node, with `node_id` and `reason`.
         n_excluded_unknown_sign: How many nodes were excluded for a null `export_sign`.
+        n_rows_dropped_nonfinite_forecast: Node rows (distinct `KEY_COLUMNS`) dropped because an
+            arm's node quantile was null or not finite.
         n_rows_dropped_missing_generator: Node rows dropped because a curtailable generator
-            beneath the node had no forecast row.
-        n_rows_dropped_not_in_every_arm: Node rows dropped because another arm lacked them.
+            beneath the node had no finite forecast row, not counted again if already counted above.
+        n_rows_dropped_not_in_every_arm: Node rows dropped because another arm lacked them, not
+            counted again if already counted above.
     """
 
     per_arm: pl.DataFrame
@@ -275,6 +303,7 @@ class NodeCurtailmentResult:
     month_totals: pl.DataFrame
     excluded: pl.DataFrame
     n_excluded_unknown_sign: int
+    n_rows_dropped_nonfinite_forecast: int
     n_rows_dropped_missing_generator: int
     n_rows_dropped_not_in_every_arm: int
 
@@ -360,7 +389,8 @@ def scaled_limits(
 
     Args:
         table: The node table, for each node's time series and `export_sign`.
-        flows: Metered flows with the columns of `FLOW_FRAME_COLUMNS`, in MW as metered.
+        flows: Metered flows with the columns of `FLOW_FRAME_COLUMNS`, in MW as metered. A null
+            or non-finite flow is left out.
         cutoff: A timezone-aware datetime. Only flows with `valid_time` strictly before it count.
         fraction: `f`, above 0 and at most 1.
 
@@ -376,7 +406,7 @@ def scaled_limits(
         msg = f"fraction must be above 0 and at most 1: {fraction}"
         raise ValueError(msg)
     history = (
-        flows.filter(pl.col("valid_time") < cutoff)
+        flows.filter(pl.col("valid_time") < cutoff, pl.col("flow_mw").is_finite())
         .join(
             table.nodes.filter(pl.col("export_sign").is_not_null()).select(
                 "node_id", "time_series_id", "export_sign"
@@ -442,8 +472,10 @@ def scale_to_megawatts(*, frame: pl.DataFrame, capacity_mw: Mapping[int, float])
         capacity_mw: Each series' effective capacity in MW.
 
     Returns:
-        `frame` with `actual` and every `q<percent>` column multiplied by the series' capacity.
-        A series missing from `capacity_mw` gets null values.
+        `frame` with `actual` and every `q<percent>` column multiplied by the series' capacity,
+        and a boolean `capacity_missing` column. A series missing from `capacity_mw` gets null
+        values and `capacity_missing` true, and `node_curtailment` excludes such a node series as
+        `REASON_NO_CAPACITY`. The capacity here must be the `capacity_mw` of the generator table.
     """
     capacities = pl.DataFrame(
         {"time_series_id": list(capacity_mw), "_capacity_mw": list(capacity_mw.values())},
@@ -452,8 +484,70 @@ def scale_to_megawatts(*, frame: pl.DataFrame, capacity_mw: Mapping[int, float])
     scaled_columns = [c for c in frame.columns if c == "actual" or _is_quantile_column(c)]
     return (
         frame.join(capacities, on="time_series_id", how="left", maintain_order="left")
-        .with_columns(*(pl.col(c) * pl.col("_capacity_mw") for c in scaled_columns))
+        .with_columns(
+            *(pl.col(c) * pl.col("_capacity_mw") for c in scaled_columns),
+            capacity_missing=pl.col("_capacity_mw").is_null(),
+        )
         .drop("_capacity_mw")
+    )
+
+
+def capacity_forecast(*, generator_frame: pl.DataFrame, table: NodeTable) -> pl.DataFrame:
+    """Build the NGED baseline arm's generator forecast: every generator runs at its capacity.
+
+    The table's `capacity_mw` and the effective capacity given to `scale_to_megawatts` must be the
+    same number. If the forecast ever exceeded `capacity_mw`, a generator counted as instructed
+    could be charged nothing, so `node_curtailment` raises on such a forecast.
+
+    Args:
+        generator_frame: The generators' rows, in MW, with `time_series_id`, the row keys, `actual`
+            (metered output in MW), and the `q<percent>` columns.
+        table: The node table, whose `capacity_mw` becomes the forecast.
+
+    Returns:
+        The rows of `generator_frame` whose series is a generator in `table`, with every
+        `q<percent>` column (`q50` included) set to the generator's `capacity_mw`.
+    """
+    capacities = table.generators.select(
+        pl.col("generator_id")
+        .cast(generator_frame.schema["time_series_id"])
+        .alias("time_series_id"),
+        "capacity_mw",
+    )
+    quantiles = [c for c in generator_frame.columns if _is_quantile_column(c)]
+    return (
+        generator_frame.join(capacities, on="time_series_id", how="inner", maintain_order="left")
+        .with_columns(**{c: pl.col("capacity_mw") for c in quantiles})
+        .drop("capacity_mw")
+    )
+
+
+def avoidable_cost(*, per_arm: pl.DataFrame, perfect_arm: str) -> pl.DataFrame:
+    """Subtract a perfect arm's cost from every arm's, price by price.
+
+    Args:
+        per_arm: `NodeCurtailmentResult.per_arm`, scored with the perfect arm in the same call so
+            that every arm covers the same rows.
+        perfect_arm: The arm built from actual node flow and actual generator output.
+
+    Returns:
+        `per_arm` with `energy_proxy_gbp` and `dcusa_form_gbp` replaced by the avoidable cost: the
+        arm's figure minus the perfect arm's at the same price.
+
+    Raises:
+        ValueError: If `perfect_arm` is not in `per_arm`.
+    """
+    if perfect_arm not in per_arm["arm"].to_list():
+        msg = f"perfect arm {perfect_arm!r} is not in per_arm"
+        raise ValueError(msg)
+    columns = ["energy_proxy_gbp", "dcusa_form_gbp"]
+    perfect = per_arm.filter(pl.col("arm") == perfect_arm).select(
+        "price_gbp_per_mwh", **{f"_perfect_{c}": pl.col(c) for c in columns}
+    )
+    return (
+        per_arm.join(perfect, on="price_gbp_per_mwh", how="left")
+        .with_columns(**{c: pl.col(c) - pl.col(f"_perfect_{c}") for c in columns})
+        .drop(*(f"_perfect_{c}" for c in columns))
     )
 
 
@@ -462,7 +556,7 @@ def _is_quantile_column(name: str) -> bool:
 
 
 def _usable_nodes(
-    *, table: NodeTable, forecast_series: Collection[int]
+    *, table: NodeTable, forecast_series: Collection[int], series_without_capacity: Collection[int]
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Split the nodes into those that can be scored and those excluded, with a reason each."""
     complete = (
@@ -475,6 +569,8 @@ def _usable_nodes(
         .then(pl.lit(REASON_UNKNOWN_SIGN))
         .when(~pl.col("node_id").is_in(complete))
         .then(pl.lit(REASON_INCOMPLETE_LIMITS))
+        .when(pl.col("time_series_id").is_in(list(series_without_capacity)))
+        .then(pl.lit(REASON_NO_CAPACITY))
         .when(~pl.col("time_series_id").is_in(list(forecast_series)))
         .then(pl.lit(REASON_NO_FORECAST_ROWS))
     )
@@ -494,7 +590,10 @@ def _node_rows(
     limits: pl.DataFrame,
     assumptions: NodeCurtailmentAssumptions,
 ) -> pl.DataFrame:
-    """Compute, per node row, the limit, the actual export, the need and the planned curtailment."""
+    """Compute, per node row, the limit, the actual export, the need and the planned curtailment.
+
+    The `finite` column is false where the node quantile made the planned curtailment null or NaN.
+    """
     low = level_column(level=round(1.0 - assumptions.tau, 2))
     high = level_column(level=round(assumptions.tau, 2))
     for column in (low, high):
@@ -524,7 +623,11 @@ def _node_rows(
             needed_mwh=(pl.col("export_mw") - pl.col("limit_mw")).clip(lower_bound=0.0)
             * HALF_HOUR_H,
         )
-        .filter(pl.col("planned_mwh").is_finite() & pl.col("export_mw").is_finite())
+        .with_columns(
+            finite=(pl.col("planned_mwh").is_finite() & pl.col("export_mw").is_finite()).fill_null(
+                value=False
+            )
+        )
         .select(
             "arm",
             *KEY_COLUMNS,
@@ -534,6 +637,7 @@ def _node_rows(
             "export_mw",
             "planned_mwh",
             "needed_mwh",
+            "finite",
         )
     )
 
@@ -543,25 +647,31 @@ def _generator_pairs(
     rows: pl.DataFrame,
     generator_frame: pl.DataFrame,
     generators: pl.DataFrame,
-) -> pl.DataFrame:
+) -> pl.LazyFrame:
     """Pair every node row with each curtailable generator connected at its valid time.
 
-    A pair whose generator has no forecast row has null `forecast_mw`, which the caller uses to
-    drop the node row.
+    A pair whose generator has no finite forecast row has null `forecast_mw`, which the caller uses
+    to drop the node row. The result is lazy so that the caller can aggregate it without holding
+    every pair in memory.
     """
     keys = [c for c in KEY_COLUMNS if c != "node_id"]
     curtailable = generators.filter(pl.col("is_forecast")).select(
         "generator_id", "node_id", "capacity_mw", "connection_date"
     )
-    forecasts = generator_frame.select(
-        *keys,
-        generator_id="time_series_id",
-        forecast_mw="q50",
-        output_mw="actual",
-    ).filter(pl.col("forecast_mw").is_finite() & pl.col("output_mw").is_finite())
+    forecasts = (
+        generator_frame.lazy()
+        .select(
+            *keys,
+            generator_id="time_series_id",
+            forecast_mw="q50",
+            output_mw="actual",
+        )
+        .filter(pl.col("forecast_mw").is_finite() & pl.col("output_mw").is_finite())
+    )
     return (
-        rows.select("arm", *KEY_COLUMNS, "planned_mwh")
-        .join(curtailable, on="node_id", how="inner")
+        rows.lazy()
+        .select("arm", *KEY_COLUMNS, "planned_mwh")
+        .join(curtailable.lazy(), on="node_id", how="inner")
         .filter(
             pl.col("connection_date").is_null()
             | (pl.col("connection_date") <= pl.col("valid_time").dt.date())
@@ -572,7 +682,11 @@ def _generator_pairs(
 
 
 def _cap_generators(*, pairs: pl.DataFrame) -> pl.DataFrame:
-    """Allocate each node row's planned curtailment to its generators and cap them."""
+    """Allocate each node row's planned curtailment to its generators and cap them.
+
+    The caller passes only pairs with planned curtailment above zero, and no forecast above its
+    capacity, so the instruction value `capacity - cap` is never negative.
+    """
     group = ["arm", *KEY_COLUMNS]
     allocated = allocate_pro_rata_by_capacity(
         frame=pairs.with_columns(
@@ -590,13 +704,7 @@ def _cap_generators(*, pairs: pl.DataFrame) -> pl.DataFrame:
         lost_mwh=pl.when(instructed)
         .then((pl.col("output_mw") - cap_mw).clip(lower_bound=0.0) * HALF_HOUR_H)
         .otherwise(0.0),
-        instruction_mw=pl.when(instructed)
-        .then(
-            (pl.col("capacity_mw") - cap_mw).clip(
-                lower_bound=0.0, upper_bound=pl.col("capacity_mw")
-            )
-        )
-        .otherwise(0.0),
+        instruction_mw=pl.when(instructed).then(pl.col("capacity_mw") - cap_mw).otherwise(0.0),
     )
 
 
@@ -685,7 +793,7 @@ def event_census(
     Args:
         table: The node table. A node with a null `export_sign` is left out.
         flows: Metered flows with the columns of `FLOW_FRAME_COLUMNS`, in MW as metered, one row per
-            series and half-hour.
+            series and half-hour. A null or non-finite flow is left out of the counts.
         scaled: Each fraction mapped to the output of `scaled_limits`, for the scaled-limit rows.
 
     Returns:
@@ -695,7 +803,8 @@ def event_census(
         that direction.
     """
     exports = (
-        flows.join(
+        flows.filter(pl.col("flow_mw").is_finite())
+        .join(
             table.nodes.filter(pl.col("export_sign").is_not_null()).select(
                 "node_id", "time_series_id", "export_sign"
             ),
@@ -706,6 +815,49 @@ def event_census(
         .select("node_id", "valid_time", "export_mw")
     )
     return _export_census(table=table, exports=exports, scaled=scaled)
+
+
+def _require_unique_row_keys(*, inputs: Mapping[str, Mapping[str, pl.DataFrame]]) -> None:
+    """Raise if any arm's frame repeats a row key, which would silently empty every arm."""
+    for kind, arms in inputs.items():
+        for arm, frame in arms.items():
+            if frame.select(ROW_KEYS).is_duplicated().any():
+                msg = f"the {kind} forecasts of arm {arm!r} repeat a row key {tuple(ROW_KEYS)}"
+                raise ValueError(msg)
+
+
+def _require_same_seeds(*, inputs: Mapping[str, Mapping[str, pl.DataFrame]]) -> None:
+    """Raise if the arms do not all hold the same seeds, because `align_arms` would trim them."""
+    seeds = {
+        f"{kind} {arm}": frozenset(frame["seed"].unique().to_list())
+        for kind, arms in inputs.items()
+        for arm, frame in arms.items()
+    }
+    if len(set(seeds.values())) > 1:
+        msg = f"every arm must hold the same seeds, otherwise the arms are trimmed: {seeds}"
+        raise ValueError(msg)
+
+
+def _require_forecast_within_capacity(*, pairs: pl.LazyFrame) -> None:
+    """Raise if a generator forecast exceeds the generator's capacity.
+
+    A capped generator's instruction value is its capacity minus its cap. A forecast above the
+    capacity could put the cap above the capacity, so that an instructed generator is charged
+    nothing. The capacity in the generator table and the one given to `scale_to_megawatts` must be
+    the same number.
+    """
+    over = (
+        pairs.filter(pl.col("forecast_mw") > pl.col("capacity_mw") * (1.0 + 1e-9))
+        .select("generator_id", "forecast_mw", "capacity_mw")
+        .collect()
+    )
+    if over.height:
+        msg = (
+            f"{over.height} generator forecast rows exceed the generator's capacity_mw, for "
+            f"generator_id {sorted(over['generator_id'].unique().to_list())}; the table's "
+            "capacity_mw and the effective capacity given to scale_to_megawatts must be the same"
+        )
+        raise ValueError(msg)
 
 
 def node_curtailment(
@@ -738,7 +890,9 @@ def node_curtailment(
 
     Raises:
         ValueError: If the arms of the two mappings differ, an arm lacks a quantile column that tau
-            needs, or `breach_ratio` does not give a whole-percent quantile.
+            needs, `breach_ratio` does not give a whole-percent quantile, an arm repeats a row key,
+            the arms do not all hold the same seeds, or a generator forecast exceeds the
+            generator's `capacity_mw`.
     """
     if assumptions.use_generators and set(node_forecasts) != set(generator_forecasts):
         msg = "node_forecasts and generator_forecasts must name the same arms"
@@ -746,25 +900,45 @@ def node_curtailment(
     if abs(assumptions.tau * 100 - round(assumptions.tau * 100)) > 1e-9:
         msg = f"breach_ratio {assumptions.breach_ratio} does not give a whole-percent quantile"
         raise ValueError(msg)
+    inputs = {"node": node_forecasts}
+    if assumptions.use_generators:
+        inputs["generator"] = generator_forecasts
+    _require_unique_row_keys(inputs=inputs)
+    _require_same_seeds(inputs=inputs)
     arms = sorted(node_forecasts)
+    series_without_capacity = {
+        int(s)
+        for frame in node_forecasts.values()
+        if "capacity_missing" in frame.columns
+        for s in frame.filter(pl.col("capacity_missing"))["time_series_id"].unique()
+    }
     aligned_nodes = align_arms(arms=node_forecasts)
     aligned_generators = align_arms(arms=generator_forecasts) if assumptions.use_generators else {}
     forecast_series = {
         int(s) for frame in aligned_nodes.values() for s in frame["time_series_id"].unique()
     }
-    usable, excluded = _usable_nodes(table=table, forecast_series=forecast_series)
+    usable, excluded = _usable_nodes(
+        table=table,
+        forecast_series=forecast_series,
+        series_without_capacity=series_without_capacity,
+    )
     limits = table.limits.select("node_id", "season", limit_mw="export_limit_mw")
 
-    rows_by_arm = [
+    all_rows_by_arm = [
         _node_rows(
             frame=aligned_nodes[arm], arm=arm, usable=usable, limits=limits, assumptions=assumptions
         )
         for arm in arms
     ]
+    total_keys = pl.concat(all_rows_by_arm).select(KEY_COLUMNS).unique()
+    nonfinite_keys = (
+        pl.concat(all_rows_by_arm).filter(~pl.col("finite")).select(KEY_COLUMNS).unique()
+    )
+    rows_by_arm = [r.filter(pl.col("finite")).drop("finite") for r in all_rows_by_arm]
     rows = pl.concat(rows_by_arm)
     n_dropped_generator = 0
     if assumptions.use_generators:
-        pairs = pl.concat(
+        pairs_lazy = pl.concat(
             _generator_pairs(
                 rows=arm_rows,
                 generator_frame=aligned_generators[arm],
@@ -773,10 +947,20 @@ def node_curtailment(
             for arm, arm_rows in zip(arms, rows_by_arm, strict=True)
         )
         group = ["arm", *KEY_COLUMNS]
-        incomplete = pairs.filter(pl.col("forecast_mw").is_null()).select(group).unique()
-        n_dropped_generator = incomplete.select(KEY_COLUMNS).unique().height
+        incomplete = pairs_lazy.filter(pl.col("forecast_mw").is_null()).select(group).unique()
+        incomplete = incomplete.collect()
+        n_dropped_generator = (
+            incomplete.select(KEY_COLUMNS).unique().join(nonfinite_keys, on=KEY_COLUMNS, how="anti")
+        ).height
+        _require_forecast_within_capacity(pairs=pairs_lazy)
         rows = rows.join(incomplete, on=group, how="anti")
-        pairs = _cap_generators(pairs=pairs.join(incomplete, on=group, how="anti"))
+        # Only node rows with planned curtailment can instruct a generator, so only they are
+        # allocated; the others have no loss and no instruction.
+        pairs = _cap_generators(
+            pairs=pairs_lazy.join(incomplete.lazy(), on=group, how="anti")
+            .filter(pl.col("planned_mwh") > 0)
+            .collect()
+        )
         curtailed = pairs.group_by(group).agg(
             curtailed_mwh=pl.col("lost_mwh").sum(),
             dcusa_gross_mwh=(HALF_HOUR_H * pl.col("instruction_mw")).sum(),
@@ -790,7 +974,7 @@ def node_curtailment(
 
     # Every arm is scored on the node rows that every arm holds.
     common = rows.group_by(KEY_COLUMNS).agg(n_arms=pl.len()).filter(pl.col("n_arms") == len(arms))
-    n_dropped_arms = rows.select(KEY_COLUMNS).unique().height - common.height
+    n_dropped_arms = total_keys.height - common.height - nonfinite_keys.height - n_dropped_generator
     rows = rows.join(common.select(KEY_COLUMNS), on=list(KEY_COLUMNS), how="inner").with_columns(
         breach_mwh=(
             pl.col("export_mw") - pl.col("curtailed_mwh") / HALF_HOUR_H - pl.col("limit_mw")
@@ -814,6 +998,7 @@ def node_curtailment(
         month_totals=_month_totals(rows=rows, assumptions=assumptions),
         excluded=excluded,
         n_excluded_unknown_sign=excluded.filter(pl.col("reason") == REASON_UNKNOWN_SIGN).height,
+        n_rows_dropped_nonfinite_forecast=nonfinite_keys.height,
         n_rows_dropped_missing_generator=n_dropped_generator,
         n_rows_dropped_not_in_every_arm=n_dropped_arms,
     )

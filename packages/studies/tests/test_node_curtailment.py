@@ -12,6 +12,7 @@ from collections.abc import Sequence
 
 import polars as pl
 import pytest
+import studies.node_curtailment as node_curtailment_module
 from studies.bootstrap import bootstrap_month_totals
 from studies.node_curtailment import (
     DEFAULT_SCALED_LIMIT_FRACTION,
@@ -22,6 +23,8 @@ from studies.node_curtailment import (
     NodeCurtailmentResult,
     NodeTable,
     allocate_pro_rata_by_capacity,
+    avoidable_cost,
+    capacity_forecast,
     event_census,
     month_total_arrays,
     node_curtailment,
@@ -1041,3 +1044,588 @@ def test_month_totals_are_price_free_and_match_the_priced_figures() -> None:
     assert totals["dcusa_gross_mwh_equivalent"] == pytest.approx(165.0)
     assert totals["n_node_half_hours"] == 1
     assert totals["month"] == "2026-01"
+
+
+# --- many arms, seeds, nodes, and a month boundary -----------------------------------------------
+
+JANUARY_NOON = dt.datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
+MARCH_FIRST = dt.datetime(2026, 3, 1, 0, 30, tzinfo=UTC)
+"""A valid time in Intermediate Cool whose forecast (24 h earlier) was made in February (Winter)."""
+
+
+def _series_rows(
+    *, series: int, entries: Sequence[tuple[dt.datetime, int, float, float]]
+) -> pl.DataFrame:
+    """A frame of one series from `(valid_time, seed, actual, q50)`; q05 and q95 equal `actual`."""
+    return pl.DataFrame(
+        {
+            "time_series_id": pl.Series([series] * len(entries), dtype=pl.Int64),
+            "power_fcst_init_time": [v - dt.timedelta(hours=24) for v, _, _, _ in entries],
+            "valid_time": [v for v, _, _, _ in entries],
+            "seed": [seed for _, seed, _, _ in entries],
+            "actual": [a for _, _, a, _ in entries],
+            "q05": [a for _, _, a, _ in entries],
+            "q50": [q for _, _, _, q in entries],
+            "q95": [a for _, _, a, _ in entries],
+        }
+    )
+
+
+def _two_node_table() -> NodeTable:
+    """Node A (series 1): limits Winter 45, Cool 35, Warm 35, Summer 35 MW, generator 101 of 30 MW.
+
+    Node B (series 2): 20 MW in every season, generator 102 of 20 MW.
+    """
+    return NodeTable(
+        nodes=_nodes(("A", 1, 1), ("B", 2, 1)),
+        limits=_limits(nodes={"A": [45.0, 35.0, 35.0, 35.0], "B": 20.0}),
+        generators=_generators((101, "A", 30.0, True), (102, "B", 20.0, True)),
+    )
+
+
+def _two_node_forecasts(
+    *, generator_101_forecast_by_seed: dict[int, float]
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Node and generator frames: A exports 70 and 50 MW, B exports 25 and 15 MW at the two times.
+
+    Generator 101 outputs 30 MW and generator 102 outputs 20 MW, and 102 is forecast exactly.
+    """
+    node = pl.concat(
+        [
+            _series_rows(
+                series=1,
+                entries=[
+                    (v, seed, flow, flow)
+                    for seed in generator_101_forecast_by_seed
+                    for v, flow in ((JANUARY_NOON, 70.0), (MARCH_FIRST, 50.0))
+                ],
+            ),
+            _series_rows(
+                series=2,
+                entries=[
+                    (v, seed, flow, flow)
+                    for seed in generator_101_forecast_by_seed
+                    for v, flow in ((JANUARY_NOON, 25.0), (MARCH_FIRST, 15.0))
+                ],
+            ),
+        ]
+    )
+    generators = pl.concat(
+        [
+            _series_rows(
+                series=101,
+                entries=[
+                    (v, seed, 30.0, forecast)
+                    for seed, forecast in generator_101_forecast_by_seed.items()
+                    for v in (JANUARY_NOON, MARCH_FIRST)
+                ],
+            ),
+            _series_rows(
+                series=102,
+                entries=[
+                    (v, seed, 20.0, 20.0)
+                    for seed in generator_101_forecast_by_seed
+                    for v in (JANUARY_NOON, MARCH_FIRST)
+                ],
+            ),
+        ]
+    )
+    return node, generators
+
+
+def _two_arm_two_seed_result() -> NodeCurtailmentResult:
+    """Arm x forecasts generator 101 at 30 MW in both seeds; arm y at 30 MW in seed 0, 20 in seed 1.
+
+    Arm x, per seed (perfect node forecasts, so planned equals needed):
+
+    - A at January noon: planned (70 - 45) * 0.5 = 12.5 MWh, cap 30 - 25 = 5 MW, lost
+      (30 - 5) * 0.5 = 12.5 MWh, instruction 25 MW.
+    - A on 1 March: the Intermediate Cool limit of 35 MW applies, planned (50 - 35) * 0.5 = 7.5
+      MWh, cap 15 MW, lost 7.5 MWh, instruction 15 MW. (The Winter limit of 45 MW of the forecast's
+      February initialisation would give 2.5 MWh.)
+    - B at January noon: planned (25 - 20) * 0.5 = 2.5 MWh, cap 15 MW, lost 2.5 MWh, instruction
+      5 MW. B on 1 March exports 15 MW, under its limit of 20 MW.
+
+    Per seed, needed = planned = curtailed = 22.5 MWh, breach 0, and 4 node rows. The Full Export
+    Curtailment Hours give a DCUSA payment of 0.5 * (25 + 15) + 0.5 * 5 = 22.5 MWh-equivalent.
+
+    Arm y in seed 1 forecasts generator 101 at 20 MW: A at January noon clamps the share at its
+    10 MWh of forecast energy, cap 0, lost 15 MWh, instruction 30 MW; A on 1 March has share 7.5,
+    cap 5, lost 12.5 MWh, instruction 25 MW. Curtailed 15 + 12.5 + 2.5 = 30 MWh, DCUSA payment
+    0.5 * (30 + 25) + 2.5 = 30 MWh-equivalent, and no breach in either row.
+    """
+    node, generators_x = _two_node_forecasts(generator_101_forecast_by_seed={0: 30.0, 1: 30.0})
+    _, generators_y = _two_node_forecasts(generator_101_forecast_by_seed={0: 30.0, 1: 20.0})
+    return node_curtailment(
+        table=_two_node_table(),
+        node_forecasts={"x": node, "y": node},
+        generator_forecasts={"x": generators_x, "y": generators_y},
+        assumptions=_assumptions(),
+    )
+
+
+def test_many_arms_seeds_nodes_and_a_month_boundary_are_counted_and_averaged() -> None:
+    """Counts are per arm and seed, energies and pounds are means over seeds, not sums.
+
+    Arm x: 22.5 MWh curtailed in each seed, so 22.5 and 2,000 * 22.5 = 45,000 GBP. Arm y: seeds
+    give 22.5 and 30.0 MWh, mean 26.25 MWh and 52,500 GBP, with a DCUSA figure of the same mean
+    payment, 26.25 * 2,000 = 52,500 GBP (a sum over seeds would give 105,000). Each arm scores 4
+    node rows per seed. Capacity is 30 + 20 = 50 MW over 2 distinct half-hours, so GBP per MW-year
+    is GBP / (50 * 2 * 0.5 / 8,766).
+    """
+    per_arm = _two_arm_two_seed_result().per_arm
+    x = per_arm.filter((pl.col("arm") == "x") & (pl.col("price_gbp_per_mwh") == HEADLINE))
+    y = per_arm.filter((pl.col("arm") == "y") & (pl.col("price_gbp_per_mwh") == HEADLINE))
+    assert x["n_node_half_hours"].item() == pytest.approx(4.0)
+    assert y["n_node_half_hours"].item() == pytest.approx(4.0)
+    assert x["needed_mwh"].item() == pytest.approx(22.5)
+    assert x["curtailed_mwh"].item() == pytest.approx(22.5)
+    assert y["curtailed_mwh"].item() == pytest.approx(26.25)
+    assert x["energy_proxy_gbp"].item() == pytest.approx(45_000.0)
+    assert y["energy_proxy_gbp"].item() == pytest.approx(52_500.0)
+    assert x["dcusa_form_gbp"].item() == pytest.approx(45_000.0)
+    assert y["dcusa_form_gbp"].item() == pytest.approx(52_500.0)
+    years = 2 * 0.5 / 8766.0
+    assert x["energy_proxy_gbp_per_mw_year"].item() == pytest.approx(45_000.0 / (50.0 * years))
+    assert y["energy_proxy_gbp_per_mw_year"].item() == pytest.approx(52_500.0 / (50.0 * years))
+
+
+def test_the_census_in_the_result_counts_each_half_hour_once_whatever_the_arms_and_seeds() -> None:
+    """Two arms and two seeds still leave 1 half-hour per node and season in the census.
+
+    Node A: January noon is Winter (70 MW against 45: exceeded), 1 March is Intermediate Cool (50
+    MW against 35: exceeded). Node B: Winter 25 against 20 (exceeded), Cool 15 against 20 (not).
+    """
+    census = _two_arm_two_seed_result().event_census.filter(
+        (pl.col("direction") == "export") & (pl.col("limit_kind") == "real")
+    )
+    counts = {
+        (node, season): (n, exceeded)
+        for node, season, n, exceeded in census.select(
+            "node_id", "season", "n_half_hours", "n_exceedances"
+        ).iter_rows()
+        if n > 0
+    }
+    assert counts == {
+        ("A", "Winter"): (1, 1),
+        ("A", "Intermediate Cool"): (1, 1),
+        ("B", "Winter"): (1, 1),
+        ("B", "Intermediate Cool"): (1, 0),
+    }
+
+
+def test_month_totals_file_a_row_under_the_month_of_its_initialisation_time() -> None:
+    """January noon was forecast on 14 January and 1 March at 00:30 on 28 February.
+
+    Each arm and seed has 2 node rows in "2026-01" and 2 in "2026-02", although the second pair are
+    valid in March. The season still comes from the valid time (see the test above).
+    """
+    totals = _two_arm_two_seed_result().month_totals
+    assert totals["month"].unique().sort().to_list() == ["2026-01", "2026-02"]
+    assert totals["n_node_half_hours"].to_list() == [2] * 8
+    jan_x_seed_0 = totals.filter(
+        (pl.col("arm") == "x") & (pl.col("seed") == 0) & (pl.col("month") == "2026-01")
+    )
+    # January noon: A lost 12.5 MWh and B 2.5 MWh.
+    assert jan_x_seed_0["curtailed_mwh"].item() == pytest.approx(15.0)
+
+
+def test_a_census_row_whose_flow_equals_the_limit_is_not_an_exceedance() -> None:
+    """Flows 44, 45 and 46 MW against a 45 MW limit: only 46 is above it, so 1 of 3."""
+    flows = _flows(series=NODE_SERIES, values=[44.0, 45.0, 46.0], start=_valid())
+    census = event_census(table=_table(), flows=flows).filter(
+        (pl.col("season") == "Winter") & (pl.col("direction") == "export")
+    )
+    assert census["n_exceedances"].to_list() == [1]
+    assert census["n_half_hours"].to_list() == [3]
+
+
+def test_a_nan_flow_is_neither_an_exceedance_nor_a_half_hour_in_the_census() -> None:
+    """Flows 10, NaN and 46 MW against 45 MW: NaN is greater than every number in Polars, so an
+    unfiltered NaN would be counted as an exceedance. Expect 1 exceedance in 2 half-hours.
+    """
+    flows = _flows(series=NODE_SERIES, values=[10.0, float("nan"), 46.0], start=_valid())
+    census = event_census(table=_table(), flows=flows).filter(
+        (pl.col("season") == "Winter") & (pl.col("direction") == "export")
+    )
+    assert census["n_exceedances"].to_list() == [1]
+    assert census["n_half_hours"].to_list() == [2]
+
+
+def test_a_node_whose_only_flows_are_nan_has_no_scaled_limit() -> None:
+    """Exports NaN and NaN: the maximum of an all-NaN column is NaN, which would become a NaN limit.
+
+    The node must have no row, so `table_with_scaled_limits` then excludes it. With one finite
+    flow of 40 MW among the NaNs the limit is 0.9 * 40 = 36.0 MW.
+    """
+    nan = float("nan")
+    only_nan = scaled_limits(
+        table=_table(), flows=_history(before=[nan, nan], after=[]), cutoff=CUTOFF, fraction=0.9
+    )
+    assert only_nan.height == 0
+    mixed = scaled_limits(
+        table=_table(), flows=_history(before=[nan, 40.0], after=[]), cutoff=CUTOFF, fraction=0.9
+    )
+    assert mixed["export_limit_mw"].to_list() == pytest.approx([36.0])
+
+
+# --- generators that are missing, not finite, over capacity, or newly connected -----------------
+
+
+def test_a_nan_generator_forecast_in_one_arm_drops_the_row_from_every_arm() -> None:
+    """Arm x has a NaN median forecast for the generator at the second half-hour; arm y does not.
+
+    The second node row is dropped (one row counted), and arm y is scored on the same one row as
+    arm x: needed 12.5 MWh in both arms, 1 node row each, and no NaN anywhere.
+    """
+    node = _forecast(
+        series=NODE_SERIES, valid_times=[_valid(step=0), _valid(step=1)], actual=[70.0, 70.0]
+    )
+    generators = _forecast(
+        series=GENERATOR_SERIES,
+        valid_times=[_valid(step=0), _valid(step=1)],
+        actual=[30.0, 30.0],
+        q50=[30.0, 30.0],
+    )
+    nan_generators = generators.with_columns(
+        q50=pl.when(pl.col("valid_time") == _valid(step=1))
+        .then(float("nan"))
+        .otherwise(pl.col("q50"))
+    )
+    result = node_curtailment(
+        table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+        node_forecasts={"x": node, "y": node},
+        generator_forecasts={"x": nan_generators, "y": generators},
+        assumptions=_assumptions(),
+    )
+    headline = result.per_arm.filter(pl.col("price_gbp_per_mwh") == HEADLINE).sort("arm")
+    assert headline["needed_mwh"].to_list() == pytest.approx([12.5, 12.5])
+    assert headline["curtailed_mwh"].to_list() == pytest.approx([12.5, 12.5])
+    assert headline["n_node_half_hours"].to_list() == pytest.approx([1.0, 1.0])
+    assert result.n_rows_dropped_missing_generator == 1
+    assert result.n_rows_dropped_not_in_every_arm == 0
+
+
+def test_a_generator_forecast_above_capacity_is_refused() -> None:
+    """A 40 MW forecast of a 30 MW generator could leave an instructed generator charged nothing."""
+    with pytest.raises(ValueError, match="capacity_mw"):
+        _score(
+            table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+            node=_one_row(flow=70.0),
+            generators=_generator_row(output=30.0, forecast=40.0),
+        )
+
+
+def test_a_forecast_exactly_at_capacity_is_accepted() -> None:
+    """A forecast of 30 MW for a 30 MW generator is the baseline arm's case: cap 5 MW as before."""
+    result = _score(
+        table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+        node=_one_row(flow=70.0),
+        generators=_generator_row(output=30.0, forecast=30.0),
+    )
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(12.5)
+
+
+def test_a_negative_generator_forecast_is_given_no_share() -> None:
+    """Generator 101 (10 MW) is forecast at -4 MW and generator 102 (30 MW) at 30 MW; node 70 MW.
+
+    The planned 12.5 MWh must not be shared with generator 101, whose forecast energy is clipped at
+    0 MWh. Generator 102 takes all of it: cap 30 - 25 = 5 MW, lost (30 - 5) * 0.5 = 12.5 MWh. An
+    unclipped negative forecast energy of -2 MWh would hand 102 an extra 2 MWh (14.5 MWh lost).
+    """
+    result = _score(
+        table=_table(generators=[(GENERATOR_SERIES, 10.0), (SECOND_GENERATOR_SERIES, 30.0)]),
+        node=_one_row(flow=70.0),
+        generators=pl.concat(
+            [
+                _generator_row(series=GENERATOR_SERIES, output=0.0, forecast=-4.0),
+                _generator_row(series=SECOND_GENERATOR_SERIES, output=30.0, forecast=30.0),
+            ]
+        ),
+    )
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(12.5)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(0.0)
+
+
+def test_a_generator_connected_on_the_valid_date_is_curtailable() -> None:
+    """A generator connected on 2026-01-15 takes its share at 12:00 on 2026-01-15: 12.5 MWh lost."""
+    generators = _generators((GENERATOR_SERIES, "A", 30.0, True)).with_columns(
+        connection_date=pl.lit(dt.date(2026, 1, 15))
+    )
+    table = NodeTable(
+        nodes=_nodes(("A", NODE_SERIES, 1)),
+        limits=_limits(nodes={"A": 45.0}),
+        generators=generators,
+    )
+    result = _score(
+        table=table, node=_one_row(flow=70.0), generators=_generator_row(output=30.0, forecast=30.0)
+    )
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(12.5)
+
+
+def test_gbp_per_mw_year_counts_only_generators_under_scored_nodes() -> None:
+    """Node B has a null sign and a 50 MW generator; only node A's 30 MW generator counts.
+
+    The energy proxy is 25,000 GBP over one half-hour, so 25,000 / (30 * 0.5 / 8,766) GBP per
+    MW-year, not the figure for 80 MW.
+    """
+    table = NodeTable(
+        nodes=_nodes(("A", NODE_SERIES, 1), ("B", 2, None)),
+        limits=_limits(nodes={"A": 45.0, "B": 45.0}),
+        generators=_generators((GENERATOR_SERIES, "A", 30.0, True), (102, "B", 50.0, True)),
+    )
+    result = _score(
+        table=table, node=_one_row(flow=70.0), generators=_generator_row(output=30.0, forecast=30.0)
+    )
+    assert _headline(result.per_arm, column="energy_proxy_gbp_per_mw_year") == pytest.approx(
+        25_000.0 / (30.0 * 0.5 / 8766.0)
+    )
+
+
+def test_the_gbp_per_mw_year_is_null_in_node_only_mode() -> None:
+    """Node-only mode has no generator capacity, so the per-MW-year figure is null."""
+    result = _score(table=_table(), node=_one_row(flow=70.0))
+    assert _headline(result.per_arm, column="energy_proxy_gbp_per_mw_year") is None
+
+
+# --- non-finite node forecasts, missing capacity, bad inputs -------------------------------------
+
+
+def test_a_node_quantile_that_is_nan_or_null_drops_the_row_in_every_arm_and_is_counted() -> None:
+    """Arm y has a NaN q95 and a null q95 in two of its three half-hours; arm x is complete.
+
+    The two rows are dropped from both arms and counted once each as a non-finite forecast, not
+    again as rows missing from an arm. The remaining row needs 12.5 MWh in each arm.
+    """
+    steps = [_valid(step=i) for i in range(3)]
+    node = _forecast(series=NODE_SERIES, valid_times=steps, actual=[70.0, 70.0, 70.0])
+    bad = node.with_columns(q95=pl.Series([70.0, float("nan"), None], dtype=pl.Float64))
+    result = node_curtailment(
+        table=_table(),
+        node_forecasts={"x": node, "y": bad},
+        generator_forecasts={},
+        assumptions=_assumptions(use_generators=False),
+    )
+    headline = result.per_arm.filter(pl.col("price_gbp_per_mwh") == HEADLINE).sort("arm")
+    assert headline["needed_mwh"].to_list() == pytest.approx([12.5, 12.5])
+    assert headline["n_node_half_hours"].to_list() == pytest.approx([1.0, 1.0])
+    assert result.n_rows_dropped_nonfinite_forecast == 2
+    assert result.n_rows_dropped_not_in_every_arm == 0
+
+
+def test_a_node_series_missing_from_the_capacity_map_is_excluded_for_that_reason() -> None:
+    """Fractions of capacity 0.5 scaled with a map that lacks series 1: node A is `no_capacity`.
+
+    It is not `no_forecast_rows`, because the series does have forecast rows.
+    """
+    fractions = _forecast(series=NODE_SERIES, valid_times=[_valid()], actual=[0.5])
+    scaled = scale_to_megawatts(frame=fractions, capacity_mw={2: 10.0})
+    assert scaled["capacity_missing"].to_list() == [True]
+    result = _score(table=_table(), node=scaled)
+    assert result.excluded.to_dicts() == [{"node_id": "A", "reason": "no_capacity"}]
+
+
+def test_a_repeated_row_key_in_one_arm_raises_for_node_and_generator_frames() -> None:
+    """A node row repeated in arm y, and then a generator row repeated, each name the arm."""
+    node = _one_row(flow=70.0)
+    generator = _generator_row(output=30.0, forecast=30.0)
+    table = _table(generators=[(GENERATOR_SERIES, 30.0)])
+    with pytest.raises(ValueError, match="node forecasts of arm 'y' repeat"):
+        node_curtailment(
+            table=table,
+            node_forecasts={"x": node, "y": pl.concat([node, node])},
+            generator_forecasts={"x": generator, "y": generator},
+            assumptions=_assumptions(),
+        )
+    with pytest.raises(ValueError, match="generator forecasts of arm 'y' repeat"):
+        node_curtailment(
+            table=table,
+            node_forecasts={"x": node, "y": node},
+            generator_forecasts={"x": generator, "y": pl.concat([generator, generator])},
+            assumptions=_assumptions(),
+        )
+
+
+def test_arms_holding_different_seeds_raise_instead_of_trimming_every_arm() -> None:
+    """Arm x holds seeds 0 and 1 and arm y only seed 0: `align_arms` would drop seed 1 from x."""
+    both = pl.concat(
+        [
+            _forecast(series=NODE_SERIES, valid_times=[_valid()], actual=[70.0], seed=0),
+            _forecast(series=NODE_SERIES, valid_times=[_valid()], actual=[70.0], seed=1),
+        ]
+    )
+    with pytest.raises(ValueError, match="same seeds"):
+        node_curtailment(
+            table=_table(),
+            node_forecasts={"x": both, "y": both.filter(pl.col("seed") == 0)},
+            generator_forecasts={},
+            assumptions=_assumptions(use_generators=False),
+        )
+
+
+# --- allocation in a sparse case -----------------------------------------------------------------
+
+
+def test_allocation_gives_a_zero_need_group_nothing() -> None:
+    """A group needing 0 MWh allocates 0 to every generator, so skipping it changes nothing."""
+    allocated = _allocate(
+        groups=["g", "g", "h", "h"],
+        capacity=[10.0, 30.0, 10.0, 30.0],
+        forecast=[5.0, 15.0, 5.0, 15.0],
+        need=[8.0, 8.0, 0.0, 0.0],
+    )
+    assert allocated == pytest.approx([2.0, 6.0, 0.0, 0.0])
+
+
+def test_rows_with_and_without_planned_curtailment_mix_in_one_score() -> None:
+    """Node A at January noon plans 12.5 MWh and at 1 March plans (30 - 35) -> 0; node B plans 0.
+
+    Only the January row instructs generator 101 (30 MW): cap 5 MW, lost 12.5 MWh, instruction 25
+    MW. The other three node rows have no loss and no instruction. Generator 102 under node B
+    (forecast 20 MW) is never capped. Curtailed 12.5 MWh, DCUSA gross 0.5 * 25 = 12.5 MWh.
+    """
+    node = pl.concat(
+        [
+            _series_rows(
+                series=1,
+                entries=[(JANUARY_NOON, 0, 70.0, 70.0), (MARCH_FIRST, 0, 30.0, 30.0)],
+            ),
+            _series_rows(
+                series=2, entries=[(JANUARY_NOON, 0, 10.0, 10.0), (MARCH_FIRST, 0, 5.0, 5.0)]
+            ),
+        ]
+    )
+    generators = pl.concat(
+        [
+            _series_rows(
+                series=101, entries=[(JANUARY_NOON, 0, 30.0, 30.0), (MARCH_FIRST, 0, 30.0, 30.0)]
+            ),
+            _series_rows(
+                series=102, entries=[(JANUARY_NOON, 0, 20.0, 20.0), (MARCH_FIRST, 0, 20.0, 20.0)]
+            ),
+        ]
+    )
+    result = node_curtailment(
+        table=_two_node_table(),
+        node_forecasts={"arm": node},
+        generator_forecasts={"arm": generators},
+        assumptions=_assumptions(),
+    )
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(12.5)
+    assert _headline(result.per_arm, column="n_node_half_hours") == pytest.approx(4.0)
+    assert result.month_totals["dcusa_gross_mwh_equivalent"].sum() == pytest.approx(12.5)
+
+
+def test_sparse_exceedances_allocate_only_the_rows_that_plan_curtailment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """300 nodes, 2 generators each, 4 half-hours; only node N000 plans curtailment, at 1 half-hour.
+
+    The allocation sees 1 node row x 2 generators = 2 pair rows, not 300 * 4 * 2 = 2,400. Memory
+    at 2,500 series is set by this height.
+    """
+    n_nodes, n_steps = 300, 4
+    ids = [f"N{i:03d}" for i in range(n_nodes)]
+    table = NodeTable(
+        nodes=_nodes(*((n, i + 1, 1) for i, n in enumerate(ids))),
+        limits=_limits(nodes=dict.fromkeys(ids, 45.0)),
+        generators=_generators(
+            *((1000 + 2 * i + g, n, 10.0, True) for i, n in enumerate(ids) for g in range(2))
+        ),
+    )
+    times = [_valid(step=i) for i in range(n_steps)]
+    node = pl.concat(
+        [
+            _forecast(
+                series=i + 1,
+                valid_times=times,
+                actual=[70.0 if (i == 0 and step == 0) else 30.0 for step in range(n_steps)],
+            )
+            for i in range(n_nodes)
+        ]
+    )
+    generators = pl.concat(
+        [
+            _forecast(series=1000 + 2 * i + g, valid_times=times, actual=[5.0] * n_steps)
+            for i in range(n_nodes)
+            for g in range(2)
+        ]
+    )
+    heights: list[int] = []
+    original = node_curtailment_module.allocate_pro_rata_by_capacity
+
+    def recording(**kwargs: object) -> pl.DataFrame:
+        heights.append(kwargs["frame"].height)  # ty: ignore[unresolved-attribute]
+        return original(**kwargs)  # ty: ignore[invalid-argument-type]
+
+    monkeypatch.setattr(node_curtailment_module, "allocate_pro_rata_by_capacity", recording)
+    result = _score(table=table, node=node, generators=generators)
+    assert heights == [2]
+    assert _headline(result.per_arm, column="n_node_half_hours") == n_nodes * n_steps
+    # Node N000 plans 12.5 MWh; its two 10 MW generators forecast 5 MW (2.5 MWh each) and clamp.
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(5.0)
+
+
+# --- the NGED baseline arm and avoidable cost ----------------------------------------------------
+
+
+def test_the_baseline_arm_runs_every_generator_at_capacity_and_pays_for_the_wrong_cap() -> None:
+    """Node 70 MW over 45 MW; generator of 30 MW assumed at 30 MW but producing only 10 MW.
+
+    Planned 12.5 MWh; forecast energy 15 MWh covers it, so the share is 12.5 MWh and the cap is
+    30 - 25 = 5 MW. Lost (10 - 5) * 0.5 = 2.5 MWh. Breach = 70 - 2.5 / 0.5 - 45 = 20 MW = 10 MWh.
+    Energy proxy at 2,000 GBP per MWh: 2,000 * (2.5 + 20 * 10) = 405,000 GBP. DCUSA form: the
+    instruction is 30 - 5 = 25 MW for 0.5 h, 12.5 MWh-equivalent, so 2,000 * (12.5 + 20 * 10) =
+    425,000 GBP.
+    """
+    table = _table(generators=[(GENERATOR_SERIES, 30.0)])
+    actual = _generator_row(output=10.0, forecast=0.0)
+    baseline = capacity_forecast(generator_frame=actual, table=table)
+    assert baseline["q50"].to_list() == [30.0]
+    assert baseline["actual"].to_list() == [10.0]
+    result = _score(table=table, node=_one_row(flow=70.0), generators=baseline)
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(2.5)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(10.0)
+    assert _headline(result.per_arm, column="energy_proxy_gbp") == pytest.approx(405_000.0)
+    assert _headline(result.per_arm, column="dcusa_form_gbp") == pytest.approx(425_000.0)
+
+
+def test_capacity_forecast_uses_each_generators_own_capacity_and_drops_other_series() -> None:
+    """Generators of 30 and 10 MW get q50 30 and 10; a series not in the table is left out."""
+    table = _table(generators=[(GENERATOR_SERIES, 30.0), (SECOND_GENERATOR_SERIES, 10.0)])
+    frame = pl.concat(
+        [
+            _generator_row(series=GENERATOR_SERIES, output=1.0, forecast=2.0),
+            _generator_row(series=SECOND_GENERATOR_SERIES, output=3.0, forecast=4.0),
+            _generator_row(series=999, output=5.0, forecast=6.0),
+        ]
+    )
+    baseline = capacity_forecast(generator_frame=frame, table=table)
+    assert baseline["time_series_id"].to_list() == [GENERATOR_SERIES, SECOND_GENERATOR_SERIES]
+    assert baseline["q50"].to_list() == [30.0, 10.0]
+    assert baseline["q05"].to_list() == [30.0, 10.0]
+    assert baseline["actual"].to_list() == [1.0, 3.0]
+
+
+def test_avoidable_cost_subtracts_the_perfect_arm_price_by_price() -> None:
+    """Arms: perfect (12.5 MWh curtailed) and a loose one (generator forecast 40 MW, 7.5 + breach).
+
+    From the forecast-too-high case the loose arm costs 215,000 GBP at 2,000 GBP per MWh and the
+    perfect arm 25,000, so the avoidable cost is 190,000 GBP, and 0 for the perfect arm itself.
+    """
+    table = _table(generators=[(GENERATOR_SERIES, 50.0)])
+    node = _one_row(flow=70.0)
+    result = node_curtailment(
+        table=table,
+        node_forecasts={"perfect": node, "loose": node},
+        generator_forecasts={
+            "perfect": _generator_row(output=30.0, forecast=30.0),
+            "loose": _generator_row(output=30.0, forecast=40.0),
+        },
+        assumptions=_assumptions(),
+    )
+    avoidable = avoidable_cost(per_arm=result.per_arm, perfect_arm="perfect")
+    assert _headline(avoidable, arm="loose", column="energy_proxy_gbp") == pytest.approx(190_000.0)
+    assert _headline(avoidable, arm="perfect", column="energy_proxy_gbp") == pytest.approx(0.0)
+    with pytest.raises(ValueError, match="not in per_arm"):
+        avoidable_cost(per_arm=result.per_arm, perfect_arm="missing")
