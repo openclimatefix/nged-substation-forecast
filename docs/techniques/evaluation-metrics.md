@@ -549,6 +549,6 @@ Anything not in MLflow is still one Polars filter away in Delta.
   for each ratio of "cost of acting on a warning" to "loss if an unwarned exceedance occurs", how
   much of a perfect forecast's value does this model capture? We do not compute these, because the
   loss from an unwarned exceedance has no single agreed monetary value; the [cost-savings
-  metrics](../roadmap/cost-savings-metrics.md) reach the same comparison by holding every model to
-  equal risk and comparing what each spends. The curves remain a useful ad-hoc analysis if that loss
-  figure ever firms up.
+  metrics](../roadmap/cost-savings-metrics.md) score a forecast by the pounds of curtailment and
+  flexibility it implies, under stated assumptions. The curves remain a useful ad-hoc analysis if
+  that loss figure ever firms up.
