@@ -18,7 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-15](#sw2-13-to-sw2-15-combining-evidence-across-windows-and-neighbours) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | SW2-9 | Proposed; the heaviest of the three |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
@@ -185,34 +184,6 @@ confirm:
   whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and
   hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
   24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
-
-#### SW2-13 to SW2-15: combining evidence across windows and neighbours
-
-**Three experiments replace the detectors' hard rules with combined evidence: across window sizes
-first (SW2-13, finished as [experiment 59](00059-sw2-13-several-windows-in-one-detector/result.md)),
-then across neighbours, then across the whole electricity network at once.** Experiment 43
-found that the better detector depends on the window, D1 at 4 hours and D0 at 24 hours, and
-experiment 55 found that the neighbour test helps little as a veto. Each experiment is scored on the
-experiment 43 scoreboard at matched unexplained-alarm rates, with recall weighted by the MW moved as
-the headline and unweighted recall second, because a small transfer matters less than a large
-transfer. Each take-home message states the share of the moved MW that the detector misses. Each
-reports recall by donor step in noise units, split by metered receiver. Each scores injected
-transfers whose shapes the detector does not assume (a constant MW, a share of the receiver's
-profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
-day.
-
-- **SW2-14 (done, [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)):**
-  a likelihood-ratio sum and a logistic regression of own and neighbour opposite steps gained +0.005
-  and +0.019 over the single-series detector (neither interval excludes zero). A post hoc arm that
-  adds the count of same-sign neighbour steps gained +0.034.
-- **SW2-15, the joint edge-flow estimator** from approach 3 on the [switching
-  events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
-  a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
-  at once with a sparsity penalty and a penalty on changes, in CVXPY. Each Primary also gets a
-  slack term for load moved to a neighbour that is not metered. The 8 Primaries metered only in MVA
-  carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
-  injections. The benchmark is the best sequential detector from experiment 59 (the 24-hour single
-  window) or SW2-14.
 
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 
