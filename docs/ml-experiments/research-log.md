@@ -1310,10 +1310,10 @@ unexplained alarms on odd months. The step detector finds 0.646 (0.354 missed). 
 estimator finds 0.108 (0.892 missed), a difference of -0.538 (97.5% interval -0.605 to -0.421).
 
 - **Finding for later experiments:** a post hoc change of the loss lifts the estimator to 0.527
-  (-0.120 against the step detector, -0.190 to -0.084). It then matches the step detector for
-  transfers with a metered receiver and a donor step of 10 noise units or more (0.92 against 0.89
-  of transfers found) and finds almost nothing where no receiver is metered and the step is under 6.
-  On the 35 labelled real transfers of over 1 day it finds 4, against 7.
+  (-0.120 against the step detector, -0.190 to -0.084). With that change it matches the step
+  detector for transfers with a metered receiver and a donor step of 10 noise units or more (0.92
+  against 0.89 of transfers found) and finds almost nothing where no receiver is metered and the
+  step is under 6. On the 35 labelled real transfers of over 1 day it finds 4, against 7.
 - **Write-up and pull request:** [the full result page](00067-sw2-15-joint-edge-flow-estimator/result.md),
   [PR #1298 (Experiment 67: one convex fit of load flows across all boundaries (SW2-15))](https://github.com/openclimatefix/nged-substation-forecast/pull/1298).
 
