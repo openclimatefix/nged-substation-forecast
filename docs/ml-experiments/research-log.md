@@ -94,6 +94,7 @@ the maintainer to confirm.
 | [00069 - Switching event detector, part 10](00069-sw2-17-missed-onsets-of-the-end-rule/result.md) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their start, and does a weak alarm confirmed by a later step back recover them? | Inconclusive: the weak alarms add +0.146 of the moved MW, but the strong threshold must rise from 4.0 to 6.55 to keep 80 alarms, so the net change is +0.007 (98.75% interval -0.014 to +0.040); the first-return end rule beats the 14-day rule on a fresh draw (+0.038, +0.016 to +0.077) | Not for production | 2026-10-16 |
 | [00070 - Switching event detector, part 11](00070-sw2-19-same-sign-neighbour-count/result.md) | Does counting the neighbours that step the same way as the alarming substation find more of the moved MW than the single-series detector with the PF14 end rule? | Supported: +0.048 of the moved MW (97.5% interval +0.021 to +0.096) on fresh headline-band transfers at 80 odd-month unexplained alarms; no gain on long transfers or the 35 real transfers (7 against 8) | Candidate | 2026-10-16 |
 | [00071 - Switching event detector, part 12](00071-sw2-18-refit-offset-and-gap-bridging/result.md) | Does taking the step statistic from two residual models refitted half a month apart, so that no alarm is suppressed at a refit, find more of the moved MW than the benchmark detector PF14? | Supported: +0.050 of the moved MW (98.33% interval +0.012 to +0.107) at no more than 80 odd-month unexplained alarms, all of it in transfers within 24 hours of a refit. Lifting the suppression alone gives +0.056, and gap bridging changes no outcome | Candidate | 2026-10-16 |
+| [00082 - Switching event detector, part 13](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md) | Do the refit offset (experiment 71) and the same-sign neighbour count (experiment 70) add up when used in one detector? | Supported: the combined detector XL finds 0.770 of the moved MW against 0.656 for PF14 (+0.114, 98.33% interval +0.074 to +0.182), and beats each part alone by +0.058 and +0.064; no gain on long transfers; 12 of 35 real transfers found against 8 | Candidate | 2026-10-17 |
 | [00072 - Step-loss monitor for the solar farms, P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a monitor find a loss of generating capacity at the 5 long-record solar farms from their daily power telemetry? | Refuted: it found 0.45 of 25% losses lasting 30 days (the plan required 0.80), 0.84 of 25% losses lasting 90 days, 0.26 of 10% losses lasting 90 days, and 3% losses barely above chance; false alarms 0.29 per farm-year on a placebo | Not for production | 2026-10-16 |
 | [00068 - Switching event detector, part 13](00068-sw2-5-train-detect-retrain-loop/result.md) | Does refitting the lagless XGBoost model without the detected switching intervals, for three rounds, raise the share of moved MW the detector finds and lower the forecast error? | Inconclusive, and no gain worth porting: recall gains +0.011 (97.5% interval +0.000 to +0.034) and the forecast's mean absolute error changes -0.175% (-1.145% to +0.603%); a random mask of about equal volume does as well | Not for production | 2026-10-16 |
 | [00067 - Switching event detector, part 14](00067-sw2-15-joint-edge-flow-estimator/result.md) | Does one convex fit of load flows across all boundaries between the 16 Primaries find more of the moved MW than the single-series 24-hour step detector? | Refuted: the joint estimator finds 0.108 of the moved MW against 0.646 (difference -0.538, 97.5% interval -0.605 to -0.421); a post hoc loss change lifts it to 0.527 (-0.120, -0.190 to -0.084) | Not for production | 2026-10-17 |
@@ -1518,6 +1519,28 @@ and no verdict on the forecasts is drawn.
 - **Write-up:** [the full result page](00083-curtailment-cost-and-tail-calibration-worked-example/result.md).
 
 ![Total curtailment cost of each forecast](00083-curtailment-cost-and-tail-calibration-worked-example/figure_1_cost.svg)
+
+### 00082: do the refit offset and the same-sign neighbour count add up? (SW2-18 and SW2-19)
+
+**The two improvements find different missed load transfers, so using both finds about twice as much
+extra moved power as either alone.** The combined detector XL takes the 24-hour residual step from
+two models refitted half a month apart (experiment 71) and scores each alarm candidate partly by the
+number of neighbouring substations stepping the same way (experiment 70). On fresh injected
+transfers that start in even months it found 0.770 of the moved MW against 0.656 for the benchmark
+PF14, the benchmark detector (+0.114, 98.33% interval +0.074 to +0.182; MW is megawatts, and a noise
+unit is the usual size of a substation's 24-hour residual step), at no more than 80 odd-month
+unexplained alarms. The verdict is `supported`.
+
+- **Finding for later experiments:** XL beats the refit-offset detector alone by +0.058 (+0.034 to
+  +0.096) and the neighbour-count score alone by +0.064 (+0.028 to +0.127), and the share of moved
+  MW missed falls from 0.344 to 0.230. Long transfers gain nothing. On the 35 labelled real
+  transfers of more than 1 day XL found 12 and PF14 8. The misses that remain sit mostly in
+  transfers with a donor step of 2 to 4 noise units and no metered receiver.
+- **Write-up and pull request:** [the full result
+  page](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md), [PR
+  #1314](https://github.com/openclimatefix/nged-substation-forecast/pull/1314).
+
+![Share of moved MW found, by detector](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/figure_1_recall_by_arm.svg)
 
 ### 00079: can the direction of flow be recovered at Primaries metered only in MVA? (PVDIS-7)
 
