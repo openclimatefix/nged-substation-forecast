@@ -10,7 +10,8 @@ a fraction of capacity), the series label (`site`), and the group (`Primary`, `B
 `solar`, or `wind`). A later step restricts the rows to the 292 runs of `fold_a_daily_gap_v1`.
 
 Demand arms. `weekly_def` and `weekly_m0` (the weekly regime of the 20 series), `frozen_def` and
-`frozen_m0` (the stack's frozen model); each with the spread factor 1.15 (`_s`), and the frozen
+`frozen_m0` (the stack's frozen model); `weekly_m0` holds only the runs that every second weekly
+refit served, and the paired contrasts keep the runs both weekly arms share; each with the spread factor 1.15 (`_s`), and the frozen
 arms also with the 14-day correction and the spread factor (`_cs`). The rounds family is
 `fz_<start>_r<rounds>` (fit A, 500, 1000, and 2000 rounds) and `fzes_<start>_best` and
 `fzes_<start>_r500` (fit B, early stopping), each with the spread factor, on the gap runs only.
@@ -196,7 +197,7 @@ def assemble_demand(*, smoke: bool) -> None:
                         regime=regime,
                         site=site,
                         origins=origins,
-                        strict=not smoke,
+                        strict=not smoke and name != "weekly_m0",
                     )
                 )
             except FileNotFoundError:

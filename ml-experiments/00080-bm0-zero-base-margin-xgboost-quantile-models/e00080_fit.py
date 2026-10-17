@@ -398,6 +398,9 @@ def main() -> None:
         "--limit-refits", type=int, default=0, help="fit only the first N refits (the check)"
     )
     parser.add_argument(
+        "--stride", type=int, default=1, help="fit every Nth refit only (paired with the stored)"
+    )
+    parser.add_argument(
         "--smoke", action="store_true", help="one series, 2 refits, 3 runs, 20 rounds, scratch dir"
     )
     args = parser.parse_args()
@@ -409,6 +412,8 @@ def main() -> None:
     out_root = common.ANCHOR_PREDS_DIR
     rounds = config.rounds
     workers = args.workers
+    if args.stride > 1:
+        jobs = dict(list(jobs.items())[:: args.stride])
     if args.limit_refits:
         jobs = dict(list(jobs.items())[: args.limit_refits])
     if args.smoke:
