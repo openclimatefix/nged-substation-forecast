@@ -73,8 +73,7 @@ metric: >-
 code: ml-experiments/00078-pvdis-5-current-capacity-vintages/
 ---
 
-# Experiment 78: does a re-estimated solar capacity lower the error of experiment 64's best
-forecast? (PVDIS-5, check 2)
+# Experiment 78: does a re-estimated solar capacity lower the error? (PVDIS-5, check 2)
 
 **Plan status: committed before any code runs.** The write-up replaces this page when the experiment
 finishes.
