@@ -45,6 +45,14 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
   seed, within each calendar year as well as overall, and a t-interval across the folds' own
   differences.
+- `tail_calibration` — coverage (the share of measured values at or below the forecast quantile) and
+  pinball loss of a quantile forecast at the 0.01, 0.05, 0.95, and 0.99 levels, with month-resampled
+  intervals, and the markdown table a `result.md` quotes.
+- `curtailment_cost` — the simple curtailment-cost metric (Metric 2, Tiers 1 and 2 of the
+  cost-savings roadmap, one series at a time): the cost of procuring a forecast's quantile (level
+  `tau`) of net export above an export limit, with `tau` fixed or calibrated to a common unmet
+  share, a sweep over the assumed price and limit, and a reader for stored prediction sets. Every
+  price and limit in it is an assumption, not an NGED figure.
 - `correlation` — the Pearson correlation of a prediction with the measured value, with an
   interval from resampling whole months and a seed, the same design `bootstrap` uses for an error.
 - `era5_ladder` — the ladder of ERA5 variable groups (which variable belongs to which rung, which

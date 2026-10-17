@@ -112,6 +112,7 @@ the maintainer to confirm.
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
 | [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) | Candidate | 2026-10-17 |
 | [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
+| [00083 - Curtailment cost and tail calibration, worked example](00083-curtailment-cost-and-tail-calibration-worked-example/result.md) | Can a simple curtailment-cost metric and a tail table rank the stored demand forecasts of experiment 48? | Inconclusive (no registered contrast): the weekly retrained model costs 21.4 GBP per MW per day less than the stack (-35.4 to -10.7) on 6 export-constrained series; every price and limit is an assumption | Not for production | 2026-10-17 |
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -1500,6 +1501,23 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
   #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
 
 ![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
+
+### 00083: can a simple curtailment-cost metric and a tail table rank the stored demand forecasts?
+
+**A forecast biased low looks cheap at a fixed procurement quantile, so the curtailment-cost metric
+also charges the energy left unmet, and the 0.99 tail and an equal-risk comparison cannot be read
+from stored sets that stop at the 0.95 quantile.** We built `studies.curtailment_cost` and
+`studies.tail_calibration`, and scored experiment 48's stored forecasts. On 6 export-constrained
+demand substations (2 bulk supply points, 2 grid supply points, 2 Primaries) the weekly retrained
+model cost 21.4 GBP per MW per day less than the stack, the demand model fitted once with a
+correction from its own errors (95% interval -35.4 to -10.7, in GBP per MW of capacity per day), and
+the rank order held across limit scales and breach ratios. Every price and limit is an assumption,
+and no verdict on the forecasts is drawn.
+
+- **Finding for later experiments:** write the 0.01 and 0.99 quantiles in every prediction set.
+- **Write-up:** [the full result page](00083-curtailment-cost-and-tail-calibration-worked-example/result.md).
+
+![Total curtailment cost of each forecast](00083-curtailment-cost-and-tail-calibration-worked-example/figure_1_cost.svg)
 
 ### 00079: can the direction of flow be recovered at Primaries metered only in MVA? (PVDIS-7)
 

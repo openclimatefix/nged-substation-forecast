@@ -12,6 +12,7 @@ from studies.bootstrap import (
     bootstrap_difference,
     bootstrap_difference_at_level,
     bootstrap_difference_by_year,
+    bootstrap_month_totals,
     bootstrap_row_difference,
     bootstrap_year_change,
     bracket_verdict,
@@ -134,6 +135,29 @@ def test_bootstrap_absolute_reproduces_the_published_random_stream():
         "n_rows": 14,
         "n_months": 4,
     }
+
+
+def test_month_totals_give_the_bounds_that_resampling_every_row_gives():
+    losses = _losses(seeds=(0, 1, 2))
+    rows = losses.filter(pl.col("arm") == "T")
+    totals = rows.group_by("seed", "month").agg(total=pl.col("loss").sum()).sort("month", "seed")
+    month_sums = totals.pivot(on="seed", index="month", values="total").sort("month")
+    counts = rows.filter(pl.col("seed") == 0).group_by("month").len().sort("month")["len"]
+
+    lower, upper = bootstrap_month_totals(
+        month_sums=month_sums.drop("month").to_numpy().T, month_counts=counts.to_numpy()
+    )
+
+    reference = bootstrap_absolute(losses=losses, arm="T", metric="loss")
+    assert lower == pytest.approx(reference["lower_95"])
+    assert upper == pytest.approx(reference["upper_95"])
+
+
+def test_month_totals_reject_a_fraction_level_and_mismatched_shapes():
+    with pytest.raises(ValueError, match="percent"):
+        bootstrap_month_totals(month_sums=np.ones((1, 2)), month_counts=np.ones(2), level=0.95)
+    with pytest.raises(ValueError, match="disagree"):
+        bootstrap_month_totals(month_sums=np.ones((1, 3)), month_counts=np.ones(2))
 
 
 def test_bootstrap_absolute_does_not_depend_on_the_order_of_the_rows():
