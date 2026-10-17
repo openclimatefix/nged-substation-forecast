@@ -58,7 +58,7 @@ lessons: >-
   share of the moved MW that no alarm starts on falls from 0.300 (PF14) to 0.195 (XL), and the
   share of the moved MW missed from 0.344 to 0.230. Long transfers (15.6 to 60 days) gain nothing,
   as in experiments 70 and 71. On the 35 labelled real transfers of more than 1 day, XL found 12
-  and PF14 8, the first real-data support for the neighbour count.
+  and PF14 8.
 advice:
   - >-
     Build the detector from the refit-offset step statistic and score its candidates with the
