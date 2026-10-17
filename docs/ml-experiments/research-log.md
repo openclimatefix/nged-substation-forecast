@@ -1509,12 +1509,13 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
 **Two substations hold too few half-hours beyond a limit to rank forecasts, so the pilot proves the
 arithmetic and a ranking waits for the January 2027 delivery of about 2,500 series.** We scored
 experiment 48's stored forecasts for Boston and Skegness by what capping the generators beneath them
-would have cost. NGED curtails early to keep headroom, so the limit is 0.9, 0.75, or 0.5 times each
-substation's earlier maximum export, and the published thermal limit is a reference only. At 0.9
-there are 19 half-hours beyond the limit in the scored year. Every cost is a calibration to history,
-not a saving, and the best guess is cheapest at all three limits without a paired difference that
-excludes zero at 0.9. No verdict on the forecasts is drawn. The thermal limits are NGED's, Supported
-by NGED Open Data.
+would have cost. The limit is 0.9, 0.75, or 0.5 times each substation's maximum export before the
+scored year, because the maintainer understands (unconfirmed) that NGED curtails early to keep
+headroom, so the published thermal limit is a reference only. At 0.9 there are 19 half-hours beyond
+the limit, and 81% of the best guess's avoidable cost is breach, not unneeded cuts. Every cost is a
+calibration to history, not a saving. The best guess is cheapest at all three limits, but at 0.9 no
+difference between arms is statistically significant at the 5% level. No verdict on the forecasts is
+drawn. The thermal limits are NGED's, Supported by NGED Open Data.
 
 - **Write-up:** [the full result page](00084-substation-limit-curtailment-cost-worked-example/result.md).
 

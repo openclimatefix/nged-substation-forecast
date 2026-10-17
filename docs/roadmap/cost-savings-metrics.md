@@ -208,17 +208,21 @@ hours:
 constraint. [Metric 1](#metric-1-flexibility-procurement-cost) prices that side. The output reports
 import-exceedance half-hours per node and season.
 
-**The scaled limit is the headline, and the real firm limit is a reference only.** NGED curtails
-early, so that one more fault still leaves headroom, and so never lets a substation approach its
-published thermal limit. The scaled limit stands in for the operating headroom NGED actually keeps,
-and it is defined for every node, including those with no known real limit: $L = f \times$ the
-node's maximum observed export (the negative tail for a node whose positive flow is import),
-computed only from history before the scored period. The fraction $f$ is 0.9 by default, with 0.75
-and 0.5 swept. "p90" here means 0.9 times the maximum, not the 90th percentile of the node's flow,
-because a percentile of a node's own flow is exceeded on 10% of half-hours by construction. A
-scaled-limit figure is a calibration to history, not a saving. The real firm limit appears as a
-reference mark and as a column of the event census, which counts export and import exceedances at
-the real limit and at each $f$ and decides whether a ranking of forecasts is possible.
+**The scaled limit is the headline, and the real firm limit is a reference only.** In the
+maintainer's understanding of NGED's practice, which NGED has not confirmed (see [issue #1318
+(Questions to ask NGED about
+curtailment)](https://github.com/openclimatefix/nged-substation-forecast/issues/1318)), NGED
+curtails early so that one more fault still leaves headroom, so it does not run a substation up to
+its published thermal limit. A substation's metered export has reached that limit once in the pilot,
+so the limit is not unreachable. The scaled limit stands in for the operating headroom, and it is
+defined for every node, including those with no known real limit: $L = f \times$ the node's maximum
+observed export (the negative tail for a node whose positive flow is import), computed only from
+history before the scored period. The fraction $f$ is 0.9 by default, with 0.75 and 0.5 swept. "p90"
+here means 0.9 times the maximum, not the 90th percentile of the node's flow, because a percentile
+of a node's own flow is exceeded on 10% of half-hours by construction. A scaled-limit figure is a
+calibration to history, not a saving. The real firm limit appears as a reference mark and as a
+column of the event census, which counts export and import exceedances at the real limit and at each
+$f$ and decides whether a ranking of forecasts is possible.
 
 **Caveats.**
 

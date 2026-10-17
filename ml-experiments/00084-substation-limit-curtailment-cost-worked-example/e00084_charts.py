@@ -74,6 +74,9 @@ def figure_1_census() -> alt.VConcatChart:
         pl.col("node_id").is_in(SHOWN_NODES)
     )
     counts = counts.with_columns(
+        period=pl.col("period").replace_strict(
+            {"all history": "All history", "scored year": "Scored year"}
+        ),
         row=pl.col("node_id").replace_strict(
             {
                 n: inputs.NODE_LABELS[n] + ("*" if n == inputs.BICKER_FEN else "")
@@ -118,13 +121,26 @@ def figure_1_census() -> alt.VConcatChart:
         panels.append(
             alt.layer(heat, text)
             .properties(
-                width=150, height=13 * len(rows), title=f"{direction.capitalize()} exceedances"
+                width=150,
+                height=13 * len(rows),
+                title=alt.TitleParams(
+                    f"{direction.capitalize()}: half-hours beyond the limit",
+                    fontSize=13,
+                    anchor="start",
+                ),
             )
-            .facet(column=alt.Column("period:N", title=None, sort=["all history", "scored year"]))
+            .facet(
+                column=alt.Column(
+                    "period:N",
+                    title=None,
+                    sort=["All history", "Scored year"],
+                    header=alt.Header(labelFontSize=12, labelFontWeight="bold"),
+                )
+            )
         )
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="Few half-hours cross the thermal limit; hundreds cross half the observed peak",
+            text="Few half-hours cross the thermal limit; over 100 per node cross half the peak",
             lines=[
                 (
                     "Number of half-hours whose flow is beyond the limit, by season. The "
@@ -213,7 +229,7 @@ def figure_2_distribution() -> alt.VConcatChart:
                     y=alt.Y(
                         "half_hours:Q",
                         scale=alt.Scale(type="log", domain=[1, 10000]),
-                        title=season if node == SHOWN_NODES[0] else None,
+                        title=f"{season}: half-hours" if node == SHOWN_NODES[0] else None,
                         axis=alt.Axis(values=[1, 10, 100, 1000, 10000]),
                     ),
                 )
@@ -236,8 +252,10 @@ def figure_2_distribution() -> alt.VConcatChart:
                 text="Each node's limit sits far out in the tail of its export",
                 lines=[
                     (
-                        "Half-hours of net export per MW (Bicker Fen: per 5 MW), all history, from "
-                        "cleaned unflagged power. Rows are seasons. Bicker Fen's thermal limit is "
+                        "Half-hours per bin on a log scale (bins are 1 MW wide; Bicker Fen's "
+                        "are 5 MW), all history, from cleaned unflagged power. Each panel has "
+                        "its own "
+                        "horizontal axis. Bicker Fen's thermal limit is "
                         "a Technical Limit and its sign is unconfirmed. The published thermal "
                         "limit is a ceiling NGED does not operate to. Limits are NGED's, "
                         "Supported by NGED Open Data."
@@ -345,14 +363,12 @@ def figure_4_headline() -> alt.VConcatChart:
         text_rows = []
         for arm_row in beside.iter_rows(named=True):
             if arm_row["price_gbp_per_mwh"] == 2000.0:
-                text_rows.append(
-                    (arm_row["arm"], "DCUSA form, GBP 2,000", arm_row["dcusa_form_gbp"] or 0.0)
-                )
+                text_rows.append((arm_row["arm"], "DCUSA form", arm_row["dcusa_form_gbp"] or 0.0))
             else:
                 text_rows.append(
                     (
                         arm_row["arm"],
-                        f"GBP {arm_row['price_gbp_per_mwh']:,.0f} per MWh",
+                        f"At GBP {arm_row['price_gbp_per_mwh']:,.0f}",
                         arm_row["energy_proxy_gbp"],
                     )
                 )
@@ -363,25 +379,25 @@ def figure_4_headline() -> alt.VConcatChart:
             text=pl.col("value").map_elements(lambda v: f"{v:,.0f}", return_dtype=pl.String),
         )
         columns = [
-            "GBP 100 per MWh",
-            "GBP 380 per MWh",
-            "GBP 11,100 per MWh",
-            "DCUSA form, GBP 2,000",
+            "At GBP 100",
+            "At GBP 380",
+            "At GBP 11,100",
+            "DCUSA form",
         ]
         table = (
             alt.Chart(text_frame)  # ty: ignore[unresolved-attribute]
-            .mark_text(fontSize=10, aria=False)
+            .mark_text(fontSize=9, aria=False)
             .encode(
                 x=alt.X(
                     "column:N",
                     sort=columns,
-                    title=None,
-                    axis=alt.Axis(orient="bottom", labelAngle=-30, labelFontSize=9),
+                    title="Avoidable cost (GBP) at other prices per MWh",
+                    axis=alt.Axis(orient="bottom", labelAngle=0, labelFontSize=9, titleFontSize=9),
                 ),
                 y=alt.Y("label:N", sort=labels, axis=None),
                 text="text:N",
             )
-            .properties(width=215, height=24 * len(order))
+            .properties(width=270, height=24 * len(order))
         )
         kind_note = {
             "scaled f=0.9": "Limit 0.9 x maximum (headline): calibration to history, not a saving",
@@ -394,13 +410,14 @@ def figure_4_headline() -> alt.VConcatChart:
             text="No forecast can be ranked at the headline limit: a few events decide each arm",
             lines=[
                 (
-                    "Avoidable cost is each arm's cost minus the perfect forecast's, over the "
-                    "scored year, July 2025 to June 2026, Boston and Skegness, Curtailment Limit "
-                    "0. Dot: estimate. Line: 95% interval from resampling whole months. Right: "
-                    "avoidable cost in GBP at the other prices, and in the DCUSA form. The limit "
-                    "is a multiple of each node's maximum before the scored year, a stand-in for "
-                    "the headroom NGED keeps. The NGED baseline is the maintainer's unconfirmed "
-                    "understanding of NGED's practice."
+                    "Avoidable cost: an arm's cost minus the perfect forecast's, July 2025 to "
+                    "June 2026, Boston and Skegness. Cost is the energy proxy, GBP 2,000 x (MWh "
+                    "of generator output cut + 20 x MWh still over the limit). Dot: estimate. "
+                    "Line: 95% interval from resampling whole months. Right: avoidable cost if "
+                    "the price were GBP 100, 380 or 11,100 per MWh, and in the DCUSA form, which "
+                    "charges each instructed generator its whole headroom. Each limit is a "
+                    "multiple of the node's maximum export before July 2025. The NGED baseline "
+                    "is the maintainer's unconfirmed understanding of NGED's practice."
                 )
             ],
         )
