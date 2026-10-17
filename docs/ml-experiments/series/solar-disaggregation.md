@@ -3,15 +3,14 @@
 **The series found that the output of solar panels behind a substation can be estimated from the
 substation's power, and that giving the forecast an explicit solar term lowers its daylight error by
 0.15 points of capacity. It also found that the limit is now the forecast of sunshine and not the
-panels.** The series has 15 experiments. A Primary substation steps 33 kV or 66 kV
-down to 11 kV in the electricity distribution network. Its meter reads demand minus the output of
-solar panels connected below it, so a sunny day lowers the metered power. We call those panels
-embedded solar.
+panels.** The series has 15 experiments. A Primary substation steps 33 kV or 66 kV down to 11 kV in
+the electricity distribution network. Its meter reads demand minus the output of solar panels
+connected below it, so a sunny day lowers the metered power. We call those panels embedded solar.
 
 - **What worked:** a fit of calendar-plus-temperature demand minus one satellite-driven solar shape
-  recovers about 85% (the daily fit) of solar-farm output added to a substation's demand. XGBoost, given the
-  panels' capacity times the forecast sunshine as a starting offset, scores 0.152 points of capacity
-  lower than the best guess (98.75% interval -0.199 to -0.111).
+  recovers about 85% (the daily fit) of solar-farm output added to a substation's demand. XGBoost,
+  given the panels' capacity times the forecast sunshine as a starting offset, scores 0.152 points
+  of capacity lower than the best guess (98.75% interval -0.199 to -0.111).
 - **What the series rules out:** GEFS, and UKV alone, as a replacement for ENS in the sunshine
   forecast (a UKV and ENS blend gives a small gain that one validation year cannot confirm), a
   fitted mix of panel orientations, a capacity series that changes week by week, and a monitor that
@@ -21,8 +20,8 @@ embedded solar.
   Distribution (NGED), could test the losses that the readings cannot show.
 
 **Scores are quantile scores in points, where 1 point is 1% of a substation's capacity, and smaller
-is better.** `d0` is the best-guess recipe of experiment 33. Every page named below
-is a finished experiment write-up, and every figure is reused from those pages.
+is better.** `d0` is the best-guess recipe of experiment 33. Every page named below is a finished
+experiment write-up, and every figure is reused from those pages.
 
 ## What the data looks like
 
@@ -34,8 +33,9 @@ downward slope is the embedded solar. [Experiment
 ![Donington's midday power against sunshine](../00039-pv-disaggregation-cams-injection/figure_02.svg)
 
 **Midday power falls in summer at the substations plotted, and the capacity fitted in experiment 39
-rose at 4 of the 5 Primaries with 4 or more years of data.** Each line is one season-year (a 12-month period), so the lines show whether
-the solar capacity has grown. Wrangle T1 sits near or below zero.
+rose at 4 of the 5 Primaries with 4 or more years of data.** Each line is one season-year (a
+12-month period), so the lines show whether the solar capacity has grown. Wrangle T1 sits near or
+below zero.
 
 ![Midday mean power by calendar month](../00039-pv-disaggregation-cams-injection/figure_03.svg)
 
@@ -45,9 +45,9 @@ week of June 2024, with the farm's output scaled to 20% of the substation's capa
 
 ![An injection adds solar farm A's shape to demand](../00039-pv-disaggregation-cams-injection/figure_07.svg)
 
-**Eight further Primaries are metered only in the size of their flow (MVA), not its direction.**
-The fit finds no reverse flow at seven of them. At Stickney, the readings on sunny days rise at
-midday, and the reading cannot say whether the flow reversed. [Experiment
+**Eight further Primaries are metered only in the size of their flow (MVA), not its direction.** The
+fit finds no reverse flow at seven of them. At Stickney, the readings on sunny days rise at midday,
+and the reading cannot say whether the flow reversed. [Experiment
 79](../00079-pvdis-7-mw-at-mva-only-primaries/result.md) drew this.
 
 ![Raw readings at the 8 MVA-only Primaries](../00079-pvdis-7-mw-at-mva-only-primaries/figure_1_raw_profile.svg)
@@ -64,16 +64,16 @@ when farm A really did run low. [Experiment
 **A simple fit finds most of the added solar capacity, and passes most real-data checks.**
 [Experiment 39](../00039-pv-disaggregation-cams-injection/result.md) added real solar-farm output to
 the demand of the 8 Primaries that meter in both directions. The daily version of the fit recovered
-0.854 (95% interval 0.815 to 0.866) of the added capacity. 6 of the 8 Primaries passed four
-further checks on the real series, and Wrangle T1 failed the placebo-sky check.
+0.854 (95% interval 0.815 to 0.866) of the added capacity. 6 of the 8 Primaries passed four further
+checks on the real series, and Wrangle T1 failed the placebo-sky check.
 
 ![Median recovery ratio by model and irradiance point](../00039-pv-disaggregation-cams-injection/figure_01.svg)
 
 **The fitted capacity is close to unbiased on pure solar output on average, but a cloud-driven
-demand load can still hide inside it.** [Experiment 40](../00040-pv-capacity-error-bars/result.md) found a median fitted
-capacity of 0.992 of the true value (0.951 to 1.032) and a false-alarm rate of 0.055. The test
-for a cloud-driven load caught a day-long load in only 0.35 of trials, so each capacity carries a
-bound of 0.18 to 0.71 of the capacity. Kirton is flagged as confounded.
+demand load can still hide inside it.** [Experiment 40](../00040-pv-capacity-error-bars/result.md)
+found a median fitted capacity of 0.992 of the true value (0.951 to 1.032) and a false-alarm rate of
+0.055. The test for a cloud-driven load caught a day-long load in only 0.35 of trials, so each
+capacity carries a bound of 0.18 to 0.71 of the capacity. Kirton is flagged as confounded.
 
 ![Capacity per Primary in 2025/26 with its interval and bound](../00040-pv-capacity-error-bars/figure_01.svg)
 
@@ -83,28 +83,28 @@ weight fitted on the training years. [Experiment
 64](../00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) scored arm `am` at 4.467
 against 4.620 for `d0`, which is -0.152 (98.75% interval -0.199 to -0.111). The same arm given the
 sunshine of another date scored 0.300 worse (0.198 to 0.407), so the forecast sunshine is doing the
-work. Climatology scores 5.272 and the manual heuristic 4.952. Arm `am` is a candidate for a
-model release.
+work. Climatology scores 5.272 and the manual heuristic 4.952. Arm `am` is a candidate for a model
+release.
 
 ![Quantile score of each arm and the planned contrasts](../00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/figure_1_headline.svg)
 
 **Part of experiment 64's gain is XGBoost starting from zero, and a capacity table refreshed once a
-season-year is enough.** [Experiment 76](../00076-pvdis-5-leak-check-beyond-10-days/result.md)
-found no route for a leak, and a refit with no solar term reproduced the gain at 10 days and
-beyond. [Experiment 78](../00078-pvdis-5-current-capacity-vintages/result.md) then showed that a
-capacity re-estimated before every forecast run lowers the score by only 0.018 points (-0.036 to
--0.004). A zero start lowers `d0` by 0.071 (-0.099 to -0.047), and the solar term still lowers the
-score by 0.100 against a `d0` that starts from zero.
+season-year is enough.** [Experiment 76](../00076-pvdis-5-leak-check-beyond-10-days/result.md) found
+no route for a leak, and a refit with no solar term reproduced the gain at 10 days and beyond.
+[Experiment 78](../00078-pvdis-5-current-capacity-vintages/result.md) then showed that a capacity
+re-estimated before every forecast run lowers the score by only 0.018 points (-0.036 to -0.004). A
+zero start lowers `d0` by 0.071 (-0.099 to -0.047), and the solar term still lowers the score by
+0.100 against a `d0` that starts from zero.
 
 ![Contrasts and starting-point reads](../00078-pvdis-5-current-capacity-vintages/figure_1_contrasts.svg)
 
 **The sunshine forecast, not the panels, now limits the gain.** [Experiment
-46](../00046-embedded-solar-share-of-primary-forecast-error/result.md) built the solar term from
-the true sunshine and scored 0.966 points lower than the same forecast without radiation inputs
-(-1.431 to -0.595), about 20% of its error. The ENS forecast of sunshine lowered the score by 0.056
-(-0.191 to +0.064). [Experiment 77](../00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md) found
-that a fitted panel shape leaves the score unchanged (-0.001, 98.33% interval -0.018 to +0.014),
-while sunshine from another date worsens it by 0.32.
+46](../00046-embedded-solar-share-of-primary-forecast-error/result.md) built the solar term from the
+true sunshine and scored 0.966 points lower than the same forecast without radiation inputs (-1.431
+to -0.595), about 20% of its error. The ENS forecast of sunshine lowered the score by 0.056 (-0.191
+to +0.064). [Experiment 77](../00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md) found that a
+fitted panel shape leaves the score unchanged (-0.001, 98.33% interval -0.018 to +0.014), while
+sunshine from another date worsens it by 0.32.
 
 ![The planned contrasts and the fitted-coefficient reads](../00046-embedded-solar-share-of-primary-forecast-error/figure_1_contrasts.svg)
 
