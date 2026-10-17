@@ -155,6 +155,12 @@ which this plan does not provide.
   product.
 - **Generators.** Only Primaries are scored, and no NGED generator series appears.
 
+## What the write-up must also answer
+
+- **More history or the full ensemble?** The finished page ends with one bullet saying whether more
+  ENS history, or the full 51-member ensemble (spread and CRPS features), would plausibly change any
+  conclusion tested here, and which of the two. This plan proposes no fetch.
+
 ## Sizing, by the five triggers
 
 - **Stored:** predictions under `data/ml-experiments/`, private; nothing in production.
