@@ -14,8 +14,10 @@ For each series and each starting value (`def`: XGBoost's estimate from the labe
   `work/curves/`.
 
 Wind farms use models without the power-curve margin, because a margin overrides the starting
-value. Predictions cover the 292 runs of `fold_a_daily_gap_v1`. Existing files stay, so a stopped
-run resumes. Seed 0 only.
+value. When early stopping ends before round 500 the booster holds fewer than 500 rounds, and the
+matched 500-round arm of that series is not written. Predictions cover the 292 runs of
+`fold_a_daily_gap_v1`. A job whose files all exist is skipped, so a stopped run resumes. Seed 0
+only.
 
     uv run python ml-experiments/00080-*/e00080_rounds.py --group Primary [--workers 3] [--smoke]
 """
@@ -90,6 +92,17 @@ def demand_job(*, site: str, nthread: int, smoke: bool) -> list[str]:
             "nthread": nthread,
             **({"base_score": 0.0} if start == "m0" else {}),
         }
+        targets = [
+            fitting.job_path(root=root, config=f"{family}_{start}_{label}", site=site, refit=refit)
+            for family, label in [
+                *[("frozen", f"r{n}") for n in fixed],
+                ("frozenes", "best"),
+                ("frozenes", f"r{fixed[0]}"),
+            ]
+        ]
+        if all(target.exists() for target in targets):
+            lines.append(f"{site} {start}: all files exist")
+            continue
         half_life = config.half_life_days
         models: dict[str, tuple[xgb.Booster, tuple[tuple[str, int], ...]]] = {}
         # Fit A: the whole window, fixed prefixes.
@@ -128,7 +141,8 @@ def demand_job(*, site: str, nthread: int, smoke: bool) -> list[str]:
             wanted = {
                 (family, label): n
                 for label, n in prefixes
-                if not fitting.job_path(
+                if n <= booster.num_boosted_rounds()
+                and not fitting.job_path(
                     root=root, config=f"{family}_{start}_{label}", site=site, refit=refit
                 ).exists()
             }
@@ -188,6 +202,17 @@ def generator_job(*, site: str, nthread: int, smoke: bool) -> list[str]:
         started = time.monotonic()
         zero = start == "m0"
         columns = gen.FEATURES[technology]
+        targets = [
+            gen_fit.job_path(root=root, arm=f"{family}_{start}_{label}", site=site, label="frozen")
+            for family, label in [
+                *[("frozen", f"r{n}") for n in fixed],
+                ("frozenes", "best"),
+                ("frozenes", f"r{fixed[0]}"),
+            ]
+        ]
+        if all(target.exists() for target in targets):
+            lines.append(f"{site} {start}: all files exist")
+            continue
         model_a = gen.FittedQuantiles(
             rows=rows,
             columns=columns,
@@ -221,7 +246,7 @@ def generator_job(*, site: str, nthread: int, smoke: bool) -> list[str]:
                 target = gen_fit.job_path(
                     root=root, arm=f"{family}_{start}_{label}", site=site, label="frozen"
                 )
-                if target.exists():
+                if target.exists() or n > model.booster.num_boosted_rounds():
                     continue
                 pieces = []
                 for origin in origins:

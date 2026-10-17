@@ -17,7 +17,7 @@ Configurations:
 - `n1h_m0`: the weekly regime (half-life 0.5 years, 500 rounds, `eta` 0.05) with a zero start, for
   the 16 Primary substations and the 4 bulk and grid supply points.
 - `n1h_def`: the same with XGBoost's estimated start, only for the reproduction check
-  (`--limit-refits 4`): its quantiles must match experiment 00048's stored ones.
+  (`--limit-refits 2`): its quantiles must match experiment 00048's stored ones.
 - `frozen_m0`: the stack's model, trained once on the control member's rows to 2025-06-30 with a
   half-life of 2 years anchored at 2025-06-30 and 500 rounds, with a zero start.
 

@@ -71,19 +71,6 @@ def training_table(
     )
 
 
-def forecast_runs(
-    *, model: gen.FittedQuantiles, row: dict, origins: list[datetime]
-) -> pl.DataFrame:
-    """Return the pooled-mixture quantiles of a series for the runs with the given origins."""
-    pieces = []
-    for origin in origins:
-        frame = pl.read_parquet(
-            gen.generator_frame_path(run=origin - common.PUBLICATION_DELAY)
-        ).filter(pl.col("time_series_id") == row["time_series_id"])
-        pieces.append(gen.pooled_mixture(part=frame, member_quantiles=model.predict(frame=frame)))
-    return pl.concat(pieces)
-
-
 def run_series(
     *,
     site: str,
@@ -144,7 +131,17 @@ def run_series(
             zero_start=zero_start,
         )
         used = served[:limit_runs] if limit_runs else served
-        forecast = forecast_runs(model=model, row=row, origins=used)
+        forecast = pl.concat(
+            [
+                gen.pooled_mixture(part=frame, member_quantiles=model.predict(frame=frame))
+                for frame in (
+                    pl.read_parquet(
+                        gen.generator_frame_path(run=origin - common.PUBLICATION_DELAY)
+                    ).filter(pl.col("time_series_id") == row["time_series_id"])
+                    for origin in used
+                )
+            ]
+        )
         common.atomic_write(
             frame=forecast.with_columns(seed=pl.lit(common.SEED).cast(pl.Int8)), target=target
         )
