@@ -159,7 +159,7 @@ def load_losses(*, series: pl.DataFrame) -> pl.DataFrame:
     )
     return (
         losses.with_columns(
-            week=pl.col("power_fcst_init_time").dt.strftime("%G-W%V"),
+            month=pl.col("power_fcst_init_time").dt.strftime("%G-W%V"),
             valid_month=pl.col("valid_time").dt.strftime("%Y-%m"),
             site=pl.col("time_series_id").replace_strict(sites, return_dtype=pl.String),
             run_date=pl.col("power_fcst_init_time").dt.date(),
@@ -248,7 +248,12 @@ def base_scores() -> pl.DataFrame:
     for path in sorted((common.WORK_DIR / "base_scores").glob("*.json")):
         item = json.loads(path.read_text())
         rows.append({**item, "base_score": str(item["base_score"])})
-    return pl.DataFrame(rows).sort("arm", "site", "seed")
+    table = pl.DataFrame(rows).sort("arm", "site", "seed")
+    for row in table.filter((pl.col("seed") == 0) & (pl.col("arm") == "d0_r")).iter_rows(
+        named=True
+    ):
+        print(f"base score of d0_r, seed 0, {row['site']}: {row['base_score']}")
+    return table
 
 
 def vintage_steps() -> pl.DataFrame:
@@ -319,6 +324,12 @@ def contrast_rows(*, losses: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame, 
         ("d1l_r", "d1l", LONG, "10 d+"),
         ("d1l_r", "am0", LONG, "10 d+, corrected"),
         ("d0_m0", "d0_r", ALL_LEADS, "all leads"),
+        ("d0_m0", "d0_r", UNDER_48H, "under 48 h"),
+        ("am_sy", "d0_m0", ALL_LEADS, "all leads (post hoc)"),
+        ("am_sy", "d0_m0", UNDER_48H, "under 48 h (post hoc)"),
+        ("am", "d0_m0", ALL_LEADS, "all leads (post hoc)"),
+        ("am", "d0_m0", UNDER_48H, "under 48 h (post hoc)"),
+        ("am0", "d0_m0", ALL_LEADS, "all leads (post hoc)"),
         ("am_sy_twin", "am_twin", ALL_LEADS, "all leads"),
     )
     splits = (
@@ -364,8 +375,15 @@ def main() -> None:
     )
     absolute = absolute_scores(losses=losses)
     print_section(title="Mean quantile score (points of capacity)", table=absolute)
-    climatology = with_losses(frame=pl.read_parquet(common.E64_ARMS_DIR / "climatology.parquet"))
-    print(f"climatology (experiment 00064's stored rows): {climatology['qs'].mean():.3f}")
+    climatology = with_losses(
+        frame=pl.read_parquet(common.E64_ARMS_DIR / "climatology.parquet").join(
+            first.select(*common.KEYS).unique(), on=list(common.KEYS), how="inner"
+        )
+    ).filter(pl.col("qs").is_not_nan())
+    print(
+        f"climatology (experiment 00064's stored rows, on the scored rows it holds): "
+        f"{climatology['qs'].mean():.3f} over {climatology.height:,} rows"
+    )
     decision, start, exploratory = contrast_rows(losses=losses)
     print_section(title=f"Verdict family ({VERDICT_LEVEL:.2f}%)", table=decision)
     print_section(title=f"Starting-point family ({START_LEVEL:.2f}%)", table=start)

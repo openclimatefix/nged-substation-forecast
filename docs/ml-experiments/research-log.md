@@ -30,6 +30,7 @@ the maintainer to confirm.
 | [00049 - Screening reference under monthly retraining](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Serve an average of the quantiles of five XGBoost models for Primary demand (weekly refits, monthly refits, the weekly-analogue model, the pooled model, the stack) | Lowers the quantile score by 0.08 points (-0.14 to -0.02) against the weekly-retrained N1 on one validation year; needs five models; the spread factor and the fingerprints do not change the score |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction | Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again |
 | [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Give the XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the calibrated ENS sunshine anomaly, with a weight fitted per series, lead band, and season, and zero beyond 10 days) | Lowers the quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess; the live service cannot yet supply the inputs, the capacity held is stale, and the weights rest on one summer |
+| [00078 - Current capacity and a zero start, PVDIS-5 check 2](00078-pvdis-5-current-capacity-vintages/result.md) | Refresh the capacity table that feeds the base margin once per season-year, and test a base margin of zero (XGBoost's start at zero) in the production XGBoost recipe | Re-estimating the capacity lowers the score by 0.018 points (-0.036 to -0.004); a zero start lowers `d0` by 0.071 (-0.099 to -0.047) in this experiment, and has not been tested on other series types |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
 | [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Use a per-Primary blend of east, south, and west shapes as the solar shape of the explicit solar term, if PVDIS-5 confirms it | Lowers held-out error by 1.3% in a fit with known weather; the shares are not identified and no forecast has used the blend yet |
 
@@ -108,6 +109,7 @@ the maintainer to confirm.
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
 | [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Candidate | 2026-10-17 |
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
+| [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047) | Candidate | 2026-10-18 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -403,6 +405,10 @@ correction (row set `fold_a_every5d_v1`, 16 Primary substations).
   0.256 against `d1l`, where the fixed-coefficient shift of 00046 lowered `d1l` by 0.056, and
   subtracting the forecast solar from a model trained on gross demand was not shown to match the
   best guess (00064).
+- **Start an XGBoost quantile model from a base margin of zero, not from its estimated base score.**
+  A zero start lowered `d0` by 0.071 points (-0.099 to -0.047) and `d1l` by about 0.10 at 10 days
+  and beyond, in one pipeline, and a capacity table refreshed once a season-year captured almost all
+  of the gain from a current capacity (00078).
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -1491,6 +1497,27 @@ is `supported`.
 - **Write-up:** [the full result page](00076-pvdis-5-leak-check-beyond-10-days/result.md).
 
 ![Contrasts at 10 days and beyond](00076-pvdis-5-leak-check-beyond-10-days/figure_1_contrasts.svg)
+
+### 00078: does a re-estimated solar capacity lower the error of experiment 64's best forecast? (PVDIS-5 check 2)
+
+**Re-estimating the solar capacity before each forecast run lowers the error of experiment 64's
+best forecast by only 0.018 points of capacity, so a capacity table refreshed once a season-year is
+enough; a larger finding is that XGBoost's estimated starting prediction costs 0.07 to 0.10 points
+against a start at zero.** We re-estimated each Primary's solar capacity before every forecast run
+from only the data available then, and predicted again with experiment 64's fitted models. The
+quantile score fell by 0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold,
+and the gain sits in April and May 2026, when the estimates were 13% to 31% above the held capacity.
+A weekly vintage adds -0.005 (-0.013 to +0.003) on top. A refit of `d1l` and `d0` in this pipeline
+scores the same as the stored models, and a start from a base margin of zero scores 0.071 points
+(-0.099 to -0.047) below `d0`. The solar term still beats the zero-start `d0` by 0.100 (-0.142 to
+-0.061). The verdict is `small gain`.
+
+- **Finding for later experiments:** score each XGBoost reference with a zero-start twin, and test a
+  zero base margin in the production recipe, because the effect is larger than the capacity effect
+  and costs nothing in production.
+- **Write-up:** [the full result page](00078-pvdis-5-current-capacity-vintages/result.md).
+
+![Contrasts and starting-point reads](00078-pvdis-5-current-capacity-vintages/figure_1_contrasts.svg)
 
 ### 00073: can the mix of solar panel orientations and the DC to AC ratio be read from a Primary's power? (PVDIS-6)
 

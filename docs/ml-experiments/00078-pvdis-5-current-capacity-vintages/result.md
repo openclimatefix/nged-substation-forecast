@@ -1,7 +1,7 @@
 ---
 id: "00078"
 slug: pvdis-5-current-capacity-vintages
-status: planned
+status: done
 size: medium
 hypothesis: >-
   Experiment 00064's arm `am` (the XGBoost model given a forecast solar output as a base margin)
@@ -71,114 +71,255 @@ metric: >-
   CRPS) in points of capacity (1 point is 1% of the series' effective capacity), after the 14-day
   correction and the 1.15 spread factor unless a read says otherwise, on experiment 00064's rows.
 code: ml-experiments/00078-pvdis-5-current-capacity-vintages/
+verdict: small gain
+best_arm: >-
+  `am_sy` (experiment 64's `am` with a season-year capacity re-estimated before each run): quantile
+  score 4.449 points of capacity, 0.018 points (98.75% interval -0.036 to -0.004) below `am` and
+  0.171 points (95% interval -0.213 to -0.130) below `d0`.
+headline: >-
+  Re-estimating the solar capacity before each forecast run lowered the error of experiment 64's
+  best forecast by only 0.018 points of capacity (98.75% interval -0.036 to -0.004), under the 0.05
+  threshold, and by 0.033 (-0.086 to +0.012) at leads under 48 hours. Starting `d0` from a base
+  margin of zero, instead of XGBoost's estimated base score, lowered its error by 0.071 points
+  (-0.099 to -0.047), and `am_sy` still beat that zero-start `d0` by 0.100 (-0.142 to -0.061).
+lessons: >-
+  A held capacity 11% to 23% below the May 2026 estimates costs `am` about 0.02 points, so a
+  capacity table
+  refreshed once a season-year captures almost all of the benefit, and a weekly refresh adds 0.005
+  (-0.013 to +0.003) on top. The solar term itself is robust to the capacity (`am_sy` against `am0`
+  is -0.190, -0.267 to -0.118). The larger finding is the starting point: XGBoost's estimated base
+  score costs the models 0.07 to 0.10 points against a start at zero, in the same pipeline, so part
+  of experiment 64's gain over `d0` was a start-at-zero effect that `d0` can have too.
+production_status: candidate
+adopted_in: none
+advice:
+  - >-
+    Refresh the capacity table once per season-year, not weekly, for `am`, because the season-year
+    vintage gains 0.018 points (-0.036 to -0.004) on a held capacity 11% to 23% below the May 2026
+    estimates, and
+    the weekly vintage adds -0.005 (-0.013 to +0.003) on top of that (C1, sensitivity reads).
+  - >-
+    Score every XGBoost reference with a start-at-zero twin (a base margin of zero), because
+    `d0_m0` scores 0.071 points (-0.099 to -0.047) below `d0` and the starting point is larger than
+    the capacity effect (starting point section).
+  - >-
+    Test a zero base margin as a change to the production XGBoost recipe, because it costs nothing
+    in production and `d1l_r` scores 0.086 points (0.047 to 0.124) above `am0` at 10 days and
+    beyond after the 14-day correction (starting point section).
+  - >-
+    Quote the gain of a solar term against a zero-start reference without the term, not only
+    against `d0`, because `am_sy` is 0.171 points below `d0` but 0.100 (-0.142 to -0.061) below
+    `d0_m0` (post hoc reads).
+  - >-
+    Expect a solar term fitted with a stale capacity to understate the gain in the months where the
+    capacity grew, because the gain of `am_sy` over `am` is -0.058 points (-0.100 to -0.028) in May
+    2026 and about zero in July to September 2025 (valid-month read).
 ---
 
 # Experiment 78: does a re-estimated solar capacity lower the error? (PVDIS-5, check 2)
 
-**Plan status: committed before any code runs.** The write-up replaces this page when the experiment
-finishes.
+**Take-home message: re-estimating the solar capacity before each forecast run lowers the error of
+experiment 64's best forecast by only 0.018 points of capacity, so a capacity table refreshed
+about once a season-year is enough.** A bigger finding sits beside it. XGBoost's default starting
+prediction (its estimated base score) costs the forecast 0.07 to 0.10 points compared with a start
+at zero, so part of the gain that experiment 64 reported over its reference `d0` was a start-at-zero
+effect. The solar term still lowers the error after both corrections: it beats a zero-start `d0` by
+0.100 points. The search narrows to the starting point of the XGBoost model, which costs nothing to
+change in production.
 
-## Question
+We asked whether a better estimate of how much solar capacity sits behind each Primary substation
+improves a forecast of the substation's power. Experiment 64 forecast power with an XGBoost model
+that starts from a solar term: the substation's solar capacity times a forecast of how sunny the day
+will be. That experiment fixed the capacity at the value estimated from data before July 2025. Here
+we re-estimated the capacity before every forecast run from only the data available then, and
+predicted again with the same fitted models. The error fell by 0.018 points, where 1 point is 1% of
+a substation's
+capacity. We also refitted two reference models, to find out whether the start-at-zero effect that
+experiment 76 suspected is real. It is.
 
-Experiment 64 gave an XGBoost model a starting prediction (a base margin) equal to a weight times
-the substation's embedded-solar capacity times a forecast of how sunny the day will be, and called
-this arm `am`. The capacity was one number per Primary substation, fitted on data up to 2025-06-30
-and held for validation days from July 2025 to June 2026. That number is 5% to 19% below experiment
-45's 2025/26 constants. This experiment replaces it with a capacity that is re-estimated before
-each forecast run, and asks whether the score falls further. The experiment also refits the
-reference model
-`d1l` in the same pipeline, which experiment 76 left open, and tests whether giving XGBoost a base
-margin of zero, instead of its estimated base score, changes the error of `d0` as well.
+**The verdict is `small gain`.** The pre-registered rule is in the front matter and was committed
+before any code ran. The headline contrast C1 is the quantile score of `am_sy` (the season-year
+vintage) minus that of `am` (experiment 64's held capacity), over all leads. The quantile score is
+an error measure in which lower is better. The upper end of C1 is -0.004, below zero but not below
+the threshold of -0.05, and C3 and C4 (below) confirm that the solar term carries solar
+information.
 
-## Arms
+| Contrast | Difference in quantile score | 98.75% interval |
+|---|---|---|
+| C1: `am_sy` minus `am`, all leads | -0.018 | -0.036 to -0.004 |
+| C2: `am_sy` minus `am`, leads under 48 hours | -0.033 | -0.086 to +0.012 |
+| C3: `am_sy` minus `am0`, all leads (the solar term) | -0.190 | -0.267 to -0.118 |
+| C4: `am_sy` minus `am_sy_twin`, all leads (a wrong-date sunshine forecast) | -0.357 | -0.496 to -0.227 |
 
-- **`am`, `am_twin`, `d0`, `d1l`, `climatology`:** experiment 64's stored predictions.
-- **`am0`:** experiment 76's stored predictions, fitted by a copy of the same code with the same
-  seeds: the `am` recipe with a margin of zero in every row,
-  so that it starts from zero like `am` and carries no solar term.
-- **`am_sy`:** experiment 64's fitted `am` models, predicted with a margin whose capacity is the
-  season-year vintage below. No model is refitted. The weight on the solar term, the training rows,
-  and the capacity used in the training margin are experiment 64's.
-- **`am_sy_twin`:** the same for experiment 64's `am_twin` models and placebo anomaly.
-- **`am_wk`:** like `am_sy`, with the weekly vintage below (a sensitivity).
-- **`d1l_r`:** `d1l` refitted here: experiment 64's recipe and 15 columns, no base margin, so
-  XGBoost estimates its own base score.
-- **`d0_r`:** `d0` (the 15 `d1l` columns plus `shortwave` and `longwave`) refitted here, no base
-  margin.
-- **`d0_m0`:** `d0_r` with a base margin of zero in every row and at prediction.
+The values are in points of capacity and come from 50,000 resamples of whole ISO weeks of forecast
+start (29 weeks) and of 3 seeds, on experiment 64's 68,903 scored rows per seed: daylight
+half-hours of April to September at the five Primary substations D9, D10, D11, D14, and D16, in July
+to September 2025 and April to June 2026. `am0` is the XGBoost model with a base margin of zero and
+no solar term (experiment 76). C2 does not meet the rule for a gain at short leads, because its
+interval includes zero.
 
-For `d1l_r` and `d0_r` the script prints XGBoost's estimated base score for each of the nine
-quantile levels, per series and seed, and the fixed 500 rounds (the recipe has no early stopping, so
-no interaction with early stopping exists in this pipeline).
+![The planned contrasts and the reads on the starting point](figure_1_contrasts.svg)
 
-## The capacity vintages
+## The arms
 
-**Season-year vintage (`am_sy`).** For each validation forecast run, the script refits experiment
-45's season-year constant on the usable half-hours of the weeks before the Monday of the run's week
-minus one week (a one-week gap for the CAMS-based solar shape and the power data to arrive). The
-fit is experiment 45's: one capacity per September-to-August season-year, non-negative least
-squares, with the demand cells and heating degree-days projected out, divided by experiment 45's
-stored recovery ratio of the series (a property of the injection test, computed from the full record
-and not truncated at the origin, so each vintage carries a small look-ahead that `am`, `am_sy`, and
-`am_wk` share). The run's capacity is chosen in this order:
+- **`am`, `am_twin`, `d0`, `d1l`:** experiment 64's stored forecasts. `am` has a base margin of the
+  weight times the held capacity times the forecast sunshine anomaly. `d0` is the best-guess recipe,
+  and `d1l` is `d0` without the two radiation inputs.
+- **`am0`:** experiment 76's stored forecasts: `am`'s recipe with a margin of zero in every row.
+- **`am_sy`, `am_sy_twin`, `am_wk`:** experiment 64's fitted `am` and `am_twin` models, predicted
+  with the capacity of the season-year vintage (`am_sy`, `am_sy_twin`) or the weekly vintage
+  (`am_wk`). Nothing is refitted, so the weights and the capacity in the training margin stay
+  experiment 64's.
+- **`d1l_r`, `d0_r`, `d0_m0`:** `d1l` and `d0` refitted here with experiment 64's recipe and seeds,
+  and `d0` refitted with a zero base margin.
 
-1. the vintage's constant for the run's season-year, if that season-year has at least 8 observed
-   weeks (weeks with 3 or more usable days) before the origin;
-2. otherwise the vintage's constant for the previous season-year, if it has at least 8 observed
-   weeks;
-3. otherwise experiment 64's held capacity (for D14, experiment 40's 2023/24 constant, because D14's
-   weeks from 2023-09-04 to 2025-08-25 are unobserved and its fitted constant there is about 0 MW).
+**The season-year vintage re-fits experiment 45's season-year constant before each forecast run.**
+The fit uses the usable half-hours of the weeks up to two weeks before the Monday of the run's week,
+and divides by experiment 45's recovery ratio. The run takes the vintage's constant for its
+season-year (September to August) once that season-year has 8 observed weeks, and otherwise the
+previous season-year's constant. Where neither exists, it takes experiment 64's held capacity. Step
+1 supplied 84% of runs at D9, D10, and D16, 47% at D11, and 29% at D14. D14's weeks from 2023-09-04
+to 2025-08-25 are unobserved, so it keeps its held capacity for the other 71% of runs. **The weekly
+vintage** averages the 4 latest observed weeks of experiment 45's `frozen` weekly fit, from the
+vintage with the latest origin up to a week before the run.
 
-**Weekly vintage (`am_wk`).** The run's capacity is the mean, over the 4 latest weeks that are not
-`unobserved`, of experiment 45's `frozen` weekly fit in the vintage with the latest `origin_monday`
-that is on or before the Monday of the run's week minus 7 days. Weeks more than 8 weeks before
-that Monday are left out, so that a series with a gap in its record does not return stale weeks.
-Experiment 45 stored the weekly
-vintages every 4 weeks. When no such weeks exist, the choice of step 3 above applies.
+## The estimated capacity rose 13% to 31% above the held value by May 2026
 
-The script prints both vintages per series and run before any arm is scored, with the share of runs
-that each step of the fallback chain supplied. The training margin of every fitted model keeps
-experiment 64's training capacity, so the contrast measures the effect of the capacity at
-prediction only.
+![Capacity of each series in each vintage](figure_2_vintages.svg)
 
-## Contrasts
+**The vintages sit near the held capacity until March 2026 and 13% to 31% above it in May 2026.**
+The season-year vintage in June 2026 is 3.0 MW at D9 (held 2.751), 2.9 at D10
+(2.356), 4.3 at D11 (3.457), 4.8 at D14 (3.705), and 4.6 at D16 (3.578), against experiment 45's
+final 2025/26 constants of 2.9, 2.9, 4.1, 4.2, and 4.4. The weekly vintage is higher and noisier.
+The season-year vintage at D9 falls below the held capacity (2.37 MW against 2.75) in November 2025,
+when the new season-year's own constant takes over. Experiment 45 found that the latest weeks of a
+real-time fit are the least accurate.
 
-| Id | Contrast | Scope | Level |
+## The gain is small and sits in April and May 2026
+
+![The gain by lead band and by valid month](figure_3_by_lead_and_month.svg)
+
+**The error falls at every lead under 10 days, and by 10 days and beyond the effect is almost
+zero.**
+The point estimates of `am_sy` minus `am` are -0.039 (-0.097 to +0.014) at 0 to 24 hours, -0.027
+(-0.061 to +0.003) at 1 to 2 days, -0.029 (-0.053 to -0.009) at 2 to 6 days, -0.013 (-0.032 to
++0.003) at 6 to 10 days, and -0.006 (-0.012 to -0.001) at 10 days and beyond. By valid month, the
+read is about zero from July to September 2025 (the vintage is within 4% of the held capacity
+there), -0.035 (-0.097 to +0.002) in April 2026, -0.058 (-0.100 to -0.028) in May, and -0.008
+(-0.021 to +0.015) in June. At D16 the read is -0.045 (-0.073 to -0.020), at D14 -0.022 (-0.044 to
+-0.002), at D10 -0.018 (-0.034 to -0.003), at D11 -0.012 (-0.032 to +0.005), and at D9 +0.006
+(-0.003 to +0.018). These reads are exploratory, at 95%.
+
+**The weekly vintage does no better than the season-year vintage.** `am_wk` minus `am_sy` is -0.005
+(-0.013 to +0.003), and `am_wk` minus `am` is -0.023 (-0.042 to -0.007) over all leads and -0.054
+(-0.116 to +0.004) under 48 hours. A weekly refresh would add about 0.005 points on top of a
+season-year refresh. Restricted to runs where step 1 supplied the capacity, `am_sy` minus `am` is
+-0.022 (-0.037 to -0.008), so the fallback to the held value dilutes the effect slightly.
+
+## Absolute scores
+
+Mean quantile score in points of capacity, after the 14-day correction and the 1.15 spread factor.
+
+| Arm | All leads | Under 48 hours | 10 days and beyond |
 |---|---|---|---|
-| C1 | `am_sy` minus `am` | all leads | 98.75% |
-| C2 | `am_sy` minus `am` | leads under 48 hours | 98.75% |
-| C3 | `am_sy` minus `am0` | all leads | 98.75% |
-| C4 | `am_sy` minus `am_sy_twin` | all leads | 98.75% |
-| D1 | `d1l_r` minus `am0` | 10 days and beyond, no 14-day correction | 98.33% |
-| D2 | `d0_r` minus `d0_m0` | 10 days and beyond, no 14-day correction | 98.33% |
-| D3 | `d1l_r` minus `am0` | all leads | 98.33% |
+| `am_wk` | 4.444 | 3.717 | 4.896 |
+| `am_sy` | 4.449 | 3.739 | 4.898 |
+| `am` | 4.467 | 3.772 | 4.904 |
+| `d0_m0` | 4.550 | 3.966 | 4.916 |
+| `d0` | 4.620 | 4.044 | 4.986 |
+| `d0_r` | 4.620 | 4.044 | 4.987 |
+| `am0` | 4.640 | 4.237 | 4.939 |
+| `d1l_r` | 4.723 | 4.342 | 5.025 |
+| `d1l` | 4.724 | 4.343 | 5.025 |
+| `am_twin` | 4.767 | 4.478 | 4.975 |
+| `am_sy_twin` | 4.807 | 4.570 | 4.982 |
 
-Intervals come from 50,000 resamples of whole ISO weeks of forecast start and of the 3 seeds
-(`studies.bootstrap.bootstrap_difference_at_level`), on the scored rows of experiment 64 (68,903 per
-seed). The climatology has no seed and is shown as a reference row.
+The climatology scores 5.272 on the 68,863 rows it holds (a month-by-half-hour mean, experiment 64).
+The wrong-date twin gets worse when the capacity grows: `am_sy_twin` minus `am_twin` is +0.040
+(+0.022 to +0.058), as expected for a solar term that carries no timing information.
 
-## Sizing
+## XGBoost's starting point costs 0.07 to 0.10 points
 
-- **What gets stored:** private prediction sets and a private capacity-vintage table under `data/`;
-  nothing in production.
-- **Serving path:** untouched.
-- **Degradation rule:** untouched. The fallback chain above is an experiment rule, not a production
-  rule.
-- **Defensible designs:** more than one (when the vintage may use data, how a young season-year is
-  treated, and whether training margins also follow the vintage). The rules above fix one, and the
-  limits section of the write-up will name the others.
-- **Callers:** none; the scripts copy experiment 64's and 76's.
+**A refit of `d1l` in this pipeline scores the same as experiment 46's stored `d1l`, so the gap
+that experiment 76 saw is not a difference between pipelines.** `d1l_r` minus `d1l` is -0.0004
+(-0.0020 to +0.0013), and `d0_r` minus `d0` is +0.0004 (-0.0018 to +0.0025).
 
-So the size is medium: a Sonnet plan review, a Sonnet code review, and a Sonnet review of the
-write-up and its prose.
+| Contrast | Difference | 98.33% interval |
+|---|---|---|
+| D1: `d1l_r` minus `am0`, 10 days and beyond, no 14-day correction | +0.102 | +0.035 to +0.169 |
+| D2: `d0_r` minus `d0_m0`, 10 days and beyond, no 14-day correction | +0.089 | +0.028 to +0.153 |
+| D3: `d1l_r` minus `am0`, all leads | +0.084 | +0.053 to +0.121 |
 
-## Earlier advice followed and departed from
+The pre-registered rule reads D1 as a real starting-point effect: its lower end is above zero and
+its point estimate is above 0.05. The same holds for `d0`. Over all leads, `d0_m0` minus `d0_r` is
+-0.071 (-0.099 to -0.047, exploratory), and under 48 hours -0.078 (-0.118 to -0.036).
 
-- **Followed:** read the gain of the solar offset against `am0` as well as `d0` (experiment 76);
-  score
-  without the 14-day correction when comparing arms at long leads (experiment 76); refit with a
-  capacity table that is current for the validation year (experiment 64).
-- **Departed from:** experiment 64 advised refitting `am`. This plan changes only the capacity at
-  prediction and keeps the fitted models, because a base margin enters the trees only as an
-  offset, and a refit with a vintage margin in the training rows is a larger design that this
-  experiment does not test.
+**XGBoost estimates one base score per quantile level, and the score rises with the level.** For
+`d0_r` at D9 it runs from 0.403 at the 0.05 level to 0.899 at the 0.95 level (power over capacity),
+and it is identical across seeds and for `d1l_r`. The recipe
+trains a fixed 500 rounds at a learning rate of 0.05, with no early stopping, so no interaction
+with early stopping exists. The reason a start at zero scores better is not tested here.
+
+**The solar term survives the correction for the starting point.** `am_sy` is 0.100 points (-0.142
+to -0.061) below `d0_m0` over all leads and 0.227 (-0.361 to -0.103) under 48 hours (post hoc,
+exploratory), against 0.171 and 0.305 below `d0`. Experiment 64's gain of `am` over `d0`, 0.152,
+is 0.082 (-0.113 to -0.052) over `d0_m0`.
+
+## Which predictions held
+
+| Prediction made in the plan | Result |
+|---|---|
+| C1 at -0.02 (-0.04 to 0.00) | Held: -0.018 (-0.036 to -0.004) |
+| C2 at -0.04 (-0.09 to 0.00) | Held in size: -0.033 (-0.086 to +0.012) |
+| `am_wk` the same as `am_sy` or 0.00 to 0.05 higher | Held for "the same": -0.005 (-0.013 to +0.003) |
+| `d1l_r` 0.00 to 0.10 above `am0` at 10 days and beyond, uncorrected | Held at the top of the range: +0.102 (+0.035 to +0.169) |
+| Verdict `small gain` or `inconclusive` | `small gain` |
+
+## Departures from the plan
+
+1. **The weekly vintage drops weeks older than 8 weeks before the run's Monday.** The code review
+   found that D14's weekly vintage would otherwise average weeks from 2023, from before the gap in
+   its record. The change was made before any arm was scored.
+2. **The first run of the statistics script grouped the bootstrap by month, not by week.** A column
+   name was wrong, so the intervals rested on 7 blocks. The corrected run uses 29 weeks. The
+   verdict changed from `refuted` to `small gain`, so every number on this page comes from the
+   corrected run.
+3. **Six exploratory reads were added after the results were seen**, and are labelled post hoc:
+   `d0_m0` against `d0_r` under 48 hours, `am_sy` and `am` against `d0_m0` (each over all leads and
+   under 48 hours), and `am0` against `d0_m0`. The reads against `d0_m0` carry the claim that the
+   solar term survives a zero start.
+
+## Limits
+
+- **The training margin keeps the held capacity.** The weights, and the capacity inside every
+  training row, are experiment 64's, so the contrast measures the capacity at prediction only. A
+  refit with a vintage capacity in the training rows is a larger design that this experiment does
+  not test.
+- **The recovery ratio is the full-record value.** Each vintage divides by one number per series,
+  from experiment 45's injection test on the full record, so the vintages carry a small look-ahead
+  that `am` and the vintage arms share.
+- **One validation year and 29 weeks of forecast start.** July to September 2025 and April to June
+  2026 are two seasons of one year, and the 2026 months hold the gain.
+- **D14 keeps its held capacity for 71% of runs.** The vintage for D14 matters only from March 2026.
+- **The reason a zero start helps is not tested.** The experiment shows the size, not the mechanism.
+
+## What the next experiment should answer
+
+**Does a zero base margin help every XGBoost model in the production recipe, and at which leads?**
+The effect is 0.07 to 0.10 points on the Primary demand models of this experiment, larger than the
+effect of the capacity, and it costs nothing in production. A test across the series and model
+types that the best guess `d0` covers (BSP and GSP demand, solar, and wind) would settle whether
+the base score belongs to the production recipe. If the capacity matters for a later model release,
+the evidence here supports refreshing the capacity table once a season-year.
+
+## Reproducing the figures
+
+```bash
+uv run python ml-experiments/00078-pvdis-5-current-capacity-vintages/e00078_capacity.py
+bash ml-experiments/00078-pvdis-5-current-capacity-vintages/e00078_run.sh
+uv run python ml-experiments/00078-pvdis-5-current-capacity-vintages/e00078_stats.py
+uv run python ml-experiments/00078-pvdis-5-current-capacity-vintages/e00078_charts.py
+npx svgo@4 --multipass --precision=1 --final-newline figure_*.svg
+```
+
+The code is in `ml-experiments/00078-pvdis-5-current-capacity-vintages/`.
