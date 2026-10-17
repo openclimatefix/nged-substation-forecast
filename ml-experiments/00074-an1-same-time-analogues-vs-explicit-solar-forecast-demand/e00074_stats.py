@@ -15,6 +15,7 @@ capacity (1 point is 1% of the series' effective capacity).
     uv run python ml-experiments/00074-*/e00074_stats.py
 """
 
+import argparse
 from typing import Final
 
 import e00074_common as common
@@ -102,13 +103,16 @@ def with_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def load_losses(*, context: pl.DataFrame, arms: tuple[str, ...], prefix: str = "") -> pl.DataFrame:
+def load_losses(
+    *, context: pl.DataFrame, arms: tuple[str, ...], prefix: str = "", seeds: tuple[int, ...] = (0,)
+) -> pl.DataFrame:
     """Return every named arm's per-row losses on the context rows, resampled by ISO week.
 
     Args:
         context: `context_table()`.
         arms: The arms to read.
         prefix: The file-name prefix (`ref_` for the context arms of experiment 64).
+        seeds: The seeds to keep (the context arms of experiment 64 hold seeds 0 to 2).
 
     Returns:
         The frame `experiment_store.losses_for_bootstrap` builds, with the context columns, `qs`,
@@ -117,9 +121,9 @@ def load_losses(*, context: pl.DataFrame, arms: tuple[str, ...], prefix: str = "
     """
     arm_losses = {
         arm: with_losses(
-            frame=pl.read_parquet(common.ARMS_DIR / f"{prefix}{arm}.parquet").join(
-                context, on=list(common.KEYS), how="inner", validate="m:1"
-            )
+            frame=pl.read_parquet(common.ARMS_DIR / f"{prefix}{arm}.parquet")
+            .filter(pl.col("seed").is_in(list(seeds)))
+            .join(context, on=list(common.KEYS), how="inner", validate="m:1")
         )
         for arm in arms
     }
@@ -349,6 +353,29 @@ def coverage_table(*, losses: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def stored_reference_scores(*, context: pl.DataFrame) -> pl.DataFrame:
+    """Return the mean score of experiment 00033's `climatology` and `manual_heuristic`.
+
+    These arms lack 40 of the context rows, so they are scored on the rows they share with the
+    context, without an interval.
+    """
+    rows = []
+    for arm in ("climatology", "manual_heuristic"):
+        frame = with_losses(
+            frame=pl.read_parquet(common.ARMS_DIR / f"ref_{arm}.parquet").join(
+                context, on=list(common.KEYS), how="inner", validate="m:1"
+            )
+        )
+        rows.append(
+            {
+                "arm": arm,
+                "qs": float(np.mean(frame["qs"].to_numpy())),
+                "mae": float(np.mean(frame["mae"].to_numpy())),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def analogue_counts() -> pl.DataFrame:
     """Return the share of validation cases with 0, 1, 2, and 3 or more matched analogues."""
     frames = [
@@ -363,22 +390,32 @@ def analogue_counts() -> pl.DataFrame:
 
 def main() -> None:
     """Compute and print every read."""
-    common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--seeds", type=int, nargs="+", default=[0])
+    parser.add_argument("--tag", default="seed0", help="the folder under work/results/")
+    args = parser.parse_args()
+    seeds = tuple(args.seeds)
+    results_dir = common.RESULTS_DIR / args.tag
+    results_dir.mkdir(parents=True, exist_ok=True)
     day = context_table(night=False)
     night = context_table(night=True)
     print(f"daylight scored rows: {day.height:,}; night rows: {night.height:,}")
-    losses = load_losses(context=day, arms=(*PLANNED_ARMS, *CONTEXT_ARMS))
-    night_losses = load_losses(context=night, arms=("R0", "E", "A3", "A3S"))
+    losses = load_losses(context=day, arms=(*PLANNED_ARMS, *CONTEXT_ARMS), seeds=seeds)
+    night_losses = load_losses(context=night, arms=("R0", "E", "A3", "A3S"), seeds=seeds)
     absolute = absolute_scores(losses=losses)
     planned = planned_contrasts(losses=losses)
     verdict, reason = verdict_rule(planned=planned)
     exploratory = exploratory_contrasts(losses=losses, night_losses=night_losses)
     coverage = coverage_table(losses=losses)
     counts = analogue_counts()
-    refs = absolute_scores(
-        losses=load_losses(
-            context=day, arms=("d0", "d1l", "am", "climatology", "manual_heuristic"), prefix="ref_"
-        )
+    refs = pl.concat(
+        [
+            absolute_scores(
+                losses=load_losses(context=day, arms=("d0", "d1l", "am"), prefix="ref_")
+            ),
+            stored_reference_scores(context=day),
+        ],
+        how="diagonal",
     )
     for name, table in (
         ("absolute", absolute),
@@ -388,7 +425,7 @@ def main() -> None:
         ("analogue_counts", counts),
         ("reference_absolute", refs),
     ):
-        common.write_atomically(frame=table, target=common.RESULTS_DIR / f"{name}.parquet")
+        common.write_atomically(frame=table, target=results_dir / f"{name}.parquet")
     with pl.Config(tbl_rows=300, tbl_cols=20, tbl_width_chars=220):
         print("Absolute scores (points of capacity, 95% intervals)")
         print(absolute)

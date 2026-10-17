@@ -58,6 +58,16 @@ def check_coverage(*, raw: pl.DataFrame, expected_cases: int) -> None:
         raise ValueError(msg)
 
 
+def set_name(*, arm: str, seeds: list[int]) -> str:
+    """Return the prediction set's name: the arm, with `-s012` once seeds 1 and 2 are added.
+
+    A prediction set is immutable, so the set of seed 0 alone keeps the plain name and the set
+    of all seeds is stored beside it.
+    """
+    suffix = "" if seeds == [0] else "-s" + "".join(str(s) for s in seeds)
+    return arm.lower() + suffix
+
+
 def main() -> None:
     """Write every arm's scored form and prediction set, and the context arms."""
     common.ARMS_DIR.mkdir(parents=True, exist_ok=True)
@@ -71,7 +81,7 @@ def main() -> None:
         frame = common.spread_quantiles(frame=raw.filter(pl.col("arm") == name))
         experiment_store.write_predictions(
             experiment_id=common.EXPERIMENT_ID,
-            name=name,
+            name=set_name(arm=name, seeds=sorted(frame["seed"].unique())),
             frame=frame,
             kind="quantiles",
             row_set_id=common.ROW_SET_ID,
