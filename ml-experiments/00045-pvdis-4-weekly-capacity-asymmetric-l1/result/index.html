@@ -1,0 +1,8447 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../../00040-pv-capacity-error-bars/result/">
+      
+      
+        <link rel="next" href="../../00041-sw2-0a-labeller-gate/result/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Can a weekly capacity series that rises easily and falls reluctantly recover injected changes in solar capacity? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#experiment-45-pvdis-4-a-weekly-capacity-series-that-rises-easily-and-falls-reluctantly" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Can a weekly capacity series that rises easily and falls reluctantly recover injected changes in solar capacity?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/embedded-pv-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How much solar sits behind each Primary substation, and how far can the number be trusted?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_10" id="__nav_8_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_11" id="__nav_8_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/wind-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wind component storage measurement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/wind-interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How should we interpolate wind components?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ifs-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which IFS forecast variables, or which second forecast, help a solar power forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/lag-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a same-hour power lag improve a day-ahead solar forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/effective-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Is a daily capacity estimate worth building for day-ahead solar forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/quick-wins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which cheap changes lower the production XGBoost forecast's error?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/production-feature-faults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production feature faults: diagnosis and forecast effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/llm-capacity-labeller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a language model label a solar plant's capacity changes?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cross-validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cross-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cross-validation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cross-validation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the cross-validation pipeline end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cross-validation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experiments
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experiments
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research-plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00001-era5-trained-stage1a-vs-ens-trained/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does an ERA5-trained weather-to-power model beat the same model trained on ENS?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00002-stage2-calibrator-and-mixture-vs-ens-quantile/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a stage 2 calibrator beat the pooled stage 1a mixture?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00003-era5-trained-stage1a-vs-ens-trained-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does an ERA5-trained model beat the same model trained on ENS, for demand series?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00005-lag-placement-stage1b-vs-stage2-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Where should lagged power enter a two-stage demand forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00006-stage1a-demand-input-feature-sweep/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which inputs work best for the ERA5-trained demand model?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00007-cams-static-correction-stage1a-residual/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a static CAMS correction remove the stage 1a daytime residual?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00008-lag-summaries-in-stage2-calibrator-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do summaries of recent power help the stage 2 calibrator?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00009-cams-trained-stage1a-vs-era5-trained-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00010-elexon-price-lags-stage1a-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the lagged electricity price help the demand model at substations with batteries?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00016-pooled-mixture-calibration-solar-wind/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a correction bring the pooled mixture's 5% to 95% band to 90% coverage for solar and wind?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00012-solar-wind-stage1a-inputs-cams-and-training-start/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which inputs and which training start work best for the solar and wind stage 1a model?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00013-primary-demand-against-stored-baselines/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Where does Primary substation demand stand against the stored baselines?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00011-school-term-and-return-to-work-columns-stage1a-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do school-term and return-to-work columns lower the stage 1a demand error after Christmas, at Easter, and in school holidays?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained demand model?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00017-training-window-and-retraining-rule-drift-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do a recent training window, recency weights, monthly retraining, or a 14-day error correction lower the demand error?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00015-same-time-price-stage1-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the same-time electricity price help a stage 1 demand model explain power?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the staged chain beat the single-stage model for Primary substation demand?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00019-primary-demand-stack-vs-manual-heuristic/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does stacking small gains beat manual_heuristic for Primary substation demand?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00020-solar-wind-stack-cams-stage0-spread-margin/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do the candidate changes for solar and wind add up to a better pooled mixture?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00021-error-correction-variants-bsp-gsp-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the recent-error correction help BSP and GSP demand, and which variant works best?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00023-lagged-power-and-error-correction-solar-wind/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does recent observed power help solar and wind forecasts?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00024-pooling-groupings-demand-xgboost/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which groupings of substations can share one XGBoost model?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00026-capacity-features-solar-wind/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a recent effective-capacity feature lower the solar and wind forecast error?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00022-era5-weather-ceiling-primary-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How much would Primary substation demand gain from ERA5 weather in place of ENS weather?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00025-price-change-features-stage1-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the change in the intra-day price help a stage 1 demand model explain power?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00027-pvlive-lags-in-stage2-gsp-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does PV_Live at the lag times lower the stage 2 quantile score of GSP demand?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00030-lagged-power-feature-sets-primary-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which lagged power columns lower the error of Primary substation demand forecasts?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00035-lead-weighted-quantile-blend-of-stored-models/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a lead-weighted blend of quantiles beat the best single model?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00032-substation-fingerprints-pooled-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do substation fingerprints improve a pooled demand model?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00034-retraining-cadence-and-cheap-proxies-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How often should the demand model be retrained, and which cheap proxy stands in for it?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00049-vp1-screening-reference-under-p-roll-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which Primary demand components still improve the score under monthly retraining?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00050-second-weather-forecast-for-solar-anomaly/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a second weather forecast give a better forecast of the solar anomaly than ENS?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00036-hierarchy-aware-bsp-gsp-forecasts/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do forecasts of the series beneath a BSP or GSP lower its error?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00033-best-guess-architecture-vs-production/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the best-guess architecture beat production, N1, and manual_heuristic?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00037-switching-first-look/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do logged switching closures show up in the telemetry, and does a neighbour-balance detector beat a plain one?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00038-switching-mask-value/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Is detecting a switching event worth anything to the forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00039-pv-disaggregation-cams-injection/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a CAMS-driven fit separate embedded solar from Primary substation demand?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00040-pv-capacity-error-bars/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How far can the capacity fitted to embedded solar be trusted?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a weekly capacity series that rises easily and falls reluctantly recover injected changes in solar capacity?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--finished"></span>
+  
+
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a weekly capacity series that rises easily and falls reluctantly recover injected changes in solar capacity?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--finished"></span>
+  
+
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#terms-used-on-this-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terms used on this page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-was-fitted-and-the-two-tuning-attempts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was fitted, and the two tuning attempts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scores-on-held-out-injections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scores on held-out injections
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-the-real-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On the real series
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-that-remain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits that remain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-question-and-why-it-is-worth-asking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The question and why it is worth asking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#size-answered-against-the-five-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Size, answered against the five triggers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#earlier-advice-followed-and-departed-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earlier advice, followed and departed from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hypothesis-and-the-five-design-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hypothesis and the five design choices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-weeks-and-masks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data, weeks, and masks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-answer-injection-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known-answer injection design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-series-three-uncertainty-terms-and-the-gap-diagnostic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real series, three uncertainty terms, and the gap diagnostic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outside-checks-and-tolerances-stated-before-any-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outside checks and tolerances, stated before any comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-sw2-10-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What SW2-10 reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cores-time-and-parallel-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cores, time, and parallel work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#work-list-split-into-units-a-sonnet-agent-can-implement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Work list, split into units a Sonnet agent can implement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#figures-raw-data-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Figures, raw data first
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-next-experiment-should-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the next experiment should answer
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00041-sw2-0a-labeller-gate/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a labeller pass a known-answer gate on switching events?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00041-sw2-0a-labeller-gate/labelled-set/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which logged switching jobs show up in the power readings?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00046-embedded-solar-share-of-primary-forecast-error/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How much of the best guess's daylight error is embedded solar?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00051-pvdis-3b-midday-loss-of-the-solar-term/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why does the solar term lose at sunny summer middays?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can the mix of solar panel orientations and the DC to AC ratio be recovered?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--finished"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00077-pvdis-6b-fitted-solar-shape-in-arm-am/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a fitted east-south-west solar shape lower the error of the solar-term forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--finished"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00053-ukv-vs-ens-solar-anomaly/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the UKV forecast the solar anomaly better than ENS?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00043-sw2-1-detector-scoreboard/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well do the two existing switching detectors find transfers?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00056-mva-only-primaries-skill-against-mw-primaries/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does Flexpectation v1 need special handling at MVA-only Primaries?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00044-sw2-2-switching-share-of-best-guess-score/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How much do labelled switching events hurt the best guess?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00052-more-nwp-products-for-wind-farms/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do more weather forecasts lower the wind farms' error at 1 to 2 days ahead?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00054-product-trained-xgboost-wind-farms/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does UKV, learned from its own history, help the wind-farm forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00057-product-trained-xgboost-solar-farms/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does UKV, learned from its own history, help the solar-farm forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00047-sw2-4-better-residual-switching-detector/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a bank-holiday column in the demand model help the switching detector find transfers?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00055-sw2-8-neighbour-veto-single-series-detector/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a neighbour veto help the single-series switching detector?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00058-sw2-8b-donor-step-recut-and-stronger-veto/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Is the recall gap without a metered receiver a step-size effect, and does a stronger veto help?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00059-sw2-13-several-windows-in-one-detector/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does one detector over several windows find more transfers than the best single window?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00060-sw2-7-profile-weighted-step-detector/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a step that weights each half-hour by the daily profile find more of the moved load?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does demand minus a forecast of solar output match the best guess while explaining the forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00076-pvdis-5-leak-check-beyond-10-days/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does experiment 64's gain beyond 10 days come from a leak?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00078-pvdis-5-current-capacity-vintages/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a re-estimated solar capacity lower the error of experiment 64's best forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00079-pvdis-7-mw-at-mva-only-primaries/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can the direction of flow be recovered at Primaries metered only in MVA?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00083-curtailment-cost-and-tail-calibration-worked-example/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Are the tails of the stored demand forecasts too narrow?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00084-substation-limit-curtailment-cost-worked-example/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can the substation-limit curtailment metric rank forecasts on the pilot?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00063-sw2-10-linear-joint-fit-v2-in-miniature/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--finished"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00061-sw2-6-paired-step-intervals/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does pairing an onset step with its return step find more of the moved load than the single-step detector?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00062-sw2-9-whitened-residual-step-detector/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does removing the residual's half-hour-to-half-hour memory help the switching detector?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00065-sw2-14-combined-single-series-and-neighbour-score/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does one score from a substation's own step and its neighbours' opposite steps find more of the moved load?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00066-sw2-16-end-rule-as-baseline/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which window and cap should the end rule of the switching detector use?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00069-sw2-17-missed-onsets-of-the-end-rule/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why do real load transfers raise no alarm at their start, and does a weak step confirmed by a step back recover them?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00071-sw2-18-refit-offset-and-gap-bridging/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do the mechanical misses of the end rule come from monthly refits and data gaps?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00070-sw2-19-same-sign-neighbour-count/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does the count of neighbours that step the same way find more of the moved load?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do the refit offset and the same-sign neighbour count add up in one switching detector?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00072-p35-step-loss-monitor-for-solar-farms/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a step-loss monitor find a lost inverter at the solar farms?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--finished"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00068-sw2-5-train-detect-retrain-loop/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does refitting the lagless XGBoost model without the detected switching help the detector and the forecast?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00048-weekly-retraining-confirmation-and-extension-demand-generators/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does weekly retraining still win on the 292 daily runs experiment 34 left out?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00067-sw2-15-joint-edge-flow-estimator/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does one convex fit of load flows across all boundaries find more of the moved load?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00029-physics-stage1-solar-pytorch/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00031-embedded-pv-features-primary-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do embedded-solar capacity features lower the error of Primary demand forecasts?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00028-pvlive-forecast-in-stage2-gsp-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do same-time sunshine analogues add anything once the solar forecast is explicit?
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--done"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/model-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/staged-probabilistic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Staged probabilistic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#terms-used-on-this-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Terms used on this page
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-was-fitted-and-the-two-tuning-attempts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was fitted, and the two tuning attempts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scores-on-held-out-injections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scores on held-out injections
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-the-real-series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On the real series
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limits-that-remain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limits that remain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-question-and-why-it-is-worth-asking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The question and why it is worth asking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#size-answered-against-the-five-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Size, answered against the five triggers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#earlier-advice-followed-and-departed-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earlier advice, followed and departed from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hypothesis-and-the-five-design-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hypothesis and the five design choices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-weeks-and-masks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data, weeks, and masks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-answer-injection-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known-answer injection design
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#real-series-three-uncertainty-terms-and-the-gap-diagnostic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real series, three uncertainty terms, and the gap diagnostic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outside-checks-and-tolerances-stated-before-any-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outside checks and tolerances, stated before any comparison
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-sw2-10-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What SW2-10 reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cores-time-and-parallel-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cores, time, and parallel work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#work-list-split-into-units-a-sonnet-agent-can-implement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Work list, split into units a Sonnet agent can implement
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#figures-raw-data-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Figures, raw data first
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-next-experiment-should-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the next experiment should answer
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="experiment-45-pvdis-4-a-weekly-capacity-series-that-rises-easily-and-falls-reluctantly">Experiment 45 (PVDIS-4): a weekly capacity series that rises easily and falls reluctantly</h1>
+<p><strong>Weekly changes in embedded solar capacity cannot yet be read from the Primary-substation data at
+the accuracy a weekly series needs. For SW2-10, use one capacity per season-year as the solar
+capacity input, and read it as a range.</strong> SW2-10 is the planned experiment in the switching work
+that fits a weather baseline, embedded solar capacity, and each labelled transfer of load in one
+linear fit. A season-year is one 12-month period, and the season-year constant is one capacity per
+season-year with no weekly freedom. The next approaches to try are a penalty set separately for each
+Primary substation, and step detection that fires only above about 25% to 30% of capacity.</p>
+<p><strong>The verdict is <code>refuted</code>, because no pair of penalty settings on the grid met the limits fixed in
+advance for tuning.</strong> We asked whether the amount of embedded solar behind each of 8 Primary
+substations (substations that feed 11 kV circuits from the 33 kV distribution network) can be
+tracked week by week. Embedded solar is solar connected inside the distribution network, mostly
+unmetered by NGED, and its capacity here means the 99th percentile of its half-hourly AC output, in
+MW. A weekly fit has two penalty settings: <code>a</code> sets the penalty on a weekly rise in capacity, and
+<code>r</code> is the factor by which a fall is penalised more than a rise. The limits were at most 0.5 false
+steps per Primary-year at the median Primary (a false step is a rise or fall of 10% of capacity
+found on a series whose true capacity is constant), at most 1.0 at the worst Primary, and at least
+0.5 of a 30% fall lasting 26 weeks recovered. The pair with the smallest shortfall (a=4 and r=30)
+was frozen, which means it was chosen on tuning units before the scoring run. It recovered 0.000 of
+the fall and gave a median of 0.66 false steps per Primary-year. A looser pair chosen after the
+scoring run (a=2 and r=10) recovered 0.576 of the fall and gave a median of 1.22 false steps.</p>
+<p><strong>The comparison with the season-year constant is not what decides the verdict, and the two
+baselines used to score it disagree.</strong> The path error is the mean absolute gap between the fitted
+and the true weekly capacity, as a share of the true mean capacity. On the semi-synthetic baseline,
+which is the worse of the two scorings for the frozen fit and so the one condition (i) uses, the
+median path error on ramps and steps was 0.027 for the season-year constant, 0.040 for the frozen
+weekly fit, and 0.159 for a weekly fit with no penalty. No weekly fit beat the constant there, but
+that baseline favours the constant by construction, because it is built by subtracting the
+season-year constant fit. On the real series plus injection, every weekly fit beat the constant on
+ramps and steps (0.012 to 0.017 against 0.020), and the free and symmetric fits also beat it on
+steps and falls. The comparison also points the same way as the verdict on the plan's main
+interval, which resamples the 8 Primaries only: the lower limit of C2 (the relative change in path
+error against the constant) is +0.029, above 0, so the clause "the asymmetric fit is worse than the
+yearly constant" fires as a second route to <code>refuted</code>. The two-way interval, which also resamples
+farm-seeds, is [-0.078, +0.773] and contains 0. The experiment's reason for <code>refuted</code> is the
+tuning-limit route.</p>
+<p><strong>The experiment could not tell whether a better-tuned penalty would see a real fall in capacity,
+such as a feeder reconfigured permanently, or whether a penalty set per Primary would work.</strong> The
+one pair that followed falls (a=2 and r=10) was chosen after the scores were seen, and a penalty set
+per Primary was not tested.</p>
+<p><strong>Four further findings limit what the series can be used for.</strong> The smallest step that the frozen
+pair detected in 80% of injections is above 25% of capacity at all 8 Primaries in both seasons: at 6
+Primaries no step of 30% or less reaches 80%, and at the other two 30% does from April to September
+only. The free weekly fit reaches 80% for 5% steps at 3 of the 8 Primaries from April to September,
+and for 10% steps at 5, but with a median of 11.6 false steps per Primary-year. The latest week of a
+real-time estimate had 3.63 times the path error of the same week in the final fit. The 90%
+intervals covered 0.62 of the weeks without a step and 0.35 of the weeks with a step. The three
+outside checks (national statistics, the Feed-in Tariff register, and the Embedded Capacity
+Register) each count only part of the installed solar, so they can neither confirm nor refute the
+series.</p>
+<p><strong>The plan's literal clause order gives <code>inconclusive</code>, and <code>refuted</code> applies instead.</strong> The first
+clause (the smallest detectable step exceeds 25% of capacity at 5 or more Primaries in every
+season) holds, but it was evaluated on a degenerate pair. With no feasible pair, the frozen
+configuration fell back to the pair nearest the limits (a=4, r=30), which scores the same as the
+strictly non-decreasing fit and detects 0.28 of steps from April to September and 0.23 from October
+to March. <code>refuted</code> applies for two reasons. The plan says that when no pair on the grid meets both
+tuning limits, the verdict is <code>refuted</code> for the asymmetric design and the limits are not relaxed.
+And the detection failure belongs to the penalty, not to the data: the free weekly fit detected
+0.85 of steps from April to September and 0.75 from October to March, with a median of 11.6 false
+steps per Primary-year.</p>
+<h2 id="terms-used-on-this-page">Terms used on this page</h2>
+<ul>
+<li><strong>Unit:</strong> one solar farm's recorded output, injected at one Primary substation with one path seed
+  in one case (a ramp, a step, a temporary fall, a transfer, a seasonal load, or a constant path).
+  Tuning units use Solar farms A to C and scoring units use Solar farms D to F.</li>
+<li><strong>Path error:</strong> the mean absolute gap between the fitted and the true weekly capacity, as a share
+  of the true mean capacity. A path error of 0.10 means the fitted capacity is on average 10% of the
+  true mean capacity away from the truth, which is 0.4 MW on a 4 MW series.</li>
+<li><strong>Primary-year:</strong> one Primary substation observed for one year. False steps are counted per
+  Primary-year.</li>
+<li><strong>Placebo sky:</strong> the solar shape shuffled between days of the same month, so the true capacity is
+  constant and any step the fit finds is false.</li>
+<li><strong>Semi-synthetic baseline:</strong> the real power minus the fitted season-year-constant solar
+  component, plus a known solar path, so the true capacity of every week is known.</li>
+<li><strong>Real series plus injection:</strong> the real power with the injected path added, scored by comparing
+  the fitted path with and without the injection.</li>
+<li><strong>Frozen pair:</strong> the pair <code>(a, r)</code> chosen on tuning units and written to a committed file before
+  the scoring run.</li>
+</ul>
+<h2 id="what-was-fitted-and-the-two-tuning-attempts">What was fitted, and the two tuning attempts</h2>
+<p><strong>Each weekly fit explains daylight power as a demand term minus one capacity per week times a solar
+shape from the Copernicus Atmosphere Monitoring Service (CAMS), and the penalised fits penalise each
+weekly change.</strong> The frozen pair is a=4 and r=30: <code>a</code> scales the penalty on a weekly rise in
+capacity (in units of one weekly standard error), and <code>r</code> is the factor by which a fall is
+penalised more than a rise. The comparison fits are a weekly capacity with no penalty (free
+weekly), a symmetric penalty (r=1), a strictly non-decreasing capacity (r=infinity), and the
+season-year constant. The penalty pair was chosen on tuning units (Solar farms A to C) and scored
+once on scoring units (Solar farms D to F, 1,320 of the 1,344 planned units, because Solar farm E's
+record is too short for 24 injections at Mount Bridge Boston).</p>
+<p><strong>The first tuning attempt was invalid and was redone, and the redone attempt is the one reported.</strong>
+The first attempt's semi-synthetic baseline subtracted the real series' fitted weekly capacity,
+which removed the weekly noise that is correlated with the solar shape, so the baseline was too
+clean. The second attempt subtracts the season-year constant fit, which keeps that noise, and
+scores the fit of baseline plus injection against the known path. The constant-path unit was also
+redefined after the first attempt's tuning results were seen. It first injected a constant capacity
+into a baseline that still held real growth within each year, so real rises counted as false steps.
+It now uses the placebo sky, so the true path is constant. The change was made on tuning units only,
+and the scoring units were never fitted before the pair was frozen. Neither attempt found a pair
+that met the limits, as the table shows.</p>
+<table>
+<thead>
+<tr>
+<th>a</th>
+<th>r</th>
+<th>Path error, mixture (second attempt)</th>
+<th>Constant-path false steps, median (second attempt)</th>
+<th>26-week fall recovered (second attempt)</th>
+<th>Largest excess over a limit (second attempt)</th>
+<th>Constant-path false steps, median (first attempt)</th>
+<th>Largest excess over a limit (first attempt)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.5</td>
+<td>10</td>
+<td>0.119</td>
+<td>4.800</td>
+<td>1.132</td>
+<td>7.182</td>
+<td>4.630</td>
+<td>7.239</td>
+</tr>
+<tr>
+<td>0.5</td>
+<td>30</td>
+<td>0.083</td>
+<td>1.696</td>
+<td>0.903</td>
+<td>4.149</td>
+<td>1.691</td>
+<td>3.806</td>
+</tr>
+<tr>
+<td>1</td>
+<td>10</td>
+<td>0.096</td>
+<td>2.500</td>
+<td>1.006</td>
+<td>5.751</td>
+<td>2.677</td>
+<td>5.866</td>
+</tr>
+<tr>
+<td>1</td>
+<td>30</td>
+<td>0.054</td>
+<td>0.841</td>
+<td>0.657</td>
+<td>1.975</td>
+<td>0.636</td>
+<td>1.975</td>
+</tr>
+<tr>
+<td>2</td>
+<td>10</td>
+<td>0.066</td>
+<td>1.043</td>
+<td>0.787</td>
+<td>2.719</td>
+<td>0.915</td>
+<td>2.662</td>
+</tr>
+<tr>
+<td>2</td>
+<td>30</td>
+<td>0.046</td>
+<td>0.511</td>
+<td>0.135</td>
+<td>1.517</td>
+<td>0.499</td>
+<td>1.377</td>
+</tr>
+<tr>
+<td>4</td>
+<td>10</td>
+<td>0.045</td>
+<td>0.620</td>
+<td>0.476</td>
+<td>1.117</td>
+<td>0.529</td>
+<td>1.141</td>
+</tr>
+<tr>
+<td>4</td>
+<td>30</td>
+<td>0.045</td>
+<td>0.382</td>
+<td>0.000</td>
+<td>0.888</td>
+<td>0.414</td>
+<td>1.141</td>
+</tr>
+</tbody>
+</table>
+<p><strong>No pair on the grid meets all three limits: pairs that follow a fall are too noisy, and pairs that
+stay quiet do not follow a fall.</strong> The limits are at most 0.5 false steps at the median Primary, at
+most 1.0 at the worst Primary, and at least 0.5 of a 26-week fall recovered. The excess column gives
+the largest amount by which a pair misses any limit, in the units of that limit. Pairs that follow a
+fall (the r=10 rows with <code>a</code> up to 2) are far too noisy. The a=4, r=30 pair stays quiet and does
+not follow a fall (0.000). The a=4, r=10 pair comes closest on the fall, recovering 0.476 of the
+26-week fall, but its false steps are 0.62 at the median Primary and 2.12 at the worst. The pair
+a=4, r=30 had the smallest excess in the second attempt, so the configuration was frozen there as a
+fallback, and it is the pair called "frozen" below. The pair a=2, r=10 was the pair chosen by an
+earlier tuning run on a baseline without weekly noise (commit 75005575). It was scored afterwards
+on the same scoring units, so every number for it is post hoc, and it is not part of the verdict.</p>
+<p><img alt="The tuning grid for both attempts" src="../figure_06.svg" /></p>
+<p><strong>Figure 6 shows that no cell of the grid is green in both rows of false steps and fall recovery.</strong>
+The frozen pair is marked F and the post hoc pair is marked P.</p>
+<h2 id="scores-on-held-out-injections">Scores on held-out injections</h2>
+<p><strong>On the semi-synthetic baseline, no weekly fit beat the season-year constant on ramps and steps,
+and the free weekly fit was the worst.</strong> The table gives each fit's absolute score on the scoring
+units. Scores are medians over farm-seeds and cases within a Primary, then medians over the 8
+Primaries. False steps are of 10% of capacity per Primary-year on the constant path, as median and
+worst Primary. Drift is the rise of the path over 5 years on a constant path, as a share of
+capacity. The fall column is the share of a 30% fall lasting 26 weeks that the path shows (0 means
+the path ignores the fall and 1 means the path follows the fall fully).</p>
+<table>
+<thead>
+<tr>
+<th>Fit</th>
+<th>Path error, ramps and steps (semi-synthetic)</th>
+<th>Path error, ramps and steps (real series plus injection)</th>
+<th>False steps, constant path (median, worst)</th>
+<th>Drift on constant path</th>
+<th>26-week fall recovered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Season-year constant</td>
+<td>0.027</td>
+<td>0.020</td>
+<td>0.17, 0.25</td>
+<td>-0.037</td>
+<td>-0.043</td>
+</tr>
+<tr>
+<td>Frozen asymmetric (a=4, r=30)</td>
+<td>0.040</td>
+<td>0.017</td>
+<td>0.66, 1.43</td>
+<td>+0.137</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Strictly non-decreasing</td>
+<td>0.040</td>
+<td>0.016</td>
+<td>0.66, 1.43</td>
+<td>+0.137</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>Symmetric (r=1)</td>
+<td>0.102</td>
+<td>0.012</td>
+<td>3.01, 6.29</td>
+<td>-0.026</td>
+<td>0.920</td>
+</tr>
+<tr>
+<td>Free weekly</td>
+<td>0.159</td>
+<td>0.014</td>
+<td>11.60, 12.27</td>
+<td>-0.019</td>
+<td>1.250</td>
+</tr>
+<tr>
+<td>Post hoc (a=2, r=10)</td>
+<td>0.064</td>
+<td>0.013</td>
+<td>1.22, 3.32</td>
+<td>+0.055</td>
+<td>0.576</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The real series plus injection reverses the ranking on ramps and steps, and the two baselines
+disagree.</strong> Every weekly fit scores 0.012 to 0.017 there, against 0.020 for the season-year
+constant. The free and symmetric fits also beat the constant on steps (0.009 and 0.010 against
+0.014) and on falls (0.007 each against 0.035), while the frozen fit is worse on falls (0.039
+against 0.035). The semi-synthetic baseline favours the constant by construction, because it
+subtracts the season-year constant fit and so removes that fit's own sampling error. The plan
+scores condition (i) on the worse of the two baselines, which for the frozen fit is the
+semi-synthetic baseline.</p>
+<p><strong>The frozen pair fails five of the six pre-registered conditions.</strong> Condition (i), a median path
+error of at most 0.15 on ramps and steps, passes at 0.040. A flat path that detects nothing scores
+0.097 there, so condition (i) is nearly trivial. Condition (ii) needs the upper limit of C2 below
+-0.20, and C2 is +0.400. On the plan's main interval, which resamples the 8 Primaries only, C2 has
+95% interval [+0.029, +0.634]. The two-way interval, which then resamples farm-seeds within each
+drawn Primary, is [-0.078, +0.773]. The post hoc pair's C2 is +1.193, with a Primaries-only interval
+of [+0.296, +1.708] and a two-way interval of [+0.272, +1.809]. Condition (iii), false steps, fails
+at a median of 0.66 and a worst of 1.43 on the constant path (the placebo sky gives 0.07 and 0.54).
+Condition (iv), the drift, is +0.137 on the constant path and +0.090 on the placebo sky against a
+limit of 0.05. Condition (v), the fall, recovers 0.000 of a 26-week fall and 0.000 of an 8-week
+fall. Condition (vi), interval coverage, is 0.620 of non-step weeks and 0.347 of step weeks.</p>
+<p><img alt="Path error by case family and fit, with 95% intervals" src="../figure_07.svg" /></p>
+<p><strong>Figure 7 shows the path error by family of injected change.</strong> For ramps the season-year constant
+scores 0.032 (95% interval 0.027 to 0.053), the frozen fit 0.041 (0.034 to 0.053), and the free
+weekly fit 0.151 (0.104 to 0.239). For steps the scores are 0.024 (0.018 to 0.043), 0.037 (0.026 to
+0.052), and 0.164 (0.107 to 0.251). On the real series plus injection every fit scores between
+0.009 and 0.026 on ramps and steps, because that scoring compares paths fitted with and without the
+injection. The verdict uses the worse of the two scorings.</p>
+<p><strong>The penalty does most of its work against noise: the frozen fit cut the free weekly fit's path
+error by 0.12.</strong> On steps of 10% or more, the frozen fit's path error minus the free weekly fit's
+is -0.120 (95% interval -0.212 to -0.069), and on ramps -0.110 (-0.198 to -0.066). The frozen fit
+and the strictly non-decreasing fit differ by 0.000 (-0.002 to 0.000) on temporary falls. The
+frozen pair is the strictly non-decreasing fit in practice.</p>
+<p><img alt="Share of a temporary fall shown by each fit" src="../figure_09.svg" /></p>
+<p><strong>Figure 9 shows that only the symmetric, free weekly, and post hoc fits follow a fall.</strong> The post
+hoc pair recovered 0.576 of a 30% fall lasting 26 weeks and 0.518 of one lasting 8 weeks, so the
+post hoc pair also follows a short fall, which the plan wanted held back (below 0.5).</p>
+<p><strong>The smallest detectable step of the frozen pair is above 25% of capacity.</strong> At the frozen pair, 6
+of the 8 Primaries have no step size (5%, 10%, 20%, or 30%) detected in 80% of injections in either
+season, and 2 Primaries (Donington and Wrangle T2) reach 30% from April to September only. A 10%
+step, which was the step the series was meant to show, is detected in 0.00 to 0.33 of injections at
+every Primary. The free weekly fit detects far more steps, with many false steps: it
+reaches 80% for 5% steps at 3 of the 8 Primaries from April to September (and at 2 from October to
+March), and for 10% steps at 5 (and at 3), with a median of 11.60 false steps per Primary-year. The
+detection curves are in <a href="../figure_08.svg">figure 8</a>.</p>
+<p><strong>A real-time estimate is worse than the final fit.</strong> On injections, the latest completed week of a
+real-time vintage has a path error of 0.122, against 0.027 for the same week in the final fit
+(ratio 3.63, limit 2.0). The ratio falls to 2.43 at 8 weeks of age, 1.95 at 13 weeks, and 1.63 at
+26 weeks (<a href="../figure_12.svg">figure 12</a>).</p>
+<p><strong>The intervals under-cover.</strong> The 90% residual block bootstrap refits the whole path. It covered
+0.620 of non-step weeks and 0.347 of step weeks for the frozen pair, and 0.708 and 0.470 for the
+post hoc pair, against the plan's 0.85 to 0.95 and at least 0.60 (<a href="../figure_13.svg">figure 13</a>). The
+coverage is scored on 94 bootstrapped units. The plan said 96, but two Mount Bridge Boston units
+could not be built. Every interval is clipped to include the point estimate, and the clipping
+touched 12.0% of observed weeks for the post hoc pair, 3.4% for the frozen pair, 1.4% for the free
+weekly fit, and 0.0% for the season-year constant.</p>
+<h2 id="on-the-real-series">On the real series</h2>
+<p><strong>On the real series the free weekly fit swings too much to read, and the season-year constant is
+the series to read.</strong> The count of weekly changes of 2% of capacity or more at Kirton is 105 rises
+and 113 falls for the free weekly fit over 359 weeks, 12 rises and 17 falls for the post hoc pair, 1
+rise and 0 falls for the frozen pair, and 3 rises and 3 falls for the season-year constant. The
+season-year constant rises from 2.294 to 4.400 MW at Donington and from 2.080 to 4.241 MW at Mount
+Bridge Boston (means of the first and last 4 observed weeks). The recommended series for SW2-10 is
+the season-year constant, chosen after the held-out scoring results were seen.</p>
+<p><img alt="Weekly capacity at each Primary: the season-year constant and the post hoc path" src="../figure_14.svg" /></p>
+<p><strong>Figure 14 shows that the season-year constant and the post hoc path agree on level from about 2021
+and differ within each year.</strong> At the 2019 and 2020 starts they differ in level (means of the first
+4 observed weeks): the season-year constant is 2.758 MW at Horncastle against 1.244 MW for the post
+hoc path, 1.847 against 1.196 MW at Spilsby, and 2.080 against 1.081 MW at Mount Bridge Boston.
+Mount Bridge Boston has 198 unobserved weeks of 354 (weeks with fewer than 3 usable days), and its
+season-year constant falls to about 0 MW from 2023-09-04 to 2025-08-25 (104 weeks, all unobserved).
+Those weeks must not be read.</p>
+<p><strong>The outside checks are partial counts and are descriptive.</strong> Of the 14 level comparisons against
+the national small-scale solar statistics (DESNZ), 3 pass, 9 fail, and 2 are report-only. Of the 27
+Primary-years, the season-year constant lies inside experiment 00040's interval in 18, and the post
+hoc path in 19, both below the plan's 80% bar. The Embedded Capacity Register total is at or below
+the series' upper bound at 6 of 6 comparisons. Only the DESNZ local-authority series could be tested
+for growth (1 pass and 5 inconclusive), and the Feed-in Tariff register and the constituency table
+could not. Every source is a floor or a partial count, so a ratio below 1 is expected and a mismatch
+does not show the series is wrong (<a href="../figure_16.svg">figure 16</a>).</p>
+<h2 id="limits-that-remain">Limits that remain</h2>
+<p>The review of the code left these limits in place. Each affects how far a number can be trusted.</p>
+<ul>
+<li><strong>The detection metric has no false-alarm control.</strong> A fit that rises at every week would count
+  as detecting every step.</li>
+<li><strong>Condition (i) is nearly trivial.</strong> A flat estimator scores 0.097 on ramps and steps, against
+  the limit of 0.15.</li>
+<li><strong>Path error and false steps are scored on observed weeks only.</strong> Mount Bridge Boston has 198 of
+  354 weeks unobserved.</li>
+<li><strong>The post hoc intervals are clipped to the point estimate in 12.0% of weeks.</strong></li>
+<li><strong>The constant-path false-step threshold is reported on two bases.</strong> The median at the frozen pair
+  is 0.66 when a step is 10% of the real series' mean capacity and 0.36 when it is 10% of the
+  injected capacity. The post hoc pair gives 1.22 and 0.77. The condition uses the first basis.</li>
+<li><strong>The season-year constant's own sampling error cancels by construction,</strong> because the baseline
+  subtracts the season-year constant fit, which favours that arm on the semi-synthetic baseline.</li>
+<li><strong>The drift limit has a floor for short series,</strong> and Wrangle T1 and T2 have only 76 and 74 weeks.</li>
+<li><strong>The post hoc pair was chosen and scored after the frozen pair failed.</strong> No number for it
+  carries the weight of a pre-registered score.</li>
+</ul>
+<h2 id="figures">Figures</h2>
+<p>The four figures above carry the argument. The others are linked here.</p>
+<ul>
+<li>Figure 1: <a href="../figure_01.svg">Raw: the model-free trend of the midday clear-minus-overcast gap</a></li>
+<li>Figure 2: <a href="../figure_02.svg">Raw: one clear and one overcast week, in summer and winter</a></li>
+<li>Figure 3: <a href="../figure_03.svg">Raw: usable daylight half-hours per Primary-week</a></li>
+<li>Figure 4: <a href="../figure_04.svg">Raw: the free weekly capacity and its standard error by month</a></li>
+<li>Figure 5: <a href="../figure_05.svg">Method: one injected path through five fits</a></li>
+<li>Figure 8: <a href="../figure_08.svg">The detection curve by step size and season</a></li>
+<li>Figure 10: <a href="../figure_10.svg">Transfers and seasonal load</a></li>
+<li>Figure 11: <a href="../figure_11.svg">False steps on the placebo sky and the constant path, and the drift</a></li>
+<li>Figure 12: <a href="../figure_12.svg">Real-time vintages</a></li>
+<li>Figure 13: <a href="../figure_13.svg">Interval calibration</a></li>
+<li>Figure 15: <a href="../figure_15.svg">The gap between the asymmetric and symmetric paths on the real series</a></li>
+<li>Figure 16: <a href="../figure_16.svg">Outside checks</a></li>
+<li>Figure 17: <a href="../figure_17.svg">Additivity of the fit</a></li>
+</ul>
+<p>The experiment's printed reports and every number on this page are in the private folder
+<code>data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/</code> (<code>report.txt</code> is the combined
+report).</p>
+<h2 id="plan">Plan</h2>
+<h3 id="the-question-and-why-it-is-worth-asking">The question and why it is worth asking</h3>
+<p><strong>The question is whether a weekly series of embedded solar capacity behind each Primary substation
+can be estimated well enough to show real steps and no invented ones.</strong> Experiments 00039 and 00040
+gave one capacity per season-year, with a detection limit near 2.5% of capacity. NGED holds almost no
+information on unmetered solar, and a capacity that changes week by week would show when a large
+rooftop fleet or a farm below 1 MW connects. A free capacity per week would be too noisy. The
+standard error of a season-year, 1.2% of capacity, implies about 8.7% per week on average (1.2%
+times the square root of 52), and far more in winter, when the sun is low. A penalty on the weekly
+increments lets neighbouring weeks share evidence, so that the path steps only where the data support
+a step.</p>
+<p><strong>The maintainer decided that capacity may fall but reluctantly.</strong> The fit estimates the solar that
+the Primary's meter sees, which can fall when home batteries charge from midday solar, when a feeder
+is permanently reconfigured, or when a solar site is switched off for repairs. A strict
+non-decreasing constraint would lower past capacity to fit a fall. The penalty on a fall is
+therefore heavy and finite.</p>
+<p><strong>The aim is explanation and a capacity series, not forecast skill.</strong> Nothing here touches the
+production forecast. Experiments 00007, 00009, 00022, and 00031 found small or no forecast gains from
+solar inputs, and PVDIS-5 tests the forecast question using the vintages this experiment produces.</p>
+<h3 id="size-answered-against-the-five-triggers">Size, answered against the five triggers</h3>
+<p>The experiment is <strong>complex</strong>, because three of the five triggers fire.</p>
+<ul>
+<li><strong>What gets stored: yes.</strong> A private weekly capacity table and a table of real-time vintages under
+  <code>data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/</code>, which SW2-10 reads. Nothing
+  enters a production Delta table.</li>
+<li><strong>The production serving path: no.</strong> Not touched.</li>
+<li><strong>A degradation rule: no.</strong> Not touched.</li>
+<li><strong>More than one defensible design: yes.</strong> The estimator (half-hourly M1, daily sums, or the
+  six-arm combination), the form of the penalty, the placement of the demand cells, and the
+  bootstrap scheme each admit more than one defensible choice. The plan fixes each choice and
+  gives the reason.</li>
+<li><strong>Code whose callers cannot be named without searching: yes</strong>, for one work item. The register
+  loader moves from experiment 00031's folder into <code>packages/studies</code>, and that change is a
+  separate reviewed pull request (work item W0).</li>
+</ul>
+<p>The process is therefore the full one: this Opus plan, a Sonnet code review before the run, Sonnet
+runs and write-up, a Sonnet check of the write-up against the printed report, and a Sonnet prose
+review. Opus reviews the result when it decides the next part of the series.</p>
+<h3 id="earlier-advice-followed-and-departed-from">Earlier advice, followed and departed from</h3>
+<p><strong>The plan follows nine items of earlier advice and departs from none.</strong></p>
+<ul>
+<li><strong>Followed:</strong> "Divide capacities fitted with M1 by 0.77" (00039): the series is divided by a
+  recovery ratio measured on injected paths. "Do not read a capacity at Kirton as PV alone" (00039):
+  Kirton keeps its status flag in every output. "Leave out the 8 MVA Primaries" (00039): the
+  series covers the 8 Primaries metered in MW. "Treat injection as a test of the PV shape and the
+  irradiance only" (00039): a penalised, constrained fit is nonlinear, so the plan scores the
+  path difference and a semi-synthetic baseline, and adds an additivity check. "Leave Wrangle T1
+  out of any claim that a Primary is free of a cloud load" (00040): the status column says so. "Do
+  not quote an embedded-solar capacity without a stated bound" (00040): three uncertainty terms are
+  stated and never summed. "Report C as the capacity and keep M1d divided by R as a cross-check"
+  (the experiment 00040 review): the weekly series is checked against C. "Calibrate ENS irradiance
+  to CAMS" (00031): the weekly series uses CAMS only, and PVDIS-5 owns the calibration. "Treat the
+  register as a weak prior at Primaries" (00031): the register check is a soft check.</li>
+</ul>
+<h3 id="hypothesis-and-the-five-design-choices">Hypothesis and the five design choices</h3>
+<p><strong>The estimator is the half-hourly fit M1, with one capacity per week and one set of demand cells
+per season-year.</strong> The fit is</p>
+<p>power = cell(season-year, month, local half-hour, day type) + b times heating degree-days - c(w)
+times u + error,</p>
+<p>where <code>u</code> is experiment 00039's unit PV shape from CAMS (the Copernicus Atmosphere Monitoring
+Service) at the Primary, <code>c(w)</code> is the capacity of
+week <code>w</code> (weeks start on Monday, Europe/London), and the cells are those of experiments 00039 and
+00040. A season-year is the 12-month period that experiments 00039 and 00040 used for one capacity.
+Keeping the cells per season-year means a slow rise in base demand cannot leak into the
+capacity, and it keeps the recovery ratio of the weekly fit comparable with the season-year ratio.
+The drawback is that a step at a month boundary is partly absorbed by the cell mean, so the injections
+include steps placed on month boundaries (risk 2).</p>
+<p><strong>M1 is chosen over the daily fit and the six-arm combination for three reasons.</strong> The daily fit
+leaks a day-long cloud load at 3.4 MW per MW, against 2.2 for M1, so a weekly daily-sum fit has seven
+points per week and the highest exposure. The six-arm combination needs a ratio vector and a
+noise bootstrap for every arm at every week. The half-hourly fit recovers 0.77 of injected capacity,
+which the series corrects by dividing by a measured ratio. The season-year mean of the weekly
+series is checked against the six-arm C of experiment 00040 (check A0), so the series stays tied to
+the estimate that carries a bound.</p>
+<p><strong>The penalty is asymmetric L1 on weekly increments, with the capacity held non-negative.</strong> The
+objective is</p>
+<p>0.5 times the squared residual, over the residual variance, plus <code>lambda_up</code> times the sum of the
+rises plus <code>lambda_down</code> times the sum of the falls.</p>
+<p>The problem is convex. The penalty is <code>lambda_up = a</code> times a Primary scale <code>s_P</code> and <code>lambda_down =
+r</code> times <code>lambda_up</code>. The scale <code>s_P</code> is the median over weeks of the free weekly fit's standard
+error, so that <code>a</code> is in units of one weekly standard error. For the scoring of a real-time
+vintage, <code>s_P</code> and the recovery ratio are computed from data up to the vintage's origin only, never
+from the full record. The grid is <code>a</code> in {0.5, 1, 2, 4} and <code>r</code> in {10, 30}, so the fall-to-rise
+penalty ratio is at least 10 (the maintainer decided that falls are heavily penalised). The same
+<code>(a, r)</code> applies to every Primary, to stop one Primary's noise from setting its own penalty. The
+comparison fits are <code>r = 1</code> (symmetric L1), <code>r = 3</code>, <code>r = infinity</code> (strictly non-decreasing),
+<code>a = 0</code> (free weekly), and the season-year constant. No convex-optimisation package
+is installed, so the solver is a short ADMM routine in numpy, checked against <code>scipy.optimize.linprog</code>
+in the self-tests (risk 13). The demand cells are projected out once per Primary, so the fit needs
+only the weekly normal matrix (about 360 by 360) and one vector per series.</p>
+<p><strong>The tuning rule picks one <code>(a, r)</code> pair on tuning units.</strong> The pair minimises the median path
+error over a mixture of ramps, steps, and a constant path, subject to two limits: at most 0.5 false
+steps per Primary-year on the placebo sky and on constant injected paths from the tuning farms A to
+C, and a 30% fall lasting 26 weeks recovered at 0.5 or more of its depth. Ties go to the larger
+<code>a</code>. The tuning limits are the same as conditions (v) and (iii), so the scoring on farms D to F
+tests generalisation to new farms and path seeds only. If no pair on the grid meets both limits,
+the verdict is <code>refuted</code> for the asymmetric design, and the limits are not relaxed after any score
+is seen. The pair is written to <code>frozen_config.json</code>. The tuning script and the scoring script are
+separate commits, and the scoring script has never run before the commit of the frozen file.</p>
+<p><strong>The capacity unit is the 99th percentile of half-hourly AC output of the fleet, as in experiments
+00039 and 00040.</strong> Installed DC capacity is larger. The conversion to DC is part of the outside
+check against DESNZ.</p>
+<h3 id="data-weeks-and-masks">Data, weeks, and masks</h3>
+<ul>
+<li><strong>Series.</strong> The 8 Primaries metered in MW (time series 7 Trusthorpe, 8 Horncastle, 10 Spilsby, 12
+  Wrangle T1, 13 Wrangle T2, 16 Mount Bridge Boston, 17 Kirton, and 18 Donington) and the 6 solar
+  farms as injection sources. The farms appear only
+  as "Solar farm A" to "Solar farm F" (<code>studies.pv_dataset.pv_sites()</code> labels), and their output is
+  always normalised by the farm's own 99th percentile, never published in megawatts.</li>
+<li><strong>Inputs.</strong> The <code>frame.parquet</code> of experiment 00039 (cleaned power, CAMS unit shape and
+  irradiance at reliability 0.9 or more, ERA5 temperature, zenith under 75 degrees), read from
+  <code>data/ml-experiments/00039-pv-disaggregation-cams-injection/work/</code>. Reading another
+  experiment's private output is allowed. Importing its code is not, so the model code is copied
+  into this folder for the third time (risk 7).</li>
+<li><strong>Weeks.</strong> 361 weeks from Monday 2019-09-02 to Monday 2026-07-27 (the last has 5 days). Each
+  Primary starts at its first week with at least 3 usable days. A week with fewer than 3 usable
+  days is <code>unobserved</code>: the fit has no data term there, the penalty interpolates, and the output
+  marks the row and widens its interval.</li>
+<li><strong>Switching mask.</strong> The logged closures, padded by 24 hours, are removed from every fit. The
+  intervals come from experiment 00037's <code>intervals.parquet</code>, and the log ends on 2026-03-25.
+  SW2-0b's labels replace the logs once they exist. Unlogged transfers stay in the data and are
+  injected as a case. The first unit (U1) found four facts that the design must handle:<ul>
+<li>The logged-closure mask removes 40 to 48% of the daylight half-hours at Mount Bridge Boston,
+  Wrangle T1, and Wrangle T2.</li>
+<li>871 of the 2,166 farm-weeks drop out of injection, mostly at Solar farm E.</li>
+<li>Kirton's correlation of power with <code>u</code> peaks at 08:00 UTC, not near 12:00 UTC.</li>
+<li>The weekly fits must therefore tolerate weeks in which most daylight half-hours are masked,
+  and Kirton is reported without a pass or fail.</li>
+</ul>
+</li>
+<li><strong>Polygons.</strong> The check already run in <code>e00045_polygon_check.py</code> found 16 valid Primary polygons,
+  overlaps under 0.3% of the smaller polygon, Mount Bridge Boston's point 95 m outside its
+  polygon, and Wrangle T1 and T2 sharing one polygon. Wrangle T1 and T2 keep separate fits and are
+  summed for any comparison against the shared polygon.</li>
+<li><strong>Validation before fitting.</strong> Row counts per Primary-week, duplicate keys, the hour-of-day
+  profile of the correlation of power with <code>u</code> (peak near 12:00 UTC), the share of CAMS hours
+  dropped per week, the timestamp scan (the injected recovery must peak at shift zero), and the
+  count of unobserved weeks. The same step prints each of the six solar farms' date coverage
+  against the 361 weeks. A farm-week in which the farm's output is missing on more than 2 days
+  is dropped from that farm's injection units, and the number dropped is reported.
+  The <code>data-validation</code> skill lists the checks.</li>
+</ul>
+<h3 id="known-answer-injection-design">Known-answer injection design</h3>
+<p><strong>Every scored result comes from injected paths whose truth is known, scored on farms and path
+seeds that were not used for tuning.</strong> The hold-out is by farm and path seed only. The tuning
+and scoring units share the same 8 Primaries, dates, baseline noise, and demand cells, so the
+scoring tests generalisation to new farms and path seeds at the same Primaries, not to new
+Primaries. The main interval therefore resamples Primaries, and results are reported per Primary.
+The design has five parts.</p>
+<ul>
+<li><strong>The baseline is semi-synthetic.</strong> For each Primary, the baseline series is the real power minus
+  the full-record fitted PV component (so it holds demand, noise, and any confound), plus a known
+  baseline PV path equal to the Primary's 2025/26 capacity from experiment 00040 times <code>u</code>. The true
+  capacity of every week is then known, level included. Removing the fitted PV component also
+  removes any confound that is correlated with the PV shape, so recovery on this baseline is
+  optimistic against experiment 00039's recovery ratio of 0.77 on real data. A second scoring uses
+  the real series with the injected path added, and compares the fitted path with and without the
+  injection, because the production series is fitted to real data that already holds unknown
+  solar. Condition (i) is scored on both baselines and both are reported; the verdict uses the
+  worse. The gap between the two scorings measures the departure from additivity.</li>
+<li><strong>Injected change.</strong> The injected output is minus the normalised output of one solar farm scaled
+  by the true path, so that its 99th percentile equals the path's value in MW. Farm output is
+  normalised, never published in megawatts.</li>
+<li><strong>Cases.</strong> Each path is drawn with a fixed seed.<ul>
+<li>Ramp: a rise of 25% or 50% of the baseline over 52 weeks.</li>
+<li>Step: a rise of 5%, 10%, 20%, or 30% at a random week, with half the steps placed in April to
+  September, half from October to March, and one in four on a month boundary.</li>
+<li>Temporary fall: 30% for 8 weeks and 30% for 26 weeks, and a 15% fall for 26 weeks.</li>
+<li>Transfer: a share of 0.3 of another Primary's net power (including its solar) added for 30
+  days, once inside the 24-hour padded mask and once outside it, so that the size of the error
+  from an unlogged transfer is measured. The truth is the share times the donor's baseline capacity.</li>
+<li>Seasonal load: a daytime load (08:00 to 20:00 local) of 10% of the baseline capacity with a
+  summer-weighted yearly cycle, once independent of the weather and once scaled by the clear-sky
+  index (a load that rises with sunshine). The truth is the unchanged baseline, so the score
+  is the seasonal swing that creeps into the capacity path.</li>
+<li>Constant path: a constant capacity equal to the baseline. Its false steps and ratchet drift
+  are scored, together with the placebo sky. <strong>Design change: the constant-path unit is built on
+  the placebo sky, not from a farm's injected output.</strong> The PV shape <code>u</code> is permuted among the
+  days of each calendar month, and the baseline capacity times the permuted shape is subtracted
+  from the real power. The real series' own growth is then uncorrelated with the permuted shape,
+  so the true path is constant. The recovery ratio of the constant-path unit is fixed at 1,
+  because the unit is built from the PV shape itself and not from a farm's output. The farm and
+  the path seed still change the rows that the farm's gaps leave, and the path seed also
+  changes the permutation.</li>
+</ul>
+</li>
+<li><strong>Hold-out.</strong> The tuning units use Solar farms A, B, and C and path seeds 0 to 3. The scoring
+  units use Solar farms D, E, and F and path seeds 1000 to 1003, at all 8 Primaries. The unit count
+  is 3 farms times 4 seeds times 8 Primaries times 14 cases (2 ramps, 4 steps, 3 temporary falls,
+  2 transfers, 2 seasonal loads, and 1 constant path) = 1,344 units in each set. Solar farm E, the
+  worst case at 0.70 recovery, falls in the scoring set on purpose, and results are also reported
+  without it. The recovery ratio of each Primary is measured on tuning units with a constant
+  injected path and applied unchanged to the scoring units.</li>
+<li><strong>Intervals.</strong> The main interval is a cluster bootstrap that resamples the 8 Primaries, 2,000
+  draws, at the 95% level. A two-way cluster bootstrap (Primaries and farms resampled
+  independently) is reported beside it. With three scoring farms the farm margin is coarse, so the
+  write-up also reports the seed-level spread.</li>
+</ul>
+<p><strong>Real-time vintages are scored on the same semi-synthetic units.</strong> The fit is repeated at origins
+every 4 weeks over the last 3 years of the record, each truncated at its origin, with the Primary
+scale <code>s_P</code> and the recovery ratio recomputed from data up to that origin, and the latest
+complete week of each vintage is scored against the truth. The write-up reports the path error of
+that week against the same week in the final fit, and the revision of the first estimate by the
+age of the week (1, 2, 4, 8, 13, and 26 weeks).</p>
+<p><strong>The bootstrap is a residual block bootstrap that refits the whole path.</strong> Each draw resamples
+whole 7-day blocks of the penalised fit's residuals, taken from the same calendar month of any
+year of the Primary's record (so that winter noise stays winter-sized), adds them to the fitted
+values, and refits the path with the frozen penalties. Missing half-hours take a residual of zero.
+Each Primary and variant gets 200 draws for the real series, and each injection unit gets 100.
+The 5th and 95th percentiles give the 90% interval, and the 25th and 75th and the 10th and 90th
+give the calibration curve. The coverage of the truth is scored on 96 scoring units (the case
+families with a step, a ramp, a fall, and a constant path), separately at weeks with no true step
+and at weeks within 2 weeks of a true step. A bootstrap of a penalised fit at a boundary tends to
+under-cover, and the decision rule counts that as a finding. If coverage at non-step weeks is under
+0.85, the write-up reports an inflation factor chosen on tuning units, labelled post hoc.</p>
+<p><strong>False steps are counted on two skies.</strong> One is experiment 00039's placebo sky, which permutes
+the PV shape <code>u</code> across days within each month (200 permutations per Primary) and leaves the
+power in place, so that the day-to-day link between cloud and power is broken and any step is false
+by construction. A placebo step is also ignored in any week within 4 weeks of a rise of 10% or more
+in the unpermuted real series, so that a real growth step is not counted as false. The other is the
+constant injected path, whose baseline holds no real growth. A false step is a rise of at least 10%
+of the Primary's mean real capacity over any 4 consecutive weeks (5% is reported as well). Both
+skies also report the ratchet drift. Conditions (iii) and (iv) are scored on both skies, on farms D
+to F for the constant path and on permutation seeds 1000 to 1099 for the placebo sky. Tuning uses
+farms A to C and permutation seeds 0 to 99.</p>
+<p><strong>The detection limit</strong> of each Primary is the smallest step on the grid (5%, 10%, 20%, 30%) that
+the path shows as a rise of at least half the step within 3 weeks of the true date in at least 80%
+of the scoring injections. It is reported for April to September and for October to March
+separately.</p>
+<h3 id="real-series-three-uncertainty-terms-and-the-gap-diagnostic">Real series, three uncertainty terms, and the gap diagnostic</h3>
+<p><strong>The real weekly series is fitted on all of a Primary's data, then divided by that Primary's
+recovery ratio.</strong> The production-style output is the real-time vintage at weekly origins, so a
+forecast date reads only what was known on that date.</p>
+<p><strong>The uncertainty statement keeps three terms apart and never sums them.</strong></p>
+<ol>
+<li>Sampling: the 90% residual-block-bootstrap interval of the weekly capacity.</li>
+<li>Transfer from farms to rooftops: a scenario of plus or minus 10%, from experiment 00040's
+   clean-Primary ratio of the daily to the six-arm capacity (0.92) and its per-farm spread.</li>
+<li>Undetected demand: two named scenarios from experiment 00040's table, an undetected day-long
+   cloud load (capacity too high by the Primary's bound B at amplitude 0.25) and a load that rises
+   with sunshine (capacity too low by 33% at amplitude 0.25).</li>
+</ol>
+<p><strong>The gap diagnostic compares the asymmetric path with the symmetric one on the real series.</strong> A
+Primary is flagged when the mean gap between the two paths is 5% of its capacity or more, or when
+the symmetric path falls by at least 10% for 8 weeks or more and the asymmetric path does not. The
+5% threshold is the weekly detection floor predicted for a summer step. The flagged falls are listed
+for SW2-0b to check against switching labels. The write-up never presents a held fall as a real
+fall.</p>
+<p><strong>Status per Primary is carried from earlier results.</strong> Kirton is <code>flagged</code> and its series appears
+with a grey band and the library range of experiment 00040 (1.2 to 4.4 MW in 2025/26). Trusthorpe is
+<code>low-power</code>. Wrangle T1 is <code>left-out</code> of any claim that a Primary is free of a confound. The others
+are <code>clean</code>. Most coastal Primaries (Skegness, Ingoldmells, and Chapel St Leonards) are metered in
+MVA and outside this experiment.</p>
+<h3 id="outside-checks-and-tolerances-stated-before-any-comparison">Outside checks and tolerances, stated before any comparison</h3>
+<p><strong>Three outside checks and one internal check are run, in order of strength. None alters the verdict.</strong></p>
+<p><strong>None of the outside photovoltaic datasets is complete.</strong> The DESNZ tables, the Ofgem Feed-in
+Tariff (FiT) register, and the Embedded Capacity Register (ECR) each count a subset of the installed
+capacity, and the FiT database has not been updated for several years. Each outside figure is
+therefore a floor or a partial count. A mismatch between an outside figure and the weekly series
+does not show that the series is wrong, so every outside check is descriptive and cannot decide
+the verdict. The measured coverage gaps are these. The FiT report covers accreditations from 1
+April 2010 to 31 March 2025, and its latest photovoltaic commissioning date is 24 March 2021 (the
+scheme closed to new applicants on 31 March 2019). The DESNZ constituency table is published for
+August 2026 and covers domestic installations only. The DESNZ local-authority table is at the end
+of 2025. The ECR as-of date is printed by the check, and the check reports it beside its result.</p>
+<ol>
+<li><strong>DESNZ small-scale solar, at constituency and local-authority level.</strong> DESNZ publishes no table
+   by lower-layer super output area (LSOA). We searched the DESNZ "Solar photovoltaics deployment"
+   workbook (Energy Trends table 6.3), the "Renewable electricity by local authority" workbook, and
+   the DESNZ sub-regional statistics pages, and found tables by parliamentary constituency
+   (domestic installations only) and by local authority (all sizes, end of 2025). The LSOA files
+   were downloaded for the area shares of the Primary polygons but are not joined to the DESNZ
+   figures. Each Primary polygon meets 1 to 4 constituencies, and a constituency or local
+   authority is scaled by the share of its area inside the polygon, so the check is coarse. The
+   tolerance is wide and is fixed here, before any comparison. The expected peak AC output is the
+   DC capacity times 0.70, with a range of 0.60 to 0.80 (experiment 00029 fitted farm DC-to-AC
+   ratios of 1.12 to 1.42, an AC-to-DC ratio of 0.70 to 0.89, and a fleet of mixed orientations
+   peaks lower than one farm). <strong>Tolerance:</strong> the ratio of the series' mean over the 12 months to
+   the snapshot date to the expected peak lies in [0.67, 1.5], read at the constituency level for
+   domestic capacity and at the local-authority level for all sizes. The comparison is reported for
+   Spilsby, Horncastle, Mount Bridge Boston, Donington, Trusthorpe, and Wrangle T1 plus T2 against
+   the shared polygon, and Kirton is reported without a range. The factor of 1.5 is the root of the
+   summed squares of the stated uncertainties: sampling (15%), farm to rooftop (10%), undetected
+   load (25%), and conversion (14%), about 33%. The check can catch only a gross failure, and
+   because the tables are partial counts, a ratio above 1 is less alarming than a ratio below 1.
+   Installations of 1 MW or more are metered by NGED and already removed from the Disaggregated
+   Demand series, so the local-authority figure for all sizes is the less direct comparison.</li>
+<li><strong>The Ofgem FiT register, as a second descriptive check.</strong> Each postcode district is allocated
+   to the Primary polygons by the share of its postcode units that lie inside the polygon
+   (Ordnance Survey Code-Point Open gives the unit positions, and no open polygon boundary for
+   postcode districts was found). The register has three uses. First, a dated baseline of
+   small-scale capacity before April 2019, summed over the districts of each polygon by commissioning
+   date. Second, a growth curve of cumulative declared net capacity (the Ofgem name for AC capacity)
+   up to 2019, compared with the weekly series over the same weeks: the signs of the growth must
+   agree and the ratio must lie within a factor of 2. Third, the share of FiT capacity in
+   installations under 50 kW, which the Embedded Capacity Register misses. There are two caveats.
+   The FiT took no new installations after 2019, so the register is a floor from then on. Postcode
+   districts do not align with the polygons, so the allocation adds error. The check has no pass
+   or fail range of its own and is reported beside check 1.</li>
+<li><strong>The Embedded Capacity Register (ECR) as a soft prior, not a floor.</strong> The check uses only
+   connected solar sites of 50 kW to under 1 MW, dated before each week, and first prints which date
+   columns the register holds and what each records (the reader lists a <code>Last Updated</code> column,
+   which is not a connection date). <strong>Tolerance:</strong> the register's total for a Primary does not
+   exceed the series' upper 90% bound at 5 or more of the 6 comparisons. The register's median was
+   0.08 of effective capacity against 0.33 from the data in experiment 00031, so the check expects
+   the register to sit well below the series. The step-date check uses only sites larger than the
+   Primary's detectable step and compares the series' rise in the 4 weeks around each date with
+   the rise at 1,000 random placebo dates. It is run only if the register holds a connection date
+   and at least 5 sites qualify across the six comparisons, and otherwise is reported as not
+   testable.</li>
+<li><strong>The season-year anchor (internal, A0).</strong> The mean of the weekly series over each season-year
+   lies inside experiment 00040's 95% interval of C at the clean Primaries in at least 80% of
+   Primary-years.</li>
+</ol>
+<p><strong>Growth-rate tolerances, fixed after the outside growth rates were extracted and before any
+comparison with the weekly series.</strong> The script <code>e00045_outside.py</code> first writes
+<code>outside_growth.parquet</code>, which holds each outside source's fractional growth per year, and only
+then compares it with the series. A fractional growth per year is the least-squares slope of the
+cumulative capacity in MW per year, divided by its mean level over the window, with both curves
+sampled at every Monday. The window is the overlap of the source's coverage with the Primary's
+series, and a growth rate over a window shorter than 1 year is reported but never tested. Wrangle
+T1 and Wrangle T2 are summed against the shared polygon. The extraction showed that three of the
+four sources cannot be tested for growth, and the rules below say so in advance.</p>
+<ul>
+<li><strong>Ofgem FiT: no growth test.</strong> The weekly series starts in September 2019 or later, after the
+  scheme closed to new applicants, so the register's cumulative curve is flat over the whole
+  overlap (growth 0.00 per year at every Primary, and under 0.2 years at Donington). The plan's
+  comparison of growth up to 2019 has no weekly series to compare against. The register's use is
+  therefore limited to the pre-2019 baseline against the series' first 8 weeks (reported with no
+  pass or fail range, as in check 2) and the share of capacity under 50 kW.</li>
+<li><strong>DESNZ local authority (all sizes, year ends 2014 to 2025): growth test with the factor of 2.</strong>
+  Let g_s be the series' growth and g_o the source's, both over the same window of at least 1 year.
+  The check <strong>passes</strong> if g_o is positive and 0.5 ≤ g_s / g_o ≤ 2. It <strong>fails</strong> if g_s / g_o &gt; 2.
+  It is <strong>inconclusive</strong> if g_s / g_o &lt; 0.5 or g_s ≤ 0, because the authority total includes the
+  farms of 1 MW or more that NGED meters and that the Disaggregated Demand series does not hold, so
+  the source can grow faster than the series for a reason that does not impugn the series. The
+  authority is allocated to a polygon by the share of the authority's FiT capacity inside it,
+  because no authority boundaries are held, so the allocation is coarse. Wrangle's window is under
+  1 year and is not tested.</li>
+<li><strong>DESNZ constituency (domestic only): no growth test.</strong> The workbook holds the August 2026 table
+  and the July 2026 table, one month apart, and DESNZ revises recent months upward, so a growth
+  rate from them is not a growth rate. The table is used for the level check only.</li>
+<li><strong>Embedded Capacity Register: no growth test.</strong> The register's only date column, <code>Last Updated</code>,
+  holds one value, 6 August 2026 (Excel serial 46240), for all 7,211 rows. It records the release
+  date of the register and not a connection date, so the step-date check in check 3 is not
+  testable, and the register is used for the level comparison only.</li>
+</ul>
+<p><strong>The level checks keep the tolerances stated above.</strong> The domestic constituency check uses the 12
+months ending 31 July 2026. The local-authority check uses the 12 months ending 31 December 2025
+and the year-end 2025 figure, and a Primary with fewer than 26 weeks of series in that period is
+not tested. Both pass if the ratio lies in [0.67, 1.5] at an AC-to-DC ratio of 0.70, and both
+report the ratio at 0.60 and 0.80. Kirton (status range-only) and Wrangle T1 (status not-clean) are
+never scored. Wrangle T1 is still added to Wrangle T2, because T2 alone against the whole polygon
+would compare unlike things, and that sum is reported with its not-clean component flagged. The
+season-year anchor uses experiment 00040's 95% bootstrap interval of the headline capacity
+(<code>headline_low</code> to <code>headline_high</code>; that experiment publishes no interval on the six-arm C
+itself), for the season-years in which the series holds at least 40 weeks.</p>
+<p><strong>The outside files need maintainer attention only on licence and size.</strong></p>
+<ul>
+<li><strong>LSOA boundaries:</strong> Office for National Statistics (ONS) LSOA (2021) generalised-clipped
+  boundaries and population-weighted centroids for England and Wales, from the ONS Open Geography
+  Portal. The whole boundary file is expected to be tens of megabytes and the centroids a few
+  megabytes (to be confirmed at download). The plan requests only the LSOAs that intersect the
+  union of the 16 polygons (a few hundred features, under 5 MB) through the portal's feature
+  service, and falls back to the full file.</li>
+<li><strong>DESNZ tables:</strong> two spreadsheets of a few megabytes.</li>
+<li><strong>Ofgem FiT report:</strong> three workbooks of about 35 MB each, and the Code-Point Open archive of
+  about 14 MB. Ofgem's copyright page releases its material under the Open Government Licence, and
+  the files download with no login or terms click-through.</li>
+<li><strong>Licence:</strong> both are published under the Open Government Licence v3.0, which needs an
+  acknowledgement and no account or signature. The ONS boundaries add "Contains OS data (c) Crown
+  copyright and database right". The cost is nil, well under the £30 cap. The maintainer decides
+  whether using an OGL file counts as accepting a licence in someone's name before the download
+  runs.</li>
+</ul>
+<h3 id="what-sw2-10-reads">What SW2-10 reads</h3>
+<p><strong>Two private parquet files, with the columns below.</strong> The folder is
+<code>data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/</code>. Both files hold one row per
+Primary, variant, and week, and both carry the same file metadata, which names the recommended
+variant and defines each column.</p>
+<ul>
+<li><code>capacity_weekly.parquet</code>, the final fit on all data, with the columns <code>week_start</code> (Date, Monday,
+  Europe/London), <code>time_series_id</code> (Int32), <code>primary_name</code> (String), <code>variant</code> (<code>frozen</code>,
+  <code>alt_post_hoc</code>, <code>season_year_constant</code>, or <code>free_weekly</code>), <code>capacity_mw</code> (Float64, the 99th
+  percentile of the half-hourly AC output of the embedded solar, divided by the variant's recovery
+  ratio), <code>low_mw</code> and <code>high_mw</code> (the 5th and 95th percentiles of the 200-draw residual block
+  bootstrap, clipped to include the point estimate, and widened in unobserved weeks), <code>status</code>,
+  <code>unobserved</code> (Boolean, true when the week has fewer than 3 usable days), <code>recovery_ratio</code>,
+  <code>rooftop_low_mw</code> and <code>rooftop_high_mw</code> (the capacity minus and plus 10%), <code>scenario_dayL_mw</code> and
+  <code>scenario_sunload_mw</code> (the capacity under each named systematic scenario, never merged into the
+  interval), and <code>recommended</code> (Boolean, true for the one variant SW2-10 should read).</li>
+<li><code>capacity_weekly_vintages.parquet</code>, the same columns plus <code>origin_monday</code> (Date): the fit at each
+  origin using only data before that Monday, for the variants <code>frozen</code> and <code>alt_post_hoc</code>.
+  Origins fall every 4 weeks over the last 3 years of the record, plus the final origin, so
+  <code>low_mw</code> and <code>high_mw</code> are null in this file. <strong>A forecast date <code>d</code> reads the rows whose
+  <code>origin_monday</code> is the last origin on or before <code>d</code> and whose <code>week_start</code> is the latest week</strong>
+  (the Monday seven days before the origin), and holds that value flat for the days after it.</li>
+</ul>
+<p><strong>The <code>status</code> column carries one label per Primary, as it appears in the file.</strong> The labels are
+<code>clean</code>, <code>low-power</code>, <code>range-only</code>, and <code>not-clean</code>. SW2-10 uses rows with status <code>clean</code> or
+<code>low-power</code>, reads <code>range-only</code> rows as a range (<code>low_mw</code> to <code>high_mw</code>) and never as a value, treats
+<code>not-clean</code> rows as unavailable, and skips rows with <code>unobserved</code> true when it needs a measured
+week. SW2-10 uses the vintage file for any held-out scoring. The path of the finished file goes to
+the "Design: Switching event detection experiments" session when it exists.</p>
+<h3 id="cores-time-and-parallel-work">Cores, time, and parallel work</h3>
+<p><strong>The whole experiment fits in 4 cores and about 2.5 hours of wall time, if all 4 cores are free.</strong>
+Each worker runs one thread (<code>OMP_NUM_THREADS=1</code>, <code>OPENBLAS_NUM_THREADS=1</code>, <code>POLARS_MAX_THREADS=1</code>),
+four workers at a time, one output file per worker chunk written atomically, fixed seeds per job.
+Check <code>uptime</code> first, because the slot's 4 cores are shared with PVDIS-3. If PVDIS-3 leaves only 2
+cores free, the four-worker stages take twice as long and the total rises from 2.5 hours to about
+4.5 hours; the implementer then runs two workers and does not start a stage that would still be
+running when PVDIS-3 needs its cores back.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Work</th>
+<th>Workers</th>
+<th>Estimate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Inputs and validation</td>
+<td>read the frame, weeks, masks, figures 1 to 4</td>
+<td>1</td>
+<td>5 min</td>
+</tr>
+<tr>
+<td>Self-tests</td>
+<td>solver, linearity, known answers</td>
+<td>1</td>
+<td>2 min</td>
+</tr>
+<tr>
+<td>Tuning</td>
+<td>8 penalty pairs on 1,344 tuning units (the normal matrix is reused, so about 0.1 to 0.3 s per fit)</td>
+<td>4</td>
+<td>10 to 15 min</td>
+</tr>
+<tr>
+<td>Freeze</td>
+<td>write and commit <code>frozen_config.json</code></td>
+<td>1</td>
+<td>1 min</td>
+</tr>
+<tr>
+<td>Scoring and contrasts</td>
+<td>the chosen pair and the four comparison fits on 1,344 scoring units</td>
+<td>4</td>
+<td>15 to 20 min</td>
+</tr>
+<tr>
+<td>Coverage bootstrap</td>
+<td>96 units times 200 draws</td>
+<td>4</td>
+<td>15 min</td>
+</tr>
+<tr>
+<td>Vintages on injections</td>
+<td>about 38 origins times 8 Primaries times 12 units</td>
+<td>4</td>
+<td>10 min</td>
+</tr>
+<tr>
+<td>Real series</td>
+<td>fits, 500-draw bootstrap per Primary, weekly-origin vintages, placebo sky (1,600 fits that rebuild the normal matrix)</td>
+<td>4</td>
+<td>30 min</td>
+</tr>
+<tr>
+<td>Outside checks</td>
+<td>DESNZ, register, season-year anchor</td>
+<td>1</td>
+<td>5 min</td>
+</tr>
+<tr>
+<td>Report and charts</td>
+<td>printed report, 17 figures</td>
+<td>2</td>
+<td>10 min</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What runs side by side.</strong> Work items W0 (register move), U1 (inputs and raw figures), and U5a
+(the download script) share no file and have no dependency on the solver, so three Sonnet agents
+start together. The solver and self-tests (U2) come first for everything that fits. <strong>Go/no-go
+before U3:</strong> in U2's self-tests, measure the seconds per fit at <code>r = 30</code>, <code>a = 0.5</code> (the
+slowest-converging corner of the grid). If the ADMM needs more than 10 times the 0.1 to 0.3 s per
+fit in the table, the implementer stops and tells the manager before starting U3. After U2, U3
+(injection, tuning, scoring) and U4 (real series, vintages, placebo) run in parallel, because they
+read the same solver and write different files. Within a run, the tuning units, the scoring units,
+the Primaries, and the bootstrap draws are independent jobs.</p>
+<h3 id="work-list-split-into-units-a-sonnet-agent-can-implement">Work list, split into units a Sonnet agent can implement</h3>
+<p>Each unit is implemented by one Sonnet agent working from the files, and reviewed by a second Sonnet
+agent that reads the code for leakage (tuning units reaching the scoring set), for the fit
+stopping at the vintage origin, and for farm output reaching a chart in megawatts. No agent starts a
+sub-agent.</p>
+<table>
+<thead>
+<tr>
+<th>Unit</th>
+<th>What it builds</th>
+<th>Files</th>
+<th>Needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>W0</td>
+<td>The Embedded Capacity Register loader in <code>packages/studies</code> (merged in PR 1267). The file holds only the workbook reader. The Primary-name normalisation and the connected-solar filter are not in it, so U5b writes them in <code>e00045_outside.py</code>.</td>
+<td><code>packages/studies/src/studies/ecr_reader.py</code> (merged in PR 1267)</td>
+<td>nothing</td>
+</tr>
+<tr>
+<td>U1</td>
+<td>Inputs, weeks, masks, validation, and the raw-data figures 1 to 4</td>
+<td><code>ml-experiments/00045-.../e00045_common.py</code>, <code>e00045_inputs.py</code>, <code>e00045_raw_charts.py</code></td>
+<td>nothing</td>
+</tr>
+<tr>
+<td>U2</td>
+<td>The weekly design, the demand-cell projection, the ADMM solver for asymmetric L1 with non-negativity, the five fits (free, symmetric, asymmetric, strictly non-decreasing, season-year constant), and the self-tests</td>
+<td><code>e00045_model.py</code>, <code>e00045_selftest.py</code></td>
+<td>U1's common module</td>
+</tr>
+<tr>
+<td>U3</td>
+<td>The injection builder (cases, semi-synthetic baseline, hold-out split), tuning, the frozen file, scoring, the contrasts, the coverage bootstrap, and vintages on injections</td>
+<td><code>e00045_inject.py</code>, <code>e00045_tune.py</code>, <code>e00045_score.py</code>, <code>e00045_bootstrap.py</code></td>
+<td>U2</td>
+</tr>
+<tr>
+<td>U4</td>
+<td>Real-series fits, recovery-ratio correction, the 500-draw bootstrap, weekly-origin vintages, the placebo sky, the gap diagnostic, and the two output files</td>
+<td><code>e00045_real.py</code>, <code>e00045_placebo.py</code>, <code>e00045_outputs.py</code></td>
+<td>U2, U3's recovery ratios</td>
+</tr>
+<tr>
+<td>U5a</td>
+<td>The download scripts for the LSOA files, the DESNZ tables, and the Ofgem FiT report with Code-Point Open, following the <code>data-download</code> skill, with a generated README</td>
+<td><code>e00045_fetch_lsoa.py</code>, <code>e00045_fetch_fit.py</code></td>
+<td>the maintainer's licence decision</td>
+</tr>
+<tr>
+<td>U5b</td>
+<td>The outside checks (DESNZ, FiT, register through <code>studies.ecr_reader</code>, the season-year anchor)</td>
+<td><code>e00045_outside.py</code></td>
+<td>U4, U5a, W0</td>
+</tr>
+<tr>
+<td>U6</td>
+<td>The printed report (every number the page quotes) and figures 5 to 17</td>
+<td><code>e00045_report.py</code>, <code>e00045_charts.py</code></td>
+<td>U3, U4, U5b</td>
+</tr>
+<tr>
+<td>U7</td>
+<td>The write-up with its plain-language opening, the research-plan row and research-log entry, and the <code>mkdocs.yml</code> line</td>
+<td><code>docs/ml-experiments/00045-.../result.md</code>, <code>docs/ml-experiments/research-plan.md</code>, <code>docs/ml-experiments/research-log.md</code>, <code>mkdocs.yml</code></td>
+<td>U6</td>
+</tr>
+</tbody>
+</table>
+<p>The order is W0, U1, and U5a together; then U2; then U3 and U4 together; then U5b and U6; then U7.
+Each unit is committed separately, and the plan commit with this page and the research-plan row
+comes first.</p>
+<h3 id="figures-raw-data-first">Figures, raw data first</h3>
+<p>All charts follow the <code>dataviz</code> skill (OCF-brand palette, sized to the text column, SVG optimised
+with <code>svgo</code>). Farm output is normalised and labelled Solar farm A to F. Substations may be named.</p>
+<ol>
+<li><strong>Raw: the model-free trend.</strong> For each Primary, the rolling 8-week mean of the midday gap
+   between clear days (daily clear-sky index of 0.8 or more) and overcast days (0.3 or less), in
+   April to September, from 2019 to 2026. Where the gap rises, the capacity rises.</li>
+<li><strong>Raw: what a week of evidence looks like.</strong> One clear and one overcast week in summer and in
+   winter at Donington, with power and CAMS irradiance on twin axes.</li>
+<li><strong>Raw: coverage.</strong> A heat map of usable daylight half-hours per Primary-week, with masked closure
+   days, dropped CAMS hours, and unobserved weeks marked.</li>
+<li><strong>Raw: how much information a week holds.</strong> The free weekly capacity with its standard error at
+   Donington, and the standard error by calendar month for all Primaries, with the implied smallest
+   detectable step.</li>
+<li><strong>Method: one injected path through five fits.</strong> A ramp, a step, and a fall at Donington with
+   Solar farm D, drawn with the free, symmetric, asymmetric, strictly non-decreasing, and
+   season-year fits.</li>
+<li><strong>Method: the penalty grid.</strong> The tuning-set error and false-step rate over <code>(a, r)</code>, with the
+   chosen pair marked.</li>
+<li><strong>Headline: path error by case family and fit,</strong> with 95% intervals, for the scoring units.</li>
+<li><strong>The detection curve:</strong> the share of steps detected against step size, for April to September
+   and October to March, one panel per Primary.</li>
+<li><strong>Falls:</strong> the share of a temporary fall recovered by depth and duration, for the symmetric,
+   asymmetric, and strictly non-decreasing fits.</li>
+<li><strong>Transfers and seasonal load:</strong> the false step from an unlogged transfer against a masked one,
+    and the seasonal swing that creeps into the path, for the weather-independent load and the
+    sunshine-correlated load.</li>
+<li><strong>False steps:</strong> the distribution over the 200 placebo permutations per Primary, the
+    constant-path injections, and the ratchet drift.</li>
+<li><strong>Real-time vintages:</strong> the first estimate against the final fit, and the revision by the age
+    of the week, on injections and on the real series.</li>
+<li><strong>Interval calibration:</strong> the coverage of the truth against the nominal level (50%, 80%, and 90%)
+    at step and non-step weeks.</li>
+<li><strong>Headline on real data:</strong> the weekly capacity of each Primary with its 90% band, experiment
+    00040's season-year C as points, Kirton in grey with its library range, and the two
+    systematic scenarios as separate lines.</li>
+<li><strong>The gap between asymmetric and symmetric paths</strong> on the real series, with held falls marked.</li>
+<li><strong>Outside checks:</strong> the series against the DESNZ expected peak with the tolerance band, and
+    the register total.</li>
+<li><strong>Additivity:</strong> the fitted increment on the real series against the semi-synthetic score for
+    the same injection.</li>
+</ol>
+<h3 id="risks">Risks</h3>
+<ol>
+<li><strong>Winter weeks carry almost no information.</strong> Daylight is short and <code>u</code> is small, so the path is
+   set by the penalty from about November to February. The standard error by month (figure 4) and
+   the seasonal detection limit state this, and the series marks wide-interval weeks.</li>
+<li><strong>Per-season-year cells absorb part of a step at a month boundary.</strong> One in four injected steps
+   sits on a boundary. If the recovered size is under 0.75 of the true size there, the write-up
+   reports it and the penalty cannot fix it.</li>
+<li><strong>The asymmetric penalty ratchets on noise.</strong> Rises are lightly penalised and falls heavily
+   penalised, so noise peaks stick. Decision-rule condition (iv) and figure 11 measure the drift. If
+   condition (iv) fails, the next part may need a penalty on the level as well as the increments.</li>
+<li><strong>The fit is not additive.</strong> The production series is fitted to real data that already holds
+   unknown solar, so the semi-synthetic scoring and the real-plus-injection scoring are both
+   reported, the verdict uses the worse, and figure 17 shows the gap.</li>
+<li><strong>Unlogged switching produces false steps.</strong> The transfer case measures the size. The real
+   series' detected steps must be checked against SW2-0b's labels once they exist, and a step that
+   coincides with a labelled transfer is not a capacity change.</li>
+<li><strong>A load that rises with sunshine looks like solar.</strong> It biases the level low and, if seasonal,
+   adds a swing to the path. The seasonal-load case measures the swing. Nothing in the data sizes
+   the real load, so the scenario columns carry it separately.</li>
+<li><strong>The model code is copied for the third time.</strong> Experiments 00039, 00040, and now 00045 each
+   hold a copy of the cell, window, and least-squares code. A move into <code>packages/studies</code> is
+   overdue and is a separate reviewed change, outside this experiment.</li>
+<li><strong>Only three scoring farms.</strong> The farm margin of the two-way bootstrap is coarse. The write-up
+   reports results with and without Solar farm E and the seed-level spread.</li>
+<li><strong>The outside checks are weak and partial.</strong> None of the DESNZ, FiT, and ECR datasets is
+   complete, so each is a floor and a mismatch does not show the series is wrong. The DESNZ
+   tolerance of a factor of 1.5 catches only gross failure, the DESNZ tables are constituency
+   level (domestic only) and local-authority level and so need area scaling, the FiT took no new
+   installations after 2019, postcode districts do not align with the polygons, and the register's
+   date field may not be a connection date.</li>
+<li><strong>The vintage end-of-record problem.</strong> Penalised fits are least constrained at the end. The
+    ERA5 temperature that production would use arrives about 5 days late, which the vintage scoring
+    ignores; dropping the temperature term moved C by 0.006 of capacity in experiment 00039.</li>
+<li><strong>Kirton and Wrangle T1.</strong> Kirton's cloud load enters its weekly path as capacity, and Wrangle
+    T1 has two years of data and a low signal. Both appear with their status, and neither supports
+    a claim.</li>
+<li><strong>CAMS dropouts.</strong> Reliability under 0.9 drops 9.7% of hours, up to 12.6% of daylight hours in
+    December, so winter weeks may fall below 3 usable days.</li>
+<li><strong>The solver is new.</strong> No convex-optimisation package is installed, and adding one changes
+    <code>pyproject.toml</code>, which belongs to the maintainer. The ADMM routine is checked against
+    <code>scipy.optimize.linprog</code> on a 30-week problem, against ordinary least squares at <code>a = 0</code>, and
+    against a constant path at large <code>a</code>. A stopping tolerance that is too loose would show as a
+    failed self-test.</li>
+<li><strong>CPU contention.</strong> The slot's 4 cores are shared with PVDIS-3. Check <code>uptime</code> before each stage.</li>
+</ol>
+<h2 id="what-the-next-experiment-should-answer">What the next experiment should answer</h2>
+<p><strong>The next experiment should ask whether a penalty set per Primary from that Primary's own weekly
+noise, together with a rule that holds a fall for a stated number of weeks, can keep constant-path
+false steps at or below 0.5 per Primary-year while recovering at least 0.5 of a 26-week fall and
+less than 0.5 of an 8-week fall.</strong> The next experiment should test this alongside the season-year
+constant plus step detection that fires only for steps above 25% to 30% of capacity, on tuning and
+scoring units fixed in advance and with the false-step limit scored on both bases of the
+constant-path threshold. The comparison fits and the placebo-sky constant path should be reused, and
+the interval should be rebuilt and checked for coverage on the tuning units before it is reported.
+PVDIS-5 reads the season-year constant for now.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
