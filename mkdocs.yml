@@ -212,6 +212,7 @@ nav:
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
+      - "Can a Primary demand forecast learn the normal running arrangement from labelled switching?": ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md
   - Live service:
       - Overview: live_service/index.md
       - Setting up the live service on AWS: live_service/aws.md
