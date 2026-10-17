@@ -206,6 +206,7 @@ nav:
       - "Can the direction of flow be recovered at Primaries metered only in MVA?": ml-experiments/00079-pvdis-7-mw-at-mva-only-primaries/result.md
       - "Are the tails of the stored demand forecasts too narrow?": ml-experiments/00083-curtailment-cost-and-tail-calibration-worked-example/result.md
       - "Can the substation-limit curtailment metric rank forecasts on the pilot?": ml-experiments/00084-substation-limit-curtailment-cost-worked-example/result.md
+      - "Do cheaper retraining schedules rank arms the way weekly retraining does?": ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
       - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
       - "Does removing the residual's half-hour-to-half-hour memory help the switching detector?": ml-experiments/00062-sw2-9-whitened-residual-step-detector/result.md
