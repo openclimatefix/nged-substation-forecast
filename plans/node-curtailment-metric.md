@@ -235,8 +235,14 @@ are rewritten to match, the latter keeping its heading text.
 **An ml-experiment, figure-led and exploratory, with no verdict on the forecasts.** It re-scores
 experiment 48's stored sets on `fold_a_daily_gap_v1` (2025-07-02 to 2026-06-30, seed 0) as paired
 node and generator arms: best guess (`weekly` + `gen_monthly`), best-guess stack (`frozen_cs` +
-`gen_frozen`), manual heuristic at tau 0.95, climatology, the perfect forecast, and a diagnostic arm
-of best-guess nodes with actual generator output. Set names are checked against experiment 48's
+`gen_frozen`), climatology, the perfect forecast, a diagnostic arm of best-guess nodes with actual
+generator output, and the NGED baseline: the manual heuristic's substation-flow forecast at tau 0.95
+with no generator forecast. NGED forecasts substation flow only with the manual heuristic today
+(the maintainer's account, not yet confirmed by NGED), so the baseline passes each generator's
+capacity as its forecast: every generator is assumed to run at full capacity and is capped at its
+capacity minus its pro rata share of the planned cut. A cap above a generator's actual output
+relieves nothing, so the shortfall is charged as breach, and the DCUSA form charges the whole
+instruction. Set names are checked against experiment 48's
 manifests first.
 
 **The first output is the event census, and it decides what the rest may claim.** For each node and
@@ -272,6 +278,8 @@ the write-up. Both PRs touch `packages/`, so neither merges on its own.
 
 ## 8. Questions still open for the maintainer or NGED
 
+The questions for NGED are also collected in [issue #1318 (Questions to ask NGED about curtailment)](https://github.com/openclimatefix/nged-substation-forecast/issues/1318), which stays open. No stage waits on the answers.
+
 1. **The sign and definition of the WALPOLE and BICKER FEN GSP series (awaiting NGED),** and whether
    WALPOLE's published export limit applies to what our series meters.
 2. **The October 2026 Exceeded Curtailment Prices** for the East Midlands licence area.
@@ -289,7 +297,9 @@ the write-up. Both PRs touch `packages/`, so neither merges on its own.
    LIFO runs only as a sensitivity once dates exist.
 5. **Are the firm PELs real limits?** NGED floors a PEL at 30% of rating, and SKEGNESS's 29.8 MW
    sits near that floor; is BOSTON held at 45.0 MW by an operating ceiling or a clipped meter?
-6. **The format of the ~2,500-series January delivery:** does it carry the hierarchy, each series'
+6. **How NGED chooses which generators to cap, and by how much,** when the heuristic forecasts
+   excess substation flow. If NGED always caps a fixed set, the baseline arm above is too weak.
+7. **The format of the ~2,500-series January delivery:** does it carry the hierarchy, each series'
    sign convention, and generator capacities, so the tables can be built from it directly?
 
 ## 9. Build order
