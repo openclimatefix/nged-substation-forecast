@@ -673,11 +673,15 @@ def test_a_row_missing_from_one_arm_is_dropped_from_every_arm() -> None:
     assert result.n_rows_dropped_not_in_every_arm == 0  # align_arms already intersected the keys
 
 
-def test_a_node_row_whose_generator_has_no_forecast_row_is_dropped_and_counted() -> None:
-    """Two half-hours; the generator has a forecast row for only the first.
+def test_a_generator_with_no_forecast_row_is_not_instructed_and_the_node_row_is_still_scored() -> (
+    None
+):
+    """Two half-hours; the 30 MW generator has a forecast row for only the first.
 
-    The second half-hour would otherwise be scored as if the generator were absent, so it is
-    dropped: one node row scored (needed 12.5 MWh), one dropped.
+    Both node rows are scored (2 node rows). In the first the generator takes the planned 12.5 MWh:
+    cap 30 - 25 = 5 MW, lost (30 - 5) x 0.5 = 12.5 MWh. In the second the generator is not
+    instructed, so nothing is curtailed and the whole 12.5 MWh excess is breach. Totals: needed
+    25.0 MWh, curtailed 12.5 MWh, breach 12.5 MWh. One generator-half-hour has no forecast.
     """
     node = _forecast(
         series=NODE_SERIES, valid_times=[_valid(step=0), _valid(step=1)], actual=[70.0, 70.0]
@@ -687,8 +691,172 @@ def test_a_node_row_whose_generator_has_no_forecast_row_is_dropped_and_counted()
         node=node,
         generators=_generator_row(output=30.0, forecast=30.0),
     )
-    assert _headline(result.per_arm, column="needed_mwh") == pytest.approx(12.5)
-    assert result.n_rows_dropped_missing_generator == 1
+    assert _headline(result.per_arm, column="n_node_half_hours") == 2
+    assert _headline(result.per_arm, column="needed_mwh") == pytest.approx(25.0)
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(12.5)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(12.5)
+    assert result.n_generator_rows_missing_forecast == 1
+    assert result.n_generator_rows_missing_actual == 0
+
+
+def test_a_generator_missing_its_forecast_gives_no_relief_and_takes_no_share() -> None:
+    """Generator 101 (10 MW, forecast NaN, output 10 MW), 102 (30 MW, forecast 8 MW, output 8 MW).
+
+    Node 70 MW over 45 MW: planned 12.5 MWh. Generator 101 is not instructed, so it is left out of
+    the allocation and 102 is offered all 12.5 MWh, clamped at its forecast energy 8 x 0.5 = 4 MWh.
+    Cap 8 - 4 / 0.5 = 0 MW, lost (8 - 0) x 0.5 = 4 MWh. Breach (70 - 4 / 0.5 - 45) x 0.5 = 8.5 MWh.
+    Had 101 been given a pro rata share of 3.125 MWh, curtailed energy would differ from 4 MWh.
+    """
+    result = _score(
+        table=_table(generators=[(GENERATOR_SERIES, 10.0), (SECOND_GENERATOR_SERIES, 30.0)]),
+        node=_one_row(flow=70.0),
+        generators=pl.concat(
+            [
+                _generator_row(series=GENERATOR_SERIES, output=10.0, forecast=float("nan")),
+                _generator_row(series=SECOND_GENERATOR_SERIES, output=8.0, forecast=8.0),
+            ]
+        ),
+    )
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(4.0)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(8.5)
+    assert result.n_generator_rows_missing_forecast == 1
+    assert result.n_generator_rows_missing_actual == 0
+
+
+def test_the_generator_still_instructed_takes_the_whole_planned_cut_when_its_neighbour_is_not() -> (
+    None
+):
+    """Generator 101 (10 MW, forecast NaN), 102 (30 MW, forecast and output 30 MW); node 70 MW.
+
+    Planned 12.5 MWh. If generator 101 stayed in the allocation it would take 12.5 x 10 / 40 =
+    3.125 MWh. It does not, so 102 takes all 12.5 MWh (under its 15 MWh forecast energy): cap 30 -
+    25 = 5 MW, lost (30 - 5) x 0.5 = 12.5 MWh, and there is no breach.
+    """
+    result = _score(
+        table=_table(generators=[(GENERATOR_SERIES, 10.0), (SECOND_GENERATOR_SERIES, 30.0)]),
+        node=_one_row(flow=70.0),
+        generators=pl.concat(
+            [
+                _generator_row(series=GENERATOR_SERIES, output=10.0, forecast=float("nan")),
+                _generator_row(series=SECOND_GENERATOR_SERIES, output=30.0, forecast=30.0),
+            ]
+        ),
+    )
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(12.5)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize("missing_actual", [float("nan"), None])
+def test_a_generator_with_a_forecast_and_no_actual_is_instructed_and_loses_nothing(
+    missing_actual: float | None,
+) -> None:
+    """Generator 30 MW, forecast 30 MW, output NaN or null; node 70 MW over 45 MW.
+
+    Planned 12.5 MWh, so the generator is instructed: cap 30 - 25 = 5 MW, and its instruction is
+    capacity - cap = 25 MW. Its output is unknown, so its energy loss is counted as 0 MWh, and the
+    whole 12.5 MWh excess is breach. Energy proxy 2000 x (0 + 20 x 12.5) = 500,000 GBP. The DCUSA
+    form still charges the instruction: 0.5 x 25 / 30 hours x 30 MW = 12.5 MWh, so 2000 x (12.5 +
+    250) = 525,000 GBP. One generator-half-hour has no actual.
+    """
+    generator = _generator_row(output=30.0, forecast=30.0).with_columns(
+        actual=pl.lit(missing_actual, dtype=pl.Float64)
+    )
+    result = _score(
+        table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+        node=_one_row(flow=70.0),
+        generators=generator,
+    )
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(0.0)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(12.5)
+    assert _headline(result.per_arm, column="energy_proxy_gbp") == pytest.approx(500_000.0)
+    assert _headline(result.per_arm, column="dcusa_form_gbp") == pytest.approx(525_000.0)
+    assert result.n_generator_rows_missing_forecast == 0
+    assert result.n_generator_rows_missing_actual == 1
+
+
+def test_a_node_row_is_still_scored_when_every_generator_is_missing_its_forecast() -> None:
+    """Two generators, both forecasts NaN; node 70 MW over 45 MW.
+
+    Nothing is instructed, so curtailed energy is 0 MWh and the whole 12.5 MWh excess is breach.
+    The node row is scored (1 node row), and two generator-half-hours have no forecast.
+    """
+    result = _score(
+        table=_table(generators=[(GENERATOR_SERIES, 10.0), (SECOND_GENERATOR_SERIES, 30.0)]),
+        node=_one_row(flow=70.0),
+        generators=pl.concat(
+            [
+                _generator_row(series=GENERATOR_SERIES, output=10.0, forecast=float("nan")),
+                _generator_row(series=SECOND_GENERATOR_SERIES, output=30.0, forecast=float("nan")),
+            ]
+        ),
+    )
+    assert _headline(result.per_arm, column="n_node_half_hours") == 1
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(0.0)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(12.5)
+    assert result.n_generator_rows_missing_forecast == 2
+
+
+def test_generator_counters_add_up_over_missing_rows_missing_forecasts_and_missing_actuals() -> (
+    None
+):
+    """Two half-hours and two generators make four generator-half-hours.
+
+    Step 0: generator 101 is complete; generator 102 has a NaN forecast (missing forecast).
+    Step 1: generator 101 has a forecast and a NaN actual (missing actual); generator 102 has no
+    row at all (missing forecast). So 2 missing forecasts, 1 missing actual, 1 complete. Both node
+    rows are scored.
+    """
+    node = _forecast(
+        series=NODE_SERIES, valid_times=[_valid(step=0), _valid(step=1)], actual=[70.0, 70.0]
+    )
+    generators = pl.concat(
+        [
+            _generator_row(series=GENERATOR_SERIES, output=10.0, forecast=10.0),
+            _generator_row(series=SECOND_GENERATOR_SERIES, output=30.0, forecast=float("nan")),
+            _forecast(
+                series=GENERATOR_SERIES,
+                valid_times=[_valid(step=1)],
+                actual=[float("nan")],
+                q50=[10.0],
+            ),
+        ]
+    )
+    result = _score(
+        table=_table(generators=[(GENERATOR_SERIES, 10.0), (SECOND_GENERATOR_SERIES, 30.0)]),
+        node=node,
+        generators=generators,
+    )
+    assert _headline(result.per_arm, column="n_node_half_hours") == 2
+    assert result.n_generator_rows_missing_forecast == 2
+    assert result.n_generator_rows_missing_actual == 1
+
+
+def test_generator_counters_cover_only_scored_node_rows_and_sum_over_arms() -> None:
+    """Node row 1 is scored; node row 2 has a NaN node quantile in arm y and is dropped everywhere.
+
+    Generator 101 has a NaN forecast in arm x at both half-hours, and a complete forecast in arm y.
+    Only row 1 is scored, so arm x counts one generator-half-hour with no forecast and arm y none,
+    one in all. The dropped row's generator-half-hour is not counted.
+    """
+    node = _forecast(
+        series=NODE_SERIES, valid_times=[_valid(step=0), _valid(step=1)], actual=[70.0, 70.0]
+    )
+    bad_node = node.with_columns(q95=pl.Series([70.0, float("nan")], dtype=pl.Float64))
+    good = _forecast(
+        series=GENERATOR_SERIES,
+        valid_times=[_valid(step=0), _valid(step=1)],
+        actual=[30.0, 30.0],
+        q50=[30.0, 30.0],
+    )
+    result = node_curtailment(
+        table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+        node_forecasts={"x": node, "y": bad_node},
+        generator_forecasts={"x": good.with_columns(q50=float("nan")), "y": good},
+        assumptions=_assumptions(),
+    )
+    assert result.n_rows_dropped_nonfinite_forecast == 1
+    assert result.n_generator_rows_missing_forecast == 1
+    assert result.n_generator_rows_missing_actual == 0
 
 
 def test_many_nodes_are_scored_together_with_each_nodes_own_limit() -> None:
@@ -1272,11 +1440,14 @@ def test_a_node_whose_only_flows_are_nan_has_no_scaled_limit() -> None:
 # --- generators that are missing, not finite, over capacity, or newly connected -----------------
 
 
-def test_a_nan_generator_forecast_in_one_arm_drops_the_row_from_every_arm() -> None:
+def test_a_nan_generator_forecast_in_one_arm_leaves_that_generator_uninstructed_in_that_arm() -> (
+    None
+):
     """Arm x has a NaN median forecast for the generator at the second half-hour; arm y does not.
 
-    The second node row is dropped (one row counted), and arm y is scored on the same one row as
-    arm x: needed 12.5 MWh in both arms, 1 node row each, and no NaN anywhere.
+    Both node rows are scored in both arms. Arm y curtails 12.5 MWh in each half-hour (25.0 MWh) and
+    has no breach. Arm x curtails 12.5 MWh in the first half-hour only, so it curtails 12.5 MWh and
+    the second half-hour's whole 12.5 MWh excess is breach. Needed is 25.0 MWh in both.
     """
     node = _forecast(
         series=NODE_SERIES, valid_times=[_valid(step=0), _valid(step=1)], actual=[70.0, 70.0]
@@ -1299,10 +1470,11 @@ def test_a_nan_generator_forecast_in_one_arm_drops_the_row_from_every_arm() -> N
         assumptions=_assumptions(),
     )
     headline = result.per_arm.filter(pl.col("price_gbp_per_mwh") == HEADLINE).sort("arm")
-    assert headline["needed_mwh"].to_list() == pytest.approx([12.5, 12.5])
-    assert headline["curtailed_mwh"].to_list() == pytest.approx([12.5, 12.5])
-    assert headline["n_node_half_hours"].to_list() == pytest.approx([1.0, 1.0])
-    assert result.n_rows_dropped_missing_generator == 1
+    assert headline["needed_mwh"].to_list() == pytest.approx([25.0, 25.0])
+    assert headline["curtailed_mwh"].to_list() == pytest.approx([12.5, 25.0])
+    assert headline["breach_mwh"].to_list() == pytest.approx([12.5, 0.0])
+    assert headline["n_node_half_hours"].to_list() == pytest.approx([2.0, 2.0])
+    assert result.n_generator_rows_missing_forecast == 1
     assert result.n_rows_dropped_not_in_every_arm == 0
 
 

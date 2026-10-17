@@ -15,9 +15,9 @@ The rule, per forecast row of a node (`r` is the breach ratio, `tau = 1 - 1/r`):
    limit for the season of the valid time and `q_tau(export)` is the tau quantile of the net export.
    Net export is `export_sign * flow`, so for `export_sign` of -1 the quantile of the export is
    minus the `1 - tau` quantile of the flow.
-2. The generators under the node whose forecast is given (the curtailable ones) share `v_node` pro
-   rata by capacity, each share clamped at the generator's own forecast energy `f_g * 0.5` MWh and
-   the excess redistributed to the unclamped generators. Any remainder is unallocated.
+2. The curtailable generators under the node whose forecast is finite share `v_node` pro rata by
+   capacity, each share clamped at the generator's own forecast energy `f_g * 0.5` MWh and the
+   excess redistributed to the unclamped generators. Any remainder is unallocated.
 3. A generator with a share `v_g > 0` is capped at `cap_g = max(0, f_g - v_g / 0.5)` MW. It loses
    `c_g = max(0, a_g - cap_g) * 0.5` MWh against its metered output `a_g`. A generator with no
    share is not capped.
@@ -33,6 +33,16 @@ reasoning.
 
 Decisions the numbers rest on, stated here because nothing in the output shows them:
 
+- A node row is scored whenever the node's own forecast and actual are finite, whatever the
+  generators beneath it hold. A generator-half-hour whose forecast is missing or not finite is not
+  instructed: it takes no share of the planned cut, gives no relief, and loses no energy. A
+  generator-half-hour whose forecast is finite but whose actual output is missing is instructed as
+  normal, and its energy loss is counted as 0 MWh, because the output cannot be seen. The result
+  counts both kinds of generator-half-hour, summed over arms, on the scored node rows only. A
+  missing forecast leaves relief out and so overstates breach. A missing actual understates the
+  loss, so the curtailed energy and its cost are lower bounds when actuals are missing. Dropping
+  every node row with any such generator would instead remove the rows that matter most: in the
+  pilot it removed 8,638 node rows, 31% of them, including the only event over a real limit.
 - The DCUSA-form figure adds `r * breach * price` to the payment, the same breach term as the energy
   proxy, so the two forms differ only in what they charge a capped generator.
 - `curtailment_limit_hours` is applied as given to the whole scored window. The caller pro-rates an
@@ -45,6 +55,7 @@ Decisions the numbers rest on, stated here because nothing in the output shows t
   count). It is null in node-only mode.
 - The module does not compute avoidable cost. `avoidable_cost` subtracts a perfect arm's figures,
   which the caller must have scored in the same call so that all arms share their rows.
+- A node row present in one arm and absent from another is dropped from every arm.
 - Every arm must hold the same seeds, because `align_arms` intersects on the seed and an arm with
   fewer seeds would trim every other arm; `node_curtailment` raises instead.
 - The capacity in `GeneratorRow.capacity_mw` and the effective capacity given to
@@ -291,10 +302,14 @@ class NodeCurtailmentResult:
         n_excluded_unknown_sign: How many nodes were excluded for a null `export_sign`.
         n_rows_dropped_nonfinite_forecast: Node rows (distinct `KEY_COLUMNS`) dropped because an
             arm's node quantile was null or not finite.
-        n_rows_dropped_missing_generator: Node rows dropped because a curtailable generator
-            beneath the node had no finite forecast row, not counted again if already counted above.
         n_rows_dropped_not_in_every_arm: Node rows dropped because another arm lacked them, not
             counted again if already counted above.
+        n_generator_rows_missing_forecast: Generator-half-hours (a curtailable generator at one
+            node row's key, summed over arms) on the scored node rows whose forecast was missing or
+            not finite. Such a generator is not instructed.
+        n_generator_rows_missing_actual: The same count where the forecast is finite and the actual
+            output is missing or not finite. Such a generator is instructed, and its loss counts as
+            0 MWh, so a missing actual can understate the curtailed energy.
     """
 
     per_arm: pl.DataFrame
@@ -304,8 +319,9 @@ class NodeCurtailmentResult:
     excluded: pl.DataFrame
     n_excluded_unknown_sign: int
     n_rows_dropped_nonfinite_forecast: int
-    n_rows_dropped_missing_generator: int
     n_rows_dropped_not_in_every_arm: int
+    n_generator_rows_missing_forecast: int
+    n_generator_rows_missing_actual: int
 
 
 def season_expression(*, time_column: str) -> pl.Expr:
@@ -650,23 +666,20 @@ def _generator_pairs(
 ) -> pl.LazyFrame:
     """Pair every node row with each curtailable generator connected at its valid time.
 
-    A pair whose generator has no finite forecast row has null `forecast_mw`, which the caller uses
-    to drop the node row. The result is lazy so that the caller can aggregate it without holding
-    every pair in memory.
+    A pair whose generator has no row, or a non-finite forecast, has null `forecast_mw` and is not
+    instructed. A pair with a finite forecast and a missing or non-finite actual has null
+    `output_mw`. The result is lazy so that the caller can aggregate it without holding every pair
+    in memory.
     """
     keys = [c for c in KEY_COLUMNS if c != "node_id"]
     curtailable = generators.filter(pl.col("is_forecast")).select(
         "generator_id", "node_id", "capacity_mw", "connection_date"
     )
-    forecasts = (
-        generator_frame.lazy()
-        .select(
-            *keys,
-            generator_id="time_series_id",
-            forecast_mw="q50",
-            output_mw="actual",
-        )
-        .filter(pl.col("forecast_mw").is_finite() & pl.col("output_mw").is_finite())
+    forecasts = generator_frame.lazy().select(
+        *keys,
+        generator_id="time_series_id",
+        forecast_mw=pl.when(pl.col("q50").is_finite()).then(pl.col("q50")),
+        output_mw=pl.when(pl.col("actual").is_finite()).then(pl.col("actual")),
     )
     return (
         rows.lazy()
@@ -684,8 +697,9 @@ def _generator_pairs(
 def _cap_generators(*, pairs: pl.DataFrame) -> pl.DataFrame:
     """Allocate each node row's planned curtailment to its generators and cap them.
 
-    The caller passes only pairs with planned curtailment above zero, and no forecast above its
-    capacity, so the instruction value `capacity - cap` is never negative.
+    The caller passes only pairs with planned curtailment above zero and a finite forecast, and no
+    forecast above its capacity, so the instruction value `capacity - cap` is never negative. A null
+    `output_mw` loses 0 MWh.
     """
     group = ["arm", *KEY_COLUMNS]
     allocated = allocate_pro_rata_by_capacity(
@@ -702,7 +716,7 @@ def _cap_generators(*, pairs: pl.DataFrame) -> pl.DataFrame:
     return allocated.with_columns(
         cap_mw=cap_mw,
         lost_mwh=pl.when(instructed)
-        .then((pl.col("output_mw") - cap_mw).clip(lower_bound=0.0) * HALF_HOUR_H)
+        .then((pl.col("output_mw") - cap_mw).clip(lower_bound=0.0).fill_null(0.0) * HALF_HOUR_H)
         .otherwise(0.0),
         instruction_mw=pl.when(instructed).then(pl.col("capacity_mw") - cap_mw).otherwise(0.0),
     )
@@ -817,6 +831,22 @@ def event_census(
     return _export_census(table=table, exports=exports, scaled=scaled)
 
 
+def _keep_shared_keys(*, arms: Mapping[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
+    """Keep each arm's generator rows whose key every arm holds, whether or not `actual` is finite.
+
+    `align_arms` would also drop a row with a missing `actual`. Here such a row stays, so that the
+    generator is still instructed and the missing output is counted.
+    """
+    frames = list(arms.values())
+    shared = frames[0].select(ROW_KEYS).unique()
+    for frame in frames[1:]:
+        shared = shared.join(frame.select(ROW_KEYS).unique(), on=list(ROW_KEYS), how="inner")
+    return {
+        name: frame.join(shared, on=list(ROW_KEYS), how="inner", maintain_order="left")
+        for name, frame in arms.items()
+    }
+
+
 def _require_unique_row_keys(*, inputs: Mapping[str, Mapping[str, pl.DataFrame]]) -> None:
     """Raise if any arm's frame repeats a row key, which would silently empty every arm."""
     for kind, arms in inputs.items():
@@ -886,7 +916,9 @@ def node_curtailment(
 
     Returns:
         A `NodeCurtailmentResult`. Every arm is scored on exactly the node rows that every arm holds
-        and for which every curtailable generator has a forecast.
+        and whose node forecast and actual are finite. A curtailable generator without a finite
+        forecast at a node row is not instructed there; one with a forecast and no actual is
+        instructed and loses 0 MWh. The result counts both.
 
     Raises:
         ValueError: If the arms of the two mappings differ, an arm lacks a quantile column that tau
@@ -913,7 +945,9 @@ def node_curtailment(
         for s in frame.filter(pl.col("capacity_missing"))["time_series_id"].unique()
     }
     aligned_nodes = align_arms(arms=node_forecasts)
-    aligned_generators = align_arms(arms=generator_forecasts) if assumptions.use_generators else {}
+    aligned_generators = (
+        _keep_shared_keys(arms=generator_forecasts) if assumptions.use_generators else {}
+    )
     forecast_series = {
         int(s) for frame in aligned_nodes.values() for s in frame["time_series_id"].unique()
     }
@@ -936,7 +970,8 @@ def node_curtailment(
     )
     rows_by_arm = [r.filter(pl.col("finite")).drop("finite") for r in all_rows_by_arm]
     rows = pl.concat(rows_by_arm)
-    n_dropped_generator = 0
+    n_missing_forecast = 0
+    n_missing_actual = 0
     if assumptions.use_generators:
         pairs_lazy = pl.concat(
             _generator_pairs(
@@ -947,19 +982,14 @@ def node_curtailment(
             for arm, arm_rows in zip(arms, rows_by_arm, strict=True)
         )
         group = ["arm", *KEY_COLUMNS]
-        incomplete = pairs_lazy.filter(pl.col("forecast_mw").is_null()).select(group).unique()
-        incomplete = incomplete.collect()
-        n_dropped_generator = (
-            incomplete.select(KEY_COLUMNS).unique().join(nonfinite_keys, on=KEY_COLUMNS, how="anti")
-        ).height
         _require_forecast_within_capacity(pairs=pairs_lazy)
-        rows = rows.join(incomplete, on=group, how="anti")
         # Only node rows with planned curtailment can instruct a generator, so only they are
-        # allocated; the others have no loss and no instruction.
+        # allocated; the others have no loss and no instruction. A generator without a finite
+        # forecast is not instructed, so it is left out of the allocation.
         pairs = _cap_generators(
-            pairs=pairs_lazy.join(incomplete.lazy(), on=group, how="anti")
-            .filter(pl.col("planned_mwh") > 0)
-            .collect()
+            pairs=pairs_lazy.filter(
+                pl.col("planned_mwh") > 0, pl.col("forecast_mw").is_not_null()
+            ).collect()
         )
         curtailed = pairs.group_by(group).agg(
             curtailed_mwh=pl.col("lost_mwh").sum(),
@@ -974,7 +1004,7 @@ def node_curtailment(
 
     # Every arm is scored on the node rows that every arm holds.
     common = rows.group_by(KEY_COLUMNS).agg(n_arms=pl.len()).filter(pl.col("n_arms") == len(arms))
-    n_dropped_arms = total_keys.height - common.height - nonfinite_keys.height - n_dropped_generator
+    n_dropped_arms = total_keys.height - common.height - nonfinite_keys.height
     rows = rows.join(common.select(KEY_COLUMNS), on=list(KEY_COLUMNS), how="inner").with_columns(
         breach_mwh=(
             pl.col("export_mw") - pl.col("curtailed_mwh") / HALF_HOUR_H - pl.col("limit_mw")
@@ -983,6 +1013,13 @@ def node_curtailment(
     )
     if pairs is not None:
         pairs = pairs.join(common.select(KEY_COLUMNS), on=list(KEY_COLUMNS), how="inner")
+        scored_pairs = pairs_lazy.join(common.select(KEY_COLUMNS).lazy(), on=list(KEY_COLUMNS))
+        n_missing_forecast = scored_pairs.filter(pl.col("forecast_mw").is_null()).collect().height
+        n_missing_actual = (
+            scored_pairs.filter(pl.col("forecast_mw").is_not_null(), pl.col("output_mw").is_null())
+            .collect()
+            .height
+        )
 
     energies = ["needed_mwh", "planned_mwh", "curtailed_mwh", "breach_mwh"]
     return NodeCurtailmentResult(
@@ -999,8 +1036,9 @@ def node_curtailment(
         excluded=excluded,
         n_excluded_unknown_sign=excluded.filter(pl.col("reason") == REASON_UNKNOWN_SIGN).height,
         n_rows_dropped_nonfinite_forecast=nonfinite_keys.height,
-        n_rows_dropped_missing_generator=n_dropped_generator,
         n_rows_dropped_not_in_every_arm=n_dropped_arms,
+        n_generator_rows_missing_forecast=n_missing_forecast,
+        n_generator_rows_missing_actual=n_missing_actual,
     )
 
 
