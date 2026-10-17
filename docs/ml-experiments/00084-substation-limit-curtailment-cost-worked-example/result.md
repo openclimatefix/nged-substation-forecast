@@ -70,9 +70,9 @@ series, which the same code can score unchanged.
 
 **Verdict: inconclusive (no registered contrast).** At the real limit every arm costs GBP 0, and
 that figure demonstrates the arithmetic. At a scaled limit, the cost is a calibration to history, not
-a saving, and it rests on events in one or two months, so at 0.9 times the maximum the month-resampled 95% interval of
-every arm reaches GBP 0. Real limits are NGED's, Supported by NGED Open
-Data. Questions for NGED are collected in [issue #1318 (Questions to ask NGED about
+a saving, and it rests on events in one or two months. At 0.9 times the maximum, the month-resampled
+95% interval of every arm reaches GBP 0. Real limits are NGED's, Supported by NGED Open Data.
+Questions for NGED are collected in [issue #1318 (Questions to ask NGED about
 curtailment)](https://github.com/openclimatefix/nged-substation-forecast/issues/1318).
 
 ## The event census comes first
