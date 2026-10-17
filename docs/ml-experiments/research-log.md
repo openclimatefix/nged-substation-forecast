@@ -106,6 +106,7 @@ the maintainer to confirm.
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
 | [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Candidate | 2026-10-17 |
+| [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Partly supported: no leak; most of the gain comes from the fit starting at zero, and the offset adds -0.035 (-0.074 to +0.003) | Not for production | 2026-10-17 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1443,6 +1444,23 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
   #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
 
 ![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
+
+### 00076: does experiment 64's gain beyond 10 days come from a leak? (PVDIS-5 leak check)
+
+**There is no leak: the gain of experiment 64's best arm at 10 days and beyond comes mostly from
+the fit starting at zero, not from the solar offset.** We read the code and checked the base margin
+of the arm `am` at every training row and every validation row, and refitted `am` with a zero margin
+everywhere (`am0`). The margin is exactly zero from 10 days, the weights and capacities use training
+rows only, and a rebuild reproduces the stored quantiles exactly. At 10 days and beyond, `am0` scores
+0.086 points of capacity (98.33% interval -0.135 to -0.040) below experiment 46's `d1l`, and the
+offset in training adds 0.035 (-0.074 to +0.003). The verdict is `partly supported`.
+
+- **Finding for later experiments:** compare a margin arm with a zero-margin refit and with a refit
+  of the reference in the same pipeline. The contrast of `am0` with `d1l` also differs in pipeline,
+  so a refit of `d1l` is the next test.
+- **Write-up:** [the full result page](00076-pvdis-5-leak-check-beyond-10-days/result.md).
+
+![Contrasts at 10 days and beyond](00076-pvdis-5-leak-check-beyond-10-days/figure_1_contrasts.svg)
 
 ### 00073: can the mix of solar panel orientations and the DC to AC ratio be read from a Primary's power? (PVDIS-6)
 
