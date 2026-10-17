@@ -115,7 +115,9 @@ def _absolute_panel() -> alt.LayerChart | alt.FacetChart:
         color=alt.Color("colour:N", scale=None),
     )
     return alt.layer(
-        base.mark_rule().encode(x="qs_lower:Q", x2="qs_upper:Q"),  # ty: ignore[unresolved-attribute]
+        base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("qs_lower:Q", scale=alt.Scale(domain=list(ABSOLUTE_DOMAIN))), x2="qs_upper:Q"
+        ),
         base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "qs:Q",
@@ -139,7 +141,9 @@ def _contrast_panel() -> alt.LayerChart | alt.FacetChart:
     return alt.layer(
         _rule(x=0.0, domain=CONTRAST_DOMAIN),
         _rule(x=-_threshold(), domain=CONTRAST_DOMAIN, dash=(4, 3), colour="black"),
-        base.mark_rule().encode(x="lower:Q", x2="upper:Q"),  # ty: ignore[unresolved-attribute]
+        base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("lower:Q", scale=alt.Scale(domain=list(CONTRAST_DOMAIN))), x2="upper:Q"
+        ),
         base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "difference:Q",
@@ -294,7 +298,7 @@ def figure_evening() -> alt.TopLevelMixin:
         base.mark_point(filled=True, size=80).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y(
                 "cloud_slope_mw:Q",
-                title="After-dark demand change from clear to fully cloudy day (MW)",
+                title="After-dark demand, cloudy minus clear day (MW)",
             )
         ),
     ).properties(

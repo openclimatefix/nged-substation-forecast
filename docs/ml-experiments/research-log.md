@@ -32,7 +32,6 @@ the maintainer to confirm.
 | [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Give the XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the calibrated ENS sunshine anomaly, with a weight fitted per series, lead band, and season, and zero beyond 10 days) | Lowers the quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess; the live service cannot yet supply the inputs, the capacity held is stale, and the weights rest on one summer |
 | [00078 - Current capacity and a zero start, PVDIS-5 check 2](00078-pvdis-5-current-capacity-vintages/result.md) | Refresh the capacity table that feeds the base margin once per season-year, and test a base margin of zero in the production XGBoost recipe | Re-estimating the capacity lowers the score by 0.018 points (-0.036 to -0.004); a zero start lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) in this experiment, and has not been tested on other series types |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
-| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Use a per-Primary blend of east, south, and west shapes as the solar shape of the explicit solar term, if PVDIS-5 confirms it | Lowers held-out error by 1.3% in a fit with known weather; the shares are not identified and no forecast has used the blend yet |
 
 ## The experiments so far
 
@@ -108,7 +107,8 @@ the maintainer to confirm.
 | [00063 - SW2-10 joint fit, v2 in miniature](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) | Does one linear fit per Primary, holding a weather baseline without radiation, embedded solar capacity times the CAMS sunshine shape, and a share term per labelled transfer, beat the frozen v1 baseline outside switching, and recover injected solar and transfers? | Inconclusive: C1 is -0.322 points of capacity (-0.437 to -0.207) at 5 Primaries, close to the 0.35-point threshold, but both injection gates failed for reasons of test design | Not for production | Pending |
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
-| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Candidate | 2026-10-17 |
+| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Not for production | 2026-10-17 |
+| [00077 - Fitted solar shape in arm am, PVDIS part 6b](00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md) | Does a fitted east-south-west solar shape, with shares fixed across training years, lower the score of experiment 64's arm `am` by more than 0.5%? | Refuted: the score is unchanged (-0.001 points, 98.33% interval -0.018 to +0.014), and another Primary's shape scores the same | Not for production | 2026-10-17 |
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
 | [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) | Candidate | 2026-10-17 |
 | [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
@@ -1597,6 +1597,27 @@ supported`, read by the pre-registered rule.
   recovered?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1304).
 
 ![Error of the recovered shares by true mix, with and without noise](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/figure_03.svg)
+
+### 00077: does a fitted solar shape lower the error of experiment 64's best arm? (PVDIS-6b)
+
+**The shape of the solar term does not limit arm `am`: a blend of east-, south-, and west-facing
+shapes fitted to each Primary left the score at 4.466 points, against 4.467 for south-facing
+panels.** We fitted one set of shares per Primary on rows up to 30 June 2025, rebuilt the solar term
+with the blend, and scored the forecasts on experiment 64's rows (five Primaries, three seeds). The
+difference was -0.001 points of capacity (98.33% interval -0.018 to +0.014), which excludes the gain
+of 0.5% (0.022 points) that would justify a table of shares. The shape of another Primary scored the
+same (+0.001, -0.006 to +0.007), as did all-south panels at the blend's tilt (-0.001, -0.014 to
++0.011). The forecast sunshine mattered: the same arm given the sunshine of another date scored 0.323
+points worse (-0.441 to -0.212). The verdict is `refuted`.
+
+- **Finding for later experiments:** put effort into the sunshine forecast and the capacity table,
+  not the panel shape. A gain of 1.3% in a fit with known weather (experiment 73) did not carry into
+  the forecast.
+- **Write-up and pull request:** [the full result
+  page](00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md), [PR #1308 (Experiment 77: does the
+  fitted solar shape lower the error of arm am? (PVDIS-6b))](https://github.com/openclimatefix/nged-substation-forecast/pull/1308).
+
+![Score of each arm and the three verdict contrasts](00077-pvdis-6b-fitted-solar-shape-in-arm-am/figure_1_headline.svg)
 
 ### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
 
