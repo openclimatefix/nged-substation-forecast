@@ -114,7 +114,7 @@ the maintainer to confirm.
 | [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) | Candidate | 2026-10-17 |
 | [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
 | [00083 - Tail calibration, worked example](00083-curtailment-cost-and-tail-calibration-worked-example/result.md) | Are the tails of the stored demand forecasts of experiment 48 too narrow? | Inconclusive (no registered contrast): every forecast is too narrow in both tails, with coverage of the 0.05 quantile 0.066 to 0.085 and of the 0.95 quantile 0.891 to 0.927; the single-series curtailment-cost metric was withdrawn | Not for production | 2026-10-17 |
-| [00084 - Substation-limit curtailment cost, worked example](00084-substation-limit-curtailment-cost-worked-example/result.md) | Does the substation-limit curtailment metric run on the pilot, and are there enough limit-exceeding half-hours to rank forecasts? | Inconclusive (no registered contrast): the real limits are crossed by 1 half-hour in the scored year and 0.9 times the maximum by 19, so the pilot proves the arithmetic and cannot rank forecasts | Not for production | 2026-10-17 |
+| [00084 - Substation-limit curtailment cost, worked example](00084-substation-limit-curtailment-cost-worked-example/result.md) | Does the substation-limit curtailment metric run on the pilot, and are there enough half-hours beyond a limit to rank forecasts? | Inconclusive (no registered contrast): 19 half-hours are beyond a limit of 0.9 times the earlier maximum in the scored year, so the pilot proves the arithmetic and cannot rank forecasts | Not for production | 2026-10-17 |
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
@@ -1506,19 +1506,19 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
 
 ### 00084: can the substation-limit curtailment metric rank forecasts on the pilot?
 
-**Two substations hold far too few limit-exceeding half-hours to rank forecasts, so the pilot proves
-the arithmetic and a ranking waits for the January 2027 delivery of about 2,500 series.** We scored
+**Two substations hold too few half-hours beyond a limit to rank forecasts, so the pilot proves the
+arithmetic and a ranking waits for the January 2027 delivery of about 2,500 series.** We scored
 experiment 48's stored forecasts for Boston and Skegness by what capping the generators beneath them
-would have cost. At NGED's published limits one half-hour in the scored year is over the limit, and
-at 0.9 times each substation's earlier maximum there are 19. The cost at the real limit
-demonstrates the arithmetic, and the cost at a scaled limit is a calibration to history, not a
-saving. No verdict on the forecasts is drawn. Real limits are NGED's, Supported by NGED Open Data.
+would have cost. NGED curtails early to keep headroom, so the limit is 0.9, 0.75, or 0.5 times each
+substation's earlier maximum export, and the published thermal limit is a reference only. At 0.9
+there are 19 half-hours beyond the limit in the scored year. Every cost is a calibration to history,
+not a saving, and the best guess is cheapest at all three limits without a paired difference that
+excludes zero at 0.9. No verdict on the forecasts is drawn. The thermal limits are NGED's, Supported
+by NGED Open Data.
 
-- **Finding for later experiments:** the metric drops a node row when any curtailable generator has no
-  metered reading, which lost 31% of the rows, so the rule for that case needs an agreed answer.
 - **Write-up:** [the full result page](00084-substation-limit-curtailment-cost-worked-example/result.md).
 
-![Half-hours over each limit, by node and season](00084-substation-limit-curtailment-cost-worked-example/figure_1_event_census.svg)
+![Half-hours beyond each limit, by node and season](00084-substation-limit-curtailment-cost-worked-example/figure_1_event_census.svg)
 
 ### 00083: are the tails of the stored demand forecasts too narrow?
 

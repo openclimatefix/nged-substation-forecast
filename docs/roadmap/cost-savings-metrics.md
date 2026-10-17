@@ -155,7 +155,7 @@ it.
 
 ### Tier 1 — substation limits, no power-flow
 
-**The node metric asks one question per half-hour: will a BSP or GSP export more than its firm
+**The node metric asks one question per half-hour: will a BSP or GSP export more than its
 limit, and if so, which generators beneath it must be capped, and what does that cost in pounds?**
 A generator is capped only when the forecast says the substation's export would exceed the
 substation's limit. Two tables hold every fact about the electricity network. The node table has
@@ -164,8 +164,8 @@ generator table has one row per generator, with its capacity, connection date, a
 forecast exists. Scoring the ~2,500 series due in January 2027 therefore needs longer tables and no
 new code. Primaries are out of scope until NGED supplies the topology.
 
-**The limit is the firm (N-1) limit: the smaller of the per-transformer pre-event limits of the
-substation's redundant transformer pair.** One transformer carries the full load when the other is
+**The published limit is the firm (N-1) limit: the smaller of the per-transformer pre-event limits
+of the substation's redundant transformer pair.** One transformer carries the full load when the other is
 out. The limit is set per NGED season, and each season is a set of whole calendar months: Winter is
 December to February, Intermediate Cool is March, April, and November, Intermediate Warm is May,
 September, and October, and Summer is June to August. The import limit follows the same rule and is
@@ -208,16 +208,17 @@ hours:
 constraint. [Metric 1](#metric-1-flexibility-procurement-cost) prices that side. The output reports
 import-exceedance half-hours per node and season.
 
-**Two limits are reported, as co-equal headlines.** The real firm limit is what NGED enforces, and
-it binds on very few half-hours, so a score at the real limit demonstrates the arithmetic more than
-it ranks forecasts. The scaled limit is defined for every node, including those with no known real
-limit: $L = f \times$ the node's maximum observed export (the negative tail for a node whose
-positive flow is import), computed only from history before the scored period. The fraction $f$ is
-0.9 by default, with 0.75 and 0.5 swept. "p90" here means 0.9 times the maximum, not the 90th
-percentile of the node's flow, because a percentile of a node's own flow is exceeded on 10% of
-half-hours by construction. A scaled-limit figure is a calibration to history, not a saving. An
-event census of export and import exceedances at the real limit and at each $f$ comes first, and it
-decides whether a ranking of forecasts is possible.
+**The scaled limit is the headline, and the real firm limit is a reference only.** NGED curtails
+early, so that one more fault still leaves headroom, and so never lets a substation approach its
+published thermal limit. The scaled limit stands in for the operating headroom NGED actually keeps,
+and it is defined for every node, including those with no known real limit: $L = f \times$ the
+node's maximum observed export (the negative tail for a node whose positive flow is import),
+computed only from history before the scored period. The fraction $f$ is 0.9 by default, with 0.75
+and 0.5 swept. "p90" here means 0.9 times the maximum, not the 90th percentile of the node's flow,
+because a percentile of a node's own flow is exceeded on 10% of half-hours by construction. A
+scaled-limit figure is a calibration to history, not a saving. The real firm limit appears as a
+reference mark and as a column of the event census, which counts export and import exceedances at
+the real limit and at each $f$ and decides whether a ranking of forecasts is possible.
 
 **Caveats.**
 
@@ -402,9 +403,9 @@ reason to read these numbers as a ranking instrument rather than a total. `histo
 closer proxy to a real network rating than an arbitrary percentile would be, because comparable
 network ratings are typically derived in a similar way.
 
-**Metric 2 does not use `historical_p99`.** It uses the firm limit of each BSP and GSP, and a scaled
-limit of 0.9 times the node's maximum observed export before the scored period, both described under
-[Tier 1](#tier-1-substation-limits-no-power-flow). A percentile of a node's own flow is exceeded on
+**Metric 2 does not use `historical_p99`.** Its headline is a scaled limit of 0.9 times the node's
+maximum observed export before the scored period, and the firm limit of each BSP and GSP is a
+reference, both described under [Tier 1](#tier-1-substation-limits-no-power-flow). A percentile of a node's own flow is exceeded on
 10% of half-hours by construction, so it cannot stand in for a limit that a node almost never
 reaches. Metric 2 holds every forecast to the same $\tau = 1 - 1/r$, not to equal risk, so the
 leaderboard's `historical_p99` rung is not shared with it.

@@ -379,7 +379,7 @@ def main() -> None:
             RESULTS_DIR / f"node_season_{kind.replace(' ', '_').replace('=', '')}.parquet"
         )
         label = (
-            "DEMONSTRATES THE ARITHMETIC (real limit)"
+            "REFERENCE ONLY: the published thermal limit, a ceiling NGED does not operate to"
             if kind == "real"
             else "CALIBRATION TO HISTORY, NOT A SAVING (scaled limit)"
         )
@@ -387,7 +387,9 @@ def main() -> None:
         lines += [
             (
                 f"Rows dropped: non-finite {result.n_rows_dropped_nonfinite_forecast}, "
-                f"missing generator {result.n_rows_dropped_missing_generator}, "
+                f"generator-half-hours missing a forecast "
+                f"{result.n_generator_rows_missing_forecast}, missing an actual "
+                f"{result.n_generator_rows_missing_actual}, "
                 f"not in every arm {result.n_rows_dropped_not_in_every_arm}. "
                 f"Excluded nodes: {result.excluded.rows()}."
             ),

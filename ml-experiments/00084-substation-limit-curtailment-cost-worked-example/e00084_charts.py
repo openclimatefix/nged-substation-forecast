@@ -37,13 +37,13 @@ LIMIT_COLOURS: Final[tuple[str, ...]] = (
 )
 LIMIT_DASHES: Final[tuple[tuple[int, int], ...]] = ((1, 0), (6, 3), (3, 3), (1, 3))
 LIMIT_NAMES: Final[dict[str, str]] = {
-    "real": "Real limit",
+    "real": "Published thermal limit",
     "scaled f=0.9": "0.9 x maximum",
     "scaled f=0.75": "0.75 x maximum",
     "scaled f=0.5": "0.5 x maximum",
 }
 SHORT_LIMIT_NAMES: Final[dict[str, str]] = {
-    "real": "real limit",
+    "real": "thermal limit",
     "scaled f=0.9": "0.9 x max",
     "scaled f=0.75": "0.75 x max",
     "scaled f=0.5": "0.5 x max",
@@ -124,19 +124,17 @@ def figure_1_census() -> alt.VConcatChart:
         )
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="Few half-hours cross the real limit; hundreds cross half the observed peak",
+            text="Few half-hours cross the thermal limit; hundreds cross half the observed peak",
             lines=[
                 (
-                    "Number of half-hours whose flow is beyond the limit, by season. All history "
-                    "is "
-                    "2019-09 (Skegness, Bicker Fen) or 2022-07 (Boston) to 2026-06-30; the scored "
-                    "year "
-                    "is 2025-07-02 to 2026-06-30. Each scaled limit is 0.9, 0.75 or 0.5 times the "
-                    "node's maximum before 2025-07-02. * Bicker Fen's sign is unconfirmed, and its "
-                    "real "
-                    "limit is a Technical Limit. No real import limit is used. Real limits are "
-                    "NGED's, "
-                    "Supported by NGED Open Data."
+                    "Number of half-hours whose flow is beyond the limit, by season. The "
+                    "published thermal limit is a ceiling NGED does not operate to; each scaled "
+                    "limit (0.9, 0.75 or 0.5 times the node's maximum before 2025-07-02) stands "
+                    "in for the headroom NGED keeps. All history is 2019-09 (Skegness, Bicker "
+                    "Fen) or 2022-07 (Boston) to 2026-06-30; the scored year is 2025-07-02 to "
+                    "2026-06-30. * Bicker Fen's sign is unconfirmed, and its thermal limit is a "
+                    "Technical Limit. No published import limit is used. Thermal limits are "
+                    "NGED's, Supported by NGED Open Data."
                 )
             ],
         )
@@ -239,8 +237,9 @@ def figure_2_distribution() -> alt.VConcatChart:
                 lines=[
                     (
                         "Half-hours of net export per MW (Bicker Fen: per 5 MW), all history, from "
-                        "cleaned unflagged power. Rows are seasons. Bicker Fen's real limit is a "
-                        "Technical Limit and its sign is unconfirmed. Real limits are NGED's, "
+                        "cleaned unflagged power. Rows are seasons. Bicker Fen's thermal limit is a "
+                        "Technical Limit and its sign is unconfirmed. The published thermal limit "
+                        "is a ceiling NGED does not operate to. Limits are NGED's, "
                         "Supported by NGED Open Data."
                     )
                 ],
@@ -304,7 +303,7 @@ def figure_3_known_answer() -> alt.Chart:
 
 
 def figure_4_headline() -> alt.VConcatChart:
-    """Avoidable cost per arm at the real limit and at f = 0.9, with other prices beside it."""
+    """Avoidable cost per arm at the three scaled limits, with other prices beside it."""
     order = [
         report.NGED_BASELINE,
         report.CLIMATOLOGY,
@@ -315,7 +314,7 @@ def figure_4_headline() -> alt.VConcatChart:
     labels = [report.ARM_LABELS[a] for a in order]
     colours = [ocf.DATA_PURPLE, ocf.DATA_SKY, ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]
     panels = []
-    for kind in ("real", "scaled f=0.9"):
+    for kind in ("scaled f=0.9", "scaled f=0.75", "scaled f=0.5"):
         slug = SLUG_OF_KIND[kind]
         intervals = pl.read_parquet(RESULTS / f"intervals_{slug}.parquet")
         avoidable = pl.read_parquet(RESULTS / f"avoidable_{slug}.parquet")
@@ -384,25 +383,24 @@ def figure_4_headline() -> alt.VConcatChart:
             )
             .properties(width=215, height=24 * len(order))
         )
-        kind_note = (
-            "Real limit: demonstrates the arithmetic (every arm costs GBP 0)"
-            if kind == "real"
-            else "Limit 0.9 x maximum: calibration to history, not a saving"
-        )
+        kind_note = {
+            "scaled f=0.9": "Limit 0.9 x maximum (headline): calibration to history, not a saving",
+            "scaled f=0.75": "Limit 0.75 x maximum: calibration to history, not a saving",
+            "scaled f=0.5": "Limit 0.5 x maximum: calibration to history, not a saving",
+        }[kind]
         panels.append(alt.hconcat(main, table, spacing=4).properties(title=kind_note))
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="No forecast can be ranked: a handful of half-hours decides every arm's cost",
+            text="No forecast can be ranked at the headline limit: a few events decide each arm",
             lines=[
                 (
                     "Avoidable cost is each arm's cost minus the perfect forecast's, over the "
-                    "scored "
-                    "year, July 2025 to June 2026, Boston and Skegness, Curtailment Limit 0. Dot: "
-                    "estimate. Line: 95% interval from resampling whole months. Right: avoidable "
-                    "cost "
-                    "in GBP at the other prices, and in the DCUSA form. The NGED baseline is the "
-                    "maintainer's unconfirmed understanding of NGED's practice. Real limits are "
-                    "NGED's, Supported by NGED Open Data."
+                    "scored year, July 2025 to June 2026, Boston and Skegness, Curtailment Limit "
+                    "0. Dot: estimate. Line: 95% interval from resampling whole months. Right: "
+                    "avoidable cost in GBP at the other prices, and in the DCUSA form. The limit "
+                    "is a multiple of each node's maximum before the scored year, a stand-in for "
+                    "the headroom NGED keeps. The NGED baseline is the maintainer's unconfirmed "
+                    "understanding of NGED's practice."
                 )
             ],
         )
