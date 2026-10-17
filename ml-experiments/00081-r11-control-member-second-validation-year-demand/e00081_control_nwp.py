@@ -122,7 +122,7 @@ def control_rows(*, run: date, cells: list[int]) -> pl.DataFrame:
         pl.col("valid_time").dt.replace_time_zone("UTC"),
         pl.col("h3_index").cast(pl.UInt64),
         pl.col("ensemble_member").cast(pl.Int8),
-    )
+    ).fill_nan(None)
 
 
 def main() -> None:
