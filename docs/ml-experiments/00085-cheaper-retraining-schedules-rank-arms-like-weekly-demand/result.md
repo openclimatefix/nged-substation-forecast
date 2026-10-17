@@ -13,37 +13,48 @@ hypothesis: >-
   (d) a weekly refit on the whole history with 150 rounds and `eta` 0.15. A schedule that passes
   can replace weekly retraining in research experiments.
 prediction: >-
-  Full weekly retraining gives a cadence gap of about -0.13 points of capacity (monthly 5.57
-  against weekly 5.44 in experiment 48) and a starting-value gap of about -0.07 (experiment 78
-  and 80's pilot). P-roll monthly and the full monthly refit reproduce the sign and size of the
-  starting-value gap, because the gap comes from the first rounds of a fit, not from the cadence.
-  P-roll quarterly scores 0.10 to 0.20 above P-roll monthly and shows the same starting-value
-  gap. The weekly refit with 150 rounds and `eta` 0.15 scores within 0.05 of full weekly
-  retraining and passes both pairs. The cadence gap under P-roll (monthly minus weekly) is
-  within 0.05 of the full-setting gap.
+  Full weekly retraining gives a cadence gap (monthly minus weekly) of about +0.13 points of
+  capacity (monthly 5.57 against weekly 5.44 in experiment 48) and a starting-value gap (zero
+  start minus estimated start) of about -0.07 (experiment 78 and the pilot of experiment 80). The
+  starting-value gap comes from the first rounds of a fit, not from the cadence, so P-roll
+  monthly, P-roll quarterly, and the full monthly refit reproduce its sign and lie within 0.05 of
+  it. P-roll quarterly scores 0.10 to 0.20 above P-roll monthly. The weekly refit with 150 rounds
+  and `eta` 0.15 scores within 0.05 of full weekly retraining, and passes both pairs. The cadence
+  gap under P-roll is within 0.05 of the full-setting gap.
 decision_rule: >-
-  Two reference contrasts on the 16 Primary substations, from stored full-weekly predictions:
-  R1 is full monthly minus full weekly (experiment 48's `monthly` and `weekly`), and R2 is the
-  zero start minus the estimated start at full weekly retraining (experiment 80's `weekly_m0`
-  minus experiment 48's `weekly`). Each cheaper schedule S is scored on its own version of the
-  contrast, computed on the same runs and the same 16 series: K1(S) is the schedule's monthly
-  arm minus its weekly arm (P-roll: `pm` minus `pw`; whole-history 150-round: not run, see
-  "Arms"), and K2(S) is the schedule's zero-start arm minus its estimated-start arm. The
-  quantile score over all leads (mean of the nine-level pinball loss, spread factor 1.15, no
-  correction) is read per contrast with a 95% interval from 20,000 resamples of whole validation
-  months (experiment 48's interval), paired on run and series. GPU fits are not bit-reproducible,
-  so the noise floor N is the larger of 0.01 points and the absolute difference between K2 of the
-  first fit of P-roll monthly and K2 of its repeat (`pm`, `pm0` against `pm_rep`, `pm0_rep`). The
+  Every contrast is computed on one run set: the daily-gap runs that experiment 80's stored
+  zero-start weekly arm serves (28 weekly anchors: 2025-07-01, 07-08, 07-15, then every 14 days to
+  2026-06-23). A run is in the set when its latest weekly refit, at or before its start, is one
+  of those 28 anchors. Every weekly arm of this experiment is fitted at exactly those anchors, and
+  the stored
+  arms (`w`, `m`, `pm`) are restricted to the same runs. Two reference contrasts come from stored
+  predictions: R1 is full monthly minus full weekly (experiment 48's `n1h` monthly and weekly
+  regimes), and R2 is the zero start minus the estimated start at full weekly retraining
+  (experiment 80's `n1h_m0` minus experiment 48's weekly). The schedule contrasts are K1(S), the
+  schedule's monthly arm minus its weekly arm, and K2(S), the schedule's zero-start arm minus its
+  estimated-start arm. K1 is scored for P-roll (`pm` minus `pw`) and for the whole-history
+  150-round recipe (`fm` minus `fw`). K1 of quarterly (`pq` minus `pw`) is descriptive, because no
+  full-quarterly reference exists on these rows. K2 is scored for P-roll monthly, quarterly, and
+  weekly, the full monthly refit (`m0` minus `m`), and the whole-history 150-round weekly refit.
+  The quantile score over all leads (spread factor 1.15, no correction) is read per contrast with a
+  95% interval from 20,000 resamples of whole origin months, paired on series, run, and valid
+  time. GPU fits are not bit-reproducible, so the noise floor N is the largest of 0.01 points, the
+  absolute difference in mean score between `pm` and its repeat `pm_rep`, the same for `pm0` and
+  `pm0_rep`, and the absolute difference between the two K2(P-roll monthly) values; the page also
+  prints how far `pm_rep` is from the stored `pm`. The tolerance is T = max(0.05, N). The
   rank-agreement rule, fixed here: a schedule agrees on a contrast when (i) the reference
   interval excludes zero and the reference size exceeds N, and the schedule's estimate has the
-  same sign and its own interval excludes zero; or (ii) otherwise, the schedule's estimate lies
-  within N of zero. A schedule passes when it agrees on every contrast it can be scored on. Cost
-  is the summed wall-clock seconds of the schedule's refits (fit plus predict), measured under
-  the same worker settings, reported in GPU minutes per year of validation per 16 series. The
-  recommendation: a schedule that passes and costs under a third of full weekly becomes the R&D
-  default for the contrasts it passed on; a schedule that fails on a contrast is not used for
-  that kind of contrast. The threshold is zero in score because the experiment ranks schedules
-  and ports nothing to production; the pass or fail rule above is the whole decision.
+  same sign, its own interval excludes zero, and it lies within T of the reference estimate; or
+  (ii) otherwise, the schedule's estimate lies within T of zero. A schedule passes when it agrees
+  on every contrast it is scored on, and the page states how many that is. The whole-history
+  weekly refit's absolute score against full weekly is reported and does not affect the pass.
+  Cost is the mean wall-clock fit seconds of one refit under the schedule's own recipe, measured
+  in this experiment's own runs (full weekly uses `m0`'s mean, the same full setting), times the
+  schedule's refits in a year (52 weekly, 12 monthly, 4 quarterly) times 16 series, in compute
+  minutes. The recommendation: a schedule that passes and costs under a third of full weekly
+  becomes the R&D default for the contrasts it passed on; a schedule that fails a contrast is not
+  used for that kind of contrast. The threshold is zero in score because the experiment ranks
+  schedules and ports nothing to production; the pass rule above is the whole decision.
 benchmark: >-
   Experiment 48's stored full weekly, full monthly, and P-roll monthly (`roll12`) predictions and
   experiment 80's stored zero-start weekly predictions, plus `manual_heuristic` and `climatology`
@@ -88,18 +99,14 @@ All arms are the N1 model (one XGBoost model per series, trained on the ENS cont
 the 16 Primary substations, seed 0, forecasting the daily runs of `fold_a_daily_gap_v1`.
 
 - **Reference (stored, not refitted):** `w` (full weekly), `m` (full monthly), `pm`
-  (P-roll monthly), `w0` (full weekly, zero start; it holds the runs that every second weekly
-  refit served, so every weekly contrast keeps the runs the arms share).
+  (P-roll monthly), `w0` (full weekly, zero start; only its 28 anchors exist, which fixes the
+  run set above).
 - **New fits:** `pq` and `pq0` (P-roll quarterly, estimated and zero start), `pm0` (P-roll
-  monthly, zero start), `pw` and `pw0` (P-roll weekly, every second weekly refit), `fw` and
-  `fw0` (schedule (d): weekly, whole history, 150 rounds, `eta` 0.15, every second weekly
-  refit), `m0` (schedule (c): full monthly, zero start), and `pm_rep` and `pm0_rep` (repeats of
-  `pm` and `pm0` for the noise floor).
-- **Contrasts per schedule:** K1 needs a weekly and a monthly arm from the same recipe, which only
-  P-roll has (`pm` minus `pw`, reference `m` minus `w`); K2 is scored for P-roll monthly
-  (`pm0` minus `pm`), P-roll quarterly (`pq0` minus `pq`), full monthly (`m0` minus `m`), P-roll
-  weekly (`pw0` minus `pw`), and the weekly 150-round refit (`fw0` minus `fw`). The weekly
-  150-round refit is also scored against full weekly on absolute score.
+  monthly, zero start), `pw` and `pw0` (P-roll weekly at the 28 anchors), `fw` and `fw0`
+  (schedule (d): weekly at the 28 anchors, whole history, 150 rounds, `eta` 0.15), `fm` (the
+  same recipe, monthly), `m0` (schedule (c): full monthly, zero start), and `pm_rep` and
+  `pm0_rep` (repeats of `pm` and `pm0` for the noise floor).
+- **Contrasts per schedule:** as in the decision rule. Quarterly is judged on K2 only.
 
 ## Not covered, and why
 
