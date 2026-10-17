@@ -17,8 +17,8 @@ capacity, so the solar term is `scale * shape` with `scale = capacity_mw / effec
   inference; the climatology is left to the trees), repeated for the nine quantile outputs. A
   model given a margin starts from the margin alone, not from XGBoost's estimated `base_score`.
 - `b`: trained on gross demand (power plus `scale` times the CAMS shape) with gross lags (each net
-  lag plus `scale` times the unit shape at the lagged time, see `e00076_inputs.py`); at inference
-  each member's gross quantiles are shifted down by `scale * (clim_cams + anomaly)`.
+  lag plus `scale` times the unit shape at the lagged time, see `e00064_inputs.py`); at
+  inference each member's gross quantiles are shifted down by `scale * (clim_cams + anomaly)`.
 
 The placebo twins replace the ensemble-mean calibrated anomaly by `anomaly_mean_calibrated_twin`
 (a member's own deviation from the mean is kept on top at inference for `a_twin`).
@@ -198,7 +198,8 @@ def training_rows(*, ctx: SeriesContext) -> pl.DataFrame:
     Returns:
         The finite-power rows of experiment 00003's training file for the series (valid time after
         the origin), with the derived columns, `lead_hours`, the three net lags, and from
-        `e00076_inputs.py`: `anomaly_mean_calibrated`, `anomaly_mean_calibrated_twin`, `clim_cams`,
+        `e00064_inputs.py` (run in experiment 00064): `anomaly_mean_calibrated`,
+        `anomaly_mean_calibrated_twin`, `clim_cams`,
         `shape_calibrated`, `u_cams`, `month` (local), `band`, `daylight`, `anomaly_cams`, and the
         three `shape_lag_*` columns.
 

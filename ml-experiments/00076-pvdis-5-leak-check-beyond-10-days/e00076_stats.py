@@ -21,6 +21,16 @@ import polars as pl
 
 from studies import bootstrap, experiment_store
 
+RAW_SOURCES: Final[dict[str, tuple[str, str]]] = {
+    "am_raw": ("e64", "am"),
+    "am0_raw": ("own", "am0"),
+    "d1l_raw": ("e46", "d1l"),
+}
+"""Arms scored without the 14-day correction (the spread factor is kept), for the raw reads.
+
+The correction adds the mean of an arm's own recent median errors, which come mostly from leads
+under 10 days, so a scored contrast at 10 days and beyond mixes the models with their corrections.
+"""
 NEW_ARMS: Final[tuple[str, ...]] = ("am0", "am_train_only")
 STORED_ARMS: Final[tuple[str, ...]] = ("d0", "d1l", "am")
 LONG_BAND: Final[int] = 4
@@ -36,6 +46,11 @@ DECISION: Final[tuple[tuple[str, str], ...]] = (
     ("am", "d1l"),
 )
 """(treatment, reference) of the three decision contrasts at 10 days and beyond."""
+RAW_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("am_raw", "am0_raw"),
+    ("am0_raw", "d1l_raw"),
+    ("am_raw", "d1l_raw"),
+)
 EXPLORATORY: Final[tuple[tuple[str, str], ...]] = (
     ("am", "d0"),
     ("d1l", "d0"),
@@ -130,6 +145,31 @@ def with_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def raw_arm(*, name: str, series: pl.DataFrame, actual: pl.DataFrame) -> pl.DataFrame:
+    """Return an arm's quantiles with the spread factor but no 14-day correction, and `actual`."""
+    source, arm = RAW_SOURCES[name]
+    folder = {
+        "e64": common.E64_RAW_ARMS_DIR,
+        "own": common.RAW_ARMS_DIR,
+        "e46": common.E46_RAW_ARMS_DIR,
+    }[source]
+    raw = pl.concat(
+        [
+            pl.read_parquet(folder / f"{arm}_seed{seed}_{site}.parquet")
+            .filter(pl.col("variant") == "base")
+            .select(*common.KEYS, "seed", *common.LEVEL_COLUMNS)
+            .with_columns(pl.col("seed").cast(pl.Int8))
+            for seed in common.SEEDS
+            for site in common.SITES
+        ]
+    )
+    stacked = common.stack(frame=raw, correct=False, spread=True).filter(
+        pl.col("valid_time") < common.HOLDOUT
+    )
+    assert series.height == stacked["time_series_id"].n_unique()
+    return stacked.join(actual, on=list(common.KEYS), how="left", validate="m:1")
+
+
 def load_losses() -> pl.DataFrame:
     """Return every compared arm's per-row losses on experiment 00064's scored rows."""
     series = common.series_table().filter(pl.col("site").is_in(list(common.SITES)))
@@ -139,7 +179,14 @@ def load_losses() -> pl.DataFrame:
         .filter(pl.col("scored"))
         .select(*common.KEYS, "band")
     )
+    actual = common.actual_table(series=series, arrays=arrays)
     arm_losses = {}
+    for name in RAW_SOURCES:
+        arm_losses[name] = with_losses(
+            frame=raw_arm(name=name, series=series, actual=actual).join(
+                context, on=list(common.KEYS), how="inner", validate="m:1"
+            )
+        )
     for arm in (*STORED_ARMS, *NEW_ARMS):
         folder = common.E64_ARMS_DIR if arm in STORED_ARMS else common.ARMS_DIR
         arm_losses[arm] = with_losses(
@@ -264,6 +311,18 @@ def main() -> None:
                     n_resamples=EXPLORATORY_RESAMPLES,
                 )
             )
+    for t, r in RAW_CONTRASTS:
+        explore_rows.append(
+            read_contrast(
+                losses=losses,
+                treatment=t,
+                reference=r,
+                scope_name="10+ d, no correction",
+                scope=long_scope,
+                level=EXPLORATORY_LEVEL,
+                n_resamples=EXPLORATORY_RESAMPLES,
+            )
+        )
     exploratory = pl.DataFrame(explore_rows)
     print_section(title="Exploratory contrasts (95%)", table=exploratory)
     for name, table in (

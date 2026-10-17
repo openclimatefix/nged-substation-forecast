@@ -639,7 +639,7 @@ def capacities() -> pl.DataFrame:
         One row per site in `SITES` with `site` and `capacity_mw`, from `CAPACITY_FILE`.
 
     Raises:
-        FileNotFoundError: If `e00076_capacity.py` has not been run.
+        FileNotFoundError: If `e00064_capacity.py` has not been run.
         ValueError: If a site is missing or a capacity is not finite and positive.
     """
     table = pl.read_parquet(CAPACITY_FILE)
