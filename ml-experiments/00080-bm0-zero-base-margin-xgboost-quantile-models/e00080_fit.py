@@ -241,18 +241,24 @@ def fit(*, matrix: xgb.DMatrix, config: Config, rounds: int, nthread: int) -> xg
 
 
 def predict_run(
-    *, model: xgb.Booster, run_rows: pl.DataFrame, row: dict, arrays: common.SeriesArrays
-) -> pl.DataFrame:
-    """Return the mixture quantiles of one run for one series.
+    *,
+    model: xgb.Booster,
+    run_rows: pl.DataFrame,
+    row: dict,
+    arrays: common.SeriesArrays,
+    prefixes: tuple[int, ...] = (0,),
+) -> dict[int, pl.DataFrame]:
+    """Return the mixture quantiles of one run for one series, for each number of rounds.
 
     Args:
         model: The series' fitted booster.
         run_rows: The run's frame rows for the series, every valid time with every member.
         row: The series' row of `common.series_table()`.
         arrays: The series' arrays on the dense grid.
+        prefixes: The numbers of boosting rounds to predict from; 0 means all of them.
 
     Returns:
-        One row per valid time: the key columns and the nine quantile columns.
+        For each prefix, one row per valid time: the key columns and the nine quantile columns.
 
     Raises:
         ValueError: If a valid time lacks a member.
@@ -265,15 +271,17 @@ def predict_run(
     if prepared.height != prepared.select(*common.KEYS).n_unique() * members:
         msg = "every valid time must hold every member"
         raise ValueError(msg)
-    matrix = prepared.select(input_columns()).to_numpy().astype(np.float32)
-    raw = model.predict(xgb.DMatrix(matrix)).reshape(-1, members, len(common.LEVELS))
-    return (
-        prepared.select(*common.KEYS)
-        .unique(maintain_order=True)
-        .hstack(
+    matrix = xgb.DMatrix(prepared.select(input_columns()).to_numpy().astype(np.float32))
+    keys = prepared.select(*common.KEYS).unique(maintain_order=True)
+    out = {}
+    for prefix in prefixes:
+        raw = model.predict(matrix, iteration_range=(0, prefix)).reshape(
+            -1, members, len(common.LEVELS)
+        )
+        out[prefix] = keys.hstack(
             pl.DataFrame(mixture_quantiles(member_quantiles=raw), schema=list(common.LEVEL_COLUMNS))
         )
-    )
+    return out
 
 
 def job_path(*, root: Path, config: str, site: str, refit: datetime) -> Path:
@@ -370,7 +378,7 @@ def run_job(
                     run_rows=frame.filter(pl.col("time_series_id") == ids[site]),
                     row=rows_of[site],
                     arrays=arrays[site],
-                )
+                )[0]
             )
     for site in todo:
         common.atomic_write(

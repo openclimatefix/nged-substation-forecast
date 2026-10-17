@@ -33,7 +33,7 @@ E48_WORK_DIR: Final[Path] = (
     / "00048-weekly-retraining-confirmation-and-extension-demand-generators"
     / "work"
 )
-"""Experiment 00048's intermediate tables, read only: the frames and the estimated-start predictions."""
+"""Experiment 00048's intermediate tables, read only: the frames and the stored predictions."""
 FRAMES_DEMAND_DIR: Final[Path] = E48_WORK_DIR / "frames_demand"
 """The 292 gap runs' demand frames, one `init=<date>.parquet` file per run."""
 FRAMES_GENERATORS_DIR: Final[Path] = E48_WORK_DIR / "frames_generators"

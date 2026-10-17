@@ -1,23 +1,26 @@
 """Assemble the arms of experiment 00080 into one prediction table per arm.
 
 An arm is a regime (which refit forecasts which daily run) applied to one configuration's refit
-predictions (`work/anchor_preds/<config>/`, from `e00080_fit.py`; `work/generator_preds/`, from
-`e00080_fit_generators.py`). Every table is keyed by series, run, valid time, and seed, holds the
-nine quantiles, the observed power (`actual`, a fraction of capacity), the series label (`site`),
-and the group (`Primary`, `BSP`, `GSP`, `solar`, or `wind`), and covers all 365 daily runs. A later
-step restricts the rows to a row set.
+predictions. The estimated-start arms (`*_def`) read experiment 00048's stored predictions
+(`E48_ANCHOR_PREDS_DIR`, `E48_GENERATOR_PREDS_DIR`), and the zero-start arms (`*_m0`) read this
+experiment's (`work/anchor_preds/`, from `e00080_fit.py` and `e00080_rounds.py`;
+`work/generator_preds/`, from `e00080_fit_generators.py` and `e00080_rounds.py`). Every table is
+keyed by series, run, valid time, and seed, holds the nine quantiles, the observed power (`actual`,
+a fraction of capacity), the series label (`site`), and the group (`Primary`, `BSP`, `GSP`,
+`solar`, or `wind`). A later step restricts the rows to the 292 runs of `fold_a_daily_gap_v1`.
 
-Demand arms. The base arms are `frozen` (the stack's model), `monthly` and `weekly` (`n1h`), and
-`roll12`. Each is written raw, with the spread factor 1.15 (`_s`), and with the 14-day correction
-and the spread factor (`_cs`); `weekly` also with the 7-day correction and the spread factor
-(`_c7s`). The correction reads, for each past half-hour, the forecast as issued: the forecast of
-the latest earlier daily run, from the refit that served that run. Each correction therefore reads
-no run before 2025-07-01, the first run of the tables.
+Demand arms. `weekly_def` and `weekly_m0` (the weekly regime of the 20 series), `frozen_def` and
+`frozen_m0` (the stack's frozen model); each with the spread factor 1.15 (`_s`), and the frozen
+arms also with the 14-day correction and the spread factor (`_cs`). The rounds family is
+`fz_<start>_r<rounds>` (fit A, 500, 1000, and 2000 rounds) and `fzes_<start>_best` and
+`fzes_<start>_r500` (fit B, early stopping), each with the spread factor, on the gap runs only.
 
-Generator arms. `gen_frozen` and `gen_monthly` are the pooled mixtures of the ERA5-trained models,
-and `gen_frozen_s` and `gen_monthly_s` apply experiment 00033's spread-factor rule month by month,
-each month fitted only on cases whose valid time is at least 3.5 hours before the month's first
-origin, the same for both arms.
+Generator arms. `gen_monthly_def` and `gen_monthly_m0` (the solar farms; for the wind farms
+`gen_monthly_def` is experiment 00048's margin model), `gen_monthly_nm_def` and
+`gen_monthly_nm_m0` (the wind farms without the margin), and the rounds family
+`gen_fz_<start>_r<rounds>`, `gen_fzes_<start>_best`, and `gen_fzes_<start>_r500`. The spread-factor
+rule of experiment 00033 is applied month by month, each month fitted only on cases whose valid
+time is at least 3.5 hours before the month's first origin (`gen_<arm>_s`).
 
 Baselines. `manual_heuristic` and `climatology` are read from the `power_forecasts` Delta table for
 the 292 runs of `fold_a_daily_gap_v1`.
@@ -46,13 +49,37 @@ BASELINES: Final[dict[str, str]] = {
 }
 """Arm name to the stored `experiment_name` of the `power_forecasts` table."""
 BASELINE_CHUNK_RUNS: Final[int] = 20
-DEMAND_PLAN: Final[dict[str, tuple[str, str, tuple[str, ...]]]] = {
-    "frozen": ("frozen", "frozen", ("s", "cs")),
-    "monthly": ("n1h", "monthly", ("s", "cs")),
-    "weekly": ("n1h", "weekly", ("s", "cs", "c7s")),
-    "roll12": ("roll12", "monthly", ("s", "cs")),
+ROUNDS_LABELS: Final[tuple[str, ...]] = ("r500", "r1000", "r2000")
+DEMAND_PLAN: Final[dict[str, tuple[Path, str, str, str, tuple[str, ...]]]] = {
+    "weekly_def": (common.E48_ANCHOR_PREDS_DIR, "n1h", "weekly", "all", ("s",)),
+    "weekly_m0": (common.ANCHOR_PREDS_DIR, "n1h_m0", "weekly", "all", ("s",)),
+    "frozen_def": (common.E48_ANCHOR_PREDS_DIR, "frozen", "frozen", "all", ("s", "cs")),
+    "frozen_m0": (common.ANCHOR_PREDS_DIR, "frozen_m0", "frozen", "all", ("s", "cs")),
+    **{
+        f"fz_{start}_{label}": (
+            common.ANCHOR_PREDS_DIR,
+            f"frozen_{start}_{label}",
+            "frozen",
+            "gap",
+            ("s",),
+        )
+        for start in ("def", "m0")
+        for label in ROUNDS_LABELS
+    },
+    **{
+        f"fzes_{start}_{label}": (
+            common.ANCHOR_PREDS_DIR,
+            f"frozenes_{start}_{label}",
+            "frozen",
+            "gap",
+            ("s",),
+        )
+        for start in ("def", "m0")
+        for label in ("best", "r500")
+    },
 }
-"""Each demand base arm: the configuration folder, the regime, and the forms written beyond raw."""
+"""Each demand arm: the folder of refit predictions, the configuration folder, the regime, the runs
+the arm covers (`all` 365 daily runs, or the 292 `gap` runs), and the forms written beyond raw."""
 SMOKE_DAYS: Final[frozenset[tuple[int, int]]] = frozenset(
     {(7, 1), (7, 2), (7, 3), (7, 8), (7, 9), (7, 10), (8, 1), (8, 2), (8, 3)}
 )
@@ -152,17 +179,13 @@ def assemble_demand(*, smoke: bool) -> None:
         int(row["time_series_id"]): arrays[row["site"]].power
         for row in series.iter_rows(named=True)
     }
-    root = (
-        common.ANCHOR_PREDS_DIR.with_name("anchor_preds_smoke")
-        if smoke
-        else common.ANCHOR_PREDS_DIR
-    )
-    origins = common.all_origins()
-    if smoke:
-        origins = [o for o in origins if (o.month, o.day) in SMOKE_DAYS]
-    for name, (config_name, regime, forms) in DEMAND_PLAN.items():
-        config = fitting.CONFIGS[config_name]
-        wanted = series.filter(pl.col("substation_type").is_in(config.groups))
+    for name, (root, config_name, regime, run_set, forms) in DEMAND_PLAN.items():
+        origins = (
+            common.all_origins() if run_set == "all" else common.origins_of_subset(subset="gap")
+        )
+        if smoke:
+            origins = [o for o in origins if (o.month, o.day) in SMOKE_DAYS]
+        wanted = series.filter(pl.col("substation_type").is_in(common.GROUPS))
         pieces = []
         for site in wanted["site"].to_list():
             try:
@@ -209,21 +232,43 @@ def assemble_demand(*, smoke: bool) -> None:
         )
 
 
+def generator_arm_files(*, name: str, smoke: bool) -> list[Path]:
+    """Return the prediction files of one generator arm, or an empty list if there are none."""
+    own = common.GENERATOR_PREDS_DIR
+    stored = common.E48_GENERATOR_PREDS_DIR
+    if smoke:
+        own = own.with_name("generator_preds_smoke")
+    folder, arm = {
+        "monthly_def": (stored, "monthly"),
+        "monthly_m0": (own, "monthly_m0"),
+        "monthly_nm_def": (own, "monthly_nm_def"),
+        "monthly_nm_m0": (own, "monthly_nm_m0"),
+    }.get(name, (own, name.replace("fz_", "frozen_").replace("fzes_", "frozenes_")))
+    if not (folder / arm).exists():
+        return []
+    return sorted((folder / arm).glob("*.parquet"))
+
+
+GENERATOR_ARMS: Final[tuple[str, ...]] = (
+    "monthly_def",
+    "monthly_m0",
+    "monthly_nm_def",
+    "monthly_nm_m0",
+    *[f"fz_{start}_{label}" for start in ("def", "m0") for label in ROUNDS_LABELS],
+    *[f"fzes_{start}_{label}" for start in ("def", "m0") for label in ("best", "r500")],
+)
+
+
 def assemble_generators(*, smoke: bool) -> None:
-    """Write the frozen and monthly generator arms, raw and with the spread factor."""
+    """Write every generator arm, raw and with the spread factor."""
     sites = gen.site_table()
     labels = {
         int(row["time_series_id"]): (row["site"], row["technology"])
         for row in sites.iter_rows(named=True)
     }
     power_of = gen.full_power(sites=sites)
-    root = (
-        common.GENERATOR_PREDS_DIR.with_name("generator_preds_smoke")
-        if smoke
-        else common.GENERATOR_PREDS_DIR
-    )
-    for arm in ("frozen", "monthly"):
-        files = sorted((root / arm).glob("*.parquet")) if (root / arm).exists() else []
+    for arm in GENERATOR_ARMS:
+        files = generator_arm_files(name=arm, smoke=smoke)
         if not files:
             print(f"gen_{arm}: forecasts missing, skipped", flush=True)
             continue

@@ -1,21 +1,23 @@
-"""Fit the ERA5-trained stage 1a models of the generators and forecast the daily runs.
+"""Fit the monthly generator models of experiment 00080 with a zero starting value.
 
-For each of the 6 solar farms (stage 1a `base`: the weather columns, no CAMS, no stage 0) and the 3
-wind farms (stage 1a `margin`: the weather columns with the power curve as the base margin of all
-nine levels) this fits two kinds of model, both on ERA5 weather and the farm's cleaned power:
+Experiment 00048 fitted the ERA5-trained stage 1a models of the 6 solar farms and the 3 wind farms
+monthly (a refit on the first day of each month from 2025-07-01 to 2026-06-01, on valid times
+before 5 days earlier, because ERA5 reaches the project 5 days late). This script repeats the
+monthly refits with the zero start, for the arms:
 
-- `frozen`: trained once on valid times before 2025-06-17, forecasting all 365 daily runs;
-- `monthly`: refitted on the first day of each month from 2025-07-01 to 2026-06-01 on valid times
-  before 5 days earlier (ERA5 reaches the project 5 days late), forecasting the runs whose origin
-  falls in the month.
+- `monthly_m0`: the solar farms with the zero start (`base_score` 0), the same columns and rows as
+  experiment 00048's `monthly` arm.
+- `monthly_nm_def` and `monthly_nm_m0`: the wind farms without the power-curve base margin, with
+  XGBoost's estimated start and with the zero start. Experiment 00048's wind model supplies the
+  margin, which makes XGBoost ignore its starting value, so these two arms are the only wind models
+  on which the starting value acts.
 
 Each model is applied to every ENS member of a run and the members' quantiles are pooled into a
-mixture, as in experiment 00033, whose spread-factor rule is applied later by
-`e00080_assemble.py`. Seed 0 only.
+mixture, as in experiment 00048. Seed 0 only.
 
 Output: `work/generator_preds/<arm>/<site>_<label>.parquet`, keyed by series, run, and valid time,
-with the nine quantile columns as a fraction of capacity; `<label>` is `frozen`, or the refit date
-for `monthly`. Existing files stay, so a stopped run resumes.
+with the nine quantile columns as a fraction of capacity; `<label>` is the refit date. Existing
+files stay, so a stopped run resumes.
 
     uv run python ml-experiments/00080-*/e00080_fit_generators.py [--workers 3] [--smoke]
 """
@@ -31,7 +33,11 @@ import e00080_common as common
 import e00080_gen_common as gen
 import polars as pl
 
-CORES: Final[int] = 10
+CORES: Final[int] = 6
+VARIANTS: Final[dict[str, tuple[tuple[str, bool], ...]]] = {
+    "solar": (("monthly_m0", True),),
+    "wind": (("monthly_nm_def", False), ("monthly_nm_m0", True)),
+}
 
 
 def job_path(*, root: Path, arm: str, site: str, label: str) -> Path:
@@ -87,7 +93,7 @@ def run_series(
     limit_runs: int | None,
     limit_refits: int,
 ) -> list[str]:
-    """Fit and write every frozen and monthly model of one generator series.
+    """Fit and write every monthly zero-start model of one generator series.
 
     Args:
         site: The series' anonymous label (A to F, W1 to W3).
@@ -109,19 +115,19 @@ def run_series(
     )
     origins = common.all_origins()
     refits = gen.MONTHLY_REFITS[:limit_refits] if limit_refits > 0 else gen.MONTHLY_REFITS
-    models: list[tuple[str, str, datetime, list[datetime]]] = [
-        ("frozen", "frozen", gen.FROZEN_TRAIN_END, origins)
-    ] + [
+    models: list[tuple[str, str, datetime, list[datetime], bool]] = [
         (
-            "monthly",
+            arm,
             f"{refit:%Y%m%d}",
             gen.training_end_for(refit=refit),
             [o for o in origins if gen.refit_serving(origin=o) == refit],
+            zero_start,
         )
+        for arm, zero_start in VARIANTS[technology]
         for refit in refits
     ]
     lines = []
-    for arm, label, train_end, served in models:
+    for arm, label, train_end, served, zero_start in models:
         target = job_path(root=out_root, arm=arm, site=site, label=label)
         if target.exists():
             continue
@@ -133,8 +139,9 @@ def run_series(
             columns=gen.FEATURES[technology],
             seed=common.SEED,
             rounds=rounds,
-            use_margin=technology == "wind",
+            use_margin=False,
             nthread=nthread,
+            zero_start=zero_start,
         )
         used = served[:limit_runs] if limit_runs else served
         forecast = forecast_runs(model=model, row=row, origins=used)
@@ -155,7 +162,7 @@ def main() -> None:
     parser.add_argument(
         "--smoke",
         action="store_true",
-        help="one solar and one wind farm, the frozen model and 2 monthly refits, 3 runs each",
+        help="one solar and one wind farm, 2 monthly refits, 3 runs each",
     )
     args = parser.parse_args()
     sites = gen.site_table()["site"].to_list()

@@ -1,22 +1,23 @@
-"""Score every arm of experiment 00080 and read the nine planned contrasts with their intervals.
+"""Score every arm of experiment 00080 and read the four planned contrasts with their intervals.
 
 Four parts, each writing under `work/results/`:
 
 - `metrics`: the per-case metrics of every arm table in `work/arms/`, to
-  `work/metrics/<arm>.parquet`
-  (the quantile score `qs`, the absolute error of the median `mae`, the threshold-weighted CRPS
-  `tw_p99`, the exceedance of the 0.95 quantile `ex95`, and the inner-90% coverage `cov90`).
-- `contrasts`: the nine planned contrasts C1 to C8w and the descriptive ones, each on the 292 runs
+  `work/metrics/<arm>.parquet` (the quantile score `qs`, the absolute error of the median `mae`,
+  the threshold-weighted CRPS `tw_p99`, the exceedance of the 0.95 quantile `ex95`, and the
+  inner-90% coverage `cov90`).
+- `contrasts`: the four planned contrasts C1 to C4 and the descriptive ones, each on the 292 runs
   of `fold_a_daily_gap_v1`, to `contrasts.parquet`. A contrast keeps the cases its two arms share,
   pairs them on series, run, and valid time, and resamples whole origin months (each run counts in
-  its origin month). The planned contrasts are read at 99.44% (Bonferroni across nine), every
+  its origin month). The planned contrasts are read at 98.75% (Bonferroni across four), every
   contrast also at 95%. Every planned contrast is also read on each series alone, descriptively.
 - `absolute`: each arm's mean metrics by group and lead band on the cases that every arm of the
   group shares, with a 95% month-resampled interval on the quantile score, to `absolute.parquet`;
   and each arm's quantile score by series, to `absolute_series.parquet`.
-- `reproduction`: the 73 runs of `fold_a_every5d_v1` scored again from the same refits. An arm
-  without a correction is compared with experiment 00034's stored seed-0 arm of the same
-  configuration, on the cases both hold, to `reproduction.parquet`; the tolerance is 0.001 points.
+- `reproduction`: the refits of the estimated start repeated here (`n1h_def`, the first two weekly
+  refits) against experiment 00048's stored quantiles, and the 500-round prefix of the 2000-round
+  estimated-start fit against experiment 00048's frozen arm, to `reproduction.parquet`; the
+  tolerance is 0.001 points of capacity.
 - `predictions`: every arm's rows on the 292 runs, saved with `experiment_store.write_predictions`
   under the arm's name. An arm already saved is skipped.
 
@@ -40,9 +41,9 @@ import polars as pl
 from studies import bootstrap, experiment_store
 
 N_RESAMPLES: Final[int] = 200_000
-"""Enough that each tail of the 99.44% interval holds about 300 resampled means."""
+"""Enough that each tail of the 98.75% interval holds about 1,200 resampled means."""
 N_RESAMPLES_95: Final[int] = 20_000
-PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 9)
+PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 4)
 NO_CHANGE_MARGIN: Final[float] = 0.05
 """C8s and C8w read as no change when the interval lies inside plus or minus this many points."""
 TOLERANCE: Final[float] = 0.001
@@ -71,39 +72,72 @@ class ContrastSpec:
 
 
 PLANNED: Final[dict[str, ContrastSpec]] = {
-    "C1": ContrastSpec(("Primary",), "weekly_s", "frozen_cs"),
-    "C2": ContrastSpec(("Primary",), "monthly_s", "frozen_cs"),
-    "C3": ContrastSpec(("Primary",), "weekly_s", "monthly_s"),
-    "C4": ContrastSpec(("Primary",), "weekly_c7s", "weekly_s"),
-    "C5": ContrastSpec(("Primary",), "weekly_cs", "weekly_s"),
-    "C6": ContrastSpec(("Primary",), "weekly_c7s", "weekly_cs"),
-    "C7": ContrastSpec(("BSP", "GSP"), "weekly_s", "frozen_cs"),
-    "C8s": ContrastSpec(("solar",), "gen_monthly_s", "gen_frozen_s"),
-    "C8w": ContrastSpec(("wind",), "gen_monthly_s", "gen_frozen_s"),
+    "C1": ContrastSpec(("Primary",), "weekly_m0_s", "weekly_def_s"),
+    "C2": ContrastSpec(("BSP", "GSP"), "weekly_m0_s", "weekly_def_s"),
+    "C3": ContrastSpec(("Primary",), "frozen_m0_cs", "frozen_def_cs"),
+    "C4": ContrastSpec(("solar",), "gen_monthly_m0_s", "gen_monthly_def_s"),
 }
-DESCRIPTIVE: Final[dict[str, ContrastSpec]] = {
-    "X_roll12_vs_monthly": ContrastSpec(("Primary",), "roll12_s", "monthly_s"),
-    "X_roll12_vs_stack": ContrastSpec(("Primary",), "roll12_s", "frozen_cs"),
-    "X_frozen_correction": ContrastSpec(("Primary",), "frozen_cs", "frozen_s"),
-    "X_primary_weekly_vs_frozen_s": ContrastSpec(("Primary",), "weekly_s", "frozen_s"),
-    "X_bspgsp_weekly_correction": ContrastSpec(("BSP", "GSP"), "weekly_cs", "weekly_s"),
-    "X_bspgsp_monthly_vs_stack": ContrastSpec(("BSP", "GSP"), "monthly_s", "frozen_cs"),
-    "X_bspgsp_weekly_vs_frozen_s": ContrastSpec(("BSP", "GSP"), "weekly_s", "frozen_s"),
-    "X_primary_weekly_vs_manual": ContrastSpec(("Primary",), "weekly_s", "manual_heuristic"),
-    "X_primary_stack_vs_manual": ContrastSpec(("Primary",), "frozen_cs", "manual_heuristic"),
-    "X_solar_frozen_vs_manual": ContrastSpec(("solar",), "gen_frozen_s", "manual_heuristic"),
-    "X_wind_frozen_vs_manual": ContrastSpec(("wind",), "gen_frozen_s", "manual_heuristic"),
+CLASS_GROUPS: Final[dict[str, tuple[str, ...]]] = {
+    "primary": ("Primary",),
+    "bspgsp": ("BSP", "GSP"),
+    "solar": ("solar",),
+    "wind": ("wind",),
 }
-REPRODUCTION_PAIRS: Final[dict[str, tuple[Path, str]]] = {
-    "weekly": (common.EXPERIMENT_00034_ARMS_DIR / "weekly.parquet", "weekly"),
-    "weekly_s": (common.EXPERIMENT_00034_ARMS_DIR / "weekly_s.parquet", "weekly_s"),
-    "monthly": (common.EXPERIMENT_00034_ARMS_DIR / "monthly.parquet", "monthly"),
-    "monthly_s": (common.EXPERIMENT_00034_ARMS_DIR / "monthly_s.parquet", "monthly_s"),
-    "roll12": (common.EXPERIMENT_00034_ARMS_DIR / "roll12.parquet", "roll12"),
-    "roll12_s": (common.EXPERIMENT_00034_ARMS_DIR / "roll12_s.parquet", "roll12_s"),
-    "frozen": (common.EXPERIMENT_00034_WORK_DIR / "reference" / "n1.parquet", "frozen"),
-}
-"""Each arm's name, mapped to experiment 00034's stored seed-0 arm of the same configuration."""
+
+
+def _arm(*, cls: str, name: str) -> str:
+    """Return the table name of a rounds-family arm (`fz_def_r500`...) for a class, spread form."""
+    return f"gen_{name}_s" if cls in {"solar", "wind"} else f"{name}_s"
+
+
+def _descriptive() -> dict[str, ContrastSpec]:
+    """Return the exploratory contrasts: the rounds family, the frozen model, wind, baselines."""
+    specs: dict[str, ContrastSpec] = {}
+    for cls, groups in CLASS_GROUPS.items():
+        for label in ("r500", "r1000", "r2000"):
+            specs[f"R_{cls}_zero_minus_estimated_{label}"] = ContrastSpec(
+                groups, _arm(cls=cls, name=f"fz_m0_{label}"), _arm(cls=cls, name=f"fz_def_{label}")
+            )
+        for start in ("def", "m0"):
+            specs[f"R_{cls}_{start}_2000_minus_500"] = ContrastSpec(
+                groups,
+                _arm(cls=cls, name=f"fz_{start}_r2000"),
+                _arm(cls=cls, name=f"fz_{start}_r500"),
+            )
+        for label in ("best", "r500"):
+            specs[f"E_{cls}_zero_minus_estimated_early_stopping_{label}"] = ContrastSpec(
+                groups,
+                _arm(cls=cls, name=f"fzes_m0_{label}"),
+                _arm(cls=cls, name=f"fzes_def_{label}"),
+            )
+        for start in ("def", "m0"):
+            specs[f"E_{cls}_{start}_early_stopping_best_minus_500"] = ContrastSpec(
+                groups,
+                _arm(cls=cls, name=f"fzes_{start}_best"),
+                _arm(cls=cls, name=f"fzes_{start}_r500"),
+            )
+    specs["X_primary_frozen_s"] = ContrastSpec(("Primary",), "frozen_m0_s", "frozen_def_s")
+    specs["X_bspgsp_frozen_s"] = ContrastSpec(("BSP", "GSP"), "frozen_m0_s", "frozen_def_s")
+    specs["X_bspgsp_frozen_cs"] = ContrastSpec(("BSP", "GSP"), "frozen_m0_cs", "frozen_def_cs")
+    specs["X_wind_no_margin_zero_minus_estimated"] = ContrastSpec(
+        ("wind",), "gen_monthly_nm_m0_s", "gen_monthly_nm_def_s"
+    )
+    specs["X_wind_no_margin_minus_margin"] = ContrastSpec(
+        ("wind",), "gen_monthly_nm_def_s", "gen_monthly_def_s"
+    )
+    specs["X_wind_no_margin_zero_minus_margin"] = ContrastSpec(
+        ("wind",), "gen_monthly_nm_m0_s", "gen_monthly_def_s"
+    )
+    specs["X_primary_weekly_zero_vs_manual"] = ContrastSpec(
+        ("Primary",), "weekly_m0_s", "manual_heuristic"
+    )
+    specs["X_primary_weekly_estimated_vs_manual"] = ContrastSpec(
+        ("Primary",), "weekly_def_s", "manual_heuristic"
+    )
+    return specs
+
+
+DESCRIPTIVE: Final[dict[str, ContrastSpec]] = _descriptive()
 
 
 def _arms_dir(*, smoke: bool) -> Path:
@@ -450,47 +484,48 @@ def compute_absolute(*, smoke: bool) -> None:
     )
 
 
-def _stored_arm_metrics(
-    *, path: Path, groups: dict[int, tuple[str, str]], seed: int
-) -> pl.DataFrame:
-    """Return an experiment 00034 arm's quantile score per case on the 73 runs, seed `seed`."""
-    frame = (
-        pl.read_parquet(path)
-        .filter(
-            (pl.col("seed") == seed)
-            & pl.col("actual").is_finite()
-            & (pl.col("valid_time") < common.HOLDOUT)
-        )
-        .sort(*common.KEYS)
-    )
-    quantiles = np.sort(frame.select(common.LEVEL_COLUMNS).to_numpy().astype(np.float64), axis=1)
-    qs = common.pinball_quantile_score(
-        quantiles=quantiles, actual=frame["actual"].to_numpy().astype(np.float64)
-    )
-    return frame.select(*common.KEYS).with_columns(
-        qs_stored=pl.Series(qs * 100.0),
-        group=pl.Series([groups[int(i)][1] for i in frame["time_series_id"].to_numpy()]),
-    )
+REPRODUCTION_ARM_PAIRS: Final[tuple[tuple[str, str], ...]] = (
+    ("fz_def_r500", "frozen_def"),
+    ("fz_def_r500_s", "frozen_def_s"),
+)
+"""The estimated-start 500-round prefix, against experiment 00048's frozen arm."""
 
 
 def compute_reproduction(*, smoke: bool) -> None:
-    """Compare the arms without a correction on the 73 runs with experiment 00034's stored arms."""
-    series = common.series_table()
-    groups = {
-        int(r["time_series_id"]): (r["site"], r["substation_type"])
-        for r in series.iter_rows(named=True)
-    }
-    rows = []
-    for arm, (stored_path, _label) in REPRODUCTION_PAIRS.items():
-        metrics_path = _metrics_dir(smoke=smoke) / f"{arm}.parquet"
-        if not metrics_path.exists() or not stored_path.exists():
-            continue
-        mine = pl.read_parquet(metrics_path).filter(
-            pl.col("group").is_in(common.GROUPS)
-            & pl.col("power_fcst_init_time").is_in(EVERY5D_ORIGINS)
+    """Compare repeated estimated-start fits with experiment 00048's stored predictions."""
+    rows: list[dict[str, object]] = []
+    mine_root = common.ANCHOR_PREDS_DIR.with_name("anchor_preds_smoke" if smoke else "anchor_preds")
+    for path in sorted((mine_root / "n1h_def").glob("*.parquet")):
+        stored_path = common.E48_ANCHOR_PREDS_DIR / "n1h" / path.name
+        mine = pl.read_parquet(path).sort(*common.KEYS)
+        stored = pl.read_parquet(stored_path)
+        joined = mine.join(stored, on=list(common.KEYS), how="inner", suffix="_stored")
+        largest = max(
+            float((joined[c] - joined[f"{c}_stored"]).abs().max())  # ty: ignore[invalid-argument-type]
+            for c in common.LEVEL_COLUMNS
         )
-        stored = _stored_arm_metrics(path=stored_path, groups=groups, seed=common.SEED)
-        joined = mine.join(stored.drop("group"), on=list(common.KEYS), how="inner", validate="1:1")
+        rows.append(
+            {
+                "check": f"n1h_def {path.stem}",
+                "cases": joined.height,
+                "largest_quantile_difference": largest,
+            }
+        )
+    for mine_arm, stored_arm in REPRODUCTION_ARM_PAIRS:
+        mine_path = _metrics_dir(smoke=smoke) / f"{mine_arm}.parquet"
+        stored_path = _metrics_dir(smoke=smoke) / f"{stored_arm}.parquet"
+        if not mine_path.exists() or not stored_path.exists():
+            continue
+        mine = pl.read_parquet(mine_path).filter(pl.col("power_fcst_init_time").is_in(GAP_ORIGINS))
+        stored = pl.read_parquet(stored_path).filter(
+            pl.col("power_fcst_init_time").is_in(GAP_ORIGINS)
+        )
+        joined = mine.join(
+            stored.select(*common.KEYS, "seed", qs_stored=pl.col("qs")),
+            on=[*common.KEYS, "seed"],
+            how="inner",
+            validate="1:1",
+        )
         for group in common.GROUPS:
             part = joined.filter(pl.col("group") == group)
             if part.is_empty():
@@ -498,8 +533,7 @@ def compute_reproduction(*, smoke: bool) -> None:
             mine_score, stored_score = float(part["qs"].mean()), float(part["qs_stored"].mean())  # ty: ignore[invalid-argument-type]
             rows.append(
                 {
-                    "arm": arm,
-                    "group": group,
+                    "check": f"{mine_arm} against {stored_arm}, {group}",
                     "cases": part.height,
                     "qs_new": mine_score,
                     "qs_stored": stored_score,
@@ -507,12 +541,10 @@ def compute_reproduction(*, smoke: bool) -> None:
                     "within_tolerance": abs(mine_score - stored_score) <= TOLERANCE,
                 }
             )
-    common.atomic_write(
-        frame=pl.DataFrame(rows, infer_schema_length=None),
-        target=_results_dir(smoke=smoke) / "reproduction.parquet",
-    )
-    with pl.Config(tbl_rows=100):
-        print(pl.DataFrame(rows, infer_schema_length=None))
+    frame = pl.DataFrame(rows, infer_schema_length=None)
+    common.atomic_write(frame=frame, target=_results_dir(smoke=smoke) / "reproduction.parquet")
+    with pl.Config(tbl_rows=100, tbl_cols=10, fmt_str_lengths=60):
+        print(frame)
 
 
 def write_arm_predictions(*, smoke: bool) -> None:
