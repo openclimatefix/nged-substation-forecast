@@ -1,29 +1,34 @@
 """Paths, series, grids, lags, corrections, and scores shared by the scripts of experiment 00077.
 
-The experiment (PVDIS-5) forecasts a Primary substation's net power as demand minus a forecast of
-its embedded solar output, in four ways
-(`docs/ml-experiments/00077-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md`). The
-helpers are copied from experiment 00046's `e00046_common.py`; an experiment may not import another
-experiment. Experiment 00046's solar inputs, boosters, and arms are read through the read-only
-`E46_*` constants and never written.
+The experiment (PVDIS-6b) rebuilds the solar term of experiment 00064's arm `am` with a fitted
+shape, a blend of east-, south-, and west-facing output
+(`docs/ml-experiments/00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md`). The helpers are
+copied from experiment 00064's `e00064_common.py`; an experiment may not import another experiment.
+The tables of experiments 00045, 00046, and 00064 are read through the read-only `E4*_*` and `E64_*`
+constants and never written.
 
-Run order (every script is `uv run python ml-experiments/00077-*/<script> ...`; the scripts that
-fit use at most 4 cores and the GPU slot of 12 GB):
+Run order (every script is `uv run python ml-experiments/00077-*/<script> ...`; the slot is 6 cores
+and 8 GB of GPU). Steps 1 to 3 run once. Steps 4 to 6 run once per solar shape, named by the
+`E77_ARM` environment variable (`blend`, `s25`, or `shuffled`), and `WORK_DIR` follows it:
 
-1. `e00077_capacity.py`: one capacity per series, `work/capacity.parquet`.
-2. `e00077_inputs.py`: calibrated training-window shapes, lag shapes of arm `b`, and the placebo
-   permutations, `work/inputs/`.
-3. `e00077_weights.py` (`--job SITE VARIANT` per job, or `--collect` once all jobs are done): the
-   cross-fitted weights `w`, `work/weights.parquet`.
-4. `e00077_fit.py --smoke`, then `e00077_run.sh`, which runs every fit and predict-only job four at
-   a time into `work/arms_raw/` and `work/boosters/`.
-5. `e00077_assemble.py`: the 14-day correction and the spread factor, `work/arms/`, and the
+1. `e00077_orient.py --part cams|train|val`: the east, south, and west unit shapes of CAMS and of
+   the ENS ensemble mean, `work/orient/`.
+2. `e00077_shares.py`: the shares of each Primary fitted on the training window, the weights of
+   each solar shape, and the evening-west check, `work/shares.parquet`,
+   `work/coefficients.parquet`, and `work/evening.parquet`.
+3. `e00077_assemble.py --references`: the stored arms of experiments 00064, 00076, and 00078.
+4. `e00077_solar_inputs.py`, `e00077_capacity.py`, then `e00077_inputs.py --part train_shape` and
+   `--part placebo`: the solar tables, the capacity, and the placebo permutations of the shape.
+5. `e00077_run.sh <shape>`: the weights `w` (`e00077_weights.py`) and the fits (`e00077_fit.py`).
+6. `e00077_assemble.py`: the 14-day correction and the spread factor, `work/arms/`, and the
    prediction sets under `data/ml-experiments/00077-*/predictions/`.
-6. `e00077_stats.py`: the pre-registered reads, printed, and `work/results/`.
 
-The series are the five verdict series (D9, D10, D11, D14, D16); D5 is not fitted or scored. The
-training window ends at `LAST_TRAINING_VALID`, and every script that reads a training input asserts
-that no row or input is later.
+Then `e00077_stats.py` (with `E77_ARM=blend`) prints the pre-registered reads, and
+`e00077_charts.py` draws the figures.
+
+The series are the five verdict series (D9, D10, D11, D14, D16). The training window ends at
+`LAST_TRAINING_VALID`, and every script that reads a training input asserts that no row or input
+is later.
 """
 
 import json
@@ -47,7 +52,7 @@ SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 
 BASE_WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}" / "work"
 """Tables shared by every arm; private and never committed."""
-SHAPE_ARMS: Final[tuple[str, ...]] = ("blend", "s25", "flat", "shuffled")
+SHAPE_ARMS: Final[tuple[str, ...]] = ("blend", "s25", "shuffled")
 """The solar shapes, each a linear combination of the east, south, and west unit shapes."""
 SHAPE_ARM: Final[str] = os.environ.get("E77_ARM", "blend")
 """The solar shape this process works on, set by the `E77_ARM` environment variable."""

@@ -29,6 +29,10 @@ ARMS_DIR: Final = common.BASE_WORK_DIR / "arms"
 RESULTS_DIR: Final = common.BASE_WORK_DIR / "results"
 THRESHOLD_FRACTION: Final[float] = 0.005
 """The smallest gain worth a table of three shares per Primary: 0.5% of the score of `am`."""
+EXPECTED_ROWS_PER_SEED: Final[int] = 68_903
+"""Experiment 00064's scored rows per seed."""
+EXPECTED_AM_SCORE: Final[float] = 4.467
+"""Experiment 00064's score of `am`, from which the threshold follows."""
 N_VERDICT_CONTRASTS: Final[int] = 3
 VERDICT_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / N_VERDICT_CONTRASTS)
 """98.33: a 5% familywise level split over the three contrasts."""
@@ -45,7 +49,6 @@ SCORED_ARMS: Final[tuple[str, ...]] = (
     "am_blend",
     "am_blend_twin",
     "am_s25",
-    "am_flat",
     "am_shuffled",
 )
 STORED_REFERENCE_ARMS: Final[tuple[str, ...]] = ("climatology", "manual_heuristic")
@@ -256,7 +259,6 @@ def stored_reference_scores(*, context: pl.DataFrame) -> pl.DataFrame:
 def exploratory_contrasts(*, losses: pl.DataFrame) -> pl.DataFrame:
     """Return the exploratory contrasts at 95%: the other controls, splits, and per-series reads."""
     reads: list[tuple[str, str, str, str, pl.Expr]] = [
-        ("E1", "am_blend", "am_flat", "all leads", ALL_ROWS),
         ("E2", "am_blend", "am_shuffled", "all leads", ALL_ROWS),
         ("E3", "am_blend", "am0", "all leads", ALL_ROWS),
         ("E4", "am_blend", "am_sy", "all leads", ALL_ROWS),
@@ -368,6 +370,8 @@ def main() -> None:
         ),
     )
     am_score = float(absolute.filter(pl.col("arm") == "am")["qs"][0])
+    assert first.height == EXPECTED_ROWS_PER_SEED, f"{first.height} scored rows per seed"
+    assert abs(am_score - EXPECTED_AM_SCORE) < 0.005, f"am scores {am_score}, not experiment 64's"
     verdict, threshold = verdict_rule(family=family, am_score=am_score)
     print(f"\nThreshold: {THRESHOLD_FRACTION:.1%} of am's score ({am_score:.3f}) = {threshold:.4f}")
     print(f"VERDICT: {verdict}")

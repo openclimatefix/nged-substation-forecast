@@ -1,28 +1,20 @@
-"""Training matrices, validation runs, and shifted forecasts shared by the fits of experiment 00077.
+"""Training matrices, validation runs, and the base margin shared by the fits of experiment 00077.
 
 Every arm is experiment 00046's `d1l` recipe (experiment 00033's N1: half-life 2 years, one
 nine-level quantile model per series and seed, trained on the ENS control member) with the embedded
-solar term attached in one of four ways. All quantities are in power over the series' effective
-capacity, so the solar term is `scale * shape` with `scale = capacity_mw / effective_capacity_mw`.
+solar term attached as a base margin (arm `am`). All quantities are in power over the series'
+effective capacity, so the solar term is `scale * shape` with
+`scale = capacity_mw / effective_capacity_mw`.
 
-- `sf`: the stored `d1l` quantiles plus `w * scale * anomaly`, where `anomaly` is the
-  ensemble-mean calibrated ENS anomaly and `w` the fitted weight (negative: a sunnier day than
-  usual lowers net power). Predict-only, so the sign convention is "added", not "subtracted".
-- `a`: one extra input column, `scale * (clim_cams + anomaly)`, the calibrated shape. In training
-  the anomaly is the ensemble mean; at inference each member row has its own calibrated anomaly.
 - `am`: XGBoost `base_margin` of `w * scale * anomaly` (ensemble-mean anomaly in training and at
   inference; the climatology is left to the trees), repeated for the nine quantile outputs. A
   model given a margin starts from the margin alone, not from XGBoost's estimated `base_score`.
-- `b`: trained on gross demand (power plus `scale` times the CAMS shape) with gross lags (each net
-  lag plus `scale` times the unit shape at the lagged time, see `e00077_inputs.py`); at inference
-  each member's gross quantiles are shifted down by `scale * (clim_cams + anomaly)`.
+- `am_twin`: the same with the placebo anomaly `anomaly_mean_calibrated_twin`.
 
-The placebo twins replace the ensemble-mean calibrated anomaly by `anomaly_mean_calibrated_twin`
-(a member's own deviation from the mean is kept on top at inference for `a_twin`).
+The anomaly, the capacity, and the weight `w` all follow the solar shape named by `E77_ARM`.
 
 Choices where the plan is silent: a month outside April to September has a weight of zero; a
-missing anomaly, climatology, or capacity counts as zero in the shift; a missing lag shape drops a
-training row of `b` and leaves a NaN gross lag at inference.
+missing anomaly, climatology, or capacity counts as zero in the shift.
 """
 
 from collections.abc import Iterator

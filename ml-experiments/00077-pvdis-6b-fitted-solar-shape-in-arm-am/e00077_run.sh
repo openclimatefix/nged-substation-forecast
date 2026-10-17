@@ -6,10 +6,14 @@
 #   weights   5 cross-fits (one per series), then the collected table
 #   fits      arm am for 5 series x 3 seeds, and arm am_twin when the shape is `blend`
 #
-#     bash ml-experiments/00077-*/e00077_run.sh blend|s25|flat|shuffled
+# Run `e00077_orient.py`, `e00077_shares.py`, `e00077_solar_inputs.py`, `e00077_capacity.py`, and
+# `e00077_inputs.py` first (see `e00077_common.py`), then `e00077_assemble.py` and
+# `e00077_stats.py` afterwards.
+#
+#     bash ml-experiments/00077-*/e00077_run.sh blend|s25|shuffled
 set -euo pipefail
 
-SHAPE="${1:?give the solar shape: blend, s25, flat, or shuffled}"
+SHAPE="${1:?give the solar shape: blend, s25, or shuffled}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SITES=(D9 D10 D11 D14 D16)
 SEEDS=(0 1 2)

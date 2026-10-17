@@ -1,38 +1,24 @@
-"""Build the solar inputs that experiment 00077 adds to experiment 00046's, under `work/inputs/`.
+"""Build the solar inputs of one solar shape for the fits, under `work/arm/<shape>/inputs/`.
 
-Experiment 00046's solar folder (CAMS `u`, climatologies, calibration slopes, validation
-anomalies) is read, never written. This script writes:
+The tables of `e00077_solar_inputs.py` (CAMS `u`, climatologies, calibration slopes, validation
+anomalies) are read, never written. This script writes:
 
 - `train_shape.parquet`: for each training row (series, run, valid time; the ENS control member's
   rows of experiment 00003's `train.parquet`) the ensemble-mean calibrated anomaly
   (`anomaly_mean_calibrated`, the lead-band slope times the ensemble-mean ENS anomaly), the CAMS
   climatology (`clim_cams`) and their sum `shape_calibrated`, plus the CAMS `u` and anomaly at the
   valid time, the month, half-hour, lead band, and the daylight flag.
-- `t_ref.parquet`: per series, the training-window mean over daylight rows of the cell temperature
-  (the control member's 2 m temperature plus 25 K times `shape_calibrated`), the reference of the
-  exploratory temperature derating `sf_temp`. Training files hold the control member only, so the
-  reference uses the control member's temperature.
+- `t_ref.parquet`: per series, the training-window mean over daylight rows of the cell temperature.
 - `val_keys.parquet`: each validation run's distinct (series, run, valid time) with the
-  ensemble-mean calibrated anomaly, read from experiment 00046's `ens_val` files.
-- `lag_runs/run=*.parquet`: for each daily 00:00 UTC ENS run the arm `b` needs, the ensemble-mean
-  `u` of every valid time in the first 36 hours, per series.
-- `lag_shapes_train.parquet`, `lag_shapes_val.parquet`: the unit PV shape at each of the three
-  lagged times of every training and validation row, for arm `b`'s gross lags, with the source of
-  each value. The shape comes from CAMS when the lagged time is more than 24 hours before the
-  origin; otherwise from the ensemble-mean `u` of the 00:00 UTC run of the origin's day when that
-  run covers the lagged time, else of the previous day's run; otherwise it is missing. A row with a
-  missing shape is dropped from `b`'s training and has a missing gross lag at inference (a missing
-  value that XGBoost handles natively; a validation row is never dropped, so the arms share keys).
-  The counts of each source per lag column are printed.
+  ensemble-mean calibrated anomaly.
 - `placebo_train.parquet`, `placebo_val.parquet`: the placebo twins' anomaly. Within a series,
   local calendar month, UTC half-hour, and lead band, the ensemble-mean calibrated anomaly of each
   forecast run is exchanged for that of another run by a seeded permutation (without replacement),
-  separately in training and validation.
+  separately in training and validation. The permutation depends only on the keys and the seed, so
+  it picks the same donor runs as experiment 00064's.
 
-    uv run python ml-experiments/00077-*/e00077_inputs.py --part train_shape
-    uv run python ml-experiments/00077-*/e00077_inputs.py --part lag_runs [--runs N]
-    uv run python ml-experiments/00077-*/e00077_inputs.py --part lag_shapes
-    uv run python ml-experiments/00077-*/e00077_inputs.py --part placebo
+    E77_ARM=blend uv run python ml-experiments/00077-*/e00077_inputs.py --part train_shape
+    E77_ARM=blend uv run python ml-experiments/00077-*/e00077_inputs.py --part placebo
 """
 
 import argparse

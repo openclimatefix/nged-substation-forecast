@@ -42,9 +42,7 @@ decision_rule: >-
   threshold is a judgement: porting the fitted shape adds a table of three shares per Primary and
   a three-orientation calculation to the capacity and solar-shape steps, and a smaller gain than
   the seed-and-week noise of a half-year contrast would not justify the table. Every other read is
-  exploratory, labelled so, at 95%: `am_blend` minus `am_blend_flat` (the blend's daily-mean
-  output with the south-facing timing, which removes the east and west timing and keeps the level),
-  the shuffled-shares contrast `am_blend` minus `am_shuffled`
+  exploratory, labelled so, at 95%: the shuffled-shares contrast `am_blend` minus `am_shuffled`
   (the shares of another Primary, a fixed cyclic permutation of the 5 series), the contrast by lead
   band and by valid month, the per-series contrasts, and the evening-west check below. The result
   is read against the separate check that experiment 00064's gain beyond 10 days (-0.082 points
@@ -100,9 +98,6 @@ the write-up.
 - `am_blend_twin`: `am_blend` with the forecast sunshine taken from another date, by experiment 64's
   permutation of runs within series, month, half-hour, and lead band. The donor run is the same for
   the east, south, and west anomalies, so the twin keeps their mutual timing.
-- `am_blend_flat`: `am` whose shape has the blend's daily-mean output at each half-hour cell but the
-  south-facing timing, an exploratory control that keeps the level of the blend and removes its
-  east and west timing.
 - `am_shuffled`: `am` with the shares of another Primary (a fixed cyclic permutation of the 5
   series), refitted capacity and weight. This is exploratory.
 - Reference rows, read from experiment 64's stored predictions: `am`, `am_twin`, `d0`, `d1l`,
@@ -149,6 +144,22 @@ descriptive, and no verdict uses it.
   callers are known.
 - **Size: medium.** One Sonnet plan review, one Sonnet code review, one Sonnet write-up review, and
   one Sonnet prose review.
+
+## Changes made after the plan was committed and before any arm was scored
+
+- **The flat-timing control `am_blend_flat` is dropped.** A reviewer of the code showed that a
+  single scale on the south shape cancels: the calibration slope, the capacity, and the weight `w`
+  absorb it, so the arm would equal `am_s25`. A per-cell version was not built.
+- **The evening-west check regresses on the day's mean daytime cloud and heating degree-days.**
+  The frame holds no cloud measure after dark, because irradiance is zero then, so the cloud
+  variable of the plan's "that evening" is the same day's daylight cloud.
+- **The fallback capacity of the series with no 2024/25 constant (D14) is scaled by the shape.** It
+  is experiment 64's capacity times the median ratio of the shape's capacity to experiment 64's at
+  the other four series.
+- **Exploratory contrasts against `am0` and `am_sy` are added,** at the request of the manager,
+  because experiment 78 found that a zero base margin alone lowers `d0`'s score. `am0` is
+  experiment 76's `am` without the solar term, and `am_sy` is experiment 78's `am` with a
+  season-year capacity vintage.
 
 ## Earlier advice followed and departed from
 

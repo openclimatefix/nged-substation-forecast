@@ -14,13 +14,11 @@ ratio of 1.15. Within each season-year the power is modelled as
 
 and the shares are the non-negative least-squares solution pooled over season-years.
 
-`work/shares.parquet` holds each Primary's shares, its mean south-only capacity, and `flat_scale`.
+`work/shares.parquet` holds each Primary's shares and its mean south-only capacity.
 `work/coefficients.parquet` holds the weights `(cE, cS, cW)` of each solar shape in each series:
 
 - `blend`: the fitted shares.
 - `s25`: `(0, 1, 0)`.
-- `flat`: `(0, k, 0)`, where `k` is the ratio of the blend's to the south shape's training-window
-  daylight energy, so the shape keeps the blend's level and the south-facing timing.
 - `shuffled`: the shares of the next series in `common.SITES`, a fixed cyclic permutation.
 
 `work/evening.parquet` holds, for each Primary, the slope of its after-dark demand (calendar cell
@@ -229,21 +227,6 @@ def fit_site(*, site_rows: pl.DataFrame) -> dict[str, object]:
     }
 
 
-def flat_scale(*, site: str, shares: np.ndarray) -> float:
-    """Return the ratio of the blend's to the south shape's training daylight energy."""
-    cams = (
-        pl.read_parquet(orient.ORIENT_DIR / "cams.parquet")
-        .filter(
-            (pl.col("site") == site)
-            & (pl.col("time") <= common.LAST_TRAINING_VALID)
-            & pl.col("uS").is_not_null()
-        )
-        .select(*orient.COLUMNS)
-        .to_numpy()
-    )
-    return float((cams @ shares).sum() / cams[:, 1].sum())
-
-
 def coefficient_table(*, shares: pl.DataFrame) -> pl.DataFrame:
     """Return the weights of the east, south, and west shapes of every solar shape and series."""
     order = list(common.SITES)
@@ -255,11 +238,9 @@ def coefficient_table(*, shares: pl.DataFrame) -> pl.DataFrame:
             0, named=True
         )
         theirs = np.array([other["east"], other["south"], other["west"]])
-        k = flat_scale(site=site, shares=mine)
         for arm, c in (
             ("blend", mine),
             ("s25", np.array([0.0, 1.0, 0.0])),
-            ("flat", np.array([0.0, k, 0.0])),
             ("shuffled", theirs),
         ):
             rows.append({"arm": arm, "site": site, "cE": c[0], "cS": c[1], "cW": c[2]})

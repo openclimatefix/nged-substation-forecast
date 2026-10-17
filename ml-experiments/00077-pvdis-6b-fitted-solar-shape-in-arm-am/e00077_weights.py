@@ -1,7 +1,6 @@
 """Fit the weight `w` of the solar term for each series, lead band, and season.
 
-For each series and each of four `d1l` variants (all inputs; no lagged-power columns; no
-cloud-proxy columns; neither), the training window is cross-fitted in 4 time-block folds: the
+For each series, the training window is cross-fitted in 4 time-block folds: the
 fold of a row is the valid time's UTC month index modulo 4, so each fold holds every fourth month.
 Seed 0 only. Each fold's model is fitted on the other three folds with experiment 00033's N1
 parameters and recency weights, and predicts the held-out rows. The out-of-fold residual of the
@@ -12,14 +11,14 @@ anomaly, the residual is regressed through the origin, per lead band and season 
 July to September), on two shifts:
 
 - the oracle shift, `scale * anomaly_cams` (experiment 00051's slope, expected negative);
-- the applied shift, `scale * anomaly_mean_calibrated`, the shift `sf` and `am` use at forecast
-  time. Only this slope, for the "all inputs" variant, feeds `sf` and `am`.
+- the applied shift, `scale * anomaly_mean_calibrated`, the shift `am` uses at forecast
+  time. Only this slope feeds `am`.
 
 `scale` is the capacity over the series' effective capacity. A sum of products and a sum of
 squares is stored for each shift so that pooled slopes can be formed.
 
     uv run python ml-experiments/00077-*/e00077_weights.py --job D9 all     # one cross-fit
-    uv run python ml-experiments/00077-*/e00077_weights.py --collect        # after all 20 jobs
+    uv run python ml-experiments/00077-*/e00077_weights.py --collect        # after all 5 jobs
 
 Each job writes `work/weights_parts/<site>_<variant>.parquet`; `--collect` writes
 `work/weights.parquet` (`site`, `variant`, `band`, `season`, `slope_oracle`, `slope_applied`, and
@@ -158,7 +157,7 @@ def to_slopes(*, sums: pl.DataFrame) -> pl.DataFrame:
 
 
 def collect() -> None:
-    """Join the 20 parts, print the slopes, and write `work/weights.parquet`."""
+    """Join the 5 parts, print the slopes, and write `work/weights.parquet`."""
     parts = sorted(PARTS_DIR.glob("*.parquet"))
     sums = pl.concat([pl.read_parquet(path) for path in parts])
     expected = {(s, v) for s in common.SITES for v in model.WEIGHT_VARIANTS}
