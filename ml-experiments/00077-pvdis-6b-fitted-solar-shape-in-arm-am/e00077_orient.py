@@ -14,8 +14,7 @@ by `e00077_solar_inputs.py`, with no second pass over the ENS archive. This scri
   `LAST_TRAINING_VALID`.
 - `ens_val/init=*.parquet`: the same for each validation run of experiment 00064's row set.
 
-    POLARS_MAX_THREADS=1 uv run python ml-experiments/00077-*/e00077_orient.py \
-        [--part cams|train|val] [--workers 6]
+    uv run python ml-experiments/00077-*/e00077_orient.py --part cams|train|val [--workers 6]
 """
 
 import argparse
