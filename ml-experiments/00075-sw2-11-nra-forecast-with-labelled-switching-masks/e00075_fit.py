@@ -40,6 +40,8 @@ MW_COLUMNS: Final[tuple[str, ...]] = (
     "mw_same_time_latest_day",
     "mw_same_time_latest_week",
 )
+SITE_CHUNKS: Final[int] = 2
+"""Each refit's series are split into this many jobs, so that files are written sooner."""
 ROUNDS: Final[int] = common.N_ROUNDS
 ETA: Final[float] = 0.05
 HALF_LIFE_DAYS: Final[float] = common.SHORT_HALF_LIFE_DAYS
@@ -357,18 +359,20 @@ def main() -> None:
     nthread = max(1, CORES // workers)
     started = time.monotonic()
     ordered = sorted(jobs.items(), key=lambda item: -len(item[1]))
+    site_chunks = [sites[i::SITE_CHUNKS] for i in range(min(SITE_CHUNKS, len(sites)))]
     with ProcessPoolExecutor(max_workers=workers) as pool:
         futures = [
             pool.submit(
                 run_job,
                 refit=refit,
                 origins=origins,
-                sites=sites,
+                sites=chunk,
                 out_root=out_root,
                 rounds=rounds,
                 nthread=nthread,
             )
             for refit, origins in ordered
+            for chunk in site_chunks
         ]
         for done, future in enumerate(futures, start=1):
             for line in future.result():
