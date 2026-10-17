@@ -20,11 +20,13 @@ decision_rule: >-
   and outside the labelled events), quantile score over all leads, read at 98.33% (Bonferroni across
   three), whole validation months resampled. C1, the masked arm minus the plain arm: the mask is
   adopted (non-inferior) when the interval's upper end is at most +0.02 points, 0.34% of the
-  plain arm's score, which is the most that experiment 44 says a perfect detector could gain;
-  C1 is a gain when the interval lies wholly below zero. C2, the arm with signed MW columns minus
+  plain arm's score, which is the most that experiment 44 says a perfect detector could gain, and so the size of
+  harm worth worrying about; only the upper end of the two-sided interval is read, which is
+  conservative; C1 is a gain when the interval lies wholly below zero. C2, the arm with signed MW columns minus
   the masked arm, and C3, the arm with lags minus MW minus the masked arm: each is supported when
   its interval lies wholly below zero, because either arm needs a detector on the serving path.
-  The best of the three arms is the v1 NRA candidate; with no magnitude arm supported, the masked
+  The v1 NRA candidate is the supported magnitude arm; when both are supported, the one with the
+  lower score on the NRA rows, and the page reports `plain` minus that arm descriptively. With no magnitude arm supported, the masked
   arm is the candidate when C1 is non-inferior and the plain arm otherwise. Every other comparison
   is descriptive.
 benchmark: >-
@@ -71,12 +73,31 @@ switching without NGED's log (SW2-12).
 - **Labels.** The visible events (conserved or one-sided) of experiment 41's labelled set, with
   the onset, end, donor, receivers, and median moved MW it stored. Events before the labelled set's
   start (January 2022) are not masked, and the training history runs from September 2019.
-- **NRA rows.** A scored case is kept when its valid time is outside every labelled event of its
+- **What the labels are.** The labels, onsets, ends, and moved MW are hindsight values that NGED
+  would not have at the forecast origin: each event has one median moved MW for its whole length,
+  estimated from telemetry that may follow the origin. This experiment is therefore an oracle
+  ceiling for the masks and the MW columns, and SW2-12 measures what a detector loses. The mask
+  drops only training rows already inside the refit's cutoff (valid time at least 3.5 hours before
+  the refit), and the MW at each lag is looked up at the lag's own time, not the valid time. The
+  labelled events of the other visibility classes (not visible, unassessable) stay in training,
+  and logged closures without a labelled event are not masked.
+- **Event sign and size.** The MW is divided by the series' effective capacity. A donor gets minus
+  the event's median moved MW, a metered receiver gets plus that MW times its share, and shares may
+  sum to less than 1. A receiver outside the 16 Primary series is ignored. A one-sided event with
+  no metered receiver still marks and signs its donor. The events are the 82 visible ones (conserved
+  or one-sided, kinds real and alarm), not the synthetic sentinel cards.
+- **NRA rows.** The row set is fixed before any arm is scored. A scored case is kept when its valid time is outside every labelled event of its
   series and outside the logged closure interval of any card that names the series as a side.
   Every arm is scored on identical rows.
 - **Not run.** The `base_margin` forecast-solar arm of
   [experiment 64](../00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) is left out.
-- **Descriptive extras.** Experiment 48's `manual_heuristic`, `climatology`, and stack rows on the
+- **Calendar columns.** Every arm uses experiment 48's N1 columns, which include hour and weekday,
+  so a model that memorises the calendar does so in all four arms alike. The contrasts are paired
+  across arms with identical columns, and no separate control is run.
+- **Reproduction check.** The `plain` arm on all 292 runs must match experiment 48's stored
+  weekly score (5.44) to 0.01, and its per-case scores to 0.001 where the graphics-card fit is
+  repeatable.
+- **Descriptive extras.** `plain` minus each other arm on the NRA rows; Experiment 48's `manual_heuristic`, `climatology`, and stack rows on the
   same cases; experiment 49's P-roll 5.150 only where its rows match; each series on its own; the
   lag-in-event subset (NRA rows whose lag falls in an event), where the magnitude arms can act.
 
