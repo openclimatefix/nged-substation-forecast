@@ -186,6 +186,7 @@ nav:
       - "Which logged switching jobs show up in the power readings?": ml-experiments/00041-sw2-0a-labeller-gate/labelled-set.md
       - "How much of the best guess's daylight error is embedded solar?": ml-experiments/00046-embedded-solar-share-of-primary-forecast-error/result.md
       - "Why does the solar term lose at sunny summer middays?": ml-experiments/00051-pvdis-3b-midday-loss-of-the-solar-term/result.md
+      - "Can the mix of solar panel orientations and the DC to AC ratio be recovered?": ml-experiments/00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md
       - "Does the UKV forecast the solar anomaly better than ENS?": ml-experiments/00053-ukv-vs-ens-solar-anomaly/result.md
       - "How well do the two existing switching detectors find transfers?": ml-experiments/00043-sw2-1-detector-scoreboard/result.md
       - "Does Flexpectation v1 need special handling at MVA-only Primaries?": ml-experiments/00056-mva-only-primaries-skill-against-mw-primaries/result.md
@@ -198,9 +199,18 @@ nav:
       - "Is the recall gap without a metered receiver a step-size effect, and does a stronger veto help?": ml-experiments/00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md
       - "Does one detector over several windows find more transfers than the best single window?": ml-experiments/00059-sw2-13-several-windows-in-one-detector/result.md
       - "Does a step that weights each half-hour by the daily profile find more of the moved load?": ml-experiments/00060-sw2-7-profile-weighted-step-detector/result.md
+      - "Does demand minus a forecast of solar output match the best guess while explaining the forecast?": ml-experiments/00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md
+      - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
       - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
       - "Does removing the residual's half-hour-to-half-hour memory help the switching detector?": ml-experiments/00062-sw2-9-whitened-residual-step-detector/result.md
       - "Does one score from a substation's own step and its neighbours' opposite steps find more of the moved load?": ml-experiments/00065-sw2-14-combined-single-series-and-neighbour-score/result.md
+      - "Which window and cap should the end rule of the switching detector use?": ml-experiments/00066-sw2-16-end-rule-as-baseline/result.md
+      - "Why do real load transfers raise no alarm at their start, and does a weak step confirmed by a step back recover them?": ml-experiments/00069-sw2-17-missed-onsets-of-the-end-rule/result.md
+      - "Do the mechanical misses of the end rule come from monthly refits and data gaps?": ml-experiments/00071-sw2-18-refit-offset-and-gap-bridging/result.md
+      - "Does the count of neighbours that step the same way find more of the moved load?": ml-experiments/00070-sw2-19-same-sign-neighbour-count/result.md
+      - "Does a step-loss monitor find a lost inverter at the solar farms?": ml-experiments/00072-p35-step-loss-monitor-for-solar-farms/result.md
+      - "Does refitting the lagless XGBoost model without the detected switching help the detector and the forecast?": ml-experiments/00068-sw2-5-train-detect-retrain-loop/result.md
+      - "Does weekly retraining still win on the 292 daily runs experiment 34 left out?": ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md
       - "Does one convex fit of load flows across all boundaries find more of the moved load?": ml-experiments/00067-sw2-15-joint-edge-flow-estimator/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md

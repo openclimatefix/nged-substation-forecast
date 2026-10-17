@@ -1,7 +1,7 @@
 ---
 id: "00067"
 slug: sw2-15-joint-edge-flow-estimator
-status: planned
+status: done
 size: complex
 hypothesis: >-
   A single convex fit of block-shaped load flows across every boundary between neighbouring Primary
@@ -48,112 +48,169 @@ metric: >-
   series starts within 2 hours and ends within the larger of 6 hours and 10% of the duration.
   Unweighted recall is secondary, and so is the share of moved MW missed.
 code: ml-experiments/00067-sw2-15-joint-edge-flow-estimator/
+verdict: refuted
+best_arm: >-
+  None. The pre-registered joint estimator (EF) finds 0.108 of the moved MW against D0M's 0.646, a
+  gain of -0.538 (97.5% interval -0.605 to -0.421). The post hoc variant with a Huber threshold of 10
+  finds 0.527, a gain of -0.120 (-0.190 to -0.084).
+lessons: >-
+  Fitting block-shaped flows to the hourly residual of all 16 Primaries at once finds far less of
+  the moved load than the 24-hour step detector when both raise about 80 unexplained alarms on odd
+  months. The estimator matches the step detector only for transfers with a metered receiver and a
+  donor step of 10 noise units or more. It misses almost every transfer with no metered receiver
+  below a step of 6 noise units. The loss is in the hourly noise model, not in the conservation
+  constraint, so a joint fit would have to start from the 24-hour step statistics.
+advice:
+  - >-
+    Do not fit block-shaped flows to the hourly residual under a Huber loss and expect to match the
+    24-hour step detector at 80 unexplained alarms: it found 0.108 against 0.646 (C1).
+  - >-
+    Report recall for donor steps under 10 noise units separately for any new detector, because the
+    joint estimator matched D0M above 10 noise units (0.92 against 0.89 post hoc) and lost 0.2 to
+    0.5 of the share found below it (recall by donor step).
+  - >-
+    Do not rely on conservation across neighbours that are metered only in MVA: 8 of the 16
+    Primaries are, and a flow into one is seen at one end only, so it acts as a cheaper slack
+    (method).
+  - >-
+    If a joint fit is tried again, fit it to the 24-hour step statistics in noise units, where the
+    noise scale is already calibrated, not to hourly residuals (what the next experiment should
+    answer).
 production_status: not-for-production
 adopted_in: none
 ---
 
 # Experiment 67: does one convex fit of load flows across all boundaries find more of the moved load?
 
-*Status: planned. This page is the plan, committed before any code runs. The write-up replaces it.*
+**A joint fit of load flows across all 30 boundaries between the 16 Primary substations found far less
+of the moved load than the single-series 24-hour step detector, and the cause is the hourly noise
+model, not the conservation of power.** At about 80 unexplained alarms on odd months, the joint
+estimator found 0.108 of the moved megawatts (MW) against 0.646 for the step detector. A post hoc
+change of its loss lifted that to 0.527, still 0.120 below. The estimator matched the step detector
+only on large transfers (a donor step of 10 noise units or more) that have a metered receiver, and
+it found almost nothing where no receiver is metered. The verdict is `refuted`.
 
-## What we ask, and how
+We asked whether fitting every boundary at once finds switched load more reliably than looking at
+each substation alone. A load transfer moves power off a donor Primary substation and onto its
+neighbours. The estimator explains the residual (measured minus predicted power) of all 16 Primaries
+as a flow across each of the 30 boundaries, plus a slack term per Primary for load moved to a
+neighbour that is not metered. A flow is zero almost always and flat when it is not. We injected 620
+known transfers into the measured power and counted the share of the moved MW found. The step
+detector D0M is the benchmark.
 
-**We ask whether fitting every boundary between neighbouring substations at once finds more
-switched load than looking at each substation alone.** A load transfer moves power off a donor
-Primary substation and onto its neighbours. The detectors in experiments 43 to 65 look for a step
-in each substation's residual (measured minus predicted power) and then check the neighbours. The
-estimator here instead assigns the residuals of all 16 substations to a flow of MW across each of
-the 30 boundaries, with a slack term per substation for load moved to a neighbour that is not
-metered. A flow is zero almost all the time and flat when non-zero, and the fit penalises both
-non-zero flows and changes in flow. Every run of non-zero flow is one detected transfer, with its
-own onset and end.
+![MW-weighted recall of each arm, by injection shape](figure_1_recall_by_arm.svg)
 
-## Method
+## Verdict
 
-- **Network.** The 16 trial Primaries and the 30 boundaries of `ADJACENCY`. Eight of the 16 are
-  metered only in MVA, a magnitude with no direction. They enter as slack-only nodes: their
-  residual can be explained only by their slack, and a flow into one is seen only at its metered
-  end.
-- **Data.** The stored residual panel of experiment 37 (`res_mw`), averaged to hourly bins and
-  divided by each series' robust standard deviation on odd months. No whitening (experiment 62).
-- **Fit, per window of 70 days.** Minimise a Huber loss (threshold 3 noise units) of the residual
-  minus the flows into and out of each metered node minus the slack, plus `lambda` times the
-  absolute value of the flows and slack (the sparsity penalty), plus `rho * lambda` times a fused
-  penalty (the sum over time of the absolute one-hour change of each flow and each slack), with
-  the slack's level penalty multiplied by `m`. The fit is a CVXPY convex problem solved with
-  Clarabel. A group version of the fused penalty, which ties the changes at one node together
-  (roadmap approach 3), solved 25 times slower in a trial on a 28-day window (55 s against 2.2 s),
-  so each flow changes on its own here. This choice was made before any scored fit.
-- **Read-out.** A run is a stretch of one flow or slack that stays above 0.1 hourly noise standard
-  deviations, with gaps of up to 3 hours bridged. Runs under 24 hours are dropped, the same
-  duration the 24-hour detectors cannot see below. A run on a boundary gives an interval on each of
-  its series that is metered in MW. A series metered only in MVA gets an interval only from its own
-  slack, since the fit has no evidence at that end. A slack run gives one on its own series. An
-  interval's onset is the first stamp of the run's first hourly bin, and its end is the first stamp
-  after its last bin. A run whose onset lies within 24 hours of a monthly refit of the residual
-  model is dropped, as the benchmark skips alarms that straddle a refit. The run stops on any
-  solver status other than `optimal` and `optimal_inaccurate`, and reports the count of
-  `optimal_inaccurate` fits.
-- **Alarms and explained alarms.** D0M raises one alarm on the onset step and one on the return
-  step of a block of load, so each EF run counts as two alarms per series, one at its onset and one
-  at its end. An alarm is explained when a logged closure touches its series within 24 hours of
-  its own stamp, the benchmark's rule. Missing hourly bins drop out of the loss.
-- **Injected transfers** are experiment 58's 1,900, in its batches and with its seeds, injected
-  with experiment 60's shapes. For each transfer the fit uses the window from 35 days before its
-  onset to 35 days after, cut from the batch's injected residual. The real-residual fit uses
-  windows of 70 days at a stride of 28 days and keeps runs whose onset lies in the middle 28 days
-  (21 to 49 days after the window start), so a run has 21 to 49 days of context on each side in
-  both fits. Both fits see more hindsight than the benchmark's 14-day end search. The write-up says
-  so, and the estimator serves only training-time masks and the event table.
-- **Tuning, on odd months only.** For each cell of the grid `rho` (1, 3, 10) by `m` (1.5, 3),
-  `lambda` is re-matched by bisection on its logarithm to the largest count of unexplained
-  odd-month alarms that does not exceed 80, the count of D0M, on the real residual. The cell with
-  the highest MW-weighted recall on 300 odd-month headline-band transfers (one shape per transfer,
-  S2, S3, or S4 by event number) wins, with ties going to the larger `lambda`. Every cell's alarm
-  count and recall are reported. The grid is fixed here, before any fit.
-- **Scored on even months.** The 620 headline-band, even-month transfers under S2, S3, and S4, with
-  the benchmark arms from experiment 65's code: D0M with the PE end rule and LOGIT_SAME. The
-  labelled real transfers over 1 day are scored too (35 of them), split by odd and even onset
-  month, with the even-month ones as the headline. Recall by donor step in noise units (bins [0,
-  2.5), [2.5, 4), [4, 6), [6, 10), and 10 or more) is split by metered receiver for EF, D0M, and
-  LOGIT_SAME, and the share of moved MW missed is tabulated for every arm.
+**The joint estimator (EF) is refuted: its gain over D0M is -0.538, with an interval wholly below
+the +0.02 bound.** MW-weighted recall is the share of the moved MW that sits in found transfers. A
+transfer is found when an alarm interval on one of its series starts within 2 hours of the true start
+and ends within the larger of 6 hours and 10% of the duration. The table gives recall pooled with
+equal weight over three injection shapes that the estimator does not assume (a constant MW, a share
+of the receiver's profile, and a mix fitted to the labelled real transfers), over the 620
+transfers of 25% to 40% of the receiving load, over 1 day, that start in even months. Weights are the
+transfers' moved MW under the donor-profile shape, as in experiment 65.
 
-## Checks before scoring
+| Arm | MW-weighted recall | MW missed | Unweighted recall | Unexplained alarms, odd / even months |
+|---|---|---|---|---|
+| D0M, 24-hour step, strongest-opposite-step end (PE) | 0.646 | 0.354 | 0.478 | 80 / 80 |
+| LOGIT + same-sign count (post hoc benchmark, experiment 65) | 0.681 | 0.319 | 0.527 | 80 / not rerun |
+| EF, pre-registered (Huber threshold 3) | 0.108 | 0.892 | 0.082 | 77 / 88 |
+| EF, Huber threshold 10 (post hoc) | 0.527 | 0.473 | 0.334 | 71 / 82 |
 
-- **Known answer:** a planted flow and a planted slack, noise-free, are recovered by the fit at the
-  right onset and end.
-- **Harness:** the injected `moved_mw` of every transfer and shape equals experiment 65's stored
-  value, and D0M's pooled even-month PE recall reads 0.646 from the stored results.
-- **Size of the job:** about 1,860 scoring fits (620 transfers by 3 shapes), 6 cells by about 8
-  bisection steps by about 58 windows of real-residual fits, and 6 by 300 tuning fits, each
-  solved in a few seconds with 4 workers.
+The contrasts, read at 97.5% (Bonferroni across two) from 20,000 resamples of whole calendar
+year-months:
 
-## Planned contrasts
+- **C1, EF minus D0M:** -0.538 (-0.605 to -0.421).
+- **C2, EF minus LOGIT + same-sign count (no verdict):** -0.573 (-0.631 to -0.474).
+- **Post hoc, Huber 10 minus D0M:** -0.120 (-0.190 to -0.084), and **minus LOGIT + same-sign:**
+  -0.154 (-0.262 to -0.103).
 
-- **C1:** EF minus D0M (PE), MW-weighted recall, pooled over S2, S3, S4.
-- **C2:** EF minus LOGIT_SAME (PE), same pooling, read without a verdict.
+![Gain in MW-weighted recall of EF](figure_2_gain_over_d0m.svg)
 
-## Sizing
+## Where the estimator loses
 
-- **What gets stored:** nothing outside the private `data/ml-experiments/00067-*` folder. No Delta
-  table, no contract.
-- **Production serving path:** not touched. The estimator needs up to 49 days of hindsight, so it
-  serves training masks and the event table, not a live input.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes. The flow shape (flat or a fraction of the donor's
-  profile), the loss, the bin width, and the group structure are all open; the plan fixes one
-  choice of each and names the others as follow-ups.
-- **Spans code whose callers cannot be named without searching:** no. The experiment copies the
-  harness of experiment 65 into its own folder, as experiments 60 to 65 each did.
-- **Size:** complex, because a new method has more than one defensible design. CVXPY is not a
-  locked dependency, so the scripts run with `uv run --with cvxpy`; adding it to the lockfile is a
-  separate decision.
+**The post hoc estimator matches D0M only for large transfers with a metered receiver, and both
+estimators find almost nothing when no receiver is metered.** The table gives the unweighted share
+of transfers found, pooled over the three shapes and counted once per shape.
 
-## Advice followed
+| Donor step (noise units) | Metered receiver: EF / EF Huber 10 / D0M / LOGIT + same-sign | No metered receiver: the same four |
+|---|---|---|
+| 2.5 to 4 | 0.11 / 0.14 / 0.58 / 0.71 | 0.02 / 0.03 / 0.20 / 0.26 |
+| 4 to 6 | 0.14 / 0.37 / 0.61 / 0.62 | 0.09 / 0.07 / 0.37 / 0.55 |
+| 6 to 10 | 0.18 / 0.66 / 0.81 / 0.81 | 4 of 7 transfers for every arm |
+| 10 or more | 0.09 / 0.92 / 0.89 / 0.90 | no transfers |
 
-- Experiment 65: use D0M with the PE end rule as the benchmark, not D1. Followed.
-- Experiment 65: pre-register any score that uses same-sign neighbour counts. Followed as C2 with
-  LOGIT_SAME as a labelled benchmark.
-- Experiment 62: no whitening. Followed.
-- Experiment 60: score on shapes the detector does not assume (S2, S3, S4). Followed; the flat
-  flow assumes none of them.
+Below 2.5 noise units no arm finds more than 5 of the 39 to 41 transfers with a metered receiver
+in any shape.
+
+![Share found by donor step](figure_3_share_found_by_step.svg)
+
+A look at one transfer that EF missed shows the mechanism. The donor, a Primary metered only in MVA,
+had a residual 8.8 hourly noise standard deviations below its baseline, and the fit placed no
+slack run on it. A Huber loss with threshold M pulls on a flow with a slope of at most 2M per hour.
+At M = 3 the slack penalty that holds the alarms to 80 (1.5 times 3.7, or 5.6) is close to the
+maximum pull of 6, so a slack of a few noise units per hour is switched off. At M = 10 the maximum
+pull is 20. The pre-registered tuning shows the same limit: the penalty that gave 0 alarms was only
+2.5 times the one that gave about 80.
+
+## Labelled real transfers
+
+**On the 35 labelled real transfers of more than 1 day, EF finds 4, D0M 7, and LOGIT + same-sign 6.**
+Both EF runs find the same 4. Of the 20 transfers that start in even months, EF finds 4, D0M 6, and
+LOGIT + same-sign 5. EF finds none of the 15 that start in odd months, D0M finds 1, and LOGIT +
+same-sign finds 1. The counts are too small to rank D0M and LOGIT + same-sign.
+
+## Method and what was fixed in advance
+
+- **Fit.** Hourly residuals, divided by each series' noise scale, in windows of 70 days. A Huber loss
+  (threshold 3), a level penalty `lambda` on flows and slacks (the slack penalty multiplied by `m`),
+  and a fused penalty `rho * lambda` on the hourly change of each flow and slack, solved with
+  CVXPY and Clarabel. The 8 Primaries metered only in MVA enter as slack-only nodes.
+- **Tuning on odd months.** For each of 6 cells (`rho` of 1, 3, or 10; `m` of 1.5 or 3), `lambda` was
+  matched to at most 80 unexplained odd-month alarms, then the cell was scored on 300 odd-month
+  transfers. Recall was 0.064 to 0.086 in every cell, and the cell with `rho` of 10 and `m` of 1.5
+  won (`lambda` 3.72, 77 alarms).
+- **Post hoc variant.** A Huber threshold of 10 with `lambda` scaled to match, tuned over 2 cells
+  (`rho` of 3 or 10, `m` of 1.5): recall on the tuning transfers was 0.296 and 0.332, and the
+  second cell won (`lambda` 4.07, 71 alarms). It was chosen after reading the pre-registered
+  result and does not change the verdict.
+- **Alarms.** Each run counts as two alarms per series metered in MW, at its onset and at its end,
+  as D0M alarms on both the onset step and the return step. An alarm is explained when a logged
+  closure touches its series within 24 hours of its own stamp. A run that starts within 24 hours of a
+  monthly refit of the residual model is dropped.
+- **Checks.** A planted flow and a planted slack were recovered at the right onset and end, and the
+  injection reproduced experiment 65's moved MW. All 3,720 scored fits of the two runs were `optimal`.
+
+## Limits
+
+- **A simpler fused penalty than the roadmap's.** The group version that ties the changes at one
+  Primary together solved 25 times slower (55 s against 2.2 s on a 28-day window), so each flow
+  changes on its own. The result does not test the group version.
+- **An edge to an MVA-only neighbour is a cheaper slack.** The flow is seen at the metered end
+  only, so for those neighbours the fit gains no conservation check. All 16 Primaries have an
+  MVA-only neighbour.
+- **More context than the benchmark.** Each fit sees 21 to 49 days of residual on each side of a
+  run (35 days around a scored transfer), against 14 days for the strongest-opposite-step end.
+  Scored transfers sit 35 days from the window edges and the tuning windows have 21 to 49 days of
+  context, so the tuning alarm counts are slightly pessimistic for EF.
+- **The benchmark is the plan's.** The plan fixed D0M with the strongest-opposite-step end rule as
+  the verdict arm. The end rule of experiment 66 merged after the plan, and EF was not scored
+  against it.
+- **A coarse grid.** Six cells for the pre-registered run and two for the variant; the Huber
+  threshold, the read-out threshold of 0.1 noise standard deviations, and the 24-hour minimum run
+  were not tuned.
+- **Tuning odd months and scoring even months share residual context** in windows that cross months,
+  as the benchmark's 24-hour windows do.
+
+## What the next experiment should answer
+
+**Does a joint fit to the 24-hour step statistics, in noise units, find more of the moved MW than
+D0M?** The step statistic already carries a noise scale calibrated on odd months, and the
+conservation constraint and slack could be applied to it. The experiment would also say whether
+conservation across the 8 MW-metered Primaries helps once the noise model is fixed.
+
+Reproduce with
+`uv run --with cvxpy python ml-experiments/00067-sw2-15-joint-edge-flow-estimator/e00067_run.py
+check tune score real`, and the same with `--huber 10 --out <data folder>/huber10`. Then run
+`e00067_report.py` and `e00067_charts.py`.

@@ -18,16 +18,9 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-5 to SW2-9](#sw2-4-to-sw2-9-detector-iterations) | Which further changes to the detector raise its event-level F1: a retrain loop, paired-step intervals, or whitening? | 3 | Nothing (SW2-4 done: experiment 47) | Proposed; one hypothesis per experiment, run in order |
-| [SW2-15, experiment 67](00067-sw2-15-joint-edge-flow-estimator/result.md) | Does the joint edge-flow estimator, a convex fit of sparse, block-shaped flows across every neighbouring boundary at once, beat the best sequential detector? | 3 | Nothing (SW2-9 done: experiment 62) | Planned; slot D |
-| [SW2-16](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Does experiment 61's end rule (the interval ends at the strongest opposite step within a cap) also find more of the moved MW at the 4-hour window, and with a cap longer than 14 days? | 2 | Nothing | Proposed; its winner becomes the baseline detector for later SW2 experiments |
-| [SW2-17](#sw2-16-and-sw2-17-the-end-rule-as-the-baseline-and-the-missed-onsets) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their onset, and does an onset rule that a later return step confirms recover them? | 2 | SW2-16 | Proposed |
-| [SW2-10](#sw2-10-v2-in-miniature-a-linear-joint-fit) | Does one linear fit per trial Primary, with a weather baseline, embedded solar capacity times a PV shape, and a term per labelled transfer, beat the frozen v1 baseline outside switching and recover injected solar and transfers? | 3 | SW2-0b | Proposed; the first test of a v2 piece against v1, with inputs from the PV-disaggregation line |
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [PVDIS-5](#pvdis-5-forecasting-net-demand-as-demand-minus-forecast-solar) | Does a solar feature, or training on gross demand and subtracting forecast solar, lower or at least match the best guess's error while explaining the forecast? | 3 | PVDIS-4 (PVDIS-3 is done: [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md)) | Proposed |
-| [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations-and-the-dc-to-ac-ratio) | Can the share of east-, south-, and west-facing solar behind each Primary, and the ratio of DC to AC capacity, be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
@@ -166,8 +159,9 @@ scored on even months, with recall weighted by the MW moved as the headline from
 The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
 confirm:
 
-- **SW2-5:** the train, detect, retrain loop, with two or three rounds of refitting the lagless
-  XGBoost model without the detected intervals.
+- **SW2-5 (done, [experiment 68](00068-sw2-5-train-detect-retrain-loop/result.md)):** three rounds
+  of refitting the lagless XGBoost model without the detected intervals changed the share of the
+  moved MW found by +0.011 and the forecast error by -0.175%, and a random mask did as well.
 - **SW2-6 (done, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** pairing the
   onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
   the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
@@ -190,74 +184,6 @@ confirm:
   whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and
   hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
   24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
-
-#### SW2-13 to SW2-15: combining evidence across windows and neighbours
-
-**Three experiments replace the detectors' hard rules with combined evidence: across window sizes
-first (SW2-13, finished as [experiment 59](00059-sw2-13-several-windows-in-one-detector/result.md)),
-then across neighbours, then across the whole electricity network at once.** Experiment 43
-found that the better detector depends on the window, D1 at 4 hours and D0 at 24 hours, and
-experiment 55 found that the neighbour test helps little as a veto. Each experiment is scored on the
-experiment 43 scoreboard at matched unexplained-alarm rates, with recall weighted by the MW moved as
-the headline and unweighted recall second, because a small transfer matters less than a large
-transfer. Each take-home message states the share of the moved MW that the detector misses. Each
-reports recall by donor step in noise units, split by metered receiver. Each scores injected
-transfers whose shapes the detector does not assume (a constant MW, a share of the receiver's
-profile, and the labelled real transfers' fitted shapes), plus the labelled real transfers over 1
-day.
-
-- **SW2-14 (done, [experiment 65](00065-sw2-14-combined-single-series-and-neighbour-score/result.md)):**
-  a likelihood-ratio sum and a logistic regression of own and neighbour opposite steps gained +0.005
-  and +0.019 over the single-series detector (neither interval excludes zero). A post hoc arm that
-  adds the count of same-sign neighbour steps gained +0.034.
-- **SW2-15, the joint edge-flow estimator** (planned as [experiment
-  67](00067-sw2-15-joint-edge-flow-estimator/result.md)), from approach 3 on the [switching
-  events](../roadmap/switching-events.md) roadmap page. Every interconnected pair of Primaries gets
-  a flow that is zero almost all the time and block-shaped when non-zero, fitted to all residuals
-  at once with a sparsity penalty and a penalty on changes, in CVXPY. Each Primary also gets a
-  slack term for load moved to a neighbour that is not metered. The 8 Primaries metered only in MVA
-  carry no direction, so they enter as slack-only nodes. Penalty weights are tuned on odd-month
-  injections. The benchmark is the best sequential detector from experiment 59 (the 24-hour single
-  window) or SW2-14.
-
-#### SW2-16 and SW2-17: the end rule as the baseline, and the missed onsets
-
-**Experiment 61 found that ending each of D0M's intervals at the strongest opposite step in the
-next 14 days finds 0.19 more of the moved MW (+0.148 to +0.237), so the end rule becomes the
-baseline, and the onset becomes the main remaining loss.** The end rule needs up to 14 days of
-hindsight, so a detector built on the end rule serves training-time masks (SW2-12) and the event
-table for NGED, not a live input to the forecast.
-
-- **SW2-16** tests the end rule at the 4-hour window as well as the 24-hour window, and with caps of
-  14, 30, and 60 days, against D0M with the 14-day cap. The labelled closures run up to 60 days, so
-  a 14-day cap ends every longer closure early. The winning window and cap become the benchmark for
-  every later SW2 detector experiment, SW2-14 included if its benchmark is not yet fixed.
-- **SW2-17** first classifies the 24 of 35 labelled real transfers over 1 day that raise no alarm
-  at their onset: a donor step under the threshold, a step spread over several hours, an onset
-  inside a data gap, or an alarm outside the 2-hour tolerance. It then tests the fix the
-  classification points to. The leading candidate is a lower onset threshold accepted only when
-  the end rule finds a matching return step within the cap, which uses the same hindsight as the
-  end rule. Injected transfers measure the false alarms this adds.
-
-#### SW2-10: v2 in miniature, a linear joint fit
-
-**Fit one linear model per trial Primary that holds a weather baseline, embedded solar, and the
-labelled transfers together, and score it against the frozen v1 baseline.** The model is net demand
-equals the baseline, minus a capacity times a PV shape, plus, for each labelled transfer k, a share
-times the donor's net power over transfer k's interval. With the intervals given, the fit is
-linear. The result tells the project whether to start the v2 differentiable-physics work sooner.
-
-- **The baseline term** is a lagless XGBoost model fitted inside SW2-10, trained with labelled
-  switching excluded.
-- **The transfer intervals** come from SW2-0b, or from the logged closures padded by 24 hours if
-  the labels are not ready.
-- **The capacity and the PV shape** come from the PV-disaggregation line: experiment 00040's
-  six-arm capacity with its bound, experiment 00039's capacity as a cross-check, and experiment
-  00039's CAMS unit PV shape. A weekly capacity series replaces the experiment 00040 capacity if
-  the PV line's weekly-capacity experiment runs. The 8 Primaries metered only in MVA are excluded.
-- **Scoring** is on held-out months outside switching against the v1 baseline, and on experiment
-  00039's injection harness extended with injected transfers that carry the donor's PV, where the
-  true capacity and the true shares are known.
 
 #### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
 
@@ -299,17 +225,17 @@ first:
 - **Skill:** a lower error in the net demand forecast at each substation.
 - **Explanation:** a forecast that NGED can read as demand minus solar. A solar term that leaves the
   error level but splits the forecast into parts an engineer recognises is still worth keeping, so
-  PVDIS-5 tests non-inferiority as well as gain.
+  experiment 64 (PVDIS-5) tested non-inferiority as well as gain.
 - **Capacity:** a time series of unmetered solar capacity per Primary. NGED holds almost no
   information on unmetered solar today, so an estimate with honest error bars is useful even when
   the estimate is far from perfect.
 
 **The capacity estimate runs offline, weekly or monthly, and the production forecast only reads the
-latest capacity table.** Nothing in this line adds a fitting step to the serving path. PVDIS-6 asks
-whether the mix of panel orientations behind each Primary can also be estimated, as the
-`UniversalSolarFleetNode` sketched in [differentiable
-physics](../techniques/differentiable-physics.md) would, so that the explicit solar forecast takes
-the right daily shape.
+latest capacity table.** Nothing in this line adds a fitting step to the serving path. [Experiment
+73](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) (PVDIS-6) found that the mix of panel
+orientations behind each Primary, the quantity the `UniversalSolarFleetNode` sketched in
+[differentiable physics](../techniques/differentiable-physics.md) would fit, is not stable across
+season-years, so the explicit solar forecast keeps one south-facing shape.
 
 **Experiments 00039 and 00040 are parts 1 and 2 of the series, and the parts below follow the
 exploratory protocol in the `ml-experiment` skill.** Opus plans each part after reading the result
@@ -329,10 +255,10 @@ goals changed.** That review judged the series against the questions it had then
 experiment could narrow the capacity bound, and whether capacity improves the forecast score. Four
 experiments (00007, 00009, 00022, and 00031) found small or no gains from solar inputs. The
 maintainer has since added two goals: a forecast that explains itself, and a capacity series that
-changes week by week for NGED. PVDIS-5 rests on the explanation goal and on what differs from those
-four experiments, not on a claim that the review missed the forecast question. The same review
-found that the daily fit is about 2.6 times more exposed than C to an undetected day-long load, so
-every part reports C as the capacity and keeps the daily fit as a cross-check.
+changes week by week for NGED. Experiment 64 (PVDIS-5) rested on the explanation goal and on what
+differs from those four experiments, not on a claim that the review missed the forecast question.
+The same review found that the daily fit is about 2.6 times more exposed than C to an undetected
+day-long load, so every part reports C as the capacity and keeps the daily fit as a cross-check.
 
 **Rules shared by every part:**
 
@@ -369,69 +295,6 @@ every part reports C as the capacity and keeps the daily fit as a cross-check.
   write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
   weeks.
 
-#### PVDIS-5: forecasting net demand as demand minus forecast solar
-
-**Compare two ways of using the capacity series in the demand forecast against the best guess, with
-a shuffled-capacity control for each, and adopt a way that explains the forecast where it matches
-the best guess's score.**
-
-- **Arm A, a solar feature:** experiment 00033's recipe plus a column of the capacity vintage times
-  the calibrated ENS solar shape. Experiment 00031's nearest arm, A2 (data-only solar products, with
-  a capacity refitted over a trailing 28-day window), lost 0.036 points (+0.002 to +0.074). What
-  differs here is the calibration of ENS against CAMS, the CAMS shape in place of a generic shape,
-  and a capacity series smoothed over many weeks.
-- **Arm B, add solar back:** train the XGBoost model on gross demand, the metered net demand plus the
-  capacity vintage times the CAMS solar shape, with no shortwave inputs. At inference, subtract the
-  capacity times each ENS member's solar from that member's gross quantiles, then pool the members
-  and apply the existing spread factor, in that order. Each lagged gross-demand input is built in
-  training exactly as serving would build it at that lead: from CAMS where CAMS's one-day delay
-  allows, and from ENS otherwise. The plan states whether the 14-day error correction acts on gross
-  or net residuals. Arm B reports the coverage of the 0.05 and 0.95 quantiles in sunny and in cloudy
-  daylight separately, because the spread of ENS leaves out the uncertainty in capacity.
-- **Controls:** each arm has a twin whose capacity values are shuffled between forecast dates
-  within each Primary and calendar month, as experiment 00031's A6 control did. In experiment
-  00031, the shuffled control gained as much at leads under 48 hours as the real arm did. A
-  climatology row and a `manual_heuristic` row give the absolute scale. Experiment 00039's trailing
-  clear-minus-overcast midday mean, as a feature, is a sanity row: experiment 00031's capacity
-  statistics of the same kind lost 0.167 points.
-- **The decision rule tests gain and non-inferiority.** An arm is a candidate when its interval
-  excludes zero in the right direction and the shuffled twin's does not. Arm B is also adoptable
-  for explanation when the upper end of its interval lies below a non-inferiority margin, which the
-  plan fixes with its reason (+0.1 points, about 2% of the best guess's score, is the starting
-  proposal).
-- **Power.** Experiment 00031's paired contrasts reached half-widths of 0.03 to 0.08 points over 16
-  Primaries, so about 0.05 to 0.11 is expected over the 8 metered in MW. The plan states which
-  effects that resolves.
-- **What [experiment 46](00046-embedded-solar-share-of-primary-forecast-error/result.md) (PVDIS-3)
-  changes.** The solar term built from ENS did not lower the error against the best guess over all
-  leads (C6 +0.048, -0.059 to +0.141), so the overall test is non-inferiority and explanation. A
-  gain test is only worth pre-registering for leads of 0 to 48 hours, where the ENS anomaly tracks
-  CAMS, with a lead-dependent coefficient fitted on the training window so that the term fades where
-  ENS has no skill.
-- **Waits for** PVDIS-4, which supplies the capacity vintages.
-
-#### PVDIS-6: the mix of panel orientations and the DC to AC ratio
-
-**Estimate the share of east-, south-, and west-facing solar behind each Primary, and drop the step
-if the shares are not identified.** Experiment 00040 found that capacities on an east-south-west
-menu swapped between years in a season-year fit. Pooling the shapes across Primaries with a shared
-prior, or fitting on clear days only, may identify them. A Primary's orientation mix would sharpen
-the explicit solar forecast in Arm B of PVDIS-5.
-
-**Also try fitting the ratio of DC to AC capacity directly, as a cheap side-arm with a known-answer
-test first.** Many GB rooftop systems have more panel capacity than inverter capacity, and a system
-like that clips at high irradiance. Experiment 00051 (PVDIS-3b) found no clipping knee in the demand
-forecast's residual, but that test was indirect, and a too-large coefficient on the solar term
-dominated it. PVDIS-6 fits a clipping level inside the capacity fit itself, on clear days, by a
-search over a few candidate DC to AC ratios. A fleet of many systems with different ratios and
-orientations clips gradually rather than at one knee, so the ratio may well not be identified.
-
-- **Known answers first:** inject the output of the metered solar farms, whose DC to AC ratios
-  experiment 00029 fitted, and check that the search recovers each farm's ratio. If it does not,
-  drop the side-arm before touching the real series.
-- **On the real series:** report the fitted ratio per Primary with its interval, and whether the
-  clipped shape fits clear days better than the unclipped shape on held-out months.
-
 #### PVDIS-7: MW at the Primaries metered only in MVA
 
 **Fit the magnitude of demand minus solar, so that the reading bounces off zero instead of going
@@ -450,8 +313,9 @@ Primaries. NGED would like MW at every Primary, and accepts that the result is r
 and replace it with PVDIS-4's weekly series once that part has run.** NGED's need is to improve on
 almost no information, so the season-year table is useful before the weekly series exists. The
 study reports C as the capacity, keeps sampling uncertainty separate from the named systematic
-scenarios, and carries each Primary's status from the earlier review. The SW2-10 joint fit reads the
-same capacities.
+scenarios, and carries each Primary's status from the earlier review. The joint fit of
+[experiment 00063](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) read the same
+capacities.
 
 ### P11: ensemble statistics as inputs
 

@@ -30,10 +30,17 @@ WIDTH: Final[int] = 520
 WRAP: Final[int] = 80
 LABELS: Final[dict[str, str]] = {
     "EF": "EF: joint edge-flow estimator",
+    "EF_H10": "EF, Huber threshold 10 (post hoc)",
     "D0M": "D0M: single-series step",
     "LOGIT_SAME": "LOGIT + same-sign count (post hoc)",
 }
-COLOURS: Final[list[str]] = [ocf.BRAND_ORANGE, "#888888", ocf.DATA_BLUE]
+ABBREVIATIONS: Final[dict[str, str]] = {
+    "EF": "EF",
+    "EF_H10": "EF Huber 10 (post hoc)",
+    "D0M": "D0M",
+    "LOGIT_SAME": "LOGIT + same-sign",
+}
+COLOURS: Final[list[str]] = [ocf.BRAND_ORANGE, ocf.DATA_GREEN, "#888888", ocf.DATA_BLUE]
 STEP_LABELS: Final[list[str]] = ["0-2.5", "2.5-4", "4-6", "6-10", "10+"]
 
 
@@ -75,7 +82,7 @@ def figure_recall(*, data: pl.DataFrame, headline: str) -> alt.TopLevelMixin:
                 "arm:N",
                 title=None,
                 scale=alt.Scale(domain=[LABELS[a] for a in ARMS], range=COLOURS),
-                legend=alt.Legend(orient="top", columns=1),
+                legend=alt.Legend(orient="top", columns=1, labelLimit=400),
             ),
         )
         .properties(
@@ -84,9 +91,12 @@ def figure_recall(*, data: pl.DataFrame, headline: str) -> alt.TopLevelMixin:
             title=_title(
                 text=headline,
                 lines=[
-                    "620 injected transfers of 25% to 40% of the receiving load, over 1 day, "
-                    "starting in even months, all arms held to 80 unexplained alarms on odd months, "
-                    "interval end from the strongest opposite step (EF: the end of its run)."
+                    (
+                        "620 injected transfers of 25% to 40% of the receiving load, over 1 day, "
+                        "starting in even months, all arms held to about 80 unexplained alarms on "
+                        "odd months, interval end from the strongest opposite step (EF: the end "
+                        "of its run)."
+                    )
                 ],
             ),
         )
@@ -97,12 +107,22 @@ def figure_gain(*, data: pl.DataFrame) -> alt.TopLevelMixin:
     """Gain in MW-weighted recall of EF over D0M and over LOGIT_SAME, with intervals."""
     frames = [data.filter(pl.col("shape") == s) for s in NON_MATCHING]
     rows = []
-    for base in ("D0M", "LOGIT_SAME"):
-        point, low, high = contrast(frames=frames, arm="EF", base=base)
-        rows.append({"base": f"over {LABELS[base]}", "point": point, "low": low, "high": high})
+    for arm in ("EF", "EF_H10"):
+        for base in ("D0M", "LOGIT_SAME"):
+            point, low, high = contrast(frames=frames, arm=arm, base=base)
+            rows.append(
+                {
+                    "base": f"{ABBREVIATIONS[arm]} over {ABBREVIATIONS[base]}",
+                    "point": point,
+                    "low": low,
+                    "high": high,
+                }
+            )
     chart = alt.Chart(pl.DataFrame(rows))
-    y = alt.Y("base:N", title=None)
-    grey = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888888").encode(x="x:Q")
+    y = alt.Y("base:N", title=None, axis=alt.Axis(labelLimit=400), sort=None)
+    grey = (
+        alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888888").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
     bars = chart.mark_rule(strokeWidth=2, color=ocf.BRAND_ORANGE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("low:Q", title="Gain in MW-weighted recall of EF (larger is better)"),
         x2="high:Q",
@@ -111,14 +131,16 @@ def figure_gain(*, data: pl.DataFrame) -> alt.TopLevelMixin:
     dots = chart.mark_point(filled=True, size=70, color=ocf.BRAND_ORANGE).encode(  # ty: ignore[unresolved-attribute]
         x="point:Q", y=y
     )
-    return (grey + bars + dots).properties(  # ty: ignore[unresolved-attribute]
-        width=WIDTH,
-        height=90,
+    return (grey + bars + dots).properties(
+        width=WIDTH + 140,
+        height=120,
         title=_title(
             text="Gain of the joint estimator over the single-series step detector",
             lines=[
-                "Dot: estimate. Line: 97.5% interval from resampling whole calendar months. "
-                "Grey rule: no gain."
+                (
+                    "Dot: estimate. Line: 97.5% interval from resampling whole calendar months. "
+                    "Grey rule: no gain."
+                )
             ],
         ),
     )
@@ -160,7 +182,7 @@ def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
                 "arm:N",
                 title=None,
                 scale=alt.Scale(domain=[LABELS[a] for a in ARMS], range=COLOURS),
-                legend=alt.Legend(orient="top", columns=1),
+                legend=alt.Legend(orient="top", columns=1, labelLimit=400),
             ),
         )
         .properties(width=WIDTH, height=150)
@@ -170,8 +192,10 @@ def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
         title=_title(
             text="Share of transfers found by the size of the donor's step",
             lines=[
-                "Unweighted share found, pooled over three shapes and counted once per shape, "
-                "even months."
+                (
+                    "Unweighted share found, pooled over three shapes and counted once per shape, "
+                    "even months."
+                )
             ],
         )
     )
@@ -180,7 +204,13 @@ def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
 def main() -> None:
     """Write the figures."""
     data = population(out=WORK_DIR)
-    _save(figure_recall(data=data, headline="HEADLINE"), name="figure_1_recall_by_arm.svg")
+    _save(
+        figure_recall(
+            data=data,
+            headline="The joint estimator finds less of the moved MW than the step detector",
+        ),
+        name="figure_1_recall_by_arm.svg",
+    )
     _save(figure_gain(data=data), name="figure_2_gain_over_d0m.svg")
     _save(figure_by_step(data=data), name="figure_3_share_found_by_step.svg")
 

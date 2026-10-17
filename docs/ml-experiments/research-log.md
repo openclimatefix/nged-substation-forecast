@@ -29,6 +29,9 @@ the maintainer to confirm.
 | [00035 - Quantile blend of stored models](00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Serve a fixed-weight average of the quantiles of the monthly-retrained N1, `a7_cs`, and the stack for Primary demand | Lowers the quantile score by 0.10 points (-0.19 to -0.03) against the monthly-retrained N1; needs three models, one of them refitted monthly; solar and wind gains are unresolved |
 | [00049 - Screening reference under monthly retraining](00049-vp1-screening-reference-under-p-roll-demand/result.md) | Serve an average of the quantiles of five XGBoost models for Primary demand (weekly refits, monthly refits, the weekly-analogue model, the pooled model, the stack) | Lowers the quantile score by 0.08 points (-0.14 to -0.02) against the weekly-retrained N1 on one validation year; needs five models; the spread factor and the fingerprints do not change the score |
 | [00034 - Retraining cadence](00034-retraining-cadence-and-cheap-proxies-demand/result.md) | Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction | Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again |
+| [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Give the XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the calibrated ENS sunshine anomaly, with a weight fitted per series, lead band, and season, and zero beyond 10 days) | Lowers the quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess; the live service cannot yet supply the inputs, the capacity held is stale, and the weights rest on one summer |
+| [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
+| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Use a per-Primary blend of east, south, and west shapes as the solar shape of the explicit solar term, if PVDIS-5 confirms it | Lowers held-out error by 1.3% in a fit with known weather; the shares are not identified and no forecast has used the blend yet |
 
 ## The experiments so far
 
@@ -87,13 +90,24 @@ the maintainer to confirm.
 | [00061 - Switching event detector, part 7](00061-sw2-6-paired-step-intervals/result.md) | Does scoring an onset step and its return step as one pair find more of the moved MW than the single-step detector? | Refuted: the paired score finds 0.13 less (98.33% interval -0.233 to -0.007); keeping the single-step alarms and taking the end from the strongest return step finds 0.19 more (+0.148 to +0.237) | Not for production | 2026-10-16 |
 | [00062 - Switching event detector, part 7](00062-sw2-9-whitened-residual-step-detector/result.md) | Does filtering out the residual's half-hour-to-half-hour memory raise the share of moved MW the 24-hour detector finds? | Refuted: the pooled change in the share of moved MW found is -0.097 (98.33% interval -0.132 to -0.057) | Not for production | 2026-10-16 |
 | [00065 - Switching event detector, part 8](00065-sw2-14-combined-single-series-and-neighbour-score/result.md) | Does one score that adds a substation's own step to its neighbours' opposite steps find more of the moved MW than the single-series detector, the neighbour gate, and the neighbour veto? | Inconclusive: the logistic-regression score gains +0.019 in share of moved MW found over the single-series detector (99.17% interval -0.011 to +0.062) and the likelihood-ratio score +0.005 (-0.010 to +0.014); a post hoc variant that adds the count of same-sign neighbour steps gains +0.034 (+0.013 to +0.091) | Not for production | 2026-10-16 |
+| [00066 - Switching event detector, part 9](00066-sw2-16-end-rule-as-baseline/result.md) | Which window (4 or 24 hours) and cap (14, 30, or 60 days) should the end rule use, as the benchmark for later detectors? | Inconclusive: the 4-hour window finds 0.147 less of the moved MW than the 24-hour window (99% interval -0.248 to -0.054); a 30-day cap finds 0.534 more on transfers over 15.6 days (+0.131 to +0.780) and 0.045 less on shorter ones (-0.070 to -0.011) | Not for production | 2026-10-16 |
+| [00069 - Switching event detector, part 10](00069-sw2-17-missed-onsets-of-the-end-rule/result.md) | Why do 24 of the 35 labelled real transfers over 1 day raise no alarm at their start, and does a weak alarm confirmed by a later step back recover them? | Inconclusive: the weak alarms add +0.146 of the moved MW, but the strong threshold must rise from 4.0 to 6.55 to keep 80 alarms, so the net change is +0.007 (98.75% interval -0.014 to +0.040); the first-return end rule beats the 14-day rule on a fresh draw (+0.038, +0.016 to +0.077) | Not for production | 2026-10-16 |
+| [00070 - Switching event detector, part 11](00070-sw2-19-same-sign-neighbour-count/result.md) | Does counting the neighbours that step the same way as the alarming substation find more of the moved MW than the single-series detector with the PF14 end rule? | Supported: +0.048 of the moved MW (97.5% interval +0.021 to +0.096) on fresh headline-band transfers at 80 odd-month unexplained alarms; no gain on long transfers or the 35 real transfers (7 against 8) | Candidate | 2026-10-16 |
+| [00071 - Switching event detector, part 12](00071-sw2-18-refit-offset-and-gap-bridging/result.md) | Does taking the step statistic from two residual models refitted half a month apart, so that no alarm is suppressed at a refit, find more of the moved MW than the benchmark detector PF14? | Supported: +0.050 of the moved MW (98.33% interval +0.012 to +0.107) at no more than 80 odd-month unexplained alarms, all of it in transfers within 24 hours of a refit. Lifting the suppression alone gives +0.056, and gap bridging changes no outcome | Candidate | 2026-10-16 |
+| [00072 - Step-loss monitor for the solar farms, P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a monitor find a loss of generating capacity at the 5 long-record solar farms from their daily power telemetry? | Refuted: it found 0.45 of 25% losses lasting 30 days (the plan required 0.80), 0.84 of 25% losses lasting 90 days, 0.26 of 10% losses lasting 90 days, and 3% losses barely above chance; false alarms 0.29 per farm-year on a placebo | Not for production | 2026-10-16 |
+| [00068 - Switching event detector, part 13](00068-sw2-5-train-detect-retrain-loop/result.md) | Does refitting the lagless XGBoost model without the detected switching intervals, for three rounds, raise the share of moved MW the detector finds and lower the forecast error? | Inconclusive, and no gain worth porting: recall gains +0.011 (97.5% interval +0.000 to +0.034) and the forecast's mean absolute error changes -0.175% (-1.145% to +0.603%); a random mask of about equal volume does as well | Not for production | 2026-10-16 |
+| [00067 - Switching event detector, part 14](00067-sw2-15-joint-edge-flow-estimator/result.md) | Does one convex fit of load flows across all boundaries between the 16 Primaries find more of the moved MW than the single-series 24-hour step detector? | Refuted: the joint estimator finds 0.108 of the moved MW against 0.646 (difference -0.538, 97.5% interval -0.605 to -0.421); a post hoc loss change lifts it to 0.527 (-0.120, -0.190 to -0.084) | Not for production | 2026-10-17 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
 | [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
 | [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as an upper limit: -0.198 (-0.316 to -0.069) points of capacity against a 0.15 target; the UKV data are a research archive, not the live feed | Not for production | 2026-10-16 |
+| [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Does a Primary demand forecast with an explicit solar term (capacity times a calibrated forecast of the sunshine anomaly) match the best guess by 0.10 points of capacity, and beat its placebo twin? | Supported: the base-margin arm `am` is -0.152 (-0.199 to -0.111) against the best guess at 98.75% | Candidate | Pending |
+| [00063 - SW2-10 joint fit, v2 in miniature](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) | Does one linear fit per Primary, holding a weather baseline without radiation, embedded solar capacity times the CAMS sunshine shape, and a share term per labelled transfer, beat the frozen v1 baseline outside switching, and recover injected solar and transfers? | Inconclusive: C1 is -0.322 points of capacity (-0.437 to -0.207) at 5 Primaries, close to the 0.35-point threshold, but both injection gates failed for reasons of test design | Not for production | Pending |
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
+| [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
+| [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Candidate | 2026-10-17 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -383,6 +397,12 @@ correction (row set `fold_a_every5d_v1`, 16 Primary substations).
   CRPS.** CAMS-trained solar lowered the member-average error by 0.14 points (00012) and the
   mixture's CRPS by 0.009 (00020), and a stage 0 mapping widened the member spread by a quarter. A
   power-curve base margin lowered the wind CRPS by 0.055 (00020).
+- **Attach the forecast solar term to the XGBoost model as a base margin, with a weight fitted on
+  the training window and zero beyond 10 days.** The base-margin arm lowered the Primary demand
+  quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess `d0` and
+  0.256 against `d1l`, where the fixed-coefficient shift of 00046 lowered `d1l` by 0.056, and
+  subtracting the forecast solar from a model trained on gross demand was not shown to match the
+  best guess (00064).
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -1279,6 +1299,26 @@ single-series detector finds 0.646 (0.354 missed). The logistic regression finds
 
 ![Gain in MW-weighted recall over the single-series detector](00065-sw2-14-combined-single-series-and-neighbour-score/figure_1_gain_over_d0m.svg)
 
+### 00067: does one convex fit of load flows across all boundaries find more of the moved load? (SW2-15)
+
+**Fitting block-shaped flows to the hourly residual of all 16 Primary substations at once found
+far less of the moved load than the single-series 24-hour step detector. The cause is the hourly
+noise model, not the conservation of power, so a joint fit would have to start from the 24-hour
+step statistics.** We injected 620 known load transfers (power moved between substations for over 1
+day) and counted the share of the moved megawatts (MW) found, with every detector held to about 80
+unexplained alarms on odd months. The step detector finds 0.646 (0.354 missed). The joint
+estimator finds 0.108 (0.892 missed), a difference of -0.538 (97.5% interval -0.605 to -0.421).
+
+- **Finding for later experiments:** a post hoc change of the loss lifts the estimator to 0.527
+  (-0.120 against the step detector, -0.190 to -0.084). It then matches the step detector for
+  transfers with a metered receiver and a donor step of 10 noise units or more (0.92 against 0.89
+  of transfers found) and finds almost nothing where no receiver is metered and the step is under 6.
+  On the 35 labelled real transfers of over 1 day it finds 4, against 7.
+- **Write-up and pull request:** [the full result page](00067-sw2-15-joint-edge-flow-estimator/result.md),
+  [PR #1298 (Experiment 67: one convex fit of load flows across all boundaries (SW2-15))](https://github.com/openclimatefix/nged-substation-forecast/pull/1298).
+
+![Gain in MW-weighted recall of the joint estimator](00067-sw2-15-joint-edge-flow-estimator/figure_2_gain_over_d0m.svg)
+
 ### 00062: does removing the residual's half-hour-to-half-hour memory help the switching detector? (SW2-9)
 
 **Filtering the residual's short memory out before the 24-hour step makes the switching detector
@@ -1302,6 +1342,181 @@ MW. At 4 hours the change was -0.145 (-0.209 to -0.097).
   [PR #1293](https://github.com/openclimatefix/nged-substation-forecast/pull/1293).
 
 ![Change in MW-weighted recall by injection shape](00062-sw2-9-whitened-residual-step-detector/figure_1_gain_by_shape.svg)
+
+### 00066: which window and cap should the end rule of the switching detector use? (SW2-16)
+
+**Lengthening the end rule's search from 14 to 30 or 60 days repairs the end of transfers longer
+than 15.6 days and breaks some shorter ones. A rule that ends at the first return step of at least
+half the onset step's size beats the 14-day rule on both sets of transfers.** An alarm interval runs
+from the step that raises an alarm (the onset step) to the opposite step (the return step) that ends
+it, and the cap is how many days after the onset the search for the return step may run. We added
+known load transfers to the power history and gave each alarm of the single-step detector D0M an
+interval end from the strongest opposite step within a cap. On a new set of 215 transfers lasting
+15.6 to 60 days, the 14-day cap found 0.013 of the moved MW and a 30-day cap 0.547, a gain of 0.534
+(99% interval +0.131 to +0.780). On experiment 58's 620 transfers, of which 1.5% last over 14 days,
+the 30-day cap found 0.045 less (-0.070 to -0.011) and the 60-day cap 0.080 less (-0.113 to -0.035).
+The 4-hour window at about the same alarm rate found 0.147 less than the 24-hour window (-0.248 to
+-0.054). The verdict is `inconclusive` by the pre-registered rule, because the longer cap fails its
+guard on the short transfers.
+
+- **Finding for later experiments:** a post hoc rule that takes the first opposite step of at least
+  half the onset step's size, and otherwise keeps the tracked end, gains +0.042 (+0.013 to +0.066)
+  on the 620 transfers and +0.412 (+0.067 to +0.621) on the long set over the 14-day end rule, and the
+  cap hardly matters for it. It needs a confirmation on a fresh draw before it becomes the benchmark.
+  On the 35 labelled real transfers of more than 1 day, D0M finds 2, the 14-day end rule 7, and the
+  post hoc rule 8. The end rule needs up to the cap's worth of hindsight, so detectors built on it
+  serve training-time masks and the event table for NGED, not live forecast inputs.
+- **Write-up and pull request:** [the full result page](00066-sw2-16-end-rule-as-baseline/result.md),
+  [PR #1297](https://github.com/openclimatefix/nged-substation-forecast/pull/1297).
+
+![MW-weighted recall by arm on the 620 transfers and on the long set](00066-sw2-16-end-rule-as-baseline/figure_1_recall_by_arm.svg)
+
+### 00069: why do real load transfers raise no alarm at their start? (SW2-17)
+
+**Half of the 24 real transfers with no alarm at their start are not a threshold problem, and
+accepting weaker alarms that a later step back confirms did not find more of the moved power.** Of
+the 35 labelled real transfers over 1 day, 24 have no alarm of the single-step detector D0M within 2
+hours of the start. Of those 24, 6 lie in gaps in the data, 3 where the monthly refit of the XGBoost
+forecast suppresses the alarm, 3 have an alarm 2 to 12 hours from the labelled start, 8 have a sharp
+step of 2 to 4 noise units, 2 have a spread or late step, and 2 show no step. On injected transfers,
+a rule that also raises a weak alarm at half the strong threshold when a matching opposite step
+follows within 14 days recovered 0.146 more of the moved MW than the strong alarms alone, but the
+strong threshold had to rise from 4.0 to 6.55 to keep 80 odd-month unexplained alarms, which lost
+0.140. The net change against the benchmark was +0.007 (98.75% interval -0.014 to +0.040), and the
+verdict is `inconclusive`.
+
+- **Finding for later experiments:** the first-return end rule PF14 beat the 14-day strongest-step
+  rule on a fresh draw, by +0.038 (+0.016 to +0.077) on 625 headline-band transfers and +0.416
+  (+0.059 to +0.595) on 206 long transfers, so PF14 is the benchmark end rule. The monthly refit and
+  a 2-hour onset tolerance account for 6 of the 24 unalarmed real transfers, and a lower threshold
+  does not address them. PF14 and the weak-alarm rule need up to 14 days of hindsight, so they serve
+  training-time masks and the event table for NGED, not live forecast inputs.
+- **Write-up and pull request:** [the full result
+  page](00069-sw2-17-missed-onsets-of-the-end-rule/result.md), [PR
+  #1300](https://github.com/openclimatefix/nged-substation-forecast/pull/1300).
+
+![The class of each unalarmed real transfer](00069-sw2-17-missed-onsets-of-the-end-rule/figure_1_classes.svg)
+
+### 00072: can a step-loss monitor find a lost inverter at the solar farms? (P35)
+
+**A solar farm's daily power readings show that the farm has lost 25% of its output only if the loss
+lasts 90 days or more, and they show a smaller or shorter loss rarely or never, so they cannot give
+early warning of one lost inverter.** We added artificial losses to the real power of 5 of the
+project's 6 solar farms (farm E has too short a record) and scored three monitors, each tuned to
+about 0.35 false alarms per farm-year on a placebo. The change-point monitor found 0.45 of 25%
+losses lasting 30 days, against the 0.80 the plan required, so the verdict is `refuted`. It found
+0.84 of 25% losses lasting 90 days and 0.26 of 10% losses lasting 90 days. A loss of 3% was found
+0.02 to 0.07 of the time, against 0.00 to 0.02 when no loss was added.
+
+- **Finding for later experiments:** a farm has only 3.1 usable days a week from April to
+  September and 2.0 from October to March, and the daily reading wanders by 6% to 11%, so a 30-day
+  loss holds about 13 usable days. A hysteresis rule (7 usable days in a row at least 10% below
+  normal) found 0.86 of 25% losses lasting 30 days, better than the change-point fit, after a
+  median delay of 14.5 days. Nothing found 10% losses lasting 30 days (0.04 to 0.13).
+- **A next experiment could:** obtain outage notices and curtailment records from National Grid
+  Electricity Distribution for the 6 solar farms, so that monitors are tested on more than farm A's
+  three low months.
+- **Write-up and pull request:** [the full result
+  page](00072-p35-step-loss-monitor-for-solar-farms/result.md), [PR
+  #1305](https://github.com/openclimatefix/nged-substation-forecast/pull/1305).
+
+![Share of planted losses detected, by loss size](00072-p35-step-loss-monitor-for-solar-farms/figure_1_detection_by_loss_size.svg)
+
+### 00070: does counting the neighbours that step the same way find more of the moved load? (SW2-19)
+
+**Counting how many neighbouring substations step in the same direction as the alarming substation
+finds more of the moved load on injected transfers, so the count is worth testing again on more real
+transfers. The 35 labelled real transfers are too few to confirm the gain.** A
+logistic alarm score on the substation's own 24-hour step, the largest opposite neighbour step, the
+number of neighbours, and the same-sign neighbour count found 0.712 of the moved MW on 615 fresh
+headline-band transfers per injection shape that start in even months, against 0.665 for the
+single-series detector with the PF14 end rule, a difference of +0.048 (97.5% interval +0.021 to
++0.096) at 80 odd-month unexplained alarms for both. The verdict is `supported`.
+
+- **Finding for later experiments:** the gain sits in transfers with no metered receiver and a
+  donor step of 2 to 4 noise units (68 of 537 found by PF14, against 167 of 537 found by
+  LOGIT_SAME). Long transfers gain nothing (0.000). On the 35 labelled real transfers the score
+  found 7 against PF14's 8.
+- **Write-up and pull request:** [the full result
+  page](00070-sw2-19-same-sign-neighbour-count/result.md), [PR
+  #1303](https://github.com/openclimatefix/nged-substation-forecast/pull/1303).
+
+![MW-weighted recall by arm](00070-sw2-19-same-sign-neighbour-count/figure_1_recall_by_arm.svg)
+
+### 00068: does refitting without the detected switching help the detector and the forecast? (SW2-5)
+
+**Refitting the lagless XGBoost model without the load transfers the detector found barely changed
+what the detector finds or the forecast error, so in these 16 series the limit on the detector is not
+that the forecast has learned the transfers.** We ran three rounds of
+refitting the XGBoost model that forecasts a Primary substation's demand from weather and calendar
+inputs, with zero weight on the half-hours inside the intervals found on the previous round's
+residual, and detecting again. To test the loop we added 130 synthetic load transfers to the
+measured power before the model trained, and the detector found a larger share of the moved
+megawatts (MW), rising from 0.522 to 0.532 (+0.011, 97.5% interval +0.000 to +0.034). The forecast's
+mean absolute error on half-hours with no logged or labelled switching changed by -0.175% (-1.145%
+to +0.603%). A mask of equal volume at random times did as well.
+
+- **Finding for later experiments:** the share of the moved MW that is missed stays at 0.47 (the
+  130 transfers in the training data) and 0.34 (620 transfers added to the residual after the
+  forecast) across all four rounds, so the onset step is where to look next.
+- **Write-up and pull request:** [the full result page](00068-sw2-5-train-detect-retrain-loop/result.md),
+  [PR #1299](https://github.com/openclimatefix/nged-substation-forecast/pull/1299).
+
+![Change in MW-weighted recall from round 0, by round](00068-sw2-5-train-detect-retrain-loop/figure_1_recall_gain.svg)
+
+### 00071: does ignoring alarms near a refit make the detector miss load transfers? (SW2-18)
+
+**The detector's blind spot at the monthly refit of its residual model lowered recall by about 5% of
+the moved power, and lifting that blind spot recovers it; bridging data gaps changes nothing.** The
+benchmark detector PF14 raises an alarm when a substation's residual steps by 4.0 noise units or
+more over 24 hours, and ends the alarm interval at the first opposite step. It ignores every alarm
+within 24 hours of the monthly refit of its XGBoost residual model. We computed the step statistic
+from the model refitted on the 1st except within 24 hours of that refit, where it comes from a
+second model refitted on the 16th. On injected transfers that start in even months, the two-model
+statistic found 0.715 of the moved MW against 0.665 for PF14 (+0.050, 98.33% interval +0.012 to
++0.107), at no more than 80 odd-month unexplained alarms (alarms more than 24 hours from a logged
+closure), and the verdict is `supported`. All of the gain lies in the 13% of transfers within 24
+hours of a refit (+0.431 there, -0.005 elsewhere).
+
+- **Finding for later experiments:** lifting the suppression with the first model alone finds
+  slightly more on injected transfers (+0.056), so the second model matters only for the 3 real
+  transfers that start at a refit, where it finds 3 and the lift alone finds 2. Gap bridging changes
+  the outcome of 0 of 1,860 transfers, because the panel holds only 3 gaps of a day or longer, and
+  the 6 real "data gap" transfers lie on series whose residual panel has no earlier rows. The 8
+  sharp small steps and the 3 transfers whose alarm falls 2 to 12 hours from the labelled start are
+  untouched.
+- **Write-up and pull request:** [the full result
+  page](00071-sw2-18-refit-offset-and-gap-bridging/result.md), [PR
+  #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
+
+![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
+
+### 00073: can the mix of solar panel orientations and the DC to AC ratio be read from a Primary's power? (PVDIS-6)
+
+**A fitted solar shape, a blend of east, south, and west shapes, predicts held-out power 1.3% better
+than all-south panels at all 8 Primary substations, but the shares in the blend are not identified,
+and the DC:AC search did not recover a farm's ratio once the farm sat in a Primary's power.** We
+added made-up east-south-west output, and real solar-farm output, to the real power of the 8
+Primaries and checked what each fit recovered. Without noise the orientation fit found the shares
+with a median error of 0.088 where guessing the fleet mix (0.2 east, 0.6 south, 0.2 west) gives
+0.300. With the real series' noise added the error was 0.200, and the shares of the free fit changed
+by a median 0.24 between consecutive September-to-August years. On held-out 28-day blocks the blend
+lowered the root mean square error of daylight power by 1.3% (98.75% interval -2.4% to -0.5%). The
+DC:AC search had a median absolute error of 0.055 on a farm's own output and 0.195 once the farm sat
+in a Primary's power, so it was dropped before any real-series fit. The verdict is `partly
+supported`, read by the pre-registered rule.
+
+- **Finding for later experiments:** use the blend as a fitted solar shape, with its shares fixed
+  across training years, and do not publish its shares as panel orientations. A known-answer test of
+  a linear fit must add noise, because the noise-free version cannot fail (median error 0.09 without
+  noise, 0.20 with it). Four of 8 Primaries have a pooled west share of 0.46 to 0.58 with an interval
+  that excludes 0.2, and a fit to rows after dark would show whether that lean is evening demand.
+- **Write-up and pull request:** [the full result
+  page](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md), [PR #1304 (Experiment 73: can
+  the mix of solar panel orientations and the DC to AC ratio be
+  recovered?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1304).
+
+![Error of the recovered shares by true mix, with and without noise](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/figure_03.svg)
 
 ### 00059: does one detector over several windows find more transfers than the best single window? (SW2-13)
 
@@ -1468,6 +1683,67 @@ service could get.
 
 ![Contrasts between the arms](00054-product-trained-xgboost-wind-farms/figure_1.svg)
 
+### 00064: does demand minus forecast solar match the best guess? (PVDIS-5)
+
+**Giving the XGBoost model the forecast solar output as a starting offset (a fixed amount added to
+every tree prediction) beat `d0`, the best-guess recipe of experiment 33, by 0.15 points of
+capacity.** Subtracting the forecast solar from an XGBoost model trained on gross demand (metered
+power plus the panels' output) was not shown to score within 0.10 points of `d0`. The verdict is
+`supported`. We built four Primary demand forecasts that each carry an explicit solar term. The
+solar term is the panels' capacity times a calibrated forecast of the sunshine anomaly from the
+European Centre for Medium-Range Weather Forecasts ensemble (ENS). We scored the forecasts on 5
+Primary substations over daylight half-hours of April to September. The starting-offset arm `am`
+scores -0.152 points (98.75% interval -0.199 to -0.111) against the best guess `d0` and -0.300
+(-0.407 to -0.198) against its placebo twin, which is the same arm given the solar shape of another
+date. At leads under 48 hours the gain is -0.272 (-0.420 to -0.145).
+
+- **Finding for later experiments:** the fitted weight on the ENS shift is -0.60 to -0.29, well
+  short of -1, and the slope on the true-sunshine shift stays at about -0.73 when the lagged-power
+  and cloud-proxy columns are removed, which points to noise in the Copernicus Atmosphere Monitoring
+  Service (CAMS) sunshine estimate or a mismatch between its shape and the panels' output; the
+  diagnostic does not separate the two, and the cloud-proxy columns absorb about 0.15 of the slope
+  at leads under 2 days. The weight was set to zero beyond 10 days, where the ENS anomaly has a
+  correlation of 0.03 with CAMS.
+- **Arm `b`:** training on gross demand and subtracting the forecast solar scores +0.105 (-0.090 to
+  +0.292) against `d0`, so it is not shown to match, and it is worse than `d0` from 6 days.
+- **What is untested:** a capacity table current for the validation year (the capacity held is 5% to
+  19% below experiment 45's 2025/26 constants), more than one summer in the weights, and the live
+  service supplying a base margin.
+- **Write-up:** [result](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md),
+  [PR #1294](https://github.com/openclimatefix/nged-substation-forecast/pull/1294).
+
+![Quantile score of each arm, and the planned contrasts](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/figure_1_headline.svg)
+
+### 00063: does a linear joint fit of baseline, solar, and transfers beat the Flexpectation v1 baseline? (SW2-10)
+
+**In hindsight, the solar part of a joint fit lowers the error of a Primary substation's median
+forecast by about a third of a point, but the tests that check whether each part comes out at the
+right size could not be passed.** "In hindsight" means the weather and sunshine inputs are estimates
+of the past that do not exist at forecast time. The verdict is `inconclusive`. We fitted one linear
+model per substation: a weather baseline without radiation inputs, plus the embedded-solar capacity
+times the CAMS (Copernicus Atmosphere Monitoring Service) sunshine shape, plus a share of the
+donor's power for each labelled switching job. We compared it with the Flexpectation v1 baseline
+outside switching, at 5 Primaries, and then added known solar-farm output and known transfers to
+check what the fit recovered.
+
+- **Headline result:** C1, the joint fit's mean absolute error minus the Flexpectation v1
+  baseline's, is -0.322 points of capacity (-0.437 to -0.207), against a threshold of 0.35. The
+  sunshine is a past estimate and the capacity is fitted on the same power, so the figure is a
+  ceiling.
+- **Finding for later experiments:** the injection gates could not be passed, because of the test
+  design. CAMS sunshine matches a real solar farm's anomaly with a slope of 0.65 to 0.87, so the
+  0.76 recovery of an injected capacity reflects how well CAMS sunshine matches a real farm, and the
+  fit's own regressor shape is recovered at exactly 1.000. A placebo transfer share has a 95th
+  percentile of 0.63 for donors under 3 MW at 6 to 12 hours and 0.14 for donors over 5 MW, so a gate
+  of 0.10 needs a scale set by donor size. The plan's filter on observed weeks left 2 event-Primary
+  pairs, and 7 once events were allowed in any week.
+- **A next experiment could:** keep the positive control, scale the share gate by donor size, use
+  intervals of 24 hours or longer, allow events in unobserved weeks, and cover all 8 Primaries.
+- **Write-up and pull request:** [result](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md),
+  [PR #1292](https://github.com/openclimatefix/nged-substation-forecast/pull/1292).
+
+![C1 by Primary, with the two pooled intervals](00063-sw2-10-linear-joint-fit-v2-in-miniature/figure_2.svg)
+
 ### 00057: does UKV, learned from its own history, help the solar-farm forecast?
 
 **Giving the Met Office's UK Variable-resolution (UKV) weather forecast to a solar-farm forecast
@@ -1489,3 +1765,28 @@ come from the CEDA research archive, not the live feed, so any gain would be an 
 - **Write-up:** [result](00057-product-trained-xgboost-solar-farms/result.md).
 
 ![Contrasts between the arms](00057-product-trained-xgboost-solar-farms/figure_1.svg)
+
+### 00048: weekly retraining of the demand model, checked on the runs experiment 34 left out
+
+**Refitting the Primary demand model weekly, with no error correction, scored 0.20 points of
+capacity below the best setup tested earlier (5.44 against 5.64) on 292 daily forecast runs that
+experiment 34 had not scored.** Scores are the quantile score in percentage points of capacity, and
+the earlier setup, called the stack, is a model fitted once with a 14-day error correction. The
+experiment refitted the XGBoost demand model (N1) weekly and monthly for 16 Primary substations and
+for 2 bulk supply point (BSP) and 2 grid supply point (GSP) substations. It refitted the weather-to-
+power model monthly for 6 solar and 3 wind farms. The verdict is supported. A 7-day or 14-day error
+correction was not shown to help a refitted model, and monthly refitting changed solar and wind
+scores by 0.04 points or less.
+
+- **Headline result:** weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly
+  minus monthly -0.13 (-0.24 to -0.03); the 7-day correction on the weekly model +0.16 (-0.06 to
+  +0.36, worse, unresolved).
+- **Finding for later experiments:** at the 2 BSP and 2 GSP substations weekly retraining gained
+  0.66 points over the stack (-1.23 to -0.27), more than predicted, on 4 series. The 7-day
+  correction window was 0.09 worse than the 14-day window. The Primary gain is fragile: it rests on
+  12 months, three series carry most of it (without D8 the interval includes zero), and the 292
+  runs share their months with experiment 34's 73, so a second validation year is the open test.
+- **Write-up and pull request:** [result](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md),
+  [PR #1269 (Experiment 48: does weekly retraining still win on the runs experiment 34 left out?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1269).
+
+![Planned contrasts](00048-weekly-retraining-confirmation-and-extension-demand-generators/figure_1.svg)

@@ -35,8 +35,20 @@ SUPPORT_AT_LEAST: Final[float] = 0.05
 REFUTED_BELOW: Final[float] = 0.02
 ALARM_MARGIN: Final[int] = 10
 STEP_EDGES: Final[tuple[float, ...]] = (0.0, 2.5, 4.0, 6.0, 10.0, float("inf"))
-ARMS: Final[dict[str, str]] = {"EF": "EF_PE", "D0M": "D0M_PE", "LOGIT_SAME": "LOGIT_SAME_PE"}
-"""Each arm's name in the tables, all with the strongest-opposite-step end rule."""
+ARMS: Final[dict[str, str]] = {
+    "EF": "EF_PE",
+    "EF_H10": "EF_H10_PE",
+    "D0M": "D0M_PE",
+    "LOGIT_SAME": "LOGIT_SAME_PE",
+}
+"""Each arm's name in the tables, all with the strongest-opposite-step end rule. EF_H10 is the
+post hoc EF with a Huber threshold of 10, whose tables sit in the `huber10` folder."""
+POST_HOC_DIR: Final[str] = "huber10"
+
+
+def post_hoc_results(*, out: Path, name: str) -> pl.DataFrame:
+    """A table of the post hoc EF run, with its setting renamed to `EF_H10_PE`."""
+    return pl.read_parquet(out / POST_HOC_DIR / name).with_columns(setting=pl.lit("EF_H10_PE"))
 
 
 def population(*, out: Path) -> pl.DataFrame:
@@ -68,6 +80,9 @@ def population(*, out: Path) -> pl.DataFrame:
                 "event_id", "shape", "setting", "found"
             ),
             pl.read_parquet(out / "event_results.parquet").select(
+                "event_id", "shape", "setting", "found"
+            ),
+            post_hoc_results(out=out, name="event_results.parquet").select(
                 "event_id", "shape", "setting", "found"
             ),
         ]
@@ -172,7 +187,13 @@ def print_real(*, out: Path) -> None:
     """The labelled real transfers of more than 1 day found by each arm, by onset parity."""
     mine = pl.read_parquet(out / "real_results.parquet")
     theirs = pl.read_parquet(EXPERIMENT_65_DIR / "real_results.parquet")
-    real = pl.concat([theirs.filter(pl.col("setting").is_in(["D0M_PE", "LOGIT_SAME_PE"])), mine])
+    real = pl.concat(
+        [
+            theirs.filter(pl.col("setting").is_in(["D0M_PE", "LOGIT_SAME_PE"])),
+            mine,
+            post_hoc_results(out=out, name="real_results.parquet"),
+        ]
+    )
     real = real.filter(pl.col("hours") > 24)
     print(
         f"\nLabelled real transfers of more than 1 day: {mine.filter(pl.col('hours') > 24).height}"
@@ -191,10 +212,11 @@ def print_alarms(*, out: Path) -> dict[str, int]:
     """Unexplained alarm counts on the real residual by odd and even month."""
     counts = {}
     ef = pl.read_parquet(out / "alarms.parquet").filter(~pl.col("explained"))
+    ef_h10 = pl.read_parquet(out / POST_HOC_DIR / "alarms.parquet").filter(~pl.col("explained"))
     theirs = pl.read_parquet(EXPERIMENT_65_DIR / "alarms.parquet").filter(
         pl.col("setting") == "D0M_PE", ~pl.col("logged_matched")
     )
-    for name, part in (("EF", ef), ("D0M", theirs)):
+    for name, part in (("EF", ef), ("EF_H10", ef_h10), ("D0M", theirs)):
         counts[name] = part.filter(pl.col("month") % 2 == 0).height
         print(
             f"{name}: unexplained alarms even months {counts[name]}, "
@@ -245,12 +267,17 @@ def main() -> None:
     frames = [data.filter(pl.col("shape") == s) for s in NON_MATCHING]
     c1 = contrast(frames=frames, arm="EF", base="D0M")
     c2 = contrast(frames=frames, arm="EF", base="LOGIT_SAME")
+    for arm in ("EF_H10",):
+        print(f"post hoc {arm}-D0M: {fmt(*contrast(frames=frames, arm=arm, base='D0M'))}")
+        c3 = contrast(frames=frames, arm=arm, base="LOGIT_SAME")
+        print(f"post hoc {arm}-LOGIT_SAME: {fmt(*c3)}")
     print(f"\nC1 EF-D0M: {fmt(*c1)} at level {LEVEL:.4f}")
     print(f"C2 EF-LOGIT_SAME (no verdict): {fmt(*c2)}")
     print_by_step(data=data)
     print_real(out=out)
     alarms = print_alarms(out=out)
     print_tuning(out=out)
+    print_tuning(out=out / POST_HOC_DIR)
     print(f"\nEXPERIMENT VERDICT: {verdict(c1=c1, alarms=alarms)}")
 
 
