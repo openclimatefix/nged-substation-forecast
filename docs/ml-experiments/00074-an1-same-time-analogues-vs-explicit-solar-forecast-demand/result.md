@@ -365,4 +365,3 @@ year would resolve a 0.05-point gain. Rejected: none.
 of the arms, the four verdicts, the pronoun and bare-noun fixes, the money-metaphor fixes, and the
 research-log rewrites. Rejected: moving all the legend ahead of the take-home paragraph, which would
 bury the conclusion.
-

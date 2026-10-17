@@ -28,6 +28,9 @@ REFERENCE_ARMS: Final[tuple[str, ...]] = ("d0", "d1l", "am", "climatology", "man
 def read_raw() -> pl.DataFrame:
     """Return every fit file as one table.
 
+    Returns:
+        The concatenated fit files: `arm`, `seed`, `KEYS`, and the nine quantiles.
+
     Raises:
         FileNotFoundError: If no fit file exists.
     """
