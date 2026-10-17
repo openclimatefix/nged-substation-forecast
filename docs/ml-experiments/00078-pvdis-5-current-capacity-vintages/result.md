@@ -39,7 +39,8 @@ decision_rule: >-
   third of experiment 00064's gain of `am` over `d0`, because a capacity re-estimated every week is
   a production pipeline step (a weekly refit of the capacity table) that a fixed table does not
   need. Verdict `supported` when the upper end of C1 is below -0.05 and the upper ends of C3 and C4
-  are below zero. `small gain` when the upper end of C1 is below 0 but not below -0.05, and the upper
+  are below zero. `small gain` when the upper end of C1 is below 0 but not below -0.05, and the
+  upper
   ends of C3 and C4 are below zero. `refuted` when the lower end of C1 is above -0.05 (a gain of the
   threshold size is ruled out) and the upper end of C1 is not below 0. `inconclusive` otherwise,
   including when C3 or C4 is not below zero, which the write-up reports as "no gain
@@ -51,7 +52,8 @@ decision_rule: >-
   The starting point matters when the lower end of D1 is above 0 and the point estimate is at least
   0.05. The gap between `am0` and the stored `d1l` is an artefact of the two pipelines when the
   upper end of D1 is below 0.05. Otherwise the reading is unresolved. A positive D1 means that
-  `d1l_r` scores worse than `am0`. Every other read is exploratory, labelled so, at 95%: `am_wk` minus `am`, `am_wk`
+  `d1l_r` scores worse than `am0`. Every other read is exploratory, labelled so, at 95%: `am_wk`
+  minus `am`, `am_wk`
   minus `am_sy`, `am` minus `am0` (reported beside C3, because the solar term is the headline
   read), `am_sy` minus `am` restricted to the runs where step 1 of the fallback chain supplied the
   capacity, the three arms against `d0` (stored) and `d0_r` (refitted), lead
@@ -71,7 +73,8 @@ metric: >-
 code: ml-experiments/00078-pvdis-5-current-capacity-vintages/
 ---
 
-# Experiment 78: does a re-estimated solar capacity lower the error of experiment 64's best forecast? (PVDIS-5, check 2)
+# Experiment 78: does a re-estimated solar capacity lower the error of experiment 64's best
+forecast? (PVDIS-5, check 2)
 
 **Plan status: committed before any code runs.** The write-up replaces this page when the experiment
 finishes.
@@ -83,14 +86,16 @@ the substation's embedded-solar capacity times a forecast of how sunny the day w
 this arm `am`. The capacity was one number per Primary substation, fitted on data up to 2025-06-30
 and held for validation days from July 2025 to June 2026. That number is 5% to 19% below experiment
 45's 2025/26 constants. This experiment replaces it with a capacity that is re-estimated before
-each forecast run, and asks whether the score falls further. The experiment also refits the reference model
+each forecast run, and asks whether the score falls further. The experiment also refits the
+reference model
 `d1l` in the same pipeline, which experiment 76 left open, and tests whether giving XGBoost a base
 margin of zero, instead of its estimated base score, changes the error of `d0` as well.
 
 ## Arms
 
 - **`am`, `am_twin`, `d0`, `d1l`, `climatology`:** experiment 64's stored predictions.
-- **`am0`:** experiment 76's stored predictions, fitted by a copy of the same code with the same seeds: the `am` recipe with a margin of zero in every row,
+- **`am0`:** experiment 76's stored predictions, fitted by a copy of the same code with the same
+  seeds: the `am` recipe with a margin of zero in every row,
   so that it starts from zero like `am` and carries no solar term.
 - **`am_sy`:** experiment 64's fitted `am` models, predicted with a margin whose capacity is the
   season-year vintage below. No model is refitted. The weight on the solar term, the training rows,
@@ -168,7 +173,8 @@ write-up and its prose.
 
 ## Earlier advice followed and departed from
 
-- **Followed:** read the gain of the solar offset against `am0` as well as `d0` (experiment 76); score
+- **Followed:** read the gain of the solar offset against `am0` as well as `d0` (experiment 76);
+  score
   without the 14-day correction when comparing arms at long leads (experiment 76); refit with a
   capacity table that is current for the validation year (experiment 64).
 - **Departed from:** experiment 64 advised refitting `am`. This plan changes only the capacity at
