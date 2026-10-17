@@ -112,6 +112,7 @@ the maintainer to confirm.
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
 | [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) | Candidate | 2026-10-17 |
 | [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
+| [00080 - Zero starting value, BM0](00080-bm0-zero-base-margin-xgboost-quantile-models/result.md) | Does starting XGBoost from zero instead of its estimated base score lower the quantile score of the production-style models for Primary, bulk and grid supply point, solar, and wind series? | Inconclusive: no gain for Primary substations (-0.017 points, 98.75% interval -0.072 to +0.054), supply points, or solar; worse for wind without the power-curve margin (+0.049) | Not for production | 2026-10-18 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -407,11 +408,12 @@ correction (row set `fold_a_every5d_v1`, 16 Primary substations).
   0.256 against `d1l`, where the fixed-coefficient shift of 00046 lowered `d1l` by 0.056, and
   subtracting the forecast solar from a model trained on gross demand was not shown to match the
   best guess (00064).
-- **Start an XGBoost quantile model from a base margin of zero, not from its estimated base score.**
-    A zero start lowered `d0` by 0.071 points (-0.099 to -0.047, against a refit of `d0`), and the
-  model without a solar term scored 0.102 points (0.035 to 0.169) lower than its refit with the
-  default start at 10 days and beyond, uncorrected, in one pipeline. A capacity table refreshed once
-  a season-year captured almost all of the gain from a current capacity (00078).
+- **Do not expect a zero start to help the production XGBoost models.** Experiment 78 found that a
+  zero base margin lowered its reference model `d0` by 0.071 points, but on the production recipe
+  the zero start changed the Primary score by -0.017 (-0.072 to +0.054) and the solar score by
+  -0.010 (-0.036 to +0.028), and worsened wind models without a power-curve margin by 0.049 (00080).
+- **Refresh the capacity table that feeds the base margin once per season-year.** A table
+  refreshed that often captured almost all of the gain from a current capacity (00078).
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -1499,6 +1501,31 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
   #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
 
 ![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
+
+### 00080: does a zero starting value lower the error of the production XGBoost models? (BM0)
+
+**Starting XGBoost from zero instead of from its own estimate does not lower the error of the
+production forecasts, so the 0.071-point gain that experiment 78 found for its reference model is
+not a lever for the production recipe.** XGBoost's quantile model begins from a base score that it
+estimates from the training labels, one value per quantile level. We refitted the production-style
+models with a start of zero and compared them with experiment 48's stored models on the same 292
+daily runs. The quantile score (lower is better; 1 point is 1% of a series' capacity) changed by
+-0.017 points (98.75% interval -0.072 to +0.054) at the 16 Primary substations retrained weekly,
++0.006 (-0.091 to +0.092) at the bulk and grid supply points, -0.033 (-0.084 to +0.031) for the
+frozen Primary stack, and -0.010 (-0.036 to +0.028) at the solar farms. Wind models without a
+power-curve margin were worse with a zero start by 0.049 (95% interval 0.032 to 0.065). The verdict
+is `inconclusive`.
+
+- **Finding for later experiments:** do not test the starting value again for demand or solar. Four
+  times as many rounds raised the Primary score by 0.211 points (0.100 to 0.352), so the fixed 500
+  rounds are not too few, and early stopping on the last 90 days of the training window picked
+  between 241 and 2,000 rounds and cannot be trusted. The next experiment is the number of rounds
+  (about 250 against 500).
+- **Noise floor:** GPU fits are not bit-reproducible. A refit of the estimated-start frozen model
+  scored 0.004 to 0.007 points from the stored one.
+- **Write-up:** [the full result page](00080-bm0-zero-base-margin-xgboost-quantile-models/result.md).
+
+![Zero start minus estimated start](00080-bm0-zero-base-margin-xgboost-quantile-models/figure_1_contrasts.svg)
 
 ### 00079: can the direction of flow be recovered at Primaries metered only in MVA? (PVDIS-7)
 
