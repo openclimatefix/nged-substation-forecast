@@ -19,12 +19,15 @@ import polars as pl
 _PREPARED: pl.DataFrame | None = None
 
 
-def _fit_row(*, w: inputs.YearWindow, index: np.ndarray, scale: float) -> dict[str, float | int]:
+def _fit_row(*, w: inputs.YearWindow, index: np.ndarray) -> dict[str, float | int]:
     """Fit both models on the rows `index` of a window and return the summary."""
     design = fit.Design.build(cells=w.cells[index], nuisance=w.nuisance[index])
     a = np.abs(w.power[index])
     u = w.shape[index]
     c_naive, m_naive = fit.naive_fit(design=design, a=a, u=u)
+    lo, hi = common.MIDDAY_HALF_HOURS
+    hh = w.half_hour[index]
+    scale = float(np.median(a[(hh >= lo) & (hh < hi)]))
     unfolded = fit.unfold_fit(design=design, a=a, u=u, scale=scale)
     loss_naive = fit.abs_loss(a=a, m=m_naive)
     return {
@@ -46,17 +49,17 @@ def _job(primary: str) -> tuple[list[dict[str, object]], list[dict[str, object]]
     boot: list[dict[str, object]] = []
     for w in inputs.year_windows(prepared=_PREPARED, primary=primary):
         everything = np.arange(len(w.power))
-        scale = w.midday_scale(mask=np.ones(len(w.power), dtype=bool))
+        scale = float(np.median(np.abs(w.power)))
         meta = {"site": primary, "year": w.year, "rows": len(w.power), "scale": scale}
-        point.append({**meta, **_fit_row(w=w, index=everything, scale=scale)})
+        point.append({**meta, **_fit_row(w=w, index=everything)})
         blocks = (w.days - w.days.min()) // common.BLOCK_DAYS
         labels = np.unique(blocks)
         rows_of = {int(b): np.flatnonzero(blocks == b) for b in labels}
-        rng = np.random.default_rng(common.BOOTSTRAP_SEED + int(w.year))
+        rng = np.random.default_rng([common.BOOTSTRAP_SEED, int(w.year), int(primary[1:])])
         for draw in range(common.WEEK_BOOTSTRAP_DRAWS):
             picks = rng.choice(labels, size=len(labels), replace=True)
             index = np.concatenate([rows_of[int(b)] for b in picks])
-            boot.append({**meta, "draw": draw, **_fit_row(w=w, index=index, scale=scale)})
+            boot.append({**meta, "draw": draw, **_fit_row(w=w, index=index)})
     return point, boot
 
 

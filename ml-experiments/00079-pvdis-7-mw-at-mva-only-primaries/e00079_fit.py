@@ -153,11 +153,18 @@ class Unfolded:
 def _run(
     *, design: Design, a: np.ndarray, u: np.ndarray, sign: np.ndarray
 ) -> tuple[float, np.ndarray, float]:
-    """Alternate the signed fit and the sign update from `sign` until the signs stop changing."""
+    """Alternate the signed fit and the sign update from `sign` until the signs stop changing.
+
+    Returns:
+        The lowest-loss pass, and the first pass (the fit to `sign x a` with the given signs).
+    """
     best: tuple[float, np.ndarray, float] | None = None
+    first: tuple[float, np.ndarray, float] | None = None
     for _ in range(common.MAX_ITERATIONS):
         c, m = signed_fit(design=design, y=sign * a, u=u)
         loss = abs_loss(a=a, m=m)
+        if first is None:
+            first = (c, m, loss)
         if best is None or loss < best[2]:
             best = (c, m, loss)
         new = np.where(m >= 0.0, 1.0, -1.0)
@@ -165,7 +172,8 @@ def _run(
             break
         sign = new
     assert best is not None
-    return best
+    assert first is not None
+    return best, first
 
 
 def start_signs(*, design: Design, a: np.ndarray, u: np.ndarray, scale: float) -> list[np.ndarray]:
@@ -193,12 +201,12 @@ def unfold_fit(*, design: Design, a: np.ndarray, u: np.ndarray, scale: float) ->
         _run(design=design, a=a, u=u, sign=s)
         for s in start_signs(design=design, a=a, u=u, scale=scale)
     ]
-    positive = results[0]
-    best = min(results, key=lambda r: r[2])
+    positive = results[0][1]
+    best = min((r[0] for r in results), key=lambda r: r[2])
     if best[2] > (1.0 - common.TIE_MARGIN) * positive[2]:
         best = positive
-    losses = sorted(r[2] for r in results)
-    distinct = len({round(r[0], 6) for r in results})
+    losses = sorted(r[0][2] for r in results)
+    distinct = len({round(r[0][0], 6) for r in results})
     return Unfolded(
         capacity=best[0],
         mean=best[1],

@@ -38,7 +38,11 @@ def case_row(
     u = window.shape[mask]
     c_signed, _ = fit.signed_fit(design=design, y=y, u=u)
     c_naive, m_naive = fit.naive_fit(design=design, a=reading, u=u)
-    unfolded = fit.unfold_fit(design=design, a=reading, u=u, scale=scale)
+    lo, hi = common.MIDDAY_HALF_HOURS
+    hh = window.half_hour[mask]
+    midday = (hh >= lo) & (hh < hi)
+    scale_fit = float(np.median(reading[midday]))
+    unfolded = fit.unfold_fit(design=design, a=reading, u=u, scale=scale_fit)
     floor = common.SIGN_FLOOR_SHARE * scale
     keep = np.abs(y) >= floor
     truth_negative = y[keep] < 0.0
@@ -46,6 +50,7 @@ def case_row(
         **meta,
         "rows": int(mask.sum()),
         "scale": scale,
+        "scale_fit": scale_fit,
         "c_base_signed": base_capacity,
         "c_signed": c_signed,
         "c_naive": c_naive,
@@ -70,16 +75,30 @@ def _job(primary: str) -> list[dict[str, object]]:
     assert _PREPARED is not None
     out: list[dict[str, object]] = []
     for w in inputs.year_windows(prepared=_PREPARED, primary=primary):
+        full = np.ones(len(w.power), dtype=bool)
+        scale = w.midday_scale(mask=full)
+        design = fit.Design.build(cells=w.cells, nuisance=w.nuisance)
+        base_capacity, _ = fit.signed_fit(design=design, y=w.power, u=w.shape)
+        out.append(
+            case_row(
+                window=w, mask=full, y=w.power, reading=np.abs(w.power), scale=scale,
+                base_capacity=base_capacity,
+                meta={
+                    "site": primary, "year": w.year, "farm": "-", "level": 0.0,
+                    "q_share": 0.0, "injected_peak_mw": 0.0,
+                },
+            )
+        )  # fmt: skip
         for farm, series in _FARMS.items():
             mask, injected = inputs.aligned_injection(window=w, farm=series)
+            if mask.sum() < common.MIN_WINDOW_ROWS:
+                continue
             scale = w.midday_scale(mask=mask)
             base_design = fit.Design.build(cells=w.cells[mask], nuisance=w.nuisance[mask])
             base_capacity, _ = fit.signed_fit(design=base_design, y=w.power[mask], u=w.shape[mask])
-            cases: list[tuple[float, float]] = [(level, 0.0) for level in (0.0, *common.LEVELS)]
+            cases = [(level, 0.0) for level in common.LEVELS]
             cases += [(1.0, q) for q in common.REACTIVE_SHARES]
             for level, q_share in cases:
-                if level == 0.0 and farm != next(iter(_FARMS)):
-                    continue
                 y = w.power[mask] - level * scale * injected
                 reading = np.sqrt(y**2 + (q_share * scale) ** 2) if q_share else np.abs(y)
                 out.append(
@@ -87,10 +106,8 @@ def _job(primary: str) -> list[dict[str, object]]:
                         window=w, mask=mask, y=y, reading=reading, scale=scale,
                         base_capacity=base_capacity,
                         meta={
-                            "site": primary, "year": w.year,
-                            "farm": farm if level else "-", "level": level,
-                            "q_share": q_share,
-                            "injected_peak_mw": level * scale,
+                            "site": primary, "year": w.year, "farm": farm, "level": level,
+                            "q_share": q_share, "injected_peak_mw": level * scale,
                         },
                     )
                 )  # fmt: skip

@@ -32,9 +32,23 @@ def run() -> None:
     for capacity in (0.0, 0.3):
         design, u, y = _series(capacity=capacity, base_level=3.0)
         assert (y > 0).all()
-        result = fit.unfold_fit(design=design, a=np.abs(y), u=u, scale=3.0)
+        result = fit.unfold_fit(design=design, a=np.abs(y), u=u, scale=float(np.median(np.abs(y))))
         assert (result.mean >= 0).all(), f"capacity {capacity}: flipped signs"
         assert abs(result.capacity - capacity) < 1e-6, f"capacity {capacity}: {result.capacity}"
+    # With noise at 10% of midday power, the capacity is still recovered through zero.
+    design, u, y = _series(capacity=4.0, base_level=1.0)
+    rng = np.random.default_rng(1)
+    noisy = y + rng.normal(scale=0.1 * float(np.median(np.abs(y))), size=len(y))
+    result = fit.unfold_fit(
+        design=design, a=np.abs(noisy), u=u, scale=float(np.median(np.abs(noisy)))
+    )
+    assert abs(result.capacity - 4.0) < 0.4, f"noisy unfold recovered {result.capacity}"
+    # A reactive floor the fit does not know about still gives a capacity of the right size.
+    q = 0.2 * float(np.median(np.abs(y)))
+    result = fit.unfold_fit(
+        design=design, a=np.sqrt(y**2 + q**2), u=u, scale=float(np.median(np.abs(y)))
+    )
+    assert 2.5 < result.capacity < 5.5, f"reactive unfold recovered {result.capacity}"
 
 
 if __name__ == "__main__":
