@@ -36,6 +36,7 @@ the series of the job it is working on. GPU memory use is one booster per worker
 """
 
 import argparse
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -631,6 +632,7 @@ def main() -> None:
         )
         rounds, workers, folds = SMOKE_ROUNDS, 1, common.fold_names(selected=["b"])
     nthread = max(1, CORES // workers)
+    os.environ["POLARS_MAX_THREADS"] = str(nthread)
     started = time.monotonic()
     futures = []
     baseline_lines: list[str] = []

@@ -81,6 +81,10 @@ def control_rows(*, run: date, cells: list[int]) -> pl.DataFrame:
     column_index = np.abs(
         longitudes[None, :] - np.mod(weights["nwp_lon"].to_numpy(), 360.0)[:, None]
     ).argmin(axis=1)
+    assert np.abs(latitudes[row_index] - weights["nwp_lat"].to_numpy()).max() < 0.13
+    assert (
+        np.abs(longitudes[column_index] - np.mod(weights["nwp_lon"].to_numpy(), 360.0)).max() < 0.13
+    )
     proportion = weights["proportion"].to_numpy().astype(np.float64)
     cell_of_point = weights["h3_index"].to_numpy()
     unique_cells = np.unique(cell_of_point)

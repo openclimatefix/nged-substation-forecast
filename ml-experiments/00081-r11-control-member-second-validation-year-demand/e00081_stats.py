@@ -391,7 +391,7 @@ def contrast_rows(
             metric=metric,
             level_label="95",
             level=95.0,
-            n_resamples=draws_small,
+            n_resamples=draws,
             grouping="block",
         )
     add(
