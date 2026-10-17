@@ -222,7 +222,7 @@ experiment. The maintainer decides when each step runs, and may stop the series 
 
 **When a series of more than three experiments finishes or pauses, write one summary report that
 tells the whole story.** A series is a set of experiments sharing a topic in the research log. The
-report lives at `docs/ml-experiments/series/<topic>.md`, with its entry in `mkdocs.yml`. It refits
+report lives at `docs/ml-experiments/series/<topic>.md`, with its entry in `mkdocs.yml`. The report refits
 nothing: it collates figures and numbers from the existing write-ups into one page. Its three parts,
 in this order:
 
