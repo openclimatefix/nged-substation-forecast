@@ -74,110 +74,120 @@ best_arm: >-
   scored 5.104 points of capacity against 5.119 for XGBoost's estimated start (C1, -0.017, 98.75%
   interval -0.072 to +0.054).
 headline: >-
-  Starting XGBoost from zero did not lower the quantile score of any production-style model:
-  Primary substations -0.017 points of capacity (98.75% interval -0.072 to +0.054), bulk and grid
-  supply points +0.006 (-0.091 to +0.092), the frozen Primary stack -0.033 (-0.084 to +0.031),
-  solar farms -0.010 (-0.036 to +0.028). Wind models without the power-curve margin were worse by
-  +0.049 (95% interval +0.032 to +0.065).
+  Starting XGBoost from zero did not lower the quantile score of any production-style XGBoost
+  model: Primary substations -0.017 points of capacity (98.75% interval -0.072 to +0.054), bulk
+  and grid supply points +0.006 (-0.091 to +0.092), the frozen Primary stack -0.033 (-0.084 to
+  +0.031), solar farms -0.010 (-0.036 to +0.028). Wind XGBoost models without the power-curve
+  margin were worse by +0.049 (95% interval +0.032 to +0.065).
 lessons: >-
-  Experiment 78's 0.071-point gain from a zero start does not carry over to the production recipe,
-  so the starting value is not worth another experiment for demand or solar. Four times as many
-  rounds raised the Primary score by 0.211 points (0.100 to 0.352) with the estimated start, so
-  the fixed 500 rounds are not too few, and early stopping on the last 90 days of the training
-  window gave no detectable gain over the matched 500 rounds and stopped anywhere from 90 to 1,292
-  rounds at the demand series.
+  Experiment 78's 0.071-point gain from a zero start does not carry over to the XGBoost recipe
+  that serves, so the starting value is not worth another experiment for demand or solar. Four
+  times as many rounds raised the Primary-substation score by 0.211 points (0.100 to 0.352) with
+  the estimated start, so the fixed 500 rounds are not too few. Early stopping on the last 90 days
+  of the training window gave no detectable gain at Primary substations and stopped anywhere from
+  90 to 1,292 rounds at the demand series.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-      Do not test the starting value of the production XGBoost quantile models again for
-      demand or solar, because C1 to C4 are all within 0.1 points of zero, with 98.75%
-      intervals that include zero (C1 to C4).
+      Do not test the starting value of the XGBoost quantile models again for demand or solar,
+      because the four point estimates are within 0.04 points of zero and every 98.75%
+      interval includes zero (C1 to C4).
   - >-
-      Keep XGBoost's estimated starting value for wind models without a power-curve base
-      margin, because a zero start scores 0.049 points (0.032 to 0.065) worse; with the margin
-      the starting value is ignored (wind read).
+      Keep the power-curve base margin in the wind XGBoost model, because it beats the same
+      model without the margin by 0.062 points (0.026 to 0.099) and the zero-start model
+      without the margin by 0.112 (0.076 to 0.148); without the margin, a zero start is worse
+      by 0.049 (0.032 to 0.065) (wind read).
   - >-
-      Keep the fixed 500 boosting rounds for demand models, because 2000 rounds scored 0.211
-      points (0.100 to 0.352) worse at the 8 Primary substations and 0.233 (0.084 to 0.453)
-      worse at the 4 bulk and grid supply points (rounds read).
+      Keep the fixed 500 boosting rounds for demand XGBoost models, because 2,000 rounds
+      scored 0.211 points (0.100 to 0.352) worse at 8 Primary substations and 0.233 (0.084 to
+      0.453) worse at the 4 bulk and grid supply points (rounds read).
   - >-
       Do not pick the number of boosting rounds by early stopping on the last 90 days of the
-      training window, because the held-out loss kept falling to 1,000 rounds while the scored
-      year worsened beyond 500, and the stopping round ranged from 241 to 2,000 (rounds read).
+      training window for demand, because the stopping round ranged from 90 to 1,292 and the
+      matched comparison at Primary substations showed no detectable gain (-0.011, -0.032 to
+      +0.008) (early-stopping read).
   - >-
-      Run an identical refit of the reference arm to measure the noise floor of GPU XGBoost,
-      because two fits of the same 500-round model scored 0.004 points apart at Primary
-      substations and 0.007 at grid supply points (reproduction read).
+      Run a repeat fit of the reference arm to measure the noise floor of GPU XGBoost, because
+      two fits of the same 500-round model scored 0.004 points apart at Primary substations
+      and 0.007 at grid supply points (reproduction read).
 ---
 
 # Experiment 80: does a zero starting value lower the error of the production XGBoost models? (BM0)
 
-**Take-home message: starting XGBoost from zero instead of from its own estimate does not lower the
-error of the production forecasts, so the 0.071-point gain that experiment 78 found for its
-reference model is not a lever for the production recipe.** At the Primary substations, the bulk and
-grid supply points, and the solar farms, the difference is under 0.04 points of capacity, with
-intervals that include zero. For wind models without a power-curve margin the zero start is worse
-by 0.049 points. More boosting rounds do not help either start, and early stopping on the last 90
-days of the training window picks the number of rounds badly. The next idea to test is the number
-of rounds itself (about 250 to 500 rather than 2000), not the starting value. The verdict is
-`inconclusive`: the pre-registered interval for the headline contrast includes zero, which here
-means no gain could be shown.
+**Take-home message: starting an XGBoost model from zero instead of from its own estimate does not
+lower the error of the forecasts that serve, so the zero start is not worth porting.** The gain of
+0.071 points that experiment 78 found for its reference model did not appear for Primary substation
+demand, bulk and grid supply point demand, or solar farms, where every difference was under 0.04
+points of capacity with an interval that includes zero. For wind XGBoost models without a
+power-curve margin a zero start was worse by 0.049 points. Four times as many boosting rounds did
+not help either start. The verdict is `inconclusive`, which here means that no gain could be shown.
 
 XGBoost's quantile model begins from a starting prediction (the base score) that it estimates from
-the training labels, one value per quantile level. We refitted the production-style models with a
-starting prediction of zero and compared them with experiment 48's stored models on the same
-292 daily forecast runs from July 2025 to June 2026. The classes were Primary substation demand
-(retrained weekly), bulk and grid supply point demand (retrained weekly), solar farms (retrained
-monthly), and wind farms. We also asked whether more boosting rounds, or early stopping, make the
-estimated start catch up.
-
-The quantile score is an error measure in which lower is better, and 1 point is 1% of a series'
-capacity.
+the training labels, one value for each of the nine quantile levels. We refitted XGBoost models for
+four classes of series with a starting prediction of zero, and compared them with the stored
+models of experiment 48, which use the estimated start, on the same 292 daily forecast runs from
+July 2025 to June 2026. The classes are Primary substations (the 33 kV or 66 kV to 11 kV
+transformers) and bulk and grid supply points (the larger sites above them), all retrained weekly,
+plus solar farms and wind farms, retrained monthly. We also asked whether more boosting rounds
+(500 are used now), or early stopping, make the estimated start catch up. The score is the
+quantile score, an error measure in which lower is better, and 1 point is 1% of a series' capacity.
 
 ![Zero start minus estimated start for the four planned contrasts and the wind models](figure_1_contrasts.svg)
 
+*Each dot is the difference in mean quantile score; negative means the zero start is better.*
+
 ![The gap at 500, 1000, and 2000 rounds and with early stopping, by class](figure_2_rounds.svg)
+
+*The zero-start gap does not close with more rounds; the early-stopping dots compare the two starts
+at different stopping rounds.*
 
 ![Held-out loss round by round for the two starts](figure_3_learning_curves.svg)
 
-- **Arms:** XGBoost's estimated start (experiment 48's stored predictions) against a zero start
-  (`base_score` 0, which is exactly the same model as a zero base margin), refitted here with the
-  same rows, weights, seed 0, spread factor 1.15, and for C3 the 14-day correction.
+*The zero start begins far behind and approaches the estimated start by about 250 rounds.*
+
+- **Arms:** the estimated start (experiment 48's stored predictions) against a zero start
+  (`base_score` 0, the same XGBoost model as a zero base margin), refitted here with the same rows,
+  weights, seed 0, and spread factor 1.15, and for C3 the 14-day correction. Arm scores below use
+  every run of the arm; the differences use only the runs both arms share.
 - **Row set:** `fold_a_daily_gap_v1`, 292 daily runs; intervals resample whole origin months.
 - **C1, Primary substations, weekly refits:** 5.104 against 5.119 points; difference -0.017
-  (98.75% interval -0.072 to +0.054). Per series it ranges from -0.107 to +0.151.
+  (98.75% interval -0.072 to +0.054). Per series the difference ranges from -0.107 to +0.151.
 - **C2, bulk and grid supply points, weekly refits:** the 2 bulk supply series score 9.417 against
   9.409 and the 2 grid supply series 17.258 against 17.223; difference +0.006 (-0.091 to +0.092).
-- **C3, Primary substations, frozen model with 14-day correction:** 5.302 against 5.339;
-  difference -0.033 (-0.084 to +0.031).
+- **C3, Primary substations, frozen XGBoost model with the 14-day correction:** 5.302 against
+  5.339; difference -0.033 (-0.084 to +0.031).
 - **C4, solar farms, monthly refits:** 4.961 against 4.971; difference -0.010 (-0.036 to +0.028).
-- **Wind (exploratory, 95%):** experiment 48's wind model supplies a power-curve base margin,
-  which makes XGBoost ignore its starting value, so a zero start is a no-op there. On wind models
-  without the margin the zero start scores 11.100 against 11.051 (+0.049, +0.032 to +0.065), and
-  the margin model scores 10.989.
-- **Why the start matters little:** the zero start begins with a much higher held-out loss
-  (Primary 0.22 against 0.05 in the first rounds) and has nearly caught up by 250 rounds.
-- **Rounds (exploratory, 95%):** the zero-start gap at the 8 Primary substations is +0.015
-  (-0.067 to +0.101) at 500 rounds, +0.112 (+0.031 to +0.204) at 1000, and +0.150 (+0.071 to
-  +0.243) at 2000, so more rounds do not close the gap. The rule "removed by more rounds" is not met
-  for any class. For the estimated start, 2000 rounds scored 0.211 points worse than 500
-  (+0.100 to +0.352) at Primary substations.
+- **Wind (exploratory, 95%):** experiment 48's wind XGBoost model supplies a power-curve base
+  margin, which makes XGBoost ignore its starting value, so a zero start changes nothing there. On
+  wind XGBoost models without the margin the zero start scores 11.100 against 11.051 (+0.049,
+  +0.032 to +0.065), and the model with the margin scores 10.989.
+- **Held-out loss by round:** on the 90 days before the training end, the mean pinball loss at
+  Primary substations is 0.122 for the zero start against 0.045 for the estimated start at round
+  10, 0.0288 against 0.0283 at round 250, and 0.0246 against 0.0214 at round 500.
+- **Rounds (exploratory, 95%):** at 8 Primary substations the zero-start gap is +0.015 (-0.067 to
+  +0.101) at 500 rounds, +0.112 (+0.031 to +0.204) at 1,000, and +0.150 (+0.071 to +0.243) at 2,000.
+  The gap is not detectable at 500 rounds and grows with more rounds, so the rule "removed by more
+  rounds" is not met for any class. With the estimated start, 2,000 rounds scored 0.211 points
+  worse than 500 (+0.100 to +0.352) at Primary substations.
 - **Early stopping (exploratory):** on the last 90 days before the training end, the stopping
-  round ranged from 90 to 1,292 for the demand series. Against its own matched 500-round prefix it
-  gained -0.011 (-0.032 to +0.008) at the Primary substations, which is not detectable. The
-  held-out block covers one season, and the scored year covers all of them.
-- **Noise floor:** GPU fits are not bit-reproducible. A refit of the estimated-start frozen model
-  scored +0.004 (Primary) and -0.007 (grid supply points) points from experiment 48's stored
-  predictions, above the planned tolerance of 0.001 and well below the intervals. Single quantiles
-  moved by up to 0.06 of capacity.
-- **Deviations, decided before any result was read:** weekly zero-start refits were fitted for
-  every second weekly refit (26 of 52), because the full set would have taken about 35 hours on the
-  shared GPU, and the contrasts keep the runs both arms share (1.7 million of the 3.2 million
-  Primary cases). The rounds family covers 8 of the 16 Primary substations (every second), for the
-  same reason. The reproduction check covers 2 weekly refits, not 4, and has no pass flag on the
-  weekly quantiles.
-- **Caveats:** one seed, so intervals reflect months only; with 4 grid supply series, 6 solar
-  farms, and 3 wind farms the intervals are wide; the validation block of the early-stopping arm is
-  not purged of runs that began before the cut.
-- **Next:** test fewer rounds (250 against 500) with the stock start, since 2000 rounds hurt.
+  round ranged from 90 to 1,292 at the demand series. Against its own matched 500-round prefix,
+  early stopping with the estimated start gained -0.011 (-0.032 to +0.008) at Primary substations
+  and -0.035 (-0.070 to -0.003) at solar farms. The comparison of the two starts at each start's own
+  stopping round (+0.431 at Primary substations) mostly reflects different stopping rounds.
+- **Noise floor:** GPU fits are not bit-reproducible. A repeat fit of the estimated-start frozen
+  XGBoost model scored +0.004 (Primary substations) and -0.007 (grid supply points) points from
+  experiment 48's stored predictions, above the planned tolerance of 0.001 and well below the
+  intervals. In the weekly repeat fits, single quantiles moved by up to 0.06 of capacity.
+- **Deviations, made before any result was read:** weekly zero-start refits cover every second
+  weekly refit (26 of 52), because all 52 would have taken about 35 hours on the shared GPU. The
+  differences therefore use half the runs (1.7 million of 3.2 million Primary-substation cases,
+  417,000 of 785,000 supply-point cases). The rounds family covers every second Primary substation
+  (8 of 16) and all 4 bulk and grid supply series, 6 solar farms, and 3 wind farms. The
+  reproduction check covers 2 weekly refits, not 4, and the planned tolerance was exceeded.
+- **Caveats:** one seed, so intervals reflect months only; with 4 bulk and grid supply series, 6
+  solar farms, and 3 wind farms the intervals are wide; the early-stopping held-out block is not
+  purged of runs that began before the cut.
+- **Next:** at the Primary substations, the median best round on the held-out block is 373, so
+  fewer than 500 rounds may be enough; the number of rounds, not the starting value, is the open
+  question.
