@@ -84,8 +84,9 @@ lessons: >-
   The explicit forecast wins where the weather forecast has skill and the sky is cloudy: leads under
   2 days and cloudy rows. The analogues match it on sunny rows and in August and September, and add
   to it on sunny rows (-0.138, -0.251 to -0.023, exploratory). The 29 weeks of forecast start of one
-  validation year give a half-width of 0.08 to 0.11 points on these contrasts, wider than the 0.05
-  threshold, so only a second validation year can settle whether the analogues are worth porting.
+  validation year give a half-width of 0.05 to 0.11 points on the planned contrasts, wider than the
+  0.05 threshold for all but one, so a second validation year would settle whether the analogues are
+  worth porting.
 production_status: not-for-production
 adopted_in: none
 advice:
@@ -106,49 +107,69 @@ advice:
     +0.098), and add -0.138 (-0.251 to -0.023) on top of it there (exploratory, by-sunshine reads).
   - >-
     Give every arm of a comparison the same starting level, such as the median of the training
-    labels, because experiments 76 and 78 found that XGBoost's estimated base score costs 0.07 to
-    0.10 points against a start at zero (departures).
+    labels, because experiments 76 and 78 found that XGBoost's estimated base score raises the score
+    by 0.07 to 0.10 points against a start at zero (departures).
   - >-
     Plan the weeks of forecast start so that a paired contrast has a half-width under 0.05 points
-    when the porting threshold is 0.05, because 29 weeks gave 0.08 to 0.11 (planned contrasts).
+    when the porting threshold is 0.05, or set the threshold from the half-width a second year can
+    reach, because 29 weeks gave 0.05 to 0.11 (planned contrasts).
 code: ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/
 ---
 
 # Experiment 74: do same-time analogues add anything once the solar forecast is explicit? (AN1)
 
-**Take-home message: telling the monthly-refitted demand model about sunshine in either of two ways
-lowered the daylight error by 0.09 to 0.15 points of capacity, and the two ways help in different
-conditions, so the next test needs more forecast weeks rather than another variant.** The explicit
-forecast of the panels' output wins at leads under 2 days and on cloudy rows. The analogues, which
-are recent days at the same time of day with similar sunshine, match it on sunny rows and in August
-and September. Using both scored best (4.518 points against 4.584 for the explicit forecast alone),
-but one validation year cannot resolve a gain that small. The verdict is `inconclusive`.
+**Take-home message: telling the XGBoost model of a Primary substation's power about sunshine, in
+either of two ways, lowered its daylight error by 0.09 to 0.15 points, and the two ways help in
+different conditions.** One point is 1% of the substation's capacity. The explicit forecast of the
+solar panels' output wins at leads under 2 days (a lead is the time from the forecast start to the
+half-hour being forecast) and on cloudy rows (rows with a clear-sky index under 0.3, which is the
+ratio of the measured sunshine to the cloud-free sunshine). The analogues, which are recent days at
+the same time of day with similar sunshine, match the explicit forecast on sunny rows and in August
+and September. Using both scored best, at 4.518 points against 4.584 for the explicit forecast
+alone, but one validation year (the 12 months from July 2025 to June 2026) cannot resolve a gain
+that small. The next test needs more forecast weeks and one new variant, analogues matched on the
+day type alone. The verdict is `inconclusive`.
 
 We asked how to tell a forecast of a Primary substation's power about the sunshine. A Primary
 substation steps 33 kV or 66 kV down to 11 kV in the electricity distribution network. Solar panels
 behind the substation's meter cut the metered power on a sunny day, so the forecast needs the
-sunshine. We tried two ways on five substations over daylight half-hours of April to September. The
-first, the explicit way, forecasts the panels' output (their capacity times the forecast sunshine,
-with a fitted weight) and gives it to the XGBoost model as a starting offset. The second, the
-analogue way, gives the model the metered power on the 3 recent days, at the same half-hour of the
-day and of the same day type, whose measured sunshine was closest to the sunshine forecast for the
-target. We refitted the model every month on the latest year of data for both ways, because a model
-that is never refitted exaggerates the value of any input that follows the recent level of power.
-Both ways beat the same refit without them. The explicit way beat it by 0.15 points, where 1 point
-is 1% of a substation's capacity. The analogue way beat it by 0.09 to 0.10 points. The experiment
-could not tell which way is better, and could not tell whether the analogues add anything once the
-offset is in.
+sunshine. We tried two ways on five substations over daylight half-hours of April to September. A
+row is one half-hour forecast of one substation from one forecast run. In the explicit way, the
+panels' output is forecast as their capacity times the forecast sunshine, with a fitted weight, and
+the XGBoost model receives that output as a starting offset: a value added to the model's
+prediction for each row before its trees. The forecast sunshine comes from the European Centre for
+Medium-Range Weather Forecasts ensemble (ENS). In the analogue way, we search the recent days for
+the 3 whose measured sunshine was closest to the sunshine forecast for the target, among days at
+the same half-hour and of the same day type (working day, weekend, or bank holiday). The measured
+sunshine is a satellite-based estimate, CAMS, from the Copernicus Atmosphere Monitoring Service.
+The XGBoost model then receives the metered power on those 3 days as input columns. We refitted the
+XGBoost model every month on the latest year of data for both ways. Experiment 34 found that a
+model that is never refitted overstates the value of an input that follows the recent level of
+power. Both ways beat the same monthly refit without either input. The explicit way beat it by
+0.15 points, and the analogue way by 0.095 points. The experiment could not tell which way is
+better, and could not tell whether the analogues add anything once the offset is in the model.
+
+**Legend of the arms.** `R0` is the monthly refit without either input, the reference. `E` is the
+refit with the explicit offset. `E_twin` is `E` given the sunshine forecast of another date, a
+placebo that keeps the capacity and the spread of the sunshine and removes its timing. `A1`, `A3`,
+and `A5` are the refits with 1, 3, and 5 analogues. `A3E` has the 3 analogues and the offset.
+`A3S` has 3 days drawn at random from the same recent days, ignoring sunshine and day type, a
+placebo for the matching. `R0_rad` is `R0` plus the radiation inputs, a context arm. The analogue
+columns are the mean and the standard deviation of the 3 days' power, the mean gap in sunshine, and
+the number of days found.
 
 ## The planned contrasts
 
-**The decision rule was committed before any code ran.** It has six contrasts on the quantile
+**The decision rule was committed before any code ran.** The rule has six contrasts on the quantile
 score, an error measure where lower is better. Every contrast is a paired difference of two arms'
 scores, with whole weeks of forecast start resampled, and every interval is 99.17% (a 5% error
 split across six). Seed 0 decides the verdict. C3 is the head-to-head contrast. C4 asks whether the
 analogues add anything once the offset is in, and needs its upper end below -0.05 to be worth
-porting. `refuted` needs C3's upper end below zero or C4's upper end below -0.05. `supported` needs
-C1's upper end below zero, C3's lower end above zero, and C4's lower end at or above -0.05. Neither
-rule is met, so the verdict is `inconclusive`: C3 runs from -0.053 to +0.161, and C4 from -0.149 to
+porting, which means building the analogue columns in the live service. The rule has four verdicts.
+`refuted` needs C3's upper end below zero or C4's upper end below -0.05. `supported` needs
+C1's upper end below zero, C3's lower end above zero, and C4's lower end at or above -0.05. `small
+gain` is the same as `supported` except that C4's upper end is below zero. Neither of the first two
+is met, so the verdict is `inconclusive`: C3 runs from -0.053 to +0.161, and C4 from -0.149 to
 +0.015.
 
 | Contrast | Arm minus arm | Difference | 99.17% interval |
@@ -161,11 +182,12 @@ rule is met, so the verdict is `inconclusive`: C3 runs from -0.053 to +0.161, an
 | C6 | `A3` minus `A3S` (3 random days) | -0.081 | -0.165 to +0.001 |
 
 The values are differences in quantile score, in points of capacity. A negative value favours the
-first arm. The rows are 68,903 half-hourly forecasts from 29 weeks of forecast start, at five
+first arm. The rows are 68,903 rows from 29 weeks of forecast start, at five
 Primary substations anonymised as D9, D10, D11, D14, and D16, one forecast run every 5 days in July
-to September 2025 and April to June 2026. The half-width of each interval is 0.05 (C1), 0.09 (C2),
-0.11 (C3), 0.08 (C4), 0.07 (C5), and 0.08 (C6), and every one except C1 is wider than the 0.05
-threshold, so C4 could not rule out a gain of that size.
+to September 2025 and April to June 2026.
+**Every interval except C1's has a half-width above the 0.05 porting threshold, so C4 could not rule
+out a gain of that size.** The half-width is half the interval's width: 0.05 (C1), 0.09 (C2), 0.11
+(C3), 0.08 (C4), 0.07 (C5), and 0.08 (C6).
 
 ![Quantile score of each arm, and the six planned contrasts](figure_1_headline.svg)
 
@@ -184,8 +206,10 @@ are in points of capacity, with 95% intervals from resampling whole weeks:
 | `A3S`, 3 random days | 4.720 (4.431 to 5.040) |
 | `R0_rad`, reference plus radiation inputs (context) | 4.614 (4.338 to 4.933) |
 
-For context, experiment 64's frozen models score 4.620 (`d0`), 4.724 (`d1l`), and 4.467 (`am`) on
-the same rows. Those models carry the 14-day correction, so no contrast uses them.
+For context, three frozen models of experiment 64 score 4.620 (`d0`, its best guess), 4.723 (`d1l`,
+the best guess without radiation inputs), and 4.466 (`am`, the offset model) on the same rows. They
+carry the 14-day correction, an average of the recent forecast errors added to the forecast, so no
+contrast uses them.
 
 ## The offset wins at short leads and on cloudy rows; the analogues catch up on sunny rows
 
@@ -200,46 +224,54 @@ this page other than C1 to C6 are exploratory, at 95%.
 
 **The split by sunshine shows why the two ways differ.** On cloudy rows (a clear-sky index under
 0.3), the analogues trail the offset by 0.429 points (0.224 to 0.657). On sunny rows (an index of
-0.7 or more), C3 is -0.050 (-0.199 to +0.098) and C4 is -0.138 (-0.251 to -0.023). The forecast
-sunshine helps most on a cloudy day, and a similar past day helps most on a sunny day. By
+0.7 or more), C3 is -0.050 (-0.199 to +0.098) and C4 is -0.138 (-0.251 to -0.023). On these 5
+substations' rows, the forecast sunshine helped most on cloudy days, and a similar past day helped
+most on sunny days. By
 substation, C3 favours the offset at D9 (+0.166, +0.066 to +0.269) and D11 (+0.101, +0.051 to
 +0.153), and is under 0.04 in size, in either direction, at D14 and D16.
 
 ![Contrasts C1 to C4 by valid month](figure_3_by_month.svg)
 
-**The analogues match the offset only in August and September.** C3 is +0.110, +0.139, +0.067, and
-+0.043 in April to July, +0.006 in August, and -0.061 in September, so the analogues trail the
-offset in the first four months. C4 is -0.163 in August and -0.175 in September. These are the means
-of each month's differences, each from 5 to 7 weeks of forecast start, so they show a sign and no
-interval.
+**By month, the analogues match the offset only in August and September.** C3 is +0.110, +0.139,
++0.067, and
++0.043 in April to July, +0.006 in August, and -0.062 in September, so the analogues trail the
+offset in the first four months. C4 is -0.163 in August and -0.175 in September. The monthly figures
+are means of each month's differences, each from 5 to 7 weeks of forecast start. The 95% intervals
+are in the printed report, and most of C3's include zero.
 
 ## Other reads
 
-- **Matching helps.** `A3` against `A3S`, the 3 random days, is -0.081 (-0.165 to +0.001) over all
-  rows, so C6's upper end is a hair above zero. The gain is -0.197 (-0.275 to -0.130) at leads
-  under 48 hours and -0.188 (-0.307 to -0.060) on sunny rows. On cloudy rows it is +0.137 (+0.002 to
-  +0.293), which means that matched analogues are worse than random days there.
-- **One analogue is enough.** `A1` minus `A3` is -0.008 (-0.037 to +0.019), and `A5` minus `A3` is
+**Every read in this list is exploratory, at 95%, except C5 and C6, which are planned and use
+99.17%.**
+
+- **Matching probably helps on sunny rows.** `A3` against `A3S`, the 3 random days, is -0.081
+  (-0.165 to +0.001) over all rows (C6, planned), so the upper end is a hair above zero. The gain
+  from matching is -0.197 (-0.275 to -0.130) at leads
+  under 48 hours and -0.188 (-0.307 to -0.060) on sunny rows. On cloudy rows the contrast is +0.137
+  (+0.002 to +0.293), which means that matched analogues are worse than random days there.
+- **One analogue scored as well as three.** `A1` minus `A3` is -0.008 (-0.037 to +0.019), and `A5`
+  minus `A3` is
   +0.034 (+0.014 to +0.060).
 - **The offset adds to the analogues.** `A3E` minus `A3`, the offset's gain on top of the
   analogues, is -0.121 (-0.157 to -0.086).
-- **The offset carries solar information.** C5 shows the offset beats its twin by 0.246 (0.173 to
-  0.322), which also held in experiment 64 (0.300).
-- **At night the analogues are level with random days.** At night rows of April to September, `A3`
+- **The offset carries solar information.** C5 (planned) shows the offset beats its twin by 0.246
+  (0.173 to 0.322), and experiment 64 found the same direction (0.300).
+- **At night the analogues are close to random days.** At night rows of April to September, `A3`
   minus `A3S` is -0.020 (-0.042 to +0.002), `A3` minus `R0` is -0.006 (-0.030 to +0.017), and `E`
   minus `R0` is +0.004 (-0.001 to +0.009).
 - **Radiation inputs help the reference too.** `R0_rad` minus `R0` is -0.120 (-0.151 to -0.090), a
   context read that no contrast uses.
 - **Coverage.** The 0.05 quantile lies above the actual power on 13.5% to 15.0% of sunny rows in
   every arm, and the 0.95 quantile lies above it on 80.6% to 82.9% of cloudy rows.
-- **8.7% of forecast cases have no analogue** (a bank holiday, or no day of the same type with
-  observed power and CAMS data in the window), and 89.4% have all 3.
+- **No analogue exists for 8.7% of rows** (a bank holiday, or no day of the same type with observed
+  power and CAMS data in the window), and 89.4% of rows have all 3.
 
 ![The planned contrasts from seed 0 and from seeds 0 to 2](figure_4_seeds.svg)
 
 **Seeds 1 and 2 changed no planned contrast by more than 0.003 points.** The widths of the
 intervals come from the weeks of forecast start, not from fit noise. The verdict from seeds 0 to 2
-together is also `inconclusive` (C3 lower end -0.048, C4 upper end +0.016). This check is post hoc.
+together is also `inconclusive` (C3 lower end -0.048, C4 upper end +0.016). The seed check is post
+hoc.
 
 ## Which predictions held
 
@@ -251,7 +283,7 @@ together is also `inconclusive` (C3 lower end -0.048, C4 upper end +0.016). This
 | C4 within -0.03 to +0.02 | Not met: -0.066, with an interval from -0.149 to +0.015 |
 | `E_twin` worse than `E` by 0.15 to 0.35 | Held: 0.246 |
 | `A3S` worse than `A3` by 0.01 to 0.06 | Not met: 0.081, slightly beyond the range |
-| `A3` and `A3S` within 0.02 at night | Held at the edge: -0.020 |
+| `A3` and `A3S` within 0.02 at night | Not met, at the edge: -0.020 (-0.042 to +0.002) |
 
 ## Departures from the plan
 
@@ -263,31 +295,35 @@ prediction, or the decision rule.**
 3. **The prediction sets are stored under lower-case names**, `r0`, `e`, `a3`, and so on, for seed
    0, and with the suffix `-s012` for seeds 0 to 2, because a stored set cannot be overwritten.
 4. **The common starting level is the median of the training labels, not zero.** Experiments 76
-   and 78 found that XGBoost's estimated base score costs 0.07 to 0.10 points against a start at
-   zero in the same pipeline. The plan gave every arm one common level so that the contrasts do not
+   and 78 found that starting from XGBoost's estimated base score raises the score by 0.07 to 0.10
+   points against a start at zero in the same pipeline. The plan gave every arm one common level so
+   that the contrasts do not
    carry that effect. Whether a start at zero would change `R0`, or the ranking of the arms, is not
    tested.
 
 **Limits that the plan stated hold.** The capacity table is experiment 64's and is 5% to 19% below
-experiment 45's 2025/26 values, which experiment 78 found costs `am` about 0.02 points. The weights
+experiment 45's 2025/26 values, which experiment 78 found worsens `am` by about 0.02 points. The
+weights
 and the sunshine calibration are fixed on data to 2025-06-30. The analogues are matched in training
 to the ensemble-mean sunshine and at inference to each member's own, which widens the pooled spread
-of the analogue arms. The candidates share a UTC half-hour, so a window that straddles a clock
+of the analogue arms. The candidates share a half-hour of the day in Coordinated Universal Time
+(UTC), so a window that straddles a clock
 change shifts a local-time profile by an hour. The placebo twin of `E` is a cyclic shift over the
-whole window's rows, so its donor for a row from the early window may be a forecast issued after
-that refit; only a sunshine anomaly crosses that boundary, and no power or label does.
+whole window's rows. A donor for a row from the early window may therefore be a forecast issued
+after that refit. Only a sunshine anomaly crosses that boundary. No power or label does.
 
 ## What the next experiment should answer
 
-**The next experiment should test the analogue columns on top of the offset with enough forecast
-weeks to resolve a gain of 0.05 points.** The ENS backfill's second validation year (experiment
-R11) would roughly double the 29 weeks, which would bring the half-width of C4 from 0.08 towards
-0.06. The experiment should start from one analogue, read sunny and cloudy rows separately in the
-plan, and add a variant whose analogues are matched on the day type alone, because C6 does not
-separate the sunshine from the day type. The decision whether to port either way belongs to the
-maintainer and the roadmap: the offset costs a table of capacities and weights, and the analogue
-columns cost the last 3 to 16 days of telemetry, a CAMS-like sunshine record, and a bank-holiday
-calendar at every forecast.
+**The next experiment should test the analogue columns on top of the offset with more forecast
+weeks, one analogue, and a variant matched on the day type alone.** A second validation year with as
+many weeks (experiment R11, which needs the ENS backfill) would cut the half-width of C4 from 0.08
+to about 0.06, because the half-width falls with the square root of the number of weeks. That is
+still above 0.05, so the plan should either set the threshold near 0.06 or ask for a third year.
+The plan should also read sunny and cloudy rows separately and add the day-type-only variant,
+because C6 does not separate the sunshine from the day type. The decision whether to port either
+way belongs to the maintainer and the roadmap. The offset costs a table of capacities and weights.
+The analogue columns cost the last 3 to 16 days of telemetry, a CAMS-like sunshine record, and a
+bank-holiday calendar at every forecast.
 
 ## Reproducing the figures
 
@@ -306,3 +342,27 @@ npx svgo@4 --multipass --precision=1 --final-newline figure_*.svg
 
 `e00074_stats.py` prints every number on this page. The code is in
 `ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/`.
+
+## Reviews
+
+**Plan review (Sonnet), triaged.** Accepted: give every arm one starting level, state the rule that
+separates `small gain` from `supported`, rebuild the training inputs for the whole P-roll window,
+state how `E_twin` is trained, note the column-count difference between arms, one definition of day
+type, and the prose faults. Rejected: none.
+
+**Code review (Sonnet), triaged.** No leakage and no wrong join. Accepted: add the ninth arm to the
+plan, make the guard in `known_rows` check the origin as well as the valid time, and state the
+mismatch between the training and inference sunshine shape. Rejected: a check of an `A3` variant
+matched to the ensemble-mean shape at inference, because the arm of experiment 64 shares the same
+design and the experiment answers the plan's question without it.
+
+**Number check (Sonnet), triaged.** Accepted: the September value, the context scores copied from
+experiment 74's own printout, the night prediction row, the half-width range, the exploratory labels,
+the claim that the monthly figures have no interval, and the unsupported statement that a second
+year would resolve a 0.05-point gain. Rejected: none.
+
+**Prose review (Sonnet), triaged.** Accepted: an opening that defines every term before use, a legend
+of the arms, the four verdicts, the pronoun and bare-noun fixes, the money-metaphor fixes, and the
+research-log rewrites. Rejected: moving all the legend ahead of the take-home paragraph, which would
+bury the conclusion.
+
