@@ -1444,23 +1444,24 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
 
 ### 00073: can the mix of solar panel orientations and the DC to AC ratio be read from a Primary's power? (PVDIS-6)
 
-**A blend of east, south, and west shapes predicts held-out power 1.3% better than all-south panels
-at all 8 Primary substations, but the shares in the blend are not identified, and the DC:AC ratio
-cannot be read at all.** We added made-up east-south-west output, and real solar-farm output, to the
-real power of the 8 Primaries and checked what each fit recovered. Without noise the orientation fit
-found the shares with a median error of 0.088 where guessing the fleet mix (0.2 east, 0.6 south,
-0.2 west) gives 0.300. With the real series' noise added the error was 0.200, and the shares of the
-free fit changed by a median 0.24 between consecutive September-to-August years. On held-out
-28-day blocks the blend lowered the root mean square error of daylight power by 1.3% (98.75%
-interval -2.4% to -0.5%). The DC:AC search had a median absolute error of 0.055 on a farm's own
-output and 0.195 once the farm sat in a Primary's power, so it was dropped before any real-series
-fit. The verdict is `partly supported`, read by the pre-registered rule.
+**A fitted solar shape, a blend of east, south, and west shapes, predicts held-out power 1.3% better
+than all-south panels at all 8 Primary substations, but the shares in the blend are not identified,
+and the DC:AC search did not recover a farm's ratio once the farm sat in a Primary's power.** We
+added made-up east-south-west output, and real solar-farm output, to the real power of the 8
+Primaries and checked what each fit recovered. Without noise the orientation fit found the shares
+with a median error of 0.088 where guessing the fleet mix (0.2 east, 0.6 south, 0.2 west) gives
+0.300. With the real series' noise added the error was 0.200, and the shares of the free fit changed
+by a median 0.24 between consecutive September-to-August years. On held-out 28-day blocks the blend
+lowered the root mean square error of daylight power by 1.3% (98.75% interval -2.4% to -0.5%). The
+DC:AC search had a median absolute error of 0.055 on a farm's own output and 0.195 once the farm sat
+in a Primary's power, so it was dropped before any real-series fit. The verdict is `partly
+supported`, read by the pre-registered rule.
 
-- **Finding for later experiments:** use the blend as a flexible solar shape and do not publish its
-  shares as panel orientations. A known-answer test of a linear fit must add noise, because the
-  noise-free version cannot fail (median error 0.09 without noise, 0.20 with it). Five of 8
-  Primaries have a pooled west share of 0.46 to 0.58, and a fit to rows after dark would show
-  whether that lean is evening demand.
+- **Finding for later experiments:** use the blend as a fitted solar shape, with its shares fixed
+  across training years, and do not publish its shares as panel orientations. A known-answer test of
+  a linear fit must add noise, because the noise-free version cannot fail (median error 0.09 without
+  noise, 0.20 with it). Four of 8 Primaries have a pooled west share of 0.46 to 0.58 with an interval
+  that excludes 0.2, and a fit to rows after dark would show whether that lean is evening demand.
 - **Write-up and pull request:** [the full result
   page](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md), [PR #1304 (Experiment 73: can
   the mix of solar panel orientations and the DC to AC ratio be
