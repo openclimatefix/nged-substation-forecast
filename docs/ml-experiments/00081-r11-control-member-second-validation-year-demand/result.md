@@ -148,8 +148,9 @@ which this plan does not provide.
   of paired contrasts are set beside experiment 48's and 49's.
 - **Whether a gain is retraining or adaptation to the 9 km product.** Neither fold separates them.
 - **Independence of the periods.** All periods score the same 13 substations.
-- **April to June.** Neither fold holds those months, and a 14.6-day run reaches 9 months of only
-  about 10 four-week blocks, so the intervals resolve less than experiment 48's.
+- **April to June.** Neither fold holds those months.
+- **Fine intervals.** Each fold has only about 10 four-week blocks, so the intervals resolve less
+  than experiment 48's.
 - **The product production serves.** Our own ENS archive starts on 2024-04-01 with a different
   product.
 - **Generators.** Only Primaries are scored, and no NGED generator series appears.
