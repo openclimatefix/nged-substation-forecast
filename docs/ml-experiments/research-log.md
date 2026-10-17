@@ -97,6 +97,7 @@ the maintainer to confirm.
 | [00071 - Switching event detector, part 12](00071-sw2-18-refit-offset-and-gap-bridging/result.md) | Does taking the step statistic from two residual models refitted half a month apart, so that no alarm is suppressed at a refit, find more of the moved MW than the benchmark detector PF14? | Supported: +0.050 of the moved MW (98.33% interval +0.012 to +0.107) at no more than 80 odd-month unexplained alarms, all of it in transfers within 24 hours of a refit. Lifting the suppression alone gives +0.056, and gap bridging changes no outcome | Candidate | 2026-10-16 |
 | [00072 - Step-loss monitor for the solar farms, P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a monitor find a loss of generating capacity at the 5 long-record solar farms from their daily power telemetry? | Refuted: it found 0.45 of 25% losses lasting 30 days (the plan required 0.80), 0.84 of 25% losses lasting 90 days, 0.26 of 10% losses lasting 90 days, and 3% losses barely above chance; false alarms 0.29 per farm-year on a placebo | Not for production | 2026-10-16 |
 | [00068 - Switching event detector, part 13](00068-sw2-5-train-detect-retrain-loop/result.md) | Does refitting the lagless XGBoost model without the detected switching intervals, for three rounds, raise the share of moved MW the detector finds and lower the forecast error? | Inconclusive, and no gain worth porting: recall gains +0.011 (97.5% interval +0.000 to +0.034) and the forecast's mean absolute error changes -0.175% (-1.145% to +0.603%); a random mask of about equal volume does as well | Not for production | 2026-10-16 |
+| [00067 - Switching event detector, part 14](00067-sw2-15-joint-edge-flow-estimator/result.md) | Does one convex fit of load flows across all boundaries between the 16 Primaries find more of the moved MW than the single-series 24-hour step detector? | Refuted: the joint estimator finds 0.108 of the moved MW against 0.646 (difference -0.538, 97.5% interval -0.605 to -0.421); a post hoc loss change lifts it to 0.527 (-0.120, -0.190 to -0.084) | Not for production | 2026-10-17 |
 | [00050 - A second weather forecast for the solar anomaly, PVDIS part 8](00050-second-weather-forecast-for-solar-anomaly/result.md) | Does the GEFS ensemble, alone or blended with ENS, forecast the solar anomaly better than ENS, and does that lower the demand forecast's error? | Refuted at the gate: GEFS's cross-validated squared error is 1.109 times ENS's and the blend's 1.002, against the 0.99 needed; the demand contrasts were not run | Not for production | Pending |
 | [00051 - Midday loss of the solar term, PVDIS part 3b](00051-pvdis-3b-midday-loss-of-the-solar-term/result.md) | Why does the solar correction of experiment 46 score worse than the forecast that kept its own radiation inputs at June-to-August midday: inverter clipping, a too-large coefficient, or noisy ensemble members? | Partly supported: the coefficient is too large (a fitted one lowers the median's mean absolute error by 0.991 points of capacity, -1.473 to -0.495); clipping is not distinguished from it; the ensemble members add 0.129 points of quantile score (0.057 to 0.212) | Not for production | Pending |
 | [00052 - More weather products for the wind farms](00052-more-nwp-products-for-wind-farms/result.md) | Does averaging the wind best guess with the ERA5-trained model fed ICON-EU's and IFS 0.25 degree's forecast lower the wind quantile score at 1 to 2 days ahead? | Inconclusive: -0.055 (-0.200 to +0.072) against a 0.15 threshold | Not for production | 2026-10-16 |
@@ -110,6 +111,7 @@ the maintainer to confirm.
 | [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Candidate | 2026-10-17 |
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
 | [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047) | Candidate | 2026-10-18 |
+| [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1305,6 +1307,26 @@ single-series detector finds 0.646 (0.354 missed). The logistic regression finds
 
 ![Gain in MW-weighted recall over the single-series detector](00065-sw2-14-combined-single-series-and-neighbour-score/figure_1_gain_over_d0m.svg)
 
+### 00067: does one convex fit of load flows across all boundaries find more of the moved load? (SW2-15)
+
+**Fitting block-shaped flows to the hourly residual of all 16 Primary substations at once found
+far less of the moved load than the single-series 24-hour step detector. The cause is the hourly
+noise model, not the conservation of power, so a joint fit would have to start from the 24-hour
+step statistics.** We injected 620 known load transfers (power moved between substations for over 1
+day) and counted the share of the moved megawatts (MW) found, with every detector held to about 80
+unexplained alarms on odd months. The step detector finds 0.646 (0.354 missed). The joint
+estimator finds 0.108 (0.892 missed), a difference of -0.538 (97.5% interval -0.605 to -0.421).
+
+- **Finding for later experiments:** a post hoc change of the loss lifts the estimator to 0.527
+  (-0.120 against the step detector, -0.190 to -0.084). With that change it matches the step
+  detector for transfers with a metered receiver and a donor step of 10 noise units or more (0.92
+  against 0.89 of transfers found) and finds almost nothing where no receiver is metered and the
+  step is under 6. On the 35 labelled real transfers of over 1 day it finds 4, against 7.
+- **Write-up and pull request:** [the full result page](00067-sw2-15-joint-edge-flow-estimator/result.md),
+  [PR #1298 (Experiment 67: one convex fit of load flows across all boundaries (SW2-15))](https://github.com/openclimatefix/nged-substation-forecast/pull/1298).
+
+![Gain in MW-weighted recall of the joint estimator](00067-sw2-15-joint-edge-flow-estimator/figure_2_gain_over_d0m.svg)
+
 ### 00062: does removing the residual's half-hour-to-half-hour memory help the switching detector? (SW2-9)
 
 **Filtering the residual's short memory out before the 24-hour step makes the switching detector
@@ -1476,6 +1498,31 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
   #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
 
 ![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
+
+### 00079: can the direction of flow be recovered at Primaries metered only in MVA? (PVDIS-7)
+
+**Hiding the sign of a Primary's power and recovering it finds the solar capacity to a median error
+of 0.09 of the capacity from the signed power (0.29 for a fit that ignores the sign) and the
+direction of flow with a balanced accuracy of 0.78 (0.5 is a guess), but 7 of the 8 real Primaries
+metered only in MVA show no reverse flow to find, and the eighth, Stickney, cannot be checked.** A
+Primary is a substation that steps 33 kV down to 11 kV. For the 7 Primaries the reading in
+megavolt-amperes (MVA) can stand in for megawatts (MW) from April to September. We subtracted the
+output of real solar farms, scaled to each Primary's median midday power, from the power of the 8
+Primaries metered in MW, threw the sign away, and fitted the magnitude of demand minus solar. The
+difference in median capacity error, unfolding fit minus the fit that ignores the sign, was -0.198
+(99% interval -0.409 to -0.068). The balanced accuracy of the direction was 0.819 once Wrangle T1
+(a Primary that exports power on most sunny days, where the fit fails) was left out. A
+reactive-power floor equal to 20% of midday power cut the balanced accuracy to 0.666. The verdict
+is `partly supported`.
+
+- **Finding for later experiments:** get signed power for Stickney before quoting any fitted value
+  there, because Stickney's sunny-midday reading is about 2.4 times its typical reading and the
+  registered fit does not explain the rise. Test any starting sign pattern for the fit on a Primary
+  that exports power on most sunny days first. Do not read the sign recovery as valid where
+  reactive power exceeds about 10% of midday power.
+- **Write-up:** [the full result page](00079-pvdis-7-mw-at-mva-only-primaries/result.md).
+
+![Fitted capacity and reverse-flow share at the MVA-only Primaries](00079-pvdis-7-mw-at-mva-only-primaries/figure_4_mva_primaries.svg)
 
 ### 00076: does experiment 64's gain beyond 10 days come from a leak? (PVDIS-5 leak check)
 
