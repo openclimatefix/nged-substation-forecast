@@ -131,7 +131,9 @@ and not truncated at the origin, so each vintage carries a small look-ahead that
 
 **Weekly vintage (`am_wk`).** The run's capacity is the mean, over the 4 latest weeks that are not
 `unobserved`, of experiment 45's `frozen` weekly fit in the vintage with the latest `origin_monday`
-that is on or before the Monday of the run's week minus 7 days. Experiment 45 stored the weekly
+that is on or before the Monday of the run's week minus 7 days. Weeks more than 8 weeks before
+that Monday are left out, so that a series with a gap in its record does not return stale weeks.
+Experiment 45 stored the weekly
 vintages every 4 weeks. When no such weeks exist, the choice of step 3 above applies.
 
 The script prints both vintages per series and run before any arm is scored, with the share of runs
