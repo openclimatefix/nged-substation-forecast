@@ -116,6 +116,7 @@ the maintainer to confirm.
 | [00083 - Tail calibration, worked example](00083-curtailment-cost-and-tail-calibration-worked-example/result.md) | Are the tails of the stored demand forecasts of experiment 48 too narrow? | Inconclusive (no registered contrast): every forecast is too narrow in both tails, with coverage of the 0.05 quantile 0.066 to 0.085 and of the 0.95 quantile 0.891 to 0.927; the single-series curtailment-cost metric was withdrawn | Not for production | 2026-10-17 |
 | [00084 - Substation-limit curtailment cost, worked example](00084-substation-limit-curtailment-cost-worked-example/result.md) | Does the substation-limit curtailment metric run on the pilot, and are there enough half-hours beyond a limit to rank forecasts? | Inconclusive (no registered contrast): 19 half-hours are beyond a limit of 0.9 times the earlier maximum in the scored year, so the pilot proves the arithmetic and cannot rank forecasts | Not for production | 2026-10-17 |
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
+| [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1976,3 +1977,28 @@ scores by 0.04 points or less.
   [PR #1269 (Experiment 48: does weekly retraining still win on the runs experiment 34 left out?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1269).
 
 ![Planned contrasts](00048-weekly-retraining-confirmation-and-extension-demand-generators/figure_1.svg)
+
+### 00075: the normal running arrangement forecast with labelled switching masks
+
+**Outside switching, the Primary demand forecast was already close to the normal running
+arrangement: removing the labelled switching from training, and adding the MW it moved, changed the
+quantile score by under 0.06 points of capacity, so the verdict is inconclusive.** The experiment
+refitted the XGBoost demand model weekly for 16 Primary substations on four arms and scored them on
+292 daily runs, on half-hours outside labelled switching.
+
+- **Headline result:** training without the switching minus plain training +0.004 points (98.33%
+  interval -0.026 to +0.025), above the +0.02 margin. The plain arm scored 5.257.
+- **Signed MW and corrected lags:** adding the signed MW columns +0.013 (-0.013 to +0.052);
+  subtracting the moved MW from each lag +0.004 (-0.019 to +0.019).
+- **Finding for later experiments:** on the 37,394 half-hours whose lag sits inside an event,
+  corrected lags (each lag minus the moved MW) lowered the score by 0.42 points (95% interval -1.51
+  to +0.02), while the MW columns raised it by 1.07. SW2-12, the same test with a detector's
+  labels, should try corrected lags together with the MW columns first.
+- **Caveat:** per-case scores differ between runs of the same fit, so only 9% matched experiment
+  48 to 0.001.
+- **Write-up and pull request:**
+  [result](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md),
+  [PR #1307 (Experiment 75: can a Primary demand forecast learn the normal running arrangement
+  from labelled switching?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1307).
+
+![Planned contrasts](00075-sw2-11-nra-forecast-with-labelled-switching-masks/figure_1.svg)
