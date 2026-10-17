@@ -11,8 +11,8 @@ a fraction of capacity), the series label (`site`), and the group (`Primary`, `B
 
 Demand arms. `weekly_def` and `weekly_m0` (the weekly regime of the 20 series), `frozen_def` and
 `frozen_m0` (the stack's frozen model); `weekly_m0` holds only the runs that every second weekly
-refit served, and the paired contrasts keep the runs both weekly arms share; each with the spread factor 1.15 (`_s`), and the frozen
-arms also with the 14-day correction and the spread factor (`_cs`). The rounds family is
+refit served, and the paired contrasts keep the runs both weekly arms share. Each arm has the
+spread factor 1.15 (`_s`), and the frozen arms also have with the 14-day correction and the spread factor (`_cs`). The rounds family is
 `fz_<start>_r<rounds>` (fit A, 500, 1000, and 2000 rounds) and `fzes_<start>_best` and
 `fzes_<start>_r500` (fit B, early stopping), each with the spread factor, on the gap runs only.
 
