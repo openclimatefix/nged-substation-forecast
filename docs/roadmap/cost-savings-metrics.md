@@ -165,11 +165,11 @@ forecast exists. Scoring the ~2,500 series due in January 2027 therefore needs l
 new code. Primaries are out of scope until NGED supplies the topology.
 
 **The published limit is the firm (N-1) limit: the smaller of the per-transformer pre-event limits
-of the substation's redundant transformer pair.** One transformer carries the full load when the other is
-out. The limit is set per NGED season, and each season is a set of whole calendar months: Winter is
-December to February, Intermediate Cool is March, April, and November, Intermediate Warm is May,
-September, and October, and Summer is June to August. The import limit follows the same rule and is
-used only to count import exceedances.
+of the substation's redundant transformer pair.** One transformer carries the full load when the
+other is out. The limit is set per NGED season, and each season is a set of whole calendar months:
+Winter is December to February, Intermediate Cool is March, April, and November, Intermediate Warm
+is May, September, and October, and Summer is June to August. The import limit follows the same rule
+and is used only to count import exceedances.
 
 **Net export is an explicit sign times our own metered flow.** The sign `export_sign` is +1 where a
 positive flow is export, -1 where a positive flow is import, and null where the sign is unconfirmed.
@@ -405,10 +405,10 @@ network ratings are typically derived in a similar way.
 
 **Metric 2 does not use `historical_p99`.** Its headline is a scaled limit of 0.9 times the node's
 maximum observed export before the scored period, and the firm limit of each BSP and GSP is a
-reference, both described under [Tier 1](#tier-1-substation-limits-no-power-flow). A percentile of a node's own flow is exceeded on
-10% of half-hours by construction, so it cannot stand in for a limit that a node almost never
-reaches. Metric 2 holds every forecast to the same $\tau = 1 - 1/r$, not to equal risk, so the
-leaderboard's `historical_p99` rung is not shared with it.
+reference, both described under [Tier 1](#tier-1-substation-limits-no-power-flow). A percentile of a
+node's own flow is exceeded on 10% of half-hours by construction, so it cannot stand in for a limit
+that a node almost never reaches. Metric 2 holds every forecast to the same $\tau = 1 - 1/r$, not to
+equal risk, so the leaderboard's `historical_p99` rung is not shared with it.
 
 **A rating never breached during the scored period is not useless.** Procurement and curtailment
 volume are driven by the *forecast* crossing the limit, so forecasts still rank, but Metric 1's

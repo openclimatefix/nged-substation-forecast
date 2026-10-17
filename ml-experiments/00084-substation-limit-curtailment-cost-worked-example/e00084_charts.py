@@ -237,9 +237,9 @@ def figure_2_distribution() -> alt.VConcatChart:
                 lines=[
                     (
                         "Half-hours of net export per MW (Bicker Fen: per 5 MW), all history, from "
-                        "cleaned unflagged power. Rows are seasons. Bicker Fen's thermal limit is a "
-                        "Technical Limit and its sign is unconfirmed. The published thermal limit "
-                        "is a ceiling NGED does not operate to. Limits are NGED's, "
+                        "cleaned unflagged power. Rows are seasons. Bicker Fen's thermal limit is "
+                        "a Technical Limit and its sign is unconfirmed. The published thermal "
+                        "limit is a ceiling NGED does not operate to. Limits are NGED's, "
                         "Supported by NGED Open Data."
                     )
                 ],
