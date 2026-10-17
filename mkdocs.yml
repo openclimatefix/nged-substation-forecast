@@ -204,6 +204,7 @@ nav:
       - "Does experiment 64's gain beyond 10 days come from a leak?": ml-experiments/00076-pvdis-5-leak-check-beyond-10-days/result.md
       - "Does a re-estimated solar capacity lower the error of experiment 64's best forecast?": ml-experiments/00078-pvdis-5-current-capacity-vintages/result.md
       - "Can the direction of flow be recovered at Primaries metered only in MVA?": ml-experiments/00079-pvdis-7-mw-at-mva-only-primaries/result.md
+      - "Does a zero starting value lower the error of the production XGBoost models?": ml-experiments/00080-bm0-zero-base-margin-xgboost-quantile-models/result.md
       - "Are the tails of the stored demand forecasts too narrow?": ml-experiments/00083-curtailment-cost-and-tail-calibration-worked-example/result.md
       - "Can the substation-limit curtailment metric rank forecasts on the pilot?": ml-experiments/00084-substation-limit-curtailment-cost-worked-example/result.md
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
