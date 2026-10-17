@@ -53,12 +53,12 @@ best_arm: >-
   (+0.074 to +0.182); C2, XL minus X, is +0.058 (+0.034 to +0.096); C3, XL minus LOGIT_SAME, is
   +0.064 (+0.028 to +0.127).
 lessons: >-
-  The refit offset and the same-sign neighbour count fix different misses, so their gains mostly
-  add: +0.114 together against +0.056 and +0.050 alone on this draw (the sum is +0.106). The
-  share of the moved MW that no alarm starts on falls from 0.300 (PF14) to 0.195 (XL), and the
-  share of the moved MW missed from 0.344 to 0.230. Long transfers (15.6 to 60 days) gain nothing,
-  as in experiments 70 and 71. On the 35 labelled real transfers of more than 1 day, XL found 12
-  and PF14 8.
+  The refit offset and the same-sign neighbour count fix different misses, so their gains add:
+  +0.114 together against +0.056 and +0.050 alone on this draw (the sum is +0.106). The share of
+  the moved MW that no alarm starts on falls from 0.300 (PF14) to 0.195 (XL), and the share of the
+  moved MW missed from 0.344 to 0.230. Long transfers (15.6 to 60 days) gain nothing, as in
+  experiments 70 and 71. On the 35 labelled real transfers of more than 1 day, XL found 12 and
+  PF14 8.
 advice:
   - >-
     Build the detector from the refit-offset step statistic and score its candidates with the
@@ -78,23 +78,33 @@ production_status: candidate
 adopted_in: none
 ---
 
-# Experiment 82 (SW2-18 and SW2-19 combined, part of the switching-event detector series): do the refit offset and the same-sign neighbour count add up?
+# Experiment 82: do two improvements to the load-transfer detector add up?
 
-**Yes: the two fixes find different missed load transfers, so using both finds about twice as much
-extra moved power as either alone. Of the megawatts (MW) moved by injected transfers, the combined
-detector XL finds 0.770 and the benchmark PF14 finds 0.656.** The remaining misses are mostly
-transfers whose donor substation steps by only 2 to 4 noise units and that have no metered
-receiver, so a stronger signal for those is the next thing to try. The verdict is `supported`.
+**Yes: the two improvements find different missed load transfers, so using both finds about twice
+as much extra moved power as either alone.** A load transfer is a switching operation that moves
+part of one Primary substation's demand (the donor's) onto neighbouring substations (the receivers)
+for hours or days. A Primary substation steps 33 kV down to 11 kV. On injected transfers, the
+combined detector (XL) found a share of 0.770 of the megawatts (MW) moved, and the benchmark detector
+(PF14) found 0.656. The misses that remain are mostly (by count) transfers with a small donor step
+and no metered receiver, so the next experiment could test a stronger detection signal for those
+transfers. The verdict is `supported`.
 
-We asked whether two earlier improvements to a detector for load transfers combine. A load transfer
-is a switching operation that moves part of one Primary substation's demand to neighbouring
-substations for hours or days. [Experiment 71](../00071-sw2-18-refit-offset-and-gap-bridging/result.md)
-stopped the detector ignoring alarms near the monthly refit of its forecasting model.
+We asked whether two earlier improvements to a detector for load transfers combine. The detector
+subtracts an XGBoost forecast, which uses no past power, from a substation's measured power, and
+raises an alarm when the 24-hour average of that residual steps by 4.0 noise units or more. One
+noise unit is the usual size of that step on odd-numbered months. The XGBoost model is refitted on
+the 1st of every month, and PF14 ignores every alarm within 24 hours of a refit.
+[Experiment 71](../00071-sw2-18-refit-offset-and-gap-bridging/result.md) removed that blind spot by
+adding a second XGBoost model refitted on the 16th (the refit offset).
 [Experiment 70](../00070-sw2-19-same-sign-neighbour-count/result.md) scored each alarm candidate
-partly by how many neighbouring substations stepped the same way. We added known transfers to the
-history of 16 Primary substations, combined the two changes, and counted the share of the moved MW
-that each detector found. Every detector was held to 80 alarms not explained by the switching log
-on odd months.
+partly by the number of neighbouring substations stepping the same way as the donor (the same-sign
+neighbour count).
+
+We added synthetic transfers to the real power history of 16 Primary substations, combined the two
+improvements, and counted the share of the moved MW that each detector found. Each detector was held
+to 80 alarms on odd months that no closure in the switching log (the log of real switching
+operations) explains. Odd months set the thresholds and fitted the scores. Recall was read on
+transfers that start in even months.
 
 ![Share of moved MW found, by detector](figure_1_recall_by_arm.svg)
 
@@ -116,7 +126,9 @@ on odd months.
   The sanity arms X and LOGIT_SAME reproduce their experiments' gains: +0.056 and +0.050 over PF14.
 - **Planned contrasts:** C1 XL minus PF14 +0.114 (+0.074 to +0.182); C2 XL minus X +0.058 (+0.034 to
   +0.096); C3 XL minus LOGIT_SAME +0.064 (+0.028 to +0.127). All three lower ends are above zero,
-  C1 is above the threshold of +0.02, and the sum of the single gains (+0.106) is close to C1.
+  C1 is above the threshold of +0.02. The sum of the single gains (+0.106) is slightly below C1, so
+  the gains add and do not overlap; C1, C2, and C3 all landed above the ranges predicted in the
+  plan, which expected a combined gain smaller than the sum.
 - **Share of the moved MW missed:** PF14 0.344, X 0.287, LOGIT_SAME 0.294, XL 0.230. For XL, 0.195
   is transfers with no alarm at the start and 0.035 is transfers with a wrong end.
 - **Shapes:** XL minus PF14 is +0.107 to +0.116 for S1, S2, S3, and S4, and +0.096 for S5; all
@@ -127,7 +139,8 @@ on odd months.
 - **Long transfers (descriptive):** XL minus PF14 +0.000 (-0.026 to +0.026).
 - **Labelled real transfers of more than 1 day (35):** found XL 12, X 10, PF14 8, LOGIT_SAME 7; an
   alarm started within 2 hours of the labelled start for XL 15, X 12, LOGIT_SAME 12, PF14 11. The
-  35 are too few to rank the arms.
+  35 are too few to rank the arms; MW-weighted recall on them is XL 0.357, X 0.350, PF14 0.156, and
+  LOGIT_SAME 0.144, so X alone nearly matches XL there.
 - **Alarms:** unexplained alarms on even months were PF14 80, X 80, LOGIT_SAME 61, XL 67, against
   at most 80 on odd months for all arms (X 75, at its grid threshold of 4.1).
 
@@ -137,12 +150,12 @@ on odd months.
   the NGED event table, not live forecast inputs.
 - The logistic score is fitted on odd-month injections, so the odd-month contrast (+0.141) is
   in-sample and decides nothing.
-- The harness reproduces experiments 71 and 70 for PF14, X, and LOGIT_SAME on their draw; there is
-  no earlier reference for XL.
+- A check on experiment 71's draw (850 rows per arm) reproduced the `found` flags of PF14, X, and
+  LOGIT_SAME exactly; there is no earlier reference for XL.
 - The 35 real transfers give a weak signal only (12 against 8 found).
 
 ## What the next experiment should answer
 
-The remaining misses sit in sharp steps of 2 to 4 noise units with no metered receiver (149 of 550
-found by XL). A stronger signal there, such as a longer window or a neighbour-balance check, is
-the next thing to test.
+By count, 401 of the 725 transfers XL misses have a donor step of 2 to 4 noise units and no metered
+receiver (149 of 550 found). Options to test include a longer averaging window and a check that
+the receivers' combined step balances the donor's.

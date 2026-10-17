@@ -1504,13 +1504,14 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
 
 ### 00082: do the refit offset and the same-sign neighbour count add up? (SW2-18 and SW2-19)
 
-**The two fixes find different missed load transfers, so using both finds about twice as much extra
-moved power as either alone.** The combined detector XL takes the 24-hour residual step from two
-models refitted half a month apart (experiment 71) and scores each alarm candidate partly by the
+**The two improvements find different missed load transfers, so using both finds about twice as much
+extra moved power as either alone.** The combined detector XL takes the 24-hour residual step from
+two models refitted half a month apart (experiment 71) and scores each alarm candidate partly by the
 number of neighbouring substations stepping the same way (experiment 70). On fresh injected
 transfers that start in even months it found 0.770 of the moved MW against 0.656 for the benchmark
-PF14 (+0.114, 98.33% interval +0.074 to +0.182), at no more than 80 odd-month unexplained alarms.
-The verdict is `supported`.
+PF14, the benchmark detector (+0.114, 98.33% interval +0.074 to +0.182; MW is megawatts, and a noise
+unit is the usual size of a substation's 24-hour residual step), at no more than 80 odd-month
+unexplained alarms. The verdict is `supported`.
 
 - **Finding for later experiments:** XL beats the refit-offset detector alone by +0.058 (+0.034 to
   +0.096) and the neighbour-count score alone by +0.064 (+0.028 to +0.127), and the share of moved
@@ -1518,7 +1519,8 @@ The verdict is `supported`.
   transfers of more than 1 day XL found 12 and PF14 8. The misses that remain sit mostly in
   transfers with a donor step of 2 to 4 noise units and no metered receiver.
 - **Write-up and pull request:** [the full result
-  page](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md), PR PRNUM.
+  page](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md), [PR
+  #1314](https://github.com/openclimatefix/nged-substation-forecast/pull/1314).
 
 ![Share of moved MW found, by detector](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/figure_1_recall_by_arm.svg)
 
