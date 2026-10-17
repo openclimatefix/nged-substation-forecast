@@ -1,22 +1,24 @@
 """Retraining regimes of experiment 00086: which refit time serves which daily forecast run.
 
 A regime is a list of refit times. A forecast run is served by the latest refit at or before its
-origin. Every refit forecasts all of the daily runs that any regime of its configuration assigns
-to it, from 2025-07-01 to 2026-06-30. The refit times are experiment 00048's weekly regime.
+origin. Every refit forecasts all of the daily runs assigned to it, from 2025-07-01 to 2026-06-30.
+The refit times are the P-roll schedule of experiment 00049: the 1st of each month.
 """
 
 from datetime import UTC, datetime, timedelta
 from typing import Final
 
-WEEKLY: Final[tuple[datetime, ...]] = tuple(
-    datetime(2025, 7, 1, tzinfo=UTC) + timedelta(days=7 * i) for i in range(52)
+MONTHLY: Final[tuple[datetime, ...]] = tuple(
+    datetime(2025 + (6 + i) // 12, (6 + i) % 12 + 1, 1, tzinfo=UTC) for i in range(12)
 )
-"""Every 7 days from 2025-07-01 to 2026-06-23."""
+"""The twelve monthly refit times, 2025-07-01 to 2026-06-01."""
+TRAIN_WINDOW: Final[timedelta] = timedelta(days=365)
+"""A refit trains on rows whose valid time lies in the 365 days before the refit."""
 REFIT_CUTOFF_AGE: Final[timedelta] = timedelta(hours=3.5)
 """A refit sees only rows whose valid time is at least this long before the refit."""
 
 REGIMES: Final[dict[str, tuple[datetime, ...]]] = {
-    "weekly": WEEKLY,
+    "monthly": MONTHLY,
 }
 
 

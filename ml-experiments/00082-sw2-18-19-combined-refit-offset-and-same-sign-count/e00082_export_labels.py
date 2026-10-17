@@ -8,7 +8,8 @@ neighbour whose own 24-hour step has the opposite sign and exceeds `NEIGHBOUR_Z`
 (`e00082_detectors._balance`), whose own level then holds at least half that step for 24 hours
 (`e00082_intervals.build_intervals`). No switching log is read.
 
-Writes `xl_intervals.parquet` in experiment 00082's private folder, one row per interval:
+Writes `xl_intervals.parquet` in experiment 00082's private folder, one row per interval (one per
+series and onset, preferring the series' own alarm over a partner row):
 
 - `series`: the series id;
 - `role`: `alarm` (the series the alarm fired on) or `partner`;
@@ -85,6 +86,13 @@ def main() -> None:
             "end": pl.Int64,
             "step_mw": pl.Float64,
         },
+    )
+    # When both sides of a transfer alarm, each series holds an `alarm` and a `partner` interval
+    # at the same onset; keep one per (series, onset), preferring the series' own alarm.
+    table = (
+        table.sort("series", "onset", pl.col("role") != "alarm")
+        .unique(subset=["series", "onset"], keep="first", maintain_order=True)
+        .sort("series", "onset")
     )
     target = WORK_DIR / "xl_intervals.parquet"
     table.write_parquet(target)

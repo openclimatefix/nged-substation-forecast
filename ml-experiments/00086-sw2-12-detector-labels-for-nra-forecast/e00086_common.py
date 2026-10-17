@@ -1,8 +1,8 @@
 """Paths, series, grids, lags, and metrics shared by the scripts of experiment 00086.
 
 The experiment forecasts the 292 daily runs of `fold_a_daily_gap_v1` for the 16 Primary series
-with weekly refits and tests labelled switching masks
-(`docs/ml-experiments/00086-sw2-11-nra-forecast-with-labelled-switching-masks/result.md`). The
+with monthly P-roll refits and tests lags corrected for switching, with oracle and detector labels
+(`docs/ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/result.md`). The
 helpers are copied from experiment 00048's `e00048_common.py`; an experiment may not import
 another experiment.
 """
@@ -19,8 +19,8 @@ import polars as pl
 from studies.solar import azimuth, zenith
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR, study_dir_for
 
-EXPERIMENT_ID: Final[int] = 75
-SLUG: Final[str] = "sw2-11-nra-forecast-with-labelled-switching-masks"
+EXPERIMENT_ID: Final[int] = 86
+SLUG: Final[str] = "sw2-12-detector-labels-for-nra-forecast"
 ROW_SET_ID: Final[str] = "fold_a_daily_gap_v1"
 """The daily 00:00 UTC runs of the validation year that `fold_a_every5d_v1` does not hold."""
 ROW_SET_ID_EVERY5D: Final[str] = "fold_a_every5d_v1"
@@ -535,6 +535,12 @@ def historical_thresholds(*, power: np.ndarray) -> dict[str, float]:
     return {"p99": float(np.quantile(values, 0.99)), "p95": float(np.quantile(values, 0.95))}
 
 
+def pinball(*, quantile: np.ndarray, actual: np.ndarray, level: float) -> np.ndarray:
+    """Return the pinball loss of one quantile forecast at `level`, per case."""
+    gap = actual - quantile
+    return np.maximum(level * gap, (level - 1.0) * gap)
+
+
 def case_metrics(
     *, quantiles: np.ndarray, actual: np.ndarray, threshold_p99: np.ndarray
 ) -> dict[str, np.ndarray]:
@@ -548,8 +554,9 @@ def case_metrics(
     Returns:
         `qs` (the quantile score), `mae` (absolute error of the median), `tw_p99` (the quantile
         score of the forecast and the observation both floored at the threshold, the
-        threshold-weighted CRPS at `historical_p99`), `ex95` (the observation exceeds the 0.95
-        quantile), and `cov90` (the observation lies inside `q05` to `q95`).
+        threshold-weighted CRPS at `historical_p99`), `pin05` and `pin95` (the pinball loss at the
+        0.05 and 0.95 quantiles), `ex95` (the observation exceeds the 0.95 quantile), and `cov90`
+        (the observation lies inside `q05` to `q95`).
     """
     return {
         "qs": pinball_quantile_score(quantiles=quantiles, actual=actual) * 100.0,
@@ -559,6 +566,8 @@ def case_metrics(
             actual=np.maximum(actual, threshold_p99),
         )
         * 100.0,
+        "pin05": pinball(quantile=quantiles[:, 0], actual=actual, level=0.05) * 100.0,
+        "pin95": pinball(quantile=quantiles[:, 8], actual=actual, level=0.95) * 100.0,
         "ex95": (actual > quantiles[:, 8]).astype(np.float64),
         "cov90": ((actual >= quantiles[:, 0]) & (actual <= quantiles[:, 8])).astype(np.float64),
     }

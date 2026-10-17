@@ -11,10 +11,15 @@ For each Primary series the module builds three arrays aligned with `common.grid
   names the series as one of its two sides.
 
 The labelled set holds events from January 2022 only, so earlier half-hours are never marked.
+
+`load_xl_labels` builds the same arrays from the XL detector's intervals (experiment 00082's
+`xl_intervals.parquet`) instead of NGED's logs. Its `closed` array is the oracle's, because the
+scored rows are defined by NGED's logged closures whichever labels the model sees.
 """
 
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -26,6 +31,13 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 LABELS_PATH: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00041-sw2-0a-labeller-gate" / "real" / "labelled_set.parquet"
 )
+XL_INTERVALS_PATH: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00082-sw2-18-19-combined-refit-offset-and-same-sign-count"
+    / "xl_intervals.parquet"
+)
+XL_GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
+"""Experiment 00082's stamp 0, a half-hour on the 2022-01-01 grid."""
 EVENT_KINDS: Final[tuple[str, ...]] = (
     "real_operation",
     "real_short",
@@ -120,4 +132,47 @@ def load_labels(*, series: pl.DataFrame) -> dict[str, SeriesLabels]:
             row = by_id.get(int(side)) if side is not None else None
             if row is not None:
                 out[row["site"]].closed[span] = True
+    return out
+
+
+def load_xl_labels(
+    *, series: pl.DataFrame, oracle: dict[str, SeriesLabels]
+) -> dict[str, SeriesLabels]:
+    """Return each series' label arrays from the XL detector's intervals.
+
+    An interval `[onset, end)` of experiment 00082's stamps marks `in_event` on the half-hours
+    from `onset` to `end - 1`. Its signed MW (the series' own 24-hour residual step, negative on a
+    donor) is divided by the series' effective capacity and added over the span. Overlapping
+    intervals add.
+
+    Args:
+        series: `common.series_table()` restricted to the series to label.
+        oracle: `load_labels` output, whose `closed` arrays are reused.
+
+    Returns:
+        The `SeriesLabels` of each site label.
+    """
+    size = common.grid_times().len()
+    by_id = {int(row["time_series_id"]): row for row in series.iter_rows(named=True)}
+    out = {
+        site: SeriesLabels(
+            in_event=np.zeros(size, dtype=bool),
+            signed_mw=np.zeros(size, dtype=np.float32),
+            closed=labels.closed,
+        )
+        for site, labels in oracle.items()
+    }
+    offset = (XL_GRID_START - common.GRID_START) / common.STEP
+    if offset != int(offset):
+        msg = "the XL grid must lie on a whole number of half-hours from the grid start"
+        raise ValueError(msg)
+    for interval in pl.read_parquet(XL_INTERVALS_PATH).iter_rows(named=True):
+        row = by_id.get(int(interval["series"]))
+        if row is None:
+            continue
+        span = slice(int(interval["onset"]) + int(offset), int(interval["end"]) + int(offset))
+        out[row["site"]].in_event[span] = True
+        out[row["site"]].signed_mw[span] += np.float32(
+            interval["step_mw"] / row["effective_capacity_mw"]
+        )
     return out
