@@ -11,8 +11,8 @@ hypothesis: >-
   is smaller than with the oracle labels of experiment 41 by the share of events XL misses.
 prediction: >-
   On the in-event-lag rows outside switching, with oracle labels the arm lowers the score by 0.3 to
-  0.6 points of capacity (experiment 75, weekly refits: corrected lags alone -0.42 after the mask). With XL labels
-  it lowers the score by 0.1 to 0.4 points, so the oracle-minus-XL gap is -0.05 to -0.3. On all
+  0.6 points of capacity (experiment 75, weekly refits: -0.42 for corrected lags alone). With XL
+  labels it lowers the score by 0.1 to 0.4 points, so the oracle-minus-XL gap is -0.05 to -0.3. On all
   rows outside switching, neither arm changes the score by more than 0.02 points either way.
 decision_rule: >-
   Three planned contrasts on the rows outside switching whose lag is inside an oracle-labelled
@@ -47,12 +47,13 @@ Plan only; the write-up replaces this page when the run finishes.
   together, once with the oracle labels of experiment 41 and once with the labels of the XL
   detector of [experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)
   (MW-weighted recall 0.770 on injected transfers). The gap is the skill lost without NGED's logs.
-- **Schedule.** The cheap P-roll schedule of [experiment 49](../00049-vp1-screening-reference-under-p-roll-demand/result.md):
+- **Schedule.** The cheap P-roll schedule of
+  [experiment 49](../00049-vp1-screening-reference-under-p-roll-demand/result.md):
   a refit on the 1st of each month from 2025-07-01 to 2026-06-01, on the latest 365 days of the ENS
   control member's rows, 150 rounds, learning rate 0.15, recency half-life 0.5 years, seed 0. The
   contrast is not about retraining cadence, so the weekly schedule of experiment 75 is not used.
-- **Arms** (experiment 75's N1 recipe and inputs). `plain`: all rows, no label input. `lagmw_oracle`: lags minus
-  MW plus the three MW columns, oracle labels, trained on all rows. `lagmw_xl`: the same with XL
+- **Arms** (experiment 75's N1 recipe and inputs). `plain`: all rows, no label input.
+  `lagmw_oracle`: lags minus MW plus the three MW columns, oracle labels, trained on all rows. `lagmw_xl`: the same with XL
   labels. `mask_xl` (descriptive): training rows inside an XL event dropped, nothing else.
 - **XL labels.** The XL alarms over the whole history, with the first-return end rule, give each
   alarm series an interval and the signed MW of its 24-hour step. Neighbours whose own step has the
