@@ -28,27 +28,32 @@ prediction: >-
   and the learning curves (one validation block) will show the estimated start still improving at
   round 500.
 decision_rule: >-
-  Five verdict contrasts, quantile score over all leads on the 292 runs of `fold_a_daily_gap_v1`,
-  zero start minus the estimated start of experiment 48, read at 99% (a 95% interval split across
-  five) from 20,000 resamples of whole validation months, with each run counted in its origin month
+  Four verdict contrasts, quantile score over all leads on the 292 runs of `fold_a_daily_gap_v1`,
+  zero start minus the estimated start of experiment 48, read at 98.75% (a 95% interval split
+  across four) from 20,000 resamples of whole validation months, with each run counted in its origin month
   (experiment 48's interval). C1 is the 16 Primary substations retrained weekly, spread factor 1.15,
   no correction. C2 is the 4 bulk supply and grid supply points, the same configuration. C3 is the
   frozen N1 stack of experiment 33 (frozen model, 14-day correction, spread factor) at the 16
   Primary substations, the arm that serves today. C4 is the 6 solar farms, retrained monthly on ERA5
-  with the month-by-month spread rule. C5 is the 3 wind farms, the same configuration; the wind
-  model keeps its power-curve base margin in both arms, and the zero start replaces the estimated
-  start of the margin-free level only (see "Arms"). Seed 0 only, as experiment 48. The threshold
+  with the month-by-month spread rule. The wind farms are not a verdict contrast, because experiment 48's wind model supplies a
+  power-curve base margin, which makes XGBoost ignore its starting value, so a zero start changes
+  nothing (tested). Wind is read in an exploratory contrast on wind models without the margin (see
+  "Arms"). Seed 0 only, as experiment 48. The threshold
   is zero for every class, because the change replaces one argument of the XGBoost call and adds no
   pipeline step. The verdict word follows C1, the class that is the production recipe: `supported`
   when the upper end of C1 is below zero, `refuted` when the lower end is above zero, `inconclusive`
-  otherwise, and `small gain` when the upper end is below zero and the point estimate is above
-  -0.05. A class is read as no change when its interval lies inside plus or minus 0.05. Every class
+  otherwise; `small gain` takes precedence over `supported` when the upper end is below zero and the
+  point estimate is above -0.05. Every class
   is reported separately, and the write-up says which classes gain, because the classes are
   different pipelines. A second, exploratory family at 95% reads the rounds: the zero-start gap at
   500, 1000, and 2000 rounds from one 2000-round fit per start and series (the frozen configuration
   of each class, predicted from prefixes of the same boosters), and the gap with early stopping on
-  the final 90 days of the training window. The gap is "removed by more rounds" when its interval at
-  2000 rounds includes zero and the point estimate is less than half the gap at 500 rounds. The
+  the final 90 days of the training window. The gap is "removed by more rounds" when the gap at 500 rounds has an interval
+  excluding zero, the interval at 2000 rounds includes zero, and the point estimate at 2000 rounds
+  is less than half the gap at 500 rounds. The rounds family is uncorrected and frozen, so it speaks
+  about the frozen model, not the weekly recipe. Early stopping scores the mean pinball loss over
+  the nine levels on the held-out block, with the recency weights of the training rows, and
+  predicts from the first `best_iteration + 1` rounds. The
   starting values (per level, per series) and the learning curves are printed before any arm is
   scored. The estimated start's reproduction is checked on the first four weekly refits and the
   frozen refit (refitted here, compared with experiment 48's stored quantiles to 0.001).
@@ -95,11 +100,10 @@ review.
 
 - **Estimated start:** XGBoost's default; experiment 48's stored predictions.
 - **Zero start:** a base margin of zero for all nine levels in every training row and at prediction.
-  The smoke test checks that this equals `base_score=0` to float precision. For the wind farms the
-  power-curve margin stays in both arms, so the wind comparison is between the margin alone and the
-  margin plus a re-estimated start. Because a supplied margin makes XGBoost ignore its base score,
-  the two wind arms may be identical; the smoke test checks, and if they are, wind is reported as
-  not testable and dropped from the family (Bonferroni across four).
+  The smoke test checks that this equals `base_score=0` to float precision. Experiment 48's wind model
+  supplies a power-curve base margin, which makes XGBoost ignore its base score, so the zero start
+  is a no-op there. Wind is tested exploratorily on two new wind models without the margin, one per
+  start, and the stored margin model is a third reference.
 - **Rounds family** (frozen configuration of each class): one 2000-round fit per start and series,
   predicted from the first 500, 1000, and 2000 rounds. A second fit per start and series on the
   training window without its last 90 days uses those 90 days for early stopping (patience 100, at
