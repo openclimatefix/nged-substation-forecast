@@ -112,6 +112,7 @@ the maintainer to confirm.
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
 | [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) | Candidate | 2026-10-17 |
 | [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
+| [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1793,6 +1794,34 @@ date. At leads under 48 hours the gain is -0.272 (-0.420 to -0.145).
   [PR #1294](https://github.com/openclimatefix/nged-substation-forecast/pull/1294).
 
 ![Quantile score of each arm, and the planned contrasts](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/figure_1_headline.svg)
+
+### 00074: do same-time sunshine analogues add anything once the solar forecast is explicit? (AN1)
+
+**Telling the XGBoost model of a Primary substation's power about sunshine, in either of two ways,
+lowered its daylight error by 0.09 to 0.15 points of capacity, and the two ways help in different
+conditions, so the next test needs more forecast weeks.** A Primary substation steps 33 kV or 66 kV
+down to 11 kV, and 1 point is 1% of its capacity. The explicit forecast of the solar panels' output,
+given to the model as a starting offset, wins at leads under 2 days (the time from the forecast start
+to the half-hour forecast) and on cloudy rows. Analogues, which are recent days at the same time of
+day with similar sunshine, match it on sunny rows and in August and September. The verdict is
+`inconclusive`. We refitted the XGBoost model every month for 5 Primary substations and scored the
+daylight half-hours of April to September. The explicit offset scored 0.149 points lower than the
+same monthly refit without sunshine information (99.17% interval -0.201 to -0.104), and 3 analogues
+scored 0.095 points lower (-0.185 to -0.007). The analogues scored 0.054 points higher than the
+offset (-0.053 to +0.161). Adding the analogues to the offset scored 0.066 points lower than the
+offset alone (-0.149 to +0.015). A gain of 0.05 points would be worth porting, but the half-width of
+0.08 could neither show nor rule out a gain of that size.
+
+- **Finding for later experiments (exploratory, 95%):** one analogue scores as well as three (-0.008,
+  -0.037 to +0.019) and five score worse (+0.034, +0.014 to +0.060). Matched analogues beat random
+  days on sunny rows (-0.188, -0.307 to -0.060) and lose to them on cloudy rows (+0.137, +0.002 to
+  +0.293).
+- **What is untested:** the analogue gain on top of the offset with a second validation year, and
+  analogues matched on the day type alone.
+- **Write-up:** [result](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md),
+  [PR #1306](https://github.com/openclimatefix/nged-substation-forecast/pull/1306).
+
+![Quantile score of each arm, and the six planned contrasts](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/figure_1_headline.svg)
 
 ### 00063: does a linear joint fit of baseline, solar, and transfers beat the Flexpectation v1 baseline? (SW2-10)
 
