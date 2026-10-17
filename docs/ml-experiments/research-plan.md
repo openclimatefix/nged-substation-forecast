@@ -22,6 +22,7 @@ sooner.
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
+| [PVDIS-6b](#pvdis-6b-the-fitted-solar-shape-in-arm-am) | Does a fitted east-south-west solar shape, with shares fixed across training years, lower the score of experiment 64's arm `am` by more than 0.5%? | 2 | Experiment 64's gain beyond 10 days checked for leakage; the weekly-capacity check of `am` | Planned as experiment 77; fits wait for the manager |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
@@ -323,6 +324,14 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   domestic load falls on sunny days, as people go outside, and biases the fitted capacity high. Each
   write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
   weeks.
+
+#### PVDIS-6b: the fitted solar shape in arm am
+
+**Rebuild experiment 64's arm `am` with experiment 73's fitted three-shape blend, and score it on
+the same rows.** The plan is
+[experiment 77](00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md). The shares are fitted on
+the training window only and held fixed across training years. The controls are the all-south shape
+at the blend's tilt, a placebo twin, and a shuffled-shares placebo.
 
 #### PVDIS-7: MW at the Primaries metered only in MVA
 
