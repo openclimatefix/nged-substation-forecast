@@ -454,6 +454,9 @@ class FittedQuantiles:
         Args:
             frame: Rows with the model's input columns.
             n_rounds: Use only the first `n_rounds` boosting rounds; `None` uses all of them.
+
+        Returns:
+            The sorted quantile predictions, shape (rows, 9).
         """
         margin = (
             None if self.curve is None else self._margin(speed=frame["wind_speed_100m"].to_numpy())
