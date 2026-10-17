@@ -274,9 +274,26 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--group", nargs="+", choices=GROUPS, required=True)
     parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument(
+        "--primary-stride",
+        type=int,
+        default=2,
+        help="fit every Nth Primary substation (the 2000-round fits are slow)",
+    )
     parser.add_argument("--smoke", action="store_true", help="two series, 20 rounds, 3 runs")
     args = parser.parse_args()
-    demand = common.series_table().filter(pl.col("substation_type").is_in(args.group))["site"]
+    table = common.series_table().filter(pl.col("substation_type").is_in(args.group))
+    primary = table.filter(pl.col("substation_type") == "Primary")["site"].to_list()[
+        :: args.primary_stride
+    ]
+    demand = pl.Series(
+        [
+            site
+            for site in table["site"]
+            if table.filter(pl.col("site") == site)["substation_type"][0] != "Primary"
+            or site in primary
+        ]
+    )
     generators = gen.site_table().filter(pl.col("technology").is_in(args.group))["site"]
     jobs = [(demand_job, s) for s in demand] + [(generator_job, s) for s in generators]
     if args.smoke:
