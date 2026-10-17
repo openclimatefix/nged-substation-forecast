@@ -191,7 +191,11 @@ hours:
    than a generator's forecast energy is clamped to that energy, and the excess goes to the
    unclamped generators by capacity, repeating until nothing is clamped. Any remainder is
    unallocated and shows up as residual breach. A generator with no forecast is never capped,
-   because capping it from its actual output would leak the outcome. The allocation order is a
+   because capping it from its actual output would leak the outcome. This holds half-hour by
+   half-hour, so a node row is still scored when a generator's forecast is missing at that
+   half-hour, with the generator giving no relief. A generator with a forecast but no metered
+   output is capped as normal and its energy loss is counted as 0 MWh, so a missing output can
+   understate the curtailed energy. The allocation order is a
    stated assumption. Last-in-first-out by connection date is a sensitivity only where connection
    dates exist.
 3. **A generator with a share is capped at its forecast median minus its share**, $\text{cap}_g =
