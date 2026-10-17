@@ -1,10 +1,9 @@
 """Paths, series, grids, lags, corrections, and metrics shared by the scripts of experiment 00085.
 
-The experiment refits experiment 00048's models with a zero starting value and compares them with
-experiment 00048's stored predictions on the same 292 daily forecast runs
-(`docs/ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md`). The helpers
-are copied from experiment 00048's `e00048_common.py`; an experiment may not import another
-experiment.
+The experiment refits experiment 00048's models under cheaper retraining schedules and compares
+them with the stored full-weekly predictions of experiments 00048 and 00080. The helpers are copied
+from experiment 00080's `e00080_common.py`; an experiment may not import another experiment. The
+plan is `docs/ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/`.
 """
 
 import json

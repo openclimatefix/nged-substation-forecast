@@ -1,31 +1,30 @@
 """Fit the demand arms of experiment 00085 and write each refit's quantiles for the daily runs.
 
-The fitting recipe is experiment 00048's (`e00048_fit.py`), and the only difference between a
-configuration and its experiment 00048 twin is the starting value: `n1h_m0` and `frozen_m0` start
-every quantile level from zero (`base_score` 0, identical to a base margin of zero) instead of from
-the estimate XGBoost makes from the training labels. One job is one refit of a configuration. A
-refit at time `t` trains each series' N1 model on the ENS control member's rows whose valid time
-is at least 3.5 hours before `t` and whose run began at or before `t`, weighted by a recency
-half-life anchored at `t`. It then forecasts the daily runs that the configuration's regimes assign
-to it (`e00085_regimes`), from the 365 daily runs of 2025-07-01 to 2026-06-30. A job writes, for
-each series, the mixture of the 51 members' nine quantiles for the runs to
-`work/anchor_preds/<config>/<site>_s0_<refit>.parquet`, keyed by series, run, and valid time.
-Existing files stay, so a stopped run resumes. Seed 0 only.
+The recipe is experiment 00080's (`e00080_fit.py`, itself experiment 00048's). A configuration
+differs from its stored twin in its retraining schedule (monthly, quarterly, or weekly refits), its
+training window, its number of rounds and learning rate, or its starting value (`zero_start`: every
+quantile level starts from zero, `base_score` 0). One job is one refit of a configuration. A refit
+at time `t` trains each series' N1 model on the ENS control member's rows whose valid time is at
+least 3.5 hours before `t` and whose run began at or before `t`, weighted by a recency half-life
+anchored at `t`, and forecasts the daily runs that the configuration's regime assigns to it. A job
+writes, for each series, the mixture of the 51 members' nine quantiles for the runs to
+`work/anchor_preds/<config>/<site>_s0_<refit>.parquet`. Existing files stay, so a stopped run
+resumes. Seed 0 only. The Primary substations only.
 
-Configurations:
+Configurations (`p` is the P-roll recipe: the latest 12 months of rows, 150 rounds, `eta` 0.15; `f`
+is the whole history with 150 rounds and `eta` 0.15; a trailing `0` is the zero start):
 
-- `n1h_m0`: the weekly regime (half-life 0.5 years, 500 rounds, `eta` 0.05) with a zero start, for
-  the 16 Primary substations and the 4 bulk and grid supply points.
-- `n1h_def`: the same with XGBoost's estimated start, only for the reproduction check
-  (`--limit-refits 2`): its quantiles must match experiment 00048's stored ones.
-- `frozen_m0`: the stack's model, trained once on the control member's rows to 2025-06-30 with a
-  half-life of 2 years anchored at 2025-06-30 and 500 rounds, with a zero start.
+- `pm_rep`, `pm0`, `pm0_rep`: monthly P-roll (the repeats measure the noise floor).
+- `pq`, `pq0`: quarterly P-roll.
+- `pw`, `pw0`, `fw`, `fw0`: weekly, at experiment 00080's 28 anchors (`--e80-anchors`).
+- `fm`: monthly, recipe `f`.
+- `m0`: monthly at the full setting (whole history, 500 rounds, `eta` 0.05), zero start.
 
 The jobs run as parallel worker processes, each with `CORES // workers` threads, and each loads only
 the runs of the job it is working on.
 
-    uv run python ml-experiments/00080-*/e00085_fit.py --config n1h_m0 [--groups Primary BSP GSP]
-        [--workers 3] [--smoke]
+    uv run python ml-experiments/00085-*/e00085_fit.py --config pw [--e80-anchors]
+        [--workers 4] [--smoke]
 """
 
 import argparse
@@ -42,7 +41,7 @@ import numpy as np
 import polars as pl
 import xgboost as xgb
 
-CORES: Final[int] = 6
+CORES: Final[int] = 8
 WEATHER: Final[tuple[str, ...]] = (
     "shortwave",
     "longwave",
@@ -114,6 +113,7 @@ CONFIGS: Final[dict[str, Config]] = {
     # Schedule (d): weekly on the whole history with fewer, larger rounds.
     "fw": _config(name="fw", regime="weekly", zero=False, **_FAST),
     "fw0": _config(name="fw0", regime="weekly", zero=True, **_FAST),
+    "fm": _config(name="fm", regime="monthly", zero=False, **_FAST),
     # Schedule (c): monthly at the full setting with a zero start.
     "m0": _config(name="m0", regime="monthly", zero=True, **_FULL),
 }
@@ -400,7 +400,9 @@ def main() -> None:
         "--limit-refits", type=int, default=0, help="fit only the first N refits (the check)"
     )
     parser.add_argument(
-        "--stride", type=int, default=1, help="fit every Nth refit only (paired with the stored)"
+        "--e80-anchors",
+        action="store_true",
+        help="weekly regimes: fit only the refits that experiment 00080's zero-start arm holds",
     )
     parser.add_argument(
         "--smoke", action="store_true", help="one series, 2 refits, 3 runs, 20 rounds, scratch dir"
@@ -414,8 +416,8 @@ def main() -> None:
     out_root = common.ANCHOR_PREDS_DIR
     rounds = config.rounds
     workers = args.workers
-    if args.stride > 1:
-        jobs = dict(list(jobs.items())[:: args.stride])
+    if args.e80_anchors:
+        jobs = {r: o for r, o in jobs.items() if r in regimes.e80_anchors()}
     if args.limit_refits:
         jobs = dict(list(jobs.items())[: args.limit_refits])
     if args.smoke:

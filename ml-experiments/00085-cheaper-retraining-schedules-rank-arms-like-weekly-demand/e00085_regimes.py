@@ -9,6 +9,8 @@ as a reproduction check. The refit times are experiment 00034's.
 from datetime import UTC, datetime, timedelta
 from typing import Final
 
+import e00085_common as common
+
 MONTHLY: Final[tuple[datetime, ...]] = tuple(
     datetime(2025 + (6 + i) // 12, (6 + i) % 12 + 1, 1, tzinfo=UTC) for i in range(12)
 )
@@ -87,3 +89,14 @@ def jobs_for(
         for refit, assigned in served(name=name, origins=origins).items():
             jobs.setdefault(refit, set()).update(assigned)
     return {refit: sorted(jobs[refit]) for refit in sorted(jobs)}
+
+
+def e80_anchors() -> frozenset[datetime]:
+    """Return the weekly refit times that experiment 00080's zero-start arm holds.
+
+    The arm's files for one series, `n1h_m0/D10_s0_<refit>.parquet`, name the 28 refits.
+    """
+    return frozenset(
+        datetime.strptime(path.stem.split("_")[-1], "%Y%m%dT%H%M").replace(tzinfo=UTC)
+        for path in sorted(common.E80_ANCHOR_PREDS_DIR.joinpath("n1h_m0").glob("D10_s0_*.parquet"))
+    )
