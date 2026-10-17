@@ -278,7 +278,10 @@ the write-up. Both PRs touch `packages/`, so neither merges on its own.
 
 ## 8. Questions still open for the maintainer or NGED
 
-The questions for NGED are also collected in [issue #1318 (Questions to ask NGED about curtailment)](https://github.com/openclimatefix/nged-substation-forecast/issues/1318), which stays open. No stage waits on the answers.
+The questions for NGED are also collected in
+[issue #1318 (Questions to ask NGED about
+curtailment)](https://github.com/openclimatefix/nged-substation-forecast/issues/1318), which stays
+open. No stage waits on the answers.
 
 1. **The sign and definition of the WALPOLE and BICKER FEN GSP series (awaiting NGED),** and whether
    WALPOLE's published export limit applies to what our series meters.
