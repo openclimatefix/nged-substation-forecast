@@ -408,7 +408,10 @@ correction (row set `fold_a_every5d_v1`, 16 Primary substations).
   subtracting the forecast solar from a model trained on gross demand was not shown to match the
   best guess (00064).
 - **Start an XGBoost quantile model from a base margin of zero, not from its estimated base score.**
-  A zero start lowered `d0` by 0.071 points (-0.099 to -0.047, against a refit of `d0`), and the model without a solar term scored 0.102 points (0.035 to 0.169) lower than its refit with the default start at 10 days and beyond, uncorrected, in one pipeline. A capacity table refreshed once a season-year captured almost all of the gain from a current capacity (00078).
+    A zero start lowered `d0` by 0.071 points (-0.099 to -0.047, against a refit of `d0`), and the
+  model without a solar term scored 0.102 points (0.035 to 0.169) lower than its refit with the
+  default start at 10 days and beyond, uncorrected, in one pipeline. A capacity table refreshed once
+  a season-year captured almost all of the gain from a current capacity (00078).
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
