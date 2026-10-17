@@ -50,6 +50,11 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
   intervals, and the markdown table a `result.md` quotes. It also holds the helpers that feed the
   table: reading named prediction sets, keeping only the rows every arm holds with a finite
   measured value, and listing a frame's quantile levels.
+- `node_curtailment` — the cost of curtailing generators when a bulk or grid supply point would
+  export over its limit: a node table and a generator table, NGED's seasons, the scaled limit (a
+  fraction of a node's maximum export before a cutoff), pro-rata allocation of the planned cut among
+  the generators under a node, the energy-proxy and DCUSA-form costs at four prices, an event census,
+  and the month totals for a month resampling.
 - `correlation` — the Pearson correlation of a prediction with the measured value, with an
   interval from resampling whole months and a seed, the same design `bootstrap` uses for an error.
 - `era5_ladder` — the ladder of ERA5 variable groups (which variable belongs to which rung, which
