@@ -22,7 +22,6 @@ sooner.
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [PVDIS-6](#pvdis-6-the-mix-of-panel-orientations-and-the-dc-to-ac-ratio) | Can the share of east-, south-, and west-facing solar behind each Primary, and the ratio of DC to AC capacity, be identified? | 4 | PVDIS-4 | Proposed |
 | [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Proposed; research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
@@ -261,11 +260,11 @@ first:
   the estimate is far from perfect.
 
 **The capacity estimate runs offline, weekly or monthly, and the production forecast only reads the
-latest capacity table.** Nothing in this line adds a fitting step to the serving path. PVDIS-6 asks
-whether the mix of panel orientations behind each Primary can also be estimated, as the
-`UniversalSolarFleetNode` sketched in [differentiable
-physics](../techniques/differentiable-physics.md) would, so that the explicit solar forecast takes
-the right daily shape.
+latest capacity table.** Nothing in this line adds a fitting step to the serving path. [Experiment
+73](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) (PVDIS-6) found that the mix of panel
+orientations behind each Primary, the quantity the `UniversalSolarFleetNode` sketched in
+[differentiable physics](../techniques/differentiable-physics.md) would fit, is not stable across
+season-years, so the explicit solar forecast keeps one south-facing shape.
 
 **Experiments 00039 and 00040 are parts 1 and 2 of the series, and the parts below follow the
 exploratory protocol in the `ml-experiment` skill.** Opus plans each part after reading the result
@@ -324,28 +323,6 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   domestic load falls on sunny days, as people go outside, and biases the fitted capacity high. Each
   write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
   weeks.
-
-#### PVDIS-6: the mix of panel orientations and the DC to AC ratio
-
-**Estimate the share of east-, south-, and west-facing solar behind each Primary, and drop the step
-if the shares are not identified.** Experiment 00040 found that capacities on an east-south-west
-menu swapped between years in a season-year fit. Pooling the shapes across Primaries with a shared
-prior, or fitting on clear days only, may identify them. A Primary's orientation mix would sharpen
-the explicit solar forecast in arm `b` of [experiment 64](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md).
-
-**Also try fitting the ratio of DC to AC capacity directly, as a cheap side-arm with a known-answer
-test first.** Many GB rooftop systems have more panel capacity than inverter capacity, and a system
-like that clips at high irradiance. Experiment 00051 (PVDIS-3b) found no clipping knee in the demand
-forecast's residual, but that test was indirect, and a too-large coefficient on the solar term
-dominated it. PVDIS-6 fits a clipping level inside the capacity fit itself, on clear days, by a
-search over a few candidate DC to AC ratios. A fleet of many systems with different ratios and
-orientations clips gradually rather than at one knee, so the ratio may well not be identified.
-
-- **Known answers first:** inject the output of the metered solar farms, whose DC to AC ratios
-  experiment 00029 fitted, and check that the search recovers each farm's ratio. If it does not,
-  drop the side-arm before touching the real series.
-- **On the real series:** report the fitted ratio per Primary with its interval, and whether the
-  clipped shape fits clear days better than the unclipped shape on held-out months.
 
 #### PVDIS-7: MW at the Primaries metered only in MVA
 

@@ -186,6 +186,7 @@ nav:
       - "Which logged switching jobs show up in the power readings?": ml-experiments/00041-sw2-0a-labeller-gate/labelled-set.md
       - "How much of the best guess's daylight error is embedded solar?": ml-experiments/00046-embedded-solar-share-of-primary-forecast-error/result.md
       - "Why does the solar term lose at sunny summer middays?": ml-experiments/00051-pvdis-3b-midday-loss-of-the-solar-term/result.md
+      - "Can the mix of solar panel orientations and the DC to AC ratio be recovered?": ml-experiments/00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md
       - "Does the UKV forecast the solar anomaly better than ENS?": ml-experiments/00053-ukv-vs-ens-solar-anomaly/result.md
       - "How well do the two existing switching detectors find transfers?": ml-experiments/00043-sw2-1-detector-scoreboard/result.md
       - "Does Flexpectation v1 need special handling at MVA-only Primaries?": ml-experiments/00056-mva-only-primaries-skill-against-mw-primaries/result.md
