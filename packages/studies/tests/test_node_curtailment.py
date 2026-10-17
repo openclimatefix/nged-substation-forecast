@@ -253,7 +253,7 @@ def test_negative_sign_flow_over_the_limit_is_a_twelve_and_a_half_mwh_excess() -
 
     A perfect forecast (q05 = q95 = -70) plans 12.5 MWh of node curtailment, delivered exactly, so
     the breach is max(0, 70 - 12.5 / 0.5 - 45) = 0 MW. Energy proxy at 2,000 GBP per MWh: 2,000 *
-    (12.5 + 20 * 0) = 25,000 GBP.
+    (12.5 + 20 x 0) = 25,000 GBP.
     """
     result = _score(table=_table(sign=-1), node=_one_row(flow=-70.0))
     assert _headline(result.per_arm, column="needed_mwh") == pytest.approx(12.5)
@@ -316,10 +316,10 @@ def test_perfect_forecasts_cost_exactly_the_needed_curtailment_when_the_generato
 ):
     """Export 70 MW, limit 45 MW, one 30 MW generator running at its forecast of 30 MW.
 
-    Planned node curtailment: (70 - 45) * 0.5 = 12.5 MWh. Forecast energy 30 * 0.5 = 15 MWh covers
+    Planned node curtailment: (70 - 45) x 0.5 = 12.5 MWh. Forecast energy 30 x 0.5 = 15 MWh covers
     it, so the generator's share is 12.5 MWh. Cap = 30 - 12.5 / 0.5 = 5 MW. Energy lost =
-    (30 - 5) * 0.5 = 12.5 MWh. Breach = max(0, 70 - 12.5 / 0.5 - 45) = 0 MW. Energy proxy at 2,000
-    GBP per MWh = 2,000 * 12.5 = 25,000 GBP.
+    (30 - 5) x 0.5 = 12.5 MWh. Breach = max(0, 70 - 12.5 / 0.5 - 45) = 0 MW. Energy proxy at 2,000
+    GBP per MWh = 2,000 x 12.5 = 25,000 GBP.
     """
     result = _score(
         table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
@@ -334,9 +334,9 @@ def test_perfect_forecasts_cost_exactly_the_needed_curtailment_when_the_generato
 def test_uncovered_excess_becomes_breach_when_the_generator_cannot_cover_it() -> None:
     """Export 70 MW, limit 45 MW, a 30 MW generator that produces and is forecast at only 10 MW.
 
-    Planned: 12.5 MWh. Forecast energy is 10 * 0.5 = 5 MWh, so the share is clamped at 5 MWh.
-    Cap = 10 - 5 / 0.5 = 0 MW; energy lost = (10 - 0) * 0.5 = 5 MWh. Breach = 70 - 5 / 0.5 - 45 =
-    15 MW = 7.5 MWh. Energy proxy at 2,000 GBP per MWh: 2,000 * (5 + 20 * 7.5) = 310,000 GBP.
+    Planned: 12.5 MWh. Forecast energy is 10 x 0.5 = 5 MWh, so the share is clamped at 5 MWh.
+    Cap = 10 - 5 / 0.5 = 0 MW; energy lost = (10 - 0) x 0.5 = 5 MWh. Breach = 70 - 5 / 0.5 - 45 =
+    15 MW = 7.5 MWh. Energy proxy at 2,000 GBP per MWh: 2,000 x (5 + 20 x 7.5) = 310,000 GBP.
     """
     result = _score(
         table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
@@ -369,8 +369,8 @@ def test_a_forecast_too_low_over_cuts_by_an_exact_amount() -> None:
     """Forecast 26 MW, output 30 MW, capacity 50 MW; node 70 MW over 45 MW (perfect node forecast).
 
     Planned 12.5 MWh; forecast energy 13 MWh covers it. Cap = 26 - 25 = 1 MW. Energy lost =
-    (30 - 1) * 0.5 = 14.5 MWh, which over-cuts the needed 12.5 MWh by 2.0 MWh. Breach = 70 - 29 - 45
-    < 0, so 0. Energy proxy: 2,000 * 14.5 = 29,000 GBP.
+    (30 - 1) x 0.5 = 14.5 MWh, which over-cuts the needed 12.5 MWh by 2.0 MWh. Breach = 70 - 29 - 45
+    < 0, so 0. Energy proxy: 2,000 x 14.5 = 29,000 GBP.
     """
     result = _score(
         table=_table(generators=[(GENERATOR_SERIES, 50.0)]),
@@ -479,7 +479,7 @@ def test_two_unequal_generators_share_the_curtailment_through_the_whole_chain() 
 
     Planned 12.5 MWh; forecast energies 5 and 15 MWh. Shares 3.125 and 9.375 MWh. The first is under
     its 5 MWh forecast energy and the second under 15, so there is no clamp. Caps: 10 - 6.25 = 3.75
-    MW and 30 - 18.75 = 11.25 MW. Energy lost: (10 - 3.75) * 0.5 = 3.125 and (30 - 11.25) * 0.5 =
+    MW and 30 - 18.75 = 11.25 MW. Energy lost: (10 - 3.75) x 0.5 = 3.125 and (30 - 11.25) x 0.5 =
     9.375 MWh, 12.5 MWh in all, with no breach.
     """
     result = _score(
@@ -512,7 +512,7 @@ def test_dcusa_form_charges_capacity_minus_cap_for_the_instructed_half_hour() ->
     """Capacity 30 MW, forecast and output 30 MW, node 70 MW over 45 MW: cap 5 MW (as above).
 
     The instruction value is 30 - 5 = 25 MW for 0.5 h, so Full Export Curtailment Hours are
-    0.5 * 25 / 30 = 0.41667 h. At a Curtailment Limit of 0, the payment is 0.41667 h * 30 MW *
+    0.5 x 25 / 30 = 0.41667 h. At a Curtailment Limit of 0, the payment is 0.41667 h x 30 MW *
     2,000 GBP per MWh = 25,000 GBP, and there is no breach.
     """
     per_arm = _dcusa_case(output=30.0, forecast=30.0, limit_hours=0.0)
@@ -522,7 +522,7 @@ def test_dcusa_form_charges_capacity_minus_cap_for_the_instructed_half_hour() ->
 def test_dcusa_form_pays_only_the_hours_above_the_curtailment_limit() -> None:
     """The same case, 0.41667 h of Full Export Curtailment Hours.
 
-    Limit 0.25 h: (0.41667 - 0.25) * 30 * 2,000 = 10,000 GBP. Limit 0.5 h, above the hours used:
+    Limit 0.25 h: (0.41667 - 0.25) x 30 x 2,000 = 10,000 GBP. Limit 0.5 h, above the hours used:
     nothing is paid, so 0 GBP.
     """
     assert _headline(
@@ -537,8 +537,8 @@ def test_dcusa_form_charges_the_headroom_of_a_generator_running_below_capacity()
     """Capacity 30 MW but output and forecast 10 MW; node 70 MW over 45 MW.
 
     As in the energy-proxy case, the share is clamped at 5 MWh, the cap is 0 MW, and the breach is
-    7.5 MWh. The instruction value is 30 - 0 = 30 MW, so the hours are 0.5 * 30 / 30 = 0.5 h and the
-    payment at limit 0 is 0.5 * 30 * 2,000 = 30,000 GBP. Adding the breach, 2,000 * 20 * 7.5 =
+    7.5 MWh. The instruction value is 30 - 0 = 30 MW, so the hours are 0.5 x 30 / 30 = 0.5 h and the
+    payment at limit 0 is 0.5 x 30 x 2,000 = 30,000 GBP. Adding the breach, 2,000 x 20 x 7.5 =
     300,000, gives 330,000 GBP, against the energy proxy's 310,000 GBP: the forms differ.
     """
     per_arm = _dcusa_case(output=10.0, forecast=10.0, limit_hours=0.0)
@@ -694,8 +694,8 @@ def test_a_node_row_whose_generator_has_no_forecast_row_is_dropped_and_counted()
 def test_many_nodes_are_scored_together_with_each_nodes_own_limit() -> None:
     """50 nodes with limits 40, 41, ..., 89 MW, each exporting 70 MW (perfect forecast, node only).
 
-    Node i (limit 40 + i) needs max(0, 30 - i) * 0.5 MWh; the sum over i = 0..29 of (30 - i) * 0.5
-    = 0.5 * 465 = 232.5 MWh. Node 10 (limit 50) alone needs 20 * 0.5 = 10.0 MWh.
+    Node i (limit 40 + i) needs max(0, 30 - i) x 0.5 MWh; the sum over i = 0..29 of (30 - i) x 0.5
+    = 0.5 x 465 = 232.5 MWh. Node 10 (limit 50) alone needs 20 x 0.5 = 10.0 MWh.
     """
     ids = [f"N{i:02d}" for i in range(50)]
     table = NodeTable(
@@ -1031,8 +1031,8 @@ def test_totals_are_averaged_over_fitting_seeds() -> None:
 def test_month_totals_are_price_free_and_match_the_priced_figures() -> None:
     """The 10 MW generator case: curtailed 5 MWh, breach 7.5 MWh, instruction 30 MW for 0.5 h.
 
-    Energy-proxy MWh-equivalent: 5 + 20 * 7.5 = 155, so 155 * 2,000 = 310,000 GBP. DCUSA gross
-    MWh-equivalent: 0.5 * 30 + 20 * 7.5 = 165, so 165 * 2,000 = 330,000 GBP (the case above).
+    Energy-proxy MWh-equivalent: 5 + 20 x 7.5 = 155, so 155 x 2,000 = 310,000 GBP. DCUSA gross
+    MWh-equivalent: 0.5 x 30 + 20 x 7.5 = 165, so 165 x 2,000 = 330,000 GBP (the case above).
     """
     result = _score(
         table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
@@ -1138,8 +1138,8 @@ def _two_arm_two_seed_result() -> NodeCurtailmentResult:
 
     Arm x, per seed (perfect node forecasts, so planned equals needed):
 
-    - A at January noon: planned (70 - 45) * 0.5 = 12.5 MWh, cap 30 - 25 = 5 MW, lost
-      (30 - 5) * 0.5 = 12.5 MWh, instruction 25 MW.
+    - A at January noon: planned (70 - 45) x 0.5 = 12.5 MWh, cap 30 - 25 = 5 MW, lost
+      (30 - 5) x 0.5 = 12.5 MWh, instruction 25 MW.
     - A on 1 March: the Intermediate Cool limit of 35 MW applies, planned (50 - 35) * 0.5 = 7.5
       MWh, cap 15 MW, lost 7.5 MWh, instruction 15 MW. (The Winter limit of 45 MW of the forecast's
       February initialisation would give 2.5 MWh.)
@@ -1147,7 +1147,7 @@ def _two_arm_two_seed_result() -> NodeCurtailmentResult:
       5 MW. B on 1 March exports 15 MW, under its limit of 20 MW.
 
     Per seed, needed = planned = curtailed = 22.5 MWh, breach 0, and 4 node rows. The Full Export
-    Curtailment Hours give a DCUSA payment of 0.5 * (25 + 15) + 0.5 * 5 = 22.5 MWh-equivalent.
+    Curtailment Hours give a DCUSA payment of 0.5 x (25 + 15) + 0.5 x 5 = 22.5 MWh-equivalent.
 
     Arm y in seed 1 forecasts generator 101 at 20 MW: A at January noon clamps the share at its
     10 MWh of forecast energy, cap 0, lost 15 MWh, instruction 30 MW; A on 1 March has share 7.5,
@@ -1167,11 +1167,11 @@ def _two_arm_two_seed_result() -> NodeCurtailmentResult:
 def test_many_arms_seeds_nodes_and_a_month_boundary_are_counted_and_averaged() -> None:
     """Counts are per arm and seed, energies and pounds are means over seeds, not sums.
 
-    Arm x: 22.5 MWh curtailed in each seed, so 22.5 and 2,000 * 22.5 = 45,000 GBP. Arm y: seeds
+    Arm x: 22.5 MWh curtailed in each seed, so 22.5 and 2,000 x 22.5 = 45,000 GBP. Arm y: seeds
     give 22.5 and 30.0 MWh, mean 26.25 MWh and 52,500 GBP, with a DCUSA figure of the same mean
-    payment, 26.25 * 2,000 = 52,500 GBP (a sum over seeds would give 105,000). Each arm scores 4
+    payment, 26.25 x 2,000 = 52,500 GBP (a sum over seeds would give 105,000). Each arm scores 4
     node rows per seed. Capacity is 30 + 20 = 50 MW over 2 distinct half-hours, so GBP per MW-year
-    is GBP / (50 * 2 * 0.5 / 8,766).
+    is GBP / (50 x 2 x 0.5 / 8,766).
     """
     per_arm = _two_arm_two_seed_result().per_arm
     x = per_arm.filter((pl.col("arm") == "x") & (pl.col("price_gbp_per_mwh") == HEADLINE))
@@ -1521,7 +1521,7 @@ def test_sparse_exceedances_allocate_only_the_rows_that_plan_curtailment(
 ) -> None:
     """300 nodes, 2 generators each, 4 half-hours; only node N000 plans curtailment, at 1 half-hour.
 
-    The allocation sees 1 node row x 2 generators = 2 pair rows, not 300 * 4 * 2 = 2,400. Memory
+    The allocation sees 1 node row x 2 generators = 2 pair rows, not 300 x 4 x 2 = 2,400. Memory
     at 2,500 series is set by this height.
     """
     n_nodes, n_steps = 300, 4
@@ -1573,9 +1573,9 @@ def test_the_baseline_arm_runs_every_generator_at_capacity_and_pays_for_the_wron
     """Node 70 MW over 45 MW; generator of 30 MW assumed at 30 MW but producing only 10 MW.
 
     Planned 12.5 MWh; forecast energy 15 MWh covers it, so the share is 12.5 MWh and the cap is
-    30 - 25 = 5 MW. Lost (10 - 5) * 0.5 = 2.5 MWh. Breach = 70 - 2.5 / 0.5 - 45 = 20 MW = 10 MWh.
-    Energy proxy at 2,000 GBP per MWh: 2,000 * (2.5 + 20 * 10) = 405,000 GBP. DCUSA form: the
-    instruction is 30 - 5 = 25 MW for 0.5 h, 12.5 MWh-equivalent, so 2,000 * (12.5 + 20 * 10) =
+    30 - 25 = 5 MW. Lost (10 - 5) x 0.5 = 2.5 MWh. Breach = 70 - 2.5 / 0.5 - 45 = 20 MW = 10 MWh.
+    Energy proxy at 2,000 GBP per MWh: 2,000 x (2.5 + 20 x 10) = 405,000 GBP. DCUSA form: the
+    instruction is 30 - 5 = 25 MW for 0.5 h, 12.5 MWh-equivalent, so 2,000 x (12.5 + 20 x 10) =
     425,000 GBP.
     """
     table = _table(generators=[(GENERATOR_SERIES, 30.0)])
