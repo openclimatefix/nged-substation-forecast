@@ -86,7 +86,7 @@ lessons: >-
   orientation. A known-answer test of a linear fit that adds no noise cannot fail, so it only counts
   once noise is added. The DC:AC ratio is visible in a farm's own output, but a Primary's demand and
   its own solar hide it.
-production_status: candidate
+production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00073-pvdis-6-orientation-mix-and-dc-ac-ratio/
 advice:

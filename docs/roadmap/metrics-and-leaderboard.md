@@ -766,10 +766,10 @@ All three fit the existing `Metrics` shape — `metric_param` carries the thresh
 **Thresholds: static, per-series, quantile-derived.** Each series gets one static threshold — the
 P99 of its full observation history, in the series type's constraint-side direction (high load for
 demand; reverse power flow for generation) — a percentile-of-history convention of the kind commonly
-used in capacity setting, and the same rung the [cost-savings
-metrics](cost-savings-metrics.md#choosing-the-limit) use, so the leaderboard carries one threshold
-concept rather than several. Physical firm/flex ratings, where NGED supplies them, feed ad-hoc case
-studies and dashboard overlays instead. The full rationale — why a full-history quantile threshold
+used in capacity setting. The [cost-savings
+metrics](cost-savings-metrics.md#choosing-the-limit) discuss limits of their own. Physical
+firm/flex ratings, where NGED supplies them, feed ad-hoc case studies and dashboard overlays
+instead. The full rationale — why a full-history quantile threshold
 beats the physical rating for scoring — and the explicit "this is a proxy" caveat live in [the
 threshold-choice
 section](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived)

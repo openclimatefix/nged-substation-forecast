@@ -339,6 +339,21 @@ def test_ticks_widens_its_step_for_a_range_over_20_wide():
     assert ticks(x_domain=(5.5, 26.5)) == [7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0]
 
 
+def test_ticks_steps_in_tens_for_a_range_over_50_wide():
+    assert ticks(x_domain=(0.0, 90.0)) == [
+        0.0,
+        10.0,
+        20.0,
+        30.0,
+        40.0,
+        50.0,
+        60.0,
+        70.0,
+        80.0,
+        90.0,
+    ]
+
+
 def test_ticks_returns_at_most_ten_values():
     assert len(ticks(x_domain=(0.0, 0.45))) == 10
 

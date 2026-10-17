@@ -220,6 +220,23 @@ Each write-up in a series ends with a short "what the next experiment should ans
 written after Opus has read the results. The experiment's own session does not start that next
 experiment. The maintainer decides when each step runs, and may stop the series at any step.
 
+**When a series of more than three experiments finishes or pauses, write one summary report that
+tells the whole story.** A series is a set of experiments sharing a topic in the research log. The
+report lives at `docs/ml-experiments/series/<topic>.md`, with its entry in `mkdocs.yml`. The report refits
+nothing: it collates figures and numbers from the existing write-ups into one page. Its three parts,
+in this order:
+
+- **What the data looks like.** Plots of the raw data and of the labelled examples, with one plain
+  sentence each, taken from the series' first experiments.
+- **What worked.** The findings that changed the best guess or the next step, each with its headline
+  number, interval, and the figure that shows it, and the one-line take-home first.
+- **What was tried.** A table of every experiment in the series with its id, the question in one
+  line, the verdict, and the headline number, so a reader can see the refuted ideas without opening
+  them.
+
+Keep the report short, link every experiment to its `result.md`, and use the figures already
+committed. A Sonnet agent writes it from the write-ups and one Sonnet agent reviews it against them.
+
 ## Small gains and stacking
 
 **`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls
