@@ -79,16 +79,20 @@ best_arm: >-
 headline: >-
   Re-estimating the solar capacity before each forecast run lowered the error of experiment 64's
   best forecast by only 0.018 points of capacity (98.75% interval -0.036 to -0.004), under the 0.05
-  threshold, and by 0.033 (-0.086 to +0.012) at leads under 48 hours. Starting `d0` from a base
-  margin of zero, instead of XGBoost's estimated base score, lowered its error by 0.071 points
-  (-0.099 to -0.047), and `am_sy` still beat that zero-start `d0` by 0.100 (-0.142 to -0.061).
+  threshold, and by 0.033 (-0.086 to +0.012, an interval that includes zero) at leads under 48
+  hours. Starting `d0` from a base margin of zero, instead of XGBoost's estimated base score,
+  lowered its error by 0.071 points (-0.099 to -0.047, against the refit `d0_r`), and `am_sy` still
+  beat that zero-start `d0` by 0.100 (-0.142 to -0.061).
 lessons: >-
-  A held capacity 11% to 23% below the May 2026 estimates costs `am` about 0.02 points, so a
+  A held capacity 11% to 23% below the May 2026 estimates raises the score of `am` by about 0.02
+  points, so a
   capacity table
-  refreshed once a season-year captures almost all of the benefit, and a weekly refresh adds 0.005
-  (-0.013 to +0.003) on top. The solar term itself is robust to the capacity (`am_sy` against `am0`
+  refreshed once a season-year captures almost all of the benefit, and a weekly refresh makes no
+  distinguishable difference (-0.005, -0.013 to +0.003). The solar term itself is robust to the
+  capacity (`am_sy` against `am0`
   is -0.190, -0.267 to -0.118). The larger finding is the starting point: XGBoost's estimated base
-  score costs the models 0.07 to 0.10 points against a start at zero, in the same pipeline, so part
+  score raises the score of the models by 0.07 to 0.10 points against a start at zero, in the same
+  pipeline, so part
   of experiment 64's gain over `d0` was a start-at-zero effect that `d0` can have too.
 production_status: candidate
 adopted_in: none
@@ -97,14 +101,15 @@ advice:
     Refresh the capacity table once per season-year, not weekly, for `am`, because the season-year
     vintage gains 0.018 points (-0.036 to -0.004) on a held capacity 11% to 23% below the May 2026
     estimates, and
-    the weekly vintage adds -0.005 (-0.013 to +0.003) on top of that (C1, sensitivity reads).
+    the weekly vintage differs from it by -0.005 (-0.013 to +0.003), which is not distinguishable
+    from zero (C1, sensitivity reads).
   - >-
-    Score every XGBoost reference with a start-at-zero twin (a base margin of zero), because
-    `d0_m0` scores 0.071 points (-0.099 to -0.047) below `d0` and the starting point is larger than
+    Score every XGBoost reference with a start-at-zero twin (a base margin of zero), because `d0_m0`
+    scores 0.071 points (-0.099 to -0.047) below `d0_r` and the starting point is larger than
     the capacity effect (starting point section).
   - >-
-    Test a zero base margin as a change to the production XGBoost recipe, because it costs nothing
-    in production and `d1l_r` scores 0.086 points (0.047 to 0.124) above `am0` at 10 days and
+    Test a zero base margin as a change to the production XGBoost recipe, because it needs no extra
+    production work and `d1l_r` scores 0.086 points (0.047 to 0.124) above `am0` at 10 days and
     beyond after the 14-day correction (starting point section).
   - >-
     Quote the gain of a solar term against a zero-start reference without the term, not only
@@ -118,31 +123,35 @@ advice:
 
 # Experiment 78: does a re-estimated solar capacity lower the error? (PVDIS-5, check 2)
 
-**Take-home message: re-estimating the solar capacity before each forecast run lowers the error of
-experiment 64's best forecast by only 0.018 points of capacity, so a capacity table refreshed
-about once a season-year is enough.** A bigger finding sits beside it. XGBoost's default starting
-prediction (its estimated base score) costs the forecast 0.07 to 0.10 points compared with a start
-at zero, so part of the gain that experiment 64 reported over its reference `d0` was a start-at-zero
-effect. The solar term still lowers the error after both corrections: it beats a zero-start `d0` by
-0.100 points. The search narrows to the starting point of the XGBoost model, which costs nothing to
-change in production.
+**Take-home message: re-estimating the solar capacity before each forecast run lowers the quantile
+score of `am`, the best-scoring forecast of experiment 64, by only 0.018 points, so a capacity table
+refreshed about once a season-year is enough.** The quantile score is an error measure in which
+lower is better, and 1 point is 1% of a substation's capacity. A larger finding sits beside this
+one. XGBoost starts each model from an estimated starting prediction (its base score). Starting from
+zero instead lowered the score of the reference model `d0` by 0.07 points, and by about 0.10 points
+for the model that carries no solar term, so part of the gain that experiment 64 reported over `d0`
+was a start-at-zero effect. The solar term still lowers the score by 0.100 points against a `d0`
+that starts from zero. The next experiment should test the starting point, which needs no extra
+production work to change.
 
 We asked whether a better estimate of how much solar capacity sits behind each Primary substation
-improves a forecast of the substation's power. Experiment 64 forecast power with an XGBoost model
-that starts from a solar term: the substation's solar capacity times a forecast of how sunny the day
-will be. That experiment fixed the capacity at the value estimated from data before July 2025. Here
-we re-estimated the capacity before every forecast run from only the data available then, and
-predicted again with the same fitted models. The error fell by 0.018 points, where 1 point is 1% of
-a substation's
-capacity. We also refitted two reference models, to find out whether the start-at-zero effect that
-experiment 76 suspected is real. It is.
+improves a forecast of the substation's power. A Primary substation steps electricity down from
+33 kV or 66 kV to 11 kV. Experiment 64 forecast power with an XGBoost model that starts from a
+solar term: the substation's solar capacity times a forecast of how sunny the day will be, added as
+a base margin (a fixed starting prediction supplied for each row). That experiment fixed the
+capacity at the value estimated from data before July 2025. Here we re-estimated the capacity before
+every forecast run from only the data available then, and predicted again with the same fitted
+XGBoost models. The score fell by 0.018 points. We also refitted two reference models, `d1l` and
+`d0`, to find out whether the start-at-zero effect that experiment 76 suspected is real. The
+start-at-zero effect is real.
 
 **The verdict is `small gain`.** The pre-registered rule is in the front matter and was committed
-before any code ran. The headline contrast C1 is the quantile score of `am_sy` (the season-year
-vintage) minus that of `am` (experiment 64's held capacity), over all leads. The quantile score is
-an error measure in which lower is better. The upper end of C1 is -0.004, below zero but not below
-the threshold of -0.05, and C3 and C4 (below) confirm that the solar term carries solar
-information.
+before any code ran. The headline contrast C1 is the quantile score of `am_sy` (`am` with the
+season-year vintage of the capacity) minus that of `am` (experiment 64's held capacity), over all
+leads. The upper end of C1 is -0.004, below zero but not below the threshold of -0.05. The threshold
+is a third of experiment 64's gain over `d0`, because a weekly refit of the capacity table is a
+production step that a fixed table does not need. C3 and C4 in the table confirm that the solar term
+carries solar information.
 
 | Contrast | Difference in quantile score | 98.75% interval |
 |---|---|---|
@@ -175,33 +184,38 @@ interval includes zero.
 
 **The season-year vintage re-fits experiment 45's season-year constant before each forecast run.**
 The fit uses the usable half-hours of the weeks up to two weeks before the Monday of the run's week,
-and divides by experiment 45's recovery ratio. The run takes the vintage's constant for its
-season-year (September to August) once that season-year has 8 observed weeks, and otherwise the
-previous season-year's constant. Where neither exists, it takes experiment 64's held capacity. Step
-1 supplied 84% of runs at D9, D10, and D16, 47% at D11, and 29% at D14. D14's weeks from 2023-09-04
-to 2025-08-25 are unobserved, so it keeps its held capacity for the other 71% of runs. **The weekly
-vintage** averages the 4 latest observed weeks of experiment 45's `frozen` weekly fit, from the
+and divides by experiment 45's recovery ratio. The recovery ratio is experiment 45's measured
+fraction of injected solar capacity that the fit recovers, and a usable half-hour is one with an
+observed power and a CAMS solar estimate. A run takes the capacity from the first of three steps
+that applies. Step 1 is the vintage's constant for the run's season-year (September to August), once
+that season-year has 8 observed weeks. Step 2 is the previous season-year's constant. Step 3 is
+experiment 64's held capacity. Step 1 supplied 84% of runs at D9, D10, and D16, 47% at D11, and 29%
+at D14. D14's weeks from 2023-09-04 to 2025-08-25 are unobserved, so step 3 supplies the other 71%
+of its runs. **The weekly vintage** averages the 4 latest observed weeks of experiment 45's `frozen`
+weekly fit (a free capacity per week with a fixed penalty on changes), from the
 vintage with the latest origin up to a week before the run.
 
 ## The estimated capacity rose 13% to 31% above the held value by May 2026
 
 ![Capacity of each series in each vintage](figure_2_vintages.svg)
 
-**The vintages sit near the held capacity until March 2026 and 13% to 31% above it in May 2026.**
-The season-year vintage in June 2026 is 3.0 MW at D9 (held 2.751), 2.9 at D10
-(2.356), 4.3 at D11 (3.457), 4.8 at D14 (3.705), and 4.6 at D16 (3.578), against experiment 45's
+**The vintages move away from the held capacity in November 2025 and sit 13% to 31% above it in May
+2026.** D9's vintage falls 14% below the held value in November, and D10's and D16's rise 9% and 10%
+above it.
+The season-year vintage in June 2026 is 3.0 MW at D9 (held 2.751 MW), 2.9 at D10 (2.356), 4.3 at D11
+(3.457), 4.8 at D14 (3.705), and 4.6 at D16 (3.578), against experiment 45's
 final 2025/26 constants of 2.9, 2.9, 4.1, 4.2, and 4.4. The weekly vintage is higher and noisier.
-The season-year vintage at D9 falls below the held capacity (2.37 MW against 2.75) in November 2025,
-when the new season-year's own constant takes over. Experiment 45 found that the latest weeks of a
+In November 2025 the new season-year's own constant takes over at D9, which is why the vintage there
+falls (2.37 MW against 2.75).  Experiment 45 found that the latest weeks of a
 real-time fit are the least accurate.
 
-## The gain is small and sits in April and May 2026
+## The gain is small and sits mostly in May 2026
 
 ![The gain by lead band and by valid month](figure_3_by_lead_and_month.svg)
 
-**The error falls at every lead under 10 days, and by 10 days and beyond the effect is almost
-zero.**
-The point estimates of `am_sy` minus `am` are -0.039 (-0.097 to +0.014) at 0 to 24 hours, -0.027
+**The point estimate is negative at every lead, but only the 2-to-6-day and 10-days-and-beyond
+intervals exclude zero.** The effect is almost zero at 10 days and beyond. The point estimates of
+`am_sy` minus `am` are -0.039 (-0.097 to +0.014) at 0 to 24 hours, -0.027
 (-0.061 to +0.003) at 1 to 2 days, -0.029 (-0.053 to -0.009) at 2 to 6 days, -0.013 (-0.032 to
 +0.003) at 6 to 10 days, and -0.006 (-0.012 to -0.001) at 10 days and beyond. By valid month, the
 read is about zero from July to September 2025 (the vintage is within 4% of the held capacity
@@ -212,8 +226,9 @@ there), -0.035 (-0.097 to +0.002) in April 2026, -0.058 (-0.100 to -0.028) in Ma
 
 **The weekly vintage does no better than the season-year vintage.** `am_wk` minus `am_sy` is -0.005
 (-0.013 to +0.003), and `am_wk` minus `am` is -0.023 (-0.042 to -0.007) over all leads and -0.054
-(-0.116 to +0.004) under 48 hours. A weekly refresh would add about 0.005 points on top of a
-season-year refresh. Restricted to runs where step 1 supplied the capacity, `am_sy` minus `am` is
+(-0.116 to +0.004) under 48 hours. A weekly refresh would lower the score by a further 0.005 points
+at most, which the intervals do not separate from zero. Restricted to runs where step 1 supplied the
+capacity, `am_sy` minus `am` is
 -0.022 (-0.037 to -0.008), so the fallback to the held value dilutes the effect slightly.
 
 ## Absolute scores
@@ -238,7 +253,7 @@ The climatology scores 5.272 on the 68,863 rows it holds (a month-by-half-hour m
 The wrong-date twin gets worse when the capacity grows: `am_sy_twin` minus `am_twin` is +0.040
 (+0.022 to +0.058), as expected for a solar term that carries no timing information.
 
-## XGBoost's starting point costs 0.07 to 0.10 points
+## XGBoost's estimated starting point raises the score by 0.07 to 0.10 points
 
 **A refit of `d1l` in this pipeline scores the same as experiment 46's stored `d1l`, so the gap
 that experiment 76 saw is not a difference between pipelines.** `d1l_r` minus `d1l` is -0.0004
@@ -250,8 +265,9 @@ that experiment 76 saw is not a difference between pipelines.** `d1l_r` minus `d
 | D2: `d0_r` minus `d0_m0`, 10 days and beyond, no 14-day correction | +0.089 | +0.028 to +0.153 |
 | D3: `d1l_r` minus `am0`, all leads | +0.084 | +0.053 to +0.121 |
 
-The pre-registered rule reads D1 as a real starting-point effect: its lower end is above zero and
-its point estimate is above 0.05. The same holds for `d0`. Over all leads, `d0_m0` minus `d0_r` is
+The pre-registered rule reads D1 as a real starting-point effect: the lower end of D1 is above zero
+and its point estimate is above 0.05. D2 gives the same reading for `d0`. Over all leads, `d0_m0`
+minus `d0_r` is
 -0.071 (-0.099 to -0.047, exploratory), and under 48 hours -0.078 (-0.118 to -0.036).
 
 **XGBoost estimates one base score per quantile level, and the score rises with the level.** For
@@ -272,7 +288,7 @@ is 0.082 (-0.113 to -0.052) over `d0_m0`.
 | C1 at -0.02 (-0.04 to 0.00) | Held: -0.018 (-0.036 to -0.004) |
 | C2 at -0.04 (-0.09 to 0.00) | Held in size: -0.033 (-0.086 to +0.012) |
 | `am_wk` the same as `am_sy` or 0.00 to 0.05 higher | Held for "the same": -0.005 (-0.013 to +0.003) |
-| `d1l_r` 0.00 to 0.10 above `am0` at 10 days and beyond, uncorrected | Held at the top of the range: +0.102 (+0.035 to +0.169) |
+| `d1l_r` 0.00 to 0.10 above `am0` at 10 days and beyond, uncorrected | Just above the range: +0.102 (+0.035 to +0.169) |
 | Verdict `small gain` or `inconclusive` | `small gain` |
 
 ## Departures from the plan
@@ -310,7 +326,7 @@ The effect is 0.07 to 0.10 points on the Primary demand models of this experimen
 effect of the capacity, and it costs nothing in production. A test across the series and model
 types that the best guess `d0` covers (BSP and GSP demand, solar, and wind) would settle whether
 the base score belongs to the production recipe. If the capacity matters for a later model release,
-the evidence here supports refreshing the capacity table once a season-year.
+the evidence here is consistent with refreshing the capacity table once a season-year.
 
 ## Reproducing the figures
 

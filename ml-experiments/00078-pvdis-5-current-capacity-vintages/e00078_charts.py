@@ -175,7 +175,7 @@ def figure_2() -> None:
         )
         .properties(
             title=title(
-                text="The vintages rise above the held capacity from March 2026",
+                text="The vintages sit 13% to 31% above the held capacity by May 2026",
                 subtitle=(
                     "Mean capacity of the forecast runs in each month, at each of the five Primary "
                     "substations. D14 uses its held value until its 2025/26 season-year has 8 "
