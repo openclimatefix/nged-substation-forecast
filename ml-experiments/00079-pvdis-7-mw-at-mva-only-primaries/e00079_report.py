@@ -161,6 +161,26 @@ def main() -> None:  # noqa: PLR0915
         f"[starts] distinct capacities reached: {distinct.rows()}; median loss gap "
         f"{known['loss_gap'].median():.4g}"
     )
+    for level in (1.0, 1.5):
+        rest = sign_eligible(frame=injected(known=known, level=level)).filter(
+            pl.col("site") != "D15"
+        )
+        ba = balanced_accuracy_stat(frame=rest, which="unfold")
+        out(
+            f"[post hoc, level {level}, without D15] BA={ba[0] + 0.5:.3f} "
+            f"[{ba[1] + 0.5:.3f}, {ba[2] + 0.5:.3f}] over {rest['site'].n_unique()} Primaries"
+        )
+        pooled = injected(known=known, level=level).filter(pl.col("site") != "D15")
+        out(
+            f"  pooled recall of reverse flow="
+            f"{pooled['tp_unfold'].sum() / pooled['truth_negative'].sum():.3f}, "
+            f"specificity={pooled['tn_unfold'].sum() / pooled['truth_positive'].sum():.3f}"
+        )
+    d15 = injected(known=known, level=1.0).filter(pl.col("site") == "D15")
+    out(
+        f"[post hoc] D15 level 1.0: median signed-fit capacity={d15['c_signed'].median():.2f}, "
+        f"unfold={d15['c_unfold'].median():.2f}"
+    )
     capacity = all(verdict_parts[f"capacity_{lv}"] for lv in (1.0, 1.5))
     direction = (
         all(verdict_parts[f"direction_{lv}"] for lv in (1.0, 1.5))

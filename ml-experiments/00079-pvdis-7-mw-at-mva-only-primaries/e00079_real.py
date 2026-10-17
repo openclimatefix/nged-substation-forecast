@@ -16,7 +16,7 @@ import e00079_inputs as inputs
 import numpy as np
 import polars as pl
 
-_PREPARED: pl.DataFrame | None = None
+_WINDOWS: dict[str, list[inputs.YearWindow]] = {}
 
 
 def _fit_row(*, w: inputs.YearWindow, index: np.ndarray) -> dict[str, float | int]:
@@ -44,10 +44,9 @@ def _fit_row(*, w: inputs.YearWindow, index: np.ndarray) -> dict[str, float | in
 
 def _job(primary: str) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     """Return the point fits and the bootstrap fits of one Primary."""
-    assert _PREPARED is not None
     point: list[dict[str, object]] = []
     boot: list[dict[str, object]] = []
-    for w in inputs.year_windows(prepared=_PREPARED, primary=primary):
+    for w in _WINDOWS[primary]:
         everything = np.arange(len(w.power))
         scale = float(np.median(np.abs(w.power)))
         meta = {"site": primary, "year": w.year, "rows": len(w.power), "scale": scale}
@@ -65,9 +64,10 @@ def _job(primary: str) -> tuple[list[dict[str, object]], list[dict[str, object]]
 
 def main() -> None:
     """Fit every window of the 16 Primaries and write `real.parquet` and `real_boot.parquet`."""
-    global _PREPARED  # noqa: PLW0603
-    _PREPARED = inputs.load_prepared()
+    global _WINDOWS  # noqa: PLW0603
+    prepared = inputs.load_prepared()
     sites = (*common.MVA_PRIMARIES, *common.MW_PRIMARIES)
+    _WINDOWS = {s: inputs.year_windows(prepared=prepared, primary=s) for s in sites}
     with get_context("fork").Pool(4) as pool:
         results = pool.map(_job, sites)
     unit = {s: ("MVA" if s in common.MVA_PRIMARIES else "MW") for s in sites}

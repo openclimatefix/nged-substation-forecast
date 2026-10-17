@@ -109,6 +109,7 @@ the maintainer to confirm.
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
 | [00073 - Solar orientation mix and DC:AC ratio, PVDIS part 6](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) | Can the share of east-, south-, and west-facing solar behind a Primary, and the ratio of DC to AC capacity, be read from its power? | Partly supported: the blend helps, its shares are not identified, DC:AC is not recovered | Candidate | 2026-10-17 |
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
+| [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction about four times in five, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -1491,6 +1492,27 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
   #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
 
 ![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
+
+### 00079: can the direction of flow be recovered at Primaries metered only in MVA? (PVDIS-7)
+
+**Hiding the sign of a Primary's power and recovering it finds the solar capacity to within about 9%
+to 11% and the direction of flow in about four half-hours in five, but 7 of the 8 real MVA-only
+Primaries show no reverse flow to find, and the eighth, Stickney, cannot be checked.** For those 7
+Primaries the MVA reading can stand in for MW from April to September. We subtracted the output of
+real solar farms from the power of the 8 Primaries metered in MW, threw the sign away, and fitted
+the magnitude of demand minus solar. The median capacity error against the signed fit was 0.092
+where a fit that ignores the missing sign gave 0.290 (contrast -0.198, 99% interval -0.409 to
+-0.068). The balanced accuracy of the direction was 0.779, and 0.819 without Wrangle T1, which is
+net generation on most sunny days and where the fit fails. A reactive-power floor of 20% of midday
+power cut the accuracy to 0.666. The verdict is `partly supported`.
+
+- **Finding for later experiments:** get signed power for Stickney before quoting any fitted value
+  there, because its sunny-midday reading is about 2.4 times its typical reading and the registered
+  fit does not explain it. Test any sign-recovery start on a Primary that is a net exporter first.
+  Do not read the sign recovery as valid where reactive power exceeds about 10% of midday power.
+- **Write-up:** [the full result page](00079-pvdis-7-mw-at-mva-only-primaries/result.md).
+
+![Fitted capacity and reverse-flow share at the MVA-only Primaries](00079-pvdis-7-mw-at-mva-only-primaries/figure_4_mva_primaries.svg)
 
 ### 00076: does experiment 64's gain beyond 10 days come from a leak? (PVDIS-5 leak check)
 

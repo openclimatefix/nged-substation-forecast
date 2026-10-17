@@ -21,7 +21,6 @@ sooner.
 | [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
 | [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
-| [PVDIS-7](#pvdis-7-mw-at-the-primaries-metered-only-in-mva) | Can a fit of the magnitude of demand minus solar recover MW, and the direction of flow, at the Primaries metered only in MVA? | 4 | PVDIS-4 | Planned as [experiment 00079](00079-pvdis-7-mw-at-mva-only-primaries/result.md); research, which NGED accepts may not succeed |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
 ## Deferred until the first results are in
@@ -267,7 +266,8 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   daylight cloud load was flagged in 6 of 7 season-years; Wrangle T1 is excluded from any claim that
   a Primary is free of a confound; Trusthorpe is marked low-power. The 8 Primaries metered only in
   MVA fold solar into the magnitude of the flow, and experiment 00039 fitted a negative capacity at
-  Stickney in every year. PVDIS-7 treats them separately.
+  Stickney in every year. [Experiment
+  00079](00079-pvdis-7-mw-at-mva-only-primaries/result.md) (PVDIS-7) treats them separately.
 - **Service areas.** `TimeSeriesMetadata.area_wkt` holds one polygon per Primary. Wrangle T1 and
   Wrangle T2 are two transformers at one substation, feeding different circuits, and share one
   polygon. Each transformer keeps its own capacity fit, and any comparison against an outside count
@@ -294,18 +294,6 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   domestic load falls on sunny days, as people go outside, and biases the fitted capacity high. Each
   write-up reports the coastal Primaries separately and compares school-holiday weeks with term-time
   weeks.
-
-#### PVDIS-7: MW at the Primaries metered only in MVA
-
-**Fit the magnitude of demand minus solar, so that the reading bounces off zero instead of going
-negative, and test on the Primaries metered in MW whether the fit recovers the direction of flow and
-the solar capacity.** The 8 MVA Primaries have MVA meters only, and NGED cannot supply real and
-reactive power there, so recovering MW from MVA is the only route to forecasting MW at every
-Primary. The model assumes a power factor of 1, which is weakest exactly where the flow passes
-through zero, because reactive power then dominates the reading. The known-answer test takes the
-absolute value of the MW readings at the 8 Primaries metered in MW and scores the recovered sign
-and capacity against the real ones. A fit that passes that test is then applied to the 8 MVA
-Primaries. NGED would like MW at every Primary, and accepts that the result is research.
 
 #### PVDIS-T: the capacity table, a study
 

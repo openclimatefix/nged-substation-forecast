@@ -19,7 +19,7 @@ import e00079_selftest as selftest
 import numpy as np
 import polars as pl
 
-_PREPARED: pl.DataFrame | None = None
+_WINDOWS: dict[str, list[inputs.YearWindow]] = {}
 _FARMS: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
 
@@ -72,9 +72,8 @@ def case_row(
 
 def _job(primary: str) -> list[dict[str, object]]:
     """Return all known-answer rows of one MW Primary."""
-    assert _PREPARED is not None
     out: list[dict[str, object]] = []
-    for w in inputs.year_windows(prepared=_PREPARED, primary=primary):
+    for w in _WINDOWS[primary]:
         full = np.ones(len(w.power), dtype=bool)
         scale = w.midday_scale(mask=full)
         design = fit.Design.build(cells=w.cells, nuisance=w.nuisance)
@@ -116,10 +115,11 @@ def _job(primary: str) -> list[dict[str, object]]:
 
 def main() -> None:
     """Run the self-tests, then every known-answer case, and write `known.parquet`."""
-    global _PREPARED, _FARMS  # noqa: PLW0603
+    global _WINDOWS, _FARMS  # noqa: PLW0603
     selftest.run()
-    _PREPARED = inputs.load_prepared()
-    _FARMS = inputs.farm_series(prepared=_PREPARED)
+    prepared = inputs.load_prepared()
+    _FARMS = inputs.farm_series(prepared=prepared)
+    _WINDOWS = {p: inputs.year_windows(prepared=prepared, primary=p) for p in common.MW_PRIMARIES}
     with get_context("fork").Pool(4) as pool:
         rows = [r for chunk in pool.map(_job, common.MW_PRIMARIES) for r in chunk]
     table = pl.DataFrame(rows)
