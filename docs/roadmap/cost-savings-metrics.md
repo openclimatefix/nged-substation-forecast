@@ -316,10 +316,7 @@ description, about half of generators have their limit at the next substation up
 point or grid supply point). In other cases the limit is on a circuit and only binds after the next
 fault. It is set by power-flow and N-1 contingency analysis: simulate one fault, run a power flow,
 simulate the next credible fault, and repeat over all credible faults. The single-series synthetic
-limit below is a crude stand-in for that analysis. The code applies the synthetic limit to any
-series, including bulk and grid supply points, and sweeps a lower limit (0.75 and 0.5 times the
-percentile) as a crude proxy for the smaller headroom after a fault. The sweep is an assumption and
-not an N-1 study.
+limit below is a crude stand-in for that analysis.
 
 We use a **synthetic limit**: the **99th percentile of each series' own full observation history**,
 in the constrained direction, labelled `historical_p99` to keep it distinct from the

@@ -14,6 +14,7 @@ quantiles is still the coverage of that column, so the table needs no knowledge 
 was made.
 """
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Final
 
@@ -21,9 +22,16 @@ import numpy as np
 import polars as pl
 
 from studies.bootstrap import bootstrap_month_totals
+from studies.experiment_store import read_predictions
 
 TAIL_LEVELS: Final[tuple[float, ...]] = (0.01, 0.05, 0.95, 0.99)
 """The quantile levels that the tail-calibration table reports, lowest first."""
+
+QUANTILE_COLUMN_PATTERN: Final[re.Pattern[str]] = re.compile(r"^q(\d{2})$")
+"""Matches a quantile column name such as `q05`; the group is the level in whole percent."""
+
+ROW_KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time", "seed")
+"""The columns that identify one forecast row, so that arms are compared on the same rows."""
 
 ACTUAL_COLUMN: Final[str] = "actual"
 """The column of the measured value, in the same unit as the quantile columns."""
@@ -181,3 +189,71 @@ def tail_calibration_markdown(*, tables: Mapping[str, pl.DataFrame], unit: str) 
                 f"{row['pinball_upper_95']:.4f}) |"
             )
     return "\n".join(lines) + "\n"
+
+
+def quantile_levels(*, frame: pl.DataFrame) -> list[tuple[float, str]]:
+    """Return the delivered quantile levels of a frame with their column names, lowest first.
+
+    Args:
+        frame: A forecast frame with `q<percent>` columns.
+
+    Returns:
+        Each level as a fraction with its column name.
+
+    Raises:
+        ValueError: If fewer than two quantile columns are present, because a quantile between
+            levels cannot be interpolated from one.
+    """
+    found = sorted(
+        (int(match[1]) / 100.0, name)
+        for name in frame.columns
+        if (match := QUANTILE_COLUMN_PATTERN.match(name))
+    )
+    if len(found) < 2:
+        msg = f"need at least two quantile columns named like q05, found {[n for _, n in found]}"
+        raise ValueError(msg)
+    return found
+
+
+def align_arms(*, arms: Mapping[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
+    """Keep only the rows that every arm holds and that have a finite measured value.
+
+    Two arms are comparable only on the same rows, and a NaN measurement would turn a limit or a
+    sum of needed energy into NaN without an error. The caller can compare the heights before and
+    after to report how many rows were dropped.
+
+    Args:
+        arms: Each arm's forecast rows, with `ROW_KEYS` and `actual`.
+
+    Returns:
+        Each arm's rows restricted to the keys all arms share with a finite `actual` in every arm,
+        each arm in its own row order.
+    """
+    names = list(arms)
+    shared = arms[names[0]].filter(pl.col("actual").is_finite()).select(ROW_KEYS).unique()
+    for name in names[1:]:
+        finite_keys = arms[name].filter(pl.col("actual").is_finite()).select(ROW_KEYS).unique()
+        shared = shared.join(finite_keys, on=list(ROW_KEYS), how="inner")
+    return {
+        name: frame.join(shared, on=list(ROW_KEYS), how="inner", maintain_order="left")
+        for name, frame in arms.items()
+    }
+
+
+def read_arms(
+    *, experiment_id: int, names: Sequence[str], row_set_id: str
+) -> dict[str, pl.DataFrame]:
+    """Read named prediction sets of one experiment, ready for `align_arms`.
+
+    Args:
+        experiment_id: The experiment that wrote the sets.
+        names: The sets' names, which become the arm names.
+        row_set_id: The row set the sets must cover.
+
+    Returns:
+        Each arm's forecast rows.
+    """
+    return {
+        name: read_predictions(experiment_id=experiment_id, name=name, row_set_id=row_set_id)
+        for name in names
+    }
