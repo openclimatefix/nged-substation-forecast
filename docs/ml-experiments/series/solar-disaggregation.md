@@ -12,9 +12,10 @@ embedded solar.
   recovers about 85% (the daily fit) of solar-farm output added to a substation's demand. XGBoost, given the
   panels' capacity times the forecast sunshine as a starting offset, scores 0.152 points of capacity
   lower than the best guess (98.75% interval -0.199 to -0.111).
-- **What the series rules out:** GEFS, and UKV alone, as a replacement for ENS in the sunshine forecast (a UKV and ENS blend gives a
-  small gain that one validation year cannot confirm), a fitted mix of panel orientations, a capacity series that changes week by
-  week, and a monitor that spots a lost inverter from daily readings.
+- **What the series rules out:** GEFS, and UKV alone, as a replacement for ENS in the sunshine
+  forecast (a UKV and ENS blend gives a small gain that one validation year cannot confirm), a
+  fitted mix of panel orientations, a capacity series that changes week by week, and a monitor that
+  spots a lost inverter from daily readings.
 - **What to try next:** improve the sunshine forecast itself and refresh the capacity table once a
   season-year. A source of a different kind, such as outage notices from National Grid Electricity
   Distribution (NGED), could test the losses that the readings cannot show.
@@ -32,8 +33,8 @@ downward slope is the embedded solar. [Experiment
 
 ![Donington's midday power against sunshine](../00039-pv-disaggregation-cams-injection/figure_02.svg)
 
-**Midday power falls in summer at the substations plotted, and the capacity fitted in experiment 39 rose at 4 of the 5 Primaries with 4 or more years of data.**
-Each line is one season-year (a 12-month period), so the lines show whether
+**Midday power falls in summer at the substations plotted, and the capacity fitted in experiment 39
+rose at 4 of the 5 Primaries with 4 or more years of data.** Each line is one season-year (a 12-month period), so the lines show whether
 the solar capacity has grown. Wrangle T1 sits near or below zero.
 
 ![Midday mean power by calendar month](../00039-pv-disaggregation-cams-injection/figure_03.svg)
@@ -68,8 +69,8 @@ further checks on the real series, and Wrangle T1 failed the placebo-sky check.
 
 ![Median recovery ratio by model and irradiance point](../00039-pv-disaggregation-cams-injection/figure_01.svg)
 
-**The fitted capacity is close to unbiased on pure solar output on average, but a cloud-driven demand load can still
-hide inside it.** [Experiment 40](../00040-pv-capacity-error-bars/result.md) found a median fitted
+**The fitted capacity is close to unbiased on pure solar output on average, but a cloud-driven
+demand load can still hide inside it.** [Experiment 40](../00040-pv-capacity-error-bars/result.md) found a median fitted
 capacity of 0.992 of the true value (0.951 to 1.032) and a false-alarm rate of 0.055. The test
 for a cloud-driven load caught a day-long load in only 0.35 of trials, so each capacity carries a
 bound of 0.18 to 0.71 of the capacity. Kirton is flagged as confounded.
