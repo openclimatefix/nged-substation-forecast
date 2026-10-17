@@ -19,13 +19,17 @@ decision_rule: >-
   event (the headline rows; the same rows for every arm), quantile score over all leads, 98.33%
   interval (Bonferroni across three), whole validation months resampled. C1, `lagmw_xl` minus
   `plain`; C2, `lagmw_oracle` minus `plain`; C3, `lagmw_xl` minus `lagmw_oracle`. The XL labels are
-  supported as a training-time input when the upper end of C1 is below zero. A production use also
-  needs the no-harm check: C1 on all rows outside switching has an upper end of at most +0.02
-  points (0.34% of the plain arm's score, experiment 75's margin). The threshold is zero because
-  the change needs a detector on the serving path, which has to pay for its complexity with a gain
-  whose interval excludes zero. If C1 does not exclude zero but the no-harm check passes, the
-  answer is that detector labels add nothing outside switching that we can show. C3 is descriptive:
-  it is the skill lost without NGED's logs. Every other comparison is descriptive.
+  supported as a training-time input when the upper end of C1 is below zero. The verdict is
+  `supported` when, in addition, C1 on all rows outside switching has an upper end of at most +0.02
+  points (0.34% of the plain arm's score, experiment 75's margin); `small gain` when C1's upper end
+  is below zero but that no-harm upper end exceeds +0.02 (production use is then not shown safe);
+  `inconclusive` when C1's interval contains zero, which is the answer "detector labels add
+  nothing we can show", whatever C2 shows; `refuted` when C1's lower end is above zero. The
+  threshold is zero because the change needs a detector on the serving path, which has to pay for
+  its complexity with a gain whose interval excludes zero. C3 is descriptive: it is the skill lost
+  without NGED's logs. The share of the oracle gain recovered (C1 over C2) and every other
+  comparison are descriptive. Both arms use hindsight labels, so C3 is a fair comparison but the
+  absolute gain is not what a live service would achieve.
 benchmark: >-
   The `plain` arm refitted by this experiment's own code. `manual_heuristic` and `climatology`
   from experiment 48's stored arms are descriptive references on the same rows.
@@ -53,17 +57,31 @@ Plan only; the write-up replaces this page when the run finishes.
   control member's rows, 150 rounds, learning rate 0.15, recency half-life 0.5 years, seed 0. The
   contrast is not about retraining cadence, so the weekly schedule of experiment 75 is not used.
 - **Arms** (experiment 75's N1 recipe and inputs). `plain`: all rows, no label input.
-  `lagmw_oracle`: lags minus MW plus the three MW columns, oracle labels, trained on all rows. `lagmw_xl`: the same with XL
-  labels. `mask_xl` (descriptive): training rows inside an XL event dropped, nothing else.
+  `lagmw_oracle`: lags minus MW plus the three MW columns, oracle labels, trained on all rows.
+  `lagmw_xl`: the same with XL labels. `mask_xl` (descriptive): training rows inside an XL event
+  dropped, nothing else.
 - **XL labels.** The XL alarms over the whole history, with the first-return end rule, give each
   alarm series an interval and the signed MW of its 24-hour step. Neighbours whose own step has the
   opposite sign (more than 2.0 noise units, the experiment 82 neighbour rule) get the same interval
   and their own step as a receiver. No switching log is read. The labels use hindsight (the end of
   an event is known 24 hours later), so the result is an upper bound for a service.
+- **Detector fit.** XL's logistic score and threshold were fitted in experiment 82 on injected
+  transfers and alarms of odd months only, with no label from the scored year (2025-07 to 2026-06)
+  read as a target. Its alarms over the real history are used as they stand.
+- **Conventions.** An interval covers the half-hours `[onset, end)` on experiment 82's grid from
+  2022-01-01 00:00 UTC, converted to UTC timestamps before being placed on experiment 75's grid; a
+  lag is inside an event when the lag's valid time is. The signed MW is negative on the donor, and
+  its sign and size are checked against the oracle on events both label (correlation printed).
+  A unit test is not added because the experiment has no tests of its own scripts; a printed
+  check on one known event replaces it.
 - **Rows.** Experiment 75's 292 runs; scored on rows outside oracle-labelled switching and logged
   closures; headline rows have a lag inside an oracle event. Also reported: the number of those
   rows whose lag is inside an XL event, and the number of rows with a lag inside an XL event that
-  the oracle does not label.
+  the oracle does not label (a second row set, descriptive, with C1 on it, which measures harm
+  from false alarms). The tail table reports the empirical coverage of the 5% to 95% band and the
+  pinball loss at 0.05 and 0.95 per arm; 0.01 and 0.99 are not stored (nine levels).
+- **Power.** The headline rows are about 1.3% of cases in 8 months, so intervals will be wide
+  (experiment 75: -1.51 to +0.02), and an `inconclusive` verdict is the likely outcome.
 - **Compute.** Slot A, 8 cores, GPU at most 12 GB. 4 workers of 2 threads each (12 refits of 16
   series and 4 arms at 150 rounds is a small job).
 - **Size.** Stored: private predictions only. Serving path: untouched. Degradation rule:
