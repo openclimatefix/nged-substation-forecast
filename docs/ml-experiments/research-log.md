@@ -135,7 +135,8 @@ fold, but dropping the Christmas column raised the error by 1.2 points inside th
   weekly minus monthly -0.039 (-0.064 to -0.012); blend minus weekly -0.038 (-0.070 to -0.007),
   short of the -0.05 threshold.
 - **Finding for later experiments:** without D8, D12, and D5, weekly minus the stack is -0.093
-  (95% -0.189 to -0.014). An all-18 km fold had the same signs for the first four contrasts with intervals that include zero.
+  (95% -0.189 to -0.014). An all-18 km fold had the same signs for the first four contrasts, with
+  intervals that include zero.
   Neither fold separates retraining from adapting to the 9 km weather product.
 - **Write-up and pull request:** [result](00081-r11-control-member-second-validation-year-demand/result.md),
   [PR #1313 (Experiment 81: do the weekly-retraining findings hold on July-to-March forecast
