@@ -38,6 +38,8 @@ HEADLINE_EVENTS: Final[int] = 160
 OTHER_BAND_EVENTS: Final[int] = 55
 """600 events: 160 in the headline band and 55 in each of the other eight bands."""
 P_EXTRA_UNMETERED: Final[float] = 0.1
+MAX_ATTEMPTS: Final[int] = 300_000
+"""Draws tried for one band before it is left short, so an impossible quota cannot loop."""
 
 
 @dataclass(frozen=True)
@@ -126,19 +128,22 @@ def draw_events(
     headline_only: int | None = None,
     first_id: int = 0,
     onset_ok: Callable[[int], bool] | None = None,
+    counts: tuple[int, int] | None = None,
 ) -> list[Event]:
     """Draw 600 events, stratified by size and duration band, each quiet on every series it uses.
 
     With `headline_only`, draw that many events in the headline band and none in the other bands.
     `first_id` numbers the events from that id, and `onset_ok` rejects an event whose onset stamp
-    it returns False for. The default arguments reproduce experiment 43's draw exactly.
+    it returns False for. `counts` replaces the 160 headline-band and 55 other-band event counts.
+    The default arguments reproduce experiment 43's draw exactly.
     """
     rng = np.random.default_rng(seed)
     sheets = sheets if sheets is not None else operations()
+    headline_count, other_count = (
+        counts if counts is not None else (HEADLINE_EVENTS, OTHER_BAND_EVENTS)
+    )
     wanted = {
-        (size, duration): HEADLINE_EVENTS
-        if (size, duration) == HEADLINE_BAND
-        else OTHER_BAND_EVENTS
+        (size, duration): headline_count if (size, duration) == HEADLINE_BAND else other_count
         for size in SIZE_BANDS
         for duration in DURATION_BANDS
     }
@@ -149,7 +154,9 @@ def draw_events(
         hours_low, hours_high = DURATION_BANDS[duration]
         pool = sheets.filter(pl.col("hours").is_between(hours_low, hours_high))
         made = 0
-        while made < count:
+        attempts = 0
+        while made < count and attempts < MAX_ATTEMPTS:
+            attempts += 1
             event = _try_event(
                 pool=pool,
                 size=size,

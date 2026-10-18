@@ -17,16 +17,17 @@ from e00088_grid import GRID_LENGTH, LABELLED_PATH, stamp_of
 from e00088_inject import Event, Injection, _share
 from e00088_intervals import EXPECTED_FLOOR_SHARE
 
-Shape = Literal["S1", "S2", "S3", "S4", "S5"]
-SHAPES: Final[tuple[Shape, ...]] = ("S1", "S2", "S3", "S4", "S5")
+Shape = Literal["S1", "S2", "S3", "S4", "S5", "S6"]
+SHAPES: Final[tuple[Shape, ...]] = ("S1", "S2", "S3", "S4", "S5", "S6")
 SHAPE_NAMES: Final[dict[str, str]] = {
     "S1": "donor profile",
     "S2": "constant MW",
     "S3": "receiver profile",
     "S4": "fitted mix",
     "S5": "profile shifted 12 h",
+    "S6": "profile reversed in time",
 }
-NON_MATCHING: Final[tuple[Shape, ...]] = ("S2", "S3", "S4")
+NON_MATCHING: Final[tuple[Shape, ...]] = ("S2", "S3", "S4", "S6")
 MIN_FITS: Final[int] = 10
 """Fewer usable fitted real transfers than this and S4 draws its profile share uniformly."""
 MIN_FIT_HOURS: Final[float] = 6.0
@@ -156,6 +157,9 @@ def inject_shaped(
                 relative = p / p.mean() if p.mean() > 0 else np.ones(len(stamps))
                 gains[receiver] = weight * level * relative
                 moved = moved + gains[receiver]
+        elif shape == "S6":
+            reversed_donor = donor[::-1]
+            moved = level * reversed_donor / max(float(reversed_donor.mean()), 1e-9)
         elif shape == "S5":
             ahead = np.clip(stamps + 24, 0, GRID_LENGTH - 1)
             shifted = np.nan_to_num(power[event.donor][ahead], nan=np.nanmedian(power[event.donor]))
