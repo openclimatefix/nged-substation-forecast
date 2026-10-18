@@ -252,6 +252,11 @@ def predict_run(
     )
 
 
+def booster_path(*, arm: str, site: str, refit: datetime) -> Path:
+    """Return the file one fitted booster is saved to."""
+    return common.BOOSTERS_DIR / arm / f"{site}_s{common.SEED}_{refit:%Y%m%dT%H%M}.ubj"
+
+
 def job_path(*, root: Path, arm: str, site: str, refit: datetime) -> Path:
     """Return the file one refit's predictions for one arm and series are written to."""
     return root / arm / f"{site}_s{common.SEED}_{refit:%Y%m%dT%H%M}.parquet"
@@ -315,6 +320,10 @@ def run_job(
         for site in sites
         for arm in ARMS
         if not job_path(root=out_root, arm=arm, site=site, refit=refit).exists()
+        or not (
+            out_root != common.ANCHOR_PREDS_DIR
+            or booster_path(arm=arm, site=site, refit=refit).exists()
+        )
     ]
     if not todo:
         return [f"refit {refit:%Y-%m-%d %H:%M}: all files exist"]
@@ -330,6 +339,12 @@ def run_job(
         )
         matrix = train_matrix(rows=known, row=row, refit=refit, arm=arm)
         models[site, arm] = fit(matrix=matrix, rounds=rounds, nthread=nthread)
+        if out_root == common.ANCHOR_PREDS_DIR:
+            target = booster_path(arm=arm, site=site, refit=refit)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_name(f"tmp_{target.name}")
+            models[site, arm].save_model(temporary)
+            temporary.rename(target)
         lines.append(
             f"{arm} {site} refit {refit:%Y-%m-%d %H:%M}: {matrix.num_row():,} of {known.height:,} "
             f"rows, {len(origins)} runs, fit {time.monotonic() - started:.0f} s"

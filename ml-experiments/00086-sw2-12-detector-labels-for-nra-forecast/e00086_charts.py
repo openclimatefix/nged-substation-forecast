@@ -1,8 +1,9 @@
 """Draw experiment 00086's figures from the saved results, as SVG.
 
-1. The three planned contrasts with their 98.33% intervals, and the non-inferiority margin.
-2. The same three contrasts on the half-hours whose lag falls inside a labelled event.
-3. Each arm's absolute quantile score on the NRA rows, beside experiment 00048's benchmarks.
+1. The three planned contrasts on the rows whose lag sits inside an oracle event, 98.33% intervals.
+2. The no-harm check and related contrasts on all rows outside switching.
+3. Each arm's absolute quantile score on the rows with a lag inside an oracle event.
+4. How many scored rows each label source puts a lag inside an event for.
 
 The SVGs are afterwards optimised with `npx svgo@4 --multipass --precision=1 --final-newline`.
 
@@ -23,38 +24,34 @@ WRAP_CHARACTERS: Final[int] = 92
 OUT_DIR: Final[Path] = common.CHART_DIR
 SCOPE: Final[str] = "16 Primary substations, 292 daily forecast runs, July 2025 to June 2026."
 LABELS: Final[dict[str, str]] = {
-    "C1": "Masked training targets minus plain",
-    "C2": "Masked + signed MW columns minus masked",
-    "C3": "Masked + lags minus MW minus masked",
+    "C1": "Detector labels (XL) minus plain",
+    "C2": "Oracle labels minus plain",
+    "C3": "Detector labels minus oracle labels",
 }
-SUBSET_IDS: Final[dict[str, str]] = {
-    "D7": "Masked training targets minus plain",
-    "D8": "Masked + signed MW columns minus masked",
-    "D9": "Masked + lags minus MW minus masked",
+OUTSIDE_LABELS: Final[dict[str, str]] = {
+    "N1": "Detector labels minus plain",
+    "D1 C2 on all rows outside switching": "Oracle labels minus plain",
+    "D9 C3 on all rows outside switching": "Detector labels minus oracle labels",
+    "D7 mask_xl minus plain, outside switching": "Detector-masked training minus plain",
 }
 ARM_LABELS: Final[dict[str, str]] = {
-    "plain": "Plain weekly (nothing removed)",
-    "nra": "Masked training targets",
-    "nra_mw": "Masked + signed MW columns",
-    "nra_lag": "Masked + lags minus MW",
-    "experiment 00048 weekly + 14-day correction": "Weekly + 14-day correction",
-    "experiment 00048 stack": "Stack: frozen + 14-day correction",
+    "plain": "Plain (no label input)",
+    "lagmw_oracle": "Corrected lags + MW, oracle labels",
+    "lagmw_xl": "Corrected lags + MW, detector labels",
+    "mask_xl": "Detector-masked training",
     "manual_heuristic": "manual_heuristic",
     "climatology": "climatology",
 }
 ARM_KIND: Final[dict[str, str]] = {
     "plain": "This experiment",
-    "nra": "This experiment",
-    "nra_mw": "This experiment",
-    "nra_lag": "This experiment",
-    "experiment 00048 weekly + 14-day correction": "Earlier benchmark",
-    "experiment 00048 stack": "Earlier benchmark",
+    "lagmw_oracle": "This experiment",
+    "lagmw_xl": "This experiment",
+    "mask_xl": "This experiment",
     "manual_heuristic": "Baseline",
     "climatology": "Baseline",
 }
 KIND_COLOURS: Final[dict[str, str]] = {
     "This experiment": ocf.DATA_BLUE,
-    "Earlier benchmark": ocf.BRAND_ORANGE,
     "Baseline": ocf.DATA_PURPLE,
 }
 
@@ -94,62 +91,34 @@ def _forest(
     )
 
 
-def figure_1(*, folder: Path) -> alt.TopLevelMixin:
-    """The planned contrasts with their Bonferroni-level intervals."""
-    data = (
+def _contrasts(*, folder: Path, labels: dict[str, str], level: str) -> pl.DataFrame:
+    return (
         pl.read_parquet(folder / "contrasts.parquet")
         .filter(
-            pl.col("id").is_in(list(LABELS))
-            & (pl.col("level_label") == "planned")
+            pl.col("id").is_in(list(labels))
+            & (pl.col("level_label") == level)
             & (pl.col("site") == "pooled")
             & (pl.col("scope") == "all leads")
         )
-        .with_columns(label=pl.col("id").replace_strict(LABELS))
+        .with_columns(label=pl.col("id").replace_strict(labels))
     )
+
+
+def figure_1(*, folder: Path) -> alt.TopLevelMixin:
+    """The planned contrasts on the rows whose lag sits inside an oracle event."""
     return _forest(
-        data=data,
+        data=_contrasts(folder=folder, labels=LABELS, level="planned"),
         order=list(LABELS.values()),
         title=_title(
-            text="Masking switching and adding its size changed the score by under 0.06 points",
-            lines=[
-                SCOPE + " Scored on half-hours outside labelled switching and logged closures.",
-                (
-                    "Dot: estimate. Line: 98.33% interval from re-drawing whole months. Zero: "
-                    "same score. Dashed line: +0.02, the harm the masked arm may show and still "
-                    "be adopted."
-                ),
-            ],
-        ),
-        extra=[_rule(value=0.02, colour=ocf.BRAND_ORANGE, dash=True)],
-    )
-
-
-def figure_2(*, folder: Path) -> alt.TopLevelMixin:
-    """The same contrasts on the half-hours whose lag falls inside a labelled event."""
-    data = (
-        pl.read_parquet(folder / "contrasts.parquet")
-        .filter(
-            pl.col("id").is_in(list(SUBSET_IDS))
-            & (pl.col("level_label") == "95")
-            & (pl.col("site") == "pooled")
-            & (pl.col("scope") == "all leads")
-        )
-        .with_columns(label=pl.col("id").replace_strict(SUBSET_IDS))
-    )
-    return _forest(
-        data=data,
-        order=list(SUBSET_IDS.values()),
-        title=_title(
-            text="Where a lag sits inside a labelled event, correcting the lag helped most",
+            text="Correcting lags with the detector's labels did not lower the error",
             lines=[
                 (
-                    SCOPE + " Only the 37,394 half-hours (1.3%) whose newest, same-day, or "
-                    "same-week lag falls in a labelled event, in 8 months."
+                    SCOPE + " Only the 37,394 half-hours (1.3%) outside switching whose lag "
+                    "sits inside an event NGED's logs label, in 8 months."
                 ),
                 (
-                    "Dot: estimate. Line: 95% interval from re-drawing whole months. Zero: same "
-                    "score. Read as description: the subset is small and the intervals are not "
-                    "corrected for several comparisons."
+                    "Dot: estimate. Line: 98.33% interval from re-drawing whole months. "
+                    "Zero: same score."
                 ),
             ],
         ),
@@ -157,11 +126,39 @@ def figure_2(*, folder: Path) -> alt.TopLevelMixin:
     )
 
 
+def figure_2(*, folder: Path) -> alt.TopLevelMixin:
+    """The no-harm check on all rows outside switching."""
+    return _forest(
+        data=pl.concat(
+            [
+                _contrasts(folder=folder, labels={"N1": OUTSIDE_LABELS["N1"]}, level="planned"),
+                _contrasts(
+                    folder=folder,
+                    labels={k: v for k, v in OUTSIDE_LABELS.items() if k != "N1"},
+                    level="95",
+                ),
+            ]
+        ),
+        order=list(OUTSIDE_LABELS.values()),
+        title=_title(
+            text="Outside switching, the detector's labels made the forecast slightly worse",
+            lines=[
+                SCOPE + " All half-hours outside labelled switching and logged closures.",
+                (
+                    "Dot: estimate. Line: 98.33% interval for the top row, 95% for the others. "
+                    "Dashed line: +0.02, the harm the plan allows."
+                ),
+            ],
+        ),
+        extra=[_rule(value=0.02, colour=ocf.BRAND_ORANGE, dash=True)],
+    )
+
+
 def figure_3(*, folder: Path) -> alt.TopLevelMixin:
-    """Each arm's absolute quantile score on the NRA rows."""
+    """Each arm's absolute quantile score on the rows with a lag inside an oracle event."""
     data = (
         pl.read_parquet(folder / "absolute.parquet")
-        .filter((pl.col("subset") == "nra") & pl.col("arm").is_in(list(ARM_LABELS)))
+        .filter((pl.col("subset") == "lag_oracle") & pl.col("arm").is_in(list(ARM_LABELS)))
         .with_columns(
             label=pl.col("arm").replace_strict(ARM_LABELS),
             kind=pl.col("arm").replace_strict(ARM_KIND),
@@ -190,27 +187,59 @@ def figure_3(*, folder: Path) -> alt.TopLevelMixin:
             width=PLOT_WIDTH,
             height=200,
             title=_title(
-                text="All four weekly arms score within 0.02 points of each other",
+                text="On rows with a lag inside an event, no arm beats the plain arm clearly",
                 lines=[
-                    (
-                        SCOPE + " Mean over the half-hours outside labelled switching and logged "
-                        "closures that every arm holds (2,928,842 cases)."
-                    ),
-                    (
-                        "Dot: mean score. The paired contrasts in figure 1 are much tighter than "
-                        "the uncertainty of any one dot, so no interval is drawn here."
-                    ),
+                    SCOPE + " Mean over the 37,394 half-hours with a lag inside an event "
+                    "(oracle labels), outside switching.",
+                    "Dot: mean score. Intervals are in figure 1.",
                 ],
             ),
         )
     )
 
 
+def figure_4(*, folder: Path) -> alt.TopLevelMixin:
+    """How many scored rows each label source puts a lag inside an event for."""
+    counts = pl.read_parquet(folder / "label_counts.parquet").row(0, named=True)
+    data = pl.DataFrame(
+        {
+            "label": [
+                "Oracle labels (NGED's logs)",
+                "Detector labels (XL)",
+                "Both",
+                "Detector only",
+            ],
+            "rows": [
+                counts["lag_oracle"],
+                counts["lag_xl"],
+                counts["lag_both"],
+                counts["lag_xl_only"],
+            ],
+        }
+    )
+    return (
+        alt.Chart(data)
+        .mark_bar(color=ocf.DATA_BLUE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("label:N", sort=data["label"].to_list(), title=None),
+            x=alt.X("rows:Q", title="Scored half-hours with a lag inside an event"),
+        )
+        .properties(
+            width=PLOT_WIDTH,
+            height=140,
+            title=_title(
+                text="The detector marks about eight times as many rows as NGED's logs",
+                lines=[SCOPE + " Rows outside switching."],
+            ),
+        )
+    )
+
+
 def main() -> None:
-    """Write the three figures."""
+    """Write the figures."""
     folder = common.RESULTS_DIR
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for index, draw in enumerate((figure_1, figure_2, figure_3), start=1):
+    for index, draw in enumerate((figure_1, figure_2, figure_3, figure_4), start=1):
         draw(folder=folder).save(OUT_DIR / f"figure_{index}.svg")
         print(f"figure {index} written")
 
