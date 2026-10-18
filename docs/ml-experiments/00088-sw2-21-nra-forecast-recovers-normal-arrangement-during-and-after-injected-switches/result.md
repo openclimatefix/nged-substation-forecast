@@ -242,8 +242,8 @@ is the fall in error from arm 1 divided by that gap.
 
 ## Plan (written before any code ran)
 
-- **Question.** [Experiment 75](../00075-sw2-11-nra-forecast-with-labelled-switching-
-  masks/result.md)
+- **Question.**
+  [Experiment 75](../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)
   could not tell whether a forecast trained without switching half-hours, with corrected lags,
   helps, because the metered target is abnormal during a switch and only 1.3% of scored
   half-hours had a lag inside an event. Injection makes the unmodified power known, so the
