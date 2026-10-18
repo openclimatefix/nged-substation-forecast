@@ -1,7 +1,7 @@
 ---
 id: "00086"
 slug: sw2-12-detector-labels-for-nra-forecast
-status: planned
+status: done
 size: medium
 hypothesis: >-
   On the 292 daily ENS forecast runs of experiment 48, giving the monthly-refitted (P-roll) Primary demand
@@ -38,55 +38,105 @@ metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 9 levels), in points of capacity,
   on the rows outside switching (all of them, and the in-event-lag subset)
 code: ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/
+verdict: inconclusive
+best_arm: >-
+  None separable from `plain`. On the 37,394 rows outside switching with a lag inside an oracle
+  event, `plain` scored 10.778, corrected lags with oracle labels 10.488, corrected lags with
+  detector labels 11.260, and detector-masked training 10.736 points of capacity.
+headline: >-
+  C1, detector labels minus plain: +0.48 points (98.33% interval -0.06 to +1.72). C2, oracle labels
+  minus plain: -0.29 (-2.06 to +0.68). C3, detector minus oracle labels: +0.77 (+0.13 to +2.34).
+  No-harm check N1, C1 on all rows outside switching: +0.056 (+0.016 to +0.126).
+lessons: >-
+  Corrected lags with the MW columns did not help even with NGED's own logs on a 12-month rolling
+  window, and the detector's labels made the forecast worse, both on the rows with a lag inside an
+  event and on the other rows outside switching. The detector marks about eight times as many rows
+  as the logs, and only 15% of the rows the logs mark.
+advice:
+  - >-
+    Do not put the XL detector's labels into the Primary forecast as corrected lags and MW
+    columns: outside switching they raised the score by 0.056 (0.016 to 0.126) (N1, figure 2).
+  - >-
+    Judge any label-based lag correction on rows with a lag inside a logged event, and expect wide
+    intervals: oracle labels changed that score by -0.29 (-2.06 to +0.68), so 8 months of such rows
+    cannot show a gain of the size experiment 75 saw (C2, figure 1).
+  - >-
+    Test the corrected lags on injected switching events with a known true normal-running-arrangement
+    signal, because the 82 logged events leave too few rows to measure a gain (label counts,
+    figure 4).
+production_status: not-for-production
+adopted_in: none
+boosters: data/ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/work/boosters/
 ---
 
 # Experiment 86: do the detector's switching labels give the same gain as NGED's logs?
 
-Plan only; the write-up replaces this page when the run finishes.
+**Take-home message: correcting the lags for switching did not lower the Primary demand forecast's
+error with either source of labels, and the detector's labels made the forecast slightly worse.**
+NGED's own logs gave a change of -0.29 points of capacity (98.33% interval -2.06 to +0.68) on the
+rows where the benefit should show. The detector's labels gave +0.48 (-0.06 to +1.72) on those rows
+and +0.056 (+0.016 to +0.126) on all other rows outside switching. The detector marks about eight
+times as many half-hours as the logs and agrees with the logs on only 15% of the half-hours the logs
+mark. Before the detector is worth putting on the serving path, it needs labels that match the logs
+better. Because eight months of in-event rows cannot show a gain even for the logs, the next
+experiment should inject switching events of known size and test whether the corrected-lag forecast
+recovers the true normal running arrangement. The verdict is **inconclusive**.
 
-- **Question.** [Experiment 75](../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)
-  found that outside switching an oracle mask and oracle MW columns changed the Primary score by
-  under 0.06 points. Only the half-hours whose lag sits inside an event gained (corrected lags
-  -0.42, -1.51 to +0.02). This experiment gives XGBoost the corrected lags and the MW columns
-  together, once with the oracle labels of experiment 41 and once with the labels of the XL
-  detector of [experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)
-  (MW-weighted recall 0.770 on injected transfers). The gap is the skill lost without NGED's logs.
-- **Schedule.** The cheap P-roll schedule of
-  [experiment 49](../00049-vp1-screening-reference-under-p-roll-demand/result.md):
-  a refit on the 1st of each month from 2025-07-01 to 2026-06-01, on the latest 365 days of the ENS
-  control member's rows, 150 rounds, learning rate 0.15, recency half-life 0.5 years, seed 0. The
-  contrast is not about retraining cadence, so the weekly schedule of experiment 75 is not used.
-- **Arms** (experiment 75's N1 recipe and inputs). `plain`: all rows, no label input.
-  `lagmw_oracle`: lags minus MW plus the three MW columns, oracle labels, trained on all rows.
-  `lagmw_xl`: the same with XL labels. `mask_xl` (descriptive): training rows inside an XL event
-  dropped, nothing else.
-- **XL labels.** The XL alarms over the whole history, with the first-return end rule, give each
-  alarm series an interval and the signed MW of its 24-hour step. Neighbours whose own step has the
-  opposite sign (more than 2.0 noise units, the experiment 82 neighbour rule) get the same interval
-  and their own step as a receiver. No switching log is read. The labels use hindsight (the end of
-  an event is known 24 hours later), so the result is an upper bound for a service.
-- **Detector fit.** XL's logistic score and threshold were fitted in experiment 82 on injected
-  transfers and alarms of odd months only, with no label from the scored year (2025-07 to 2026-06)
-  read as a target. Its alarms over the real history are used as they stand.
-- **Conventions.** An interval covers the half-hours `[onset, end)` on experiment 82's grid from
-  2022-01-01 00:00 UTC, converted to UTC timestamps before being placed on experiment 75's grid; a
-  lag is inside an event when the lag's valid time is. The signed MW is negative on the donor, and
-  its sign and size are checked against the oracle on events both label (correlation printed).
-  A unit test is not added because the experiment has no tests of its own scripts; a printed
-  check on one known event replaces it.
-- **Rows.** Experiment 75's 292 runs; scored on rows outside oracle-labelled switching and logged
-  closures; headline rows have a lag inside an oracle event. Also reported: the number of those
-  rows whose lag is inside an XL event, and the number of rows with a lag inside an XL event that
-  the oracle does not label (a second row set, descriptive, with C1 on it, which measures harm
-  from false alarms). The tail table reports the empirical coverage of the 5% to 95% band and the
-  pinball loss at 0.05 and 0.95 per arm; 0.01 and 0.99 are not stored (nine levels).
-- **Power.** The headline rows are about 1.3% of cases in 8 months, so intervals will be wide
-  (experiment 75: -1.51 to +0.02), and an `inconclusive` verdict is the likely outcome.
-- **Compute.** Slot A, 8 cores, GPU at most 12 GB. 4 workers of 2 threads each (12 refits of 16
-  series and 4 arms at 150 rounds is a small job).
-- **Size.** Stored: private predictions only. Serving path: untouched. Degradation rule:
-  untouched. More than one defensible design: no, the brief fixes the arms and the labels. Callers
-  across code: the XL export script runs inside experiment 82's folder because its pickled score
-  can only be loaded there; the fit and scoring scripts are copies of experiment 75's.
-- **Earlier advice followed.** Test corrected lags with the MW columns (experiment 75 advice 2);
-  judge against a same-code `plain` arm (advice 4). Departed from: none.
+An electricity network operator sometimes closes a normally open switch, so that one Primary
+substation (a substation that steps down to the local distribution network) carries load that
+belongs to a neighbour. The point of a forecast of the normal running arrangement (NRA) is to cope
+with the half-hours whose recent power readings (the lags) were taken during such a switch, and to
+forecast while a substation is in an abnormal arrangement. We asked whether subtracting the moved MW
+from each lag, and giving the moved MW to XGBoost as three more columns, lowers the error. We tried
+it with the events in NGED's switching logs (oracle labels) and with the events found by the XL
+load-transfer detector of [experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md),
+which reads no log.
+
+We refitted the demand model monthly on a rolling 12-month window ([experiment 49](../00049-vp1-screening-reference-under-p-roll-demand/result.md)'s
+cheap schedule) for 16 Primary substations, and scored 292 daily forecast runs from July 2025 to
+June 2026. The score is the quantile score in points of capacity, where smaller is better.
+
+![The three planned contrasts](figure_1.svg)
+
+![Contrasts on all rows outside switching](figure_2.svg)
+
+![Absolute score of each arm](figure_3.svg)
+
+![Rows marked by each label source](figure_4.svg)
+
+- **Arms** (experiment 75's inputs, seed 0). `plain`: all rows, no label input. `lagmw_oracle`:
+  lags minus the signed MW plus three MW columns, oracle labels, trained on all rows. `lagmw_xl`:
+  the same with XL labels. `mask_xl`: training rows inside an XL event dropped (descriptive).
+- **Rows.** 3,199,243 cases; 2,928,842 outside switching (oracle events and logged closures). The
+  headline rows are the 37,394 of them (1.3%, in 8 months) with a lag inside an oracle event.
+- **Score on the headline rows** (`plain` / oracle / XL / `mask_xl`): 10.778 / 10.488 / 11.260 /
+  10.736. `manual_heuristic` scores 8.975 and `climatology` 13.231 on the same rows.
+- **Score on all rows outside switching:** 5.408 / 5.417 / 5.464 / 5.412. `manual_heuristic` 6.121
+  and `climatology` 7.479 (on slightly fewer rows).
+- **Contrasts (98.33% intervals).** C1 +0.48 (-0.06 to +1.72). C2 -0.29 (-2.06 to +0.68). C3, the
+  skill lost without NGED's logs, +0.77 (+0.13 to +2.34). The share of the oracle gain recovered is
+  not defined, because C2 is not a gain. N1, C1 on all rows outside switching, +0.056 (+0.016 to
+  +0.126): its upper end exceeds the +0.02 margin.
+- **Descriptive contrasts (95%).** `lagmw_xl` minus `plain` on the 296,878 rows with a lag inside
+  an XL event only: +0.47 (+0.24 to +0.84), which is the harm from detector labels the logs do not
+  confirm. `lagmw_oracle` minus `plain` on all rows outside switching: +0.009 (-0.006 to +0.022).
+  `mask_xl` minus `plain` outside switching: +0.004 (-0.017 to +0.026); on the headline rows -0.042
+  (-0.084 to -0.008).
+- **Tails** (coverage of the 5% to 95% band; pinball loss at 0.05 and 0.95, in points). Outside
+  switching, `plain` 0.893, 0.914, 1.162; oracle 0.892, 0.913, 1.161; XL 0.885, 0.929, 1.181. On
+  the headline rows, `plain` 0.784, 1.506, 3.386; oracle 0.750, 1.498, 3.385; XL 0.721, 1.808,
+  3.424. The 0.01 and 0.99 quantiles are not stored (nine levels).
+- **Label coverage.** Rows outside switching with a lag inside an event: 37,394 by the logs,
+  302,619 by the detector, 5,741 by both. The detector may be marking real transfers that NGED did
+  not log, which these data cannot tell apart from false alarms.
+- **Caveats.** Both label sources use hindsight (an event's end is known up to 14 days later), so
+  C3 compares like with like but the absolute gain is not what a live service would get. The
+  headline rows are 1.3% of cases in 8 months, so intervals are wide. One seed. The signed MW of the
+  detector is the substation's own 24-hour residual step, not a logged MW; where both label a
+  half-hour the correlation is weak (0.19 at the one substation with enough overlap).
+- **Models kept.** All 768 boosters (4 arms, 12 monthly refits, 16 substations) are saved under
+  `data/ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/work/boosters/<arm>/` for the
+  follow-up that injects switching events.
+- **What the next experiment should answer.** Whether the corrected-lag forecast recovers the true
+  normal running arrangement when switching events of known size are injected into the lags, so
+  that the in-event rows are numerous enough to measure.

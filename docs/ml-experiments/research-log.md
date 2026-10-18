@@ -117,6 +117,7 @@ the maintainer to confirm.
 | [00084 - Substation-limit curtailment cost, worked example](00084-substation-limit-curtailment-cost-worked-example/result.md) | Does the substation-limit curtailment metric run on the pilot, and are there enough half-hours beyond a limit to rank forecasts? | Inconclusive (no registered contrast): 19 half-hours are beyond a limit of 0.9 times the earlier maximum in the scored year, so the pilot proves the arithmetic and cannot rank forecasts | Not for production | 2026-10-17 |
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
+| [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -2002,3 +2003,27 @@ refitted the XGBoost demand model weekly for 16 Primary substations on four arms
   from labelled switching?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1307).
 
 ![Planned contrasts](00075-sw2-11-nra-forecast-with-labelled-switching-masks/figure_1.svg)
+
+### 00086: the normal running arrangement forecast with the detector's labels
+
+**Correcting the lags for switching did not lower the Primary demand forecast's error with either
+source of labels, and the detector's labels made the forecast slightly worse, so the verdict is
+inconclusive.** The experiment refitted the XGBoost demand model monthly for 16 Primary substations
+and scored 292 daily runs, giving the model each lag minus the moved MW and the moved MW as three
+columns.
+
+- **Headline result:** on the 37,394 half-hours outside switching whose lag sits inside a logged
+  event, detector labels minus the plain arm +0.48 points of capacity (98.33% interval -0.06 to
+  +1.72); NGED's logs minus the plain arm -0.29 (-2.06 to +0.68). The plain arm scored 10.778.
+- **Outside switching:** detector labels raised the score by 0.056 (+0.016 to +0.126), above the
+  +0.02 margin the plan allowed.
+- **Finding for later experiments:** the detector marks 302,619 scored half-hours and the logs
+  37,394, and both mark 5,741. The next experiment injects switching events of known size and tests
+  whether the corrected-lag forecast recovers the true normal running arrangement. The 768 trained
+  boosters are kept for it.
+- **Write-up and pull request:**
+  [result](00086-sw2-12-detector-labels-for-nra-forecast/result.md),
+  [PR #1322 (Experiment 86: do the detector's switching labels give the same gain as NGED's
+  logs?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1322).
+
+![Contrasts on the rows with a lag inside a logged event](00086-sw2-12-detector-labels-for-nra-forecast/figure_1.svg)
