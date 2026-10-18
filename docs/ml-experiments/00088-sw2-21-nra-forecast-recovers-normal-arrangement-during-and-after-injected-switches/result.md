@@ -41,7 +41,8 @@ decision_rule: >-
   with causal XL MW (whether masking the targets adds to the lag correction). C4, arm 2 with
   causal XL MW minus arm 1 (the lag correction alone). The verdict is `supported` when the upper
   end of C1 is below zero, C1's point value is at least 20% of the gap from arm 1 to the ceiling
-  (arm 5), and C1 is negative in at least 3 of the 4 scored onset months. It is `small gain` when the
+  (arm 5), and C1 is negative in at least 3 of the 4 scored onset months. It is `small gain` when
+  the
   upper end of C1 is below zero but one of the other two conditions fails, `inconclusive` when
   C1's interval contains zero, and `refuted` when its lower end is above zero. Four month blocks
   give few distinct resamples, so the per-month signs are part of the rule and the interval is
@@ -62,7 +63,8 @@ metric: >-
   (points of capacity), with the quantile score, the pinball loss at the 0.05 and 0.95 quantiles,
   and 90% interval coverage beside it
 code: >-
-  ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/
+  ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-
+  switches/
 ---
 
 # Experiment 88: does the full NRA forecast recover the normal arrangement during a switch?
@@ -140,11 +142,13 @@ Plan only; the write-up replaces this page when the run finishes.
   `thresholds.json`), run on the injected residuals (fast path of experiment 43: the stored
   residual plus the injected MW) with every value at or after the cut stamp (the origin minus 3.5
   hours) set to missing, and with only the 45 days before the cut visible. The functions are those
-  that built experiment 82's `xl_intervals.parquet`, with four causal rules added. The step statistic exists only where its
+  that built experiment 82's `xl_intervals.parquet`, with four causal rules added. The step
+  statistic exists only where its
   48-half-hour after-window is complete, and a candidate is a local peak among those stamps. A
   rising step can therefore fire up to 24 hours before its true onset, with the step understated;
   this is what the same code does when run live, so it is kept, and the write-up reports the
-  onset error and the detected step over the injected median MW by hours since onset. A return step or level failure ends an interval only when it lies
+  onset error and the detected step over the injected median MW by hours since onset. A return
+  step or level failure ends an interval only when it lies
   at least 48 half-hours before the cut, and the first-return search stops at the cut. Any other
   interval is open and runs to the cut. Partners follow the rule that built `xl_intervals.parquet`
   (an opposite-sign neighbour step above 2.0 noise units whose level holds at least half the step
@@ -196,7 +200,8 @@ Plan only; the write-up replaces this page when the run finishes.
 
 A Sonnet reviewer found these, all accepted unless noted.
 
-- Rising-step peaks fire early on a partial window: fixed by requiring a full after-window.
+- Rising-step peaks fire early on a partial window: kept as live behaviour, with onset error and
+  step ratio reported by hours since onset.
 - "Open interval" was undefined on truncated data: fixed by the explicit end rule above.
 - The first-return search could fix an end early: ends are accepted only 48 half-hours before the
   cut.
