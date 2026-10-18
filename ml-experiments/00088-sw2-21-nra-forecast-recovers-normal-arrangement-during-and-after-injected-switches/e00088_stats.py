@@ -10,6 +10,7 @@ calendar months of the transfer's onset, holding the shapes' months together.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 import e00088_common as common
@@ -44,6 +45,8 @@ ARMS: Final[dict[str, str]] = {
     "arm3_caus": "nra_oracle_caus",
     "arm4_inj": "nra_xl_inj",
     "arm4_caus": "nra_xl_caus",
+    "arm2_cmax": "lagmw_xl_cmax",
+    "arm4_cmax": "nra_xl_cmax",
     "arm5": "ceiling",
 }
 """The brief's arm numbers (1 plain, 2 lag correction, 3 oracle-trained NRA, 4 XL-trained NRA, 5
@@ -286,6 +289,6 @@ def absolute_scores(*, frame: pl.DataFrame, shapes: tuple[str, ...]) -> pl.DataF
     return pl.DataFrame(rows)
 
 
-def cases_dir_files(*, pattern: str) -> list:
+def cases_dir_files(*, pattern: str, directory: Path = common.CASES_DIR) -> list:
     """Return the sorted per-batch files that match a pattern."""
-    return sorted(common.CASES_DIR.glob(pattern))
+    return sorted(directory.glob(pattern))

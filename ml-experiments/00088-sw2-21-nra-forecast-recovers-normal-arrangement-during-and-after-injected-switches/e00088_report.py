@@ -17,19 +17,34 @@ HEADLINE: Final[tuple[str, ...]] = stats.HEADLINE_SHAPES
 RESULTS_DIR = common.RESULTS_DIR
 
 
-def load() -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Return the case table and the controls' cells."""
-    cells = pl.concat(
+def load() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    """Return the case table, the events, and the per-band cells."""
+    first_pass = pl.concat(
         [
             frame
             for path in stats.cases_dir_files(pattern="cells_*.parquet")
             if (frame := pl.read_parquet(path)).height
         ]
     )
+    second_pass = pl.concat(
+        [
+            frame
+            for path in stats.cases_dir_files(
+                pattern="cells_*.parquet", directory=common.WORK_DIR / "cases_caus"
+            )
+            if (frame := pl.read_parquet(path)).height
+        ]
+    )
+    # The first pass forecast every variant; its causal-MW variants summed duplicate intervals, so
+    # the second pass (which de-duplicates them and adds the max-merge variants) replaces them.
+    redone = second_pass["variant"].unique().to_list()
+    cells = pl.concat(
+        [first_pass.filter(~pl.col("variant").is_in(redone)), second_pass], how="diagonal"
+    )
     events = pl.concat(
         [pl.read_parquet(path) for path in stats.cases_dir_files(pattern="events_*.parquet")]
     )
-    return stats.case_table(cells=cells, events=events), events
+    return stats.case_table(cells=cells, events=events), events, cells
 
 
 def save(*, name: str, frame: pl.DataFrame) -> None:
@@ -63,6 +78,9 @@ def headline(*, cases: pl.DataFrame) -> pl.DataFrame:
         ("C2 arm3_inj - arm1", "arm3_inj", "arm1"),
         ("C3 arm4_caus - arm2_caus", "arm4_caus", "arm2_caus"),
         ("C4 arm2_caus - arm1", "arm2_caus", "arm1"),
+        ("post hoc arm4_cmax - arm1", "arm4_cmax", "arm1"),
+        ("post hoc arm2_cmax - arm1", "arm2_cmax", "arm1"),
+        ("post hoc arm4_cmax - arm2_cmax", "arm4_cmax", "arm2_cmax"),
     ):
         interval = stats.contrast(frame=scored, shapes=HEADLINE, arm_a=arm_a, arm_b=arm_b)
         signs = stats.month_signs(frame=scored, shapes=HEADLINE, arm_a=arm_a, arm_b=arm_b)
@@ -86,7 +104,16 @@ def gap_shares(*, cases: pl.DataFrame, label: str, shapes: tuple[str, ...]) -> p
     """Return the share of the arm-1-to-ceiling gap that arms 2, 3, and 4 close, by time bin."""
     rows = []
     for bin_name, frame in family_a_bins(cases=cases.filter(pl.col("scored"))):
-        for arm in ("arm2_inj", "arm2_caus", "arm3_inj", "arm3_caus", "arm4_inj", "arm4_caus"):
+        for arm in (
+            "arm2_inj",
+            "arm2_caus",
+            "arm2_cmax",
+            "arm3_inj",
+            "arm3_caus",
+            "arm4_inj",
+            "arm4_caus",
+            "arm4_cmax",
+        ):
             share, gap = stats.share_of_gap(frame=frame, shapes=shapes, arm=arm)
             rows.append(
                 {
@@ -171,9 +198,82 @@ def by_bins(
     return pl.DataFrame(rows)
 
 
+def lead_band_table(*, cells: pl.DataFrame, events: pl.DataFrame) -> pl.DataFrame:
+    """Return each variant's MW-weighted mean error by lead band, family A, headline shapes."""
+    weights = events.select("shape", "event_id", "moved_mw", "onset_month").with_columns(
+        w=pl.col("moved_mw").clip(lower_bound=0.0), month=pl.col("onset_month") % 100
+    )
+    work = (
+        cells.filter((pl.col("family") == "A") & pl.col("shape").is_in(HEADLINE))
+        .join(weights, on=["shape", "event_id"], how="left")
+        .filter(pl.col("month").is_in(list(stats.SCORED_MONTH_NUMBERS)))
+    )
+    return (
+        work.group_by("band", "variant")
+        .agg(
+            mae=(pl.col("mae") * pl.col("w") * pl.col("n")).sum()
+            / (pl.col("w") * pl.col("n")).sum(),
+            qs=(pl.col("qs") * pl.col("w") * pl.col("n")).sum() / (pl.col("w") * pl.col("n")).sum(),
+        )
+        .sort("band", "variant")
+    )
+
+
+def odd_month_check(*, cases: pl.DataFrame) -> pl.DataFrame:
+    """Return the headline contrasts on events starting in the odd months (XL tuned there)."""
+    odd = cases.filter(~pl.col("scored") & (pl.col("family") == "A"))
+    rows = []
+    for name, arm_a, arm_b in (
+        ("arm4_caus - arm1", "arm4_caus", "arm1"),
+        ("arm4_cmax - arm1", "arm4_cmax", "arm1"),
+        ("arm3_inj - arm1", "arm3_inj", "arm1"),
+    ):
+        interval = stats.contrast(frame=odd, shapes=HEADLINE, arm_a=arm_a, arm_b=arm_b, level=95.0)
+        rows.append(
+            {"contrast": name, "point": interval.point, "low": interval.low, "high": interval.high}
+        )
+    return pl.DataFrame(rows)
+
+
+def controls() -> None:
+    """Print the false-alarm and real-event checks when their files exist."""
+    false_path = common.CASES_DIR / "controls_false.parquet"
+    if false_path.exists():
+        table = pl.read_parquet(false_path)
+        summary = (
+            table.group_by("variant")
+            .agg(
+                mae=(pl.col("mae") * pl.col("n")).sum() / pl.col("n").sum(),
+                qs=(pl.col("qs") * pl.col("n")).sum() / pl.col("n").sum(),
+                cases=pl.struct("site", "origin").n_unique(),
+                marked=(pl.col("caus_mw_newest") != 0).mean(),
+            )
+            .sort("variant")
+        )
+        print("\nFalse-alarm check (500 pairs with no transfer)")
+        print(summary)
+        save(name="controls_false", frame=summary)
+    real_path = common.CASES_DIR / "controls_real.parquet"
+    if real_path.exists():
+        table = pl.read_parquet(real_path)
+        summary = (
+            table.group_by("variant")
+            .agg(
+                mae=(pl.col("mae") * pl.col("n")).sum() / pl.col("n").sum(),
+                qs=(pl.col("qs") * pl.col("n")).sum() / pl.col("n").sum(),
+                events=pl.col("card_id").n_unique(),
+                cases=pl.struct("site", "origin", "card_id").n_unique(),
+            )
+            .sort("variant")
+        )
+        print("\nReal-event check (NRA estimates as the truth)")
+        print(summary)
+        save(name="controls_real", frame=summary)
+
+
 def main() -> None:
     """Compute every table and print it."""
-    cases, events = load()
+    cases, events, cells = load()
     print(f"cases: {cases.height:,}; events: {events.select('shape', 'event_id').n_unique():,}")
     print(cases.group_by("shape", "family", "scored").len().sort("shape", "family", "scored"))
     save(name="planned_contrasts", frame=headline(cases=cases))
@@ -194,6 +294,19 @@ def main() -> None:
         print(f"\n{name}: family {family} by {column}")
         with pl.Config(tbl_rows=30, tbl_cols=40, fmt_str_lengths=30):
             print(table)
+    bands = lead_band_table(cells=cells, events=events)
+    save(name="lead_bands", frame=bands)
+    print("\nBy lead band (family A, headline shapes, MW-weighted mean absolute error)")
+    print(
+        bands.pivot(on="variant", index="band", values="mae").with_columns(
+            pl.col(pl.Float64).round(3)
+        )
+    )
+    odd = odd_month_check(cases=cases)
+    save(name="odd_months", frame=odd)
+    print("\nOdd-month check (detector tuned on these months), 95% intervals")
+    print(odd)
+    controls()
     scored_a = cases.filter(pl.col("scored") & (pl.col("family") == "A"))
     absolute = stats.absolute_scores(frame=scored_a, shapes=HEADLINE)
     save(name="absolute_family_a", frame=absolute)
