@@ -18,8 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-22](00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/result.md) | With switching removed from the training targets, does the longest history (2021-03 onward) beat the 12-month window, and does setting ARA lags to missing help on rows whose lags lie in an ARA? | 1 | Nothing | Experiment 89, planned |
-| [SW2-21](#sw2-21-recovering-the-normal-running-arrangement-during-and-after-a-switch) | When a Primary is in, or has just left, an abnormal running arrangement, does the NRA forecast recover the true unmodified power on injected switches, with the MW from the truth and from the causal XL detector? | 2 | SW2-12 (experiment 86) | Proposed; tests the NRA forecast's main purpose, with targets inside events removed at training |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
@@ -183,34 +181,6 @@ confirm:
   whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and
   hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
   24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
-
-#### SW2-21: recovering the normal running arrangement during and after a switch
-
-**Test the NRA forecast on what it is for: forecasting the normal running arrangement while a
-Primary is switched, or just after a switch has ended.** The metered target cannot score this,
-because during a switch the metered power is abnormal. Injected switches make the truth known: a
-transfer is added to a donor's and its receivers' power, and to the lag inputs rebuilt from that
-power, in quiet periods, and the forecast is scored against the unmodified series.
-
-- **Two families of forecast origins:** inside an injected switch, binned by the time since its
-  onset, and just after a switch, with lags inside it and the target after its end.
-- **What the NRA booster sees.** At training, rows whose target lies inside a labelled event are
-  removed, so the booster learns only normal-arrangement targets, and every lag inside a labelled
-  event is corrected by the event's signed MW, which is also a column. The training labels come
-  from hindsight: the oracle labels of experiment 41 for one booster, the XL detector's for
-  another. At forecast time every origin is forecast, and a lag inside an event known at the
-  origin is corrected by that event's MW, from the injection or from the XL detector run causally
-  on data up to the origin.
-- **Arms:** the plain booster on the contaminated lags; experiment 86's lag-correction booster,
-  trained on all rows; the full NRA booster trained on oracle labels; the full NRA booster trained
-  on XL labels; and the plain booster on the unmodified lags as a ceiling. The full NRA boosters
-  are new fits on the monthly retraining schedule.
-- **Headline:** the MW-weighted mean absolute error against the unmodified series inside a switch,
-  the XL-trained full NRA booster with causal XL MW against plain, with the oracle-trained booster
-  and the lag-correction booster beside it, and the share of the gap to the ceiling that each arm
-  closes.
-- **Second check:** the conserved two-sided events of experiment 41, where each side's step gives
-  an estimate of the other side's normal running arrangement.
 
 ### PVDIS: separating embedded solar from Primary demand
 
