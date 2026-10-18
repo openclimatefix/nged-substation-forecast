@@ -89,7 +89,7 @@ forecast is misled when one of those readings was taken during an ARA. We asked 
 detector can give each half-hour of the lag window a probability of lying inside an ARA.
 
 We added a known amount of load (a transfer) to the recorded power of 16 Primary substations, 839
-times, using the draw of [experiment 88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md).
+times, using the draw of experiment 88.
 A second draw added 183 longer transfers, lasting 1 to 60 days, so the two draws hold 1,022
 transfers. The probability was fitted on transfers that start in odd calendar months and scored on
 transfers that start in even months.
