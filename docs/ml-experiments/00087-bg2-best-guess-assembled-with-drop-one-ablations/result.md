@@ -105,4 +105,13 @@ Opus-reviewed.
   experiment 64's weights, which were fitted on data before the validation year. BG2 does the same,
   because it has no leakage and it matches the scores the design quotes (0.149 and 0.152).
   The write-up records this as a deviation if the reviewers agree.
+- Experiment 74's offset inputs stop at the end of May 2026, so BG2 rebuilds the missing runs. The
+  offset arms start from the median of the training labels plus the offset, and the other arms from
+  XGBoost's own start. Experiment 78's capacity vintages are used only where their estimation window
+  ended before the run; otherwise the capacity table of experiment 64 is used and ablation A6 is
+  identical by construction.
+- The solar and wind reference is the ERA5-trained mixture refitted at 11 levels, not experiment
+  33's stored arm. Weekly generator refits keep experiment 33's 2-year half-life.
+- The spread factor, the blend scheme, the offset gate, and the half-life were chosen or scored on
+  the same validation year, so the predicted scores carry selection bias.
 - Defaults D1 to D7 run as stated. Any further deviation is listed in the write-up.
