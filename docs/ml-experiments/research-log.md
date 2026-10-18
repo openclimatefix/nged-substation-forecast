@@ -124,7 +124,7 @@ the maintainer to confirm.
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
 | [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
-| [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: the old year scores 1.57 points worse, and removing the level takes off 42% of that, none without the largest series | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
+| [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2149,21 +2149,19 @@ LV1 (level-normalised long history).
 
 ### 00093: does an old training year still hurt once the level is removed? (AGE1)
 
-**Taking each substation's average demand level out of the targets removes under half of the harm
-an old training year does, and none of it without the one substation that carries most of the
-harm.** The old year differs from the recent year in more than its level. We trained a frozen
+**Taking each substation's average demand level out of the training data removes under half of the
+extra forecast error that an old training year causes, and removes none of it for 12 of the 13
+substations.** The old year differs from the recent year in more than its level. We trained one
 XGBoost quantile model per substation on one year (2021-07 to 2022-06 or 2024-07 to 2025-06), raw
-or with a trailing 365-day level subtracted, and scored 13 Primary substations on 365 daily runs
-from July 2025 to June 2026. The old year scored 1.57 points of capacity worse than the recent year
-(98.3% interval 1.14 to 2.00); with the level removed the gap was 0.91 (0.69 to 1.20), so 42% was
-removed, short of the half predicted. Without the substation with the largest penalty the gaps
-were 0.61 raw and 0.68 with the level removed. The old year also changes the weather product (18 km
-control member against 9 km), which this experiment could not separate from age, so that seam is
-the next thing to test. The level-normalised long-history experiment LV1 is not supported by this
-result.
+or with a trailing 365-day average demand level subtracted, and scored 13 primary substations on 365
+daily runs from July 2025 to June 2026. The old year scored 1.57 percentage points of capacity worse
+than the recent year (98.3% interval 1.14 to 2.00). With the level removed, the gap was 0.91 (0.69
+to 1.20). Level removal therefore took off 42% of the gap, short of the half predicted. Without the
+substation with the largest gap, the gaps were 0.61 raw and 0.68 with the level removed. The old
+years also use 18 km weather grid spacing against 9 km in the recent year, which this experiment
+could not separate from age, so the next experiment should test the change of weather product.
 
 - **Write-up:** [the full result page](00093-age1-old-training-year-after-level-normalisation-demand/result.md),
-  [PR #1335 (Experiment 93: does an old training year still hurt once the level is removed?
-  (AGE1))](https://github.com/openclimatefix/nged-substation-forecast/pull/1335).
+  [PR #1335](https://github.com/openclimatefix/nged-substation-forecast/pull/1335).
 
 ![Age penalty, raw and level removed](00093-age1-old-training-year-after-level-normalisation-demand/figure_1.svg)

@@ -20,8 +20,8 @@ import polars as pl
 
 WIDTH: Final[int] = 540
 SCOPE: Final[str] = (
-    "13 Primary substations, 365 daily forecast runs, July 2025 to June 2026. "
-    "Frozen models, each trained on one year."
+    "13 primary substations, 365 daily forecast runs, July 2025 to June 2026. "
+    "Each model was trained once, on one year of data."
 )
 ARM_LABELS: Final[dict[str, str]] = {
     "old1_raw": "Trained 2021-07 to 2022-06, raw",
@@ -92,19 +92,24 @@ def figure_1() -> alt.TopLevelMixin:
     )
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#555555").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     points = base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("estimate:Q", title="Old-year score minus recent-year score (points of capacity)")
+        x=alt.X(
+            "estimate:Q",
+            title="Old-year minus recent-year quantile score (points of capacity)",
+            scale=alt.Scale(domain=[0, 2.2]),
+        )
     )
     bars = base.mark_rule().encode(x="low:Q", x2="high:Q")  # ty: ignore[unresolved-attribute]
     return alt.layer(zero, bars, points).properties(
         width=WIDTH,
         height=230,
         title=alt.TitleParams(
-            "Removing the level takes off under half of the old year's penalty",
+            "Subtracting the average demand level removes under half of the old year's extra error",
             subtitle=[
                 SCOPE,
-                "Dot: estimate. Line: interval from re-drawing whole months (98.3% for the top",
-                "two rows, 95% elsewhere). Zero: same score as the model trained on 2024-07 to",
-                "2025-06. Above zero: the old year is worse.",
+                "Dot: mean difference. Line: interval from resampling whole calendar months",
+                "(98.3% for all 13 series, 95% for the other rows). Zero: same score as the model",
+                "trained on 2024-07 to 2025-06. Above zero: the old year is worse. Raw: trained on",
+                "demand as measured. Level removed: trained after subtracting the 365-day average.",
             ],
             anchor="start",
         ),
@@ -137,7 +142,7 @@ def figure_2() -> alt.TopLevelMixin:
         width=WIDTH,
         height=210,
         title=alt.TitleParams(
-            "Absolute score of each model",
+            "Quantile score of each model, by training year",
             subtitle=[SCOPE, "Dot: mean. Line: 95% interval from re-drawing whole months."],
             anchor="start",
         ),
@@ -163,16 +168,21 @@ def figure_3() -> alt.TopLevelMixin:
     )
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#555555").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     points = base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("penalty:Q", title="Old-year score minus recent-year score (points of capacity)")
+        x=alt.X(
+            "penalty:Q",
+            title="Old-year minus recent-year quantile score (points of capacity)",
+            scale=alt.Scale(domain=[-0.5, 14]),
+        )
     )
     return alt.layer(zero, points).properties(
         width=WIDTH,
         height=300,
         title=alt.TitleParams(
-            "One substation carries most of the penalty; elsewhere removing the level barely helps",
+            "One substation carries most of the penalty; the level barely matters for the rest",
             subtitle=[
                 SCOPE,
-                "Each dot is one substation's mean difference. Above zero: the old year is worse.",
+                "Each dot is one substation's mean difference in quantile score.",
+                "Above zero: the old year is worse.",
             ],
             anchor="start",
         ),
@@ -199,17 +209,15 @@ def figure_4() -> alt.TopLevelMixin:
             "level:N",
             sort=["q01", "q05", "q95", "q99"],
             title="Quantile level",
-            axis=alt.Axis(labelAngle=0),
+            axis=alt.Axis(labelAngle=0, labelExpr="slice(datum.label, 1) + '%'"),
         ),
         color=alt.Color(
             "arm:N",
             scale=alt.Scale(
-                domain=[
-                    ARM_LABELS[a] for a in ("old1_raw", "old1_all", "recent_raw", "recent_all")
-                ],
+                domain=list(TAIL_LABELS.values()),
                 range=[RAW_COLOUR, NORMALISED_COLOUR, ocf.DATA_PURPLE, ocf.DATA_GREEN],
             ),
-            legend=alt.Legend(orient="top", title=None, columns=1),
+            legend=alt.Legend(orient="top", title=None, columns=1, labelLimit=300),
         ),
         xOffset=alt.XOffset("arm:N"),
     )
@@ -227,7 +235,7 @@ def figure_4() -> alt.TopLevelMixin:
         width=WIDTH,
         height=260,
         title=alt.TitleParams(
-            "Old-year models miss the lower quantiles too often",
+            "Old-year models see demand below their low forecasts too often",
             subtitle=[
                 SCOPE,
                 "Bar: share of actual values at or below the quantile. Tick: the ideal share.",
