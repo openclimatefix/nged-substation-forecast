@@ -839,6 +839,9 @@ def main() -> None:
     parser.add_argument("--sites", nargs="+", help="fit only these series labels, e.g. D2 D5")
     parser.add_argument("--offset", action="store_true", help="the offset twin at the 5 Primaries")
     parser.add_argument("--seed", type=int, default=common.SEED)
+    parser.add_argument(
+        "--repeat", action="store_true", help="write to anchor_preds_repeat (the noise-floor refit)"
+    )
     parser.add_argument("--workers", type=int, default=2, help="processes sharing the GPU")
     parser.add_argument("--cores", type=int, default=12, help="CPU cores for all workers")
     parser.add_argument(
@@ -865,7 +868,9 @@ def main() -> None:
         series = series.filter(pl.col("site").is_in(args.sites))
     sites = series["site"].to_list()
     jobs = selected_jobs(config=config, regime=args.regime, origins=common.all_origins())
-    out_root = common.ANCHOR_PREDS_DIR
+    out_root = common.ANCHOR_PREDS_DIR.with_name(
+        "anchor_preds_repeat" if args.repeat else "anchor_preds"
+    )
     rounds, workers = config.rounds, args.workers
     if args.smoke:
         sites = sites[:1]
