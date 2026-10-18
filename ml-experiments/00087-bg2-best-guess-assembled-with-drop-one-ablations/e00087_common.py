@@ -9,6 +9,7 @@ experiment, so the copies are the only link. The 14-day correction lives in `e00
 """
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -574,7 +575,7 @@ def historical_thresholds(*, power: np.ndarray) -> dict[str, float]:
     Returns:
         The two quantiles of the finite values before the holdout.
     """
-    values = power[: int(grid_index(times=HOLDOUT))]
+    values = power[: int(grid_index(times=LAST_TRAINING_VALID)) + 1]
     values = values[np.isfinite(values)]
     return {"p99": float(np.quantile(values, 0.99)), "p95": float(np.quantile(values, 0.95))}
 
@@ -582,7 +583,7 @@ def historical_thresholds(*, power: np.ndarray) -> dict[str, float]:
 def atomic_write(*, frame: pl.DataFrame, target: Path) -> None:
     """Write a parquet file through a temporary name so an interrupted write leaves no file."""
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp")
+    temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp")
     frame.write_parquet(temporary)
     temporary.rename(target)
 
