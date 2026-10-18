@@ -231,6 +231,7 @@ nav:
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
       - "Can a Primary demand forecast learn the normal running arrangement from labelled switching?": ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md
+      - "Can the causal switching detector give a calibrated probability of an abnormal running arrangement?": ml-experiments/00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md
       - "Do the detector's switching labels give the same gain as NGED's logs?": ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/result.md
       - "Do same-time sunshine analogues add anything once the solar forecast is explicit?": ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md
   - Live service:
