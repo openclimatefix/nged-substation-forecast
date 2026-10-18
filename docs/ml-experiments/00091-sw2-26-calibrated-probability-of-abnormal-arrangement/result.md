@@ -92,9 +92,10 @@ that probability, and whether the probability is calibrated.
   residuals. Truth is the logged closures plus the oracle-labelled events of experiment 86. The
   logs miss ARAs, so precision is a lower bound.
 - **Weather in the residual model.** The detector's residual model is the stage 1a model fed with
-  ERA5 weather, as in experiment 88. ERA5 arrives about 5 days late. This experiment asks first whether a
-  calibrated probability helps at all under ideal laboratory conditions, so it does not build the
-  ENS-driven residual that a live probability needs. The write-up lists every laboratory shortcut.
+  ERA5 weather, as in experiment 88. ERA5 arrives about 5 days late. This experiment asks first
+  whether a calibrated probability helps at all under ideal laboratory conditions, so it does not
+  build the ENS-driven residual that a live probability needs. The write-up lists every laboratory
+  shortcut.
 - **Compute.** No GPU. About 3 to 6 CPU hours on 4 cores (slot C); workers write one file per
   batch and shape.
 
