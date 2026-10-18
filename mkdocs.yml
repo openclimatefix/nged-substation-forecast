@@ -213,6 +213,7 @@ nav:
       - "Are the tails of the stored demand forecasts too narrow?": ml-experiments/00083-curtailment-cost-and-tail-calibration-worked-example/result.md
       - "Can the substation-limit curtailment metric rank forecasts on the pilot?": ml-experiments/00084-substation-limit-curtailment-cost-worked-example/result.md
       - "Do cheaper retraining schedules rank arms the way weekly retraining does?": ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md
+      - "Does an explicit heating term lower the cold-hour error?": ml-experiments/00094-explicit-heating-offset-primary-demand/result.md
       - "Do the weekly-retraining findings hold on July-to-March forecast runs the project has not scored?": ml-experiments/00081-r11-control-member-second-validation-year-demand/result.md
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
       - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
@@ -234,6 +235,7 @@ nav:
       - "Can a Primary demand forecast learn the normal running arrangement from labelled switching?": ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md
       - "Can the causal switching detector give a calibrated probability of an abnormal running arrangement?": ml-experiments/00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md
       - "Do the detector's switching labels give the same gain as NGED's logs?": ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/result.md
+      - "Does the longest history, with switching masked, improve the NRA forecast?": ml-experiments/00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/result.md
       - "Does telling the model how unusual each lag is improve the forecast?": ml-experiments/00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md
       - "Is the drift of Primary demand mostly a per-series level?": ml-experiments/00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md
       - "Does an old training year still hurt once the demand level is removed?": ml-experiments/00093-age1-old-training-year-after-level-normalisation-demand/result.md
