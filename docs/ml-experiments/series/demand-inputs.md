@@ -1,48 +1,65 @@
 # Demand inputs: which extra information helps the substation demand forecast
 
-**The series found that most extra inputs to the demand forecast help by less than 0.1 points of
-capacity, and that recent power in the second-stage calibrator, the clock, and a Christmas column
-are the exceptions.** The series has 13 experiments. Each one added a different kind of information
-to the model that forecasts how much power a substation draws: recent power readings, satellite
+**Most extra inputs to the demand forecast improve it by less than 0.1 points of capacity.** Three
+inputs are the exceptions: recent power in the second-stage calibrator, the hour and weekday, and a
+Christmas column. The series has 13 experiments. Each one added a different kind of information to
+the XGBoost model that forecasts how much power a substation draws: recent power readings, satellite
 sunshine, the electricity price, the school calendar, or a shared model for several substations.
-Most of the experiments scored 20 demand series, 16 of them Primary substations. A Primary
-substation steps 33 kV or 66 kV down to 11 kV in the electricity distribution network.
+Most experiments scored forecasts for 20 time series of substation power, 16 of them from Primary
+substations. A Primary substation steps 33 kV or 66 kV down to 11 kV in the electricity distribution
+network. The other 4 series are 2 bulk supply points and 2 grid supply points, which sit higher in
+the network.
 
-- **What worked:** recent power readings help most when they enter the second-stage calibrator. The
-  calibrator with lags scored 0.84 points of capacity better than stage 1b with the same readings
-  (99% interval +0.28 to +1.50). That score is a ceiling, as the first finding below explains.
-  Hour and weekday lower the error by about 0.5 points, and a 14-day Christmas column lowers it by
-  1.8 points over 15 December to 7 January.
-  Training on satellite sunshine instead of reanalysis shortwave lowers the score by 0.035 points,
-  and a further 0.067 with a correction to the forecast sunshine. One XGBoost model per
-  substation type (4 models) scores 0.15 points worse than 20 models, one per series.
-- **What the series found no gain from:** extra summaries of recent power, the electricity price at
-  the same
-  half-hour or its changes, school-term columns, and fingerprints of each substation. None showed a
-  resolved gain that reached its planned threshold. Experiments 8 and 30 are inconclusive and could
-  not exclude a gain of 0.15 points.
-- **What to try next:** test national demand and wind before any price column, because both scored
-  at least as well as the price. Re-test the lag placement with forecast-time weather in place of
-  the reanalysis ceiling. Fit the stage 0 sunshine correction on more than 14 months of ENS and on
-all
-  ensemble members, because it fixed the year's mean but missed the monthly mean by up to 18.6%,
-  and a post hoc per-month mapping fitted on one year did no better.
+**The forecast has stages, and the page names them.** Stage 1a is an XGBoost model that maps weather
+and the calendar to power. Stage 1b adds recent power readings (lags) to that model. Stage 2, the
+calibrator, corrects the quantiles of the earlier stage using recent forecast errors. Stage 0 is a
+correction applied to the weather inputs before stage 1a reads them.
 
-**Scores are in points of capacity, where 1 point is 1% of a series' effective capacity, and smaller
-is better.** Quantile scores measure how well the forecast's quantiles fit what happened. Errors of
-the median are mean absolute errors. Every page named below is a finished experiment write-up, and
-every figure is reused from those pages. ERA5 is the European Centre for Medium-Range Weather
-Forecasts' (ECMWF) reanalysis, a record of past weather. ENS is ECMWF's 51-member ensemble weather
-forecast. CAMS is the Copernicus Atmosphere Monitoring Service's satellite-derived irradiance.
+**Scores are in points of capacity, where 1 point is 1% of a time series' effective capacity, and
+smaller is better.** A quantile score measures how well the forecast quantiles fit what happened. An
+error of the median is a mean absolute error of the middle forecast. A difference between two arms
+is
+the score of the first arm minus the score of the second, so a negative difference means the first
+arm is
+better, except where the text says the number is an extra score. Each interval is a confidence
+interval
+from resampling whole months; its level (97.5% to 99.44%) is set by the number of contrasts the
+experiment planned. Each experiment scored its inputs on a selection year and then on a confirmation
+year, or on one validation year. ERA5 is the European Centre for Medium-Range Weather Forecasts'
+(ECMWF) reanalysis, a record of past weather. ENS is ECMWF's 51-member ensemble weather forecast.
+CAMS is the Copernicus Atmosphere Monitoring Service's satellite-derived irradiance (sunshine
+reaching the ground). The figures are reused from the experiment write-ups linked below.
+
+- **What the experiments found:**
+    - Recent power helps most in the second-stage calibrator. It scored 0.84 points better than the
+      same readings in stage 1b (99% interval +0.28 to +1.50). That figure overstates a live
+      forecast, as the first finding below explains.
+    - The hour and weekday lower the error by about 0.5 points, and a Christmas column lowers it by
+      1.8 points from 15 December to 7 January.
+    - Training on CAMS irradiance instead of ERA5 shortwave lowers the score by 0.035 points, and a
+      correction to the ENS irradiance lowers it by a further 0.067.
+    - One XGBoost model per substation type (4 models) scores 0.15 points worse than one model per
+      series (20 models).
+- **What gave no resolved gain:** extra summaries of recent power (minimum, mean, and maximum), the
+  electricity price at the same half-hour or its changes, school-term columns, and fingerprints of
+  each substation. None reached its planned threshold. Experiments 8 and 30 are inconclusive and
+  could not exclude a gain of 0.15 points.
+- **Follow-ups the results point to:** national demand and wind would test whether the price is
+  needed at all, because both scored at least as well as the price. The lag placement would be
+  re-tested with forecast-time weather in place of the ERA5 weather that makes the first result a
+  ceiling. A stage 0 fitted on more than 14 months of ENS and on all ensemble members would test the
+  monthly mismatch: stage 0 fixed the mean over the year but left the monthly mean up to 18.6% off
+  CAMS, and a post hoc mapping per calendar month, fitted on one year, did no better.
 
 ## What the data looks like
 
 **A Primary substation's demand follows a daily and weekly shape, and a few series swing far outside
 it.** The chart shows one week of July 2025 and one of January 2026 for the Primary substation with
-the median error (P12) and the one with the highest error (P2), with the forecasts of the chosen
+the median error (P12) and the Primary substation with the highest error (P2), with the forecasts of
+the chosen
 input set. P12's power follows the morning and evening peaks and the weekend dip. P2's power
-repeatedly falls to 10% to 40% of capacity for hours, which no input explains. [Experiment
-6](../00006-stage1a-demand-input-feature-sweep/result.md) drew this.
+repeatedly falls to 10% to 40% of capacity for hours, which none of the inputs tested explains.
+[Experiment 6](../00006-stage1a-demand-input-feature-sweep/result.md) drew the chart.
 
 ![Observed power and forecasts for two Primary substations](../00006-stage1a-demand-input-feature-sweep/figure_7.svg)
 
@@ -50,40 +67,42 @@ repeatedly falls to 10% to 40% of capacity for hours, which no input explains. [
 inputs do not see.** The chart shows P12's week of July 2025 with CAMS irradiance below. On the five
 weekdays with irradiance above 450 W/m², the observed power dips 10 to 25 points of capacity below
 the forecasts. On the cloudy weekend it does not. One week cannot separate cloud from weekday.
-[Experiment 6](../00006-stage1a-demand-input-feature-sweep/result.md) drew this.
+[Experiment 6](../00006-stage1a-demand-input-feature-sweep/result.md) drew the chart.
 
 ![P12's week in July 2025 with CAMS irradiance below](../00006-stage1a-demand-input-feature-sweep/figure_11.svg)
 
 **The error is largest at Christmas, when the forecast without a holiday column misses the dip.**
 The chart shows the observed power and the forecasts over Christmas 2025, with and without the
-windowed Christmas column. The base arm's Primary error is 9.66 points from 15 December to 7 January
+windowed Christmas column. The Primary error without the Christmas column is 9.66 points from 15
+December to 7 January
 against 7.52 on the other days. [Experiment
-6](../00006-stage1a-demand-input-feature-sweep/result.md) drew this.
+6](../00006-stage1a-demand-input-feature-sweep/result.md) drew the chart.
 
 ![Observed power and forecasts over Christmas 2025](../00006-stage1a-demand-input-feature-sweep/figure_13.svg)
 
-**The ENS forecast of daytime shortwave is higher than satellite irradiance, and the gap varies by
-month.** The chart plots the ratio of ENS daylight shortwave to CAMS, as published and after the
+**The ENS forecast of daylight shortwave differs from satellite irradiance by up to 26%, depending
+on the month.** The chart plots the ratio of ENS daylight shortwave to CAMS, as published and after
+the
 stage 0 correction. The published ratio runs from 0.92 to 1.26 by month. [Experiment
-14](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) drew this.
+14](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) drew the chart.
 
 ![Ratio of ENS daylight shortwave to CAMS, by month](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/figure_1.svg)
 
-**The series has no labelled examples, and no committed plot of the electricity price.** The inputs
-were scored against the substations' own metered power, so no labels were needed. [Experiment
+**This page has no chart of the electricity price.** [Experiment
 10](../00010-elexon-price-lags-stage1a-demand/result.md) and [experiment
 15](../00015-same-time-price-stage1-demand/result.md) plot the price's effect on the error, not the
-price. We did not regenerate a plot.
+price itself.
 
-## What worked
+## What the experiments found
 
 **Recent power helps most when it enters the second-stage calibrator, not the first-stage model.**
 [Experiment 5](../00005-lag-placement-stage1b-vs-stage2-demand/result.md) gave both placements the
 same inputs on 20 series and 73 runs. Stage 1b with a calibrator scored 0.84 points worse than the
 calibrator with lags (99% interval +0.28 to +1.50) for leads up to 48 hours. The scores were 5.31
 for lags in the calibrator, 6.14 for stage 1b, and 7.11 for no lags. Using both placements lowered
-the score by at most 0.12 points. Every lagged arm is a ceiling, because the recent residuals use
-ERA5 weather at past times. A calibrator without lags scored about 1 point worse at short leads.
+the score by at most 0.12 points. Every lagged arm overstates what a live forecast could do, because
+the lagged residuals use ERA5 weather at past times, which a live forecast lacks. A calibrator
+without lags scored about 1 point worse at short leads.
 
 ![Lagged power in the calibrator beats lagged power in stage 1b at every lead](../00005-lag-placement-stage1b-vs-stage2-demand/figure_2.svg)
 
@@ -93,21 +112,24 @@ mean, and maximum of the last 24 hours and of the same weekday. The score change
 (98.75% interval -0.14 to +0.13) for leads up to 48 hours. [Experiment
 30](../00030-lagged-power-feature-sets-primary-demand/result.md) gave the single-stage model N1 all
 13 lags of `manual_heuristic`. The 6 weekly analogues lowered the score by 0.30 points (-0.63 to
--0.02), the 7 annual analogues added 0.29 (+0.13 to +0.49) back, and with the 14-day correction N1
+-0.02), the 7 annual analogues raised the score by 0.29 (+0.13 to +0.49), and with the 14-day
+correction N1
 scores 5.34. A weekly mean and median arm, added post hoc and scored on one validation year, scores
 5.29, which
 is 0.05 below N1 (-0.08 to -0.02).
 
 ![Quantile score of each arm, without and with the correction](../00030-lagged-power-feature-sets-primary-demand/figure_1.svg)
 
-**The clock and a Christmas column are the inputs that clearly help.** [Experiment
+**Of the non-lag inputs tested, the hour, the weekday, and a Christmas column clearly helped.**
+[Experiment
 6](../00006-stage1a-demand-input-feature-sweep/result.md) scored input sets for the ERA5-trained
 stage 1a model on 14 Primary substations. Hour and weekday lowered the error by 0.55 points (99.4%
 interval -0.71 to -0.41) on the selection year and 0.46 (-0.61 to -0.30) on the confirmation year,
 against 1.5 predicted. The 14-day Christmas column, a post hoc check in the write-up, lowers the
 Primary error by 1.78 points from 15
 December to 7 January (-2.30 to -1.26) and changes it by 0.00 on other days. A 2023-09 training
-start lowers the confirmation-year error by 0.86 more, but it did not help on the selection year.
+start lowers the confirmation-year error by a further 0.86, but the 2023-09 start did not help on
+the selection year.
 
 ![Change in error inside each special-day window, Primary substations](../00006-stage1a-demand-input-feature-sweep/figure_12.svg)
 
@@ -121,12 +143,12 @@ lowered the Primary quantile score by 0.035 points (97.5% interval -0.070 to +0.
 planned. The gain is in daylight and the first 6 days. [Experiment
 14](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) mapped the ENS
 shortwave onto CAMS and lowered the score by a further 0.067 (-0.094 to -0.039), in 12 of 12 months.
-The mean daylight ratio to CAMS reached 1.000, but the monthly ratio ran from 0.81 to 1.13, so the
-5% monthly rule failed, and the member spread widened by 27%.
+The mean daylight ratio to CAMS reached 1.000. The monthly ratio still ran from 0.81 to 1.13, so the
+5% monthly rule failed. The spread between ensemble members also widened by 27%.
 
 ![Stage 0's contrasts by scope](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/figure_2.svg)
 
-**The electricity price does not help reliably, and national demand and wind do at least as well.**
+**The electricity price gave no reliable gain. National demand and wind scored at least as well.**
 [Experiment 15](../00015-same-time-price-stage1-demand/result.md) lowered the pooled error by 0.52
 points (97.5% interval -0.88 to -0.11) in the selection year and 0.18 (-0.50 to +0.08) in the
 confirmation year. A price from another week scored within 0.07 of the real price. [Experiment
@@ -138,13 +160,15 @@ battery response, because only 2 of the 20 series have a battery of at least 5% 
 
 ![Pooled contrasts with 97.5% intervals](../00015-same-time-price-stage1-demand/figure_1.svg)
 
-**Four models score 0.15 points worse than 20 models, if each model gets the series identifier.**
+**A pool of 4 models, one per substation type, scores 0.15 points worse than 20 models, one per
+series, if each model gets the series identifier.**
 [Experiment 24](../00024-pooling-groupings-demand-xgboost/result.md) refitted the 20 series with one
 model per substation type. On 16 Primary substations the score was 5.47 against 5.32 for per-series
 models (+0.15, 99.44% interval +0.03 to +0.26). One model for all series scored 5.61 (+0.29, +0.19
 to +0.42). Without the identifier the by-type pool lost a further 0.82 points. A random grouping
-scored the same as the by-type grouping, so the number of models matters more than which
-substations share one. The experiment is flagged a candidate for the next release.
+scored the same as the by-type grouping, so in this experiment the number of models mattered more
+than which substations share a model. The research log lists the experiment as a candidate for the
+next model release.
 
 ![Quantile score by grouping](../00024-pooling-groupings-demand-xgboost/figure_2.svg)
 
