@@ -1,7 +1,7 @@
 ---
 id: "00095"
 slug: age2-old-year-penalty-with-the-same-weather-product-demand
-status: planned
+status: done
 size: simple
 hypothesis: >-
   The extra forecast error of an old training year (experiment 93) comes mostly from the change of
@@ -30,41 +30,142 @@ row_set_id: age1_daily_2025_07_to_2026_06_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over 11 levels, 0.01 to 0.99) in
   points of capacity.
+verdict: refuted
+best_arm: >-
+  The 2024-07 year on ERA5 (diagnostic, not for production): 4.51 (95% interval 4.18 to 4.89) points
+  of capacity. The best control-member arm is the same year: 4.78 (4.45 to 5.14).
+headline: >-
+  The old-year penalty does not shrink when both years use ERA5: the 2021-07 year is 1.71 points
+  worse than the 2024-07 year on ERA5 (99% interval 1.15 to 2.29) and 1.57 worse on the control
+  member (1.12 to 2.03), so the penalty belongs to the age of the training data, not the weather
+  product. The gap shrinks steadily with a newer year (ERA5: 1.71, 1.26, 0.46 for the 2021-07,
+  2022-07, and 2023-07 years).
+lessons: >-
+  Changing the weather product from 18 km to 9 km does not explain why an old training year scores
+  worse. The penalty grows by about 0.4 to 0.8 points for each year older, on both products. It is
+  not an average level shift (experiment 93), not the weather product (this experiment), and not
+  one broken meter, because the largest-gap substation (D8) shows a smooth fall in demand with no
+  step. The remaining candidates are demand that has changed shape, such as embedded solar or
+  heating, and changes to the electricity network.
+advice:
+  - >-
+    Train Primary demand models on the newest year or two of data until the cause of the age penalty
+    is found, because each older year scores worse on ERA5 and on the control member (C1, C2, figure
+    2).
+  - >-
+    Do not spend more experiments on the 18 km to 9 km weather seam as an explanation of the age
+    penalty, because the ERA5 gap is no smaller than the control-member gap (C3, figure 1).
+  - >-
+    Test explicit demand-shape terms, such as heating and embedded solar, before a long-history
+    model, because the penalty falls 0.4 to 0.8 points per year of age with no level or product
+    explanation (figure 2, figure 4).
+  - >-
+    Report every old-year contrast with and without D8, because its gap is 13.1 points while the
+    other 12 substations' gaps are 0.0 to 2.6 (figure 3).
 production_status: not-for-production
 adopted_in: none
 ---
 
 # Experiment 95: is the old-year penalty the weather product or the age? (AGE2)
 
-**Planned. This page holds the plan; the write-up replaces it when the fits have run.**
+**An old training year scores worse because of its age, not because it used a coarser weather
+forecast.** The extra error stayed the same size when both years used ERA5 (ECMWF's estimate of
+past weather), and it grew steadily with each year older. The result rules out
+the weather product as the explanation. Experiment 93 had already ruled out an average level shift,
+so the cause is probably a change in how the substations' demand depends on weather and time of
+day, such as growing embedded solar output or heating, or a change to the electricity network. The
+next experiment should add explicit solar and heating terms rather than a longer history. The
+prediction is refuted on both counts: with ERA5, the gap was 109% of the gap on the control member,
+not under half, and the 2023-07 year was 0.50 points behind the 2024-07 year, not under 0.3.
 
-Experiment 93 found that a Primary demand model trained on 2021-07 to 2022-06 scores 1.57 points of
-capacity worse than one trained on 2024-07 to 2025-06, and that the old years used a coarser
-weather forecast (18 km grid spacing against 9 km). Experiment 95 separates the two causes.
+We trained one XGBoost quantile model per Primary substation (13 substations) on one year of
+demand and weather. Experiment 93 had shown that a model trained on 2021-07 to 2022-06 scores
+1.57 points of capacity worse than one trained on 2024-07 to 2025-06 ("points": percentage points of
+the substation's effective capacity, on the quantile score, where smaller is better). The old years
+in that experiment also used a coarser weather forecast. Here we trained each model once and did
+not retrain it, scored it on the 365 daily forecast runs from July 2025 to June 2026, and swapped
+the weather. The ERA5 models were trained and scored with ERA5 weather at the valid time. The other
+models used the unperturbed run ("control member") of the ECMWF ensemble forecast, which has 18 km
+grid spacing up to June 2023 and 9 km from July 2023.
 
-## Design
+![Old-year gap on the control member and on ERA5](figure_1.svg)
 
-- **Arms (13 Primary substations, one frozen fit per series and arm, 150 rounds at learning rate
-  0.15, seed 0, no refits).** Each arm is scored on the 365 daily runs of 2025-07 to 2026-06, using
-  the weather product it was trained on at inference.
-    - ERA5 arms (diagnostic, not for production, because ERA5 arrives about 5 days late):
-      trained on 2021-07, 2022-07, 2023-07, or 2024-07 years, with ERA5 weather at the valid time.
-      The rows are the control member's (run, valid time) pairs, so only the weather columns differ.
-    - Control-member arms: 2021-07, 2022-07 (18 km) and 2024-07 (9 km) reuse the experiment 93 raw
-      predictions. The 2023-07 to 2024-06 year (9 km) is new: the control member from the daily
-      frames of experiment 81 up to 2024-03-31, then the control member rows of the stage 1 pilot
-      from 2024-04-01.
-- **Reported:** the absolute score of every arm; the old-minus-recent gap per weather product; the
-  share of the experiment 93 gap that survives on ERA5 (C2 over C1); all contrasts with and without
-  the substation that carries most of the penalty (D8, post hoc); a check of D8's history for a
-  step change; tail calibration at 0.01, 0.05, 0.95, and 0.99.
-- **Not scored:** the curtailment-cost metric and the `manual_heuristic` baseline, because the
-  question compares training years of one model.
+![Quantile score by training year](figure_2.svg)
 
-## Sizing
+![Gap by substation](figure_3.svg)
 
-- **Stored:** nothing beyond private predictions.
-- **Serving path:** untouched.
-- **Degradation rule:** untouched.
-- **Designs:** one defensible design (the experiment 93 recipe with the weather product swapped).
-- **Callers:** the scripts copy experiment 93's, and no package code changes.
+![Demand of substation D8](figure_4.svg)
+
+![Tail calibration](figure_5.svg)
+
+## Results
+
+- **Planned contrasts (99% interval, the Bonferroni level for five).** C1, the 2021-07 year minus
+  the 2024-07 year on the control member, is 1.57 (1.12 to 2.03). C2, the same on ERA5, is 1.71
+  (1.15 to 2.29). C3, C1 minus C2, is -0.15 (-0.32 to -0.002), so the ERA5 gap is slightly larger;
+  C2 is 109% of C1 (1.00 to 1.18). C4, the 2023-07 year minus the 2024-07 year on the 9 km control
+  member, is 0.50 (0.28 to 0.76). C5, the 2021-07 year minus the 2022-07 year on the 18 km control
+  member, is 0.29 (-0.35 to 0.85), which cannot separate one year of age from zero.
+- **The gap shrinks with each year of age on ERA5 (95%).** Against the 2024-07 year the 2022-07 year
+  is 1.26 points behind (1.10 to 1.44) and the 2023-07 year is 0.46 behind (0.36 to 0.57). On the
+  control member the 2022-07 year is 1.28 behind (1.04 to 1.55).
+- **Absolute quantile score (points, 95% interval).**
+    - ERA5: 2021-07 6.22 (5.82 to 6.60); 2022-07 5.77 (5.37 to 6.27); 2023-07 4.97 (4.58 to 5.43);
+      2024-07 4.51 (4.18 to 4.89).
+    - Control member: 2021-07 6.34 (6.01 to 6.69); 2022-07 6.05 (5.60 to 6.62); 2023-07 5.28
+      (4.84 to 5.77); 2024-07 4.78 (4.45 to 5.14).
+- **Without D8, the substation that carries most of the penalty (post hoc, 95%).** C1 is 0.61
+  (0.41 to 0.81), C2 is 0.78 (0.53 to 1.04), C4 is 0.35 (0.19 to 0.53), and C5 is -0.05 (-0.52 to
+  0.37). The ERA5 gap is still no smaller than the control-member gap. D8's own gap is 13.1 points
+  on the control member and 12.9 on ERA5.
+- **D8 shows no step change or meter fault.** Its monthly mean demand fell from 0.82 of capacity in
+  2021-07 to 0.34 in 2026-06, with no month under 99.3% observed half-hours and under 0.6% of
+  half-hours repeating the previous value. The largest change of the 60-day mean over 60 days is
+  0.22 of capacity, a seasonal rebound ending 2024-08-25. Summer demand fell faster than winter
+  demand (August 0.77 in 2021 and 0.31 in 2025; January 0.76 in 2022 and 0.48 in 2026), which fits
+  growing embedded solar output, but this experiment did not test that.
+- **Rows in the normal switching arrangement only (95%).** C1 is 1.65 (0.84 to 2.03) and C2 is 1.81
+  (0.79 to 2.26), so labelled switching events do not explain the penalty. The labels start in
+  2022-01, so the first half of the 2021-07 year is not masked.
+- **Weather product within one year (post hoc, 95%).** ERA5 scores 0.31 points better than the
+  control member for the 2023-07 year (0.16 to 0.46) and 0.27 better for the 2024-07 year (0.13 to
+  0.42).
+- **Tail calibration (share of actual values at or below the quantile; ideal 0.01, 0.05, 0.95,
+  0.99).**
+
+| Model | 0.01 | 0.05 | 0.95 | 0.99 |
+|---|---|---|---|---|
+| 2021-07, control member | 0.091 | 0.196 | 0.924 | 0.984 |
+| 2021-07, ERA5 | 0.098 | 0.233 | 0.917 | 0.983 |
+| 2024-07, control member | 0.015 | 0.077 | 0.913 | 0.984 |
+| 2024-07, ERA5 | 0.019 | 0.096 | 0.893 | 0.980 |
+
+  The pinball loss at the 0.01 quantile is 1.30 (control member) and 1.35 (ERA5) for the 2021-07
+  year, and 0.27 and 0.28 for the 2024-07 year.
+
+## Caveats
+
+- **Schedule.** Frozen fits of 150 boosting rounds at learning rate 0.15, seed 0, one fit per
+  substation and arm. Weekly or monthly refits would give an old year's model newer data, so the
+  contrasts describe how old a frozen model's training data is, not a retraining schedule.
+- **ERA5 arms are diagnostic.** ERA5 arrives about 5 days after the weather, so no live service
+  could use it at forecast time. The ERA5 arms score the same runs and valid times as the control
+  member arms, with a single weather value per time and no ensemble spread. Absolute scores and
+  tail calibration are therefore not like for like across the two products, and C3 compares two
+  contrasts that each hold within one product.
+- **The 2023-07 year.** Its rows come from experiment 81's daily frames up to 2024-03-31 and from
+  the stage 1 pilot's training file from 2024-04-01. The 2024-01-03 run is missing, so the year has
+  one run fewer. The 18 km to 9 km change took place in June 2023, so the 2023-07 year is 9 km.
+- **Intervals.** They resample 12 whole calendar months, so they are coarse. The share of C1 on
+  ERA5 is a ratio of two means and its interval is only informative because C1's interval excludes
+  zero.
+- **Not scored.** The curtailment-cost metric and the `manual_heuristic` and climatology rows, as in
+  experiment 93.
+
+## What to try next
+
+The age penalty is about 0.4 to 0.8 points for each year older, on both weather products, and a
+level shift does not explain it. Two experiments could test what does: an explicit heating offset
+(the subject of the reserved experiment 94) and an explicit embedded-solar term, with the old years
+re-scored. If either term shrinks the gap across the four years, a longer history becomes worth
+trying. Otherwise, the models should keep training on the newest year or two.
