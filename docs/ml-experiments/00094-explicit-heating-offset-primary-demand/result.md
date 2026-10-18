@@ -55,16 +55,15 @@ headline: >-
   to 48 hours (98.75% interval -0.203 to -0.034), under the 0.3 threshold, and by 0.022 over all
   rows (-0.042 to +0.000). The share of observations above the q95 forecast in those hours fell from
   0.167 to 0.162, against a predicted fall of at least 0.03. The monotone constraint gained about
-  half as much, 0.074 (-0.111 to -0.020), at no production cost. Added to experiment 64's solar
+  half as much, 0.074 (-0.111 to -0.020), with no new serving column. Added to experiment 64's solar
   term (5 series, 73 runs), the heating term lowered the all-rows score by 0.050 (-0.065 to -0.036).
 lessons: >-
   A heating term shaves a little off the cold-hour error but does not repair the cold-hour tail:
   the forecast is still about 2.7 points of capacity too low in cold hours at long leads, and q95
-  is still exceeded in 16% to 17% of cold hours against 12% in mild winter hours. The long-lead
-  bias probably comes from the ENS temperature forecast, which this experiment did not test and
-  which no function of that forecast corrects.
-  The monotone constraint matches half of the offset's gain, so part of the gain is stopping the
-  trees from reversing the temperature response, not extrapolating beyond the coldest training hour.
+  is still exceeded in 16% to 17% of cold hours against 10% to 12% in mild winter hours. This
+  experiment did not locate the remaining error; the ENS temperature forecast is one untested
+  candidate. The monotone constraint gains about half of the offset's gain, and `ht` minus `mono`
+  (-0.069, -0.104 to +0.005) does not separate the two.
 production_status: candidate
 adopted_in: none
 advice:
@@ -98,10 +97,10 @@ Primaries that have one and the 73 runs of `fold_a_every5d_v1`, so the two block
 rows. In cold hours at leads up to 48 hours the quantile score (an error measure in points of a
 substation's capacity; lower is better) fell by 0.143 points, under the 0.3 threshold fixed in
 advance. The share of observations above the q95 forecast, 0.167 in those hours, fell by 0.005. A
-decreasing monotone constraint on temperature gained half as much. The remaining cold-hour error
-therefore does not sit in the shape of the temperature response; it most likely sits in the
-temperature forecast itself, so the next experiment should look at the forecast temperature at long
-leads, not at more demand terms.
+decreasing monotone constraint on temperature gained about half as much. This experiment did not
+locate the remaining cold-hour error. One untested candidate is the ENS temperature forecast, so
+the next experiment could compare the forecast temperature with the observed temperature in cold
+hours by lead.
 
 We asked whether telling the XGBoost demand model about heating explicitly helps in cold weather.
 For each of 16 Primary substations (which step 33 kV down to 11 kV) and each hour of the day, we
@@ -172,24 +171,36 @@ We compared the result with the same model without the term on 365 daily forecas
   95% intervals):** `amh` (the solar margin plus the heating margin) minus `am`: all rows -0.050
   (-0.065 to -0.036), cold hours -0.160 (-0.234 to -0.067), cold up to 48 hours -0.198 (-0.375 to
   -0.035), mild winter hours -0.075 (-0.111 to -0.038), April to September -0.024 (-0.034 to
-  -0.014). Absolute scores `am` 3.940 and `amh` 3.890 over all rows. The heating term therefore adds
-  to the solar term, at a smaller size than in block A because block B has one fit for the year and
-  no refits.
+  -0.014). Absolute scores `am` 3.940 and `amh` 3.890 over all rows. The heating term therefore
+  lowers the score of
+  the solar model further, by more than in block A in every slice. Block B differs from block A in
+  series, runs, seeds, refits, and the 14-day correction, so the sizes are not comparable. No arm
+  with the heating term alone ran on the block B rows, so additivity is not tested. In cold hours
+  up to 48 hours the bias of `amh` is -0.425 against -0.155 for `am` (more over-forecast), and the
+  q95 exceedance is unchanged (0.136 against 0.136).
 - **Explainability:** the last figure shows the fitted term for one substation over 3 to 9
   January 2026. The term follows the temperature and the daily shape, and sits at about 5% to 15%
   of the substation's capacity when the demand is 55% to 105%.
 - **Deviations from the plan:** the solar offset is not in the 16-substation arms (it acts only in
   April to September at 5 series, and its inputs exist only for the 73 runs and to June 2025), so
-  block B carries the additivity test. The plan said "member temperature" for the cold slice; the
+  block B tests the heating term on top of the solar term. The plan said "member temperature" for
+  the cold slice; the
   scoring uses the ensemble mean, one value per case. The curtailment-cost metric and q01 and q99
   tail reads are not reported, because the nine-level model stops at q95. The optional arm scaled
   by Low Carbon Technology heat-pump counts was skipped, because the data needs a portal account.
-- **Caveats:** one seed in block A (experiment 85 found repeat fits move the score by 0.000 to
-  0.001). Three ISO weeks (2025-W47, 2026-W01, and 2026-W02) hold 53% of the cold cases, and the
-  cold-hour intervals rest on 21 weeks of one winter. Cold up to 48 hours is 28,344 cases from 365
-  runs.
+- **Caveats:** in block B the heating coefficients are fitted on net power without removing the
+  solar margin first, so on sunny winter days the two terms may share some of the same effect. One
+  seed in block A (experiment 85 found repeat fits move the score by 0.000 to
+  0.001). Three ISO weeks (2025-W47, 2026-W01, and 2026-W02) hold 66% of the 28,344 cold cases at
+  leads up to 48 hours, and the C1 and C3 intervals rest on 21 weeks of one winter. The other
+  intervals rest on 53 weeks (C2, C4), 23 weeks (cold, all leads), 13 weeks (mild winter), and 15
+  weeks (June to August).
+- **Predictions against results:** a cold-hour fall of at least 0.3 failed (0.143). A q95 exceedance
+  fall of at least 0.03 failed (0.005, from 0.167, not the 0.18 predicted). An all-rows change of
+  at most +0.01 passed (-0.022). A long-lead bias fall of under half passed (5% to 11%). A `mono`
+  gain of at most a third of the offset's failed (0.074 against 0.143, 52%).
 - **What the result rules out:** a heating degree-hour term as the fix for the cold-hour tail. It
   leaves the exceedance of q95 at 16% to 17% of cold hours.
 - **What to try next:** compare the forecast temperature with the observed temperature in cold
-  hours by lead; test the monotone constraint inside the production recipe, since it costs nothing
-  to port; a second winter is needed before any decision to port the heating term.
+  hours by lead; test the monotone constraint inside the production recipe, since it adds no
+  serving column; a second winter is needed before any decision to port the heating term.
