@@ -2,7 +2,7 @@
 
 **The series found that most extra inputs to the demand forecast help by less than 0.1 points of
 capacity, and that recent power in the second-stage calibrator, the clock, and a Christmas column
-are the exceptions.** The series has 14 experiments. Each one added a different kind of information
+are the exceptions.** The series has 13 experiments. Each one added a different kind of information
 to the model that forecasts how much power a substation draws: recent power readings, satellite
 sunshine, the electricity price, the school calendar, or a shared model for several substations.
 Most of the experiments scored 20 demand series, 16 of them Primary substations. A Primary
@@ -16,13 +16,17 @@ substation steps 33 kV or 66 kV down to 11 kV in the electricity distribution ne
   Training on satellite sunshine instead of reanalysis shortwave lowers the score by 0.035 points,
   and a further 0.067 with a correction to the forecast sunshine. One XGBoost model per
   substation type (4 models) scores 0.15 points worse than 20 models, one per series.
-- **What the series rules out:** extra summaries of recent power, the electricity price at the same
-  half-hour or its changes, school-term columns, and fingerprints of each substation. None gave a
-  gain that held in both validation years and reached its planned threshold.
+- **What the series found no gain from:** extra summaries of recent power, the electricity price at
+  the same
+  half-hour or its changes, school-term columns, and fingerprints of each substation. None showed a
+  resolved gain that reached its planned threshold. Experiments 8 and 30 are inconclusive and could
+  not exclude a gain of 0.15 points.
 - **What to try next:** test national demand and wind before any price column, because both scored
   at least as well as the price. Re-test the lag placement with forecast-time weather in place of
-  the reanalysis ceiling. Test a sunshine correction that works month by month, because the stage 0
-  correction fixed the year's mean and missed the monthly mean by up to 18.6%.
+  the reanalysis ceiling. Fit the stage 0 sunshine correction on more than 14 months of ENS and on
+all
+  ensemble members, because it fixed the year's mean but missed the monthly mean by up to 18.6%,
+  and a post hoc per-month mapping fitted on one year did no better.
 
 **Scores are in points of capacity, where 1 point is 1% of a series' effective capacity, and smaller
 is better.** Quantile scores measure how well the forecast's quantiles fit what happened. Errors of
@@ -90,7 +94,9 @@ mean, and maximum of the last 24 hours and of the same weekday. The score change
 30](../00030-lagged-power-feature-sets-primary-demand/result.md) gave the single-stage model N1 all
 13 lags of `manual_heuristic`. The 6 weekly analogues lowered the score by 0.30 points (-0.63 to
 -0.02), the 7 annual analogues added 0.29 (+0.13 to +0.49) back, and with the 14-day correction N1
-scores 5.34. A weekly mean and median arm scores 5.29, which is 0.05 below N1 (-0.08 to -0.02).
+scores 5.34. A weekly mean and median arm, added post hoc and scored on one validation year, scores
+5.29, which
+is 0.05 below N1 (-0.08 to -0.02).
 
 ![Quantile score of each arm, without and with the correction](../00030-lagged-power-feature-sets-primary-demand/figure_1.svg)
 
@@ -98,14 +104,16 @@ scores 5.34. A weekly mean and median arm scores 5.29, which is 0.05 below N1 (-
 6](../00006-stage1a-demand-input-feature-sweep/result.md) scored input sets for the ERA5-trained
 stage 1a model on 14 Primary substations. Hour and weekday lowered the error by 0.55 points (99.4%
 interval -0.71 to -0.41) on the selection year and 0.46 (-0.61 to -0.30) on the confirmation year,
-against 1.5 predicted. The 14-day Christmas column lowers the Primary error by 1.78 points from 15
+against 1.5 predicted. The 14-day Christmas column, a post hoc check in the write-up, lowers the
+Primary error by 1.78 points from 15
 December to 7 January (-2.30 to -1.26) and changes it by 0.00 on other days. A 2023-09 training
 start lowers the confirmation-year error by 0.86 more, but it did not help on the selection year.
 
 ![Change in error inside each special-day window, Primary substations](../00006-stage1a-demand-input-feature-sweep/figure_12.svg)
 
 **Satellite sunshine as a training input gives a small gain, and a correction to the forecast
-sunshine roughly triples it.** [Experiment 7](../00007-cams-static-correction-stage1a-residual/result.md)
+sunshine roughly triples it.** [Experiment
+7](../00007-cams-static-correction-stage1a-residual/result.md)
 found that a static correction removed 46.6% of the daylight squared residual (98.33% interval 38.4%
 to 53.1%), just under the planned 50%. [Experiment
 9](../00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) trained stage 1a on CAMS and
@@ -124,13 +132,13 @@ points (97.5% interval -0.88 to -0.11) in the selection year and 0.18 (-0.50 to 
 confirmation year. A price from another week scored within 0.07 of the real price. [Experiment
 25](../00025-price-change-features-stage1-demand/result.md) added the price's changes, which lowered
 the error by only 0.037 points (-0.056 to -0.018), against a 0.1 threshold. National demand and
-wind scored 0.22 and 0.40 points below the price-change arm, so the price may stand in for national
-conditions. [Experiment 10](../00010-elexon-price-lags-stage1a-demand/result.md) could not test a
+wind scored 0.22 and 0.40 points below the price-change arm in the selection and confirmation years
+respectively. [Experiment 10](../00010-elexon-price-lags-stage1a-demand/result.md) could not test a
 battery response, because only 2 of the 20 series have a battery of at least 5% of capacity.
 
 ![Pooled contrasts with 97.5% intervals](../00015-same-time-price-stage1-demand/figure_1.svg)
 
-**Four models can replace 20 at a cost of 0.15 points, if each model gets the series identifier.**
+**Four models score 0.15 points worse than 20 models, if each model gets the series identifier.**
 [Experiment 24](../00024-pooling-groupings-demand-xgboost/result.md) refitted the 20 series with one
 model per substation type. On 16 Primary substations the score was 5.47 against 5.32 for per-series
 models (+0.15, 99.44% interval +0.03 to +0.26). One model for all series scored 5.61 (+0.29, +0.19
@@ -142,7 +150,8 @@ substations share one. The experiment is flagged a candidate for the next releas
 
 **Fingerprints of each substation do not help a pooled model.** [Experiment
 32](../00032-substation-fingerprints-pooled-demand/result.md) added location, training-window
-statistics, and recent-window statistics to the by-type pool. All three together changed the score
+statistics, and recent-window statistics to the by-type pool. Training-window and recent-window
+statistics together changed the score
 by +0.02 points (99.375% interval -0.05 to +0.10), and a substation held out of the pool scored 1.39
 points worse with training-window statistics (+0.99 to +1.91).
 
@@ -158,12 +167,12 @@ points worse with training-window statistics (+0.99 to +1.91).
 | [8](../00008-lag-summaries-in-stage2-calibrator-demand/result.md) | Do summaries of recent power help the stage 2 calibrator? | Inconclusive | -0.02 (-0.14 to +0.13) |
 | [9](../00009-cams-trained-stage1a-vs-era5-trained-demand/result.md) | Does a stage 1a trained on CAMS irradiance beat one trained on ERA5 shortwave? | Refuted (gain 0.035 against 0.2 planned) | -0.035 (-0.070 to +0.001) |
 | [10](../00010-elexon-price-lags-stage1a-demand/result.md) | Does the lagged price lower the stage 1a error at substations with batteries? | Inconclusive | At B2, -0.92 (-2.10 to +0.07) in the selection year and -0.06 (-0.38 to +0.23) in the confirmation year |
-| [11](../00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do return-to-work and school-term columns lower the error in those windows? | Refuted | 2 to 20 January +0.06 (-0.17 to +0.30); Easter +0.20; half terms -0.29 (-0.68 to +0.07) |
+| [11](../00011-school-term-and-return-to-work-columns-stage1a-demand/result.md) | Do return-to-work and school-term columns lower the error in those windows? | Refuted (the rule's wording was looser than intended; read as intended, inconclusive for Easter and half terms; Lincolnshire series only) | 2 to 20 January +0.06 (-0.17 to +0.30); Easter +0.20; half terms -0.29 (-0.68 to +0.07) |
 | [14](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md) | Does a stage 0 that maps ENS irradiance onto CAMS help the CAMS-trained model? | Inconclusive (monthly 5% rule failed) | -0.067 (-0.094 to -0.039) |
 | [15](../00015-same-time-price-stage1-demand/result.md) | Does the same-time price help a stage 1 demand model? | Inconclusive | -0.52 (-0.88 to -0.11) selection year; -0.18 (-0.50 to +0.08) confirmation year |
 | [24](../00024-pooling-groupings-demand-xgboost/result.md) | Which groupings of substations can share one XGBoost model? | Supported | By type with identifier +0.15 (+0.03 to +0.26); all series +0.29 (+0.19 to +0.42) |
 | [25](../00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price help a stage 1 demand model? | Small gain | -0.037 (-0.056 to -0.018) selection year; -0.050 (-0.083 to -0.018) confirmation year |
-| [30](../00030-lagged-power-feature-sets-primary-demand/result.md) | Which lagged power columns lower the Primary error of N1? | Inconclusive | All 13 lags minus N1 -0.01 (-0.45 to +0.43); weekly mean and median -0.05 (-0.08 to -0.02) with the correction |
+| [30](../00030-lagged-power-feature-sets-primary-demand/result.md) | Which lagged power columns lower the Primary error of N1? | Inconclusive | All 13 lags minus N1 -0.01 (-0.45 to +0.43); weekly mean and median (post hoc) -0.05 (-0.08 to -0.02) with the correction |
 | [32](../00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints improve a pooled demand model? | Inconclusive | +0.02 (-0.05 to +0.10); held-out substation +1.39 (+0.99 to +1.91) |
 
 Each headline number is a change in points of capacity. A negative number is a lower score, which
