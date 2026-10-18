@@ -61,8 +61,8 @@ metric: >-
   MW-weighted mean absolute error of the median forecast against the true unmodified series
   (points of capacity), with the quantile score, the pinball loss at the 0.05 and 0.95 quantiles,
   and 90% interval coverage beside it
-code: ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-
-injected-switches/
+code: >-
+  ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/
 ---
 
 # Experiment 88: does the full NRA forecast recover the normal arrangement during a switch?
