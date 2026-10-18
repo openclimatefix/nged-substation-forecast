@@ -20,6 +20,7 @@ sooner.
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
+| [96](00096-sw2-23-synthetic-switches-injected-into-training/result.md) | Does training on about three times as many synthetic switching transfers as the real record holds make the normal-arrangement forecast recover the unmodified power better, with the detector's MW as well as the true MW? | 2 | Experiment 88 | Planned |
 
 ## Deferred until the first results are in
 
