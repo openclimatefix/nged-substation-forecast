@@ -70,76 +70,136 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 91: can the causal switching detector give a calibrated probability of an abnormal running arrangement?
+# Experiment 91: a probability that a past half-hour lies inside a switching period
 
-**Take-home message: under ideal laboratory conditions, a probability built from the causal
-refit-offset neighbour-count detector (RO-NC, called XL on the pages of experiments 70, 71, and 82)
-cannot be told apart from the detector's yes-or-no flag, and on real switching it has almost no
-skill.** Widening a forecast's quantiles by this probability would therefore act on few of the rows
-that need it. The probability beats the flag only for transfers large enough for the detector to
-see. A source of warning that does not depend on a detector label is the next thing to try.
+**Take-home message: a probability built from the causal switching detector is not reliably better
+than the detector's yes-or-no flag, and against NGED's switching logs it has almost no skill.** The
+detector is called RO-NC here (the refit-offset neighbour-count detector, called XL in experiments
+70, 71, and 82) and is "causal" because it sees only data before the forecast origin. A rule that
+widened the forecast's uncertainty bands whenever the probability is high would widen them for only
+about 8% of the half-hours that NGED's logs mark as switching. The probability beats the flag only
+for injected transfers large enough for the detector to see. One option for a later experiment is a
+warning signal that needs no switching label, such as how unusual the recent power readings are.
 
 An abnormal running arrangement (ARA) is a period when a network operator has closed a normally
-open switch, so that one Primary substation (a substation that steps down to the local distribution
-network) carries load that belongs to a neighbour. A forecast that reads recent power (a lag) is
-misled when a lag lies inside an ARA. We asked whether the detector, shown only the data before a
-forecast origin, can say for each half-hour of the 7 days before the origin how likely it is to lie
-inside an ARA. We injected 839 transfers of known size and timing into the power of 16 Primary
-substations (from [experiment 88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)'s
-draw), and a second pass of 183 transfers lasting 1 to 60 days. We then fitted the probability on
-transfers that start in odd calendar months and scored it on those that start in even months.
+open switch, so that one Primary substation (a substation that steps down to the local
+distribution network) carries load that belongs to a neighbour. A forecast made at an origin time
+takes as inputs the power readings (lags) of the 7 days before the origin, the lag window. The
+forecast is misled when one of those readings was taken during an ARA. We asked whether the
+detector can give each half-hour of the lag window a probability of lying inside an ARA.
 
-The verdict is **inconclusive**. Arm 2, the calibrated score of the latest candidate, has a Brier
-score (mean squared error of a probability; smaller is better) 3.3% below the yes-or-no flag (97.5%
-interval -7.6% to +1.6%), against the 20% target. Where the transfers are large enough to see
-(a post hoc subset), the gain is 11.2% (-20.3% to -2.0%).
+We added a known amount of load (a transfer) to the recorded power of 16 Primary substations, 839
+times, using the draw of [experiment 88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md).
+A second draw added 183 longer transfers, lasting 1 to 60 days, so the two draws hold 1,022
+transfers. The probability was fitted on transfers that start in odd calendar months and scored on
+transfers that start in even months.
+
+The verdict is **inconclusive**. The calibrated score of the latest candidate (arm 2, defined below)
+has a Brier score (the mean squared error of a probability; smaller is better) 3.3% below the
+recalibrated yes-or-no flag (arm 1), with a 97.5% interval from -7.6% to +1.6%. The interval
+includes zero, so the experiment can neither support nor refute a gain, and the pre-registered
+prediction required at least 20%. The 20% threshold is the smallest gain judged worth carrying the
+extra detector output to the serving path. In a post hoc subset (chosen after seeing the results)
+that drops transfers whose donor substation steps by under 4 noise units (the size of the
+substation's usual half-hour-to-half-hour variation), the gain is 11.2% (-20.3% to -2.0%). Area
+under the receiver operating characteristic curve (0.5 means no skill, 1.0 means perfect
+separation of half-hours inside a transfer from half-hours outside) is 0.53 against NGED's logs.
+
+**Arm 2's gain over the flag is small and its interval includes zero on the pre-registered rows.**
 
 ![Change in Brier score against the yes-or-no flag](figure_1.svg)
 
+**The probability separates well for transfers under 14 days and poorly beyond.**
+
 ![Area under the curve by duration of the injected transfer](figure_2.svg)
+
+**Probabilities above 0.5 are too high.**
 
 ![Reliability of the probability](figure_3.svg)
 
-- **Arms.** Arm 1: the yes-or-no flag (the half-hour lies inside an interval of a candidate above the
-  detector's threshold), replaced by its hit rates on odd months so it is calibrated too. Arm 2: a
-  logistic regression on the candidate's score, its age, the time from its onset to the half-hour,
-  and any return step, then isotonic regression, for the latest unreturned candidate. Arm 3: arm 2
-  plus the candidate's step in noise units. Post hoc arm: the highest-scoring candidate instead of
-  the latest.
-- **Pre-registered rows** (shapes S2, S3, S4, and S6, even months, 3,358,215 rows of all five
-  shapes with 85,650 inside an injected transfer): Brier score flag 0.02321, arm 2 0.02243, arm 3
-  0.02229, post hoc arm 0.02239. Area under the curve 0.710, 0.728, 0.729, and 0.718.
-- **Contrasts** (change in Brier score against arm 1, 97.5% intervals from resampling 83 injection
-  batches): C1, arm 2, -3.3% (-7.6% to +1.6%). C2, arm 3, -4.0% (-8.2% to +0.8%). Arm 3 against arm 2:
-  -0.7% (-1.9% to +0.9%). Arm 2 beats the flag in 3 of the 4 even months that hold positive rows.
-- **Calibration.** The condition of the plan (no bin holding at least 5% of rows misses by more than
-  0.1) is met, but only because 97% of rows fall in the lowest bin. Probabilities of 0.55 to 0.77
-  are too high: 0.29 to 0.35 of those rows lie inside a transfer (figure 3).
-- **Post hoc rows.** Dropping the rows the same detector already flags on the uninjected power
-  (which hold unlabelled real switching): arm 2 -1.6% (-6.1% to +2.9%). Also dropping rows inside
-  transfers whose donor step is under 4 noise units: arm 2 -11.2% (-20.3% to -2.0%), arm 3 -11.6%
-  (-20.7% to -2.2%), post hoc arm -13.5% (-23.6% to -3.5%); Brier scores 0.00902, 0.00801, 0.00798,
-  and 0.00780, area under the curve 0.871, 0.880, 0.880, and 0.879.
-- **By duration of the injected transfer** (clean rows, both draws; area under the curve for the
-  flag, arm 2, post hoc arm): under 24 hours 0.813, 0.826, 0.829; 1 to 3 days 0.835, 0.855, 0.861;
-  3 to 14 days 0.827, 0.828, 0.837; over 14 days 0.675, 0.670, 0.682. The flag marks 64%, 70%, 68%,
-  and 37% of the positive rows, and 1.1%, 2.8%, 2.9%, and 2.4% of the negative rows.
-- **Real half-hours** (292 origins, 130,816 rows, 19,099 inside a logged closure or labelled event;
-  the logs are incomplete, so precision is a lower bound): area under the curve flag 0.521, arm 2
-  0.532, arm 3 0.528, post hoc arm 0.531. The flag marks 6,271 rows, of which 1,607 (26%) lie inside
-  the logs, and misses 17,492 of the 19,099 logged rows.
-- **Laboratory shortcuts.** The residual model uses ERA5 weather, which arrives about 5 days late, so
-  a live probability would need a residual built from ENS forecasts. The noise scales, the
-  logistic score, and its threshold were fitted on odd months of the whole record, including months
-  after an origin. The expected power is floored at 10% of its whole-record median. The injected
-  power does not enter the monthly refits of the residual model (the fast path). Rows are every
-  sixth hour of the 7-day lag window. A row inside a transfer belongs to the month the transfer
-  starts in, and any other row to the month of its lag stamp, so rows at one origin can fall on both
-  sides of the odd-even split.
-- **Caveats.** The 183 longer transfers are fewer than the 384 asked for, because the quiet-period
-  rules left few windows. The isotonic map is fitted on the logistic regression's own training
-  rows. Partner intervals take the score and step of the alarm series, so arm 3 adds little on the
-  receiver side.
-- **What to try next.** A lag-unusualness input that needs no switching label (the question of
-  experiment 90, SW2-28), and a detector that sees the real switching the logs hold, since this
-  detector finds 8% of it.
+## Arms
+
+A candidate is an interval that the detector proposes, with a score, an onset, a size in noise
+units, and, once it has ended, a return step.
+
+- **Arm 1:** the flag. A half-hour is flagged when it lies inside a candidate whose score reaches
+  the detector's threshold. Each flag value is replaced by the share of odd-month half-hours with
+  that value that lay inside a transfer, so the flag is calibrated too.
+- **Arm 2:** for the most recent candidate whose switching has not been reversed, a logistic
+  regression on its score, its age, the time from its onset to the half-hour, and any return step,
+  then isotonic regression (a monotone calibration curve). A half-hour with no such candidate gets
+  the odd-month rate.
+- **Arm 3:** arm 2 plus the candidate's size in noise units.
+- **Post hoc arm:** arm 2 with the highest-scoring candidate instead of the most recent.
+
+## Results
+
+- **Pre-registered rows.** The even-month test set holds 3,358,215 half-hours with 85,650 inside a
+  transfer, for the five shapes S1 to S6 that the injection uses (a shape is how the moved MW
+  varies through the day). The four shapes S2, S3, S4, and S6 are pooled for the contrasts. Brier
+  scores: arm 1 0.02321, arm 2 0.02243, arm 3 0.02229, post hoc arm 0.02239. Area under the curve:
+  0.710, 0.728, 0.729, and 0.718.
+- **Contrasts** (change in Brier score against arm 1, 97.5% intervals from resampling the 83
+  injection batches, each a set of about 10 transfers injected together). C1, arm 2: -3.3% (-7.6% to
+  +1.6%). C2, arm 3: -4.0% (-8.2% to +0.8%). Arm 3 against arm 2: -0.7% (-1.9% to +0.9%). In 3 of the
+  4 even months that contain half-hours inside a transfer, arm 2 has the lower Brier score.
+- **Calibration.** The prediction's reliability condition (no probability bin holding at least 5% of
+  half-hours misses the diagonal by more than 0.1) is met. It is met only because 97% of half-hours
+  fall in the lowest bin, so the condition tests almost nothing. In the bins covering probabilities
+  0.55 to 0.77, only 0.29 to 0.35 of the half-hours lie inside a transfer.
+- **Post hoc rows.** Dropping the half-hours that the same detector already flags on the uninjected
+  power (which holds unlabelled real switching) changes arm 2 to -1.6% (-6.1% to +2.9%). Also
+  dropping transfers whose donor step is under 4 noise units gives the table below.
+
+| Arm | Brier score | Change against arm 1 (97.5% interval) | Area under the curve |
+|---|---|---|---|
+| 1: flag | 0.00902 | - | 0.871 |
+| 2: latest candidate | 0.00801 | -11.2% (-20.3% to -2.0%) | 0.880 |
+| 3: with size | 0.00798 | -11.6% (-20.7% to -2.2%) | 0.880 |
+| Post hoc: highest-scoring candidate | 0.00780 | -13.5% (-23.6% to -3.5%) | 0.879 |
+
+- **By duration of the newest injected transfer** (post hoc subset, both draws, half-hours at
+  origins whose newest transfer has that duration):
+
+| Duration | Half-hours inside a transfer | Area under the curve: flag | arm 2 | post hoc arm | Flag marks (inside / outside a transfer) |
+|---|---|---|---|---|---|
+| Under 24 hours | 5,752 | 0.813 | 0.826 | 0.829 | 64% / 1.1% |
+| 1 to 3 days | 20,878 | 0.835 | 0.855 | 0.861 | 70% / 2.8% |
+| 3 to 14 days | 44,008 | 0.827 | 0.828 | 0.837 | 68% / 2.9% |
+| Over 14 days | 75,132 | 0.675 | 0.670 | 0.682 | 37% / 2.4% |
+
+- **Real half-hours.** The 292 forecast origins (one per daily run) have lag windows holding 130,816
+  half-hours, of which 19,099 lie inside a closure in NGED's logs or a labelled event. Area under
+  the curve: flag 0.521, arm 2 0.532, arm 3 0.528, post hoc arm 0.531. The flag marks 6,271
+  half-hours, of which 1,607 (26%) lie inside the logs, and misses 17,492 of the 19,099 logged
+  half-hours. NGED's logs are incomplete, so some flagged half-hours counted as wrong may be real
+  switching, and 26% is a lower bound on the share of flagged half-hours that are real.
+
+## Laboratory shortcuts and caveats
+
+- **A live probability would need a different weather input.** The detector's expected-power model
+  uses ERA5 weather estimates, which arrive about 5 days late. A live version would use ENS
+  (ECMWF ensemble) forecasts, and this experiment does not test one.
+- **Some fitted constants saw months after the origin.** The noise scales, the logistic score, and its
+  threshold were fitted on odd months of the whole record, including months after an origin.
+- **The injected power skips the monthly refits.** The expected-power model is not refitted on the
+  injected power, and its expected power is floored at 10% of its whole-record median.
+- **Rows are sampled and split by month.** The lag window contributes every sixth hour. A half-hour
+  inside a transfer takes the calendar month the transfer starts in, and any other half-hour takes
+  the month of its timestamp. Half-hours at one origin can therefore fall on both sides of the
+  odd-even split.
+- **The longer draw is smaller than planned.** We planned 384 longer transfers and placed 183,
+  because the requirement that a transfer start in a quiet period left few windows long enough.
+- **The calibration curve and the regression share training rows.** The isotonic regression is
+  fitted on the logistic regression's own odd-month training rows. All scores use even months, so
+  this does not touch the results above.
+- **Arm 3 adds little at the receiving substation.** A receiving substation's candidates inherit the
+  score and size of the donor substation's alarm, so the size gives arm 3 almost no extra
+  information there.
+
+## What to try next
+
+One option is an input that measures how unusual the recent lag power is, which needs no switching
+label (the question of experiment 90, SW2-28). Another is a detector that sees the real switching
+that the logs hold, since this detector flags only 8% of the half-hours that NGED's logs mark as
+switching.

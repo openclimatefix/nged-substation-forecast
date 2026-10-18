@@ -79,9 +79,17 @@ def injected_truth(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Where a lag stamp lies inside an injected interval on the series, and that event's size.
 
+    Args:
+        events: The batch's injected events.
+        series: The series to score.
+        lags: The lag stamps.
+        stats: `event_stats` of the batch.
+        cut: The first stamp that is not visible.
+
     Returns:
         The truth flag, and an array of (step in noise units, MW moved, hours, hours since onset
-        at the cut) of the covering event with the largest step, NaN where no event covers.
+        at the cut, onset stamp) of the covering event with the largest step, NaN where no event
+        covers.
     """
     flag = np.zeros(lags.size, dtype=bool)
     detail = np.full((lags.size, 5), np.nan)
