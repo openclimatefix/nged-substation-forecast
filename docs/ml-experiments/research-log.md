@@ -122,6 +122,7 @@ the maintainer to confirm.
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
+| [00089 - Normal running arrangement forecast, longest history, SW2-22](00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/result.md) | With switching removed from the training targets, does the longest history (2021-03 onward) beat 12 months, and does setting lags inside an abnormal arrangement to missing help? | Refuted: masking raised the score by 0.409 points of capacity on rows with a lag in an abnormal arrangement (98.33% interval +0.281 to +0.517); the longest history changed it by +0.009 (-0.052 to +0.069) | Not for production | 2026-10-18 |
 | [00090 - Lag unusualness inputs, SW2-28](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) | Does giving the Primary demand model the PIT of each lag against a climatology improve the forecast on all rows, and widen the quantiles on rows with a lag inside a logged switching event? | Refuted: the PIT inputs raised the score by 0.355 points of capacity on all rows outside switching (97.5% interval +0.209 to +0.513); on rows with a lag inside a logged event +0.795 (-0.325 to +2.787, inconclusive) | Not for production | 2026-10-18 |
 | [00088 - Normal running arrangement forecast on injected switches, SW2-21](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md) | When a Primary substation is inside a switching transfer or has just left one, does the NRA forecast recover the true unmodified power, with the MW from the injection and from the refit-offset neighbour-count detector run only on data before the origin? | Inconclusive: with the true MW, a booster trained on NGED's logged transfers closes 83% (70% to 91%) of the error a transfer adds; with the MW from the refit-offset neighbour-count detector as built, a booster trained on that detector's transfers closes 16% (-17% to 67%), -0.149 points of capacity against the plain forecast (98.75% interval -1.174 to +0.148) | Not for production | 2026-10-18 |
 | [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
@@ -2101,6 +2102,30 @@ moved MW as three columns.
   logs?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1322).
 
 ![Contrasts on the rows with a lag inside a logged event](00086-sw2-12-detector-labels-for-nra-forecast/figure_1.svg)
+
+### 00089: the normal running arrangement forecast on the longest history
+
+**Setting past power readings that fall inside an abnormal running arrangement (ARA) to missing made
+the Primary demand forecast worse, and training on all history since March 2021 instead of 12 months
+changed nothing; the verdict is refuted.** The experiment refitted the XGBoost demand model monthly
+for 16 Primary substations, removed ARA half-hours from the training targets, and scored 292 daily
+runs.
+
+- **Headline result:** masking minus no masking on the 352,765 half-hours with a lag inside an ARA
+  +0.409 points of capacity (98.33% interval +0.281 to +0.517); longest history minus 12 months
+  +0.009 (-0.052 to +0.069) on all rows outside switching. The 12-month arm scored 5.468 there.
+- **Finding for later experiments:** removing the labelled switching from the training targets did
+  not make the longer history help, so that switching does not explain why a long history fails to
+  help demand forecasts. The union of the labels marks 9 to 16% of half-hours per year from 2022,
+  and
+  masking on the union raised the error in all three pairs of arms (12 months, longest history, and
+  longest history from 2024-04-01).
+- **Write-up and pull request:**
+  [result](00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/result.md),
+  [PR #1331 (Experiment 89: does the longest history, with switching masked, improve the NRA
+  forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1331).
+
+![Planned contrasts](00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/figure_1.svg)
 
 ### 00090: lag unusualness inputs
 
