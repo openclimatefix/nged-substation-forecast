@@ -13,8 +13,9 @@ prediction: >-
   year the unadjusted q05 covers 0.039 and q95 covers 0.938 (nominal 0.05 and 0.95), so the lower
   tail is too wide and the upper tail slightly too narrow. We therefore predict that no single
   global scale (arm 1) reaches the 0.01 band at both ends, that a per-level, per-lead-band, per-class
-  adjustment (arms 3 to 5) does, and that arm 6's absolute gap from nominal at 0.5% and 99.5% is smaller than arm 0's and arm 5's,
-  which read those levels off a normal extrapolation of q01 and q05.
+  adjustment (arms 3 to 5) does, and that arm 6's absolute gap from nominal at 0.5% and 99.5% is
+  smaller than arm 0's and arm 5's, which read those levels off a normal extrapolation of q01 and
+  q05.
 decision_rule: >-
   An arm passes the tail test when, in the 12 to 36 hour lead band of each class (Primary, and
   bulk or grid supply point), the coverage of q05, q95, q01, and q99 is each within 0.01 of nominal.
@@ -99,8 +100,8 @@ lead band unless stated.
 3. **Scale factor per level, lead band, and class.**
 4. **Level remapping:** isotonic regression of calibration coverage on nominal level, inverted to
    find the stored level whose empirical coverage equals each target (the lowest level of a flat
-   segment); the stored quantile function is interpolated linearly in the level, and extrapolated beyond q01 and q99 with the normal
-   spacing of q01 and q05.
+   segment); the stored quantile function is interpolated linearly in the level, and
+   extrapolated beyond q01 and q99 with the normal spacing of q01 and q05.
 5. **Split-conformal shift:** for each level, the additive shift equal to the calibration quantile
    of `actual - q_level` (with the usual `ceil((n+1)p)/n` correction).
 6. **Stored body plus fitted tails:** q10 to q90 stay as stored. At each end, a generalised Pareto
