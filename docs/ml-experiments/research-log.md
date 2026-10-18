@@ -33,6 +33,7 @@ the maintainer to confirm.
 | [00078 - Current capacity and a zero start, PVDIS-5 check 2](00078-pvdis-5-current-capacity-vintages/result.md) | Refresh the capacity table that feeds the base margin once per season-year, and test a base margin of zero in the production XGBoost recipe | Re-estimating the capacity lowers the score by 0.018 points (-0.036 to -0.004); a zero start lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) in this experiment, and has not been tested on other series types |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Retrain the Primary demand model weekly and drop the 14-day correction | Second set of runs (control-only, 2023-07 to 2024-03): weekly scores 0.24 points below the stack (99.17% interval -0.36 to -0.15) and 0.04 below monthly (control member of the ECMWF ensemble only) |
+| [00094 - Explicit heating term, HT1](00094-explicit-heating-offset-primary-demand/result.md) | Add a per-series heating degree-hour term to the base margin of the Primary demand model | Lowers the cold-hour score by 0.143 points (-0.203 to -0.034) and the all-rows score by 0.022 (-0.042 to +0.000); needs a coefficient fit in training and a margin in serving; leaves cold-hour q95 exceedance at 16% to 17% |
 
 ## The experiments so far
 
@@ -126,6 +127,7 @@ the maintainer to confirm.
 | [00090 - Lag unusualness inputs, SW2-28](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) | Does giving the Primary demand model the PIT of each lag against a climatology improve the forecast on all rows, and widen the quantiles on rows with a lag inside a logged switching event? | Refuted: the PIT inputs raised the score by 0.355 points of capacity on all rows outside switching (97.5% interval +0.209 to +0.513); on rows with a lag inside a logged event +0.795 (-0.325 to +2.787, inconclusive) | Not for production | 2026-10-18 |
 | [00088 - Normal running arrangement forecast on injected switches, SW2-21](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md) | When a Primary substation is inside a switching transfer or has just left one, does the NRA forecast recover the true unmodified power, with the MW from the injection and from the refit-offset neighbour-count detector run only on data before the origin? | Inconclusive: with the true MW, a booster trained on NGED's logged transfers closes 83% (70% to 91%) of the error a transfer adds; with the MW from the refit-offset neighbour-count detector as built, a booster trained on that detector's transfers closes 16% (-17% to 67%), -0.149 points of capacity against the plain forecast (98.75% interval -1.174 to +0.148) | Not for production | 2026-10-18 |
 | [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
+| [00094 - Explicit heating term, HT1](00094-explicit-heating-offset-primary-demand/result.md) | Does a per-series heating degree-hour term in the XGBoost base margin lower the cold-hour error of Primary demand? | Small gain: -0.143 points (98.75% interval -0.203 to -0.034) in cold hours up to 48 h, under the 0.3 threshold; q95 exceedance in cold hours barely moves (0.167 to 0.162) | Candidate | 2026-10-18 |
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
@@ -1555,6 +1557,26 @@ contrasts that are 0.05 points or larger.
 - **Write-up:** [the full result page](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md).
 
 ![Contrasts under each schedule](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_1.svg)
+
+### 00094: does an explicit heating term lower the cold-hour error? (HT1)
+
+**Giving the XGBoost demand model an explicit heating term lowered its error in cold weather by a
+little, and did not fix the cold-weather tail.** For the 16 Primary substations, the heating term
+lowered the quantile score (an error measure in points of capacity) by 0.143 points in cold hours
+(ensemble-mean forecast temperature below 3 °C) at leads up to 48 hours (98.75% interval -0.203 to
+-0.034), under the 0.3 threshold fixed in advance, and by 0.022 over all rows (-0.042 to +0.000).
+The share of observations above the q95 forecast, which a calibrated forecast would hold at 0.05,
+fell from 0.167 to 0.162 in those hours. The median forecast stayed about 2.7 points of capacity too
+low in cold hours at leads over 48 hours. A decreasing monotone constraint on temperature gained
+about half as much (0.074, -0.111 to -0.020) and needs no new serving column. Added to experiment
+64's solar term at the 5 Primaries that have one, over 73 forecast runs, the heating term lowered
+the all-rows score by 0.050 (-0.065 to -0.036). The 16-substation arms have no solar term. The
+experiment did not locate the remaining cold-hour error; the ENS temperature forecast is one
+untested candidate.
+
+- **Write-up:** [the full result page](00094-explicit-heating-offset-primary-demand/result.md).
+
+![Contrasts of the arms against the reference](00094-explicit-heating-offset-primary-demand/figure_1.svg)
 
 ### 00084: can the substation-limit curtailment metric rank forecasts on the pilot?
 
