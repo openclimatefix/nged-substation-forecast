@@ -89,9 +89,47 @@ def load_rows() -> pl.DataFrame:
     return pl.concat([injected, real], how="diagonal_relaxed")
 
 
+LONG_SEED_FROM: Final[int] = 10_000
+"""Batch seeds from here on belong to the second pass of longer transfers."""
+DURATION_BINS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("under 24 h", 0.0, 24.0),
+    ("1 to 3 d", 24.0, 72.0),
+    ("3 to 14 d", 72.0, 336.0),
+    ("over 14 d", 336.0, 1e9),
+)
+"""Duration bins of the newest active transfer at a cut, in hours."""
+
+
+def add_reference_hours(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add `ref_hours`: the duration of the newest-onset transfer active at each row's cut.
+
+    Active means the transfer starts before the cut and ends within the 7-day lag window of it.
+    """
+    import e00091_harness as harness
+
+    state = harness.make_state()
+    main_events = harness.cached_events(power=state["panel"]["power"])
+    batches = dict(harness.seeded_batches(events=main_events))
+    long_path = common.WORK_DIR / "long_events.pkl"
+    if long_path.exists():
+        from e00091_inject import batches as split
+
+        for i, batch in enumerate(split(events=pickle.loads(long_path.read_bytes()))):
+            batches[9100 + 1000 + i] = batch
+    pairs = frame.select("seed", "cut").unique()
+    hours = []
+    for seed, cut in pairs.iter_rows():
+        active = [e for e in batches[seed] if e.onset < cut and e.end > cut - 336]
+        hours.append(max(active, key=lambda e: e.onset) if active else None)
+    pairs = pairs.with_columns(
+        ref_hours=pl.Series([(e.end - e.onset) / 2 if e else None for e in hours], dtype=pl.Float64)
+    )
+    return frame.join(pairs, on=["seed", "cut"], how="left")
+
+
 def variant_rows(*, frame: pl.DataFrame, variant: str) -> pl.DataFrame:
-    """Return the injected rows of one variant (see `VARIANTS`)."""
-    injected = frame.filter(pl.col("shape") != "REAL")
+    """Return the injected rows of one variant (see `VARIANTS`), from the main draw only."""
+    injected = frame.filter((pl.col("shape") != "REAL") & (pl.col("seed") < LONG_SEED_FROM))
     if variant == "all":
         return injected
     injected = injected.filter(~pl.col("background").fill_null(False))
@@ -286,12 +324,60 @@ def report_variant(*, injected: pl.DataFrame, name: str) -> dict[str, np.ndarray
     return predictions
 
 
+def report_durations(*, frame: pl.DataFrame) -> None:
+    """Post hoc: fit on odd months of both draws, score by the newest transfer's duration bin.
+
+    Rows are the clean rows (no background flag) of the headline shapes. A row's bin is the
+    duration of the newest-onset transfer active at its cut, so the bin holds that transfer's
+    positive rows and the negative rows of the same cuts.
+    """
+    injected = frame.filter(
+        pl.col("shape").is_in(HEADLINE_SHAPES) & ~pl.col("background").fill_null(False)
+    )
+    injected = injected.filter(
+        pl.col("ev_step_z").is_null()
+        | (pl.col("ev_step_z") >= LARGE_STEP_Z)
+        | (pl.col("seed") >= LONG_SEED_FROM)
+    )
+    injected = add_reference_hours(frame=injected)
+    fit, test = injected.filter(pl.col("fit")), injected.filter(~pl.col("fit"))
+    print("\n######## post hoc: by duration of the newest active transfer (both draws, clean rows)")
+    print(f"rows: fit {fit.height:,}, test {test.height:,}")
+    fitted = {arm: fit_arm(frame=fit, arm=arm) for arm in ARMS}
+    predictions = {arm: predict(fitted=fitted[arm], frame=test) for arm in ARMS}
+    y = test["y"].to_numpy().astype(float)
+    hours = test["ref_hours"].to_numpy()
+    recall = test["flag"].to_numpy()
+    for name, low, high in DURATION_BINS:
+        m = np.isfinite(hours) & (hours >= low) & (hours < high)
+        print(f"\n-- {name}: rows {m.sum():,}, positives {int(y[m].sum()):,}")
+        if y[m].sum() == 0:
+            continue
+        print(
+            f"   flag recall on positives {recall[m & (y > 0)].mean():.3f}, "
+            f"flag rate on negatives {recall[m & (y == 0)].mean():.3f}"
+        )
+        for arm in ("flag", "latest", "latest_x1", "best"):
+            p = predictions[arm][m]
+            rel = reliability(p=p, y=y[m]).filter(pl.col("share") >= BIN_SHARE)
+            print(
+                f"   {arm:10s} Brier {brier(p=p, y=y[m]):.5f}  AUC {auc(p=p, y=y[m]):.4f}  "
+                f"max gap {rel['gap'].max():.3f}"
+            )
+        print(reliability(p=predictions["latest"][m], y=y[m]))
+    test.select(
+        "seed", "shape", "cut", "series", "lag_stamp", "y", "ref_hours", "flag"
+    ).write_parquet(OUT_DIR / "test_rows_duration.parquet")
+    np.savez(OUT_DIR / "test_predictions_duration.npz", **predictions)
+
+
 def main() -> None:
     """Score every variant, then the real half-hours with the `all` calibration."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     frame = load_rows()
     for name in VARIANTS:
         report_variant(injected=variant_rows(frame=frame, variant=name), name=name)
+    report_durations(frame=frame)
     real = frame.filter(pl.col("shape") == "REAL")
     ry = real["y"].to_numpy().astype(float)
     print(
