@@ -238,6 +238,13 @@ def read_arm(*, fold: str, arm: str, smoke: bool) -> pl.DataFrame | None:
 def shared_keys(*, fold: str, smoke: bool) -> pl.DataFrame:
     """Return the cases that every arm table of the fold holds.
 
+    Args:
+        fold: The fold name.
+        smoke: Whether to read the smoke outputs.
+
+    Returns:
+        The case keys present in every arm table.
+
     Raises:
         FileNotFoundError: If the fold has no metrics.
     """

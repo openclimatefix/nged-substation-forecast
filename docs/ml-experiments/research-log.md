@@ -137,7 +137,8 @@ fold, but dropping the Christmas column raised the error by 1.2 points inside th
   (95% -0.189 to -0.014). An all-18 km fold had the same signs with intervals that include zero.
   Neither fold separates retraining from adapting to the 9 km weather product.
 - **Write-up and pull request:** [result](00081-r11-control-member-second-validation-year-demand/result.md),
-  [PR #1313 (Experiment 81: do the weekly-retraining findings hold on July-to-March forecast runs the project has not scored?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1313).
+  [PR #1313 (Experiment 81: do the weekly-retraining findings hold on July-to-March forecast
+  runs the project has not scored?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1313).
 
 ![Planned contrasts](00081-r11-control-member-second-validation-year-demand/figure_1.svg)
 

@@ -204,6 +204,13 @@ def refit_times(*, fold: common.Fold, regime: str) -> tuple[datetime, ...]:
 def chosen_refit(*, refits: tuple[datetime, ...], origin: datetime) -> datetime:
     """Return the latest refit at or before an origin.
 
+    Args:
+        refits: The refit times.
+        origin: The forecast origin.
+
+    Returns:
+        The latest refit time not after the origin.
+
     Raises:
         ValueError: If every refit is later than the origin.
     """
@@ -286,6 +293,14 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime, config: Config) -> pl.Dat
 
     A refit sees a row only if its valid time is at least 3.5 hours before the refit (the frozen
     model: no later than its anchor), and, for a rolling window, only the latest `window_days`.
+
+    Args:
+        rows: The candidate training rows.
+        refit: The refit time.
+        config: The arm configuration.
+
+    Returns:
+        The rows the refit may see.
 
     Raises:
         ValueError: If a kept row's valid time is later than the cut-off.

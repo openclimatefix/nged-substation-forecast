@@ -100,6 +100,17 @@ def regime_rows(
 ) -> pl.DataFrame:
     """Return one series' quantiles for a configuration and regime, from the chosen refits.
 
+    Args:
+        root: The folder of the saved refit files.
+        fold: The fold being assembled.
+        config: The arm configuration name.
+        regime: The refit schedule name.
+        site: The series label.
+        origins: The forecast origins to serve.
+
+    Returns:
+        The series' quantile rows, one per case.
+
     Raises:
         ValueError: If a refit file lacks a run assigned to it.
         FileNotFoundError: If a refit file of the series is missing.
