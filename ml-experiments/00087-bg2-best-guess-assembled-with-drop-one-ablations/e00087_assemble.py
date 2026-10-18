@@ -99,6 +99,8 @@ WEIGHT_GRID_STEP: Final[int] = 4
 SCORING_CHUNK_ROWS: Final[int] = 1_000_000
 REPEAT_DIR: Final[Path] = common.WORK_DIR / "anchor_preds_repeat"
 """Where the noise-floor repeat fit of the weekly model writes (same layout as `anchor_preds`)."""
+OPTIONAL_ARMS: Final[frozenset[str]] = frozenset({"p_a6_capacity_held", "g_a_wind_margin"})
+"""Arms a strict run may skip when their fits are absent; every other missing file is an error."""
 SELF_TEST_RUNS: Final[int] = 45
 SELF_TEST_STEPS: Final[int] = 96
 
@@ -435,6 +437,9 @@ def emit(*, ctx: Context, name: str, table: pl.DataFrame, started: float) -> Non
         print(f"{name}: no cases shared by the members, skipped", flush=True)
         return
     frame = finalise(ctx=ctx, frame=table)
+    if frame.select(KEY_COLUMNS).is_duplicated().any():
+        msg = f"arm {name} holds two rows with the same series, run, valid time, and seed"
+        raise ValueError(msg)
     write_arm(ctx=ctx, name=name, frame=frame)
     print(f"{name}: {frame.height:,} rows, {time.monotonic() - started:.0f} s", flush=True)
 
@@ -632,6 +637,8 @@ def blend_arm(
     )
     ctx.results_dir.mkdir(parents=True, exist_ok=True)
     table.write_parquet(ctx.results_dir / f"blend_weights_{weights_name}.parquet")
+    with pl.Config(tbl_rows=24, tbl_cols=12):
+        print(f"blend weights {weights_name}:\n{table}", flush=True)
     return keys.hstack(pl.DataFrame(blended, schema=list(common.LEVEL_COLUMNS)))
 
 
@@ -692,6 +699,8 @@ def build_primary(*, ctx: Context) -> None:
         try:
             table = build()
         except FileNotFoundError as error:
+            if ctx.strict and name not in OPTIONAL_ARMS:
+                raise
             print(f"{name}: skipped, {error}", flush=True)
             continue
         emit(ctx=ctx, name=name, table=table, started=started)
@@ -752,6 +761,8 @@ def build_bspgsp(*, ctx: Context) -> None:
         try:
             table = build()
         except FileNotFoundError as error:
+            if ctx.strict and name not in OPTIONAL_ARMS:
+                raise
             print(f"{name}: skipped, {error}", flush=True)
             continue
         emit(ctx=ctx, name=name, table=table, started=started)
@@ -765,9 +776,14 @@ def generator_mixtures(*, ctx: Context, arm: str) -> pl.DataFrame | None:
     files = sorted((ctx.generator_root / arm).glob("*.parquet"))
     if not files:
         return None
-    return pl.concat([pl.read_parquet(path) for path in files]).filter(
+    table = pl.concat([pl.read_parquet(path) for path in files]).filter(
         pl.col("power_fcst_init_time").is_in(ctx.origins)
     )
+    runs = table.group_by("time_series_id").agg(runs=pl.col("power_fcst_init_time").n_unique())
+    if ctx.strict and (runs["runs"] != len(ctx.origins)).any():
+        msg = f"generator arm {arm}: some series lack runs; runs per series {runs.rows()}"
+        raise ValueError(msg)
+    return table
 
 
 def with_spread_factor(*, ctx: Context, table: pl.DataFrame) -> pl.DataFrame:
@@ -833,6 +849,9 @@ def build_generators(*, ctx: Context) -> None:
     }
     for name, (source, spread) in plan.items():
         if source not in plain:
+            if ctx.strict and name not in OPTIONAL_ARMS:
+                msg = f"{name}: no {source} predictions under {ctx.generator_root}"
+                raise FileNotFoundError(msg)
             print(f"{name}: skipped, no {source} predictions", flush=True)
             continue
         table = with_spread_factor(ctx=ctx, table=plain[source]) if spread else plain[source]
@@ -1080,6 +1099,59 @@ def _write_fixture_fits(*, ctx: Context) -> None:
                     )
 
 
+def _write_fixture_generators(*, ctx: Context) -> None:
+    """Write fake generator mixtures: the weekly arms by refit date, the others as `frozen`."""
+    levels = np.linspace(-0.1, 0.1, 11)
+    arms_of = {
+        "era5_frozen_mixture": ("frozen", 0.03),
+        "ens_frozen": ("frozen", 0.02),
+        "ens_weekly": ("weekly", 0.01),
+        "ens_weekly_margin": ("weekly", 0.005),
+    }
+    for arm, (regime, bias) in arms_of.items():
+        for row in ctx.sites.iter_rows(named=True):
+            if arm == "ens_weekly_margin" and row["technology"] != "wind":
+                continue
+            power = ctx.power_of[int(row["time_series_id"])]
+            if regime == "frozen":
+                assigned = {None: list(ctx.origins)}
+            else:
+                assigned = dict(regimes.served(name="weekly", origins=ctx.origins))
+            for refit, runs in assigned.items():
+                frames = []
+                for origin in runs:
+                    valid = [origin + (k + 1) * common.STEP for k in range(SELF_TEST_STEPS)]
+                    keys = pl.DataFrame(
+                        {
+                            "time_series_id": [row["time_series_id"]] * SELF_TEST_STEPS,
+                            "power_fcst_init_time": [origin] * SELF_TEST_STEPS,
+                            "valid_time": valid,
+                        },
+                        schema={
+                            "time_series_id": pl.Int32,
+                            "power_fcst_init_time": pl.Datetime("us", "UTC"),
+                            "valid_time": pl.Datetime("us", "UTC"),
+                        },
+                    )
+                    truth = common.take(
+                        values=power, index=np.asarray(common.grid_index(times=keys["valid_time"]))
+                    )
+                    centre = np.clip(np.nan_to_num(truth, nan=0.3) + bias, 0.0, 1.0)
+                    frames.append(
+                        keys.hstack(
+                            pl.DataFrame(
+                                (centre[:, None] + levels).astype(np.float32),
+                                schema=list(common.LEVEL_COLUMNS),
+                            )
+                        ).with_columns(seed=pl.lit(0).cast(pl.Int8))
+                    )
+                label = "frozen" if refit is None else f"{refit:%Y%m%d}"
+                common.atomic_write(
+                    frame=pl.concat(frames),
+                    target=ctx.generator_root / arm / f"{row['site']}_{label}.parquet",
+                )
+
+
 def self_test() -> None:
     """Check the blend's causality, then build every demand arm from fake refit files."""
     _check_blend_is_causal()
@@ -1090,6 +1162,25 @@ def self_test() -> None:
         _write_fixture_fits(ctx=ctx)
         build_primary(ctx=ctx)
         build_bspgsp(ctx=ctx)
+        _write_fixture_generators(ctx=ctx)
+        build_generators(ctx=ctx)
+        generator_names = [
+            "g_prev_best_era5",
+            "g_ens_frozen",
+            "g_ens_weekly",
+            "g_a_spread_on",
+            "g_a_wind_margin",
+        ]
+        for name in generator_names:
+            table = pl.read_parquet(ctx.arms_dir / f"{name}.parquet")
+            assert table.select(KEY_COLUMNS).is_duplicated().sum() == 0, name
+            assert table["group"].unique().sort().to_list() == (
+                ["wind"] if name == "g_a_wind_margin" else ["solar", "wind"]
+            ), name
+        build_perfect(ctx=ctx)
+        perfect = pl.read_parquet(ctx.arms_dir / "ref_perfect.parquet")
+        assert (perfect["q01"] == perfect["actual"]).all()
+        assert (perfect["q99"] == perfect["actual"]).all()
         names = [
             "p_s1_frozen",
             "p_s2_stack",
@@ -1150,7 +1241,9 @@ def self_test() -> None:
         first = weights.row(0, named=True)
         assert all(abs(first[c] - 0.2) < 1e-9 for c in first if c.startswith("w_")), first
         print(weights)
-        print(f"self-test passed: {len(names)} arms built from fake refit files")
+        print(
+            f"self-test passed: {len(names) + len(generator_names) + 1} arms built from fake files"
+        )
     finally:
         shutil.rmtree(folder, ignore_errors=True)
 

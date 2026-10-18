@@ -1562,6 +1562,7 @@ def _class_report(*, name: str, outputs: Mapping[str, pl.DataFrame]) -> list[str
                 ),
                 "",
             ]
+    lines += _scope_lines(name=name, outputs=outputs)
     tails = outputs["tails"]
     if not tails.is_empty():
         lines += [
@@ -1572,6 +1573,56 @@ def _class_report(*, name: str, outputs: Mapping[str, pl.DataFrame]) -> list[str
                     "arm", "level", "coverage", "coverage_lower_95", "coverage_upper_95", "pinball"
                 )
             ),
+            "",
+        ]
+    return lines
+
+
+def _scope_lines(*, name: str, outputs: Mapping[str, pl.DataFrame]) -> list[str]:
+    """Return report tables of the key arms' error by scope, and their reliability."""
+    lines: list[str] = []
+    scopes = outputs["scopes"]
+    key_arms = [
+        arms.BG2_OF_CLASS[name],
+        arms.PREVIOUS_BEST_OF_CLASS[name],
+        "ref_manual_heuristic",
+    ]
+    if not scopes.is_empty():
+        for dimension, metric in (
+            ("lead_day", "mae"),
+            ("lead_day_midday", "mae"),
+            ("lead_band", "mae"),
+            ("lead_band", "qs"),
+            ("season", "mae"),
+            ("season", "qs"),
+            ("sun", "mae"),
+            ("sun", "qs"),
+            ("hour_uk", "mae"),
+            ("origin_month", "qs"),
+            ("series", "qs"),
+        ):
+            part = scopes.filter(
+                (pl.col("dimension") == dimension)
+                & (pl.col("metric") == metric)
+                & pl.col("arm").is_in(key_arms)
+            )
+            if part.is_empty():
+                continue
+            wide = part.pivot(on="arm", index="scope", values="value", maintain_order=True)
+            lines += [
+                f"{metric} by {dimension} (points of capacity):",
+                "",
+                markdown(frame=wide),
+                "",
+            ]
+    reliability = outputs["reliability"]
+    if not reliability.is_empty():
+        part = reliability.filter(pl.col("arm").is_in(key_arms))
+        wide = part.pivot(on="arm", index="nominal", values="observed", maintain_order=True)
+        lines += [
+            "Reliability: the share of cases at or below each quantile (nominal level first):",
+            "",
+            markdown(frame=wide),
             "",
         ]
     return lines
