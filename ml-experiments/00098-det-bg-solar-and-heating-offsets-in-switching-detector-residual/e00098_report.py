@@ -5,7 +5,7 @@ the fresh headline-band and long draws, by injection shape, with month-resampled
 planned contrasts C1, C2, and C3; recall by donor step; the labelled real transfers; and the alarm
 counts.
 
-    uv run python ml-experiments/00070-*/e00098_report.py
+    uv run python ml-experiments/00098-*/e00098_report.py
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from e00098_run import ARMS, TARGET
 
 N_RESAMPLES: Final[int] = 20_000
 LEVEL: Final[float] = 1 - 0.05 / 4
-"""Two-sided level of the intervals: Bonferroni across the three planned contrasts (98.33%)."""
+"""Two-sided level of the intervals: Bonferroni across the three planned contrasts (98.75%)."""
 SEED: Final[int] = 8200
 THRESHOLD: Final[float] = 0.02
 STEP_EDGES: Final[tuple[float, ...]] = (0.0, 2.0, 4.0, 6.0, 10.0, float("inf"))

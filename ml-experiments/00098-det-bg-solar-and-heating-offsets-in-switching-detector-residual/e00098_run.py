@@ -44,6 +44,7 @@ from e00098_common import (
     ML_EXPERIMENTS_DATA_DIR,
     TUNING_MONTHS,
     WORK_DIR,
+    load_panel,
     near_log_masks,
     stamp_months,
 )
@@ -285,7 +286,7 @@ def make_state(*, out: Path, trained: bool = True) -> dict:
         "panel": panel,
         "offset_panel": offset_panel,
         "scales": all_scales(panel=panel, offset_panel=offset_panel),
-        "shares": fit_profile_shares(panel=panel),
+        "shares": fit_profile_shares(panel=load_panel(arm="h05_stored")),
         "thresholds": read_json(out=out, name="thresholds.json") if trained else {},
         "models": pickle.loads((out / "models.pkl").read_bytes()) if trained else {},
     }

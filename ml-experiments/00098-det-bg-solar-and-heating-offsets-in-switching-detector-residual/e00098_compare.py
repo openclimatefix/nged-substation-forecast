@@ -14,6 +14,7 @@ import itertools
 import json
 from typing import Final
 
+import numpy as np
 import polars as pl
 from e00098_common import BASE_DIR, FITS_ROOT, SERIES_IDS
 from e00098_fit import SOLAR_SERIES
@@ -42,7 +43,7 @@ def arm_frames(*, arm: str, detector: str) -> list[pl.DataFrame]:
             frame.select("event_id", "weight", "year_month", "metered_receivers", "donor_step_z")
             .join(donors, on="event_id", validate="1:1")
             .with_columns(found=frame[detector])
-            .rename({"found": arm})
+            .rename({"found": arm, "donor_step_z": f"z_{arm}"})
         )
     return frames
 
@@ -55,9 +56,19 @@ def paired(*, arms: list[str], detector: str) -> list[pl.DataFrame]:
         frame = per_arm[arms[0]][index]
         for arm in arms[1:]:
             other = per_arm[arm][index]
-            if other.height != frame.height or not other["event_id"].equals(frame["event_id"]):
+            same = other.height == frame.height and all(
+                other[c].equals(frame[c])
+                for c in (
+                    "event_id",
+                    "weight",
+                    "year_month",
+                    "metered_receivers",
+                    "donor",
+                )
+            )
+            if not same:
                 raise ValueError(f"{arm} scores different transfers from {arms[0]}")
-            frame = frame.with_columns(other[arm])
+            frame = frame.with_columns(other[arm], other[f"z_{arm}"])
         out.append(frame)
     return out
 
@@ -116,8 +127,8 @@ def noise_rows(*, arms: list[str]) -> pl.DataFrame:
                         "group": group,
                         "season": season,
                         "band": band,
-                        "median_abs": float(cell["abs_residual"].median()) * 100,
-                        "mae": float(cell["abs_residual"].mean()) * 100,
+                        "median_abs": float(np.median(cell["abs_residual"].to_numpy())) * 100,
+                        "mae": float(np.mean(cell["abs_residual"].to_numpy())) * 100,
                         "rows": cell.height,
                     }
                 )
@@ -132,24 +143,30 @@ def odd_summer_midday(*, arm: str) -> float:
         pl.col("month") % 2 == 1,
         pl.col("hour").is_in(list(MIDDAY_HOURS)),
     )
-    return float(table["abs_residual"].median()) * 100
+    return float(np.median(table["abs_residual"].to_numpy())) * 100
 
 
 def by_step(*, frames: list[pl.DataFrame], arms: list[str]) -> list[dict]:
-    """Transfers found by donor step in noise units (S2 to S4 summed), split by metered receiver."""
+    """Transfers found by donor step in each arm's own noise units (S2 to S4 summed).
+
+    The step in noise units depends on the arm's residual noise, so each arm bins by its own step
+    and reports its own transfer count `n_<arm>` as well as the number found.
+    """
     out = []
     for flag, label in ((True, "metered"), (False, "unmetered")):
         for low, high in itertools.pairwise(STEP_EDGES):
-            n, counts = 0, dict.fromkeys(arms, 0)
-            for frame in frames:
-                part = frame.filter(
-                    (pl.col("metered_receivers") > 0) == flag,
-                    pl.col("donor_step_z").abs().is_between(low, high, "left"),
-                )
-                n += part.height
-                for arm in arms:
-                    counts[arm] += int(part[arm].sum())
-            out.append({"receivers": label, "low": low, "high": high, "n": n, **counts})
+            row: dict = {"receivers": label, "low": low, "high": high}
+            for arm in arms:
+                found = n = 0
+                for frame in frames:
+                    part = frame.filter(
+                        (pl.col("metered_receivers") > 0) == flag,
+                        pl.col(f"z_{arm}").abs().is_between(low, high, "left"),
+                    )
+                    n += part.height
+                    found += int(part[arm].sum())
+                row[arm], row[f"n_{arm}"] = found, n
+            out.append(row)
     return out
 
 
@@ -214,7 +231,9 @@ def main() -> None:
         )
     )
     print(
-        noise.filter(pl.col("group") == "all series").group_by("arm").agg(mae=pl.col("mae").mean())
+        noise.filter(pl.col("group") == "all series")
+        .group_by("arm")
+        .agg(mae=(pl.col("mae") * pl.col("rows")).sum() / pl.col("rows").sum())
     )
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, indent=1))

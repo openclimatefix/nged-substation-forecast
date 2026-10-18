@@ -73,11 +73,11 @@ def _dot_and_line(
         base = base.encode(
             color=alt.Color(f"{y}:N", legend=None, scale=alt.Scale(domain=order, range=colours))
         )
-    return base.mark_rule().encode(
+    rule = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("low:Q", title="Share of moved MW found"), x2="high:Q"
-    ) + (  # ty: ignore[unresolved-attribute]
-        base.mark_point(filled=True, size=70).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
     )
+    point = base.mark_point(filled=True, size=70).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
+    return rule + point
 
 
 def figure_recall(*, results: dict) -> alt.TopLevelMixin:
@@ -140,7 +140,7 @@ def figure_contrasts(*, results: dict) -> alt.TopLevelMixin:
     rules = (
         alt.Chart(marks)
         .mark_rule(strokeDash=[4, 3])
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x="x:Q",
             color=alt.Color(
                 "what:N", scale=alt.Scale(range=["#7A7F87", ocf.BRAND_ORANGE]), title=None
@@ -182,7 +182,7 @@ def figure_noise() -> alt.TopLevelMixin:
     return (
         alt.Chart(noise)
         .mark_line(point=True)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("band:N", sort=BAND_ORDER, title="UTC hour band", axis=alt.Axis(labelAngle=0)),
             y=alt.Y("median_abs:Q", title="Median absolute residual (points of capacity)"),
             color=alt.Color(
@@ -193,7 +193,7 @@ def figure_noise() -> alt.TopLevelMixin:
             width=WIDTH,
             height=200,
             title=_title(
-                text="The CAMS solar offset lowers the summer midday residual by about 12%, the ERA5 offset does not",
+                text="The CAMS solar offset cuts the summer midday residual by 12%; ERA5 does not",
                 lines=[
                     (
                         "Median absolute difference between measured and forecast demand, "

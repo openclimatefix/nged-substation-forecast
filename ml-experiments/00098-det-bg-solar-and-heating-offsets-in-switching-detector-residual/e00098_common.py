@@ -106,14 +106,16 @@ def arm_fit_path(*, arm: str, which: str, series: int) -> Path:
     return own if own.exists() else FITS_ROOT / "ctrl" / which / f"{series}.parquet"
 
 
-def load_panel() -> dict[str, dict[int, np.ndarray]]:
+def load_panel(*, arm: str | None = None) -> dict[str, dict[int, np.ndarray]]:
     """Return `power`, `expected`, and `residual` arrays per series, NaN where missing.
 
     The arm `h05_stored` reads experiment 37's panel. Any other arm replaces the expected power of
     that panel with its own refits on the 1st, where the arm has a fit, and leaves NaN elsewhere.
+    `arm` defaults to the arm named by `E98_ARM`.
     """
+    arm = ARM if arm is None else arm
     frame = pl.read_parquet(PANEL_PATH)
-    if ARM != "h05_stored":
+    if arm != "h05_stored":
         capacity = (
             pl.scan_parquet(FEATURES_PATH)
             .group_by("time_series_id")
@@ -122,17 +124,21 @@ def load_panel() -> dict[str, dict[int, np.ndarray]]:
         )
         parts = []
         for series in SERIES_IDS:
-            path = arm_fit_path(arm=ARM, which="first", series=series)
+            path = arm_fit_path(arm=arm, which="first", series=series)
             cap = capacity.filter(pl.col("time_series_id") == series)[
                 "effective_capacity_mw"
             ].item()
-            fit = pl.read_parquet(path).select("valid_time", "pred")
+            fit = pl.read_parquet(path).select("valid_time", "pred", "target")
+            joined = frame.filter(pl.col("series") == series).join(
+                fit, on="valid_time", how="inner", validate="1:1"
+            )
+            mismatch = (joined["target"] * cap - joined["obs_mw"]).abs().max()
+            if mismatch is None or float(mismatch) > 1e-3:
+                raise ValueError(f"series {series}: fit target differs from observed power")
             parts.append(
-                frame.filter(pl.col("series") == series)
-                .join(fit, on="valid_time", how="inner", validate="1:1")
-                .with_columns(expected_mw=pl.col("pred") * cap)
+                joined.with_columns(expected_mw=pl.col("pred") * cap)
                 .with_columns(res_mw=pl.col("obs_mw") - pl.col("expected_mw"))
-                .drop("pred")
+                .drop("pred", "target")
             )
         frame = pl.concat(parts)
     out: dict[str, dict[int, np.ndarray]] = {"power": {}, "expected": {}, "residual": {}}
