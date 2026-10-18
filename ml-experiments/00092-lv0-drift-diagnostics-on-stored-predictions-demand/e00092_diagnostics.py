@@ -597,6 +597,7 @@ def d6(
         .agg(g=(pl.col("weekly_mw").last() / pl.col("weekly_mw").first() - 1))
         .join(site, on="site")
     )
+    known = set(growth["time_series_id"].to_list())
     grown = set(growth.filter(pl.col("g") > 0.05)["time_series_id"].to_list())
     per = per.with_columns(
         step=pl.struct("time_series_id", "month_idx").map_elements(
@@ -604,33 +605,43 @@ def d6(
         ),
         steep=pl.col("time_series_id").is_in(top),
         grown=pl.col("time_series_id").is_in(grown),
+        cap_known=pl.col("time_series_id").is_in(known),
         event=pl.struct("time_series_id", "month_idx").map_elements(
             lambda r: (r["time_series_id"], r["month_idx"]) in alarm_months, return_dtype=pl.Boolean
         ),
     ).with_columns(any_flag=pl.col("step") | pl.col("steep") | pl.col("grown") | pl.col("event"))
     per.write_parquet(RESULTS / "d6_gap.parquet")
+    shared = (
+        frames["weekly"]
+        .select(*key, "actual", "q05", "q95")
+        .join(frames["monthly"].select(*key, m_q05="q05", m_q95="q95"), on=key)
+    )
+    shared = shared.filter(pl.col("time_series_id").is_in(ids))
     tails = {}
-    for name, frame in frames.items():
-        f = frame.filter(pl.col("time_series_id").is_in(ids))
+    for name, prefix in (("weekly", ""), ("monthly", "m_")):
         row = {}
         for level, col in ((0.05, "q05"), (0.95, "q95")):
-            d = pl.col("actual") - pl.col(col)
+            d = pl.col("actual") - pl.col(prefix + col)
             loss = pl.max_horizontal(level * d, (level - 1) * d)
-            r = f.select(cov=(pl.col("actual") <= pl.col(col)).mean(), pin=loss.mean() * 100)
+            r = shared.select(
+                cov=(pl.col("actual") <= pl.col(prefix + col)).mean(), pin=loss.mean() * 100
+            )
             row[col] = {"coverage": float(r["cov"][0]), "pinball_points": float(r["pin"][0])}
         tails[name] = row
-    total = per["gap_rel"].sum()
     rng = np.random.default_rng(SEED)
-    months = per["month_idx"].to_numpy()
-    uniq = np.unique(months)
     out = {
         "n_series": int(per["time_series_id"].n_unique()),
         "n_series_months": per.height,
         "mean_gap_points": float(per.select(pl.col("gap_rel").mean()).item()),
     }
     for flag in ("step", "steep", "grown", "event", "any_flag"):
-        mask = per[flag].to_numpy()
-        gap = per["gap_rel"].to_numpy()
+        # The capacity flag is only defined for the series with a capacity vintage.
+        sub = per.filter(pl.col("cap_known")) if flag == "grown" else per
+        mask = sub[flag].to_numpy()
+        gap = sub["gap_rel"].to_numpy()
+        months = sub["month_idx"].to_numpy()
+        uniq = np.unique(months)
+        total = gap.sum()
 
         boot, boot_diff = [], []
         for _ in range(N_RESAMPLES):

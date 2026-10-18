@@ -251,7 +251,7 @@ def figure_4() -> alt.TopLevelMixin:
             "Loss from extra history does not follow a series' drift, outside one series",
             subtitle=[
                 SCOPE,
-                "One dot per series. The outlier on the right has a 38-point level change.",
+                "One dot per series. The outlier on the right has a 30-point level change.",
             ],
             anchor="start",
         )
@@ -292,7 +292,6 @@ def figure_6() -> alt.TopLevelMixin:
     labels = {
         "step": "A persistent step in the month",
         "steep": "Series in the steepest quarter of drift",
-        "grown": "Solar capacity grew over 5% (5 series with data)",
         "event": "A switching alarm in the month",
         "any_flag": "Any of the four",
     }
@@ -326,6 +325,7 @@ def figure_6() -> alt.TopLevelMixin:
                 "Dot: mean gap in flagged minus unflagged months.",
                 "Line: 95% interval from re-drawing whole months.",
                 "Positive: weekly refits gain more where the flag is true. Zero: no difference.",
+                "Intervals re-draw months only, with the series fixed.",
             ],
             anchor="start",
         ),
