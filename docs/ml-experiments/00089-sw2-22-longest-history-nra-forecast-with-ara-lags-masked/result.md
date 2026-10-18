@@ -26,10 +26,13 @@ decision_rule: >-
   is below zero. Both thresholds are zero because neither change adds a model: masking adds one
   array lookup per lag at serving time (and so an ARA label on the serving path, which makes its
   threshold a gain whose interval excludes zero), and a longer window only changes the training
-  slice. C3 is descriptive. Verdict `supported` when both hold, `mixed` when one holds and the other's lower end is above zero, `small gain` when one holds, `inconclusive` when
-  neither interval excludes zero, `refuted` when a lower end is above zero. The in-event-lag rows
+  slice. C3 is descriptive. Verdict `supported` when both hold, `mixed` when one holds and the
+  other's lower end is above zero, `small gain` when one holds, `inconclusive` when neither
+  interval excludes zero, `refuted` when a lower end is above zero. The in-event-lag rows
   are rows whose valid time lies outside every ARA and whose origin lag, same-time-latest-day lag,
-  or same-time-latest-week lag lies inside an ARA. The arms M, L_ens, and LM_ens are descriptive. Both labels and masks use hindsight ARA labels, so C1 and C3 are upper bounds on what a live service, which cannot know an ongoing event, would achieve.
+  or same-time-latest-week lag lies inside an ARA. The arms M, L_ens, and LM_ens are descriptive.
+  The masks use hindsight ARA labels, so C1 and C3 are upper bounds on what a live service, which
+  cannot know an ongoing event, would achieve.
 benchmark: >-
   Arm R, the 12-month-window booster with ARA targets removed and lags unmasked, refitted by this
   experiment. The plain booster of experiment 86, `manual_heuristic`, and `climatology` are
