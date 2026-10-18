@@ -643,3 +643,32 @@ def gpu_hours_total(*, log: Path = GPU_HOURS_LOG) -> float:
             merged.append([start, end])
     total = sum(end - start for start, end in merged)
     return total / 3600.0
+
+
+def load_power_arrays(*, series: pl.DataFrame) -> dict[str, SeriesArrays]:
+    """Return each series' observed power over capacity on the dense grid, with no weather columns.
+
+    The 14-day correction and the scoring read only `power`, so this skips the ERA5 features that
+    `load_series_arrays` joins. `features` is an empty array.
+
+    Args:
+        series: `series_table()`.
+
+    Returns:
+        Each site label's `SeriesArrays`, NaN where unobserved.
+    """
+    grid = grid_times()
+    observed = pl.read_parquet(OBSERVED_PATH, columns=["time_series_id", "valid_time", "power"])
+    out: dict[str, SeriesArrays] = {}
+    for row in series.iter_rows(named=True):
+        own = observed.filter(pl.col("time_series_id") == row["time_series_id"])
+        power = np.full(grid.len(), np.nan, dtype=np.float32)
+        index = np.asarray(grid_index(times=own["valid_time"]))
+        inside = (index >= 0) & (index < power.size)
+        power[index[inside]] = (
+            own["power"].to_numpy()[inside] / row["effective_capacity_mw"]
+        ).astype(np.float32)
+        out[row["site"]] = SeriesArrays(
+            features=np.empty((0, 0), dtype=np.float32), power=power, valid_time=grid
+        )
+    return out
