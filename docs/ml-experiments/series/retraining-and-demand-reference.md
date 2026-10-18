@@ -1,25 +1,24 @@
 # Retraining cadence and the demand reference: how often to refit the demand model
 
-**The series found that refitting the Primary demand model every week, with no error correction,
-beat the earlier best setup (a model fitted once, plus a 14-day correction built from its recent
-errors) by about 0.2 points of capacity on two separate sets of forecast runs.** The gain is
-concentrated in a few substations, and the case for weekly over monthly refitting is small (0.04 to
-0.13 points). The series has eleven experiments. They scored 16 Primary substations (substations
+**The series found that refitting the Primary demand XGBoost model every week, with no error
+correction, beat the earlier best setup (a model fitted once, plus a 14-day correction built from
+its recent errors) by about 0.2 points of capacity on two separate sets of forecast runs.** The gain
+is concentrated in a few substations, and the case for weekly over monthly refitting is small (0.04
+to 0.13 points). The series has eleven experiments. They scored 16 Primary substations (substations
 that step power down to the local distribution network) unless a row says otherwise.
 
 - **What worked:** refitting often. Weekly refitting scored 0.20 points below the earlier best setup
   on 292 daily runs (99.44% interval -0.40 to -0.035) and 0.24 below it on 274 runs from a different
   period (99.17% interval -0.360 to -0.145). Averaging the quantiles of several retrained models
-  gained a further 0.04 to 0.08 points.
-- **What the series rules out:** a 14-day error correction on a model that is refitted weekly
-  (+0.23 points worse in experiment 34), refitting quarterly (0.38 points worse than weekly in
-  experiment 85), re-tuning the spread factor, and substation fingerprints. It also rules out
-  refitting solar and wind models for accuracy: monthly refits changed those scores by 0.04 points
-  or less.
-- **What to try next:** a weekly refit at production settings on a third period, since three substations
-  carry much of the gain; the Christmas column and the
-  half-life on a second winter, where the intervals were wide; and the blend of weekly refits with
-  the weekly-analogue model, which cleared its threshold once and missed it once.
+  gained a further 0.04 to 0.10 points. - **What the series rules out:** a 14-day error correction
+  on a model that is refitted weekly (+0.23 points worse in experiment 34), refitting quarterly
+  (0.38 points worse than weekly in experiment 85), re-tuning the spread factor, and substation
+  fingerprints. The series also found no accuracy reason to refit solar and wind XGBoost models:
+  monthly refits changed those scores by 0.04 points or less. - **What to try next:** a weekly refit
+  at production settings on a third period, since three substations carry much of the gain; the
+  Christmas column and the half-life on a second winter, where the intervals were wide; and the
+  blend of weekly refits with the weekly-analogue model, which cleared its threshold once and missed
+  it once.
 
 **Scores are in points, where 1 point is 1% of a series' capacity, and smaller is better.**
 Experiments 34, 35, 48, 49, 80, 81, and 85 use the quantile score, an error measure that rewards a
@@ -77,23 +76,24 @@ N1, the same XGBoost model without the correction.
 
 ![The nine planned contrasts](../00019-primary-demand-stack-vs-manual-heuristic/figure_2.svg)
 
-**What worked: refitting the model monthly scored below the stack, and refitting weekly scored below
-monthly.** [Experiment 34](../00034-retraining-cadence-and-cheap-proxies-demand/result.md) refitted
-the model once a year, every 6 months, quarterly, monthly, weekly, and daily, and scored 73 runs.
-Monthly minus the stack was -0.20 (95% interval -0.38 to -0.01; the stricter 99.375% interval, -0.44
-to +0.08, included zero, so the verdict was inconclusive). Weekly minus monthly was -0.07 (99.375%
-interval -0.18 to -0.00). Daily scored within 0.01 of weekly on three months. The gain per step
-shrinks as refits become more frequent.
+**What worked: refitting the XGBoost model monthly scored below the stack at 95%, and refitting
+weekly scored below monthly.** [Experiment
+34](../00034-retraining-cadence-and-cheap-proxies-demand/result.md) refitted the model once a year,
+every 6 months, quarterly, monthly, weekly, and daily, and scored 73 runs. Monthly minus the stack
+was -0.20 (95% interval -0.38 to -0.01; the stricter 99.375% interval, -0.44 to +0.08, included
+zero, so the verdict was inconclusive). Weekly minus monthly was -0.07 (99.375% interval -0.18 to
+-0.00). Daily scored within 0.01 of weekly on three months. The gain per step shrinks as refits
+become more frequent.
 
 ![Difference from the stack by retraining cadence](../00034-retraining-cadence-and-cheap-proxies-demand/figure_1.svg)
 
-**The 14-day correction stops helping once the model is refitted often, and hurts at weekly
-cadence.** Experiment 34 found the correction cost +0.11 at monthly cadence (unresolved) and +0.23
-at weekly cadence (99.375% interval +0.03 to +0.44). [Experiment
+**The 14-day correction stops helping once the XGBoost model is refitted often, and hurts at weekly
+cadence.** Experiment 34 found the correction raised the score (worse) by +0.11 at monthly cadence
+(unresolved) and +0.23 at weekly cadence (99.375% interval +0.03 to +0.44). [Experiment
 48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) found a 7-day
 correction +0.16 worse (-0.06 to +0.36) and a 14-day correction +0.08 worse (-0.13 to +0.27) on the
 weekly model, neither resolved. The correction still lowered the frozen model's score by 1.45 points
-(95% interval -1.87 to -0.98), so it helps a model that is not refitted.
+(95% interval -1.87 to -0.98), so the correction helps an XGBoost model that is not refitted.
 
 **Weekly refitting held on 292 further daily runs, and on a second period.** [Experiment
 48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) scored the
@@ -111,13 +111,13 @@ zero).
 
 ![Weekly retraining beat the stack in fold B; fold C has the same sign with wider intervals](../00081-r11-control-member-second-validation-year-demand/figure_1.svg)
 
-**The gain is concentrated in a few substations.** Without the three substations that carry it
-(D8, D12, and D5 in experiment 81), the gain over the stack is 0.09 points (95% interval -0.189 to
--0.014). Substation D8 alone gains 2.05 (-2.60 to -1.44). On the earlier 274-run fold from
-2022-07 to 2023-03 (18 km weather), weekly minus the stack was -0.080 (-0.187 to +0.051), the same
-sign with an interval that includes zero. Experiment 81 found no sign that weekly refitting adapts
-to the 9 km weather product: its gain over the stack fell from -0.552 in December to -0.137 in
-March.
+**The gain is concentrated in a few substations.** Without the three substations that carry it (D8,
+D12, and D5 in experiment 81), the gain over the stack is 0.09 points (95% interval -0.189 to
+-0.014). Substation D8 alone gains 2.05 (-2.60 to -1.44). On the earlier 273-run fold from 2022-07
+to 2023-03 (18 km weather), weekly minus the stack was -0.080 (99.17% interval -0.187 to +0.051),
+the same sign with an interval that includes zero. Experiment 81 found no sign that weekly refitting
+adapts to the 9 km weather product: its gain over the stack fell from -0.552 in December to -0.137
+in March.
 
 ![Each series' own difference for the stack and monthly contrasts](../00081-r11-control-member-second-validation-year-demand/figure_4.svg)
 
