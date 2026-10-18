@@ -38,6 +38,7 @@ with the 11 quantile columns as a fraction of capacity and `seed`; `<label>` is 
 """
 
 import argparse
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -117,6 +118,15 @@ def job_path(*, root: Path, arm: str, site: str, label: str) -> Path:
     return root / arm / f"{site}_{label}.parquet"
 
 
+def args_monthly() -> bool:
+    """Return whether the weekly arms refit monthly instead (the `BG2_ENS_MONTHLY` variable is 1).
+
+    The budget of 16 GPU-hours does not hold the weekly refits of the generator models at the
+    measured speed, so the run may refit them monthly. The write-up records which was used.
+    """
+    return os.environ.get("BG2_ENS_MONTHLY") == "1"
+
+
 def jobs_of(*, arm: Arm) -> list[Job]:
     """Return an arm's fits: one per refit of its regime, or one frozen fit for the ERA5 arm."""
     origins = common.all_origins()
@@ -129,14 +139,15 @@ def jobs_of(*, arm: Arm) -> list[Job]:
                 origins=tuple(origins),
             )
         ]
+    regime = "monthly" if arm.regime == "weekly" and args_monthly() else arm.regime
     return [
         Job(
             arm=arm.name,
-            label=FROZEN_LABEL if arm.regime == "frozen" else f"{refit:%Y%m%d}",
+            label=FROZEN_LABEL if regime == "frozen" else f"{refit:%Y%m%d}",
             refit=refit,
             origins=tuple(served),
         )
-        for refit, served in regimes.served(name=arm.regime, origins=origins).items()
+        for refit, served in regimes.served(name=regime, origins=origins).items()
     ]
 
 
