@@ -120,7 +120,7 @@ have no impedance.
 
 Three planned pieces of work would draw on the two publications:
 
-- [Tier 3 curtailment costing](cost-savings-metrics.md#tier-3-full-power-flow-modelling), which is
+- [Tier 2 curtailment costing](cost-savings-metrics.md#tier-2-full-power-flow-modelling), which is
   out of scope today for want of exactly this model.
 - [Switching-event detection](switching-events.md), which reasons about which substations can
   exchange load.

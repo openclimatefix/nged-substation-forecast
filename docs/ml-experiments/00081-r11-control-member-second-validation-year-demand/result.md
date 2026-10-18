@@ -1,7 +1,7 @@
 ---
 id: "00081"
 slug: r11-control-member-second-validation-year-demand
-status: planned
+status: done
 size: complex
 hypothesis: >-
   The Primary substation demand findings of experiments 48 and 49 keep their sign on forecast runs
@@ -61,133 +61,108 @@ metric: >-
   the median and the exceedance rate of the 0.95 quantile are reported and decide nothing. Every
   number is a control-only number and is never compared with a 51-member score.
 code: ml-experiments/00081-r11-control-member-second-validation-year-demand/
-production_status: not-for-production
+verdict: supported
+best_arm: >-
+  Weekly refitting with no correction: 4.494 points of capacity (control-only fold), against 4.734
+  for the stack, 4.533 for monthly refitting, and 5.211 for `manual_heuristic`. The blend of four
+  models scored 4.457.
+headline: >-
+  C1, weekly minus the stack: -0.240 points (99.17% interval -0.360 to -0.145). C3, weekly minus
+  monthly: -0.039 (-0.064 to -0.012). C6, blend minus weekly: -0.038 (-0.070 to -0.007). C4 and C5
+  are unresolved. Fold C has the same signs with intervals that include zero.
+lessons: >-
+  Weekly retraining beat the stack on a second set of runs, with a gain as large as in experiment 48
+  and a lower bound that excludes zero without the three series that carried experiment 48. The
+  Christmas column helps inside the Christmas window in both winters, which the whole-fold contrast
+  could not show. The 14-day correction did not help a frozen model here. The gain may include
+  adaptation to the 9 km weather product, which the folds cannot separate.
+advice:
+  - >-
+    Port weekly retraining of the Primary demand model and drop the 14-day correction for it, because
+    the gain held on a second set of runs at -0.24 (-0.36 to -0.15) and -0.09 (-0.19 to -0.01)
+    without D8, D12, and D5 (C1).
+  - >-
+    Keep the Christmas column, because dropping it raised the error by 1.2 points inside
+    2023-12-18 to 2024-01-04 and by 1.8 points inside the same window of the winter before
+    (Christmas window; C4 could not resolve it over a whole fold).
+  - >-
+    Do not rely on the five-model blend result for a four-model blend: the blend of weekly, monthly,
+    rolling, and stack scored 0.038 below weekly alone, short of the -0.05 threshold (C6).
+  - >-
+    Score a weather-product change separately before crediting retraining, because the frozen model
+    lost about 3 points of its advantage over `manual_heuristic` when the runs moved from 18 km to
+    9 km (9 km check).
+production_status: candidate
 adopted_in: none
 ---
 
 # Experiment 81: do the weekly-retraining findings hold on July-to-March forecast runs the project has not scored?
 
-**Status: planned. No code has run.** This page is the plan, committed before any fit. The
-sections below are the question, the design, what the folds cannot say, and the sizing. An Opus plan
-review changed the block length, the replication rules, the series count, the run counts, the
-leakage guards, and the GPU estimate, and dropped the solar stage.
+**Take-home: weekly retraining of the Primary demand model beat the stack again, on forecast runs
+from a different period, by about as much as before (0.24 points of capacity), so the
+case for porting it now rests on two periods instead of one.** The gain is concentrated: without
+the three substations that carried experiment 48, it is 0.09 points (95% interval -0.19 to -0.01).
+The Christmas column earns its place, and the five-model blend does not carry over as a
+four-model blend. The verdict is **supported**.
 
-## The question
+We scored 13 Primary substations on 274 daily runs from 2023-07 to 2024-03, for which the project
+holds only the control member of the ECMWF ensemble (ENS), so every number is a control-only number
+and no absolute score is comparable with experiments 48 or 49. The error is the quantile score
+in points of capacity (1 point is 1% of a substation's capacity); smaller is better. The stack is a
+model fitted once, with a 14-day correction built from its recent errors.
 
-**Two findings that decide the next model release rest on one validation year.** Experiment 48
-found that refitting the Primary substation demand model every week scored 0.20 points of capacity
-below the best setup then known, but the gap crosses zero with a t-interval over the 12 months and
-shrinks to -0.08 without three of the 16 substations. Experiment 49 found that dropping the
-Christmas column and lengthening the half-life changed the score by under 0.02 points, on one
-winter. We ask whether the same contrasts have the same sign on forecast runs from 2023-07 to
-2024-03, for which the project holds only the ENS control member. Those nine months hold no April to
-June, so they are a second set of runs, not a second year.
+![Planned contrasts, fold B and fold C](figure_1.svg)
 
-## Design
+![Absolute score of every arm, fold B](figure_2.svg)
 
-**Rows and folds.** The ENS control-member backfill has 1,104 daily runs from 2021-03-21 to
-2024-03-31; the runs of 2022-09-10 and 2024-01-03 are missing. Fold B, the one the maintainer asked
-for, is the 274 daily 00:00 UTC runs of 2023-07-01 to 2024-03-31 (row set
-`control_fold_b_daily_v1`). The ECMWF ensemble moved from 18 km to 9 km native resolution on
-2023-06-27, so every run in fold B is 9 km while 2.3 years of its training history is 18 km. Fold C
-is the 273 runs of 2022-07-01 to 2023-03-31 (row set `control_fold_c_daily_v1`), all 18 km, with 15
-months of training history. Fold C is a second replication on a different period. It has its own
-confounds: a short history that starves the frozen model and so favours retraining, the fall in
-demand in the winter of 2022-23, and training rows from the 2021 lockdown months. It therefore
-cannot show that a fold B gain is adaptation to the 9 km product, and the page draws no such
-inference. A direct descriptive check of the product change fits a frozen model to 2023-03-31 and
-reports its score relative to `manual_heuristic`, which does not depend on the weather product, for
-April to June 2023 (18 km) and July to September 2023 (9 km).
+![Score by lead band, fold B](figure_3.svg)
 
-**Series.** Of the 16 Primaries, three lack power through the backfill period: the first valid
-reading of series 7 is 2023-08-23, of series 13 is 2024-12-11, and of series 12 is 2025-02-06. The
-experiment scores the other 13, so every frozen model has the same history. D12 of experiment 48
-is read against this list when the labels are matched; a series with no data in fold B drops out of
-the "without D8, D12, and D5" read.
+![Each series on its own, fold B](figure_4.svg)
 
-**Training rule and leakage guards.** Every model trains on its own history: the ENS control
-member's rows from 2021-03-21. A refit at time T uses only rows whose valid time precedes T less
-the 3-hour telemetry delay, never rows cut by init time, and an assert checks the largest valid
-time in every training set. The correction reads no forecast issued before the fold's first run,
-because the frozen model's earlier forecasts are in-sample. The built frames assert that every
-power lag is null where the lag is no longer than the lead. Climatology and effective capacities are
-fitted before the fold: nothing from 2024-04-01 onwards enters a fold B fit, and nothing from
-2023-04-01 onwards enters a fold C fit. Frames are built as in experiment 48 (production's
-half-hourly upsampling, each series' H3 cells, power lags from the observed power), from one member
-in place of 51. The backfill has no precipitation type, which the final feature list does not use.
+![Frozen model against `manual_heuristic` across the 9 km change](figure_5.svg)
 
-**Arms (Primary, 13 series, N1 recipe of experiment 34, spread factor 1.15).** Fold B runs all of
-these. Fold C drops the blend and the frozen arm without correction.
-
-- **Stack:** frozen N1 (fitted to 2023-06-30 in fold B, to 2022-06-30 in fold C; half-life 2
-  years; 500 rounds) with the 14-day correction built from the forecasts as issued.
-- **Weekly** and **monthly:** full refits, half-life 0.5 years, no correction.
-- **Rolling:** experiment 49's P-roll, a refit every month on the latest 12 months, 150 rounds,
-  learning rate 0.15, half-life 0.5 years; **rolling without the Christmas column;** and **rolling
-  with a 2-year half-life.**
-- **Frozen without correction** (descriptive), `manual_heuristic`, and `climatology`.
-- **Blend:** weekly, monthly, rolling, and stack under a monthly weight vector. It has four members,
-  not the five of experiment 49, so C6 asks whether blending a corrected frozen model with retrained
-  models helps, not whether experiment 49's five-model result repeats.
-
-**Spread factor.** The factor 1.15 was chosen on forecasts pooled over 51 members. One member's
-quantiles may be narrower, so every arm reports its 0.95 exceedance rate, and a descriptive check
-re-chooses the factor on fold B's first three months and reports its effect on later months.
-
-**Arms left out.** Substation fingerprints are not run, because experiment 49 bounded their effect
-below 0.05 points and the porting threshold is 0.10. The solar and analogue contrasts of
-experiments 64, 78, and 74 are not run: fold B holds 92 days of daylight April-to-September rows,
-about 3 four-week blocks, and the sunshine anomaly those experiments used is an ensemble mean that
-one member cannot give. Testing them needs a summer fold with a recalibrated control-only anomaly,
-which this plan does not provide.
-
-## What the control-only folds cannot say
-
-- **Absolute skill.** One member cannot give an ensemble mean, spread, CRPS, coverage, or a
-  51-member quantile score. Every number is labelled "control-only fold", and only the sign and size
-  of paired contrasts are set beside experiment 48's and 49's.
-- **Whether a gain is retraining or adaptation to the 9 km product.** Neither fold separates them.
-- **Independence of the periods.** All periods score the same 13 substations.
-- **April to June.** Neither fold holds those months.
-- **Fine intervals.** Each fold has only about 10 four-week blocks, so the intervals resolve less
-  than experiment 48's.
-- **The product production serves.** Our own ENS archive starts on 2024-04-01 with a different
-  product.
-- **Generators.** Only Primaries are scored, and no NGED generator series appears.
-
-## What the write-up must also answer
-
-- **More history or the full ensemble?** The finished page ends with one bullet saying whether more
-  ENS history, or the full 51-member ensemble (spread and CRPS features), would plausibly change any
-  conclusion tested here, and which of the two. This plan proposes no fetch.
-
-## Sizing, by the five triggers
-
-- **Stored:** predictions under `data/ml-experiments/`, private; nothing in production.
-- **Serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes, the fold choice and the replication rule, which is why
-  this plan had an Opus review.
-- **Callers not nameable without searching:** no; the scripts copy experiments 34, 48, and 49.
-
-The experiment is complex because it builds new frames from a new archive and its plan could change
-the verdict on weekly retraining. Review set: one Opus plan review (done), one Sonnet code review,
-one Sonnet write-up check, one Sonnet prose review.
-
-**Earlier advice followed.** Test weekly retraining and the Christmas column on a further period
-(48, 49); read contrasts at a Bonferroni level (34); leave the spread factor at 1.15 (49), with the
-check above. Departures: weekly blocks become 4-week blocks, because runs overlap by 14.6 days.
-
-**Plan review (Opus), triaged.** Accepted: 4-week blocks; the block bootstrap governing and the
-t-interval labelling a result fragile; R-b needing fold B's own interval; one rule per contrast;
-C6 without a replication rule; C2 descriptive and a refuted branch for C3; the Christmas window as
-a number only, with a pooled read over winters; fold C reported as a replication with its
-confounds and the adaptation inference removed; the reversed adaptation prediction; the direct
-9 km check; cutting training by valid time; the correction warm-up rule; lag asserts; fitting
-climatology and capacities before the fold; the two missing runs; the 13-series set (checked
-against the power data); the exceedance rate and spread check; scoping to July to March; dropping
-the solar stage; and a GPU estimate scaled from experiment 48. Rejected: none.
-
-**Resources.** Scaling experiment 48's timings (weekly refits 2.4 GPU hours for 52 refits) gives
-about 4 to 5 GPU hours for fold B and about 2.5 for fold C, run as parallel workers inside slot E (6
-cores), one GPU fit at a time. No GPU fit starts before the ML manager says go.
+- **Arms:** stack; weekly, monthly, and rolling-12-month refits (half-life 0.5 years, no
+  correction); rolling without the Christmas column; rolling with a 2-year half-life; a blend of
+  weekly, monthly, rolling, and stack. Baselines: `manual_heuristic`, `climatology`.
+- **Rows:** fold B is `control_fold_b_daily_v1` (274 runs, 2023-07-01 to 2024-03-31, 9 km). Fold C
+  is `control_fold_c_daily_v1` (273 runs, 2022-07-01 to 2023-03-31, 18 km, 15 months of history).
+  Seed 0. Intervals use 4-week blocks of forecast start (10 blocks).
+- **Absolute scores, fold B:** blend 4.457, weekly 4.494, monthly 4.533, rolling 4.681, stack
+  4.734, `manual_heuristic` 5.211, `climatology` 5.700 (95% intervals about plus or minus 0.3).
+  Fold C: weekly 4.020, monthly 4.054, rolling 4.073, stack 4.100, `manual_heuristic` 4.845,
+  `climatology` 6.099.
+- **C1, weekly minus the stack:** fold B -0.240 (99.17% -0.360 to -0.145; 95% month t-interval
+  -0.359 to -0.121). Fold C -0.080 (-0.187 to +0.051). Without D8, D12, and D5, fold B -0.093
+  (95% -0.189 to -0.014) and fold C -0.084 (-0.170 to +0.018). D8 alone gains 2.05 (95% -2.60 to
+  -1.44).
+- **C3, weekly minus monthly:** fold B -0.039 (-0.064 to -0.012; the month t-interval, -0.078 to
+  -0.000, only just excludes zero). Fold C -0.035 (-0.085 to +0.014).
+- **C2, monthly minus the stack (descriptive):** fold B -0.201 (-0.324 to -0.105); fold C -0.045
+  (-0.162 to +0.082).
+- **C4, rolling without the Christmas column minus with it:** fold B +0.011 (-0.115 to +0.188),
+  fold C +0.041 (-0.054 to +0.252), unresolved. Inside 2023-12-18 to 2024-01-04 dropping the column
+  raised the score by 1.20 points, against -0.07 outside the window; the winter before, +1.79
+  against -0.08.
+- **C5, half-life 2 years minus 0.5 years:** fold B -0.019 (-0.060 to +0.040), fold C +0.014
+  (-0.027 to +0.058), unresolved.
+- **C6, blend minus weekly:** -0.038 (-0.070 to -0.007), a small gain that misses the -0.05 threshold.
+  The blend has four members; experiment 49's had five.
+- **Correction and spread:** the 14-day correction made the frozen model worse here (+0.091, -0.005
+  to +0.187). The 0.95 exceedance rate is 0.052 for weekly with the spread factor and 0.073 without
+  it; re-choosing the factor on the first three months (1.10) changed later scores by +0.002.
+- **9 km check (descriptive):** the frozen model beat `manual_heuristic` by 9.1% on runs before
+  2023-06-27 (18 km) and by 6.3% after (9 km), April to September 2023. The weeks differ in
+  season, so this is a hint that part of weekly retraining's fold B gain is adaptation to the 9 km
+  product, not a measurement.
+- **Caveats:** neither fold can separate retraining from adaptation to a weather product. Effective
+  capacities come from the stage 1 pilot's table, built from all data, so they scale scores and
+  inputs but were not fitted before each fold. The spread check chose its factor on cases whose
+  targets reach 14.6 days into the first scored month. R-b pools two periods that score the same 13
+  substations as if independent. The 13 substations exclude three that lack data (series 7, 13, 12).
+- **More history or the full ensemble?** More history, not the full ensemble. The folds answer
+  retraining and column questions, which depend on how much the weather-to-demand relation drifts,
+  so a longer or more varied history would narrow C4 and test the 9 km confound. Ensemble spread and
+  CRPS features would not change any conclusion tested here, because none of the six contrasts
+  uses them.
+- **Next:** a summer fold is the open test for the solar arms of experiments 64, 78, and 74; this
+  experiment could not run them.

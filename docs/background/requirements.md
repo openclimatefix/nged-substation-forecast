@@ -61,13 +61,14 @@ substation's own: a generation constraint typically binds above the primary, dri
 aggregated flow across several substations rather than by any single meter in isolation. The
 forecasts that matter for curtailment are therefore the forecasts that net and sum correctly up the
 hierarchy — which is why [curtailment
-scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) nets at one primary before
-summing up the substation hierarchy. Curtailment savings accrue to the whole system rather than to
-NGED's own spend. Curtailment is nonetheless in scope alongside flexibility procurement, so the
-forecast requirement is the same for both decisions. So the question users ask of a forecast is
-rarely "what is the most likely load?" and usually "**how likely is net demand to cross this
-limit?**" — a [mock-up of the operator view](manual-heuristic-forecast.md#the-operators-view) plots
-demand as headroom below a constraint line.
+scoring](../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) scores a forecast against
+the limits of the bulk supply points and grid supply points where generation constraints bind.
+Curtailment savings accrue to the whole system rather than to NGED's own spend. Curtailment is
+nonetheless in scope alongside flexibility procurement, so the forecast requirement is the same
+for both decisions. So the question users ask of a forecast is rarely "what is the most likely
+load?" and usually "**how likely is net demand to cross this limit?**" — a [mock-up of the operator
+view](manual-heuristic-forecast.md#the-operators-view) plots demand as headroom below a constraint
+line.
 
 The project's value therefore concentrates in **both tails** of each forecast distribution: A model
 fails at the job if it is excellent on typical half-hours but unreliable in the handful of
