@@ -111,6 +111,7 @@ def extend_quantiles(*, delivered: np.ndarray) -> np.ndarray:
     Returns:
         The quantiles at `OUT_LEVELS`, shape (n, 15), sorted along the second axis.
     """
+    delivered = np.sort(delivered, axis=1)
     out = np.empty((delivered.shape[0], len(OUT_LEVELS)), dtype=np.float64)
     for j, p in zip(DELIVERED_COLUMNS, DELIVERED_LEVELS, strict=True):
         out[:, j] = delivered[:, DELIVERED_LEVELS.index(p)]
@@ -251,6 +252,8 @@ def pareto_tails(*, calibration: Rows, test: Rows) -> np.ndarray:
     with a generalised Pareto distribution. The share of calibration rows beyond the stored q95 is
     `p_u`. A level whose tail probability is below `p_u` is `q95 + spread * GPD quantile at
     1 - tail/p_u`; any other level keeps its stored value. The lower tail mirrors this about q05.
+    A tail that is already too wide, so that `p_u` is below the level's tail probability, is left as
+    stored: the arm can widen a tail and cannot narrow one.
     """
     out = test.quantiles.copy()
     q05_col, q95_col = OUT_LEVELS.index(0.05), OUT_LEVELS.index(0.95)

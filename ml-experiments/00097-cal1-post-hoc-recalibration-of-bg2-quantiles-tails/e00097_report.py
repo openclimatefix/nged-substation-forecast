@@ -130,15 +130,16 @@ def main() -> None:  # noqa: PLR0915
     sums = {a: np.zeros((len(months), n_groups, N_COLUMNS, 2)) for a in arms}
     counts = np.zeros((len(months), n_groups))
     exceed_days: dict[tuple[str, int, int], set[int]] = {}
-    node_ids = frame.filter(pl.col("time_series_id").is_in([1, 2]) & (pl.col("class_code") == 1))[
-        "time_series_id"
-    ].unique()
-    node_mask = np.isin(series, node_ids.to_numpy()) & (class_code == 1)
+    scored_node_ids = read_node_table().nodes["time_series_id"].to_numpy()
+    node_mask = np.isin(series, scored_node_ids) & (class_code == 1)
+    if set(series[node_mask]) != set(scored_node_ids.tolist()):
+        msg = "the scored nodes' series are not all in the supply-point set"
+        raise ValueError(msg)
     node_position = np.full(len(frame), -1)
     node_rows_all = np.flatnonzero(node_mask & np.isin(month_label, months))
     node_position[node_rows_all] = np.arange(len(node_rows_all))
     node_q = {a: np.zeros((len(node_rows_all), len(recal.DELIVERED_COLUMNS))) for a in arms}
-    day_key = (valid.astype("datetime64[D]").astype(np.int64)) * 1000 + series
+    day_key = (valid.astype("datetime64[D]").astype(np.int64)) * 10**6 + series
     print(f"rows {len(frame):,}; scored months {months}")
 
     for m_idx, month in enumerate(months):
@@ -173,6 +174,11 @@ def main() -> None:  # noqa: PLR0915
                         "class_band": band_cal,
                         "class_band_recent": recent_cal,
                     }[grouping]
+                    if len(cal_idx) and not valid[cal_idx].max() < np.datetime64(
+                        month_start.replace(tzinfo=None)
+                    ):
+                        msg = f"leak: arm {arm} fits on a row from {month} or later"
+                        raise AssertionError(msg)
                     calibration = rows_of(actual=actual, matrix=matrix, index=cal_idx)
                     out = function(calibration=calibration, test=test)
                     pin, cover = pinball_and_cover(actual=test.actual, quantiles=out)
@@ -343,8 +349,8 @@ def decision(*, tables: Mapping[str, pl.DataFrame]) -> list[str]:
                     f"vs {CENTRE_TOLERANCE * base['value']:.5f}"
                 )
         lines.append(
-            f"{arm}: tail_pass={tail_ok} centre_pass={centre_ok} all_testable={testable}; "
-            + "; ".join(notes)
+            f"{arm}: tail_pass={tail_ok if testable else 'not testable'} "
+            f"centre_pass={centre_ok} all_testable={testable}; " + "; ".join(notes)
         )
     return lines
 
