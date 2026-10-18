@@ -1519,7 +1519,7 @@ setting (95% interval +0.036 to +0.229), +0.118 with a 12-month window, and +0.1
 Quarterly refits scored 0.38 above weekly refits on the same window. The zero-start gap was -0.017
 (-0.062 to +0.037) at full weekly retraining, too small to rank any schedule. The experiment does
 not cover the `am`-against-`d0` or five-model-blend contrasts. Cheap schedules suit research
-contrasts, and full weekly retraining stays for the best-guess experiments and production.
+contrasts that are 0.05 points or larger.
 
 - **Write-up:** [the full result page](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md).
 
