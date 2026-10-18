@@ -169,7 +169,22 @@ def real_check(*, state: dict) -> pl.DataFrame:
     rows_of = {int(r["time_series_id"]): r for r in series.iter_rows(named=True)}
     out: list[dict] = []
     origins = common.origins_of_subset(subset="gap")
-    for event in real_events():
+    eligible = real_events()
+    print(f"eligible real transfers (conserved, both sides at most half missing): {len(eligible)}")
+    for event in eligible:
+        first = grid.stamp_of(when=event["onset_utc"])
+        last = grid.stamp_of(when=event["end_utc"]) + 1
+        inside = sum(
+            first <= cases.newest_stamp(origin=o) < last
+            and cases.newest_stamp(origin=o) - first <= 7 * grid.BLOCK
+            for o in origins
+        )
+        print(
+            f"  {event['card_id']}: {event['onset_utc']:%Y-%m-%d %H:%M} to "
+            f"{event['end_utc']:%Y-%m-%d %H:%M} ({(last - first) / 2:.1f} h), missing share "
+            f"{event['max_side_missing_share']:.2f}, daily origins inside: {inside}"
+        )
+    for event in eligible:
         first = grid.stamp_of(when=event["onset_utc"])
         last = grid.stamp_of(when=event["end_utc"]) + 1
         sides = {
