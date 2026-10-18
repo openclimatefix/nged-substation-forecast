@@ -635,14 +635,11 @@ def gpu_hours_total(*, log: Path = GPU_HOURS_LOG) -> float:
         end = datetime.fromisoformat(entry["logged_at"]).timestamp()
         intervals.append((end - entry["seconds"], end))
     total = 0.0
-    current_start, current_end = None, None
+    merged: list[list[float]] = []
     for start, end in sorted(intervals):
-        if current_end is None or start > current_end:
-            if current_end is not None:
-                total += current_end - current_start
-            current_start, current_end = start, end
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
         else:
-            current_end = max(current_end, end)
-    if current_end is not None:
-        total += current_end - current_start
+            merged.append([start, end])
+    total = sum(end - start for start, end in merged)
     return total / 3600.0
