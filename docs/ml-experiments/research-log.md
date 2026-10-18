@@ -2103,23 +2103,22 @@ moved MW as three columns.
 
 ### 00090: lag unusualness inputs
 
-**Telling the Primary demand model how unusual each lag is made the forecast worse, so the model
-gets nothing from the input beyond what the lag value and the calendar give it; the verdict is
-refuted.** The experiment refitted the XGBoost demand model monthly for 16 Primary substations,
+**Telling the Primary demand XGBoost model how unusual each lag is made the forecast worse; the
+verdict is refuted.** The experiment refitted the XGBoost demand model monthly for 16 Primary substations,
 trained on half-hours outside switching, and scored 292 daily runs with and without the PIT (the
 share of ordinary readings below the lag, at the same time of day, kind of day, and month) of each
 of the three lags.
 
-- **Headline result:** on the 2,928,842 half-hours outside switching, the PIT arm minus the plain
-  arm +0.355 points of capacity (97.5% interval +0.209 to +0.513). On the 37,394 of them with a lag
+- **Headline result:** on the 2,928,842 half-hours outside switching, the PIT arm scored 0.355
+  points of capacity worse than the plain arm (97.5% interval +0.209 to +0.513). On the 37,394 of them with a lag
   inside a logged event, +0.795 (-0.325 to +2.787).
 - **Tails:** coverage of the 5%-to-95% band fell from 0.888 to 0.874 outside switching and from
-  0.770 to 0.740 on rows with a lag inside a logged event, so the model did not widen its band.
+  0.770 to 0.740 on rows with a lag inside a logged event, so the XGBoost model did not widen its band.
 - **Finding for later experiments:** widening the quantiles when a lag may be inside an abnormal
   arrangement needs an explicit rule (SW2-27) rather than an input to the booster. The lag-free
   booster PIT and neighbour arms were not run.
 - **Write-up and pull request:**
-  [result](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md), PR to follow.
+  [result](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md).
 
 ![Contrasts on all rows and on rows with a lag inside a logged event](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/figure_1.svg)
 
