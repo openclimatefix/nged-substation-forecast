@@ -5,9 +5,10 @@ status: planned
 size: medium
 hypothesis: >-
   The refit-offset neighbour-count detector (RO-NC, called XL on the pages of experiments 70, 71,
-  and 82), run causally (with only the data before a forecast origin), can give for each past half-hour in the lag window a probability that the half-hour lies
-  inside an abnormal running arrangement (ARA). The probability is calibrated, and it separates
-  better than the detector's yes-or-no flag.
+  and 82), run causally (with only the data before a forecast origin), can give for each past
+  half-hour in the lag window a probability that the half-hour lies inside an abnormal running
+  arrangement (ARA). The probability is calibrated, and it separates better than the detector's
+  yes-or-no flag.
 prediction: >-
   Isotonic calibration fitted on injected transfers that start in odd calendar months gives a
   reliability curve within 0.1 of the diagonal on injected transfers that start in even months. The
@@ -69,8 +70,8 @@ that probability, and whether the probability is calibrated.
   oracle-labelled event are dropped.
 - **Odd and even months.** Transfers that start in odd calendar months fit the calibration. Transfers
   that start in even months score it. A row inside an injected transfer takes the month the
-  transfer starts in, and any other row takes the month of its lag stamp. Experiment 82 fitted its logistic score and threshold on odd
-  months too, so even-month rows stay out of every fit.
+  transfer starts in, and any other row takes the month of its lag stamp. Experiment 82 fitted its
+  logistic score and threshold on odd months too, so even-month rows stay out of every fit.
 - **Candidates.** The causal detector keeps every candidate above a low score floor (the RO-NC
   threshold minus 4 log-odds), not only those above the threshold. Each candidate gets the
   detector's interval (the tracked level end, then the first return step), with its end known only
