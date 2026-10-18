@@ -214,6 +214,7 @@ nav:
       - "Can the substation-limit curtailment metric rank forecasts on the pilot?": ml-experiments/00084-substation-limit-curtailment-cost-worked-example/result.md
       - "Which post-hoc recalibration of the best guess fixes its tails?": ml-experiments/00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md
       - "Do cheaper retraining schedules rank arms the way weekly retraining does?": ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md
+      - "Does an explicit heating term lower the cold-hour error?": ml-experiments/00094-explicit-heating-offset-primary-demand/result.md
       - "Do the weekly-retraining findings hold on July-to-March forecast runs the project has not scored?": ml-experiments/00081-r11-control-member-second-validation-year-demand/result.md
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
       - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
