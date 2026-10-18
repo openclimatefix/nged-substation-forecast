@@ -18,8 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-12](#sw2-12-a-v1-forecast-under-the-normal-running-arrangement-with-the-detectors-labels) | How much of the NRA skill of experiment 75 is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-8 | Proposed |
-| [SW2-21](#sw2-21-recovering-the-normal-running-arrangement-during-and-after-a-switch) | When a Primary is in, or has just left, an abnormal running arrangement, does the NRA forecast recover the true unmodified power on injected switches, with the MW from the truth and from the causal XL detector? | 2 | SW2-12 (experiment 86) | Proposed; tests the NRA forecast's main purpose |
+| [SW2-21](#sw2-21-recovering-the-normal-running-arrangement-during-and-after-a-switch) | When a Primary is in, or has just left, an abnormal running arrangement, does the NRA forecast recover the true unmodified power on injected switches, with the MW from the truth and from the causal XL detector? | 2 | SW2-12 (experiment 86) | Proposed; tests the NRA forecast's main purpose, with targets inside events removed at training |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
@@ -184,22 +183,6 @@ confirm:
   hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
   24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
 
-#### SW2-12: a v1 forecast under the normal running arrangement with the detector's labels
-
-**Repeat [experiment 75](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) with
-the labels from the best detector after SW2-8, which is what Flexpectation v2 will have.** The gap
-between the two runs is the skill lost without a labelled set. Experiment 75 found that masking the
-labelled switching, and the signed MW at each lag, changed the Primary score outside switching by
-under 0.06 points of capacity.
-
-- **The arms** are experiment 75's four, plus a fifth that gives XGBoost the corrected lags (each
-  lag minus the signed MW moved) and the signed MW columns together.
-- **Scoring** uses the same rows in every arm and in both runs: half-hours outside NGED's logged
-  closures and outside the labelled events.
-- **Threshold.** The masked arm is adopted when its interval does not show it worse than the plain
-  arm by more than 0.02 points. A magnitude arm needs a detector on the serving path, so it needs a
-  gain whose interval excludes zero.
-
 #### SW2-21: recovering the normal running arrangement during and after a switch
 
 **Test the NRA forecast on what it is for: forecasting the normal running arrangement while a
@@ -210,13 +193,21 @@ power, in quiet periods, and the forecast is scored against the unmodified serie
 
 - **Two families of forecast origins:** inside an injected switch, binned by the time since its
   onset, and just after a switch, with lags inside it and the target after its end.
-- **Arms:** the plain booster on the contaminated lags; the NRA booster (corrected lags and the MW
-  column) with the injected MW; the NRA booster with the MW from the XL detector run causally, on
-  data up to the origin only; and the plain booster on the unmodified lags as a ceiling. The
-  boosters are experiment 86's.
+- **What the NRA booster sees.** At training, rows whose target lies inside a labelled event are
+  removed, so the booster learns only normal-arrangement targets, and every lag inside a labelled
+  event is corrected by the event's signed MW, which is also a column. The training labels come
+  from hindsight: the oracle labels of experiment 41 for one booster, the XL detector's for
+  another. At forecast time every origin is forecast, and a lag inside an event known at the
+  origin is corrected by that event's MW, from the injection or from the XL detector run causally
+  on data up to the origin.
+- **Arms:** the plain booster on the contaminated lags; experiment 86's lag-correction booster,
+  trained on all rows; the full NRA booster trained on oracle labels; the full NRA booster trained
+  on XL labels; and the plain booster on the unmodified lags as a ceiling. The full NRA boosters
+  are new fits on the monthly retraining schedule.
 - **Headline:** the MW-weighted mean absolute error against the unmodified series inside a switch,
-  causal XL against plain, with the oracle arm beside it, and the share of the gap to the ceiling
-  that each arm closes.
+  the XL-trained full NRA booster with causal XL MW against plain, with the oracle-trained booster
+  and the lag-correction booster beside it, and the share of the gap to the ceiling that each arm
+  closes.
 - **Second check:** the conserved two-sided events of experiment 41, where each side's step gives
   an estimate of the other side's normal running arrangement.
 
