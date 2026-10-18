@@ -118,6 +118,7 @@ the maintainer to confirm.
 | [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
 | [00083 - Tail calibration, worked example](00083-curtailment-cost-and-tail-calibration-worked-example/result.md) | Are the tails of the stored demand forecasts of experiment 48 too narrow? | Inconclusive (no registered contrast): every forecast is too narrow in both tails, with coverage of the 0.05 quantile 0.066 to 0.085 and of the 0.95 quantile 0.891 to 0.927; the single-series curtailment-cost metric was withdrawn | Not for production | 2026-10-17 |
 | [00084 - Substation-limit curtailment cost, worked example](00084-substation-limit-curtailment-cost-worked-example/result.md) | Does the substation-limit curtailment metric run on the pilot, and are there enough half-hours beyond a limit to rank forecasts? | Inconclusive (no registered contrast): 19 half-hours are beyond a limit of 0.9 times the earlier maximum in the scored year, so the pilot proves the arithmetic and cannot rank forecasts | Not for production | 2026-10-17 |
+| [00085 - Cheaper retraining schedules](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) | Do cheaper retraining schedules rank the cadence and starting-value contrasts the way full weekly retraining does? | Partly supported: a monthly 12-month-window refit and a weekly 150-round refit reproduce the monthly-minus-weekly gap (+0.118 and +0.125 against +0.125); the starting-value gap (-0.017) is too small to test | Not for production | 2026-10-18 |
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
@@ -1531,6 +1532,22 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
   #1302](https://github.com/openclimatefix/nged-substation-forecast/pull/1302).
 
 ![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
+
+### 00085: do cheaper retraining schedules rank arms the way weekly retraining does? (SPD1)
+
+**A monthly refit on the latest 12 months of data, or a weekly refit with 150 rounds at a higher
+learning rate on the whole history, gives the same monthly-minus-weekly gap as full weekly
+retraining, at 0.03 to 0.31 of its fit time; a quarterly refit scores much worse.** For the 16
+Primary substations, monthly minus weekly retraining scored +0.125 points of capacity at the full
+setting (95% interval +0.036 to +0.229), +0.118 with a 12-month window, and +0.125 with 150 rounds.
+Quarterly refits scored 0.38 above weekly refits on the same window. The zero-start gap was -0.017
+(-0.062 to +0.037) at full weekly retraining, too small to rank any schedule. The experiment does
+not cover the `am`-against-`d0` or five-model-blend contrasts. Cheap schedules suit research
+contrasts that are 0.05 points or larger.
+
+- **Write-up:** [the full result page](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md).
+
+![Contrasts under each schedule](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_1.svg)
 
 ### 00084: can the substation-limit curtailment metric rank forecasts on the pilot?
 
