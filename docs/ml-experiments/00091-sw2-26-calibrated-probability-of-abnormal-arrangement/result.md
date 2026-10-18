@@ -4,8 +4,8 @@ slug: sw2-26-calibrated-probability-of-abnormal-arrangement
 status: planned
 size: medium
 hypothesis: >-
-  The XL load-transfer detector of experiment 82, run causally (with only the data before a forecast
-  origin), can give for each past half-hour in the lag window a probability that the half-hour lies
+  The refit-offset neighbour-count detector (RO-NC, called XL on the pages of experiments 70, 71,
+  and 82), run causally (with only the data before a forecast origin), can give for each past half-hour in the lag window a probability that the half-hour lies
   inside an abnormal running arrangement (ARA). The probability is calibrated, and it separates
   better than the detector's yes-or-no flag.
 prediction: >-
@@ -29,7 +29,7 @@ decision_rule: >-
   the harness), the bins by hours since onset, area under the receiver operating characteristic
   curve, and the real-data check are descriptive.
 benchmark: >-
-  Arm 1, the binary causal XL flag (the half-hour lies inside an interval the causal detector
+  Arm 1, the binary causal RO-NC flag (the half-hour lies inside an interval the causal detector
   reports, open or closed), with its two values replaced by their hit rates on odd months so that
   its Brier score is also calibrated. The uncalibrated 0 and 1 flag is reported too.
 row_set_id: >-
@@ -53,7 +53,7 @@ forecast that reads recent power as input (a lag) is misled when a lag lies insi
 86 and 88 showed that correcting such a lag by the detector's MW does not help, because the MW is
 about 1.8 times too large. They also showed that the 5% to 95% band of the forecast covers only 78%
 of such rows. The next step is to widen the band when a lag may be inside an ARA, which needs a
-probability and no MW. This experiment asks whether the XL detector of [experiment
+probability and no MW. This experiment asks whether the RO-NC detector of [experiment
 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md), run causally, can give
 that probability, and whether the probability is calibrated.
 
@@ -63,23 +63,24 @@ that probability, and whether the probability is calibrated.
   S4, S6, 83 batches of events on disjoint series), redrawn with experiment 88's seeds. For each of
   the 292 daily origins of `fold_a_daily_gap_v1` with an injected event active in the lag window,
   the detector is run causally with the cut at the newest usable half-hour (the origin minus 3.5
-  hours) for all 16 Primary series. Every second hour of the lag window (the 7 days before the cut)
+  hours) for all 16 Primary series. Every sixth hour of the lag window (the 7 days before the cut)
   on every series is a row. A row is positive when the half-hour lies inside an injected interval
   on that series, and negative otherwise, except that rows inside a logged closure or an
   oracle-labelled event are dropped.
 - **Odd and even months.** Transfers that start in odd calendar months fit the calibration. Transfers
-  that start in even months score it. Experiment 82 fitted its logistic score and threshold on odd
+  that start in even months score it. A row inside an injected transfer takes the month the
+  transfer starts in, and any other row takes the month of its lag stamp. Experiment 82 fitted its logistic score and threshold on odd
   months too, so even-month rows stay out of every fit.
-- **Candidates.** The causal detector keeps every candidate above a low score floor (the XL
+- **Candidates.** The causal detector keeps every candidate above a low score floor (the RO-NC
   threshold minus 4 log-odds), not only those above the threshold. Each candidate gets the
   detector's interval (the tracked level end, then the first return step), with its end known only
   if it lies at least 48 half-hours before the cut.
 - **Arms.**
-    1. Binary causal XL flag: the row lies inside an interval of a candidate above the XL
+    1. Binary causal RO-NC flag: the row lies inside an interval of a candidate above the RO-NC
        threshold, open or closed.
     2. Calibrated score of the latest unreturned candidate: of the candidates of the row's series
        that start at or before the row and have not returned before it, take the latest. A logistic
-       regression on its XL score, the log of its age at the cut, and (when a return step is known
+       regression on its RO-NC score, the log of its age at the cut, and (when a return step is known
        after the row) the return step in noise units gives a raw score; isotonic regression on odd
        months maps the raw score to a probability. A row with no such candidate gets the odd-month
        rate.
@@ -91,6 +92,13 @@ that probability, and whether the probability is calibrated.
 - **Real half-hours (descriptive).** The detector run causally at the same 292 cuts on the real
   residuals. Truth is the logged closures plus the oracle-labelled events of experiment 86. The
   logs miss ARAs, so precision is a lower bound.
+- **Post hoc variants (labelled as such in the write-up).** The pre-registered rows keep every
+  half-hour outside an injected transfer as a negative, but the real data hold unlabelled switching
+  that the detector rightly flags. Variant `clean` drops the rows that the same detector, run on
+  the uninjected residuals at the same cut, already flags. Variant `clean_large` also drops rows
+  inside injected transfers whose donor step is under 4 noise units, which no detector that needs
+  24 hours of data can see. A fourth arm takes the highest-scoring covering candidate instead of
+  the latest one. The verdict follows the pre-registered rows.
 - **Weather in the residual model.** The detector's residual model is the stage 1a model fed with
   ERA5 weather, as in experiment 88. ERA5 arrives about 5 days late. This experiment asks first
   whether a calibrated probability helps at all under ideal laboratory conditions, so it does not
