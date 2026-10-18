@@ -145,6 +145,7 @@ nav:
       - Research plan: ml-experiments/research-plan.md
       - Series reports:
           - "Solar disaggregation: separating embedded solar from substation demand": ml-experiments/series/solar-disaggregation.md
+          - "Demand inputs: which extra information helps the substation demand forecast": ml-experiments/series/demand-inputs.md
       - "Does an ERA5-trained weather-to-power model beat the same model trained on ENS?": ml-experiments/00001-era5-trained-stage1a-vs-ens-trained/result.md
       - "Does a stage 2 calibrator beat the pooled stage 1a mixture?": ml-experiments/00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md
       - "Does an ERA5-trained model beat the same model trained on ENS, for demand series?": ml-experiments/00003-era5-trained-stage1a-vs-ens-trained-demand/result.md
