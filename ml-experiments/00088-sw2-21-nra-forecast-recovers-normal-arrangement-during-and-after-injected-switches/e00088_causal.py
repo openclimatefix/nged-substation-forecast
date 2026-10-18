@@ -110,7 +110,14 @@ def causal_intervals(
     intervals = first_return_intervals(intervals=tracked, inputs=inputs, cap_days=CAP_DAYS)
     own_step = {(r["series"], r["stamp"]): r["step_mw"] for r in kept.iter_rows(named=True)}
     out: list[CausalInterval] = []
-    for iv in intervals:
+    # When both sides of a transfer alarm, each series holds an `alarm` and a `partner` interval at
+    # the same onset; keep one per (series, onset), preferring the series' own alarm, as the label
+    # export of experiment 00082 does.
+    seen: set[tuple[int, int]] = set()
+    for iv in sorted(intervals, key=lambda i: (i.series, i.onset, i.role != "alarm")):
+        if (iv.series, iv.onset) in seen:
+            continue
+        seen.add((iv.series, iv.onset))
         key = (iv.alarm_series, iv.onset)
         step = own_step[key] if iv.role == "alarm" else partner_steps[key][iv.series]
         is_open = iv.end + WINDOW > cut

@@ -48,6 +48,8 @@ LAG_WINDOW: Final[int] = 7 * grid.BLOCK
 """A lag is at most 7 days before the newest usable value."""
 BANDS: Final[tuple[tuple[str, float, float], ...]] = common.LEAD_BANDS[:4]
 OUT_DIR: Final[Path] = common.CASES_DIR
+CAUS_DIR: Final[Path] = common.WORK_DIR / "cases_caus"
+"""Cells of a re-run that forecasts only the causal-MW variants."""
 VARIANTS: Final[tuple[tuple[str, str, str | None], ...]] = (
     ("plain", "plain", None),
     ("ceiling", "plain", None),
@@ -57,6 +59,8 @@ VARIANTS: Final[tuple[tuple[str, str, str | None], ...]] = (
     ("nra_oracle_caus", "nra_oracle", "caus"),
     ("nra_xl_inj", "nra_xl", "inj"),
     ("nra_xl_caus", "nra_xl", "caus"),
+    ("lagmw_xl_cmax", "lagmw_xl", "cmax"),
+    ("nra_xl_cmax", "nra_xl", "cmax"),
 )
 """Each variant's name, its booster arm, and its forecast-time MW source (None: no correction)."""
 _STATE: dict[str, object] = {}
@@ -114,15 +118,33 @@ def injected_arrays(
 
 
 def causal_array(
-    *, intervals: list[causal.CausalInterval], series_id: int, capacity: float, size: int
+    *,
+    intervals: list[causal.CausalInterval],
+    series_id: int,
+    capacity: float,
+    size: int,
+    merge: str = "sum",
 ) -> np.ndarray:
-    """Return the signed MW over capacity that the causal intervals of one series mark."""
+    """Return the signed MW over capacity that the causal intervals of one series mark.
+
+    Args:
+        intervals: The causal detector's intervals.
+        series_id: The series to mark.
+        capacity: The series' effective capacity in MW.
+        size: The length of the dense grid.
+        merge: `sum` adds overlapping intervals, as the XL training labels do; `max` takes the
+            step of largest size at each half-hour (a post hoc variant).
+    """
     out = np.zeros(size, dtype=np.float32)
-    for interval in intervals:
-        if interval.series == series_id:
-            out[OFFSET + interval.onset : OFFSET + interval.end] += np.float32(
-                interval.step_mw / capacity
-            )
+    mine = [i for i in intervals if i.series == series_id]
+    if merge == "max":
+        mine.sort(key=lambda i: abs(i.step_mw))
+    for interval in mine:
+        value = np.float32(interval.step_mw / capacity)
+        if merge == "max":
+            out[OFFSET + interval.onset : OFFSET + interval.end] = value
+        else:
+            out[OFFSET + interval.onset : OFFSET + interval.end] += value
     return out
 
 
@@ -290,7 +312,9 @@ def run_batch(job: tuple[int, list[Event], str]) -> str:
         A progress line.
     """
     seed, batch, shape = job
-    target = OUT_DIR / f"cells_{shape}_{seed}.parquet"
+    out_dir: Path = _STATE.get("out_dir", OUT_DIR)  # ty: ignore[invalid-assignment]
+    variants: tuple = _STATE.get("variants", VARIANTS)  # ty: ignore[invalid-assignment]
+    target = out_dir / f"cells_{shape}_{seed}.parquet"
     if target.exists():
         return f"{target.name} exists"
     started = time.monotonic()
@@ -350,6 +374,13 @@ def run_batch(job: tuple[int, list[Event], str]) -> str:
                     capacity=row["effective_capacity_mw"],
                     size=size,
                 ),
+                "cmax": causal_array(
+                    intervals=intervals,
+                    series_id=sid,
+                    capacity=row["effective_capacity_mw"],
+                    size=size,
+                    merge="max",
+                ),
             }
             lag_index = np.array([common.grid_index(times=origin) - common.NEWEST_AGE])
             newest_inj = float(signed["inj"][lag_index][0])
@@ -369,13 +400,13 @@ def run_batch(job: tuple[int, list[Event], str]) -> str:
                     **cell,
                 }
                 for cell in forecast_cell(
-                    site=row["site"], origin=origin, power=power, signed=signed, variants=VARIANTS
+                    site=row["site"], origin=origin, power=power, signed=signed, variants=variants
                 )
             )
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     common.atomic_write(
         frame=event_table(batch=batch, injection=injection, shape=shape, seed=seed, state=state),
-        target=OUT_DIR / f"events_{shape}_{seed}.parquet",
+        target=out_dir / f"events_{shape}_{seed}.parquet",
     )
     common.atomic_write(frame=pl.DataFrame(cells, infer_schema_length=None), target=target)
     return f"{target.name}: {len(cells):,} cells in {time.monotonic() - started:.0f} s"
@@ -438,8 +469,11 @@ def check_alignment(*, state: dict) -> None:
             raise ValueError(msg)
 
 
-def init_worker() -> None:
+def init_worker(only_caus: bool = False) -> None:
     """Load the dense-grid context and the harness state once per worker."""
+    if only_caus:
+        _STATE["out_dir"] = CAUS_DIR
+        _STATE["variants"] = tuple(v for v in VARIANTS if v[2] in ("caus", "cmax"))
     fitting.context()
     _STATE["harness"] = harness.make_state()
     check_alignment(state=_STATE["harness"])  # ty: ignore[invalid-argument-type]
@@ -450,6 +484,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--pilot", action="store_true", help="one small batch, one shape")
+    parser.add_argument(
+        "--only-caus", action="store_true", help="forecast only the causal-MW variants"
+    )
     args = parser.parse_args()
     state = harness.make_state()
     events = harness.cached_events(power=state["panel"]["power"])
@@ -471,7 +508,9 @@ def main() -> None:
         print(run_batch((seed, batch, "S2")))
         return
     started = time.monotonic()
-    with ProcessPoolExecutor(max_workers=args.workers, initializer=init_worker) as pool:
+    with ProcessPoolExecutor(
+        max_workers=args.workers, initializer=init_worker, initargs=(args.only_caus,)
+    ) as pool:
         for done, line in enumerate(pool.map(run_batch, jobs), start=1):
             print(f"[{done}/{len(jobs)}] {line}", flush=True)
     print(f"done in {time.monotonic() - started:.0f} s")

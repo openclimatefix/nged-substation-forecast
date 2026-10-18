@@ -37,11 +37,14 @@ FALSE_VARIANTS: Final[tuple[tuple[str, str, str | None], ...]] = (
     ("lagmw_xl_caus", "lagmw_xl", "caus"),
     ("nra_oracle_caus", "nra_oracle", "caus"),
     ("nra_xl_caus", "nra_xl", "caus"),
+    ("lagmw_xl_cmax", "lagmw_xl", "cmax"),
+    ("nra_xl_cmax", "nra_xl", "cmax"),
 )
 REAL_VARIANTS: Final[tuple[tuple[str, str, str | None], ...]] = (
     ("plain", "plain", None),
     ("lagmw_xl_caus", "lagmw_xl", "caus"),
     ("nra_xl_caus", "nra_xl", "caus"),
+    ("nra_xl_cmax", "nra_xl", "cmax"),
     ("nra_oracle_orac", "nra_oracle", "orac"),
 )
 MAX_MISSING: Final[float] = 0.5
@@ -87,6 +90,13 @@ def false_alarms(*, state: dict) -> pl.DataFrame:
                 series_id=int(row["time_series_id"]),
                 capacity=row["effective_capacity_mw"],
                 size=arrays[site].power.size,
+            ),
+            "cmax": cases.causal_array(
+                intervals=intervals,
+                series_id=int(row["time_series_id"]),
+                capacity=row["effective_capacity_mw"],
+                size=arrays[site].power.size,
+                merge="max",
             ),
         }
         index = common.grid_index(times=origin) - common.NEWEST_AGE
@@ -188,6 +198,13 @@ def real_check(*, state: dict) -> pl.DataFrame:
                         series_id=side,
                         capacity=row["effective_capacity_mw"],
                         size=arrays[site].power.size,
+                    ),
+                    "cmax": cases.causal_array(
+                        intervals=intervals,
+                        series_id=side,
+                        capacity=row["effective_capacity_mw"],
+                        size=arrays[site].power.size,
+                        merge="max",
                     ),
                     "orac": labels[site]["oracle"].signed_mw,
                     "inj": np.zeros_like(arrays[site].power),

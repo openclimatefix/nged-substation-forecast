@@ -10,6 +10,7 @@ from typing import Final
 
 import e00088_common as common
 import e00088_stats as stats
+import numpy as np
 import polars as pl
 
 HEADLINE: Final[tuple[str, ...]] = stats.HEADLINE_SHAPES
@@ -104,6 +105,72 @@ def gap_shares(*, cases: pl.DataFrame, label: str, shapes: tuple[str, ...]) -> p
     return pl.DataFrame(rows)
 
 
+def arm_means(*, frame: pl.DataFrame, shapes: tuple[str, ...]) -> dict[str, float]:
+    """Return each arm's weighted mean absolute error, shapes averaged with equal weight."""
+    out = {}
+    for arm, variant in stats.ARMS.items():
+        work = frame.with_columns(pl.col(f"mae_{variant}").alias("_v")).drop_nulls("_v")
+        out[arm] = stats.mean_value(frame=work, shapes=shapes, column="_v").point
+    return out
+
+
+def detection(*, frame: pl.DataFrame) -> dict[str, float]:
+    """Return how often the causal detector had marked the transfer at the newest lag.
+
+    Cases are weighted by the event's MW. `found` is the share with a non-zero causal MW at the
+    newest lag, `right_sign` the share with the injected sign, and `ratio` the weighted median of
+    the causal over the injected MW among cases with the right sign.
+    """
+    w = frame["w"].to_numpy()
+    caus, inj = frame["caus_mw"].to_numpy(), frame["inj_mw"].to_numpy()
+    found = caus != 0
+    right = found & (np.sign(caus) == np.sign(inj)) & (inj != 0)
+    wrong = found & ~right
+    ratio = caus[right] / inj[right]
+    order = np.argsort(ratio)
+    cumulative = np.cumsum(w[right][order]) / max(w[right].sum(), 1e-12)
+    median = float(ratio[order][np.searchsorted(cumulative, 0.5)]) if right.any() else float("nan")
+    total = max(w.sum(), 1e-12)
+    return {
+        "found": float((w * found).sum() / total),
+        "right_sign": float((w * right).sum() / total),
+        "wrong_or_stray": float((w * wrong).sum() / total),
+        "ratio_median": median,
+    }
+
+
+def by_bins(
+    *, cases: pl.DataFrame, family: str, column: str, bins: tuple[tuple[str, float, float], ...]
+) -> pl.DataFrame:
+    """Return arm means, C1, and detection for bins of a column, headline shapes pooled."""
+    rows = []
+    frame = cases.filter(pl.col("scored") & (pl.col("family") == family))
+    for name, low, high in bins:
+        part = frame.filter((pl.col(column) >= low) & (pl.col(column) < high))
+        if part.filter(pl.col("shape").is_in(HEADLINE)).is_empty():
+            continue
+        means = arm_means(frame=part, shapes=HEADLINE)
+        c1 = stats.contrast(frame=part, shapes=HEADLINE, arm_a="arm4_caus", arm_b="arm1", level=95)
+        c2 = stats.contrast(frame=part, shapes=HEADLINE, arm_a="arm3_inj", arm_b="arm1", level=95)
+        rows.append(
+            {
+                "family": family,
+                "column": column,
+                "bin": name,
+                "cases": part.filter(pl.col("shape") == "S2").height,
+                **{f"mae_{arm}": value for arm, value in means.items()},
+                "c1": c1.point,
+                "c1_low": c1.low,
+                "c1_high": c1.high,
+                "c2": c2.point,
+                "c2_low": c2.low,
+                "c2_high": c2.high,
+                **detection(frame=part.filter(pl.col("shape").is_in(HEADLINE))),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def main() -> None:
     """Compute every table and print it."""
     cases, events = load()
@@ -115,6 +182,18 @@ def main() -> None:
         save(name=f"gap_shares_{label}", frame=table)
         print(f"\nShare of the gap closed, {label}")
         print(table)
+    hours_b = (("0-24 h", 0.0, 24.0), ("1-3 d", 24.0, 72.0), ("3-7 d", 72.0, 1e9))
+    for name, family, column, bins in (
+        ("by_onset", "A", "hours_at_origin", stats.ONSET_BINS),
+        ("by_step_a", "A", "donor_step_z", stats.STEP_BINS),
+        ("by_since_end", "B", "hours_at_origin", hours_b),
+        ("by_step_b", "B", "donor_step_z", stats.STEP_BINS),
+    ):
+        table = by_bins(cases=cases, family=family, column=column, bins=bins)
+        save(name=name, frame=table)
+        print(f"\n{name}: family {family} by {column}")
+        with pl.Config(tbl_rows=30, tbl_cols=40, fmt_str_lengths=30):
+            print(table)
     scored_a = cases.filter(pl.col("scored") & (pl.col("family") == "A"))
     absolute = stats.absolute_scores(frame=scored_a, shapes=HEADLINE)
     save(name="absolute_family_a", frame=absolute)
