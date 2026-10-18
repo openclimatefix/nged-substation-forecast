@@ -63,8 +63,9 @@ advice:
     since the detector cannot see most real switching (real half-hours, figure 2).
   - >-
     When injecting transfers to score a detector, draw durations of 1 day and longer as well: the
-    detector needs 24 hours of data, and its area under the curve is 0.81 to 0.86 for transfers
-    under 14 days and 0.67 over 14 days (figure 2).
+    detector separates poorly in the first 24 hours after an onset (area under the curve 0.60 for
+    the flag and 0.61 for arm 2, against 0.72 to 0.73 later), and by transfer duration its area
+    under the curve is 0.81 to 0.86 under 14 days and 0.67 to 0.68 over 14 days (figure 2).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -73,11 +74,10 @@ adopted_in: none
 
 **Take-home message: under ideal laboratory conditions, a probability built from the causal
 refit-offset neighbour-count detector (RO-NC, called XL on the pages of experiments 70, 71, and 82)
-is only slightly better than the detector's yes-or-no flag, and on real switching it has almost no
+cannot be told apart from the detector's yes-or-no flag, and on real switching it has almost no
 skill.** Widening a forecast's quantiles by this probability would therefore act on few of the rows
-that need it. The probability is useful only for transfers large enough and long enough for the
-detector to see. A source of warning that does not depend on a detector label is the next thing to
-try.
+that need it. The probability beats the flag only for transfers large enough for the detector to
+see. A source of warning that does not depend on a detector label is the next thing to try.
 
 An abnormal running arrangement (ARA) is a period when a network operator has closed a normally
 open switch, so that one Primary substation (a substation that steps down to the local distribution

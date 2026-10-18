@@ -334,7 +334,7 @@ def report_variant(*, injected: pl.DataFrame, name: str) -> dict[str, np.ndarray
             round(brier(p=predictions["flag"][m], y=y[m]), 5),
         )
     test.write_parquet(OUT_DIR / f"test_rows_{name}.parquet")
-    np.savez(OUT_DIR / f"test_predictions_{name}.npz", **predictions)
+    np.savez(OUT_DIR / f"test_predictions_{name}.npz", **predictions)  # ty: ignore[invalid-argument-type]
     return predictions
 
 
@@ -394,7 +394,7 @@ def report_durations(*, frame: pl.DataFrame) -> None:
     test.select(
         "seed", "shape", "cut", "series", "lag_stamp", "y", "ref_hours", "flag"
     ).write_parquet(OUT_DIR / "test_rows_duration.parquet")
-    np.savez(OUT_DIR / "test_predictions_duration.npz", **predictions)
+    np.savez(OUT_DIR / "test_predictions_duration.npz", **predictions)  # ty: ignore[invalid-argument-type]
 
 
 def main() -> None:

@@ -2101,7 +2101,7 @@ moved MW as three columns.
 ### 00091: a calibrated probability of an abnormal running arrangement from the causal detector
 
 **Under ideal laboratory conditions, a probability built from the causal refit-offset
-neighbour-count detector is only slightly better than the detector's yes-or-no flag, and against
+neighbour-count detector cannot be told apart from the detector's yes-or-no flag, and against
 NGED's switching logs it has almost no skill, so the verdict is inconclusive.** The experiment
 injected 839 transfers of known size and timing (and 183 lasting 1 to 60 days) into the power of 16
 Primary substations, then scored the probability that each half-hour of the 7 days before a
@@ -2113,7 +2113,8 @@ forecast origin lies inside an abnormal running arrangement.
 - **Finding for later experiments:** the detector flags 1,607 of the 19,099 half-hours that NGED's
   logs mark as switching, so a forecast-widening rule driven by this probability would act on about
   8% of real switching. Area under the curve is 0.81 to 0.86 for injected transfers under 14 days
-  and 0.67 over 14 days. A lag-unusualness input that needs no switching label is the next thing to try.
+  and 0.67 to 0.68 over 14 days. A lag-unusualness input that needs no switching label is the next
+  thing to try.
 - **Write-up and pull request:**
   [result](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md),
   [PR #1333 (Experiment 91: can the causal switching detector give a calibrated probability of an

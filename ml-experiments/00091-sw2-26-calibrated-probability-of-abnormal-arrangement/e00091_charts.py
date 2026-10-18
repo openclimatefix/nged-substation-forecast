@@ -121,7 +121,7 @@ def figure_2() -> alt.TopLevelMixin:
     order = [data.filter(pl.col("bin") == b)["label"][0] for b in bins]
     arms = ["flag", "latest", "best"]
     chart = (
-        alt.Chart(data.filter(pl.col("arm").is_in(arms)))
+        alt.Chart(data.filter(pl.col("arm").is_in(arms)))  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70)
         .encode(
             x=alt.X(
@@ -157,12 +157,12 @@ def figure_3() -> alt.TopLevelMixin:
     )
     arms = ["flag", "latest", "latest_x1"]
     diagonal = (
-        alt.Chart(pl.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0]}))
+        alt.Chart(pl.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0]}))  # ty: ignore[unresolved-attribute]
         .mark_line(color="#777777", strokeDash=[4, 3])
         .encode(x="x:Q", y="y:Q")
-    )  # ty: ignore[unresolved-attribute]
+    )
     points = (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
             x=alt.X("mean_p:Q", scale=alt.Scale(domain=[0, 1]), title="Predicted probability"),

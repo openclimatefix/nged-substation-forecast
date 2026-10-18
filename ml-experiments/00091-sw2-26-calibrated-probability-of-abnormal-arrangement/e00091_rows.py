@@ -14,7 +14,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final, cast
 
 import e00091_candidates as cands
 import e00091_common as common
@@ -24,7 +24,7 @@ import e00091_labels as labelling
 import numpy as np
 import polars as pl
 from e00091_inject import Event, Injection
-from e00091_profile import inject_shaped
+from e00091_profile import Shape, inject_shaped
 
 OFFSET: Final[int] = harness.OFFSET
 SCORED_SHAPES: Final[tuple[str, ...]] = ("S1", "S2", "S3", "S4", "S6")
@@ -33,7 +33,7 @@ LAG_WINDOW: Final[int] = 7 * grid.BLOCK
 LAG_STEP: Final[int] = 12
 """Every sixth hour of the lag window is a row."""
 ROWS_DIR: Final[Path] = common.WORK_DIR / "rows"
-_STATE: dict[str, object] = {}
+_STATE: dict[str, Any] = {}
 
 
 def newest_stamp(*, origin: datetime) -> int:
@@ -156,23 +156,27 @@ def run_job(job: tuple[int, list[Event] | None, str]) -> str:
     started = time.monotonic()
     state = _STATE["harness"]
     ara = _STATE["ara"]
-    panel = state["panel"]  # ty: ignore[invalid-argument-type]
+    panel = state["panel"]
     origins = common.origins_of_subset(subset="gap")
-    only: set[int] | None = _STATE.get("only_cuts")  # ty: ignore[invalid-assignment]
+    only: set[int] | None = _STATE.get("only_cuts")
     frames = []
     if batch is None:
         residual, offset, events = panel["residual"], state["offset_panel"]["residual"], []
     else:
         injection: Injection = inject_shaped(
-            power=panel["power"], events=batch, seed=seed, shape=shape, shares=state["shares"]
-        )  # ty: ignore[invalid-argument-type]
+            power=panel["power"],
+            events=batch,
+            seed=seed,
+            shape=cast(Shape, shape),
+            shares=state["shares"],
+        )
         residual = injection.fast_residual(panel["residual"])
-        offset = injection.fast_residual(state["offset_panel"]["residual"])  # ty: ignore[invalid-argument-type]
+        offset = injection.fast_residual(state["offset_panel"]["residual"])
         events = batch
     stats = (
         {}
         if batch is None
-        else event_stats(batch=batch, injection=injection, scale=state["scales"]["X"])  # ty: ignore[unresolved-reference]
+        else event_stats(batch=batch, injection=injection, scale=state["scales"]["X"])
     )
     for origin in origins:
         cut = newest_stamp(origin=origin) + 1
@@ -184,12 +188,12 @@ def run_job(job: tuple[int, list[Event] | None, str]) -> str:
             continue
         frames.append(
             build_rows(
-                state=state,  # ty: ignore[invalid-argument-type]
+                state=state,
                 residual=residual,
                 offset=offset,
                 cut=cut,
                 events=events,
-                ara=ara,  # ty: ignore[invalid-argument-type]
+                ara=ara,
                 shape=shape,
                 seed=seed,
                 real=batch is None,
@@ -219,7 +223,9 @@ def main() -> None:
     state = harness.make_state()
     events = harness.cached_events(power=state["panel"]["power"])
     batches = harness.seeded_batches(events=events)
-    jobs = [(seed, batch, shape) for shape in SCORED_SHAPES for seed, batch in batches]
+    jobs: list[tuple[int, list[Event] | None, str]] = [
+        (seed, batch, shape) for shape in SCORED_SHAPES for seed, batch in batches
+    ]
     jobs.append((0, None, "REAL"))
     if args.pilot:
         init_worker()
