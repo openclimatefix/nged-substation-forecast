@@ -101,8 +101,8 @@ better), over 11 quantile levels from q01 to q99.
   hindsight labels, and the weather inputs are ERA5 at lag times, which a live service would not
   have.
 - **Rows scored.** 2,928,842 half-hours outside switching (the general headline). 37,394 of them
-  have a lag inside a logged event (the switching headline, 1.3%, spread over 8 of the 12 months). The spread factor of
-  1.15 is applied to both arms, as in the production recipe.
+  have a lag inside a logged event (the switching headline, 1.3%, spread over 8 of the 12 months).
+  The spread factor of 1.15 is applied to both arms, as in the production recipe.
 - **Planned contrasts** (`clim_pit` minus `plain`, 97.5% interval, whole months re-drawn). C1, all
   rows outside switching: +0.355 (+0.209 to +0.513), `refuted`. C2, rows with a lag inside a logged
   event: +0.795 (-0.325 to +2.787), `inconclusive`. The `supported` bar was an upper end below -0.02.
@@ -120,18 +120,18 @@ better), over 11 quantile levels from q01 to q99.
 | Outside switching | 0.985 / 0.985 | 0.888 / 0.874 | 0.789 / 0.759 | 0.298 / 0.300 | 0.918 / 0.969 | 1.172 / 1.203 | 0.390 / 0.391 |
 | Lag inside a logged event | 0.971 / 0.972 | 0.770 / 0.740 | 0.668 / 0.612 | 0.482 / 0.491 | 1.494 / 1.530 | 3.629 / 3.573 | 0.665 / 0.678 |
 
-- **What it rules out.** The unusualness inputs did not make the XGBoost model widen its band: on rows with
-  a lag inside a logged event the band covers 0.740 instead of 0.770 with the inputs. Only the upper
-  tail on those rows improved (pinball at q95 3.573 against 3.629), and the 97.5% interval of C2 contains zero.
+- **What it rules out.** The unusualness inputs did not make the XGBoost model widen its band: on
+  rows with a lag inside a logged event the band covers 0.740 instead of 0.770 with the inputs. Only
+  the upper tail on those rows improved (pinball at q95 3.573 against 3.629), and the 97.5% interval
+  of C2 contains zero.
 - **Caveats.** The training PITs are in sample (a lag usually lies inside the climatology window
   that defines its PIT), while forecast-time PITs for lags after the refit are out of sample. A
   cell's pooling also crosses midnight, so the first and last half-hours of a day borrow values from
-  the neighbouring day type and month. The in-sample training PITs and the midnight pooling may each add to the harm. This experiment
-  tested neither. The result uses one seed and the monthly schedule: this experiment did not test a weekly
-  refit. Only the climatology reference was run.
-  The lag-free-booster PIT and neighbour arms of SW2-28 need the booster of SW2-27, which does not
-  exist yet, and experiment 88's injected cases were not rescored. The curtailment metric was not
-  scored.
+  the neighbouring day type and month. The in-sample training PITs and the midnight pooling may each
+  add to the harm. This experiment tested neither. The result uses one seed and the monthly
+  schedule: this experiment did not test a weekly refit. Only the climatology reference was run. The
+  lag-free-booster PIT and neighbour arms of SW2-28 need the booster of SW2-27, which does not exist
+  yet, and experiment 88's injected cases were not rescored. The curtailment metric was not scored.
 - **Open question for the next experiment.** Whether an explicit rule that widens the quantiles
   from the probability that a lag is inside an abnormal arrangement (SW2-26 feeding SW2-27) fixes
   the 0.77 coverage that the inputs tested here did not fix.

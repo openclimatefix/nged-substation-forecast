@@ -2110,8 +2110,8 @@ share of ordinary readings below the lag, at the same time of day, kind of day, 
 of the three lags.
 
 - **Headline result:** on the 2,928,842 half-hours outside switching, the PIT arm scored 0.355
-  points of capacity worse than the plain arm (97.5% interval +0.209 to +0.513). On the 37,394 of them with a lag
-  inside a logged event, +0.795 (-0.325 to +2.787).
+  points of capacity worse than the plain arm (97.5% interval +0.209 to +0.513). On the 37,394 of
+  them with a lag inside a logged event, +0.795 (-0.325 to +2.787).
 - **Tails:** coverage of the 5%-to-95% band fell from 0.888 to 0.874 outside switching and from
   0.770 to 0.740 on rows with a lag inside a logged event, so the XGBoost model did not widen its band.
 - **Finding for later experiments:** widening the quantiles when a lag may be inside an abnormal

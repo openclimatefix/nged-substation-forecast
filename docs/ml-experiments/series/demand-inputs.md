@@ -184,9 +184,10 @@ points worse with training-window statistics (+0.99 to +1.91).
 **Telling the Primary demand model how unusual each lag is did not help, and raised the error.**
 [Experiment 90](../00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) gave the
 XGBoost model the probability integral transform (the share of ordinary readings below the lag, at
-the same time of day, kind of day, and month) of its three lags. The quantile score worsened by 0.355 points of capacity (97.5% interval +0.209 to +0.513) on all
-half-hours outside switching. [Experiment 18](../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md)
-had also found no gain from lag anomalies.
+the same time of day, kind of day, and month) of its three lags. The quantile score worsened by
+0.355 points of capacity (97.5% interval +0.209 to +0.513) on all half-hours outside switching.
+[Experiment 18](../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md) had also
+found no gain from lag anomalies.
 
 ## What was tried
 
