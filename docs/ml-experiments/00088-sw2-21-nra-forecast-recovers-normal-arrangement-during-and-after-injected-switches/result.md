@@ -64,7 +64,8 @@ code: ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-durin
 
 Plan only; the write-up replaces this page when the run finishes.
 
-- **Question.** [Experiment 75](../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)
+- **Question.** [Experiment 75](../00075-sw2-11-nra-forecast-with-labelled-switching-
+  masks/result.md)
   could not tell whether a forecast trained without switching half-hours, with corrected lags,
   helps, because the metered target is abnormal during a switch and only 1.3% of scored
   half-hours had a lag inside an event. Injection makes the unmodified power known, so the
@@ -189,10 +190,14 @@ A Sonnet reviewer found these, all accepted unless noted.
 
 - Rising-step peaks fire early on a partial window: fixed by requiring a full after-window.
 - "Open interval" was undefined on truncated data: fixed by the explicit end rule above.
-- The first-return search could fix an end early: ends are accepted only 48 half-hours before the cut.
+- The first-return search could fix an end early: ends are accepted only 48 half-hours before the
+  cut.
 - Family B is hurt for about a day after the end: predicted, and reported by hours since the end.
-- Fitted constants are a mild leak: stated. Partner rule: made explicit. Grid and capacity offsets: stated and asserted.
-- Six month blocks: per-month signs are now part of the verdict. Bonferroni now covers four contrasts, adding the lag correction alone (C4).
-- The 20% threshold is also reported for the 1-3 d bin. A share of the gap is reported only where the gap's interval excludes zero.
+- Fitted constants are a mild leak: stated. Partner rule: made explicit. Grid and capacity offsets:
+  stated and asserted.
+- Six month blocks: per-month signs are now part of the verdict. Bonferroni now covers four
+  contrasts, adding the lag correction alone (C4).
+- The 20% threshold is also reported for the 1-3 d bin. A share of the gap is reported only where
+  the gap's interval excludes zero.
 - Compute estimate and a pilot are added; the 73 every-fifth-day runs are dropped.
 - Rejected: none.
