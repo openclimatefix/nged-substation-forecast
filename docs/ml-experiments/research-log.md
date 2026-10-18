@@ -130,6 +130,7 @@ the maintainer to confirm.
 | [00094 - Explicit heating term, HT1](00094-explicit-heating-offset-primary-demand/result.md) | Does a per-series heating degree-hour term in the XGBoost base margin lower the cold-hour error of Primary demand? | Small gain: -0.143 points (98.75% interval -0.203 to -0.034) in cold hours up to 48 h, under the 0.3 threshold; q95 exceedance in cold hours barely moves (0.167 to 0.162) | Candidate | 2026-10-18 |
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
+| [00097 - Tail recalibration, CAL1](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md) | Which post-hoc recalibration of the best guess's stored quantiles gives the best tail coverage without hurting the centre? | Refuted by the pre-registered rule, inconclusive about recalibration in general: no arm passed both tests; stored Primary q05 and q95 cover 0.035 and 0.938 at 12 to 36 hours, and no arm of 1 to 7b moved them by more than 0.013 | Not for production | 2026-10-18 |
 | [00095 - Old training year, AGE2](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md) | Does an old training year still hurt a frozen Primary demand model when the old and recent years use the same weather product? | Refuted: on ERA5 the 2021-07 year is 1.71 points of capacity behind the 2024-07 year (99% interval 1.15 to 2.29), no smaller than the 1.57 on the control member, so the penalty is age, not the weather product | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1338) |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
@@ -2268,6 +2269,24 @@ could not separate from age, so the next experiment should test the change of we
   [PR #1335](https://github.com/openclimatefix/nged-substation-forecast/pull/1335).
 
 ![Age penalty, raw and level removed](00093-age1-old-training-year-after-level-normalisation-demand/figure_1.svg)
+
+### 00097: which post-hoc recalibration of the best guess fixes its tails? (CAL1)
+
+**The best guess's stored tails are already close to nominal, and no recalibration fitted on earlier
+months improved them by more than the sampling noise of 9 months.** At 12 to 36 hours lead for
+Primary substations, the stored q05 covers 0.035 of measurements (nominal 0.05) and q95 covers 0.938
+(nominal 0.95). We fitted eight recalibrations of the stored quantiles of the weekly-retrained best
+guess on every earlier month and scored them on October 2025 to June 2026 for 16 Primary substations
+and 4 bulk or grid supply points. No arm moved Primary q05 or q95 coverage by more than 0.013, less
+than the plus or minus 0.02 interval, and a global factor of 1.15 made the quantile score worse
+(+0.00032 points of capacity, 95% interval +0.00021 to +0.00043). Coverage of q95 swung between 0.88
+and 0.97 from month to month, and the stored median covers only 0.45, and a static table cannot
+correct either.
+
+- **Write-up:** [the full result page](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md),
+  [PR #1340](https://github.com/openclimatefix/nged-substation-forecast/pull/1340).
+
+![Tail coverage, Primary substations](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/figure_1_primary_tail_coverage.svg)
 
 ### 00095: does an old training year score worse because of the weather product, or its age? (AGE2)
 
