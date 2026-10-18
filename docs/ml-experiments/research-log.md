@@ -130,6 +130,7 @@ the maintainer to confirm.
 | [00094 - Explicit heating term, HT1](00094-explicit-heating-offset-primary-demand/result.md) | Does a per-series heating degree-hour term in the XGBoost base margin lower the cold-hour error of Primary demand? | Small gain: -0.143 points (98.75% interval -0.203 to -0.034) in cold hours up to 48 h, under the 0.3 threshold; q95 exceedance in cold hours barely moves (0.167 to 0.162) | Candidate | 2026-10-18 |
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
+| [00095 - Old training year, AGE2](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md) | Does an old training year still hurt a frozen Primary demand model when the old and recent years use the same weather product? | Refuted: on ERA5 the 2021-07 year is 1.71 points of capacity behind the 2024-07 year (99% interval 1.15 to 2.29), no smaller than the 1.57 on the control member, so the penalty is age, not the weather product | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1338) |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2267,3 +2268,23 @@ could not separate from age, so the next experiment should test the change of we
   [PR #1335](https://github.com/openclimatefix/nged-substation-forecast/pull/1335).
 
 ![Age penalty, raw and level removed](00093-age1-old-training-year-after-level-normalisation-demand/figure_1.svg)
+
+### 00095: does an old training year score worse because of the weather product, or its age? (AGE2)
+
+**An old training year scores worse than a recent one, and the coarser weather forecast of the old
+years is not the main reason.** We trained one XGBoost quantile model per Primary substation (13
+substations) on one year of data, once and not retrained, with ERA5 weather or with the control
+member of the ECMWF ensemble forecast, and scored 365 daily forecast runs from July 2025 to June
+2026. On ERA5 the 2021-07 year scored 1.71 points of capacity worse than the 2024-07 year (99%
+interval 1.15 to 2.29), against 1.57 (1.12 to 2.03) on the control member, so the gap did not shrink
+when both years used one weather product. On ERA5 the gap fell with each newer year (1.71, 1.26, and
+0.46 points for the 2021-07, 2022-07, and 2023-07 years). One substation, D8, carries most of the
+gap; its demand fell smoothly, with no step or stuck meter. Experiment 93 found that an average
+level shift does not explain the gap, and this experiment found the same for the weather product.
+Explicit demand-shape terms, such as heating and embedded solar, are the next candidates.
+
+- **Write-up:** [the full result
+page](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md),   [PR
+#1338](https://github.com/openclimatefix/nged-substation-forecast/pull/1338).
+
+![Old-year gap on the control member and on ERA5](00095-age2-old-year-penalty-with-the-same-weather-product-demand/figure_1.svg)
