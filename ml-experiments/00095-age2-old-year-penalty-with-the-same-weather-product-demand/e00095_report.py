@@ -227,7 +227,7 @@ def report_d8() -> dict:
     frame = frame.with_columns(
         month=pl.col("valid_time").dt.strftime("%Y-%m"),
         repeat=(pl.col("power") == pl.col("power").shift(1)).cast(pl.Float64),
-        observed=pl.col("power").is_finite().cast(pl.Float64),
+        observed=pl.col("power").is_not_null().cast(pl.Float64),
     )
     table = (
         frame.group_by("month")

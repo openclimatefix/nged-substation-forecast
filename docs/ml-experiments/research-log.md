@@ -2222,21 +2222,22 @@ could not separate from age, so the next experiment should test the change of we
 
 ![Age penalty, raw and level removed](00093-age1-old-training-year-after-level-normalisation-demand/figure_1.svg)
 
-### 00095: is the old-year penalty the weather product or the age? (AGE2)
+### 00095: does an old training year score worse because of the weather product, or its age? (AGE2)
 
-**An old training year scores worse because of its age, not because it used a coarser weather
-forecast.** We trained one XGBoost quantile model per Primary substation (13 substations) on one
-year of data, once and without refits, with ERA5 weather or with the control member of the ECMWF
-ensemble, and scored 365 daily runs from July 2025 to June 2026. On ERA5 the 2021-07 year scored
-1.71 points of capacity worse than the 2024-07 year (99% interval 1.15 to 2.29), against 1.57 (1.12
-to 2.03) on the control member, so the penalty did not shrink when both years used one weather
-product. On ERA5 the gap fell with each newer year (1.71, 1.26, and 0.46 points for the 2021-07,
-2022-07, and 2023-07 years). One substation, D8, carries most of the gap; its demand fell smoothly
-with no step or meter fault. Experiment 93 ruled out an average level shift and this experiment
-rules out the weather product, so explicit demand-shape terms such as heating and embedded solar are
-the next candidates.
+**An old training year scores worse than a recent one, and the coarser weather forecast of the old
+years is not the main reason.** We trained one XGBoost quantile model per Primary substation (13
+substations) on one year of data, once and not retrained, with ERA5 weather or with the control
+member of the ECMWF ensemble forecast, and scored 365 daily forecast runs from July 2025 to June
+2026. On ERA5 the 2021-07 year scored 1.71 points of capacity worse than the 2024-07 year (99%
+interval 1.15 to 2.29), against 1.57 (1.12 to 2.03) on the control member, so the gap did not shrink
+when both years used one weather product. On ERA5 the gap fell with each newer year (1.71, 1.26, and
+0.46 points for the 2021-07, 2022-07, and 2023-07 years). One substation, D8, carries most of the
+gap; its demand fell smoothly, with no step or stuck meter. Experiment 93 found that an average
+level shift does not explain the gap, and this experiment found the same for the weather product.
+Explicit demand-shape terms, such as heating and embedded solar, are the next candidates.
 
-- **Write-up:** [the full result page](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md),
-  [PR #1338](https://github.com/openclimatefix/nged-substation-forecast/pull/1338).
+- **Write-up:** [the full result
+page](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md),   [PR
+#1338](https://github.com/openclimatefix/nged-substation-forecast/pull/1338).
 
 ![Old-year gap on the control member and on ERA5](00095-age2-old-year-penalty-with-the-same-weather-product-demand/figure_1.svg)
