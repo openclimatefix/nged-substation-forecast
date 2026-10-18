@@ -143,6 +143,8 @@ nav:
       - Overview: ml-experiments/README.md
       - Research log: ml-experiments/research-log.md
       - Research plan: ml-experiments/research-plan.md
+      - Series reports:
+          - "Solar disaggregation: separating embedded solar from substation demand": ml-experiments/series/solar-disaggregation.md
       - "Does an ERA5-trained weather-to-power model beat the same model trained on ENS?": ml-experiments/00001-era5-trained-stage1a-vs-ens-trained/result.md
       - "Does a stage 2 calibrator beat the pooled stage 1a mixture?": ml-experiments/00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md
       - "Does an ERA5-trained model beat the same model trained on ENS, for demand series?": ml-experiments/00003-era5-trained-stage1a-vs-ens-trained-demand/result.md
@@ -204,6 +206,7 @@ nav:
       - "Does experiment 64's gain beyond 10 days come from a leak?": ml-experiments/00076-pvdis-5-leak-check-beyond-10-days/result.md
       - "Does a re-estimated solar capacity lower the error of experiment 64's best forecast?": ml-experiments/00078-pvdis-5-current-capacity-vintages/result.md
       - "Can the direction of flow be recovered at Primaries metered only in MVA?": ml-experiments/00079-pvdis-7-mw-at-mva-only-primaries/result.md
+      - "Does a zero starting value lower the error of the production XGBoost models?": ml-experiments/00080-bm0-zero-base-margin-xgboost-quantile-models/result.md
       - "Are the tails of the stored demand forecasts too narrow?": ml-experiments/00083-curtailment-cost-and-tail-calibration-worked-example/result.md
       - "Can the substation-limit curtailment metric rank forecasts on the pilot?": ml-experiments/00084-substation-limit-curtailment-cost-worked-example/result.md
       - "Do cheaper retraining schedules rank arms the way weekly retraining does?": ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md
@@ -223,6 +226,7 @@ nav:
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
+      - "Can a Primary demand forecast learn the normal running arrangement from labelled switching?": ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md
       - "Do same-time sunshine analogues add anything once the solar forecast is explicit?": ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md
   - Live service:
       - Overview: live_service/index.md

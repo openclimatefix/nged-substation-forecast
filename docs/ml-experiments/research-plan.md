@@ -18,8 +18,8 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [SW2-11](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | With the labelled switching removed from the training targets, does the best-guess architecture forecast the normal running arrangement as well outside switching as the plain best guess, and does a switching magnitude paired with each lagged power input, or a lag corrected by that magnitude, improve it? | 2 | RT2 (experiment 48), for the architecture | Proposed; picks the v1 NRA candidate |
-| [SW2-12](#sw2-11-and-sw2-12-a-v1-forecast-under-the-normal-running-arrangement) | How much of SW2-11's NRA skill is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-11 and SW2-8 | Proposed |
+| [SW2-12](#sw2-12-a-v1-forecast-under-the-normal-running-arrangement-with-the-detectors-labels) | How much of the NRA skill of experiment 75 is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-8 | Proposed |
+| [SW2-21](#sw2-21-recovering-the-normal-running-arrangement-during-and-after-a-switch) | When a Primary is in, or has just left, an abnormal running arrangement, does the NRA forecast recover the true unmodified power on injected switches, with the MW from the truth and from the causal XL detector? | 2 | SW2-12 (experiment 86) | Proposed; tests the NRA forecast's main purpose |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
@@ -184,35 +184,41 @@ confirm:
   hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
   24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
 
-#### SW2-11 and SW2-12: a v1 forecast under the normal running arrangement
+#### SW2-12: a v1 forecast under the normal running arrangement with the detector's labels
 
-**Retrain the best-guess architecture so that it never learns to predict an abnormal running
-arrangement, and pick the v1 NRA candidate from three arms.** SW2-11 uses experiment 00041's
-labelled switching, and SW2-12 repeats the experiment with the detector's labels, which is what
-Flexpectation v2 will have. The gap between the two runs is the skill lost without a labelled set.
+**Repeat [experiment 75](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) with
+the labels from the best detector after SW2-8, which is what Flexpectation v2 will have.** The gap
+between the two runs is the skill lost without a labelled set. Experiment 75 found that masking the
+labelled switching, and the signed MW at each lag, changed the Primary score outside switching by
+under 0.06 points of capacity.
 
-- **The architecture** is the winner of RT2 (experiment 00048). Weekly retraining without the
-  error correction is the leading candidate. If the winner keeps an error correction, the
-  correction's history leaves out switching half-hours and looks back far enough to hold 14
-  unmasked days, and the write-up reports the unmasked days per window and how often the fallback
-  to the last full correction fired.
-- **The arms:** the plain architecture with nothing removed; the NRA arm, with logged switching
-  removed from the training targets; and the NRA arm plus, for each lagged power input, the signed
-  MW moved by any switching event at that lag. A fourth arm replaces each lag by the lag minus that
-  MW, because a tree model cannot easily subtract one column from another.
-- **The labels in SW2-11** are experiment 00041's visible events, conserved or one-sided, which
-  two Sonnet labellers and an Opus adjudicator found in the telemetry at NGED's logged times. The
-  target mask removes each event's interval from the training targets of its donor and receivers,
-  and the magnitudes are the events' labelled MW moved.
-- **The labels in SW2-12** come from the best detector after SW2-8.
+- **The arms** are experiment 75's four, plus a fifth that gives XGBoost the corrected lags (each
+  lag minus the signed MW moved) and the signed MW columns together.
 - **Scoring** uses the same rows in every arm and in both runs: half-hours outside NGED's logged
-  closures and outside the labelled events, where the metered target is the NRA target. A
-  secondary metered view scores every half-hour and decides nothing.
-- **Threshold.** The target mask needs a detector at training time only, so the NRA arm is adopted
-  when its interval does not show it worse than the plain arm. The magnitude arms need a detector
-  on the serving path, so they need a gain whose interval excludes zero. Experiment 00044 bounded a
-  perfect detector's gain at 0.34% of the best guess's quantile score under the NRA view, so the
-  gains are expected to be small.
+  closures and outside the labelled events.
+- **Threshold.** The masked arm is adopted when its interval does not show it worse than the plain
+  arm by more than 0.02 points. A magnitude arm needs a detector on the serving path, so it needs a
+  gain whose interval excludes zero.
+
+#### SW2-21: recovering the normal running arrangement during and after a switch
+
+**Test the NRA forecast on what it is for: forecasting the normal running arrangement while a
+Primary is switched, or just after a switch has ended.** The metered target cannot score this,
+because during a switch the metered power is abnormal. Injected switches make the truth known: a
+transfer is added to a donor's and its receivers' power, and to the lag inputs rebuilt from that
+power, in quiet periods, and the forecast is scored against the unmodified series.
+
+- **Two families of forecast origins:** inside an injected switch, binned by the time since its
+  onset, and just after a switch, with lags inside it and the target after its end.
+- **Arms:** the plain booster on the contaminated lags; the NRA booster (corrected lags and the MW
+  column) with the injected MW; the NRA booster with the MW from the XL detector run causally, on
+  data up to the origin only; and the plain booster on the unmodified lags as a ceiling. The
+  boosters are experiment 86's.
+- **Headline:** the MW-weighted mean absolute error against the unmodified series inside a switch,
+  causal XL against plain, with the oracle arm beside it, and the share of the gap to the ceiling
+  that each arm closes.
+- **Second check:** the conserved two-sided events of experiment 41, where each side's step gives
+  an estimate of the other side's normal running arrangement.
 
 ### PVDIS: separating embedded solar from Primary demand
 
