@@ -145,6 +145,7 @@ nav:
       - Research plan: ml-experiments/research-plan.md
       - Series reports:
           - "Solar disaggregation: separating embedded solar from substation demand": ml-experiments/series/solar-disaggregation.md
+          - "Demand inputs: which extra information helps the substation demand forecast": ml-experiments/series/demand-inputs.md
           - "Weather products and blending: which weather data improves the forecast": ml-experiments/series/weather-products-and-blending.md
           - "Retraining cadence and the demand reference: how often to refit the demand model": ml-experiments/series/retraining-and-demand-reference.md
       - "Does an ERA5-trained weather-to-power model beat the same model trained on ENS?": ml-experiments/00001-era5-trained-stage1a-vs-ens-trained/result.md
@@ -231,7 +232,9 @@ nav:
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
       - "Can a Primary demand forecast learn the normal running arrangement from labelled switching?": ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md
+      - "Can the causal switching detector give a calibrated probability of an abnormal running arrangement?": ml-experiments/00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md
       - "Do the detector's switching labels give the same gain as NGED's logs?": ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/result.md
+      - "Is the drift of Primary demand mostly a per-series level?": ml-experiments/00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md
       - "Do same-time sunshine analogues add anything once the solar forecast is explicit?": ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md
   - Live service:
       - Overview: live_service/index.md

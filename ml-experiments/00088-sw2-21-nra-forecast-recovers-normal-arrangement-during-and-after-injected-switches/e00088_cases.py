@@ -23,7 +23,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00088_causal as causal
 import e00088_common as common
@@ -35,11 +35,11 @@ import numpy as np
 import polars as pl
 import xgboost as xgb
 from e00088_inject import Event, Injection
-from e00088_profile import inject_shaped
+from e00088_profile import Shape, inject_shaped
 
 OFFSET: Final[int] = harness.OFFSET
 """Half-hours from the dense grid's start (2019-09-01) to experiment 00082's grid (2022-01-01)."""
-SCORED_SHAPES: Final[tuple[str, ...]] = ("S1", "S2", "S3", "S4", "S6")
+SCORED_SHAPES: Final[tuple[Shape, ...]] = ("S1", "S2", "S3", "S4", "S6")
 MAX_LEAD_HOURS: Final[float] = 240.0
 MEMBERS: Final[tuple[int, ...]] = tuple(range(0, 51, 5))
 """The control member and every fifth member: 11 of the 51, the same in every arm."""
@@ -63,7 +63,7 @@ VARIANTS: Final[tuple[tuple[str, str, str | None], ...]] = (
     ("nra_xl_cmax", "nra_xl", "cmax"),
 )
 """Each variant's name, its booster arm, and its forecast-time MW source (None: no correction)."""
-_STATE: dict[str, object] = {}
+_STATE: dict[str, Any] = {}
 
 
 def newest_stamp(*, origin: datetime) -> int:
@@ -134,6 +134,9 @@ def causal_array(
         size: The length of the dense grid.
         merge: `sum` adds overlapping intervals, as the XL training labels do; `max` takes the
             step of largest size at each half-hour (a post hoc variant).
+
+    Returns:
+        The signed MW over capacity on the dense grid.
     """
     out = np.zeros(size, dtype=np.float32)
     mine = [i for i in intervals if i.series == series_id]
@@ -150,7 +153,7 @@ def causal_array(
 
 def booster(*, arm: str, site: str, refit: datetime) -> xgb.Booster:
     """Return a fitted booster, loaded once per process."""
-    cache: dict = _STATE.setdefault("boosters", {})  # ty: ignore[invalid-assignment]
+    cache: dict = _STATE.setdefault("boosters", {})
     path = fitting.booster_path(arm=arm, site=site, refit=refit)
     if path not in cache:
         model = xgb.Booster()
@@ -165,7 +168,7 @@ def booster(*, arm: str, site: str, refit: datetime) -> xgb.Booster:
 
 def run_frame(*, run: datetime, series_id: int, row: dict) -> pl.DataFrame:
     """Return a run's member rows for one series with derived columns, kept for later shapes."""
-    cache: dict = _STATE.setdefault("frames", {})  # ty: ignore[invalid-assignment]
+    cache: dict = _STATE.setdefault("frames", {})
     key = (run, series_id)
     if key not in cache:
         if len(cache) > 400:
@@ -302,7 +305,7 @@ def forecast_cell(
     return rows
 
 
-def run_batch(job: tuple[int, list[Event], str]) -> str:
+def run_batch(job: tuple[int, list[Event], Shape]) -> str:
     """Inject one batch with one shape, forecast its cases, and write the cells.
 
     Args:
@@ -312,8 +315,8 @@ def run_batch(job: tuple[int, list[Event], str]) -> str:
         A progress line.
     """
     seed, batch, shape = job
-    out_dir: Path = _STATE.get("out_dir", OUT_DIR)  # ty: ignore[invalid-assignment]
-    variants: tuple = _STATE.get("variants", VARIANTS)  # ty: ignore[invalid-assignment]
+    out_dir: Path = _STATE.get("out_dir", OUT_DIR)
+    variants: tuple = _STATE.get("variants", VARIANTS)
     target = out_dir / f"cells_{shape}_{seed}.parquet"
     if target.exists():
         return f"{target.name} exists"
@@ -321,12 +324,12 @@ def run_batch(job: tuple[int, list[Event], str]) -> str:
     state = _STATE["harness"]
     series, arrays, _ = fitting.context()
     rows_of = {int(r["time_series_id"]): r for r in series.iter_rows(named=True)}
-    panel = state["panel"]  # ty: ignore[invalid-argument-type]
+    panel = state["panel"]
     injection = inject_shaped(
         power=panel["power"], events=batch, seed=seed, shape=shape, shares=state["shares"]
-    )  # ty: ignore[invalid-argument-type]
+    )
     residual = injection.fast_residual(panel["residual"])
-    offset = injection.fast_residual(state["offset_panel"]["residual"])  # ty: ignore[invalid-argument-type]
+    offset = injection.fast_residual(state["offset_panel"]["residual"])
     powers = {
         sid: injected_arrays(
             site_row=rows_of[sid],
@@ -340,7 +343,7 @@ def run_batch(job: tuple[int, list[Event], str]) -> str:
     origins = [
         o
         for o in common.origins_of_subset(subset="gap")
-        if _STATE.get("origin_ok", lambda _: True)(o)  # ty: ignore[call-non-callable]
+        if _STATE.get("origin_ok", lambda _: True)(o)
     ]
     causal_cache: dict[int, list[causal.CausalInterval]] = {}
     for origin in origins:
@@ -359,7 +362,7 @@ def run_batch(job: tuple[int, list[Event], str]) -> str:
                 state=state,
                 residual=residual,
                 offset=offset,
-                cut=cut,  # ty: ignore[invalid-argument-type]
+                cut=cut,
             )
         intervals = causal_cache[cut]
         for event, sid, (family, hours) in todo:
@@ -476,7 +479,7 @@ def init_worker(only_caus: bool = False) -> None:
         _STATE["variants"] = tuple(v for v in VARIANTS if v[2] in ("caus", "cmax"))
     fitting.context()
     _STATE["harness"] = harness.make_state()
-    check_alignment(state=_STATE["harness"])  # ty: ignore[invalid-argument-type]
+    check_alignment(state=_STATE["harness"])
 
 
 def main() -> None:

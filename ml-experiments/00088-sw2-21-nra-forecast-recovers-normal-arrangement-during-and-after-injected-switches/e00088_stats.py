@@ -200,6 +200,9 @@ def contrast(
         arm_b: A key of `ARMS`.
         metric: One of `METRICS`.
         level: The interval's coverage in percent.
+
+    Returns:
+        The weighted mean difference and its interval.
     """
     column = f"d_{metric}_{arm_a}_{arm_b}"
     diff = frame.with_columns(

@@ -101,6 +101,9 @@ def corrected(*, frame: pl.DataFrame, source: str) -> pl.DataFrame:
     Args:
         frame: A frame from `add_lags` that holds the source's `<source>_mw_*` columns.
         source: The source whose MW is used.
+
+    Returns:
+        The frame with corrected lags and the MW columns.
     """
     moved = [f"{source}_{name}" for name in MW_COLUMNS]
     return frame.with_columns(

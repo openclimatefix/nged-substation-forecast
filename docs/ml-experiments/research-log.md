@@ -123,6 +123,8 @@ the maintainer to confirm.
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
 | [00088 - Normal running arrangement forecast on injected switches, SW2-21](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md) | When a Primary substation is inside a switching transfer or has just left one, does the NRA forecast recover the true unmodified power, with the MW from the injection and from the refit-offset neighbour-count detector run only on data before the origin? | Inconclusive: with the true MW, a booster trained on NGED's logged transfers closes 83% (70% to 91%) of the error a transfer adds; with the MW from the refit-offset neighbour-count detector as built, a booster trained on that detector's transfers closes 16% (-17% to 67%), -0.149 points of capacity against the plain forecast (98.75% interval -1.174 to +0.148) | Not for production | 2026-10-18 |
+| [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
+| [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2129,3 +2131,50 @@ whole year).
   during and after injected switches?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1328).
 
 ![Error by time since the transfer began](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/figure_1.svg)
+
+### 00091: a probability that a past half-hour lies inside a switching period
+
+**A probability built from the causal switching detector is not reliably better than the
+detector's yes-or-no flag, and against NGED's switching logs it has almost no skill, so the verdict
+is inconclusive.** The experiment injected 839 transfers of known size and timing (and 183 lasting
+1 to 60 days) into the power of 16 Primary substations. For each half-hour of the 7 days before a
+forecast origin, it scored the probability that the half-hour lies inside an abnormal running
+arrangement.
+
+- **Headline result:** the calibrated score of the latest candidate (the most recent interval the
+  detector proposes) has a Brier score 3.3% below the flag (97.5% interval -7.6% to +1.6%), against
+  a 20% threshold. In a post hoc subset that drops transfers whose donor substation steps by under 4
+  noise units, the gain is 11.2% (-20.3% to -2.0%).
+- **Finding for later experiments:** a rule that widened the forecast's uncertainty bands using this
+  probability would do so for only about 8% of the half-hours that NGED's logs mark as switching
+  (the detector flags 1,607 of 19,099).
+- **Duration:** area under the curve (0.5 is no skill) is 0.81 to 0.86 for injected transfers under
+  14 days and 0.67 to 0.68 over 14 days.
+- **Next:** one option is an input that measures how unusual the recent lag power is, which needs
+  no switching label (experiment 90).
+- **Write-up and pull request:**
+  [result](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md),
+  [PR #1333 (Experiment 91: can the causal switching detector give a calibrated probability of an
+  abnormal running arrangement?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1333).
+
+![Change in Brier score against the yes-or-no flag](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/figure_1.svg)
+
+### 00092: how has Primary demand drifted since 2022? (LV0)
+
+**Primary substation demand has drifted since 2022, differently in each substation, but a plain
+level shift does not explain why longer training history or pooled XGBoost models score worse.** We
+measured the residual (observed power minus the forecast of experiment 17's XGBoost model, frozen in
+2022) in the stored forecasts of six experiments, in percentage points of effective capacity
+("points"). Of 13 Primary substations with at least 24 months of data, 12 drift by at least 1 point
+a year in some hours of the day. The April-to-September midday residual falls by 1.3 points a year
+(95% interval -2.3 to -0.9), which may reflect growing embedded solar output (untested). The extra
+loss from all history over a 12-month window tracks each series' level change at r = 0.70, but only
+through one series; in the other 12 series r = -0.03. The extra bias of pooled models does not
+follow each series' level (r = 0.13). Weekly refits gain 0.017 points of mean pinball loss over
+monthly refits, and the gain was larger only in the 3 series with the steepest all-hours slope. The
+experiment AGE1 (does an old training year still hurt once its level is removed) should run before
+LV1 (level-normalised long history).
+
+- **Write-up:** [the full result page](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md).
+
+![Drift by hour band and season](00092-lv0-drift-diagnostics-on-stored-predictions-demand/figure_1.svg)
