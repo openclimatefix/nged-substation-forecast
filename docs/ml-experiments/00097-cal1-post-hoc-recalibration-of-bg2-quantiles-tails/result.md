@@ -1,7 +1,7 @@
 ---
 id: "00097"
 slug: cal1-post-hoc-recalibration-of-bg2-quantiles-tails
-status: planned
+status: done
 size: medium
 hypothesis: >-
   A post-hoc recalibration of the stored quantiles of the best-guess forecast (BG2, experiment 87),
@@ -39,126 +39,138 @@ metric: >-
   mode, Curtailment Limit 0), reported descriptively because 2 nodes hold too few events to rank
   arms.
 code: ml-experiments/00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/
+verdict: refuted
+verdict_note: >-
+  No arm passed both pre-registered tests. The tests are strict against the sampling noise of 9
+  scored months, so the experiment shows that the stored tails are already close to nominal, and
+  cannot show that any recalibration improves them.
+best_arm: >-
+  None passed. Arm 6 (stored body plus Pareto tails) lowered the Primary quantile score by 0.00009
+  points of capacity (95% interval -0.00015 to -0.00001) in the 12 to 36 hour band, and kept the
+  centre unchanged by construction.
+headline: >-
+  The stored best-guess quantiles cover the lower tail too widely (q05 covers 0.035) and the upper
+  tail slightly too narrowly (q95 covers 0.938), at 12 to 36 hours for Primary substations, and
+  no post-hoc recalibration fitted on earlier months moved coverage by more than its own interval.
+lessons: >-
+  The tail error is mostly drift, not a fixed shape: the coverage of q95 swung from 0.88 to 0.97
+  between months, and the stored median covers only 0.45. A calibration table fitted on earlier
+  months cannot follow that drift. A global factor of 1.15 is worse than doing nothing.
 production_status: not-for-production
 adopted_in: none
+advice:
+  - >-
+    Do not apply the global spread factor of 1.15 to the best-guess quantiles: it moves q05 coverage
+    from 0.035 to 0.022 and raises the Primary quantile score by 0.00032 (figures 1 and 3).
+  - >-
+    Do not fit Student-t or skew-normal distributions to the whole forecast: they raise the Primary
+    quantile score by 0.00055 and 0.00135 and plan 16 to 24 times more curtailed energy at the
+    scaled limit of 0.9 (figure 3, curtailment bullets).
+  - >-
+    Try to correct the bias of the median before the tails: the stored median covers 0.45 for
+    Primary and 0.43 for supply points, and only the conformal shift moves it (figure 4).
+  - >-
+    Test a calibration that tracks level and spread over a short recent window, or an online
+    update, rather than another static table: coverage by month swings more than any arm's
+    correction (by-month bullet).
+  - >-
+    Judge any tail recalibration over at least 2 years of scored runs: 9 months give intervals of
+    plus or minus 0.02 on q95 coverage, wider than the 0.01 bar (figure 1).
 ---
 
 # Experiment 97: which post-hoc recalibration of the best guess fixes its tails
 
-**Status: planned. This page is the plan and is rewritten as the write-up once the scoring has
-run.** The sections below are fixed before any recalibrated number exists.
+**Take-home: the best guess's stored tails are already close to nominal, and a calibration table
+fitted on earlier months does not reliably improve them.** At 12 to 36 hours lead for Primary
+substations, the stored q05 covers 0.035 of measurements (nominal 0.05) and q95 covers 0.938
+(nominal 0.95), so the lower quantile sits too far out and the upper quantile slightly too close in.
+Every recalibration that works from stored quantiles moved those numbers by at most 0.013, which is
+less than the interval of plus or minus 0.02 that 9 months of data give. The bigger problem is
+drift: the coverage of q95 swung between 0.88 and 0.97 from month to month, and the stored median
+covers only 0.45, so the forecasts sit slightly low. The next experiment should therefore correct
+the median and track recent spread, not refit another static table.
 
-## Question
+We asked whether the stored quantiles of the weekly-retrained best-guess forecast (BG2, experiment
+87) can be recalibrated after the fact. For each month from October 2025 to June 2026 we fitted nine
+recalibrations on every earlier measurement and scored them on the runs of that month, for 16
+Primary substations and 4 bulk or grid supply points. **Verdict: refuted by the pre-registered
+rule.** No arm brought the coverage of q01, q05, q95, and q99 within 0.01 of nominal in both classes
+and kept the centre of the distribution unchanged.
 
-NGED uses these forecasts to decide when to curtail generators, so the outer quantiles matter most.
-Earlier experiments found the tails of the older forecasts too narrow, and the global spread factor
-of 1.15 is one number for every level, lead, and series. This experiment asks which recalibration of
-the best guess's stored quantiles gives the best tail coverage without hurting the centre. It reuses
-stored predictions only, so nothing is refitted and the experiment runs on 4 CPU cores.
+## Figures
 
-## Data and rows
+![Primary tail coverage](figure_1_primary_tail_coverage.svg)
 
-- **Stored sets:** `p_s4_weekly` (16 Primary substations, 292 daily runs, 2025-07-02 to 2026-06-30)
-  and `b_weekly` (2 bulk supply points and 2 grid supply points, same runs), from experiment 87
-  (BG2). Both hold q01, q05 to q95, and q99 as fractions of capacity, plus `actual` and
-  `lead_hours`. `p_s2_stack` is a second Primary set and runs through the same code as a
-  robustness check. BG2's solar and wind sets had not landed when this plan was written; they join
-  as further classes when they exist, and the write-up says which classes it covers.
-- **Rows dropped:** rows whose `actual` is NaN (11,189 Primary and 17,311 supply-point rows in
-  the sets read), because a NaN measurement has no coverage.
-- **Weekly retraining** produced the stored sets, so absolute scores are production-style.
-- **Lead bands:** under 12 hours, 12 to 36 hours (the curtailment band), 36 to 96 hours, and 96
-  hours or more.
-- **Classes:** Primary, and bulk or grid supply point (4 series, pooled for calibration).
+![Supply-point tail coverage](figure_2_supply_point_tail_coverage.svg)
 
-## Rolling origin, no peeking
+![Quantile score change](figure_3_quantile_score_change.svg)
 
-The scored months are October 2025 to June 2026 (9 months, by month of `power_fcst_init_time`).
-For a scored month M, every adjustment is fitted on the rows whose `valid_time` is before the
-first instant of M, so a run made in an earlier month whose valid times reach into M never leaks
-its measurements into M. The window expands: it holds every earlier row, so a fit for a winter month
-includes summer rows, and the write-up reports coverage by scored month to show any drift. The
-first three months (July to September 2025) only supply calibration data. A scored run is one whose
-`power_fcst_init_time` is in M. The stored rows are out of sample by construction, because weekly
-retraining fits each run's model on data before the run's initialisation time. Every arm is scored
-on the same rows.
+![Reliability](figure_4_reliability.svg)
 
-## Arms
+## Design
 
-All arms keep `q50` as stored, sort the output quantiles so they never cross, and fit per class and
-lead band unless stated.
+- **Stored sets:** `p_s4_weekly` (Primary) and `b_weekly` (supply points) of experiment 87, 292
+  daily runs from 2025-07-02 to 2026-06-30, weekly retraining, 3,984,540 rows after dropping rows
+  with no measurement. Scored months October 2025 to June 2026, calibration window expanding from
+  July 2025. No weather is read at lag times: the experiment uses only stored predictions.
+- **Arms:** 0 as stored; 1 global factor 1.15; 2 scale per level; 3 scale per level, lead band, and
+  class; 4 isotonic level remapping; 5 split-conformal shift; 6 stored q10 to q90 plus Pareto tails;
+  7a Student-t; 7b skew-normal. Arms 8 and 9 are post hoc: arms 3 and 5 refitted on the last 90
+  days only. Levels 0.5%, 99.5%, 0.1%, and 99.9% are extrapolated (arms 0 to 5) or fitted (arms 6
+  and 7).
+- **Leakage guard:** the script asserts, before any number prints, that every calibration row's
+  valid time precedes the first scored run of its month. A scale factor hit its limit of 0.5 to 5 in
+  44 of 1,440 fits.
+- **Classes:** the supply-point class pools 2 bulk and 2 grid supply points. No solar or wind
+  forecast set existed when the experiment ran, so neither class is covered.
 
-0. **As stored.**
-1. **Global spread factor 1.15** about the median, for every level.
-2. **Scale factor per quantile level:** the adjusted quantile is `q50 + k (q_level - q50)`, on both
-   sides of the median, and `k` is the value that makes the calibration coverage of the adjusted
-   quantile equal its nominal level (the quantile of `(actual - q50) / (q_level - q50)` at that
-   level for levels above 0.5, and at one minus that level below 0.5; rows where the stored
-   quantile equals `q50` are skipped). One `k` per level, pooled over lead bands and series within
-   a class, limited to 0.5 to 5; the write-up counts how often the limit binds. Stored quantiles are
-   sorted before fitting.
-3. **Scale factor per level, lead band, and class.**
-4. **Level remapping:** isotonic regression of calibration coverage on nominal level, inverted to
-   find the stored level whose empirical coverage equals each target (the lowest level of a flat
-   segment); the stored quantile function is interpolated linearly in the level, and
-   extrapolated beyond q01 and q99 with the normal spacing of q01 and q05.
-5. **Split-conformal shift:** for each level, the additive shift equal to the calibration quantile
-   of `actual - q_level` (with the usual `ceil((n+1)p)/n` correction).
-6. **Stored body plus fitted tails:** q10 to q90 stay as stored. At each end, a generalised Pareto
-   distribution is fitted to the calibration excesses beyond the stored q95 (and q05), scaled by
-   the stored spread, pooled over the series of a class, with the exceedance probability `p_u`
-   taken from the calibration share of rows beyond the stored q95 rather than assumed to be 0.05.
-   A level with tail probability `1 - p` below `p_u` is `q95 + spread * GPD quantile at 1 -
-   (1 - p) / p_u`, which gives q95, q99, q99.5, and q99.9 (and the mirrored lower levels); a level
-   with `1 - p` at or above `p_u` keeps its stored value. The shape parameter is limited to -0.25 to
-   0.5.
-7. **Fully parametric:** a Student-t (7a) and a skew-normal (7b) fitted to the calibration
-   residual `(actual - q50)` divided by the stored interquartile spread over 1.349, subsampled to
-   at most 20,000 rows per fit with a fixed seed. Logit-normal for bounded generator output is not
-   run, because no generator sets exist yet.
+## Results
 
-Levels beyond q01 and q99 (0.5%, 99.5%, and 0.1%, 99.9%) come from the normal extrapolation of
-arms 0 to 5 and from the fitted tails of arms 6 and 7. A comparison at those levels therefore
-compares extrapolation rules as well as calibration methods. The 0.1% and 99.9% levels are
-reported with their exceedance counts and are not part of the decision rule.
+- **Stored forecast, Primary, 12 to 36 hours:** coverage of q01, q05, q95, q99, and q99.5 is 0.0037,
+  0.0346, 0.9383, 0.9905, and 0.9934.
+- **Stored forecast, supply points, 12 to 36 hours:** coverage of q01, q05, q95, and q99 is 0.0039,
+  0.0362, 0.9323, and 0.9939, from 44 to 347 days with an exceedance.
+- **Best calibrated arm for tail coverage:** arm 3 gives Primary coverage of 0.0100, 0.0478, 0.9397,
+  and 0.9855, but supply-point q95 coverage of 0.9248, which is 0.025 from nominal.
+- **Tail test:** all 9 arms fail at least one of the 8 decision cells (4 levels, 2 classes). Every
+  cell has at least 30 days with an exceedance except the supply-point q01 and q99 cells of arm 1.
+- **Centre test:** arms 0 and 6 pass; arms 1 to 5, 7a, and 7b fail it on the all-leads centre score
+  (upper bound above 1% of the stored centre score). At 12 to 36 hours the Primary centre changes
+  by at most 0.0003 for arms 1 to 6.
+- **Quantile score, Primary, 12 to 36 hours (minus arm 0, points of capacity):** arm 1 +0.00032
+  (+0.00021 to +0.00043), arm 3 -0.00002 (-0.00011 to +0.00009), arm 5 -0.00002, arm 6 -0.00009
+  (-0.00015 to -0.00001), arm 7a +0.00055 (+0.00044 to +0.00066), arm 7b +0.00135 (+0.00104 to
+  +0.00167). The stored forecast's score is 0.01882.
+- **Beyond q99:** arm 6 gives Primary coverage of 0.9949 at 99.5% (stored 0.9934) and 0.0064 at
+  0.5% (stored 0.0024, nominal 0.005); its intervals overlap the stored forecast's. Supply-point
+  q99 coverage falls from 0.9939 to 0.9772 under arm 6.
+- **Median bias:** the stored q50 covers 0.452 (Primary) and 0.427 (supply points) at 12 to 36
+  hours. Only arm 5 moves it, to 0.487 and 0.442; the post hoc arm 9 gives 0.501 and 0.479.
+- **Drift:** stored Primary q95 coverage by month ranges from 0.880 (January 2026) to 0.974 (April
+  2026), and q05 coverage from 0.018 (March 2026) to 0.063 (April 2026).
+- **Post hoc arms 8 and 9:** the last-90-days window does not beat the expanding window: Primary
+  q05 coverage 0.051 for both, q95 0.945 and 0.943, quantile score +0.00009 and -0.00002 against
+  arm 0.
+- **Curtailment at the scaled limit of 0.9 (node-only, two bulk supply points, GBP 2,000 per MWh,
+  calibration to history, not a saving):** 17 half-hours of export beyond the limit, all at one
+  node. Avoidable cost is GBP 618,171 for the stored forecast and GBP 629,684 to 668,866 for arms 1
+  to 5, with every interval from 0 upwards, so the arms are not separable. Arms 7a and 7b cost GBP
+  2.36 million and GBP 3.12 million because they plan 911 and 1,364 MWh of curtailment against 57.5
+  MWh for the stored forecast and 33.7 MWh needed.
 
-## Scoring
+## Caveats
 
-- **Tail table:** coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99 by arm, lead band, and
-  class, with a 95% interval from resampling whole months (`studies.tail_calibration`). Coverage at
-  0.005 and 0.995 is reported with the number of exceedances and an interval from the same month
-  resampling, which is wide because 9 months hold few exceedances. Every cell also reports the
-  number of days holding an exceedance, as the count of independent events. A 9-block month
-  resampling gives indicative intervals only.
-- **Coverage by scored month** for the 12 to 36 hour band, and the centre score by lead band, so a
-  hidden worsening or a seasonal drift is visible.
-- **Quantile score** over the 11 delivered levels, and the centre score defined above, with
-  paired month-resampled intervals against arm 0.
-- **Curtailment cost:** the two bulk supply points (Boston and Skegness) scored through
-  `studies.node_curtailment` in node-only mode, at the scaled limit of 0.9 times the maximum export
-  before the scored period, with the sweep at 0.75 and 0.5, the event count first, and the perfect
-  forecast as reference. Bicker Fen and Walpole are not scored because their export signs are
-  unconfirmed. The two supply points hold few events (19 half-hours at 0.9 over a full year), so the
-  result shows the arithmetic and cannot rank arms.
-- **Leakage check:** the report script asserts, before any number prints, that the largest
-  calibration `valid_time` is before the first scored `power_fcst_init_time` of each scored month.
+- **Few months:** 9 scored months give coarse intervals, so a pass or fail at 0.01 is partly noise.
+- **Classes missing:** solar and wind sets did not exist, and the supply-point class holds 4 series.
+- **Exploratory:** only the 12 to 36 hour cells are decision cells; every other number is
+  exploratory, and arms 8 and 9 are post hoc.
+- **Extrapolation:** arms 0 to 5 read levels beyond q01 and q99 off a normal extrapolation, so those
+  comparisons are of extrapolation rules.
 
-## Size and process
+## What to try next
 
-- **Stored:** nothing outside `data/ml-experiments/`; no schema changes.
-- **Serving path:** untouched; the experiment reads stored predictions.
-- **Degradation rule:** untouched.
-- **More than one design:** yes (eight arms are the designs), which is why the arms are all run.
-- **Callers across code:** none; the code is one folder under `ml-experiments/` plus the existing
-  `studies` machinery.
-
-The size is medium: one Sonnet plan review, Sonnet implementation, one Sonnet code review for
-leakage, and one Sonnet prose review.
-
-## Earlier advice followed
-
-- Report tail coverage and pinball at 0.01, 0.05, 0.95, and 0.99 next to the headline score
-  (maintainer, 2026-10-17).
-- Headline the scaled limit of 0.9 for curtailment and show the real limit only as reference
-  (curtailment reporting rule, 2026-10-18).
-- Experiment 49's advice to keep the spread factor at 1.15 is the baseline arm 1, not an assumption.
+- **Correct the median first:** shift q50 by a recent-window bias and re-check coverage of every
+  level.
+- **Track drift:** test an online or recent-window update of level and spread over at least 2
+  years of scored runs.
+- **Wait for the solar and wind sets** before judging the Pareto tails of arm 6.
