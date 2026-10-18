@@ -227,4 +227,3 @@ follows.
 - **Compute.** The pilot forecast 40 cases with all 8 variants in 9 s, so all events and 5 shapes
   are scored. Each forecast uses 11 of the 51 ENS members (the control member and every fifth),
   leads up to 10 days, and the spread factor of 1.15 of experiment 33 on the quantiles.
-
