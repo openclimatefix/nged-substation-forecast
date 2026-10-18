@@ -1557,17 +1557,19 @@ contrasts that are 0.05 points or larger.
 
 ### 00094: does an explicit heating term lower the cold-hour error? (HT1)
 
-**A heating term in the XGBoost base margin lowers the cold-hour error a little and leaves the cold-
-hour tail as badly calibrated as before.** For the 16 Primary substations, the term lowered the
-quantile score by 0.143 points of capacity in cold hours at leads up to 48 hours (98.75% interval
--0.203 to -0.034), under the 0.3 threshold fixed in advance, and by 0.022 over all rows (-0.042 to
-+0.000). The share of observations above the q95 forecast in those hours fell from 0.167 to 0.162,
-and the forecast stayed about 2.7 points too low in cold hours at long leads. A decreasing monotone
-constraint on temperature gained half as much (0.074, -0.111 to -0.020) and adds no serving column.
-Added to experiment 64's solar term at the 5 Primaries that have one, the heating term lowered the
-all-rows score by 0.050 (-0.065 to -0.036). The 16-substation arms have no solar term, and block B
-covers only the 5 series and 73 runs. The experiment did not locate the remaining cold-hour error;
-the ENS temperature forecast is one untested candidate.
+**Giving the XGBoost demand model an explicit heating term lowered its error in cold weather by a
+little, and did not fix the cold-weather tail.** For the 16 Primary substations, the heating term
+lowered the quantile score (an error measure in points of capacity) by 0.143 points in cold hours
+(ensemble-mean forecast temperature below 3 °C) at leads up to 48 hours (98.75% interval -0.203 to
+-0.034), under the 0.3 threshold fixed in advance, and by 0.022 over all rows (-0.042 to +0.000).
+The share of observations above the q95 forecast, which a calibrated forecast would hold at 0.05,
+fell from 0.167 to 0.162 in those hours. The median forecast stayed about 2.7 points of capacity too
+low in cold hours at leads over 48 hours. A decreasing monotone constraint on temperature gained
+about half as much (0.074, -0.111 to -0.020) and needs no new serving column. Added to experiment
+64's solar term at the 5 Primaries that have one, over 73 forecast runs, the heating term lowered
+the all-rows score by 0.050 (-0.065 to -0.036). The 16-substation arms have no solar term. The
+experiment did not locate the remaining cold-hour error; the ENS temperature forecast is one
+untested candidate.
 
 - **Write-up:** [the full result page](00094-explicit-heating-offset-primary-demand/result.md).
 

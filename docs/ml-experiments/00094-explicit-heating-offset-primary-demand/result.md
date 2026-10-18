@@ -90,26 +90,31 @@ advice:
 
 # Experiment 94: does an explicit heating term lower the cold-hour error? (HT1)
 
-**A heating term in the XGBoost base margin lowers the forecast error in cold hours only a little,
-and leaves the cold-hour tail as badly calibrated as before.** The 16 Primary substation arms in
-this experiment have no solar term, and the solar-plus-heating contrast (block B) covers only the 5
-Primaries that have one and the 73 runs of `fold_a_every5d_v1`, so the two blocks do not share
-rows. In cold hours at leads up to 48 hours the quantile score (an error measure in points of a
-substation's capacity; lower is better) fell by 0.143 points, under the 0.3 threshold fixed in
-advance. The share of observations above the q95 forecast, 0.167 in those hours, fell by 0.005. A
-decreasing monotone constraint on temperature gained about half as much. This experiment did not
-locate the remaining cold-hour error. One untested candidate is the ENS temperature forecast, so
-the next experiment could compare the forecast temperature with the observed temperature in cold
-hours by lead.
+**Giving the XGBoost demand model an explicit heating term lowered its error in cold weather by a
+little, and did not fix the cold-weather tail.** We asked whether telling the model about heating
+explicitly helps when it is cold. XGBoost is a forecasting method built from decision trees, and a
+tree predicts a constant for temperatures colder than any hour it was trained on. For each of 16
+Primary substations (which step 33 kV down to 11 kV) and each hour of the day, we fitted by least
+squares how much a substation's demand, as a fraction of its capacity, rises per degree Celsius
+below 15.5 °C, using the training rows only. We then gave XGBoost the product of that slope and the
+degrees below 15.5 °C as a base margin (a fixed starting prediction supplied for each row). We
+compared the result with the same XGBoost model without the term on 365 daily forecast runs from
+July 2025 to June 2026.
 
-We asked whether telling the XGBoost demand model about heating explicitly helps in cold weather.
-For each of 16 Primary substations (which step 33 kV down to 11 kV) and each hour of the day, we
-fitted by least squares how much power over capacity rises per degree below 15.5 C, on the training
-rows only, and gave the product of that slope and the degrees below 15.5 C to XGBoost as a base
-margin (a fixed starting prediction supplied for each row). Trees cannot predict beyond the
-coldest hour they have seen, so a term that is linear in temperature could cover the colder hours.
-We compared the result with the same model without the term on 365 daily forecast runs from July
-2025 to June 2026. The verdict is `small gain`.
+The quantile score is an error measure for a probabilistic forecast, in points of a substation's
+capacity (lower is better). In cold hours (ensemble-mean forecast temperature below 3 °C from the
+ECMWF ensemble, ENS) at leads up to 48 hours, the heating term lowered the score by 0.143 points.
+The threshold fixed in advance for a worthwhile gain was 0.3 points, so the verdict is `small gain`.
+The q95 forecast should be exceeded by 5% of observations. In those hours it was exceeded by 16.7%
+of observations without the term and 16.2% with it. A decreasing monotone constraint on temperature
+gained about half as much as the heating term. This experiment did not locate the remaining
+cold-hour error. One untested candidate is the ENS temperature forecast, so the next experiment
+could compare the forecast temperature with the observed temperature in cold hours by lead.
+
+A second comparison, block B, adds the heating term to experiment 64's solar term. It covers only
+the 5 Primaries that have a solar term and the 73 forecast runs of `fold_a_every5d_v1`, and it
+lowered the all-rows score by 0.050 points. The 16-substation arms have no solar term, so the two
+blocks do not share rows.
 
 ![Contrasts of the arms against the reference](figure_1.svg)
 
@@ -159,8 +164,8 @@ We compared the result with the same model without the term on 365 daily forecas
 | Mild winter | `ht` | 0.122 | 0.033 | 1.214 |
 | Mild winter | `mono` | 0.120 | 0.030 | 1.240 |
 
-- **Bias (observed minus median, points of capacity) in cold hours:** at leads up to 24 hours
-  1.80 (`ref`), 1.73 (`ht`), 1.61 (`mono`); at 6 to 10 days 3.31, 3.14, 3.27; beyond 10 days 2.89,
+- **Bias (observed minus median, points of capacity) in cold hours:** over 48 hours 2.90, 2.70,
+  2.81; at leads up to 24 hours 1.80 (`ref`), 1.73 (`ht`), 1.61 (`mono`); at 6 to 10 days 3.31, 3.14, 3.27; beyond 10 days 2.89,
   2.57, 2.78. The bias is positive at every lead, so the forecast is too low in the cold.
 - **Exploratory contrasts (95%):** `ht` in cold hours at all leads -0.074 (-0.138 to +0.007), over
   48 hours -0.064 (-0.132 to +0.030), with cold hours defined by ERA5 temperature at leads up to 48
@@ -189,9 +194,9 @@ We compared the result with the same model without the term on 365 daily forecas
   tail reads are not reported, because the nine-level model stops at q95. The optional arm scaled
   by Low Carbon Technology heat-pump counts was skipped, because the data needs a portal account.
 - **Caveats:** in block B the heating coefficients are fitted on net power without removing the
-  solar margin first, so on sunny winter days the two terms may share some of the same effect. One
-  seed in block A (experiment 85 found repeat fits move the score by 0.000 to
-  0.001). Three ISO weeks (2025-W47, 2026-W01, and 2026-W02) hold 66% of the 28,344 cold cases at
+  solar margin first, so the heating coefficient may absorb part of the demand reduction that the
+  solar margin already models. Block A used one seed. Experiment 85 found that repeat fits change
+  the score by 0.000 to 0.001. Three ISO weeks (2025-W47, 2026-W01, and 2026-W02) hold 66% of the 28,344 cold cases at
   leads up to 48 hours, and the C1 and C3 intervals rest on 21 weeks of one winter. The other
   intervals rest on 53 weeks (C2, C4), 23 weeks (cold, all leads), 13 weeks (mild winter), and 15
   weeks (June to August).
@@ -199,8 +204,8 @@ We compared the result with the same model without the term on 365 daily forecas
   fall of at least 0.03 failed (0.005, from 0.167, not the 0.18 predicted). An all-rows change of
   at most +0.01 passed (-0.022). A long-lead bias fall of under half passed (5% to 11%). A `mono`
   gain of at most a third of the offset's failed (0.074 against 0.143, 52%).
-- **What the result rules out:** a heating degree-hour term as the fix for the cold-hour tail. It
-  leaves the exceedance of q95 at 16% to 17% of cold hours.
+- **What the result shows:** in this winter's data, the heating degree-hour term did not repair the
+  cold-hour tail. The heating term leaves the exceedance of q95 at 16% to 17% of cold hours.
 - **What to try next:** compare the forecast temperature with the observed temperature in cold
   hours by lead; test the monotone constraint inside the production recipe, since it adds no
   serving column; a second winter is needed before any decision to port the heating term.
