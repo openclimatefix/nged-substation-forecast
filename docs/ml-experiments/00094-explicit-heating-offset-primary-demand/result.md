@@ -165,7 +165,8 @@ blocks do not share rows.
 | Mild winter | `mono` | 0.120 | 0.030 | 1.240 |
 
 - **Bias (observed minus median, points of capacity) in cold hours:** over 48 hours 2.90, 2.70,
-  2.81; at leads up to 24 hours 1.80 (`ref`), 1.73 (`ht`), 1.61 (`mono`); at 6 to 10 days 3.31, 3.14, 3.27; beyond 10 days 2.89,
+  2.81; at leads up to 24 hours 1.80 (`ref`), 1.73 (`ht`), 1.61 (`mono`); at 6 to 10 days 3.31,
+  3.14, 3.27; beyond 10 days 2.89,
   2.57, 2.78. The bias is positive at every lead, so the forecast is too low in the cold.
 - **Exploratory contrasts (95%):** `ht` in cold hours at all leads -0.074 (-0.138 to +0.007), over
   48 hours -0.064 (-0.132 to +0.030), with cold hours defined by ERA5 temperature at leads up to 48
@@ -196,7 +197,8 @@ blocks do not share rows.
 - **Caveats:** in block B the heating coefficients are fitted on net power without removing the
   solar margin first, so the heating coefficient may absorb part of the demand reduction that the
   solar margin already models. Block A used one seed. Experiment 85 found that repeat fits change
-  the score by 0.000 to 0.001. Three ISO weeks (2025-W47, 2026-W01, and 2026-W02) hold 66% of the 28,344 cold cases at
+  the score by 0.000 to 0.001. Three ISO weeks (2025-W47, 2026-W01, and 2026-W02) hold 66% of the
+  28,344 cold cases at
   leads up to 48 hours, and the C1 and C3 intervals rest on 21 weeks of one winter. The other
   intervals rest on 53 weeks (C2, C4), 23 weeks (cold, all leads), 13 weeks (mild winter), and 15
   weeks (June to August).
