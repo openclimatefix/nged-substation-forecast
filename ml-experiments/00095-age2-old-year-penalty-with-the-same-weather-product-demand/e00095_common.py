@@ -1,0 +1,539 @@
+"""Paths, series, grids, lags, and levels shared by the scripts of experiment 00095.
+
+The experiment fits frozen demand models on one year of rows, with ERA5 or the ENS control member
+as the weather product, and scores them on 2025-07 to 2026-06
+(`docs/ml-experiments/00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md`).
+The helpers are copied from experiment 00093's `e00093_common.py`; an experiment may not import
+another experiment.
+"""
+
+import json
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from typing import Final
+
+import holidays
+import numpy as np
+import polars as pl
+from studies.solar import azimuth, zenith
+from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR, study_dir_for
+
+EXPERIMENT_ID: Final[int] = 95
+SLUG: Final[str] = "age2-old-year-penalty-with-the-same-weather-product-demand"
+ROW_SET_ID: Final[str] = "age1_daily_2025_07_to_2026_06_v1"
+"""Experiment 93's row set: all 365 daily 00:00 UTC runs of the validation year, valid times before
+the hold-out. Experiment 95 reuses experiment 93's control-member forecasts, so it keeps the id."""
+SEED: Final[int] = 0
+
+WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}" / "work"
+"""Intermediate tables and boosters; private and never committed."""
+E81_FRAMES_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00081-r11-control-member-second-validation-year-demand"
+    / "work"
+    / "frames"
+)
+"""Experiment 00081's daily control-member demand frames, 2021-03-21 to 2024-03-31; read only."""
+AGE1_PREDS_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00093-age1-old-training-year-after-level-normalisation-demand"
+    / "work"
+    / "preds"
+)
+"""Experiment 93's forecasts, read only: the 2021-07, 2022-07, and 2024-07 control-member arms."""
+PREDS_DIR: Final[Path] = WORK_DIR / "preds"
+"""One parquet file of quantiles per arm and series, private and never committed."""
+RESULTS_DIR: Final[Path] = WORK_DIR / "results"
+CHART_DIR: Final[Path] = WORK_DIR / "charts"
+LABELS_PATH: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00041-sw2-0a-labeller-gate" / "real" / "labelled_set.parquet"
+)
+"""Experiment 41's labelled switching events and closures; read only."""
+WINDOWS: Final[dict[str, tuple[datetime, datetime]]] = {
+    "old1": (datetime(2021, 7, 1, tzinfo=UTC), datetime(2022, 6, 30, 23, 30, tzinfo=UTC)),
+    "old2": (datetime(2022, 7, 1, tzinfo=UTC), datetime(2023, 6, 30, 23, 30, tzinfo=UTC)),
+    "mid": (datetime(2023, 7, 1, tzinfo=UTC), datetime(2024, 6, 30, 23, 30, tzinfo=UTC)),
+    "recent": (datetime(2024, 7, 1, tzinfo=UTC), datetime(2025, 6, 30, 23, 30, tzinfo=UTC)),
+}
+"""Each training year: a run starts, and its valid times fall, inside the window."""
+E48_WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00048-weekly-retraining-confirmation-and-extension-demand-generators"
+    / "work"
+)
+"""Experiment 00048's intermediate tables, read only: the frames and the stored predictions."""
+FRAMES_DEMAND_DIR: Final[Path] = E48_WORK_DIR / "frames_demand"
+"""The 292 gap runs' demand frames, one `init=<date>.parquet` file per run."""
+EXPERIMENT_00034_WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00034-retraining-cadence-and-cheap-proxies-demand" / "work"
+)
+"""Experiment 00034's intermediate tables, read only."""
+AFTER_DIR: Final[Path] = EXPERIMENT_00034_WORK_DIR / "ens_after_training"
+"""The control member's daily runs from 2025-07-01 to 2026-06-29, read only."""
+DEMAND_DIR: Final[Path] = study_dir_for(study="stage1_pilot") / "demand"
+"""The stage 1 pilot's demand inputs, read only."""
+SERIES_PATH: Final[Path] = DEMAND_DIR / "inputs" / "series.parquet"
+ERA5_PATH: Final[Path] = DEMAND_DIR / "inputs" / "era5_features.parquet"
+OBSERVED_PATH: Final[Path] = DEMAND_DIR / "inputs" / "observed.parquet"
+VALIDATION_DIR: Final[Path] = DEMAND_DIR / "ens_every5d" / "val"
+"""The 73 demand frames of `fold_a_every5d_v1`, read only."""
+PILOT_TRAIN_START: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
+"""The stage 1 pilot's training file holds control-member runs from this day; experiment 81's end
+the day before."""
+ENS_TRAIN_PATH: Final[Path] = DEMAND_DIR / "ens_every5d" / "train.parquet"
+FEATURE_SET_PATH: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00005-lag-placement-stage1b-vs-stage2-demand"
+    / "work"
+    / "feature_set.json"
+)
+"""Experiment 00006's final Primary column list, as experiment 00005 froze it; read only."""
+FOLD_A_FRAMES_DIR: Final[Path] = (
+    study_dir_for(study="quick_wins_fixed_pipeline_1156") / "frames" / "combined" / "fold_a"
+)
+NGED_METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
+"""The metadata table, read only for each series' metered units."""
+"""The ENS archive's Delta table directory, one partition folder per initialisation time."""
+DROPPED_SITES: Final[frozenset[str]] = frozenset({"D7", "D20"})
+"""The battery and the biofuel generator, whose substation type is EHV Customer."""
+SUBSTATION_TYPES: Final[frozenset[str]] = frozenset({"Primary", "BSP", "GSP"})
+GROUPS: Final[tuple[str, ...]] = ("Primary", "BSP", "GSP")
+
+FIRST_RUN: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
+LAST_RUN: Final[datetime] = datetime(2026, 6, 30, tzinfo=UTC)
+EVERY5D_STRIDE_DAYS: Final[int] = 5
+PUBLICATION_DELAY: Final[timedelta] = timedelta(hours=9)
+"""`power_fcst_init_time` is the run's initialisation time plus this."""
+GRID_START: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
+GRID_END: Final[datetime] = datetime(2026, 7, 31, 23, 30, tzinfo=UTC)
+STEP: Final[timedelta] = timedelta(minutes=30)
+STEPS_PER_DAY: Final[int] = 48
+LAST_TRAINING_VALID: Final[datetime] = datetime(2025, 6, 30, 23, 30, tzinfo=UTC)
+HOLDOUT: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
+LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
+LEVEL_COLUMNS: Final[tuple[str, ...]] = (
+    "q01",
+    "q05",
+    "q10",
+    "q25",
+    "q40",
+    "q50",
+    "q60",
+    "q75",
+    "q90",
+    "q95",
+    "q99",
+)
+ATOM_MASSES: Final[np.ndarray] = np.diff(
+    np.concatenate([[0.0], (LEVELS[:-1] + LEVELS[1:]) / 2, [1.0]])
+)
+"""Probability mass of each level: the interval between the mid-points to its neighbours."""
+INNER_NINE: Final[slice] = slice(1, 10)
+"""The columns of the nine levels that earlier experiments used (0.05 to 0.95)."""
+LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("0-24 h", 0.0, 24.0),
+    ("1-2 d", 24.0, 48.0),
+    ("2-6 d", 48.0, 144.0),
+    ("6-10 d", 144.0, 240.0),
+    ("10+ d", 240.0, 10_000.0),
+)
+KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
+
+DERIVED: Final[tuple[str, ...]] = (
+    "solar_zenith",
+    "solar_azimuth",
+    "hour_local",
+    "day_of_week_local",
+    "covid_indicator",
+    "days_to_nearest_holiday",
+    "days_to_christmas",
+)
+"""Stage 1a columns computed from the timestamp and the location, not read from a weather file."""
+LOCKDOWN_START: Final[datetime] = datetime(2020, 3, 23, tzinfo=UTC)
+LOCKDOWN_END: Final[datetime] = datetime(2021, 7, 19, tzinfo=UTC)
+"""The 0/1 lockdown indicator is 1 from the first to the last of these days, inclusive."""
+HOLIDAY_YEARS: Final[range] = range(2018, 2029)
+HOLIDAY_CLIP_DAYS: Final[int] = 7
+CHRISTMAS_CLIP_DAYS: Final[int] = 14
+QUANTILE_PARAMETERS: Final[dict[str, object]] = {
+    "eta": 0.05,
+    "max_depth": 6,
+    "min_child_weight": 1,
+    "subsample": 0.8,
+    "colsample_bytree": 1.0,
+    "colsample_bynode": 1.0,
+    "tree_method": "hist",
+    "device": "cuda",
+    "objective": "reg:quantileerror",
+    "quantile_alpha": LEVELS,
+}
+"""N1's parameters (experiment 00003's, with the 9-level quantile loss); callers set `nthread`."""
+N_ROUNDS: Final[int] = 500
+RECENCY_HALF_LIFE_DAYS: Final[float] = 2 * 365.25
+SHORT_HALF_LIFE_DAYS: Final[float] = 0.5 * 365.25
+SPREAD_FACTOR: Final[float] = 1.15
+"""The calibrator spread factor of experiment 00018, applied to the demand arms."""
+CORRECTION_DAYS: Final[tuple[int, ...]] = (7, 14)
+MIN_CORRECTION_DAYS: Final[int] = 3
+TELEMETRY_DELAY: Final[timedelta] = timedelta(hours=3)
+"""A value is usable once it is this old, plus the half-hour it covers."""
+NEWEST_AGE: Final[int] = int(TELEMETRY_DELAY / STEP) + 1
+"""Half-hours between the origin and the newest usable observation (3.5 hours)."""
+LAG_COLUMNS: Final[tuple[str, ...]] = (
+    "lag_origin",
+    "lag_same_time_latest_day",
+    "lag_same_time_latest_week",
+)
+N1_EXTRA_COLUMNS: Final[tuple[str, ...]] = ("lead_hours",)
+
+
+@dataclass(frozen=True)
+class SeriesArrays:
+    """One series' arrays on the dense half-hourly grid.
+
+    Attributes:
+        features: Stage 1a's input columns, float32, one row per grid half-hour.
+        power: Observed power over effective capacity, NaN where unobserved.
+        valid_time: The grid's UTC timestamps.
+    """
+
+    features: np.ndarray
+    power: np.ndarray
+    valid_time: pl.Series
+
+
+def run_dates(*, subset: str) -> list[datetime]:
+    """Return the 00:00 UTC initialisation times of a set of daily ENS runs, sorted.
+
+    Args:
+        subset: `all` for the 365 daily runs of the validation year, `every5d` for the 73 of
+            `fold_a_every5d_v1`, or `gap` for the 292 of `fold_a_daily_gap_v1`.
+
+    Returns:
+        The runs' initialisation times.
+
+    Raises:
+        ValueError: If `subset` is not one of the three names.
+    """
+    days = (LAST_RUN - FIRST_RUN).days + 1
+    every_day = [FIRST_RUN + timedelta(days=i) for i in range(days)]
+    if subset == "all":
+        return every_day
+    on_stride = [d for i, d in enumerate(every_day) if i % EVERY5D_STRIDE_DAYS == 0]
+    if subset == "every5d":
+        return on_stride
+    if subset == "gap":
+        return [d for d in every_day if d not in set(on_stride)]
+    msg = f"unknown run subset {subset!r}"
+    raise ValueError(msg)
+
+
+def origin_of(*, run: datetime) -> datetime:
+    """Return a run's `power_fcst_init_time`: its initialisation time plus the publication delay."""
+    return run + PUBLICATION_DELAY
+
+
+def all_origins() -> list[datetime]:
+    """Return the `power_fcst_init_time` of the 365 daily runs, sorted."""
+    return [origin_of(run=run) for run in run_dates(subset="all")]
+
+
+def origins_of_subset(*, subset: str) -> list[datetime]:
+    """Return the `power_fcst_init_time` of one run subset (`all`, `every5d`, or `gap`)."""
+    return [origin_of(run=run) for run in run_dates(subset=subset)]
+
+
+def demand_frame_path(*, run: datetime) -> Path:
+    """Return the demand frame of a run: the stored one for a run of `fold_a_every5d_v1`.
+
+    Args:
+        run: The run's 00:00 UTC initialisation time.
+
+    Returns:
+        The file holding the run's 51-member rows for the 22 demand series.
+    """
+    name = f"init={run:%Y-%m-%d}.parquet"
+    if run in set(run_dates(subset="every5d")):
+        return VALIDATION_DIR / name
+    return FRAMES_DEMAND_DIR / name
+
+
+def feature_columns() -> list[str]:
+    """Return stage 1a's input columns from the frozen sweep set, calendar included."""
+    columns: list[str] = json.loads(FEATURE_SET_PATH.read_text())["columns"]
+    return columns
+
+
+def series_table() -> pl.DataFrame:
+    """Return the 20 substation series with label, group, capacity, coordinates, and H3 cell.
+
+    The coordinates never leave this process.
+
+    Returns:
+        One row per series with `time_series_id`, `site` (D1 to D22), `group`,
+        `substation_type` (Primary, BSP, or GSP), `units` (MW or MVA), `latitude`,
+        `longitude`, `h3_res_5`, and `effective_capacity_mw`.
+
+    Raises:
+        ValueError: If the table does not hold 20 series or a series is not a substation.
+    """
+    table = pl.read_parquet(SERIES_PATH)
+    metadata = pl.read_parquet(
+        FOLD_A_FRAMES_DIR / "metadata.parquet",
+        columns=["time_series_id", "substation_type", "h3_res_5"],
+    )
+    units = pl.read_parquet(NGED_METADATA_PATH, columns=["time_series_id", "units"])
+    kept = (
+        table.filter(~pl.col("site").is_in(DROPPED_SITES))
+        .join(metadata, on="time_series_id", how="left", validate="1:1")
+        .join(units, on="time_series_id", how="left", validate="1:1")
+        .with_columns(pl.col("units").cast(pl.String))
+        .with_columns(pl.col("substation_type").cast(pl.String))
+    )
+    if kept.height != 20 or not set(kept["substation_type"].to_list()) <= SUBSTATION_TYPES:
+        msg = "expected the 20 Primary, BSP, and GSP series"
+        raise ValueError(msg)
+    return kept.sort(pl.col("site").str.slice(1).cast(pl.Int32))
+
+
+def grid_times() -> pl.Series:
+    """Return the dense half-hourly grid every per-series array is indexed on."""
+    return pl.datetime_range(
+        GRID_START, GRID_END, interval="30m", time_unit="us", time_zone="UTC", eager=True
+    )
+
+
+def grid_index(*, times: datetime | pl.Series) -> int | np.ndarray:
+    """Return the grid index of one timestamp, or of a series of timestamps.
+
+    Args:
+        times: A UTC timestamp, or a Polars series of them.
+
+    Returns:
+        The index, or an integer array of indices.
+    """
+    if isinstance(times, datetime):
+        return int((times - GRID_START) / STEP)
+    return ((times.dt.epoch("us") - int(GRID_START.timestamp() * 1e6)) // 1_800_000_000).to_numpy()
+
+
+def take(*, values: np.ndarray, index: np.ndarray) -> np.ndarray:
+    """Return `values[index]`, NaN where the index falls off either end of the grid.
+
+    Args:
+        values: A float array on the grid.
+        index: Integer indices.
+
+    Returns:
+        A float32 array the shape of `index`.
+    """
+    inside = (index >= 0) & (index < values.size)
+    out = np.full(index.shape, np.nan, dtype=np.float32)
+    out[inside] = values[index[inside]]
+    return out
+
+
+def holiday_gaps() -> pl.DataFrame:
+    """Return, for each calendar date, the signed days to the nearest holiday and to Christmas.
+
+    Returns:
+        A frame with `date`, `days_to_nearest_holiday` (positive before the holiday, negative after
+        it, clipped at 7 days either way, from the `holidays` package's England calendar), and
+        `days_to_christmas` (the same sign, to 25 December, missing beyond 14 days either way).
+    """
+    calendar = holidays.country_holidays("GB", subdiv="ENG", years=HOLIDAY_YEARS)
+    holiday_dates = np.array(sorted(calendar), dtype="datetime64[D]")
+    days = pl.date_range(
+        date(HOLIDAY_YEARS.start, 1, 1),
+        date(HOLIDAY_YEARS.stop - 1, 12, 31),
+        eager=True,
+    )
+    gaps = (holiday_dates[None, :] - days.to_numpy()[:, None]).astype("timedelta64[D]").astype(int)
+    nearest = gaps[np.arange(days.len()), np.abs(gaps).argmin(axis=1)]
+    christmas = np.array(
+        [np.datetime64(f"{year}-12-25") for year in HOLIDAY_YEARS], dtype="datetime64[D]"
+    )
+    to_christmas = (
+        (christmas[None, :] - days.to_numpy()[:, None]).astype("timedelta64[D]").astype(int)
+    )
+    nearest_christmas = to_christmas[np.arange(days.len()), np.abs(to_christmas).argmin(axis=1)]
+    return pl.DataFrame(
+        {
+            "date": days,
+            "days_to_nearest_holiday": np.clip(nearest, -HOLIDAY_CLIP_DAYS, HOLIDAY_CLIP_DAYS),
+            "days_to_christmas": np.where(
+                np.abs(nearest_christmas) <= CHRISTMAS_CLIP_DAYS, nearest_christmas, np.nan
+            ),
+        }
+    )
+
+
+def derived_columns(*, valid_time: pl.Series, latitude: float, longitude: float) -> pl.DataFrame:
+    """Return the timestamp-and-location columns of stage 1a for period-ending UTC stamps.
+
+    The sun position is at the midpoint of the half-hour ending at each stamp. The local hour,
+    weekday, and holiday distance use the stamp in Europe/London time.
+
+    Args:
+        valid_time: Period-ending UTC stamps.
+        latitude: Degrees north.
+        longitude: Degrees east.
+
+    Returns:
+        One row per stamp with the `DERIVED` columns, float32 (the holiday distance in whole days).
+    """
+    midpoint = valid_time.dt.offset_by("-15m")
+    local = valid_time.dt.convert_time_zone("Europe/London")
+    frame = pl.DataFrame(
+        {
+            "solar_zenith": zenith(stamps=midpoint, latitude=latitude, longitude=longitude),
+            "solar_azimuth": azimuth(stamps=midpoint, latitude=latitude, longitude=longitude),
+            "hour_local": local.dt.hour().cast(pl.Float64)
+            + local.dt.minute().cast(pl.Float64) / 60.0,
+            "day_of_week_local": local.dt.weekday().cast(pl.Float64),
+            "covid_indicator": (
+                (valid_time >= LOCKDOWN_START) & (valid_time < LOCKDOWN_END + timedelta(days=1))
+            ).cast(pl.Float64),
+            "date": local.dt.date(),
+        }
+    )
+    return (
+        frame.join(holiday_gaps(), on="date", how="left", validate="m:1", maintain_order="left")
+        .select(DERIVED)
+        .cast(dict.fromkeys(DERIVED, pl.Float32))
+    )
+
+
+def with_derived(*, frame: pl.DataFrame, latitude: float, longitude: float) -> pl.DataFrame:
+    """Add the `DERIVED` columns to a frame with a `valid_time` column, replacing any it has.
+
+    Args:
+        frame: Rows with a UTC `valid_time`.
+        latitude: Degrees north.
+        longitude: Degrees east.
+
+    Returns:
+        The frame with the `DERIVED` columns, computed once per distinct valid time.
+    """
+    times = frame["valid_time"].unique().sort()
+    table = derived_columns(valid_time=times, latitude=latitude, longitude=longitude).with_columns(
+        valid_time=times
+    )
+    return frame.drop(DERIVED, strict=False).join(
+        table, on="valid_time", how="left", validate="m:1", maintain_order="left"
+    )
+
+
+def load_series_arrays(*, series: pl.DataFrame) -> dict[str, SeriesArrays]:
+    """Return each series' ERA5 features, calendar, and observed power on the dense grid.
+
+    Args:
+        series: `series_table()`.
+
+    Returns:
+        Each site label's `SeriesArrays`.
+    """
+    columns = feature_columns()
+    weather = [c for c in columns if c not in DERIVED]
+    grid = pl.DataFrame({"valid_time": grid_times()})
+    era5 = pl.read_parquet(ERA5_PATH)
+    observed = pl.read_parquet(OBSERVED_PATH, columns=["time_series_id", "valid_time", "power"])
+    out: dict[str, SeriesArrays] = {}
+    for row in series.iter_rows(named=True):
+        joined = (
+            grid.join(
+                era5.filter(pl.col("time_series_id") == row["time_series_id"]).select(
+                    "valid_time", *weather
+                ),
+                on="valid_time",
+                how="left",
+                validate="1:1",
+            )
+            .join(
+                observed.filter(pl.col("time_series_id") == row["time_series_id"]).select(
+                    "valid_time", pl.col("power") / row["effective_capacity_mw"]
+                ),
+                on="valid_time",
+                how="left",
+                validate="1:1",
+            )
+            .sort("valid_time")
+        )
+        derived = with_derived(
+            frame=joined.select("valid_time"),
+            latitude=row["latitude"],
+            longitude=row["longitude"],
+        )
+        matrix = (
+            joined.select(weather)
+            .with_columns(derived.select(DERIVED))
+            .select(columns)
+            .to_numpy()
+            .astype(np.float32)
+        )
+        out[row["site"]] = SeriesArrays(
+            features=matrix,
+            power=joined["power"].to_numpy().astype(np.float32),
+            valid_time=joined["valid_time"],
+        )
+    return out
+
+
+def pinball_quantile_score(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndarray:
+    """Return twice the mass-weighted mean pinball loss of the 9 levels, per case.
+
+    Args:
+        quantiles: Shape (cases, 9).
+        actual: Shape (cases,).
+
+    Returns:
+        The quantile score per case, shape (cases,).
+    """
+    difference = actual[:, None] - quantiles
+    pinball = np.where(difference >= 0, LEVELS * difference, (LEVELS - 1) * difference)
+    return 2.0 * (pinball * ATOM_MASSES).sum(axis=1)
+
+
+def origin_lags(*, power: np.ndarray, target: np.ndarray, origin: np.ndarray) -> np.ndarray:
+    """Return the three lags measured from the forecast origin, using only usable observations.
+
+    The newest usable observation is at grid index `origin - NEWEST_AGE`, where the age covers
+    the telemetry delay and the half-hour a value spans.
+
+    Args:
+        power: Observed power over effective capacity on the grid, NaN where unobserved.
+        target: Grid index of each case's valid time.
+        origin: Grid index of each case's initialisation time.
+
+    Returns:
+        A float32 array of shape (cases, 3) in `LAG_COLUMNS` order: the newest usable value, the
+        value at the latest earlier time with the valid time's half-hour of day, and the value at
+        the latest earlier time with its weekday and half-hour.
+
+    Raises:
+        ValueError: If a case's valid time is not after its origin.
+    """
+    if (target <= origin).any():
+        msg = "every valid time must be after its initialisation time"
+        raise ValueError(msg)
+    newest = origin - NEWEST_AGE
+    gap = target - newest
+    day = target - STEPS_PER_DAY * np.ceil(gap / STEPS_PER_DAY).astype(int)
+    week = target - 7 * STEPS_PER_DAY * np.ceil(gap / (7 * STEPS_PER_DAY)).astype(int)
+    return np.stack(
+        [
+            take(values=power, index=newest),
+            take(values=power, index=day),
+            take(values=power, index=week),
+        ],
+        axis=1,
+    )
+
+
+def atomic_write(*, frame: pl.DataFrame, target: Path) -> None:
+    """Write a parquet file through a temporary name so an interrupted write leaves no file."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
+    frame.write_parquet(temporary)
+    temporary.rename(target)
