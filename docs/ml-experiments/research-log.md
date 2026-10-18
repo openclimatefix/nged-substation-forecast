@@ -2076,8 +2076,8 @@ refitted the XGBoost demand model weekly for 16 Primary substations on four arms
 ### 00086: the normal running arrangement forecast with the detector's labels
 
 **Correcting the lags for switching did not lower the Primary demand forecast's error with either
-source of labels, and the detector's labels made the forecast slightly worse, so the verdict is
-inconclusive.** The experiment refitted the XGBoost demand model monthly for 16 Primary substations
+source of labels, and the detector's labels raised the error slightly on all rows outside
+switching, so the verdict is inconclusive.** The experiment refitted the XGBoost demand model monthly for 16 Primary substations
 and scored 292 daily runs, giving the model each lag minus the moved MW and the moved MW as three
 columns.
 
@@ -2086,8 +2086,8 @@ columns.
   +1.72); NGED's logs minus the plain arm -0.29 (-2.06 to +0.68). The plain arm scored 10.778.
 - **Outside switching:** detector labels raised the score by 0.056 (+0.016 to +0.126), above the
   +0.02 margin the plan allowed.
-- **Finding for later experiments:** the detector marks 302,619 scored half-hours and the logs
-  37,394, and both mark 5,741. The next experiment injects switching events of known size and tests
+- **Finding for later experiments:** the detector marks 302,619 scored half-hours (8.1 times as
+  many as the 37,394 of the logs), and both mark only 5,741 (15% of the logs' half-hours). The next experiment injects switching events of known size and tests
   whether the corrected-lag forecast recovers the true normal running arrangement. The 768 trained
   boosters are kept for it.
 - **Write-up and pull request:**
