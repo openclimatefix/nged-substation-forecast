@@ -77,11 +77,11 @@ N1, the same XGBoost model without the correction.
 
 ![The nine planned contrasts](../00019-primary-demand-stack-vs-manual-heuristic/figure_2.svg)
 
-**What worked: refitting the model monthly scored below the stack, and refitting weekly scored
-below monthly.** [Experiment 34](../00034-retraining-cadence-and-cheap-proxies-demand/result.md)
-refitted the model once a year, every 6 months, quarterly, monthly, weekly, and daily, and scored
-73 runs. Monthly minus the stack was -0.20 (95% interval -0.38 to -0.01; the stricter 99.375% interval, -0.44 to
-+0.08, included zero, so the verdict was inconclusive). Weekly minus monthly was -0.07 (99.375%
+**What worked: refitting the model monthly scored below the stack, and refitting weekly scored below
+monthly.** [Experiment 34](../00034-retraining-cadence-and-cheap-proxies-demand/result.md) refitted
+the model once a year, every 6 months, quarterly, monthly, weekly, and daily, and scored 73 runs.
+Monthly minus the stack was -0.20 (95% interval -0.38 to -0.01; the stricter 99.375% interval, -0.44
+to +0.08, included zero, so the verdict was inconclusive). Weekly minus monthly was -0.07 (99.375%
 interval -0.18 to -0.00). Daily scored within 0.01 of weekly on three months. The gain per step
 shrinks as refits become more frequent.
 
@@ -97,14 +97,15 @@ weekly model, neither resolved. The correction still lowered the frozen model's 
 
 **Weekly refitting held on 292 further daily runs, and on a second period.** [Experiment
 48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) scored the
-292 daily runs experiment 34 left out. Weekly refitting scored 5.44 against the stack's 5.64
-(-0.20, 99.44% interval -0.40 to -0.035) and beat monthly (5.57) by 0.13 (-0.24 to -0.03). At the 2
-bulk supply point and 2 grid supply point substations, weekly refitting scored 0.66 below the stack
-(-1.23 to -0.27). [Experiment 81](../00081-r11-control-member-second-validation-year-demand/result.md)
-repeated the test on 274 runs from 2023-07 to 2024-03, with the control member of the ensemble only,
-on 13 substations. Weekly minus the stack was -0.240 (99.17% interval -0.360 to -0.145), and weekly
-minus monthly was -0.039 (-0.064 to -0.012; the 95% t-interval over months, -0.078 to -0.000, only
-just excludes zero).
+292 daily runs experiment 34 left out. Weekly refitting scored 5.44 against the stack's 5.64 (-0.20,
+99.44% interval -0.40 to -0.035) and beat monthly (5.57) by 0.13 (-0.24 to -0.03). At the 2 bulk
+supply point and 2 grid supply point substations, weekly refitting scored 0.66 below the stack
+(-1.23 to -0.27). [Experiment
+81](../00081-r11-control-member-second-validation-year-demand/result.md) repeated the test on 274
+runs from 2023-07 to 2024-03, with the control member of the ensemble only, on 13 substations.
+Weekly minus the stack was -0.240 (99.17% interval -0.360 to -0.145), and weekly minus monthly was
+-0.039 (-0.064 to -0.012; the 95% t-interval over months, -0.078 to -0.000, only just excludes
+zero).
 
 ![Planned contrasts, experiment 48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/figure_1.svg)
 
@@ -125,12 +126,13 @@ compute.** Experiment 34 tested four stand-ins for monthly refitting and found t
 12-month window (monthly refits on the latest 12 months, 150 rounds, learning rate 0.15, called
 P-roll) matched full monthly refitting on all three rank tests, at 0.03 points of score and about a
 third of the GPU time. Warm-start boosting (updating the previous model) failed, and got worse with
-more updates. [Experiment 85](../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md)
-tested six cheaper schedules against the gap full weekly retraining gives between monthly and weekly
-refits (+0.125, 95% interval +0.036 to +0.229). The monthly 12-month window gave +0.118 and a weekly
-whole-history refit with 150 rounds gave +0.125. Quarterly refits on the 12-month window scored
-0.381 above weekly (+0.207 to +0.565). The starting-value gap (-0.017) was too small to rank any
-schedule, so agreement on that contrast says nothing.
+more updates. [Experiment
+85](../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) tested six cheaper
+schedules against the gap full weekly retraining gives between monthly and weekly refits (+0.125,
+95% interval +0.036 to +0.229). The monthly 12-month window gave +0.118 and a weekly whole-history
+refit with 150 rounds gave +0.125. Quarterly refits on the 12-month window scored 0.381 above weekly
+(+0.207 to +0.565). The starting-value gap (-0.017) was too small to rank any schedule, so agreement
+on that contrast says nothing.
 
 ![Contrasts under each schedule, with the full-weekly reference](../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_1.svg)
 
