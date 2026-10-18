@@ -65,8 +65,7 @@ code: ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-durin
 injected-switches/
 ---
 
-# Experiment 88: does the full NRA forecast recover the normal running arrangement during and after
-a switch?
+# Experiment 88: does the full NRA forecast recover the normal arrangement during a switch?
 
 Plan only; the write-up replaces this page when the run finishes.
 
