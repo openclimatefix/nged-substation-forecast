@@ -1,29 +1,29 @@
-"""Fit the four arms of experiment 00089 and write each monthly refit's quantiles.
+"""Fit the arms of experiment 00089 and write each monthly refit's quantiles.
 
 One job is one monthly refit (P-roll, experiment 00049). A refit at time `t` trains, for each
-Primary series and each arm, an N1 model on the ENS control member's rows whose valid time lies in
-the 365 days ending 3.5 hours before `t` and whose run began at or before `t`, weighted by a
-recency half-life anchored at `t`, for 150 rounds at a learning rate of 0.15. It then forecasts the
-daily runs of the 292 of `fold_a_daily_gap_v1` that the monthly regime assigns to it, and writes
-for each arm and series the mixture of the 51 members' nine quantiles to
+Primary series and each arm, an N1 model on the ENS control member's rows that the arm's window
+admits (see `ARMS`), with the rows whose valid time lies inside an abnormal running arrangement
+(ARA) removed from the training targets, for 150 rounds at a learning rate of 0.15. The arms that
+mask lags set to missing every lag whose time lies inside an ARA, in training and in prediction.
+It then forecasts the daily runs of the 292 of `fold_a_daily_gap_v1` that the monthly regime
+assigns to it, and writes for each arm and series the mixture of the 51 members' nine quantiles to
 `work/anchor_preds/<arm>/<site>_s0_<refit>.parquet`. Existing files stay, so a stopped run
 resumes. Seed 0 only.
 
-Arms:
+The ARA is the union of the XL detector's intervals, NGED's logged events, and NGED's logged
+closures. Training rows come from three places: the control-member backfill frames of experiment
+00081 (2021-03-21 to 2024-03-31, every `BACKFILL_STRIDE`-th run), the stage 1 pilot's every-5-days
+training runs (2024-04-01 to 2025-06-30), and experiment 00034's daily control-member runs
+(2025-07-01 onward).
 
-- `plain`: nothing removed, nothing added.
-- `lagmw_oracle`: each lag replaced by the lag minus the signed MW that NGED-log-based (oracle)
-  events moved at that lag time, plus the three MW columns; trained on all rows.
-- `lagmw_xl`: the same with the XL detector's events and MW.
-- `mask_xl`: training rows whose valid time lies inside an XL event are dropped; nothing else.
-
-    uv run python ml-experiments/00089-*/e00089_fit.py [--workers 4] [--smoke]
+    uv run python ml-experiments/00089-*/e00089_fit.py [--workers 3] [--smoke]
 """
 
 import argparse
 import time
 from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -34,22 +34,67 @@ import numpy as np
 import polars as pl
 import xgboost as xgb
 
-CORES: Final[int] = 8
-ARMS: Final[tuple[str, ...]] = ("plain", "lagmw_oracle", "lagmw_xl", "mask_xl")
-MW_COLUMNS: Final[tuple[str, ...]] = (
-    "mw_origin",
-    "mw_same_time_latest_day",
-    "mw_same_time_latest_week",
+CORES: Final[int] = 6
+BACKFILL_FRAMES_DIR: Final[Path] = (
+    common.ML_EXPERIMENTS_DATA_DIR
+    / "00081-r11-control-member-second-validation-year-demand"
+    / "work"
+    / "frames"
 )
-LABEL_SOURCES: Final[tuple[str, ...]] = ("oracle", "xl")
-"""Each source's signed-MW frame columns are `<source>_<MW column>`."""
-ARM_SOURCE: Final[dict[str, str]] = {"lagmw_oracle": "oracle", "lagmw_xl": "xl"}
-CORRECTED_ARMS: Final[tuple[str, ...]] = tuple(ARM_SOURCE)
+"""Experiment 00081's control-member demand frames, one `init=<date>.parquet` per run, read only."""
+BACKFILL_STRIDE: Final[int] = 5
+"""Every fifth backfill run is kept, as the stage 1 pilot's training runs are every fifth day."""
+ENS_START: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
+"""The first day of the Dynamical.org ENS archive, a different product from the backfill."""
+
+
+@dataclass(frozen=True)
+class Arm:
+    """How an arm picks its training rows and treats its lags.
+
+    Attributes:
+        rolling: True for the 365 days before the refit; False for all rows from `start`.
+        start: The earliest valid time of the rows when `rolling` is False.
+        half_life_days: Half-life of the recency weight, anchored at the refit.
+        mask_lags: True to set to missing every lag whose time lies inside an ARA.
+    """
+
+    rolling: bool
+    start: datetime | None
+    half_life_days: float
+    mask_lags: bool
+
+
+ARMS: Final[dict[str, Arm]] = {
+    "r": Arm(rolling=True, start=None, half_life_days=common.SHORT_HALF_LIFE_DAYS, mask_lags=False),
+    "m": Arm(rolling=True, start=None, half_life_days=common.SHORT_HALF_LIFE_DAYS, mask_lags=True),
+    "l": Arm(
+        rolling=False, start=None, half_life_days=common.RECENCY_HALF_LIFE_DAYS, mask_lags=False
+    ),
+    "lm": Arm(
+        rolling=False, start=None, half_life_days=common.RECENCY_HALF_LIFE_DAYS, mask_lags=True
+    ),
+    "l_ens": Arm(
+        rolling=False,
+        start=ENS_START,
+        half_life_days=common.RECENCY_HALF_LIFE_DAYS,
+        mask_lags=False,
+    ),
+    "lm_ens": Arm(
+        rolling=False,
+        start=ENS_START,
+        half_life_days=common.RECENCY_HALF_LIFE_DAYS,
+        mask_lags=True,
+    ),
+}
+"""R and M: the 12-month window (experiment 00086's recipe). L and LM: all rows since 2021-03.
+The `_ens` arms: all rows since 2024-04-01, the clean check on one weather product."""
+ARA_LAG_COLUMNS: Final[tuple[str, ...]] = tuple(f"ara_{name}" for name in common.LAG_COLUMNS)
+"""True where the lag's time lies inside an ARA."""
 SITE_CHUNKS: Final[int] = 2
 """Each refit's series are split into this many jobs, so that files are written sooner."""
 ROUNDS: Final[int] = 150
 ETA: Final[float] = 0.15
-HALF_LIFE_DAYS: Final[float] = common.SHORT_HALF_LIFE_DAYS
 WEATHER: Final[tuple[str, ...]] = (
     "shortwave",
     "longwave",
@@ -61,16 +106,18 @@ WEATHER: Final[tuple[str, ...]] = (
 )
 
 
-def input_columns(*, arm: str) -> list[str]:
-    """Return an arm's input columns in matrix order."""
-    base = [*common.feature_columns(), *common.N1_EXTRA_COLUMNS, *common.LAG_COLUMNS]
-    return [*base, *MW_COLUMNS] if arm in CORRECTED_ARMS else base
+def input_columns() -> list[str]:
+    """Return the input columns in matrix order; every arm has the same ones."""
+    return [*common.feature_columns(), *common.N1_EXTRA_COLUMNS, *common.LAG_COLUMNS]
 
 
-def add_lags(
-    *, frame: pl.DataFrame, power: np.ndarray, labels: dict[str, labelling.SeriesLabels]
-) -> pl.DataFrame:
-    """Add the three origin lags and, for each label source, the signed MW at the same lag times."""
+def ara_array(*, labels: dict[str, labelling.SeriesLabels]) -> np.ndarray:
+    """Return the half-hours inside an ARA: an XL event, a logged event, or a logged closure."""
+    return labels["xl"].in_event | labels["oracle"].in_event | labels["oracle"].closed
+
+
+def add_lags(*, frame: pl.DataFrame, power: np.ndarray, ara: np.ndarray) -> pl.DataFrame:
+    """Add the three origin lags, a flag per lag for a lag inside an ARA, and the target's flag."""
     target = np.asarray(common.grid_index(times=frame["valid_time"]))
     origin = np.asarray(common.grid_index(times=frame["power_fcst_init_time"]))
     lags = pl.DataFrame(
@@ -78,33 +125,19 @@ def add_lags(
         schema=list(common.LAG_COLUMNS),
         orient="row",
     ).cast(pl.Float32)
-    out = frame.hstack(lags)
-    for source in LABEL_SOURCES:
-        moved = pl.DataFrame(
-            common.origin_lags(power=labels[source].signed_mw, target=target, origin=origin),
-            schema=[f"{source}_{name}" for name in MW_COLUMNS],
-            orient="row",
-        ).cast(pl.Float32)
-        out = out.hstack(moved)
-    return out
+    inside = common.origin_lags(power=ara.astype(np.float32), target=target, origin=origin) > 0.5
+    flags = pl.DataFrame(inside, schema=list(ARA_LAG_COLUMNS), orient="row")
+    in_ara = common.take(values=ara.astype(np.float32), index=target) > 0.5
+    return frame.hstack(lags).hstack(flags).with_columns(in_ara=pl.Series(in_ara))
 
 
-def for_arm(*, frame: pl.DataFrame, arm: str) -> pl.DataFrame:
-    """Return the frame with the arm's inputs.
-
-    The corrected arms get each lag minus its signed MW, and the signed MW under the `MW_COLUMNS`
-    names, from the arm's label source. The other arms keep the lags as they are.
-    """
-    if arm not in CORRECTED_ARMS:
+def for_arm(*, frame: pl.DataFrame, arm: Arm) -> pl.DataFrame:
+    """Return the frame, with a lag inside an ARA set to missing if the arm masks lags."""
+    if not arm.mask_lags:
         return frame
-    source = ARM_SOURCE[arm]
-    moved = [f"{source}_{name}" for name in MW_COLUMNS]
     return frame.with_columns(
-        *(
-            (pl.col(lag) - pl.col(mw)).alias(lag)
-            for lag, mw in zip(common.LAG_COLUMNS, moved, strict=True)
-        ),
-        *(pl.col(mw).alias(name) for mw, name in zip(moved, MW_COLUMNS, strict=True)),
+        pl.when(pl.col(flag)).then(None).otherwise(pl.col(lag)).alias(lag)
+        for lag, flag in zip(common.LAG_COLUMNS, ARA_LAG_COLUMNS, strict=True)
     )
 
 
@@ -121,24 +154,40 @@ def mixture_quantiles(*, member_quantiles: np.ndarray) -> np.ndarray:
     return np.sort(pooled, axis=1).astype(np.float32)
 
 
-def training_rows(
-    *, row: dict, arrays: common.SeriesArrays, labels: dict[str, labelling.SeriesLabels]
-) -> pl.DataFrame:
-    """Return one series' control-member rows with derived columns, lags, signed MW, and event flag.
+_BACKFILL: dict[str, pl.DataFrame] = {}
 
-    The rows run to 2026-06-29. The power of the rows after 2025-06-30 is filled from the dense
-    grid. Every row's eligibility for a refit is applied per refit, not here.
+
+def _backfill_rows() -> pl.DataFrame:
+    """Return every `BACKFILL_STRIDE`-th backfill run's rows for all series, kept per worker."""
+    if "rows" not in _BACKFILL:
+        paths = sorted(BACKFILL_FRAMES_DIR.glob("init=*.parquet"))[::BACKFILL_STRIDE]
+        _BACKFILL["rows"] = pl.concat(
+            [
+                pl.read_parquet(
+                    path, columns=[*common.KEYS, "ensemble_member", *WEATHER]
+                ).with_columns(pl.col(*WEATHER).cast(pl.Float32))
+                for path in paths
+            ]
+        )
+    return _BACKFILL["rows"]
+
+
+def training_rows(*, row: dict, arrays: common.SeriesArrays, ara: np.ndarray) -> pl.DataFrame:
+    """Return one series' control-member rows with derived columns, lags, and ARA flags.
+
+    The rows run from 2021-03-21 to 2026-06-29. The power of the backfill rows and of the rows
+    after 2025-06-30 is read from the dense grid. Every row's eligibility for a refit is applied
+    per refit, not here.
 
     Args:
         row: The series' row of `common.series_table()`.
         arrays: The series' arrays on the dense grid.
-        labels: The series' label arrays by source (`oracle`, `xl`).
+        ara: The series' ARA array on the dense grid.
 
     Returns:
         The rows keyed by series, run, and valid time, with `ensemble_member`, `power` (in MW),
-        the weather columns, the derived columns, `lead_hours`, the three lags, the three signed
-        MW columns of each label source, and `in_event_xl` (the valid time lies inside an XL
-        event).
+        the weather columns, the derived columns, `lead_hours`, the three lags, the three
+        lag-inside-an-ARA flags, and `in_ara` (the valid time lies inside an ARA).
     """
     series_id = row["time_series_id"]
     before = (
@@ -153,8 +202,16 @@ def training_rows(
             for path in sorted(common.AFTER_DIR.glob("init=*.parquet"))
         ]
     )
-    padded = after.with_columns(power=pl.lit(None, dtype=pl.Float32)).select(before.columns)
-    rows = pl.concat([before, padded.cast(before.schema)])
+    backfill = _backfill_rows().filter(pl.col("time_series_id") == series_id)
+    unfilled = pl.concat(
+        [backfill, after.select(backfill.columns).cast(backfill.schema)]
+    ).with_columns(power=pl.lit(None, dtype=pl.Float32))
+    rows = pl.concat(
+        [
+            unfilled.select(before.columns).cast(before.schema),
+            before,
+        ]
+    ).sort("power_fcst_init_time", "valid_time", "ensemble_member")
     index = np.asarray(common.grid_index(times=rows["valid_time"]))
     filled = common.take(values=arrays.power, index=index) * row["effective_capacity_mw"]
     rows = rows.with_columns(
@@ -167,34 +224,38 @@ def training_rows(
     rows = rows.with_columns(
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
     )
-    rows = add_lags(frame=rows, power=arrays.power, labels=labels)
-    in_event = labels["xl"].in_event[np.asarray(common.grid_index(times=rows["valid_time"]))]
-    return rows.with_columns(in_event_xl=pl.Series(in_event))
+    return add_lags(frame=rows, power=arrays.power, ara=ara)
 
 
-def known_rows(*, rows: pl.DataFrame, refit: datetime) -> pl.DataFrame:
-    """Return the rows a refit at `refit` may see.
+def known_rows(*, rows: pl.DataFrame, refit: datetime, arm: Arm) -> pl.DataFrame:
+    """Return the rows a refit at `refit` may see in an arm's window.
 
-    A refit sees a row only if its valid time is at least 3.5 hours before the refit and within
-    the 365 days before it, and its run began at or before the refit.
+    A refit sees a row only if its valid time is at least 3.5 hours before the refit, its run
+    began at or before the refit, and its valid time lies in the arm's window: the 365 days before
+    the refit, or on or after the arm's start.
     """
-    return rows.filter(
+    known = rows.filter(
         (pl.col("valid_time") <= refit - regimes.REFIT_CUTOFF_AGE)
-        & (pl.col("valid_time") > refit - regimes.TRAIN_WINDOW)
         & (pl.col("power_fcst_init_time") <= refit)
     )
+    if arm.rolling:
+        return known.filter(pl.col("valid_time") > refit - regimes.TRAIN_WINDOW)
+    if arm.start is not None:
+        return known.filter(pl.col("valid_time") >= arm.start)
+    return known
 
 
-def train_matrix(*, rows: pl.DataFrame, row: dict, refit: datetime, arm: str) -> xgb.DMatrix:
-    """Return the weighted training matrix of one series' rows for an arm, anchored at `refit`."""
-    if arm == "mask_xl":
-        rows = rows.filter(~pl.col("in_event_xl"))
-    rows = for_arm(frame=rows, arm=arm)
+def train_matrix(*, rows: pl.DataFrame, row: dict, refit: datetime, arm: Arm) -> xgb.DMatrix:
+    """Return the weighted training matrix of one series' rows for an arm, anchored at `refit`.
+
+    Rows whose valid time lies inside an ARA are dropped for every arm.
+    """
+    rows = for_arm(frame=rows.filter(~pl.col("in_ara")), arm=arm)
     age_days = (refit - rows["valid_time"]).dt.total_seconds() / 86_400
     return xgb.DMatrix(
-        rows.select(input_columns(arm=arm)).to_numpy().astype(np.float32),
+        rows.select(input_columns()).to_numpy().astype(np.float32),
         label=(rows["power"] / row["effective_capacity_mw"]).to_numpy(),
-        weight=0.5 ** (age_days.to_numpy() / HALF_LIFE_DAYS),
+        weight=0.5 ** (age_days.to_numpy() / arm.half_life_days),
     )
 
 
@@ -210,21 +271,21 @@ def fit(*, matrix: xgb.DMatrix, rounds: int, nthread: int) -> xgb.Booster:
 def predict_run(
     *,
     model: xgb.Booster,
-    arm: str,
+    arm: Arm,
     run_rows: pl.DataFrame,
     row: dict,
     arrays: common.SeriesArrays,
-    labels: dict[str, labelling.SeriesLabels],
+    ara: np.ndarray,
 ) -> pl.DataFrame:
     """Return the mixture quantiles of one run for one series and arm.
 
     Args:
         model: The series' fitted booster for the arm.
-        arm: The arm's name.
+        arm: The arm.
         run_rows: The run's frame rows for the series, every valid time with every member.
         row: The series' row of `common.series_table()`.
         arrays: The series' arrays on the dense grid.
-        labels: The series' label arrays.
+        ara: The series' ARA array on the dense grid.
 
     Returns:
         One row per valid time: the key columns and the nine quantile columns.
@@ -235,13 +296,13 @@ def predict_run(
     prepared = common.with_derived(
         frame=run_rows, latitude=row["latitude"], longitude=row["longitude"]
     )
-    prepared = add_lags(frame=prepared, power=arrays.power, labels=labels)
+    prepared = add_lags(frame=prepared, power=arrays.power, ara=ara)
     prepared = for_arm(frame=prepared, arm=arm).sort("valid_time", "ensemble_member")
     members = prepared["ensemble_member"].n_unique()
     if prepared.height != prepared.select(*common.KEYS).n_unique() * members:
         msg = "every valid time must hold every member"
         raise ValueError(msg)
-    matrix = prepared.select(input_columns(arm=arm)).to_numpy().astype(np.float32)
+    matrix = prepared.select(input_columns()).to_numpy().astype(np.float32)
     raw = model.predict(xgb.DMatrix(matrix)).reshape(-1, members, len(common.LEVELS))
     return (
         prepared.select(*common.KEYS)
@@ -268,27 +329,29 @@ _CACHE: dict[str, object] = {}
 def _context() -> tuple[
     pl.DataFrame,
     dict[str, common.SeriesArrays],
-    dict[str, dict[str, labelling.SeriesLabels]],
+    dict[str, np.ndarray],
 ]:
-    """Return the Primary series table, arrays, and labels, loaded once per worker process."""
+    """Return the Primary series table, arrays, and ARA arrays, loaded once per worker process."""
     if "series" not in _CACHE:
         series = common.series_table().filter(pl.col("substation_type").is_in(common.GROUPS))
         _CACHE["series"] = series
         _CACHE["arrays"] = common.load_series_arrays(series=series)
         oracle = labelling.load_labels(series=series)
         xl = labelling.load_xl_labels(series=series, oracle=oracle)
-        _CACHE["labels"] = {site: {"oracle": oracle[site], "xl": xl[site]} for site in oracle}
+        _CACHE["ara"] = {
+            site: ara_array(labels={"oracle": oracle[site], "xl": xl[site]}) for site in oracle
+        }
         _CACHE["rows"] = {}
-    return _CACHE["series"], _CACHE["arrays"], _CACHE["labels"]  # ty: ignore[invalid-return-type]
+    return _CACHE["series"], _CACHE["arrays"], _CACHE["ara"]  # ty: ignore[invalid-return-type]
 
 
 def _training_rows_cached(
-    *, row: dict, arrays: common.SeriesArrays, labels: dict[str, labelling.SeriesLabels]
+    *, row: dict, arrays: common.SeriesArrays, ara: np.ndarray
 ) -> pl.DataFrame:
     """Return a series' training rows, kept for the worker's later jobs."""
     cache: dict[str, pl.DataFrame] = _CACHE["rows"]  # ty: ignore[invalid-assignment]
     if row["site"] not in cache:
-        cache[row["site"]] = training_rows(row=row, arrays=arrays, labels=labels)
+        cache[row["site"]] = training_rows(row=row, arrays=arrays, ara=ara)
     return cache[row["site"]]
 
 
@@ -314,7 +377,7 @@ def run_job(
     Returns:
         One progress line per series and arm fitted.
     """
-    series, arrays, labels = _context()
+    series, arrays, ara = _context()
     todo = [
         (site, arm)
         for site in sites
@@ -334,10 +397,11 @@ def run_job(
         started = time.monotonic()
         row = rows_of[site]
         known = known_rows(
-            rows=_training_rows_cached(row=row, arrays=arrays[site], labels=labels[site]),
+            rows=_training_rows_cached(row=row, arrays=arrays[site], ara=ara[site]),
             refit=refit,
+            arm=ARMS[arm],
         )
-        matrix = train_matrix(rows=known, row=row, refit=refit, arm=arm)
+        matrix = train_matrix(rows=known, row=row, refit=refit, arm=ARMS[arm])
         models[site, arm] = fit(matrix=matrix, rounds=rounds, nthread=nthread)
         if out_root == common.ANCHOR_PREDS_DIR:
             target = booster_path(arm=arm, site=site, refit=refit)
@@ -356,13 +420,13 @@ def run_job(
             pieces[site, arm].append(
                 predict_run(
                     model=models[site, arm],
-                    arm=arm,
+                    arm=ARMS[arm],
                     run_rows=frame.filter(
                         pl.col("time_series_id") == rows_of[site]["time_series_id"]
                     ),
                     row=rows_of[site],
                     arrays=arrays[site],
-                    labels=labels[site],
+                    ara=ara[site],
                 )
             )
     for site, arm in todo:
@@ -376,7 +440,7 @@ def run_job(
 def main() -> None:
     """Fit and write every arm's jobs."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workers", type=int, default=4, help="processes; each gets 8 // workers")
+    parser.add_argument("--workers", type=int, default=3, help="processes; each gets 6 // workers")
     parser.add_argument(
         "--smoke", action="store_true", help="2 series, 2 refits, 3 runs, 20 rounds, scratch dir"
     )

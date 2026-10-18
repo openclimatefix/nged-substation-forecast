@@ -4,12 +4,12 @@ Steps:
 
 1. `metrics`: for each arm, read the monthly refits' quantiles (`e00089_fit.py`), apply experiment
    00033's spread factor of 1.15, attach the observed power, and write per-case scores plus the
-   flags `nra` (the valid time is outside every oracle event and every logged closure of the
-   series), `lag_oracle` (one of the three lag times is inside an oracle event), and `lag_xl` (one
-   is inside an XL event) to `work/metrics/<arm>.parquet`.
+   flags `nra` (the valid time is outside every ARA: an XL event, a logged event, or a logged
+   closure), `lag_ara` (one of the three lag times is inside an ARA), and `lag_oracle` (one is
+   inside a logged event) to `work/metrics/<arm>.parquet`.
 2. `results`: the planned contrasts C1 to C3 and the no-harm check at the Bonferroni level, the
    descriptive contrasts, the absolute scores and tail table, the label coverage counts, and the
-   agreement of the XL and oracle signed MW, in `work/results/*.parquet`.
+   labelled events per training year and source, in `work/results/*.parquet`.
 
     uv run python ml-experiments/00089-*/e00089_stats.py [--smoke]
 """
@@ -33,9 +33,9 @@ PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 3.0)
 N_RESAMPLES_PLANNED: Final[int] = 20_000
 N_RESAMPLES_95: Final[int] = 4_000
 NON_INFERIORITY_MARGIN: Final[float] = 0.02
-"""Points of capacity: 0.34% of experiment 00075's plain score of 5.44, the most experiment 00044
-says a perfect detector could gain."""
-ARM_NAMES: Final[tuple[str, ...]] = fitting.ARMS
+"""Points of capacity: the no-harm margin of experiments 00075 and 00086 (about 0.4% of a score)."""
+ARM_NAMES: Final[tuple[str, ...]] = tuple(fitting.ARMS)
+REFERENCE_ARM: Final[str] = "r"
 EXPERIMENT_00048_ARMS: Final[dict[str, str]] = {
     "manual_heuristic": "manual_heuristic",
     "climatology": "climatology",
@@ -54,8 +54,9 @@ class Contrast:
     Attributes:
         treatment: The arm whose score is differenced.
         reference: The arm it is differenced against.
-        subset: `all`, `nra`, `lag_oracle` (NRA rows with a lag in an oracle event), `lag_xl`
-            (NRA rows with a lag in an XL event), or `lag_xl_only` (`lag_xl` and not `lag_oracle`).
+        subset: `all`, `nra` (valid time outside every ARA), `lag_ara` (`nra` rows with a lag
+            inside an ARA, the headline rows), or `lag_oracle` (`nra` rows with a lag inside a
+            logged event).
     """
 
     treatment: str
@@ -64,24 +65,25 @@ class Contrast:
 
 
 PLANNED: Final[dict[str, Contrast]] = {
-    "C1": Contrast("lagmw_xl", "plain", "lag_oracle"),
-    "C2": Contrast("lagmw_oracle", "plain", "lag_oracle"),
-    "C3": Contrast("lagmw_xl", "lagmw_oracle", "lag_oracle"),
+    "C1": Contrast("lm", "l", "lag_ara"),
+    "C2": Contrast("l", "r", "nra"),
+    "C3": Contrast("lm", "r", "lag_ara"),
 }
-NO_HARM: Final[Contrast] = Contrast("lagmw_xl", "plain", "nra")
+NO_HARM: Final[Contrast] = Contrast("lm", "l", "nra")
 """C1 on all rows outside switching, read at the planned level against the margin."""
 DESCRIPTIVE: Final[dict[str, Contrast]] = {
-    "D1 C2 on all rows outside switching": Contrast("lagmw_oracle", "plain", "nra"),
-    "D2 C1 on all half-hours": Contrast("lagmw_xl", "plain", "all"),
-    "D3 C2 on all half-hours": Contrast("lagmw_oracle", "plain", "all"),
-    "D4 C1 on rows with a lag in an XL event": Contrast("lagmw_xl", "plain", "lag_xl"),
-    "D5 C1 on rows with a lag in an XL event only": Contrast("lagmw_xl", "plain", "lag_xl_only"),
-    "D6 C2 on rows with a lag in an XL event only": Contrast(
-        "lagmw_oracle", "plain", "lag_xl_only"
+    "D1 L minus R on rows with a lag inside an ARA": Contrast("l", "r", "lag_ara"),
+    "D2 LM minus R on all rows outside switching": Contrast("lm", "r", "nra"),
+    "D3 M minus R on rows with a lag inside an ARA": Contrast("m", "r", "lag_ara"),
+    "D4 M minus R on all rows outside switching": Contrast("m", "r", "nra"),
+    "D5 LM_ens minus L_ens on rows with a lag inside an ARA": Contrast(
+        "lm_ens", "l_ens", "lag_ara"
     ),
-    "D7 mask_xl minus plain, outside switching": Contrast("mask_xl", "plain", "nra"),
-    "D8 mask_xl minus plain, lag in an oracle event": Contrast("mask_xl", "plain", "lag_oracle"),
-    "D9 C3 on all rows outside switching": Contrast("lagmw_xl", "lagmw_oracle", "nra"),
+    "D6 LM_ens minus L_ens on all rows outside switching": Contrast("lm_ens", "l_ens", "nra"),
+    "D7 L_ens minus R on all rows outside switching": Contrast("l_ens", "r", "nra"),
+    "D8 L minus L_ens on all rows outside switching": Contrast("l", "l_ens", "nra"),
+    "D9 LM minus L on rows with a lag inside a logged event": Contrast("lm", "l", "lag_oracle"),
+    "D10 L minus R on all half-hours": Contrast("l", "r", "all"),
 }
 
 
@@ -126,6 +128,10 @@ def compute_metrics(*, smoke: bool) -> None:
     arrays = common.load_series_arrays(series=series)
     labels = labelling.load_labels(series=series)
     xl_labels = labelling.load_xl_labels(series=series, oracle=labels)
+    ara = {
+        site: fitting.ara_array(labels={"oracle": labels[site], "xl": xl_labels[site]})
+        for site in labels
+    }
     gap = set(common.origins_of_subset(subset="gap"))
     origins = sorted(gap)
     if smoke:
@@ -153,10 +159,8 @@ def compute_metrics(*, smoke: bool) -> None:
             lag_events = common.origin_lags(
                 power=labels[site].in_event.astype(np.float32), target=index, origin=origin_index
             )
-            lag_events_xl = common.origin_lags(
-                power=xl_labels[site].in_event.astype(np.float32),
-                target=index,
-                origin=origin_index,
+            lag_ara = common.origin_lags(
+                power=ara[site].astype(np.float32), target=index, origin=origin_index
             )
             threshold = common.historical_thresholds(power=arrays[site].power)["p99"]
             finite = np.isfinite(sorted_q.select(common.LEVEL_COLUMNS).to_numpy()).all(axis=1)
@@ -178,9 +182,9 @@ def compute_metrics(*, smoke: bool) -> None:
                         (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
                         / 60.0
                     ),
-                    nra=pl.Series(~labels[site].in_event[index] & ~labels[site].closed[index]),
+                    nra=pl.Series(~ara[site][index]),
                     lag_oracle=pl.Series(np.nan_to_num(lag_events[keep]).max(axis=1) > 0.5),
-                    lag_xl=pl.Series(np.nan_to_num(lag_events_xl[keep]).max(axis=1) > 0.5),
+                    lag_ara=pl.Series(np.nan_to_num(lag_ara[keep]).max(axis=1) > 0.5),
                     **{
                         name: pl.Series(values.astype(np.float32))
                         for name, values in scores.items()
@@ -209,14 +213,10 @@ def subset_of(*, frame: pl.DataFrame, subset: str) -> pl.DataFrame:
     """Return the cases of one of the subsets named in `Contrast`."""
     if subset == "all":
         return frame
-    if subset == "nra":
-        return frame.filter(pl.col("nra"))
     rows = frame.filter(pl.col("nra"))
-    if subset == "lag_oracle":
-        return rows.filter(pl.col("lag_oracle"))
-    if subset == "lag_xl":
-        return rows.filter(pl.col("lag_xl"))
-    return rows.filter(pl.col("lag_xl") & ~pl.col("lag_oracle"))
+    if subset == "nra":
+        return rows
+    return rows.filter(pl.col("lag_oracle") if subset == "lag_oracle" else pl.col("lag_ara"))
 
 
 def paired_frame(*, contrast: Contrast, smoke: bool) -> pl.DataFrame:
@@ -292,94 +292,90 @@ def _planned_row(*, contrasts: pl.DataFrame, contrast_id: str) -> dict[str, floa
 
 
 def verdict(*, contrasts: pl.DataFrame) -> dict[str, object]:
-    """Return the pre-registered verdict from C1 and the no-harm check.
+    """Return the pre-registered verdict from C1, C2, and the no-harm check.
 
-    `refuted` when C1's lower end is above zero; `supported` when C1's upper end is below zero and
-    the no-harm upper end is at most the margin; `small gain` when only the first holds;
-    `inconclusive` otherwise.
+    Masking is supported when C1's upper end is below zero and the no-harm upper end is at most
+    the margin. The long history is supported when C2's upper end is below zero. The verdict is
+    `refuted` when C1's or C2's lower end is above zero, `supported` when both are supported,
+    `small gain` when one is, and `inconclusive` otherwise.
     """
     if contrasts.filter(pl.col("id") == "C1").is_empty():
-        return {
-            "verdict": "no rows",
-            "c1": None,
-            "c1_lower": None,
-            "c1_upper": None,
-            "no_harm_upper": None,
-            "share_of_oracle_gain": None,
-        }
+        return {"verdict": "no rows"}
     c1 = _planned_row(contrasts=contrasts, contrast_id="C1")
+    c2 = _planned_row(contrasts=contrasts, contrast_id="C2")
+    c3 = _planned_row(contrasts=contrasts, contrast_id="C3")
     harm = _planned_row(contrasts=contrasts, contrast_id="N1")
-    if c1["lower"] > 0.0:
+    masking = c1["upper"] < 0.0 and harm["upper"] <= NON_INFERIORITY_MARGIN
+    history = c2["upper"] < 0.0
+    if c1["lower"] > 0.0 or c2["lower"] > 0.0:
         word = "refuted"
-    elif c1["upper"] < 0.0:
-        word = "supported" if harm["upper"] <= NON_INFERIORITY_MARGIN else "small gain"
+    elif masking and history:
+        word = "supported"
+    elif masking or history:
+        word = "small gain"
     else:
         word = "inconclusive"
-    c2 = _planned_row(contrasts=contrasts, contrast_id="C2")
     return {
         "verdict": word,
+        "masking_supported": masking,
+        "history_supported": history,
         "c1": c1["difference"],
         "c1_lower": c1["lower"],
         "c1_upper": c1["upper"],
+        "c2": c2["difference"],
+        "c2_lower": c2["lower"],
+        "c2_upper": c2["upper"],
+        "c3": c3["difference"],
+        "c3_lower": c3["lower"],
+        "c3_upper": c3["upper"],
         "no_harm_upper": harm["upper"],
-        "share_of_oracle_gain": c1["difference"] / c2["difference"] if c2["difference"] else None,
     }
 
 
 def label_counts(*, smoke: bool) -> pl.DataFrame:
-    """Return how many scored rows each label source puts a lag inside an event for."""
-    frame = read_arm(arm="plain", smoke=smoke)
+    """Return how many scored rows have a lag inside an ARA, by label source."""
+    frame = read_arm(arm=REFERENCE_ARM, smoke=smoke)
     nra = frame.filter(pl.col("nra"))
     return pl.DataFrame(
         {
             "cases": [frame.height],
             "nra_cases": [nra.height],
+            "lag_ara": [int(nra["lag_ara"].sum())],
             "lag_oracle": [int(nra["lag_oracle"].sum())],
-            "lag_xl": [int(nra["lag_xl"].sum())],
-            "lag_both": [int((nra["lag_oracle"] & nra["lag_xl"]).sum())],
-            "lag_xl_only": [int((nra["lag_xl"] & ~nra["lag_oracle"]).sum())],
         }
     )
 
 
-def label_agreement() -> pl.DataFrame:
-    """Return, per series, how the XL labels cover the oracle's and how their signed MW compare.
+def events_per_year() -> pl.DataFrame:
+    """Return, per calendar year and label source, the events and labelled half-hours.
 
-    For each Primary series, over the scored year's half-hours: those inside an oracle event,
-    those inside an XL event, those inside both, and the correlation and the median ratio of the
-    two signed-MW fractions of capacity on the half-hours inside both. A negative correlation
-    would mean a sign mismatch.
+    The XL source counts detector intervals by onset; the oracle source counts logged events and
+    closures by their onset or logged close. Half-hours are those of the 16 series summed.
     """
     series = common.series_table().filter(pl.col("substation_type").is_in(common.GROUPS))
     oracle = labelling.load_labels(series=series)
     xl = labelling.load_xl_labels(series=series, oracle=oracle)
-    first = common.grid_index(times=common.FIRST_RUN)
-    last = common.grid_index(times=common.HOLDOUT)
+    times = common.grid_times()
+    years = times.dt.year().to_numpy()
     rows = []
-    for site in oracle:
-        window = slice(first, last)
-        o_in, x_in = oracle[site].in_event[window], xl[site].in_event[window]
-        both = o_in & x_in
-        o_mw, x_mw = oracle[site].signed_mw[window][both], xl[site].signed_mw[window][both]
-        usable = np.abs(o_mw) > 0
+    for year in range(2021, 2027):
+        mask = years == year
         rows.append(
             {
-                "site": site,
-                "oracle_halfhours": int(o_in.sum()),
-                "xl_halfhours": int(x_in.sum()),
-                "both_halfhours": int(both.sum()),
-                "correlation": float(np.corrcoef(o_mw, x_mw)[0, 1]) if both.sum() > 2 else None,
-                "share_ratio_above_1_5": float(np.mean(x_mw[usable] / o_mw[usable] > 1.5))
-                if usable.any()
-                else None,
-                "max_abs_oracle": float(np.abs(oracle[site].signed_mw).max()),
-                "max_abs_xl": float(np.abs(xl[site].signed_mw).max()),
-                "median_ratio": float(np.median(x_mw[usable] / o_mw[usable]))
-                if usable.any()
-                else None,
+                "year": year,
+                "xl_halfhours": int(sum(xl[s].in_event[mask].sum() for s in xl)),
+                "oracle_event_halfhours": int(sum(oracle[s].in_event[mask].sum() for s in oracle)),
+                "oracle_closed_halfhours": int(sum(oracle[s].closed[mask].sum() for s in oracle)),
+                "ara_halfhours": int(
+                    sum(
+                        fitting.ara_array(labels={"oracle": oracle[s], "xl": xl[s]})[mask].sum()
+                        for s in oracle
+                    )
+                ),
+                "all_halfhours": int(mask.sum()) * len(oracle),
             }
         )
-    return pl.DataFrame(rows, infer_schema_length=None)
+    return pl.DataFrame(rows)
 
 
 def compute_results(*, smoke: bool) -> None:
@@ -391,8 +387,8 @@ def compute_results(*, smoke: bool) -> None:
         for arm in ARM_NAMES
     }
     for arm, keys in key_sets.items():
-        if not keys.equals(key_sets["plain"]):
-            msg = f"arm {arm} does not hold the same cases as the plain arm"
+        if not keys.equals(key_sets[REFERENCE_ARM]):
+            msg = f"arm {arm} does not hold the same cases as the reference arm"
             raise ValueError(msg)
     rows: list[dict[str, object]] = []
     specs = (
@@ -413,12 +409,12 @@ def compute_results(*, smoke: bool) -> None:
     contrasts.write_parquet(results_dir / "contrasts.parquet")
     pl.DataFrame([verdict(contrasts=contrasts)]).write_parquet(results_dir / "verdict.parquet")
     label_counts(smoke=smoke).write_parquet(results_dir / "label_counts.parquet")
-    label_agreement().write_parquet(results_dir / "label_agreement.parquet")
-    plain = read_arm(arm="plain", smoke=smoke)
+    events_per_year().write_parquet(results_dir / "events_per_year.parquet")
+    plain = read_arm(arm=REFERENCE_ARM, smoke=smoke)
     absolute = []
     for arm in ARM_NAMES:
         frame = read_arm(arm=arm, smoke=smoke)
-        for subset in ("nra", "all", "lag_oracle", "lag_xl", "lag_xl_only"):
+        for subset in ("nra", "all", "lag_ara", "lag_oracle"):
             part = subset_of(frame=frame, subset=subset)
             absolute.append(
                 {
@@ -430,13 +426,15 @@ def compute_results(*, smoke: bool) -> None:
                     "cov90": _mean(part["cov90"]),
                     "pin05": _mean(part["pin05"]),
                     "pin95": _mean(part["pin95"]),
+                    "ex05": _mean(part["ex05"]),
+                    "ex95": _mean(part["ex95"]),
                     "cases": part.height,
                 }
             )
     baseline_dir = common.EXPERIMENT_00048_WORK_DIR / "metrics"
     keys_of = {
         subset: subset_of(frame=plain, subset=subset).select(*common.KEYS)
-        for subset in ("nra", "all", "lag_oracle")
+        for subset in ("nra", "all", "lag_ara")
     }
     for name, label in EXPERIMENT_00048_ARMS.items():
         path = baseline_dir / f"{name}.parquet"
@@ -457,6 +455,8 @@ def compute_results(*, smoke: bool) -> None:
                     "cov90": float("nan"),
                     "pin05": float("nan"),
                     "pin95": float("nan"),
+                    "ex05": float("nan"),
+                    "ex95": float("nan"),
                     "cases": part.height,
                 }
             )
@@ -472,7 +472,7 @@ def main() -> None:
     compute_results(smoke=args.smoke)
     results_dir = _dirs(smoke=args.smoke)[2]
     with pl.Config(tbl_rows=200, tbl_cols=20, fmt_str_lengths=60):
-        for name in ("absolute", "label_counts", "label_agreement", "verdict"):
+        for name in ("absolute", "label_counts", "events_per_year", "verdict"):
             print(name)
             print(pl.read_parquet(results_dir / f"{name}.parquet"))
         print(

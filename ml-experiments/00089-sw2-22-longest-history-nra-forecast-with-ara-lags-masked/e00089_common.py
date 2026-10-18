@@ -557,8 +557,8 @@ def case_metrics(
         `qs` (the quantile score), `mae` (absolute error of the median), `tw_p99` (the quantile
         score of the forecast and the observation both floored at the threshold, the
         threshold-weighted CRPS at `historical_p99`), `pin05` and `pin95` (the pinball loss at the
-        0.05 and 0.95 quantiles), `ex95` (the observation exceeds the 0.95 quantile), and `cov90`
-        (the observation lies inside `q05` to `q95`).
+        0.05 and 0.95 quantiles), `ex05` and `ex95` (the observation falls below the 0.05 quantile
+        or exceeds the 0.95 quantile), and `cov90` (the observation lies inside `q05` to `q95`).
     """
     return {
         "qs": pinball_quantile_score(quantiles=quantiles, actual=actual) * 100.0,
@@ -570,6 +570,7 @@ def case_metrics(
         * 100.0,
         "pin05": pinball(quantile=quantiles[:, 0], actual=actual, level=0.05) * 100.0,
         "pin95": pinball(quantile=quantiles[:, 8], actual=actual, level=0.95) * 100.0,
+        "ex05": (actual < quantiles[:, 0]).astype(np.float64),
         "ex95": (actual > quantiles[:, 8]).astype(np.float64),
         "cov90": ((actual >= quantiles[:, 0]) & (actual <= quantiles[:, 8])).astype(np.float64),
     }

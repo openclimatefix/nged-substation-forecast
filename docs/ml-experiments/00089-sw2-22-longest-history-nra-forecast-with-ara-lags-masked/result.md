@@ -29,8 +29,7 @@ decision_rule: >-
   slice. Verdict `supported` when both hold, `small gain` when one holds, `inconclusive` when
   neither interval excludes zero, `refuted` when a lower end is above zero. The in-event-lag rows
   are rows whose valid time lies outside every ARA and whose origin lag, same-time-latest-day lag,
-  or same-time-latest-week lag lies inside an ARA. The 12-month arm with masking (M) and the
-  oracle-only and XL-only label sources are descriptive.
+  or same-time-latest-week lag lies inside an ARA. The arms M, L_ens, and LM_ens are descriptive.
 benchmark: >-
   Arm R, the 12-month-window booster with ARA targets removed and lags unmasked, refitted by this
   experiment. The plain booster of experiment 86, `manual_heuristic`, and `climatology` are
@@ -59,10 +58,13 @@ Planned. The plan, written before any fit, is in the front matter and in the bul
   onward) beat the 12-month window, and does setting ARA lags to missing help on rows whose lags
   lie in an ARA?
 - **Arms** (Primary N1 XGBoost, monthly P-roll refits, 150 rounds, eta 0.15, control member only,
-  seed 0, 16 series). R: 12-month window, ARA targets removed, lags unmasked. L: all history before
-  each refit with a half-life of 0.5 years (the recency weight experiment 86 used), ARA targets
-  removed, lags unmasked. LM: L with every lag inside an ARA set to missing. M: R with masking
-  (descriptive). Every arm drops training rows whose target is inside an ARA.
+  seed 0, 16 series). Every arm drops training rows whose target is inside an ARA. R: the last 365
+  days, recency half-life 0.5 years (experiment 86's recipe), lags unmasked. M: R with lags inside
+  an ARA set to missing. L: all rows since 2021-03, recency half-life 2 years, lags unmasked. LM:
+  L with masked lags. L_ens and LM_ens: L and LM using only rows from 2024-04-01, the clean check
+  on one weather product. R and M are descriptive about masking alone; L_ens and LM_ens are
+  descriptive about the product seam. L and R differ in window and half-life together, and L_ens
+  separates the two partly.
 - **ARA label.** The union of the XL detector's intervals (hindsight end rule), NGED's logged events,
   and NGED's logged closures. Neither source labels anything before 2022-01, so 2021-03 to
   2021-12 is unlabelled and its switching stays in the training targets. The write-up reports
