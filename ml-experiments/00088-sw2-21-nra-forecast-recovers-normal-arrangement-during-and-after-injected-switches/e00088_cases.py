@@ -435,8 +435,17 @@ def main() -> None:
     jobs = [(seed, batch, shape) for shape in SCORED_SHAPES for seed, batch in batches]
     if args.pilot:
         init_worker()
-        _STATE["origin_ok"] = lambda o: o.month in (8, 10, 12)  # pilot: boosters written so far
-        seed, batch = sorted(batches, key=lambda b: len(b[1]))[len(batches) // 2]
+        _STATE["origin_ok"] = lambda o: o.month == 8  # pilot: the refit whose boosters exist
+
+        def aug_cases(item: tuple[int, list[Event]]) -> int:
+            return sum(
+                classify(event=e, newest=newest_stamp(origin=o)) is not None
+                for e in item[1]
+                for o in common.origins_of_subset(subset="gap")
+                if o.month == 8
+            )
+
+        seed, batch = max(batches, key=aug_cases)
         print(run_batch((seed, batch, "S2")))
         return
     started = time.monotonic()

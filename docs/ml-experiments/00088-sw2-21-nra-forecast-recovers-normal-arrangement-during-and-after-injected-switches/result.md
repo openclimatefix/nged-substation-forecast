@@ -41,9 +41,9 @@ decision_rule: >-
   with causal XL MW (whether masking the targets adds to the lag correction). C4, arm 2 with
   causal XL MW minus arm 1 (the lag correction alone). The verdict is `supported` when the upper
   end of C1 is below zero, C1's point value is at least 20% of the gap from arm 1 to the ceiling
-  (arm 5), and C1 is negative in at least 5 of the 6 onset months. It is `small gain` when the
+  (arm 5), and C1 is negative in at least 3 of the 4 scored onset months. It is `small gain` when the
   upper end of C1 is below zero but one of the other two conditions fails, `inconclusive` when
-  C1's interval contains zero, and `refuted` when its lower end is above zero. Six month blocks
+  C1's interval contains zero, and `refuted` when its lower end is above zero. Four month blocks
   give few distinct resamples, so the per-month signs are part of the rule and the interval is
   read as a range. The threshold of 20% of the gap is set by the cost of porting: the full NRA
   forecast needs a causal detector, a second booster family, and a label table on the serving
@@ -207,3 +207,24 @@ A Sonnet reviewer found these, all accepted unless noted.
   the gap's interval excludes zero.
 - Compute estimate and a pilot are added; the 73 every-fifth-day runs are dropped.
 - Rejected: none.
+
+## Changes made before any scoring
+
+The event draw and a timing pilot ran before any forecast was scored. They changed the plan as
+follows.
+
+- **Scored months.** August and December 2025 hold no 15-day window that is quiet on any series,
+  so the draw returned none. The scored months are the four even months that do:
+  October 2025 (76 events), February 2026 (72), April 2026 (99), and June 2026 (99). The
+  decision rule's resampling therefore uses four month blocks, and C1 must be negative in 3 of
+  them. Events starting in the odd months (July, September, January, March, May) are drawn too and
+  reported separately as a descriptive check, because the detector's score and threshold were
+  fitted on odd months and so favour it there.
+- **Quiet rule.** Experiment 37's switching log ends in March 2026, so the quiet rule also
+  excludes 7 days around every closure in experiment 41's labelled set, which runs to June 2026.
+- **Draw.** 839 events in total, 27 headline-band and 9 per other band requested per month, those
+  drawn over a data gap removed. Shape S5 (profile shifted 12 hours) is not scored.
+- **Compute.** The pilot forecast 40 cases with all 8 variants in 9 s, so all events and 5 shapes
+  are scored. Each forecast uses 11 of the 51 ENS members (the control member and every fifth),
+  leads up to 10 days, and the spread factor of 1.15 of experiment 33 on the quantiles.
+
