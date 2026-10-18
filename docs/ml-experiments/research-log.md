@@ -121,6 +121,7 @@ the maintainer to confirm.
 | [00085 - Cheaper retraining schedules](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) | Do cheaper retraining schedules rank the cadence and starting-value contrasts the way full weekly retraining does? | Partly supported: a monthly 12-month-window refit and a weekly 150-round refit reproduce the monthly-minus-weekly gap (+0.118 and +0.125 against +0.125); the starting-value gap (-0.017) is too small to test | Not for production | 2026-10-18 |
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
+| [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2071,3 +2072,27 @@ refitted the XGBoost demand model weekly for 16 Primary substations on four arms
   from labelled switching?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1307).
 
 ![Planned contrasts](00075-sw2-11-nra-forecast-with-labelled-switching-masks/figure_1.svg)
+
+### 00086: the normal running arrangement forecast with the detector's labels
+
+**Correcting the lags for switching did not lower the Primary demand forecast's error with either
+source of labels, and the detector's labels raised the error slightly on all rows outside switching,
+so the verdict is inconclusive.** The experiment refitted the XGBoost demand model monthly for 16
+Primary substations and scored 292 daily runs, giving the model each lag minus the moved MW and the
+moved MW as three columns.
+
+- **Headline result:** on the 37,394 half-hours outside switching whose lag sits inside a logged
+  event, detector labels minus the plain arm +0.48 points of capacity (98.33% interval -0.06 to
+  +1.72); NGED's logs minus the plain arm -0.29 (-2.06 to +0.68). The plain arm scored 10.778.
+- **Outside switching:** detector labels raised the score by 0.056 (+0.016 to +0.126), above the
+  +0.02 margin the plan allowed.
+- **Finding for later experiments:** the detector marks 302,619 scored half-hours (8.1 times as many
+  as the 37,394 of the logs), and both mark only 5,741 (15% of the logs' half-hours). One option for
+  the next experiment is to inject switching events of known size and test whether the corrected-lag
+  forecast recovers the true normal running arrangement. The 768 trained boosters are kept for it.
+- **Write-up and pull request:**
+  [result](00086-sw2-12-detector-labels-for-nra-forecast/result.md),
+  [PR #1322 (Experiment 86: do the detector's switching labels give the same gain as NGED's
+  logs?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1322).
+
+![Contrasts on the rows with a lag inside a logged event](00086-sw2-12-detector-labels-for-nra-forecast/figure_1.svg)
