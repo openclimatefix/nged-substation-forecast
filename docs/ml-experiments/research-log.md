@@ -123,6 +123,7 @@ the maintainer to confirm.
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
 | [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
+| [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer history and pooling hurt? | Inconclusive: 12 of 13 series drift by 1 point a year or more in some hour band, but the loss from extra history is not linked to drift once one series is set aside (r = -0.03), and the pooled models' extra bias does not follow level (r = 0.13) | Not for production | 2026-10-18 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2124,3 +2125,18 @@ arrangement.
   abnormal running arrangement?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1333).
 
 ![Change in Brier score against the yes-or-no flag](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/figure_1.svg)
+
+### 00092: how has Primary demand drifted since 2022? (LV0)
+
+**The drift is real and mostly specific to each series, but a plain level shift does not explain why
+longer history hurts or why pooled models lose.** On the stored forecasts of five experiments, 12 of
+13 Primaries drift by at least 1 point of capacity a year in some hour band, and summer midday falls
+by 1.3 points a year (95% interval -2.3 to -0.9), which fits growing embedded solar output. The loss
+from extra history tracks each series' level change at r = 0.70, but only through one series; without
+it r = -0.03. The pooled models' extra bias does not follow each series' level (r = 0.13). Weekly
+refits gain 0.017 points over monthly refits, and the gain is larger only in the 3 steepest-drifting
+series. AGE1 should run before LV1.
+
+- **Write-up:** [the full result page](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md).
+
+![Drift by hour band and season](00092-lv0-drift-diagnostics-on-stored-predictions-demand/figure_1.svg)
