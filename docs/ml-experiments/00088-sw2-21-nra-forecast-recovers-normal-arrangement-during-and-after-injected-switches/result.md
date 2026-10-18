@@ -1,7 +1,7 @@
 ---
 id: "00088"
 slug: sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches
-status: planned
+status: done
 size: complex
 hypothesis: >-
   When a Primary substation (a substation that steps down to the local distribution network) is
@@ -62,14 +62,158 @@ metric: >-
   MW-weighted mean absolute error of the median forecast against the true unmodified series
   (points of capacity), with the quantile score, the pinball loss at the 0.05 and 0.95 quantiles,
   and 90% interval coverage beside it
-code: >-
-  ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-
-  switches/
+verdict: inconclusive
+best_arm: >-
+  With the injected MW, the oracle-trained NRA booster (arm 3) scores 4.619 points of capacity in
+  mean absolute error against the true unmodified power, against 5.409 for the plain booster
+  (arm 1) and 4.455 for the ceiling (arm 5). With the detector's own MW, no arm is separable from
+  the plain booster: the RO-NC-trained NRA booster (arm 4) scores 5.261.
+headline: >-
+  C1, arm 4 with RO-NC MW as built minus plain: -0.149 points of capacity (98.75% interval -1.174
+  to +0.148), closing 16% (-17% to +67%) of the gap to the ceiling, negative in 2 of 4 months.
+  C2, oracle-trained NRA with injected MW minus plain: -0.790 (-1.397 to -0.412), closing 83%
+  (70% to 91%). C3, arm 4 minus arm 2: +0.070 (-0.015 to +0.171). C4, arm 2 minus plain: -0.219
+  (-1.159 to +0.095). Post hoc, with the largest of overlapping detector steps: arm 4 minus plain
+  -0.406 (-1.223 to -0.083), closing 43% (17% to 71%).
+lessons: >-
+  Knowing the MW moved is what recovers the normal running arrangement. The detector's MW, as
+  built, is 1.5 times too large from the second day, because overlapping intervals are summed,
+  and it stays on for days after a transfer ends. Masking training targets adds nothing.
+advice:
+  - >-
+    Estimate the MW of a detected transfer once per half-hour, from the largest step of the
+    overlapping detector intervals and not their sum, before using it to correct lags: arm 4's
+    gain over plain went from -0.15 (-1.17 to +0.15) to -0.41 (-1.22 to -0.08) points (C1, post
+    hoc).
+  - >-
+    Make the detector's end estimate faster, or let the MW decay to zero, before correcting lags
+    in production: after a transfer ended, correcting with the detector's MW raised the error by
+    0.15 to 0.46 points for up to 7 days (family B figure).
+  - >-
+    Do not drop the training rows inside detected transfers to improve a forecast of the normal
+    running arrangement: arm 4 minus lag correction alone was +0.07 (-0.015 to +0.171) points
+    (C3).
+  - >-
+    Test any future detector-fed correction against the true MW first: with the injected MW the
+    lag correction closes 50% of the gap and the oracle-trained booster 83%, so a detector must
+    supply MW within about 1.5 times of the truth to keep that gain (figure 3).
+  - >-
+    Score the real transfers with forecast origins every few hours, not once a day: no daily
+    09:00 origin falls inside any of the 4 labelled real transfers of the validation year with
+    both sides observed, so the real-event check scored none.
+production_status: not-for-production
+adopted_in: none
+code: ml-experiments/00088-*/
 ---
 
 # Experiment 88: does the full NRA forecast recover the normal arrangement during a switch?
 
-Plan only; the write-up replaces this page when the run finishes.
+**Take-home message: a demand forecast that corrects its lag inputs for a switching transfer
+recovers the normal running arrangement only if the megawatts moved are known, and the detector
+we have does not yet supply them well enough.** With the true MW, correcting the lags closed
+about half of the extra error that a transfer causes, and a booster trained on NGED's logged
+transfers closed 83%. With the MW from the refit-offset neighbour-count detector (RO-NC, called
+XL in experiments 70, 71, and 82), run only on data before the forecast, the gain was 16% and not
+separable from zero. The detector's MW was about 1.5 times the true MW from the second day on,
+because overlapping detector intervals are summed, and the detector kept correcting for days after
+a transfer had ended. Counting overlapping intervals once (post hoc) closed 43% inside a transfer,
+but still raised the error after it ended. Dropping the transfer's half-hours from the training
+targets added nothing. The verdict is **inconclusive**.
+
+**Scope.** The forecast origins run from 2025-07-02 to 2026-06-30 (292 daily runs, 16 Primary
+substations). These numbers are not for the whole year: C1 to C4 are scored only on forecast
+origins that fall inside an injected transfer (family A), which is 613 cases per shape (172
+transfers, 233 distinct series-origin pairs) and 2,452 cases over the four pooled shapes. Per
+shape that is 13% of the year's 4,672 series-origin pairs (5% as distinct pairs), and 292,575 of
+about 2.24 million target half-hours. Transfers start in four even months (October 2025,
+February, April, and June 2026), and those four months are the blocks that are resampled.
+August and December hold no 15-day window that is quiet on any substation, so they are not
+scored. Every forecast is scored against the true, unmodified power. No metered half-hour
+(abnormal during a switch) is scored.
+
+We asked whether the normal-running-arrangement (NRA) booster of experiments 75 and 86 forecasts
+the power a substation would have drawn had a switch not happened, while the switch is on
+(family A) or after it has ended (family B). The metered power cannot answer this, so we injected
+known transfers of power into a substation's recorded power and into its receivers', in quiet
+periods, rebuilt the lag inputs from the injected power, and scored against the true unmodified
+power. Five arms were scored: the plain booster (arm 1), the lag-correction booster (arm 2), the
+NRA booster trained on NGED's logged events (arm 3), the NRA booster trained on RO-NC events
+(arm 4), and the plain booster on unmodified lags (ceiling, arm 5). Arms 2 to 4 were run with the
+MW from the injection and from RO-NC run on data before the origin.
+
+![Error by time since onset](figure_1.svg)
+
+![Planned contrasts](figure_2.svg)
+
+![Share of the gap closed](figure_3.svg)
+
+![After the transfer ends](figure_4.svg)
+
+- **Method.** 839 injected transfers in 10 months (experiment 82's sampler, quiet within 7 days
+  of any logged closure or alarm), each under five shapes: S1 donor profile, S2 constant MW,
+  S3 receiver profile, S4 fitted mix, and S6 donor profile reversed in time. The headline pools
+  S2, S3, S4, and S6. Boosters: experiment 86's `plain` and `lagmw_xl` and two new boosters
+  (`nra_oracle`, `nra_xl`) on the monthly rolling schedule (150 rounds, eta 0.15, seed 0). Each
+  forecast uses 11 of the 51 ensemble members and leads to 10 days. Weights: the transfer's mean
+  MW. The retraining schedule is monthly; the contrasts are about lags, not cadence.
+- **Absolute error in family A (points of capacity, 95% interval).** Plain 5.409 (4.785 to
+  6.049). Ceiling 4.455 (3.913 to 4.976). Lag correction, injected MW 4.923; RO-NC MW 5.190.
+  Oracle-trained NRA, injected MW 4.619; RO-NC MW 5.069. RO-NC-trained NRA, injected MW 4.929;
+  RO-NC MW as built 5.261; largest-step MW (post hoc) 5.003. The plain-to-ceiling gap is 0.95
+  (0.70 to 1.44) points, and it persists at every lead: plain minus ceiling is 0.74, 0.78, 1.05,
+  and 0.96 at leads of 0 to 24 h, 1 to 2 d, 2 to 6 d, and 6 to 10 d.
+- **Planned contrasts (98.75%, shapes pooled).** C1 -0.149 (-1.174 to +0.148), 2 of 4 months
+  negative. C2 -0.790 (-1.397 to -0.412), 4 of 4. C3 +0.070 (-0.015 to +0.171). C4 -0.219
+  (-1.159 to +0.095). Per shape (95%), C1 is -0.06 to -0.25 with every interval containing zero,
+  and C2 is -0.69 to -0.84 with none containing zero.
+- **Share of the gap closed (95%).** Injected MW: lag correction 51% (9% to 74%), RO-NC-trained
+  NRA 50% (12% to 73%), oracle-trained NRA 83% (70% to 91%). RO-NC MW as built: 23% (-10% to
+  66%), 16% (-17% to 67%), and 36% (-2% to 74%). Largest-step MW (post hoc): lag correction 48%
+  (18% to 71%), NRA 43% (17% to 71%). By time since onset the gap is 0.42, 0.93, and 1.95 points
+  (0 to 24 h, 1 to 3 d, over 3 d), and RO-NC-trained NRA with the as-built MW closes 17%, 8%, and
+  23%, none separable from zero.
+- **What the detector reports.** At the newest usable lag it had marked 32%, 73%, and 70% of the
+  moved MW (by time since onset), with the right sign in all but 2% of cases. The median ratio of
+  its MW to the injected median was 0.71, 1.47, and 1.45. Split after the fact by that ratio, the
+  as-built RO-NC-trained NRA booster changed the error against plain by -0.57 points where the
+  detector's MW was at most 1.5 times the true MW (565 of 2,452 cases), +0.26 where it was more
+  than 1.5 times (461 cases), and -0.06 where the detector marked nothing (1,426 cases). The
+  largest-step MW changed the error by -0.71 in the second group.
+- **After a transfer ends (family B, descriptive).** Plain 4.93, 4.77, and 4.90 points at 0 to 24 h,
+  1 to 3 d, and 3 to 7 d after the end. RO-NC-trained NRA with as-built MW is higher by +0.36
+  (0.07 to 0.55), +0.46 (0.23 to 0.73), and +0.35 (0.12 to 0.50). With injected MW it is lower by
+  0.31, 0.16, and 0.11. The detector still marked 43%, 36%, and 13% of cases after the end.
+- **Tails (family A, shapes pooled).** Pinball loss at the 0.05 and 0.95 quantiles and 90%
+  interval coverage: plain 0.794, 0.792, 0.878; oracle-trained NRA with injected MW 0.609, 0.675,
+  0.913; RO-NC-trained NRA as built 0.798, 0.736, 0.882; ceiling 0.587, 0.667, 0.923. The stored
+  boosters hold nine quantile levels, so the 0.01 and 0.99 quantiles and the curtailment-cost
+  metric are not scored.
+- **Odd months (descriptive; the detector was tuned there).** C1 -0.165 (-0.590 to +0.060), post hoc
+  largest-step MW -0.204 (-0.592 to -0.000), oracle -0.328 (-1.102 to +0.034), 95% intervals.
+- **False-alarm check.** On 401 distinct (series, origin) pairs with no transfer, the detector
+  marked none at the newest lag, so no false alarm arose. Running the NRA boosters with zero MW
+  raised the error over the ceiling by +0.004 (RO-NC-trained), +0.015 (lag correction), and
+  +0.041 (oracle-trained) points.
+- **Real-event check: not scored.** Four labelled real transfers of the validation year have both
+  sides at most half missing, each lasting 1 to 13 hours, and no daily 09:00 origin falls inside
+  them. The conserved transfers of experiment 41 that last days have one side mostly missing.
+- **Caveats.** Four month blocks give a coarse interval, and intervals read as ranges. Injected
+  transfers add a known MW to recorded power with the stored residual model unchanged (the fast
+  path of experiment 43). The causal detector may fire up to a day before the true onset with the
+  step understated, which the code reproduces from experiment 82. Experiment 86's XL labels sum
+  overlapping intervals, as the as-built arm does. The oracle-trained arm 3 uses NGED's logged
+  events at training, and the RO-NC-trained arm 4 uses hindsight labels, so neither is a live
+  service.
+- **Deviations from the plan.** Months, draw size, and shapes are in the plan section "Changes made
+  before any scoring" below. After the first scoring pass, the causal detector's overlapping
+  alarm and partner intervals at one onset were summed twice (the experiment 82 label export keeps
+  one); this was fixed and the causal variants re-run before any number above was written. The
+  largest-step variants are post hoc.
+- **What to try next.** Replace the detector's summed MW by one MW per half-hour, end a transfer
+  as soon as the step reverses, and let the MW decay in the days after the end, then repeat the
+  family A and B contrasts. Score real transfers with several forecast origins a day.
+
+## Plan (written before any code ran)
 
 - **Question.** [Experiment 75](../00075-sw2-11-nra-forecast-with-labelled-switching-
   masks/result.md)
@@ -93,7 +237,7 @@ Plan only; the write-up replaces this page when the run finishes.
   does not assume (S6 is new), and report by donor step in noise units. Experiment 58 and 43:
   injected events are in quiet periods (no logged closure within 7 days, no alarm within 2 days).
 
-## Design
+### Design
 
 - **Injection.** Experiment 82's harness: `draw_events` with the 600-event stratification (160 in
   the headline band, 55 in each of the other eight bands of size and duration), onsets restricted
@@ -186,7 +330,7 @@ Plan only; the write-up replaces this page when the run finishes.
   cores. Each worker handles one batch of events (disjoint series within 7 days) and writes its
   output to its own file. Scoring waits until experiment 86 has written all its boosters.
 
-## Process
+### Process
 
 1. Sonnet writes this plan; one Sonnet reviewer reads it; findings are triaged below.
 2. Sonnet implements. One Sonnet code reviewer checks for leakage (nothing at or after the
@@ -196,7 +340,7 @@ Plan only; the write-up replaces this page when the run finishes.
    and a second Sonnet reviewer runs the prose review.
 4. The PR merges under the skill's "Merging" rules.
 
-## Plan review
+### Plan review
 
 A Sonnet reviewer found these, all accepted unless noted.
 
@@ -215,7 +359,7 @@ A Sonnet reviewer found these, all accepted unless noted.
 - Compute estimate and a pilot are added; the 73 every-fifth-day runs are dropped.
 - Rejected: none.
 
-## Changes made before any scoring
+### Changes made before any scoring
 
 The event draw and a timing pilot ran before any forecast was scored. They changed the plan as
 follows.

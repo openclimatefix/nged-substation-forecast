@@ -122,6 +122,7 @@ the maintainer to confirm.
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
+| [00088 - Normal running arrangement forecast on injected switches, SW2-21](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md) | When a Primary substation is inside a switching transfer or has just left one, does the NRA forecast recover the true unmodified power, with the MW from the injection and from the refit-offset neighbour-count detector run only on data before the origin? | Inconclusive: with the injected MW the oracle-trained NRA booster closes 83% (70% to 91%) of the gap to a forecast with no switch; with the detector's MW as built the RO-NC-trained NRA booster closes 16% (-17% to 67%), -0.149 points of capacity against plain (98.75% interval -1.174 to +0.148) | Not for production | 2026-10-18 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2096,3 +2097,28 @@ moved MW as three columns.
   logs?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1322).
 
 ![Contrasts on the rows with a lag inside a logged event](00086-sw2-12-detector-labels-for-nra-forecast/figure_1.svg)
+
+### 00088: does the normal running arrangement forecast recover the true power during a switch?
+
+**A forecast with lags corrected for a switch recovers the normal running arrangement only when the
+MW moved is known, and the detector's MW, as built, is not yet good enough, so the verdict is
+inconclusive.** The experiment injected known transfers into 16 Primary substations' recorded power
+and scored forecasts against the true unmodified power, on forecast origins inside a transfer
+(613 cases per shape, 172 transfers, in four even months of the validation year; not the whole
+fold).
+
+- **Headline result:** with the injected MW, the oracle-trained NRA booster closes 83% (70% to 91%)
+  of the gap to a forecast with no switch (-0.790 points of capacity against plain, 98.75% interval
+  -1.397 to -0.412). With the refit-offset neighbour-count detector's MW as built, the
+  RO-NC-trained NRA booster is -0.149 (-1.174 to +0.148) and closes 16% (-17% to 67%).
+- **Finding for later experiments:** the detector's MW was about 1.5 times the true MW from the
+  second day, because overlapping intervals are summed, and it stayed on for days after a transfer
+  ended (+0.36 to +0.46 points against plain). Taking the largest step instead (post hoc) gave
+  -0.406 (-1.223 to -0.083) inside a transfer. Dropping the transfer's half-hours from the training
+  targets added nothing (+0.070, -0.015 to +0.171).
+- **Write-up and pull request:**
+  [result](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md),
+  [PR #1328 (Experiment 88: does the full NRA forecast recover the normal running arrangement
+  during and after injected switches?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1328).
+
+![Error by time since the transfer began](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/figure_1.svg)

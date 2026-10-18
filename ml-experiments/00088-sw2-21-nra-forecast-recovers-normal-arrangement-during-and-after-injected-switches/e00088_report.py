@@ -198,6 +198,33 @@ def by_bins(
     return pl.DataFrame(rows)
 
 
+def arm_by_bin(
+    *,
+    cases: pl.DataFrame,
+    family: str,
+    column: str,
+    bins: tuple[tuple[str, float, float], ...],
+) -> pl.DataFrame:
+    """Return each arm's weighted mean absolute error with a 95% interval in each bin."""
+    frame = cases.filter(pl.col("scored") & (pl.col("family") == family))
+    rows = []
+    for name, low, high in bins:
+        part = frame.filter((pl.col(column) >= low) & (pl.col(column) < high))
+        for arm, variant in stats.ARMS.items():
+            work = part.with_columns(pl.col(f"mae_{variant}").alias("_v")).drop_nulls("_v")
+            interval = stats.mean_value(frame=work, shapes=HEADLINE, column="_v")
+            rows.append(
+                {
+                    "bin": name,
+                    "arm": arm,
+                    "value": interval.point,
+                    "low": interval.low,
+                    "high": interval.high,
+                }
+            )
+    return pl.DataFrame(rows)
+
+
 def lead_band_table(*, cells: pl.DataFrame, events: pl.DataFrame) -> pl.DataFrame:
     """Return each variant's MW-weighted mean error by lead band, family A, headline shapes."""
     weights = events.select("shape", "event_id", "moved_mw", "onset_month").with_columns(
@@ -245,7 +272,7 @@ def controls() -> None:
             .agg(
                 mae=(pl.col("mae") * pl.col("n")).sum() / pl.col("n").sum(),
                 qs=(pl.col("qs") * pl.col("n")).sum() / pl.col("n").sum(),
-                cases=pl.struct("site", "origin").n_unique(),
+                pairs=pl.struct("site", "origin").n_unique(),
                 marked=(pl.col("caus_mw_newest") != 0).mean(),
             )
             .sort("variant")
@@ -256,6 +283,9 @@ def controls() -> None:
     real_path = common.CASES_DIR / "controls_real.parquet"
     if real_path.exists():
         table = pl.read_parquet(real_path)
+        if table.is_empty():
+            print("\nReal-event check: no forecast origin falls inside an eligible event")
+            return
         summary = (
             table.group_by("variant")
             .agg(
@@ -269,6 +299,53 @@ def controls() -> None:
         print("\nReal-event check (NRA estimates as the truth)")
         print(summary)
         save(name="controls_real", frame=summary)
+
+
+def scope_and_shapes(*, cases: pl.DataFrame) -> None:
+    """Print the case counts, the per-shape contrasts, and the split by the detector's MW ratio."""
+    scored = cases.filter(pl.col("scored") & (pl.col("family") == "A"))
+    print("\nScope: family A, scored months")
+    for shape in stats.ALL_SHAPES:
+        part = scored.filter(pl.col("shape") == shape)
+        print(
+            f"{shape}: cases {part.height}, transfers {part['event_id'].n_unique()}, distinct "
+            f"(series, origin) {part.select('site', 'origin').n_unique()}, target half-hours "
+            f"{int(part['n'].sum())}"
+        )
+    headline = scored.filter(pl.col("shape").is_in(HEADLINE))
+    print(f"headline cases {headline.height}, target half-hours {int(headline['n'].sum())}")
+    print(f"fold series-origin pairs {16 * 292}, half-hours at leads to 10 d {16 * 292 * 480}")
+    print("\nPer-shape contrasts, 95% intervals")
+    for shape in stats.ALL_SHAPES:
+        texts = []
+        for label, arm in (("C1", "arm4_caus"), ("C2", "arm3_inj"), ("cmax", "arm4_cmax")):
+            interval = stats.contrast(
+                frame=scored, shapes=(shape,), arm_a=arm, arm_b="arm1", level=95.0
+            )
+            texts.append(f"{label} {interval.text()}")
+        print(shape, "; ".join(texts))
+    split = headline.with_columns(
+        ratio=(pl.col("caus_mw") / pl.col("inj_mw")).abs(),
+        found=pl.col("caus_mw") != 0,
+        d=pl.col("mae_nra_xl_caus") - pl.col("mae_plain"),
+        dm=pl.col("mae_nra_xl_cmax") - pl.col("mae_plain"),
+    ).with_columns(
+        band=pl.when(~pl.col("found"))
+        .then(pl.lit("not marked"))
+        .when(pl.col("ratio") <= 1.5)
+        .then(pl.lit("ratio at most 1.5"))
+        .otherwise(pl.lit("ratio above 1.5"))
+    )
+    print("\nChange against plain by the detector's MW over the injected MW (post hoc split)")
+    print(
+        split.group_by("band")
+        .agg(
+            cases=pl.len(),
+            as_built=(pl.col("d") * pl.col("w")).sum() / pl.col("w").sum(),
+            largest_step=(pl.col("dm") * pl.col("w")).sum() / pl.col("w").sum(),
+        )
+        .sort("band")
+    )
 
 
 def main() -> None:
@@ -294,6 +371,15 @@ def main() -> None:
         print(f"\n{name}: family {family} by {column}")
         with pl.Config(tbl_rows=30, tbl_cols=40, fmt_str_lengths=30):
             print(table)
+    hours_b = (("0-24 h", 0.0, 24.0), ("1-3 d", 24.0, 72.0), ("3-7 d", 72.0, 1e9))
+    save(
+        name="arm_by_onset",
+        frame=arm_by_bin(cases=cases, family="A", column="hours_at_origin", bins=stats.ONSET_BINS),
+    )
+    save(
+        name="arm_by_since_end",
+        frame=arm_by_bin(cases=cases, family="B", column="hours_at_origin", bins=hours_b),
+    )
     bands = lead_band_table(cells=cells, events=events)
     save(name="lead_bands", frame=bands)
     print("\nBy lead band (family A, headline shapes, MW-weighted mean absolute error)")
@@ -306,6 +392,7 @@ def main() -> None:
     save(name="odd_months", frame=odd)
     print("\nOdd-month check (detector tuned on these months), 95% intervals")
     print(odd)
+    scope_and_shapes(cases=cases)
     controls()
     scored_a = cases.filter(pl.col("scored") & (pl.col("family") == "A"))
     absolute = stats.absolute_scores(frame=scored_a, shapes=HEADLINE)
