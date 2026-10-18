@@ -223,6 +223,7 @@ nav:
       - "Do the mechanical misses of the end rule come from monthly refits and data gaps?": ml-experiments/00071-sw2-18-refit-offset-and-gap-bridging/result.md
       - "Does the count of neighbours that step the same way find more of the moved load?": ml-experiments/00070-sw2-19-same-sign-neighbour-count/result.md
       - "Do the refit offset and the same-sign neighbour count add up in one switching detector?": ml-experiments/00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md
+      - "Does the full NRA forecast recover the normal running arrangement during and after an injected switch?": ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md
       - "Does a step-loss monitor find a lost inverter at the solar farms?": ml-experiments/00072-p35-step-loss-monitor-for-solar-farms/result.md
       - "Does refitting the lagless XGBoost model without the detected switching help the detector and the forecast?": ml-experiments/00068-sw2-5-train-detect-retrain-loop/result.md
       - "Does weekly retraining still win on the 292 daily runs experiment 34 left out?": ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md
@@ -231,8 +232,10 @@ nav:
       - "Do embedded-solar capacity features lower the error of Primary demand forecasts?": ml-experiments/00031-embedded-pv-features-primary-demand/result.md
       - "Does a forecast of the GSP's PV_Live solar generation lower the stage 2 quantile score of GSP demand?": ml-experiments/00028-pvlive-forecast-in-stage2-gsp-demand/result.md
       - "Can a Primary demand forecast learn the normal running arrangement from labelled switching?": ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md
+      - "Can the causal switching detector give a calibrated probability of an abnormal running arrangement?": ml-experiments/00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md
       - "Do the detector's switching labels give the same gain as NGED's logs?": ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/result.md
       - "Does telling the model how unusual each lag is improve the forecast?": ml-experiments/00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md
+      - "Is the drift of Primary demand mostly a per-series level?": ml-experiments/00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md
       - "Do same-time sunshine analogues add anything once the solar forecast is explicit?": ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md
   - Live service:
       - Overview: live_service/index.md
