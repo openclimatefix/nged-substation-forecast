@@ -169,3 +169,22 @@ runs. The verdict is partly supported: cadence is supported, and starting value 
 - **Next:** use monthly 12-month-window refits for feature and recipe screening, the 150-round
   weekly refit where weekly cadence matters, and keep full weekly retraining for the best-guess
   experiments and production.
+
+## Recommended R&D defaults
+
+- **Feature and recipe contrasts of 0.05 points or more:** use monthly refits on a 12-month window
+  with 150 rounds and `eta` 0.15. It reproduced the cadence gap to within 0.01 and repeated to
+  within 0.001. It saves about 1,420 to 1,540 of the 1,590 compute minutes a weekly year takes (90
+  to 97%). Only the cadence contrast was tested, so a feature contrast is assumed to carry over.
+- **Contrasts about cadence, retraining rules, or how fast a model adapts:** use the weekly refit on
+  the whole history with 150 rounds and `eta` 0.15. It scored within 0.003 of full weekly and saves
+  about 1,090 minutes (69%). Experiment 34 found a weekly-analogue gain of 0.05 shrank to 0.01
+  under monthly retraining, so a conclusion about recent-data features, the 14-day correction, the
+  training window, or the half-life can change with the schedule. Check it on this weekly refit.
+- **Absolute scores and tail scores:** quote them from weekly retraining only. Monthly refits on a
+  12-month window score 0.16 points above weekly (5.563 against 5.405) and 0.05 above at q95
+  pinball loss, so the same arm reads worse on every schedule except weekly.
+- **Quarterly refits:** do not use them. They lose 0.26 points to monthly and 0.38 to weekly, and
+  this experiment cannot show that they rank any contrast correctly.
+- **Contrasts under 0.05 points:** this experiment cannot say which schedule keeps them, because
+  the only one tested, the zero-start gap, was -0.017.
