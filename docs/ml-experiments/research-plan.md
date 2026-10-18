@@ -18,6 +18,7 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [BG2](../ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) | How well does the best guess assembled from the last experiments do against the previous best of each target class, and what does each part add? | 1 | Nothing | Planned as experiment 87 |
 | [SW2-12](#sw2-12-a-v1-forecast-under-the-normal-running-arrangement-with-the-detectors-labels) | How much of the NRA skill of experiment 75 is lost when the switching labels come from the detector instead of NGED's logs? | 3 | SW2-8 | Proposed |
 | [SW2-21](#sw2-21-recovering-the-normal-running-arrangement-during-and-after-a-switch) | When a Primary is in, or has just left, an abnormal running arrangement, does the NRA forecast recover the true unmodified power on injected switches, with the MW from the truth and from the causal XL detector? | 2 | SW2-12 (experiment 86) | Proposed; tests the NRA forecast's main purpose |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
