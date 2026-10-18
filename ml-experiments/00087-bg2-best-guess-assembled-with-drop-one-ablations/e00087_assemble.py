@@ -55,7 +55,7 @@ import itertools
 import shutil
 import tempfile
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -653,8 +653,14 @@ def single_member_arm(
     return finish_member(ctx=ctx, raw=raw, correct=correct, spread=True)
 
 
-def build_primary(*, ctx: Context) -> None:
-    """Write the Primary staircase S1 to S6 and the ablations A2 to A7 (A1 is S5)."""
+def build_primary(*, ctx: Context, only: Collection[str] | None = None) -> None:
+    """Write the Primary staircase S1 to S6 and the ablations A2 to A7 (A1 is S5).
+
+    Args:
+        ctx: The context.
+        only: Build only these arms, or every arm if `None` (an early reproduction check needs
+            only the weekly arm).
+    """
     primary = ("Primary",)
     plan: dict[str, Callable[[], pl.DataFrame]] = {
         "p_s1_frozen": lambda: single_member_arm(
@@ -695,6 +701,8 @@ def build_primary(*, ctx: Context) -> None:
         ),
     }
     for name, build in plan.items():
+        if only is not None and name not in only:
+            continue
         started = time.monotonic()
         try:
             table = build()
@@ -704,7 +712,8 @@ def build_primary(*, ctx: Context) -> None:
             print(f"{name}: skipped, {error}", flush=True)
             continue
         emit(ctx=ctx, name=name, table=table, started=started)
-    build_noise_repeat(ctx=ctx)
+    if only is None:
+        build_noise_repeat(ctx=ctx)
 
 
 def build_noise_repeat(*, ctx: Context) -> None:
@@ -736,8 +745,13 @@ def build_noise_repeat(*, ctx: Context) -> None:
     emit(ctx=ctx, name="p_noise_repeat_weekly", table=table, started=started)
 
 
-def build_bspgsp(*, ctx: Context) -> None:
-    """Write the BSP and GSP staircase and ablations."""
+def build_bspgsp(*, ctx: Context, only: Collection[str] | None = None) -> None:
+    """Write the BSP and GSP staircase and ablations.
+
+    Args:
+        ctx: The context.
+        only: Build only these arms, or every arm if `None`.
+    """
     groups = ("BSP", "GSP")
     plan: dict[str, Callable[[], pl.DataFrame]] = {
         "b_frozen": lambda: single_member_arm(
@@ -757,6 +771,8 @@ def build_bspgsp(*, ctx: Context) -> None:
         ),
     }
     for name, build in plan.items():
+        if only is not None and name not in only:
+            continue
         started = time.monotonic()
         try:
             table = build()
@@ -1257,6 +1273,9 @@ def main() -> None:
         choices=("demand", "generators", "references", "perfect"),
         default=["demand", "generators", "references", "perfect"],
     )
+    parser.add_argument(
+        "--arms", nargs="+", help="build only these demand arms (for an early reproduction check)"
+    )
     parser.add_argument("--smoke", action="store_true", help="read smoke folders, write apart")
     parser.add_argument("--no-store", action="store_true", help="do not write the prediction store")
     parser.add_argument("--self-test", action="store_true", help="build arms from fake refit files")
@@ -1266,8 +1285,8 @@ def main() -> None:
         return
     ctx = make_context(smoke=args.smoke, store=not args.no_store)
     if "demand" in args.parts:
-        build_primary(ctx=ctx)
-        build_bspgsp(ctx=ctx)
+        build_primary(ctx=ctx, only=args.arms)
+        build_bspgsp(ctx=ctx, only=args.arms)
     if "generators" in args.parts:
         build_generators(ctx=ctx)
     if "references" in args.parts:
