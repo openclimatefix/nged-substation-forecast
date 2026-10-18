@@ -18,7 +18,8 @@ Prints, and writes to `work/results/`:
 
 import re
 from dataclasses import dataclass
-from typing import Final
+from pathlib import Path
+from typing import Any, Final
 
 import e00085_common as common
 import numpy as np
@@ -32,7 +33,7 @@ NOISE_MINIMUM: Final[float] = 0.01
 TOLERANCE_MINIMUM: Final[float] = 0.05
 REFITS_PER_YEAR: Final[dict[str, int]] = {"weekly": 52, "monthly": 12, "quarterly": 4}
 N_SERIES: Final[int] = 16
-LOG_DIR: Final[object] = common.WORK_DIR.parent / "logs"
+LOG_DIR: Final[Path] = common.WORK_DIR.parent / "logs"
 
 
 @dataclass(frozen=True)
@@ -121,13 +122,13 @@ def parse_cost() -> pl.DataFrame:
     """Return the mean fit seconds of one refit per configuration, from the fit logs."""
     rows = []
     for path in sorted(LOG_DIR.glob("*.log")):
-        seconds = [float(m.group(1)) for m in re.finditer(r" fit (\d+) s", path.read_text()) if m]
+        seconds = [float(m.group(1)) for m in re.finditer(r" fit (\d+) s", path.read_text())]
         if seconds:
             rows.append({"config": path.stem, "fits": len(seconds), "mean_fit_s": np.mean(seconds)})
     return pl.DataFrame(rows)
 
 
-def absolute_rows(*, arms: dict[str, pl.DataFrame], shared: pl.DataFrame) -> list[dict]:
+def absolute_rows(*, arms: dict[str, pl.DataFrame], shared: pl.DataFrame) -> list[dict[str, Any]]:
     """Return each arm's mean metrics on the shared cases, with a 95% interval on the score."""
     absolute = []
     for name, table in arms.items():
@@ -148,22 +149,8 @@ def absolute_rows(*, arms: dict[str, pl.DataFrame], shared: pl.DataFrame) -> lis
     return absolute
 
 
-def main() -> None:
-    """Compute and print every table."""
-    common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    arms = {p.stem: case_table(name=p.stem) for p in sorted(common.ARMS_DIR.glob("*.parquet"))}
-    print("arms:", ", ".join(arms))
-    shared = None
-    for table in arms.values():
-        keys = table.select(*common.KEYS)
-        shared = keys if shared is None else shared.join(keys, on=list(common.KEYS), how="inner")
-    shared = shared.unique()  # ty: ignore[possibly-unbound-attribute]
-    print(f"cases every arm shares: {shared.height:,}")
-    absolute = absolute_rows(arms=arms, shared=shared)
-    absolute_frame = pl.DataFrame(absolute)
-    absolute_frame.write_parquet(common.RESULTS_DIR / "absolute.parquet")
-    with pl.Config(tbl_rows=40, tbl_cols=10, float_precision=3):
-        print(absolute_frame)
+def contrast_rows(*, arms: dict[str, pl.DataFrame]) -> list[dict[str, Any]]:
+    """Return each contrast whose two arms exist: estimate and 95% interval, paired on case."""
     rows = []
     for spec in CONTRASTS:
         if spec.treatment not in arms or spec.reference not in arms:
@@ -184,6 +171,29 @@ def main() -> None:
                 "high": high,
             }
         )
+    return rows
+
+
+def main() -> None:
+    """Compute and print every table."""
+    common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    arms = {p.stem: case_table(name=p.stem) for p in sorted(common.ARMS_DIR.glob("*.parquet"))}
+    print("arms:", ", ".join(arms))
+    shared: pl.DataFrame | None = None
+    for table in arms.values():
+        keys = table.select(*common.KEYS)
+        shared = keys if shared is None else shared.join(keys, on=list(common.KEYS), how="inner")
+    if shared is None:
+        msg = "no arm tables found; run e00085_assemble.py first"
+        raise FileNotFoundError(msg)
+    shared = shared.unique()
+    print(f"cases every arm shares: {shared.height:,}")
+    absolute = absolute_rows(arms=arms, shared=shared)
+    absolute_frame = pl.DataFrame(absolute)
+    absolute_frame.write_parquet(common.RESULTS_DIR / "absolute.parquet")
+    with pl.Config(tbl_rows=40, tbl_cols=10, float_precision=3):
+        print(absolute_frame)
+    rows = contrast_rows(arms=arms)
     contrasts = pl.DataFrame(rows)
     contrasts.write_parquet(common.RESULTS_DIR / "contrasts.parquet")
     with pl.Config(tbl_rows=40, tbl_cols=10, float_precision=3, fmt_str_lengths=60):

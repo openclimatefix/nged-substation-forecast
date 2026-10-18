@@ -1,7 +1,7 @@
 ---
 id: "00085"
 slug: cheaper-retraining-schedules-rank-arms-like-weekly-demand
-status: planned
+status: done
 size: medium
 hypothesis: >-
   For the 16 Primary substation demand series, a cheaper retraining schedule ranks two pairs of
@@ -64,64 +64,108 @@ metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over nine levels), in points of capacity
   (1 point is 1% of the series' effective capacity); MAE of the median, coverage of the 0.01 to
   0.99 quantile band, and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles are reported
+verdict: partly supported
+best_arm: >-
+  Weekly refits on the whole history with 150 rounds and `eta` 0.15: 5.408 points of capacity,
+  against 5.405 for full weekly retraining, at about 0.31 of its fit time.
+headline: >-
+  Monthly minus weekly retraining is +0.125 (95% interval +0.036 to +0.229) at the full setting,
+  +0.118 (+0.033 to +0.216) with a 12-month window, and +0.125 (+0.038 to +0.227) with 150 rounds.
+  The zero-start gap is -0.017 (-0.062 to +0.037) at full weekly retraining, too small to rank
+  schedules by.
+lessons: >-
+  The cadence gap is reproduced by a monthly refit on a 12-month window and by a weekly refit on
+  the whole history with 150 rounds, so those two schedules can stand in for full weekly retraining
+  on cadence contrasts. A quarterly refit loses 0.38 points to weekly, so it ranks arms of
+  different cadence wrongly. Repeating a 12-month-window fit moves the score by 0.000 to 0.001, so
+  GPU noise is far below the contrasts.
+advice:
+  - >-
+    Use monthly P-roll (12-month window, 150 rounds, `eta` 0.15) for research contrasts between
+    features or recipes, because it reproduced the monthly-minus-weekly gap to within 0.01 at about
+    a tenth of the fit time (K1).
+  - >-
+    Use the weekly refit on the whole history with 150 rounds and `eta` 0.15 when weekly cadence
+    matters but full settings are too slow: it scored within 0.003 of full weekly at about 0.31 of
+    the fit time (absolute scores).
+  - >-
+    Do not use quarterly refits to compare arms that differ in cadence or in how fast they adapt:
+    they score 0.38 above weekly (K1 quarterly).
+  - >-
+    Do not rely on a 0.017-point contrast to rank schedules: on 158 runs the zero-start gap is
+    inside the noise, so a pass on it carries no information (R2).
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/
 ---
 
 # Experiment 85: do cheaper retraining schedules rank arms the way weekly retraining does? (SPD1)
 
-**This page is the plan, committed before any code runs.** The take-home message, the verdict, and
-the figures are written after the run.
+**A monthly refit on the latest 12 months of data (150 rounds), or a weekly refit with 150 larger
+rounds on the whole history, ranks cadence contrasts the way full weekly retraining does, at 0.10
+to 0.31 of its fit time. A quarterly refit does not, and the starting-value contrast is too small
+on these rows to say anything about any schedule.** The write-up covers only cadence (monthly
+against weekly) and starting value (zero against XGBoost's estimated start) for the Primary
+substation N1 model. It says nothing about the `am`-against-`d0` contrast of experiment 64 or the
+five-model blend of experiment 49, which the manager excluded because experiment 64 has no weekly
+reference and the blend mixes schedules.
 
-## Question
+We refitted the 16 Primary substations' demand model under cheaper schedules and compared each
+schedule's score gaps with the gaps that stored full weekly retraining gives, on 158 daily forecast
+runs. The verdict is partly supported: cadence is supported, and starting value cannot be tested.
 
-Weekly retraining costs 52 refits for each series. The maintainer asks whether research
-experiments can use a cheaper schedule, and keep weekly retraining for production and best-guess
-experiments. This experiment checks whether four cheaper schedules give the same answer as full
-weekly retraining on two contrasts for which stored weekly predictions exist.
+![Contrasts under each schedule, with the full-weekly reference](figure_1.svg)
 
-## Size
+![Absolute score of each schedule](figure_2.svg)
 
-- **What gets stored:** predictions under `data/ml-experiments/` only.
-- **Production serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes, in how to decide that a cheaper schedule "agrees"; the
-  rule is fixed above before any fit.
-- **Callers:** the code copies experiment 80's fitting and scoring modules, which copy experiment
-  48's; nothing outside `ml-experiments/` calls it.
+![Fit cost of each schedule](figure_3.svg)
 
-That is **medium**, close to simple: no new data and no new method. It gets a Sonnet plan review,
-a Sonnet code review, a Sonnet check of the write-up against the printed report, and a Sonnet
-prose review. No Opus review, because no verdict can change production.
+## Results
 
-## Arms
+- **Rows:** 16 Primary substations, 158 runs of `fold_a_daily_gap_v1` (the runs whose latest
+  weekly refit is one of experiment 80's 28 anchors), seed 0, N1 model with the spread factor 1.15
+  and no correction, ENS weather. Weekly schedules refit at those 28 anchors only.
+- **Noise floor N:** 0.01 points. A repeat of the 12-month-window monthly fit scored 5.563 against
+  5.563, and its zero-start repeat 5.547 against 5.546. Tolerance T is 0.05.
+- **Cadence gap (monthly minus weekly):** reference 0.125 (0.036 to 0.229). The 12-month window
+  gives 0.118 and the 150-round recipe 0.125, so both agree (rule i). Quarterly minus weekly,
+  descriptive, is 0.381 (0.207 to 0.565).
+- **Starting-value gap (zero minus default start):** reference -0.017 (-0.062 to +0.037), smaller
+  than the -0.04 to -0.07 planned. Every schedule gives -0.003 to -0.020, so each passes rule ii,
+  but any value within 0.05 of zero passes, so the pass is weak evidence.
+- **Pass table:** monthly 12-month window 2 of 2, weekly 150 rounds 2 of 2, weekly 12-month window
+  1 of 1, quarterly 1 of 1 (on starting value only), full monthly 1 of 1 (on starting value only).
 
-All arms are the N1 model (one XGBoost model per series, trained on the ENS control member) for
-the 16 Primary substations, seed 0, forecasting the daily runs of `fold_a_daily_gap_v1`.
+| Arm | Score | 95% interval | Coverage of q05 to q95 | Pinball at q05 | Pinball at q95 |
+|---|---|---|---|---|---|
+| Weekly, full setting | 5.405 | 5.111 to 5.716 | 0.889 | 0.910 | 1.236 |
+| Weekly, 150 rounds | 5.408 | 5.119 to 5.711 | 0.897 | 0.908 | 1.233 |
+| Weekly, 12-month window | 5.445 | 5.157 to 5.749 | 0.889 | 0.912 | 1.245 |
+| Monthly, full setting | 5.530 | 5.179 to 5.912 | 0.888 | 0.907 | 1.294 |
+| Monthly, 150 rounds | 5.533 | 5.185 to 5.913 | 0.896 | 0.911 | 1.288 |
+| Monthly, 12-month window | 5.563 | 5.219 to 5.939 | 0.889 | 0.920 | 1.288 |
+| Quarterly, 12-month window | 5.826 | 5.446 to 6.252 | 0.883 | 0.946 | 1.372 |
 
-- **Reference (stored, not refitted):** `w` (full weekly), `m` (full monthly), `pm`
-  (P-roll monthly), `w0` (full weekly, zero start; only its 28 anchors exist, which fixes the
-  run set above).
-- **New fits:** `pq` and `pq0` (P-roll quarterly, estimated and zero start), `pm0` (P-roll
-  monthly, zero start), `pw` and `pw0` (P-roll weekly at the 28 anchors), `fw` and `fw0`
-  (schedule (d): weekly at the 28 anchors, whole history, 150 rounds, `eta` 0.15), `fm` (the
-  same recipe, monthly), `m0` (schedule (c): full monthly, zero start), and `pm_rep` and
-  `pm0_rep` (repeats of `pm` and `pm0` for the noise floor).
-- **Contrasts per schedule:** as in the decision rule. Quarterly is judged on K2 only.
+## Cost
 
-## Not covered, and why
+- **Fit time of one refit (one series, 2 threads):** 114 s at the full setting (500 rounds, whole
+  history), 33 to 36 s for the 150-round whole-history recipe, and 13 to 51 s for the 12-month
+  window. Other jobs shared the machine, so the same recipe varied by up to 4 times.
+- **A year for 16 series:** full weekly about 1,590 compute minutes (the monthly full-setting fit
+  time times 52, not measured separately), full monthly 366, weekly 150 rounds 460 to 500, monthly
+  12-month window 42 to 164, quarterly 54.
+- **Against the one-third rule:** monthly 12-month window (0.03 to 0.10 of full weekly) and weekly
+  150 rounds (0.29 to 0.31) pass. Weekly on the 12-month window (0.31 to 0.35) is borderline.
 
-The brief also names two contrasts from earlier experiments: `am` against `d0` (experiment 64) and
-the five-model blend against its best single member (experiment 49). Experiment 64 fitted each arm
-once, at 2025-06-30, so no stored weekly reference exists and the five series use their own
-capacity-table machinery; refitting them under four schedules is a larger experiment. Experiment 49's
-blend picks weights from five members of mixed schedules. Both are left to the manager to
-schedule if wanted.
+## Caveats and what to try next
 
-## Advice from earlier experiments
-
-Followed: screen on P-roll (experiment 34), report absolute scores, run fits in parallel inside
-the slot, score zero start with its estimated-start twin (experiment 78). Departures: none.
-
-## Lessons for the next experiment
-
-Written after the run.
+- **Starting value is untested:** the stored weekly zero-start arm covers half of the weeks, and
+  the gap on those runs is within the noise. A later experiment should pick a contrast of 0.1 points
+  or more, such as the `am` against `d0` gap, to test schedules.
+- **One series class, one seed:** Primary N1 demand only. Tail scores stop at q05 and q95, because
+  the stored quantile models have nine levels from 0.05 to 0.95.
+- **Cost is noisy:** read the cost as an order of magnitude, not a measurement.
+- **Not covered:** the `am`-against-`d0` and five-model-blend contrasts, as stated above.
+- **Next:** use monthly 12-month-window refits for feature and recipe screening, the 150-round
+  weekly refit where weekly cadence matters, and keep full weekly retraining for the best-guess
+  experiments and production.
