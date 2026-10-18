@@ -132,6 +132,7 @@ the maintainer to confirm.
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
 | [00097 - Tail recalibration, CAL1](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md) | Which post-hoc recalibration of the best guess's stored quantiles gives the best tail coverage without hurting the centre? | Refuted by the pre-registered rule, inconclusive about recalibration in general: no arm passed both tests; stored Primary q05 and q95 cover 0.035 and 0.938 at 12 to 36 hours, and no arm of 1 to 7b moved them by more than 0.013 | Not for production | 2026-10-18 |
 | [00095 - Old training year, AGE2](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md) | Does an old training year still hurt a frozen Primary demand model when the old and recent years use the same weather product? | Refuted: on ERA5 the 2021-07 year is 1.71 points of capacity behind the 2024-07 year (99% interval 1.15 to 2.29), no smaller than the 1.57 on the control member, so the penalty is age, not the weather product | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1338) |
+| [00098 - Switching event detector, part 14](00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md) | Do the best guess's solar and heating offsets in the lagless demand model's residual make RO-NC find more of the moved MW? | Inconclusive: RO-NC recall 0.766 for the control, +0.002 (-0.013 to +0.009) with CAMS solar, -0.002 (-0.019 to +0.012) with ERA5 solar, +0.010 (-0.010 to +0.034) with heating added, although CAMS solar cuts the summer midday residual by 12% | Not for production | 2026-10-18 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2287,6 +2288,23 @@ correct either.
   [PR #1340](https://github.com/openclimatefix/nged-substation-forecast/pull/1340).
 
 ![Tail coverage, Primary substations](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/figure_1_primary_tail_coverage.svg)
+
+### 00098: do the best guess's solar and heating offsets sharpen the switching detector? (DET-BG)
+
+**A cleaner summer residual did not make the switching detector find more moved power.** We gave
+the demand forecast behind the refit-offset neighbour-count detector (RO-NC) the best guess's
+solar offset, from ERA5 or CAMS irradiance, and then a heating offset, and re-ran experiment 82's
+detector on the same synthetic transfers. The CAMS solar offset cut the median summer midday
+residual of the 5 Primaries with a solar capacity by 12% (5.26 to 4.63 points of capacity), and
+the ERA5 offset cut nothing, because H0.5 already reads ERA5 shortwave. RO-NC's MW-weighted recall
+stayed at 0.766 to 0.776 in every arm, and every contrast interval straddles zero (heating added to
+CAMS solar: +0.010, 98.75% interval -0.010 to +0.034). The remaining misses are small transfers
+with no metered receiver, so the next test needs a different signal.
+
+- **Write-up:** [the full result page](00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md),
+  [PR #1341](https://github.com/openclimatefix/nged-substation-forecast/pull/1341).
+
+![Share of moved MW found, by arm](00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/figure_1_recall_by_arm.svg)
 
 ### 00095: does an old training year score worse because of the weather product, or its age? (AGE2)
 
