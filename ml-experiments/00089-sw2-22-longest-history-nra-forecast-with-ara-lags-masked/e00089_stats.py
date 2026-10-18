@@ -296,7 +296,8 @@ def verdict(*, contrasts: pl.DataFrame) -> dict[str, object]:
 
     Masking is supported when C1's upper end is below zero and the no-harm upper end is at most
     the margin. The long history is supported when C2's upper end is below zero. The verdict is
-    `refuted` when C1's or C2's lower end is above zero, `supported` when both are supported,
+    `mixed` when one change is supported and the other's lower end is above zero, `refuted` when
+    C1's or C2's lower end is above zero, `supported` when both are supported,
     `small gain` when one is, and `inconclusive` otherwise.
     """
     if contrasts.filter(pl.col("id") == "C1").is_empty():
@@ -307,7 +308,9 @@ def verdict(*, contrasts: pl.DataFrame) -> dict[str, object]:
     harm = _planned_row(contrasts=contrasts, contrast_id="N1")
     masking = c1["upper"] < 0.0 and harm["upper"] <= NON_INFERIORITY_MARGIN
     history = c2["upper"] < 0.0
-    if c1["lower"] > 0.0 or c2["lower"] > 0.0:
+    if (c1["lower"] > 0.0 and history) or (c2["lower"] > 0.0 and masking):
+        word = "mixed"
+    elif c1["lower"] > 0.0 or c2["lower"] > 0.0:
         word = "refuted"
     elif masking and history:
         word = "supported"

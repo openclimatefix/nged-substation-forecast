@@ -54,7 +54,7 @@ class Arm:
 
     Attributes:
         rolling: True for the 365 days before the refit; False for all rows from `start`.
-        start: The earliest valid time of the rows when `rolling` is False.
+        start: The earliest run initialisation time of the rows when `rolling` is False.
         half_life_days: Half-life of the recency weight, anchored at the refit.
         mask_lags: True to set to missing every lag whose time lies inside an ARA.
     """
@@ -232,7 +232,7 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime, arm: Arm) -> pl.DataFrame
 
     A refit sees a row only if its valid time is at least 3.5 hours before the refit, its run
     began at or before the refit, and its valid time lies in the arm's window: the 365 days before
-    the refit, or on or after the arm's start.
+    the refit, or a run initialised on or after the arm's start.
     """
     known = rows.filter(
         (pl.col("valid_time") <= refit - regimes.REFIT_CUTOFF_AGE)
@@ -241,7 +241,7 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime, arm: Arm) -> pl.DataFrame
     if arm.rolling:
         return known.filter(pl.col("valid_time") > refit - regimes.TRAIN_WINDOW)
     if arm.start is not None:
-        return known.filter(pl.col("valid_time") >= arm.start)
+        return known.filter(pl.col("power_fcst_init_time") >= arm.start)
     return known
 
 

@@ -26,10 +26,10 @@ decision_rule: >-
   is below zero. Both thresholds are zero because neither change adds a model: masking adds one
   array lookup per lag at serving time (and so an ARA label on the serving path, which makes its
   threshold a gain whose interval excludes zero), and a longer window only changes the training
-  slice. Verdict `supported` when both hold, `small gain` when one holds, `inconclusive` when
+  slice. C3 is descriptive. Verdict `supported` when both hold, `mixed` when one holds and the other's lower end is above zero, `small gain` when one holds, `inconclusive` when
   neither interval excludes zero, `refuted` when a lower end is above zero. The in-event-lag rows
   are rows whose valid time lies outside every ARA and whose origin lag, same-time-latest-day lag,
-  or same-time-latest-week lag lies inside an ARA. The arms M, L_ens, and LM_ens are descriptive.
+  or same-time-latest-week lag lies inside an ARA. The arms M, L_ens, and LM_ens are descriptive. Both labels and masks use hindsight ARA labels, so C1 and C3 are upper bounds on what a live service, which cannot know an ongoing event, would achieve.
 benchmark: >-
   Arm R, the 12-month-window booster with ARA targets removed and lags unmasked, refitted by this
   experiment. The plain booster of experiment 86, `manual_heuristic`, and `climatology` are
@@ -72,8 +72,8 @@ Planned. The plan, written before any fit, is in the front matter and in the bul
 - **Training rows.** The control member of the 18 km runs (2021-03 to 2023-06-26), the 9 km runs
   (2023-06-27 to 2024-03-31), and the Dynamical.org archive from 2024-04-01, which is a different
   product (seam at 2024-04-01). The first two come from the backfill that experiment 81 built into
-  frames. The write-up labels which window each number uses and shows R on the 2024-04+ rows only
-  as the clean check.
+  frames. The write-up labels which window each number uses; L_ens and LM_ens (runs initialised from
+  2024-04-01) are the clean check on one product.
 - **Scored rows.** The 292 daily runs of `fold_a_daily_gap_v1` (2025-07 to 2026-06) with a valid
   time outside every ARA. Headline rows: those with a lag inside an ARA.
 - **Weather at lag times.** The forecast's own weather columns from the same run; nothing from
