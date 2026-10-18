@@ -140,9 +140,11 @@ Plan only; the write-up replaces this page when the run finishes.
   `thresholds.json`), run on the injected residuals (fast path of experiment 43: the stored
   residual plus the injected MW) with every value at or after the cut stamp (the origin minus 3.5
   hours) set to missing, and with only the 45 days before the cut visible. The functions are those
-  that built experiment 82's `xl_intervals.parquet`, with four causal rules added. A candidate must
-  be a local peak with the whole 48-half-hour after-window present, so a rising step cannot
-  fire early on a partial window. A return step or level failure ends an interval only when it lies
+  that built experiment 82's `xl_intervals.parquet`, with four causal rules added. The step statistic exists only where its
+  48-half-hour after-window is complete, and a candidate is a local peak among those stamps. A
+  rising step can therefore fire up to 24 hours before its true onset, with the step understated;
+  this is what the same code does when run live, so it is kept, and the write-up reports the
+  onset error and the detected step over the injected median MW by hours since onset. A return step or level failure ends an interval only when it lies
   at least 48 half-hours before the cut, and the first-return search stops at the cut. Any other
   interval is open and runs to the cut. Partners follow the rule that built `xl_intervals.parquet`
   (an opposite-sign neighbour step above 2.0 noise units whose level holds at least half the step

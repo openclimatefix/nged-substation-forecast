@@ -64,7 +64,11 @@ def false_alarms(*, state: dict) -> pl.DataFrame:
         row = next(r for r in rows_of.values() if r["site"] == site)
         newest = cases.newest_stamp(origin=origin)
         span = slice(harness.OFFSET + newest - CLEAR_STAMPS, harness.OFFSET + newest + CLEAR_STAMPS)
-        closed = labels[site]["oracle"].closed[span] | labels[site]["oracle"].in_event[span]
+        closed = (
+            labels[site]["oracle"].closed[span]
+            | labels[site]["oracle"].in_event[span]
+            | labels[site]["xl"].in_event[span]
+        )
         data = np.isfinite(arrays[site].power[span]).mean()
         if closed.any() or data < 0.9:
             continue
@@ -136,7 +140,7 @@ def nra_truth(*, event: dict, side: int, rows_of: dict, arrays: dict) -> np.ndar
     moved = float(event["moved_mw_p50"])
     receivers = json.loads(event["receivers"] or "[]")
     if side == int(event["donor"]):
-        step = sum(moved * float(r["share"]) for r in receivers)
+        step = moved
     else:
         share = next((float(r["share"]) for r in receivers if int(r["series"]) == side), None)
         if share is None:
@@ -158,7 +162,10 @@ def real_check(*, state: dict) -> pl.DataFrame:
     for event in real_events():
         first = grid.stamp_of(when=event["onset_utc"])
         last = grid.stamp_of(when=event["end_utc"]) + 1
-        sides = {int(event["donor"]), *(int(r["series"]) for r in json.loads(event["receivers"]))}
+        sides = {
+            int(event["donor"]),
+            *(int(r["series"]) for r in json.loads(event["receivers"] or "[]")),
+        }
         for origin in origins:
             newest = cases.newest_stamp(origin=origin)
             if not (first <= newest < last and newest - first <= 7 * grid.BLOCK):

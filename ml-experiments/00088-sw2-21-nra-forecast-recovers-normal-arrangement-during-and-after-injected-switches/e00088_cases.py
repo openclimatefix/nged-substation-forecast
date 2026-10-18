@@ -133,6 +133,10 @@ def booster(*, arm: str, site: str, refit: datetime) -> xgb.Booster:
     if path not in cache:
         model = xgb.Booster()
         model.load_model(path)
+        expected = len(fitting.input_columns(with_mw=arm != "plain"))
+        if model.num_features() != expected:
+            msg = f"{path} has {model.num_features()} features, expected {expected}"
+            raise ValueError(msg)
         cache[path] = model
     return cache[path]
 
@@ -190,6 +194,9 @@ def predict(
         frame = fitting.corrected(frame=frame, source=source)
     matrix = frame.select(fitting.input_columns(with_mw=with_mw)).to_numpy().astype(np.float32)
     members = len(MEMBERS)
+    if frame.height != frame["valid_time"].n_unique() * members:
+        msg = "every valid time must hold every member"
+        raise ValueError(msg)
     raw = model.predict(xgb.DMatrix(matrix)).reshape(-1, members, len(common.LEVELS))
     pooled = fitting.mixture_quantiles(member_quantiles=raw).astype(np.float64)
     median = pooled[:, [common.MEDIAN]]
@@ -253,8 +260,9 @@ def forecast_cell(
     index = np.asarray(common.grid_index(times=valid))
     scored_against = arrays[site].power if truth is None else truth
     actual = common.take(values=scored_against, index=index).astype(np.float64)
+    # A real-event check scores the NRA estimate inside the event, so its own labels block nothing.
     blocked = labels[site]["oracle"].in_event | labels[site]["oracle"].closed
-    keep = np.isfinite(actual) & ~blocked[index]
+    keep = np.isfinite(actual) & (True if truth is not None else ~blocked[index])
     p99 = common.historical_thresholds(power=arrays[site].power)["p99"]
     rows = []
     for name, arm, mw in variants:
@@ -417,10 +425,24 @@ def event_table(
     return pl.DataFrame(rows)
 
 
+def check_alignment(*, state: dict) -> None:
+    """Fail unless the panel's power over capacity equals the dense grid wherever both exist."""
+    series, arrays, _ = fitting.context()
+    for row in series.iter_rows(named=True):
+        panel = state["panel"]["power"][int(row["time_series_id"])]
+        dense = arrays[row["site"]].power[OFFSET : OFFSET + panel.size]
+        both = np.isfinite(panel) & np.isfinite(dense)
+        gap = np.abs(panel[both] / row["effective_capacity_mw"] - dense[both]).max()
+        if gap > 1e-5:
+            msg = f"series {row['site']}: panel and dense power differ by {gap}"
+            raise ValueError(msg)
+
+
 def init_worker() -> None:
     """Load the dense-grid context and the harness state once per worker."""
     fitting.context()
     _STATE["harness"] = harness.make_state()
+    check_alignment(state=_STATE["harness"])  # ty: ignore[invalid-argument-type]
 
 
 def main() -> None:

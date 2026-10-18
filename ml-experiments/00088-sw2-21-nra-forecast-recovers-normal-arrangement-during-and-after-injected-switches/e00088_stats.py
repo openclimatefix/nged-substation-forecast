@@ -153,6 +153,8 @@ def _draws(*, n_months: int) -> np.ndarray:
 def _interval(*, point: float, draws: np.ndarray, level: float) -> Interval:
     """Return the percentile interval of resampled statistics around a point value."""
     finite = draws[np.isfinite(draws)]
+    if finite.size < draws.size:
+        print(f"warning: {draws.size - finite.size} of {draws.size} resamples were not finite")
     if finite.size == 0:
         return Interval(point, float("nan"), float("nan"))
     tail = (100.0 - level) / 2.0

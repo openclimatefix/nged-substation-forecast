@@ -19,7 +19,11 @@ RESULTS_DIR = common.RESULTS_DIR
 def load() -> tuple[pl.DataFrame, pl.DataFrame]:
     """Return the case table and the controls' cells."""
     cells = pl.concat(
-        [pl.read_parquet(path) for path in stats.cases_dir_files(pattern="cells_*.parquet")]
+        [
+            frame
+            for path in stats.cases_dir_files(pattern="cells_*.parquet")
+            if (frame := pl.read_parquet(path)).height
+        ]
     )
     events = pl.concat(
         [pl.read_parquet(path) for path in stats.cases_dir_files(pattern="events_*.parquet")]
