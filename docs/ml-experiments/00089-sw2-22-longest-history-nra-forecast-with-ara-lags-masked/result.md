@@ -68,8 +68,9 @@ Planned. The plan, written before any fit, is in the front matter and in the bul
   on one weather product. R and M are descriptive about masking alone; L_ens and LM_ens are
   descriptive about the product seam. L and R differ in window and half-life together, and L_ens
   separates the two partly.
-- **ARA label.** The union of the XL detector's intervals (hindsight end rule), NGED's logged events,
-  and NGED's logged closures. Neither source labels anything before 2022-01, so 2021-03 to
+- **ARA label.** The union of the intervals of the refit-offset neighbour-count (RO-NC) detector
+  (called XL in experiments 70, 71, and 82; hindsight end rule), NGED's logged events, and
+  NGED's logged closures. Neither source labels anything before 2022-01, so 2021-03 to
   2021-12 is unlabelled and its switching stays in the training targets. The write-up reports
   labelled events per training year and per source.
 - **Training rows.** The control member of the 18 km runs (2021-03 to 2023-06-26), the 9 km runs
