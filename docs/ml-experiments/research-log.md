@@ -32,7 +32,7 @@ the maintainer to confirm.
 | [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Give the XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the calibrated ENS sunshine anomaly, with a weight fitted per series, lead band, and season, and zero beyond 10 days) | Lowers the quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess; the live service cannot yet supply the inputs, the capacity held is stale, and the weights rest on one summer |
 | [00078 - Current capacity and a zero start, PVDIS-5 check 2](00078-pvdis-5-current-capacity-vintages/result.md) | Refresh the capacity table that feeds the base margin once per season-year, and test a base margin of zero in the production XGBoost recipe | Re-estimating the capacity lowers the score by 0.018 points (-0.036 to -0.004); a zero start lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) in this experiment, and has not been tested on other series types |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
-| [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Retrain the Primary demand model weekly and drop the 14-day correction | Second set of runs (control-only, 2023-07 to 2024-03): weekly scores 0.24 points below the stack (99.17% interval -0.36 to -0.15) and 0.04 below monthly |
+| [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Retrain the Primary demand model weekly and drop the 14-day correction | Second set of runs (control-only, 2023-07 to 2024-03): weekly scores 0.24 points below the stack (99.17% interval -0.36 to -0.15) and 0.04 below monthly (control member of the ECMWF ensemble only) |
 
 ## The experiments so far
 
@@ -125,7 +125,8 @@ the maintainer to confirm.
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
 
 **Weekly retraining of the Primary demand model beat the stack again, by 0.24 points of capacity, on
-274 runs from 2023-07 to 2024-03 for which the project holds only the ENS control member.** The
+274 runs from 2023-07 to 2024-03 for which the project holds only the control member of the ECMWF
+ensemble (ENS).** The
 experiment scored 13 Primary substations and repeated experiment 48's and 49's contrasts. The
 verdict is supported. The Christmas column and the 2-year half-life stayed unresolved over the whole
 fold, but dropping the Christmas column raised the error by 1.2 points inside the Christmas window.
@@ -134,7 +135,7 @@ fold, but dropping the Christmas column raised the error by 1.2 points inside th
   weekly minus monthly -0.039 (-0.064 to -0.012); blend minus weekly -0.038 (-0.070 to -0.007),
   short of the -0.05 threshold.
 - **Finding for later experiments:** without D8, D12, and D5, weekly minus the stack is -0.093
-  (95% -0.189 to -0.014). An all-18 km fold had the same signs with intervals that include zero.
+  (95% -0.189 to -0.014). An all-18 km fold had the same signs for the first four contrasts with intervals that include zero.
   Neither fold separates retraining from adapting to the 9 km weather product.
 - **Write-up and pull request:** [result](00081-r11-control-member-second-validation-year-demand/result.md),
   [PR #1313 (Experiment 81: do the weekly-retraining findings hold on July-to-March forecast
