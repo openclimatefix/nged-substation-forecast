@@ -105,7 +105,8 @@ supply point and 2 grid supply point substations, weekly refitting scored 0.66 b
 runs from 2023-07 to 2024-03, with the control member of the ensemble only, on 13 substations.
 Weekly minus the stack was -0.240 (99.17% interval -0.360 to -0.145), and weekly minus monthly was
 -0.039 (-0.064 to -0.012; the 95% t-interval over months, -0.078 to -0.000, only just excludes
-zero).
+zero). In experiment 48 the weekly-minus-stack gap crosses zero under a t-interval over months
+(-0.43 to +0.04) and without substation D8 (-0.14, interval -0.34 to +0.04).
 
 ![Planned contrasts, experiment 48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/figure_1.svg)
 
