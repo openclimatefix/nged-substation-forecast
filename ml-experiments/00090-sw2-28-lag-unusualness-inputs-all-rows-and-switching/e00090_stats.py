@@ -3,13 +3,14 @@
 Steps:
 
 1. `metrics`: for each arm, read the monthly refits' quantiles (`e00090_fit.py`), apply experiment
-   00033's spread factor of 1.15, attach the observed power, and write per-case scores plus the
+   00033's spread factor of 1.15 (the production recipe), attach the observed power, and write
+   per-case scores plus the
    flags `nra` (the valid time is outside every oracle event and every logged closure of the
    series), `lag_oracle` (one of the three lag times is inside an oracle event), and `lag_xl` (one
    is inside an XL event) to `work/metrics/<arm>.parquet`.
-2. `results`: the planned contrasts C1 to C3 and the no-harm check at the Bonferroni level, the
-   descriptive contrasts, the absolute scores and tail table, the label coverage counts, and the
-   agreement of the XL and oracle signed MW, in `work/results/*.parquet`.
+2. `results`: the planned contrasts C1 and C2 at the Bonferroni level, the descriptive contrasts,
+   the absolute scores and tail table, and the label coverage counts, in
+   `work/results/*.parquet`.
 
     uv run python ml-experiments/00090-*/e00090_stats.py [--smoke]
 """
@@ -28,19 +29,13 @@ import polars as pl
 
 from studies import bootstrap
 
-PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 3.0)
-"""The coverage in percent of a two-sided interval Bonferroni-corrected across three contrasts."""
+PLANNED_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 2.0)
+"""The coverage in percent of a two-sided interval Bonferroni-corrected across two contrasts."""
 N_RESAMPLES_PLANNED: Final[int] = 20_000
 N_RESAMPLES_95: Final[int] = 4_000
-NON_INFERIORITY_MARGIN: Final[float] = 0.02
-"""Points of capacity: 0.34% of experiment 00075's plain score of 5.44, the most experiment 00044
-says a perfect detector could gain."""
+GAIN_THRESHOLD: Final[float] = -0.02
+"""Points of capacity: 0.4% of the plain arm's score of about 5.4, the planned `supported` bar."""
 ARM_NAMES: Final[tuple[str, ...]] = fitting.ARMS
-EXPERIMENT_00048_ARMS: Final[dict[str, str]] = {
-    "manual_heuristic": "manual_heuristic",
-    "climatology": "climatology",
-}
-"""Experiment 00048's metrics files read as benchmarks, with their labels."""
 SCOPES: Final[tuple[tuple[str, float, float], ...]] = (
     ("all leads", 0.0, 10_000.0),
     *common.LEAD_BANDS,
@@ -54,8 +49,9 @@ class Contrast:
     Attributes:
         treatment: The arm whose score is differenced.
         reference: The arm it is differenced against.
-        subset: `all`, `nra`, `lag_oracle` (NRA rows with a lag in an oracle event), `lag_xl`
-            (NRA rows with a lag in an XL event), or `lag_xl_only` (`lag_xl` and not `lag_oracle`).
+        subset: `all`, `nra` (rows outside switching), `lag_oracle` (`nra` rows with a lag in an
+            oracle event), `lag_xl` (`nra` rows with a lag in an XL event), or `lag_xl_only`
+            (`lag_xl` and not `lag_oracle`).
     """
 
     treatment: str
@@ -64,24 +60,15 @@ class Contrast:
 
 
 PLANNED: Final[dict[str, Contrast]] = {
-    "C1": Contrast("lagmw_xl", "plain", "lag_oracle"),
-    "C2": Contrast("lagmw_oracle", "plain", "lag_oracle"),
-    "C3": Contrast("lagmw_xl", "lagmw_oracle", "lag_oracle"),
+    "C1": Contrast("clim_pit", "plain", "nra"),
+    "C2": Contrast("clim_pit", "plain", "lag_oracle"),
 }
-NO_HARM: Final[Contrast] = Contrast("lagmw_xl", "plain", "nra")
-"""C1 on all rows outside switching, read at the planned level against the margin."""
 DESCRIPTIVE: Final[dict[str, Contrast]] = {
-    "D1 C2 on all rows outside switching": Contrast("lagmw_oracle", "plain", "nra"),
-    "D2 C1 on all half-hours": Contrast("lagmw_xl", "plain", "all"),
-    "D3 C2 on all half-hours": Contrast("lagmw_oracle", "plain", "all"),
-    "D4 C1 on rows with a lag in an XL event": Contrast("lagmw_xl", "plain", "lag_xl"),
-    "D5 C1 on rows with a lag in an XL event only": Contrast("lagmw_xl", "plain", "lag_xl_only"),
-    "D6 C2 on rows with a lag in an XL event only": Contrast(
-        "lagmw_oracle", "plain", "lag_xl_only"
+    "D1 clim_pit on all half-hours": Contrast("clim_pit", "plain", "all"),
+    "D2 clim_pit on rows with a lag in an XL event": Contrast("clim_pit", "plain", "lag_xl"),
+    "D3 clim_pit on rows with a lag in an XL event only": Contrast(
+        "clim_pit", "plain", "lag_xl_only"
     ),
-    "D7 mask_xl minus plain, outside switching": Contrast("mask_xl", "plain", "nra"),
-    "D8 mask_xl minus plain, lag in an oracle event": Contrast("mask_xl", "plain", "lag_oracle"),
-    "D9 C3 on all rows outside switching": Contrast("lagmw_xl", "lagmw_oracle", "nra"),
 }
 
 
@@ -291,39 +278,33 @@ def _planned_row(*, contrasts: pl.DataFrame, contrast_id: str) -> dict[str, floa
     ).row(0, named=True)
 
 
-def verdict(*, contrasts: pl.DataFrame) -> dict[str, object]:
-    """Return the pre-registered verdict from C1 and the no-harm check.
+def verdict(*, contrasts: pl.DataFrame) -> pl.DataFrame:
+    """Return the pre-registered verdict word of C1 (general) and C2 (switching).
 
-    `refuted` when C1's lower end is above zero; `supported` when C1's upper end is below zero and
-    the no-harm upper end is at most the margin; `small gain` when only the first holds;
-    `inconclusive` otherwise.
+    `refuted` when the lower end is above zero; `supported` when the upper end is below the gain
+    threshold; `small gain` when it is below zero only; `inconclusive` otherwise.
     """
-    if contrasts.filter(pl.col("id") == "C1").is_empty():
-        return {
-            "verdict": "no rows",
-            "c1": None,
-            "c1_lower": None,
-            "c1_upper": None,
-            "no_harm_upper": None,
-            "share_of_oracle_gain": None,
-        }
-    c1 = _planned_row(contrasts=contrasts, contrast_id="C1")
-    harm = _planned_row(contrasts=contrasts, contrast_id="N1")
-    if c1["lower"] > 0.0:
-        word = "refuted"
-    elif c1["upper"] < 0.0:
-        word = "supported" if harm["upper"] <= NON_INFERIORITY_MARGIN else "small gain"
-    else:
-        word = "inconclusive"
-    c2 = _planned_row(contrasts=contrasts, contrast_id="C2")
-    return {
-        "verdict": word,
-        "c1": c1["difference"],
-        "c1_lower": c1["lower"],
-        "c1_upper": c1["upper"],
-        "no_harm_upper": harm["upper"],
-        "share_of_oracle_gain": c1["difference"] / c2["difference"] if c2["difference"] else None,
-    }
+    rows = []
+    for contrast_id in PLANNED:
+        row = _planned_row(contrasts=contrasts, contrast_id=contrast_id)
+        if row["lower"] > 0.0:
+            word = "refuted"
+        elif row["upper"] < GAIN_THRESHOLD:
+            word = "supported"
+        elif row["upper"] < 0.0:
+            word = "small gain"
+        else:
+            word = "inconclusive"
+        rows.append(
+            {
+                "id": contrast_id,
+                "verdict": word,
+                "difference": row["difference"],
+                "lower": row["lower"],
+                "upper": row["upper"],
+            }
+        )
+    return pl.DataFrame(rows)
 
 
 def label_counts(*, smoke: bool) -> pl.DataFrame:
@@ -342,48 +323,24 @@ def label_counts(*, smoke: bool) -> pl.DataFrame:
     )
 
 
-def label_agreement() -> pl.DataFrame:
-    """Return, per series, how the XL labels cover the oracle's and how their signed MW compare.
-
-    For each Primary series, over the scored year's half-hours: those inside an oracle event,
-    those inside an XL event, those inside both, and the correlation and the median ratio of the
-    two signed-MW fractions of capacity on the half-hours inside both. A negative correlation
-    would mean a sign mismatch.
-    """
-    series = common.series_table().filter(pl.col("substation_type").is_in(common.GROUPS))
-    oracle = labelling.load_labels(series=series)
-    xl = labelling.load_xl_labels(series=series, oracle=oracle)
-    first = common.grid_index(times=common.FIRST_RUN)
-    last = common.grid_index(times=common.HOLDOUT)
-    rows = []
-    for site in oracle:
-        window = slice(first, last)
-        o_in, x_in = oracle[site].in_event[window], xl[site].in_event[window]
-        both = o_in & x_in
-        o_mw, x_mw = oracle[site].signed_mw[window][both], xl[site].signed_mw[window][both]
-        usable = np.abs(o_mw) > 0
-        rows.append(
-            {
-                "site": site,
-                "oracle_halfhours": int(o_in.sum()),
-                "xl_halfhours": int(x_in.sum()),
-                "both_halfhours": int(both.sum()),
-                "correlation": float(np.corrcoef(o_mw, x_mw)[0, 1]) if both.sum() > 2 else None,
-                "share_ratio_above_1_5": float(np.mean(x_mw[usable] / o_mw[usable] > 1.5))
-                if usable.any()
-                else None,
-                "max_abs_oracle": float(np.abs(oracle[site].signed_mw).max()),
-                "max_abs_xl": float(np.abs(xl[site].signed_mw).max()),
-                "median_ratio": float(np.median(x_mw[usable] / o_mw[usable]))
-                if usable.any()
-                else None,
-            }
-        )
-    return pl.DataFrame(rows, infer_schema_length=None)
+TAIL_COLUMNS: Final[tuple[str, ...]] = (
+    "qs",
+    "mae",
+    "tw_p99",
+    "cov98",
+    "cov90",
+    "cov80",
+    "ex95",
+    "ex99",
+    "pin01",
+    "pin05",
+    "pin95",
+    "pin99",
+)
 
 
 def compute_results(*, smoke: bool) -> None:
-    """Write the contrasts, the absolute scores, the benchmarks, and the label checks."""
+    """Write the contrasts, the absolute scores and tails by lead band, and the label counts."""
     _, _, results_dir = _dirs(smoke=smoke)
     results_dir.mkdir(parents=True, exist_ok=True)
     key_sets = {
@@ -395,11 +352,7 @@ def compute_results(*, smoke: bool) -> None:
             msg = f"arm {arm} does not hold the same cases as the plain arm"
             raise ValueError(msg)
     rows: list[dict[str, object]] = []
-    specs = (
-        ("planned", {**PLANNED, "N1": NO_HARM}),
-        ("descriptive", DESCRIPTIVE),
-    )
-    for family, group in specs:
+    for family, group in (("planned", PLANNED), ("descriptive", DESCRIPTIVE)):
         for contrast_id, contrast in group.items():
             rows.extend(
                 contrast_rows(
@@ -411,55 +364,24 @@ def compute_results(*, smoke: bool) -> None:
             )
     contrasts = pl.DataFrame(rows)
     contrasts.write_parquet(results_dir / "contrasts.parquet")
-    pl.DataFrame([verdict(contrasts=contrasts)]).write_parquet(results_dir / "verdict.parquet")
+    verdict(contrasts=contrasts).write_parquet(results_dir / "verdict.parquet")
     label_counts(smoke=smoke).write_parquet(results_dir / "label_counts.parquet")
-    label_agreement().write_parquet(results_dir / "label_agreement.parquet")
-    plain = read_arm(arm="plain", smoke=smoke)
     absolute = []
     for arm in ARM_NAMES:
         frame = read_arm(arm=arm, smoke=smoke)
         for subset in ("nra", "all", "lag_oracle", "lag_xl", "lag_xl_only"):
             part = subset_of(frame=frame, subset=subset)
-            absolute.append(
-                {
-                    "arm": arm,
-                    "subset": subset,
-                    "qs": _mean(part["qs"]),
-                    "mae": _mean(part["mae"]),
-                    "tw_p99": _mean(part["tw_p99"]),
-                    "cov90": _mean(part["cov90"]),
-                    "pin05": _mean(part["pin05"]),
-                    "pin95": _mean(part["pin95"]),
-                    "cases": part.height,
-                }
-            )
-    baseline_dir = common.EXPERIMENT_00048_WORK_DIR / "metrics"
-    keys_of = {
-        subset: subset_of(frame=plain, subset=subset).select(*common.KEYS)
-        for subset in ("nra", "all", "lag_oracle")
-    }
-    for name, label in EXPERIMENT_00048_ARMS.items():
-        path = baseline_dir / f"{name}.parquet"
-        if not path.exists():
-            continue
-        other = pl.read_parquet(path).filter(pl.col("group") == "Primary")
-        for subset, keys in keys_of.items():
-            part = keys.join(
-                other.select(*common.KEYS, "qs"), on=list(common.KEYS), how="inner", validate="1:1"
-            )
-            absolute.append(
-                {
-                    "arm": label,
-                    "subset": subset,
-                    "qs": _mean(part["qs"]),
-                    "mae": float("nan"),
-                    "tw_p99": float("nan"),
-                    "cov90": float("nan"),
-                    "pin05": float("nan"),
-                    "pin95": float("nan"),
-                    "cases": part.height,
-                }
-            )
+            for scope, low, high in SCOPES:
+                band = part.filter((pl.col("lead_hours") >= low) & (pl.col("lead_hours") < high))
+                absolute.append(
+                    {
+                        "arm": arm,
+                        "subset": subset,
+                        "scope": scope,
+                        **{name: _mean(band[name]) for name in TAIL_COLUMNS},
+                        "cases": band.height,
+                    }
+                )
     pl.DataFrame(absolute).write_parquet(results_dir / "absolute.parquet")
 
 
@@ -472,7 +394,10 @@ def main() -> None:
     compute_results(smoke=args.smoke)
     results_dir = _dirs(smoke=args.smoke)[2]
     with pl.Config(tbl_rows=200, tbl_cols=20, fmt_str_lengths=60):
-        for name in ("absolute", "label_counts", "label_agreement", "verdict"):
+        print(
+            pl.read_parquet(results_dir / "absolute.parquet").filter(pl.col("scope") == "all leads")
+        )
+        for name in ("label_counts", "verdict"):
             print(name)
             print(pl.read_parquet(results_dir / f"{name}.parquet"))
         print(

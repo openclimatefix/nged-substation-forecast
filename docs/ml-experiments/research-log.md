@@ -122,6 +122,7 @@ the maintainer to confirm.
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
+| [00090 - Lag unusualness inputs, SW2-28](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) | Does giving the Primary demand model the PIT of each lag against a climatology improve the forecast on all rows, and widen the quantiles on rows with a lag inside a logged switching event? | Refuted: the PIT inputs raised the score by 0.355 points of capacity on all rows outside switching (97.5% interval +0.209 to +0.513); on rows with a lag inside a logged event +0.795 (-0.325 to +2.787, inconclusive) | Not for production | 2026-10-18 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
@@ -2096,3 +2097,25 @@ moved MW as three columns.
   logs?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1322).
 
 ![Contrasts on the rows with a lag inside a logged event](00086-sw2-12-detector-labels-for-nra-forecast/figure_1.svg)
+
+### 00090: lag unusualness inputs
+
+**Telling the Primary demand model how unusual each lag is made the forecast worse, so the model
+gets nothing from the input beyond what the lag value and the calendar give it; the verdict is
+refuted.** The experiment refitted the XGBoost demand model monthly for 16 Primary substations,
+trained on half-hours outside switching, and scored 292 daily runs with and without the PIT (the
+share of ordinary readings below the lag, at the same time of day, kind of day, and month) of each
+of the three lags.
+
+- **Headline result:** on the 2,928,842 half-hours outside switching, the PIT arm minus the plain
+  arm +0.355 points of capacity (97.5% interval +0.209 to +0.513). On the 37,394 of them with a lag
+  inside a logged event, +0.795 (-0.325 to +2.787).
+- **Tails:** coverage of the 5%-to-95% band fell from 0.888 to 0.874 outside switching and from
+  0.770 to 0.740 on rows with a lag inside a logged event, so the model did not widen its band.
+- **Finding for later experiments:** widening the quantiles when a lag may be inside an abnormal
+  arrangement needs an explicit rule (SW2-27) rather than an input to the booster. The lag-free
+  booster PIT and neighbour arms were not run.
+- **Write-up and pull request:**
+  [result](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md), PR to follow.
+
+![Contrasts on all rows and on rows with a lag inside a logged event](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/figure_1.svg)

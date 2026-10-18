@@ -181,6 +181,13 @@ points worse with training-window statistics (+0.99 to +1.91).
 
 ![The eight planned contrasts](../00032-substation-fingerprints-pooled-demand/figure_1.svg)
 
+**Telling the Primary demand model how unusual each lag is did not help, and raised the error.**
+[Experiment 90](../00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) gave the
+XGBoost model the probability integral transform (the share of ordinary readings below the lag, at
+the same time of day, kind of day, and month) of its three lags. The score rose by 0.355 points
+(97.5% interval +0.209 to +0.513) on all half-hours outside switching, a second null for lag
+anomalies after [experiment 18](../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md).
+
 ## What was tried
 
 | Experiment | Question | Verdict | Headline number |
@@ -198,6 +205,7 @@ points worse with training-window statistics (+0.99 to +1.91).
 | [25](../00025-price-change-features-stage1-demand/result.md) | Does the change in the intra-day price help a stage 1 demand model? | Small gain | -0.037 (-0.056 to -0.018) selection year; -0.050 (-0.083 to -0.018) confirmation year |
 | [30](../00030-lagged-power-feature-sets-primary-demand/result.md) | Which lagged power columns lower the Primary error of N1? | Inconclusive | All 13 lags minus N1 -0.01 (-0.45 to +0.43); weekly mean and median (post hoc) -0.05 (-0.08 to -0.02) with the correction |
 | [32](../00032-substation-fingerprints-pooled-demand/result.md) | Do numeric fingerprints improve a pooled demand model? | Inconclusive | +0.02 (-0.05 to +0.10); held-out substation +1.39 (+0.99 to +1.91) |
+| [90](../00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) | Does the PIT of each lag against a climatology help the Primary demand model, outside and during switching? | Refuted | +0.355 (+0.209 to +0.513) on all rows outside switching; +0.795 (-0.325 to +2.787) with a lag inside a logged event |
 
 Each headline number is a change in points of capacity. A negative number is a lower score, which
 is better. In experiments 5, 24, and 32 the number is the extra score of the arm named in the row.

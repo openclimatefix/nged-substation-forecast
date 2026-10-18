@@ -87,7 +87,7 @@ def with_pits(*, frame: pl.DataFrame, grid: np.ndarray) -> pl.DataFrame:
 
 
 def mixture_quantiles(*, member_quantiles: np.ndarray) -> np.ndarray:
-    """Pool members' quantiles into the mixture's nine quantiles, as experiment 00019 does."""
+    """Pool members' quantiles into the mixture's eleven quantiles, as experiment 00019 does."""
     cases, members, levels = member_quantiles.shape
     values = member_quantiles.reshape(cases, members * levels)
     weights = np.tile(common.ATOM_MASSES, members) / members
