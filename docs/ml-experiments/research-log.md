@@ -32,6 +32,7 @@ the maintainer to confirm.
 | [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Give the XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the calibrated ENS sunshine anomaly, with a weight fitted per series, lead band, and season, and zero beyond 10 days) | Lowers the quantile score by 0.152 points (98.75% interval -0.199 to -0.111) against the best guess; the live service cannot yet supply the inputs, the capacity held is stale, and the weights rest on one summer |
 | [00078 - Current capacity and a zero start, PVDIS-5 check 2](00078-pvdis-5-current-capacity-vintages/result.md) | Refresh the capacity table that feeds the base margin once per season-year, and test a base margin of zero in the production XGBoost recipe | Re-estimating the capacity lowers the score by 0.018 points (-0.036 to -0.004); a zero start lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) in this experiment, and has not been tested on other series types |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
+| [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Retrain the Primary demand model weekly and drop the 14-day correction | Second set of runs (control-only, 2023-07 to 2024-03): weekly scores 0.24 points below the stack (99.17% interval -0.36 to -0.15) and 0.04 below monthly (control member of the ECMWF ensemble only) |
 
 ## The experiments so far
 
@@ -112,12 +113,38 @@ the maintainer to confirm.
 | [00077 - Fitted solar shape in arm am, PVDIS part 6b](00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md) | Does a fitted east-south-west solar shape, with shares fixed across training years, lower the score of experiment 64's arm `am` by more than 0.5%? | Refuted: the score is unchanged (-0.001 points, 98.33% interval -0.018 to +0.014), and another Primary's shape scores the same | Not for production | 2026-10-17 |
 | [00076 - Leak check on PVDIS-5](00076-pvdis-5-leak-check-beyond-10-days/result.md) | Does experiment 64's gain at 10 days and beyond, where its solar term is zero, come from a leak? | Supported: no route for a leak found; a refit with no solar term reproduces the gain, so it matches a start-at-zero effect, and the offset in training adds +0.004 (-0.012 to +0.021) without the 14-day correction | Not for production | 2026-10-17 |
 | [00078 - Current capacity for PVDIS-5](00078-pvdis-5-current-capacity-vintages/result.md) | Does a solar capacity re-estimated before each forecast run lower the error of experiment 64's best forecast, and does a start at zero matter for XGBoost? | Small gain: -0.018 points (98.75% interval -0.036 to -0.004), under the 0.05 threshold; a zero base margin lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) | Candidate | 2026-10-17 |
+| [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-17 |
+| [00080 - Zero starting value, BM0](00080-bm0-zero-base-margin-xgboost-quantile-models/result.md) | Does starting XGBoost from zero instead of its estimated base score lower the quantile score of the production-style models for Primary, bulk and grid supply point, solar, and wind series? | Inconclusive: no gain for Primary substations (-0.017 points, 98.75% interval -0.072 to +0.054), supply points, or solar; worse for wind without the power-curve margin (+0.049) | Not for production | 2026-10-17 |
 | [00079 - Direction of flow at the MVA-only Primaries, PVDIS part 7](00079-pvdis-7-mw-at-mva-only-primaries/result.md) | Can a fit of the magnitude of demand minus solar recover the solar capacity and the direction of flow at Primaries metered only in MVA? | Partly supported: the capacity is recovered (median error 0.09 against 0.29 for the naive fit) and the direction with a balanced accuracy of 0.78, but 7 of the 8 real MVA-only Primaries show no reverse flow and Stickney cannot be checked | Not for production | 2026-10-18 |
 | [00083 - Tail calibration, worked example](00083-curtailment-cost-and-tail-calibration-worked-example/result.md) | Are the tails of the stored demand forecasts of experiment 48 too narrow? | Inconclusive (no registered contrast): every forecast is too narrow in both tails, with coverage of the 0.05 quantile 0.066 to 0.085 and of the 0.95 quantile 0.891 to 0.927; the single-series curtailment-cost metric was withdrawn | Not for production | 2026-10-17 |
 | [00084 - Substation-limit curtailment cost, worked example](00084-substation-limit-curtailment-cost-worked-example/result.md) | Does the substation-limit curtailment metric run on the pilot, and are there enough half-hours beyond a limit to rank forecasts? | Inconclusive (no registered contrast): 19 half-hours are beyond a limit of 0.9 times the earlier maximum in the scored year, so the pilot proves the arithmetic and cannot rank forecasts | Not for production | 2026-10-17 |
+| [00085 - Cheaper retraining schedules](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) | Do cheaper retraining schedules rank the cadence and starting-value contrasts the way full weekly retraining does? | Partly supported: a monthly 12-month-window refit and a weekly 150-round refit reproduce the monthly-minus-weekly gap (+0.118 and +0.125 against +0.125); the starting-value gap (-0.017) is too small to test | Not for production | 2026-10-18 |
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
+| [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
+
+### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
+
+**Weekly retraining of the Primary demand model beat the stack again, by 0.24 points of capacity, on
+274 runs from 2023-07 to 2024-03 for which the project holds only the control member of the ECMWF
+ensemble (ENS).** The
+experiment scored 13 Primary substations and repeated experiment 48's and 49's contrasts. The
+verdict is supported. The Christmas column and the 2-year half-life stayed unresolved over the whole
+fold, but dropping the Christmas column raised the error by 1.2 points inside the Christmas window.
+
+- **Headline result:** weekly minus the stack -0.240 points (99.17% interval -0.360 to -0.145);
+  weekly minus monthly -0.039 (-0.064 to -0.012); blend minus weekly -0.038 (-0.070 to -0.007),
+  short of the -0.05 threshold.
+- **Finding for later experiments:** without D8, D12, and D5, weekly minus the stack is -0.093
+  (95% -0.189 to -0.014). An all-18 km fold had the same signs for the first four contrasts, with
+  intervals that include zero.
+  Neither fold separates retraining from adapting to the 9 km weather product.
+- **Write-up and pull request:** [result](00081-r11-control-member-second-validation-year-demand/result.md),
+  [PR #1313 (Experiment 81: do the weekly-retraining findings hold on July-to-March forecast
+  runs the project has not scored?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1313).
+
+![Planned contrasts](00081-r11-control-member-second-validation-year-demand/figure_1.svg)
 
 ### 00001: ERA5-trained stage 1a against ENS-trained, for solar and wind
 
@@ -413,11 +440,12 @@ correction (row set `fold_a_every5d_v1`, 16 Primary substations).
   0.256 against `d1l`, where the fixed-coefficient shift of 00046 lowered `d1l` by 0.056, and
   subtracting the forecast solar from a model trained on gross demand was not shown to match the
   best guess (00064).
-- **Start an XGBoost quantile model from a base margin of zero, not from its estimated base score.**
-    A zero start lowered `d0` by 0.071 points (-0.099 to -0.047, against a refit of `d0`), and the
-  model without a solar term scored 0.102 points (0.035 to 0.169) lower than its refit with the
-  default start at 10 days and beyond, uncorrected, in one pipeline. A capacity table refreshed once
-  a season-year captured almost all of the gain from a current capacity (00078).
+- **Do not expect a zero start to help the production XGBoost models.** Experiment 78 found that a
+  zero base margin lowered its reference model `d0` by 0.071 points, but on the production recipe
+  the zero start changed the Primary score by -0.017 (-0.072 to +0.054) and the solar score by
+  -0.010 (-0.036 to +0.028), and worsened wind models without a power-curve margin by 0.049 (00080).
+- **Refresh the capacity table that feeds the base margin once per season-year.** A table
+  refreshed that often captured almost all of the gain from a current capacity (00078).
 
 ### 00007: does a static CAMS correction remove the stage 1a daytime residual?
 
@@ -1506,6 +1534,22 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
 
 ![The change in recall, split by whether a transfer touches a refit](00071-sw2-18-refit-offset-and-gap-bridging/figure_3_zone_split.svg)
 
+### 00085: do cheaper retraining schedules rank arms the way weekly retraining does? (SPD1)
+
+**A monthly refit on the latest 12 months of data, or a weekly refit with 150 rounds at a higher
+learning rate on the whole history, gives the same monthly-minus-weekly gap as full weekly
+retraining, at 0.03 to 0.31 of its fit time; a quarterly refit scores much worse.** For the 16
+Primary substations, monthly minus weekly retraining scored +0.125 points of capacity at the full
+setting (95% interval +0.036 to +0.229), +0.118 with a 12-month window, and +0.125 with 150 rounds.
+Quarterly refits scored 0.38 above weekly refits on the same window. The zero-start gap was -0.017
+(-0.062 to +0.037) at full weekly retraining, too small to rank any schedule. The experiment does
+not cover the `am`-against-`d0` or five-model-blend contrasts. Cheap schedules suit research
+contrasts that are 0.05 points or larger.
+
+- **Write-up:** [the full result page](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md).
+
+![Contrasts under each schedule](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_1.svg)
+
 ### 00084: can the substation-limit curtailment metric rank forecasts on the pilot?
 
 **Two substations hold too few half-hours beyond a limit to rank forecasts, so the pilot proves the
@@ -1556,6 +1600,31 @@ unexplained alarms. The verdict is `supported`.
   #1314](https://github.com/openclimatefix/nged-substation-forecast/pull/1314).
 
 ![Share of moved MW found, by detector](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/figure_1_recall_by_arm.svg)
+
+### 00080: does a zero starting value lower the error of the production XGBoost models? (BM0)
+
+**Starting XGBoost from zero instead of from its own estimate does not lower the error of the
+production forecasts, so the 0.071-point gain that experiment 78 found for its reference model is
+not a lever for the production recipe.** XGBoost's quantile model begins from a base score that it
+estimates from the training labels, one value per quantile level. We refitted the production-style
+models with a start of zero and compared them with experiment 48's stored models on the same 292
+daily runs. The quantile score (lower is better; 1 point is 1% of a series' capacity) changed by
+-0.017 points (98.75% interval -0.072 to +0.054) at the 16 Primary substations retrained weekly,
++0.006 (-0.091 to +0.092) at the bulk and grid supply points, -0.033 (-0.084 to +0.031) for the
+frozen Primary stack, and -0.010 (-0.036 to +0.028) at the solar farms. Wind models without a
+power-curve margin were worse with a zero start by 0.049 (95% interval 0.032 to 0.065). The verdict
+is `inconclusive`.
+
+- **Finding for later experiments:** do not test the starting value again for demand or solar. Four
+  times as many rounds raised the Primary score by 0.211 points (0.100 to 0.352), so the fixed 500
+  rounds are not too few, and early stopping on the last 90 days of the training window stopped
+  between 90 and 1,292 rounds at the demand series and gained nothing detectable. The open
+  question is the number of rounds, not the starting value.
+- **Noise floor:** GPU fits are not bit-reproducible. A refit of the estimated-start frozen model
+  scored 0.004 to 0.007 points from the stored one.
+- **Write-up:** [the full result page](00080-bm0-zero-base-margin-xgboost-quantile-models/result.md).
+
+![Zero start minus estimated start](00080-bm0-zero-base-margin-xgboost-quantile-models/figure_1_contrasts.svg)
 
 ### 00079: can the direction of flow be recovered at Primaries metered only in MVA? (PVDIS-7)
 
