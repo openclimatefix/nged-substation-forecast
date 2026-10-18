@@ -4,18 +4,21 @@ slug: sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-
 status: planned
 size: complex
 hypothesis: >-
-  When a Primary substation (a substation that steps down to the local distribution network) is inside a load transfer, or has just left one, an XGBoost demand
+  When a Primary substation (a substation that steps down to the local distribution network) is
+  inside a load transfer, or has just left one, an XGBoost demand
   model that was trained without the transfer's half-hours as targets, with the lags corrected by
   the transfer's signed MW and the MW as a column ("full NRA", NRA being the normal running
   arrangement), forecasts the power the substation would have drawn had no transfer happened
   better than the plain model does. This holds when the MW comes from the XL detector of
-  experiment 82 (XL, a logistic score on the 24-hour residual step) run causally on data up to the forecast origin, but by less than when the MW
+  experiment 82 (XL, a logistic score on the 24-hour residual step) run causally on data up to the
+  forecast origin, but by less than when the MW
   comes from the injected truth.
 prediction: >-
   On injected transfers whose forecast origin falls inside the transfer (family A), the full NRA
   booster trained on XL labels, given causal XL MW, closes 20% to 45% of the gap in MW-weighted
   mean absolute error between the plain booster and the ceiling (the plain booster on lags with no
-  transfer). It closes about 0% in the first 24 hours after onset and little in the next 12 hours, because the
+  transfer). It closes about 0% in the first 24 hours after onset and little in the next 12 hours,
+  because the
   24-hour step statistic needs 24 hours of data after the onset (plus the 3.5-hour telemetry delay),
   and 40% to 70% from the second day. In family B the causal detector keeps an ended transfer open
   for about a day after it ends, so arm 4 with causal XL MW is worse than the plain booster in the
@@ -26,7 +29,8 @@ prediction: >-
   found the mask changes the NRA-row score by under 0.03 points of capacity). On forecast origins
   with no transfer, false causal XL alarms raise the error by under 0.02 points of capacity.
 decision_rule: >-
-  Four planned contrasts on the family A cases (forecast origin inside the injected interval), shapes
+  Four planned contrasts on the family A cases (forecast origin inside the injected interval),
+  shapes
   S2, S3, S4, and S6 pooled with equal weight. These are the shapes that the harness does not
   build by taking a share of the donor's profile, so the headline does not rest on the shape that
   matches the harness. The measure is the MW-weighted mean absolute error of the median forecast
@@ -57,10 +61,12 @@ metric: >-
   MW-weighted mean absolute error of the median forecast against the true unmodified series
   (points of capacity), with the quantile score, the pinball loss at the 0.05 and 0.95 quantiles,
   and 90% interval coverage beside it
-code: ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/
+code: ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-
+injected-switches/
 ---
 
-# Experiment 88: does the full NRA forecast recover the normal running arrangement during and after a switch?
+# Experiment 88: does the full NRA forecast recover the normal running arrangement during and after
+a switch?
 
 Plan only; the write-up replaces this page when the run finishes.
 
@@ -102,7 +108,8 @@ Plan only; the write-up replaces this page when the run finishes.
 - **Cases.** The 292 daily runs of `fold_a_daily_gap_v1` (origin 09:00 UTC; the runs that
   experiment 86's boosters forecast, so the 73 every-fifth-day runs are not used). Family A: the
   origins with onset at or before the origin minus 3.5 hours (so the newest usable lag is inside the
-  interval), up to 7 days after the onset and before the end. Family B: the origins from 3.5 hours after the end up to 7 days after the
+  interval), up to 7 days after the onset and before the end. Family B: the origins from 3.5 hours
+  after the end up to 7 days after the
   end (the lag window; a lag at least 7 days and 3.5 hours before the origin cannot touch the
   interval). A case is an (event, series, origin, valid time), for the donor and each metered
   receiver, with lead up to 10 days. The donor, the metered receivers, and the unmodified power
