@@ -33,6 +33,7 @@ NOISE_MINIMUM: Final[float] = 0.01
 TOLERANCE_MINIMUM: Final[float] = 0.05
 REFITS_PER_YEAR: Final[dict[str, int]] = {"weekly": 52, "monthly": 12, "quarterly": 4}
 N_SERIES: Final[int] = 16
+EXPECTED_RUNS: Final[int] = 158
 LOG_DIR: Final[Path] = common.WORK_DIR.parent / "logs"
 
 
@@ -174,6 +175,31 @@ def contrast_rows(*, arms: dict[str, pl.DataFrame]) -> list[dict[str, Any]]:
     return rows
 
 
+def noise_floor(*, by: dict[str, dict[str, Any]], arm_qs: dict[str, float]) -> float:
+    """Return the noise floor N from the repeat fits of P-roll monthly, and print its parts."""
+    needed = ("pm", "pm_rep", "pm0", "pm0_rep")
+    if any(name not in arm_qs for name in needed) or "K2 P-roll monthly repeat" not in by:
+        msg = "the repeat fits of P-roll monthly are needed for the noise floor"
+        raise ValueError(msg)
+    parts = {
+        "|pm_rep - pm|": abs(arm_qs["pm_rep"] - arm_qs["pm"]),
+        "|pm0_rep - pm0|": abs(arm_qs["pm0_rep"] - arm_qs["pm0"]),
+        "|K2 repeat - K2|": abs(
+            by["K2 P-roll monthly repeat"]["estimate"] - by["K2 P-roll monthly"]["estimate"]
+        ),
+    }
+    print("noise components:", {k: round(v, 4) for k, v in parts.items()})
+    return max(NOISE_MINIMUM, *parts.values())
+
+
+def write_cost() -> None:
+    """Print and save the mean fit seconds per refit of each configuration."""
+    cost = parse_cost()
+    with pl.Config(tbl_rows=40, float_precision=1):
+        print(cost)
+    cost.write_parquet(common.RESULTS_DIR / "cost.parquet")
+
+
 def main() -> None:
     """Compute and print every table."""
     common.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -188,6 +214,10 @@ def main() -> None:
         raise FileNotFoundError(msg)
     shared = shared.unique()
     print(f"cases every arm shares: {shared.height:,}")
+    runs = shared["power_fcst_init_time"].n_unique()
+    if runs != EXPECTED_RUNS:
+        msg = f"the shared run set holds {runs} runs, expected {EXPECTED_RUNS}"
+        raise ValueError(msg)
     absolute = absolute_rows(arms=arms, shared=shared)
     absolute_frame = pl.DataFrame(absolute)
     absolute_frame.write_parquet(common.RESULTS_DIR / "absolute.parquet")
@@ -200,14 +230,7 @@ def main() -> None:
         print(contrasts)
     by = {row["contrast"]: row for row in rows}
     arm_qs = {row["arm"]: row["qs"] for row in absolute}
-    noise = max(
-        NOISE_MINIMUM,
-        abs(arm_qs.get("pm_rep", arm_qs["pm"]) - arm_qs["pm"]),
-        abs(arm_qs.get("pm0_rep", arm_qs.get("pm0", 0.0)) - arm_qs.get("pm0", 0.0)),
-        abs(by["K2 P-roll monthly repeat"]["estimate"] - by["K2 P-roll monthly"]["estimate"])
-        if "K2 P-roll monthly repeat" in by and "K2 P-roll monthly" in by
-        else 0.0,
-    )
+    noise = noise_floor(by=by, arm_qs=arm_qs)
     tolerance = max(TOLERANCE_MINIMUM, noise)
     print(f"noise floor N = {noise:.4f}; tolerance T = {tolerance:.4f}")
     verdicts = []
@@ -244,10 +267,7 @@ def main() -> None:
                 scored=pl.len(), agreed=pl.col("agrees").sum(), passes=pl.col("agrees").all()
             )
         )
-    cost = parse_cost()
-    with pl.Config(tbl_rows=40, float_precision=1):
-        print(cost)
-    cost.write_parquet(common.RESULTS_DIR / "cost.parquet")
+    write_cost()
 
 
 if __name__ == "__main__":

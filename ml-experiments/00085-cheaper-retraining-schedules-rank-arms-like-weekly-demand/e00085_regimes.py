@@ -91,12 +91,19 @@ def jobs_for(
     return {refit: sorted(jobs[refit]) for refit in sorted(jobs)}
 
 
+N_E80_ANCHORS: Final[int] = 28
+
+
 def e80_anchors() -> frozenset[datetime]:
     """Return the weekly refit times that experiment 00080's zero-start arm holds.
 
     The arm's files for one series, `n1h_m0/D10_s0_<refit>.parquet`, name the 28 refits.
     """
-    return frozenset(
+    anchors = frozenset(
         datetime.strptime(path.stem.split("_")[-1], "%Y%m%dT%H%M").replace(tzinfo=UTC)
         for path in sorted(common.E80_ANCHOR_PREDS_DIR.joinpath("n1h_m0").glob("D10_s0_*.parquet"))
     )
+    if len(anchors) != N_E80_ANCHORS:
+        msg = f"expected {N_E80_ANCHORS} anchors, found {len(anchors)}"
+        raise ValueError(msg)
+    return anchors

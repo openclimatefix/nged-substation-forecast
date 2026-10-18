@@ -62,8 +62,9 @@ benchmark: >-
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Quantile score (twice the mass-weighted mean pinball loss over nine levels), in points of capacity
-  (1 point is 1% of the series' effective capacity); MAE of the median, coverage of the 0.01 to
-  0.99 quantile band, and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles are reported
+  (1 point is 1% of the series' effective capacity); MAE of the median, coverage of the 0.05 to
+  0.95 quantile band, and pinball loss at the 0.05 and 0.95 quantiles are reported (the stored
+  quantile models stop at those levels)
 verdict: partly supported
 best_arm: >-
   Weekly refits on the whole history with 150 rounds and `eta` 0.15: 5.408 points of capacity,
@@ -76,8 +77,9 @@ headline: >-
 lessons: >-
   The cadence gap is reproduced by a monthly refit on a 12-month window and by a weekly refit on
   the whole history with 150 rounds, so those two schedules can stand in for full weekly retraining
-  on cadence contrasts. A quarterly refit loses 0.38 points to weekly, so it ranks arms of
-  different cadence wrongly. Repeating a 12-month-window fit moves the score by 0.000 to 0.001, so
+  on cadence contrasts. A quarterly refit scores 0.38 points above a weekly refit on the
+  same window, three times the monthly gap, so quarterly refits are too coarse to stand in for
+  weekly or monthly. Repeating a 12-month-window fit moves the score by 0.000 to 0.001, so
   GPU noise is far below the contrasts.
 advice:
   - >-
@@ -90,10 +92,10 @@ advice:
     the fit time (absolute scores).
   - >-
     Do not use quarterly refits to compare arms that differ in cadence or in how fast they adapt:
-    they score 0.38 above weekly (K1 quarterly).
+    they score 0.38 above weekly refits on the same 12-month window (K1 quarterly).
   - >-
     Do not rely on a 0.017-point contrast to rank schedules: on 158 runs the zero-start gap is
-    inside the noise, so a pass on it carries no information (R2).
+    inside the noise, so a schedule's agreement on that contrast carries no information (R2).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/
@@ -101,18 +103,23 @@ code: ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-de
 
 # Experiment 85: do cheaper retraining schedules rank arms the way weekly retraining does? (SPD1)
 
-**A monthly refit on the latest 12 months of data (150 rounds), or a weekly refit with 150 larger
-rounds on the whole history, ranks cadence contrasts the way full weekly retraining does, at 0.10
-to 0.31 of its fit time. A quarterly refit does not, and the starting-value contrast is too small
-on these rows to say anything about any schedule.** The write-up covers only cadence (monthly
-against weekly) and starting value (zero against XGBoost's estimated start) for the Primary
-substation N1 model. It says nothing about the `am`-against-`d0` contrast of experiment 64 or the
-five-model blend of experiment 49, which the manager excluded because experiment 64 has no weekly
-reference and the blend mixes schedules.
+**Refitting the demand model monthly on the latest 12 months of data (150 boosting rounds), or
+weekly on the whole history with 150 rounds at a higher learning rate, gives the same gap between
+monthly and weekly retraining as full weekly retraining does, at 0.03 to 0.31 of its fit time.**
+Refitting only quarterly scores much worse. The contrast between starting a model from zero and
+from XGBoost's estimated value is too small on these rows to rank any schedule.
 
-We refitted the 16 Primary substations' demand model under cheaper schedules and compared each
-schedule's score gaps with the gaps that stored full weekly retraining gives, on 158 daily forecast
-runs. The verdict is partly supported: cadence is supported, and starting value cannot be tested.
+We asked whether research experiments can use a cheaper retraining schedule instead of weekly
+retraining. For the 16 Primary substations we refitted the XGBoost demand model (N1: one model per
+substation, trained on the ECMWF ensemble control forecast) under seven cheaper schedules. We then
+compared the gaps in the quantile score between arms under each schedule with the gaps stored
+weekly retraining gives, on 158 daily forecast runs from July 2025 to June 2026. The quantile
+score is the mean pinball loss over nine quantile levels, in percentage points of the substation's
+capacity (lower is better). The verdict is partly supported: by the rule fixed in advance every
+schedule passes, but the pass on the starting-value contrast is empty, so only the cadence
+contrast supports the claim. The page covers these two contrasts for the Primary N1 model only. It
+leaves out the `am`-against-`d0` contrast of experiment 64 and the five-model blend of experiment
+49, because experiment 64 has no weekly reference and the blend mixes schedules.
 
 ![Contrasts under each schedule, with the full-weekly reference](figure_1.svg)
 
@@ -122,19 +129,29 @@ runs. The verdict is partly supported: cadence is supported, and starting value 
 
 ## Results
 
-- **Rows:** 16 Primary substations, 158 runs of `fold_a_daily_gap_v1` (the runs whose latest
-  weekly refit is one of experiment 80's 28 anchors), seed 0, N1 model with the spread factor 1.15
-  and no correction, ENS weather. Weekly schedules refit at those 28 anchors only.
-- **Noise floor N:** 0.01 points. A repeat of the 12-month-window monthly fit scored 5.563 against
-  5.563, and its zero-start repeat 5.547 against 5.546. Tolerance T is 0.05.
-- **Cadence gap (monthly minus weekly):** reference 0.125 (0.036 to 0.229). The 12-month window
-  gives 0.118 and the 150-round recipe 0.125, so both agree (rule i). Quarterly minus weekly,
-  descriptive, is 0.381 (0.207 to 0.565).
-- **Starting-value gap (zero minus default start):** reference -0.017 (-0.062 to +0.037), smaller
-  than the -0.04 to -0.07 planned. Every schedule gives -0.003 to -0.020, so each passes rule ii,
-  but any value within 0.05 of zero passes, so the pass is weak evidence.
-- **Pass table:** monthly 12-month window 2 of 2, weekly 150 rounds 2 of 2, weekly 12-month window
-  1 of 1, quarterly 1 of 1 (on starting value only), full monthly 1 of 1 (on starting value only).
+- **Terms:** the cadence gap is the monthly arm's score minus the weekly arm's. The starting-value
+  gap is the score of a model whose boosting starts from zero minus that of a model that starts
+  from XGBoost's estimate from the training labels. A 12-month window means each refit trains on
+  the latest 12 months only (150 rounds, learning rate 0.15). The full setting trains on the whole
+  history (500 rounds, learning rate 0.05).
+- **Rows:** 16 Primary substations, 158 runs, N1 model with the spread factor 1.15 (a fixed widening
+  of the quantiles) and no 14-day correction. Every weekly arm refits at the 28 weekly dates that
+  experiment 80's stored zero-start arm holds, and every contrast keeps the runs those refits
+  serve.
+- **Noise floor:** 0.01 points. A repeat of the 12-month-window monthly fit scored 5.563 against
+  5.563, and its zero-start repeat 5.547 against 5.546. The tolerance is 0.05.
+- **Cadence gap:** the full-setting reference is +0.125 (95% interval +0.036 to +0.229). The
+  12-month window gives +0.118 and the 150-round whole-history recipe +0.125, so both agree with
+  the reference. Quarterly minus weekly refits on the 12-month window, descriptive because no
+  full-quarterly reference exists, is +0.381 (+0.207 to +0.565).
+- **Starting-value gap:** the reference is -0.017 (-0.062 to +0.037), smaller than the -0.07 the
+  plan predicted. Every schedule gives between -0.003 and -0.020, so each agrees under the rule for
+  an unresolved reference (an estimate within 0.05 of zero). Any estimate within 0.05 of zero
+  passes, so the agreement is weak evidence.
+- **Pass table:** monthly 12-month window 2 of 2 contrasts, weekly 150 rounds 2 of 2, weekly
+  12-month window 1 of 1, quarterly 1 of 1, full monthly 1 of 1 (the last three on starting value
+  only). The plan's other predictions: quarterly scored 0.263 above monthly (predicted 0.10 to
+  0.20), and the monthly gap was within 0.01 of the reference (predicted within 0.05).
 
 | Arm | Score | 95% interval | Coverage of q05 to q95 | Pinball at q05 | Pinball at q95 |
 |---|---|---|---|---|---|
@@ -148,43 +165,48 @@ runs. The verdict is partly supported: cadence is supported, and starting value 
 
 ## Cost
 
-- **Fit time of one refit (one series, 2 threads):** 114 s at the full setting (500 rounds, whole
-  history), 33 to 36 s for the 150-round whole-history recipe, and 13 to 51 s for the 12-month
-  window. Other jobs shared the machine, so the same recipe varied by up to 4 times.
-- **A year for 16 series:** full weekly about 1,590 compute minutes (the monthly full-setting fit
-  time times 52, not measured separately), full monthly 366, weekly 150 rounds 460 to 500, monthly
+- **Fit time of one refit (one series, 2 threads):** 114 s at the full setting, 33 to 36 s for the
+  150-round whole-history recipe, and 13 to 51 s for the 12-month window. Other jobs shared the
+  machine, so the same recipe varied by up to 4 times.
+- **A year for 16 series:** full weekly about 1,590 compute minutes (the full monthly fit time
+  times 52, not measured separately), full monthly 366, weekly 150 rounds 460 to 500, monthly
   12-month window 42 to 164, quarterly 54.
 - **Against the one-third rule:** monthly 12-month window (0.03 to 0.10 of full weekly) and weekly
   150 rounds (0.29 to 0.31) pass. Weekly on the 12-month window (0.31 to 0.35) is borderline.
 
-## Caveats and what to try next
+## Caveats
 
+- **Departure from the written rule:** by the pre-registered rule every schedule passes, and
+  quarterly (0.034 of full weekly's cost) would become the default for the starting-value
+  contrast. The page declines that, because the rule is vacuous for a gap of 0.017 and the
+  descriptive quarterly gap of 0.38 is large.
 - **Starting value is untested:** the stored weekly zero-start arm covers half of the weeks, and
-  the gap on those runs is within the noise. A later experiment should pick a contrast of 0.1 points
-  or more, such as the `am` against `d0` gap, to test schedules.
+  the gap on those runs is within the noise. A later experiment should test schedules on a contrast
+  of 0.1 points or more that has a stored weekly reference.
 - **One series class, one seed:** Primary N1 demand only. Tail scores stop at q05 and q95, because
   the stored quantile models have nine levels from 0.05 to 0.95.
-- **Cost is noisy:** read the cost as an order of magnitude, not a measurement.
-- **Not covered:** the `am`-against-`d0` and five-model-blend contrasts, as stated above.
-- **Next:** use monthly 12-month-window refits for feature and recipe screening, the 150-round
-  weekly refit where weekly cadence matters, and keep full weekly retraining for the best-guess
-  experiments and production.
+- **Cost is noisy:** the plan priced a schedule by the mean fit time of its recipe. Identical
+  recipes ran 4 times apart because of other jobs, so the page gives a range, and the cost is an
+  order of magnitude.
 
 ## Recommended R&D defaults
 
 - **Feature and recipe contrasts of 0.05 points or more:** use monthly refits on a 12-month window
-  with 150 rounds and `eta` 0.15. It reproduced the cadence gap to within 0.01 and repeated to
-  within 0.001. It saves about 1,420 to 1,540 of the 1,590 compute minutes a weekly year takes (90
-  to 97%). Only the cadence contrast was tested, so a feature contrast is assumed to carry over.
-- **Contrasts about cadence, retraining rules, or how fast a model adapts:** use the weekly refit on
-  the whole history with 150 rounds and `eta` 0.15. It scored within 0.003 of full weekly and saves
-  about 1,090 minutes (69%). Experiment 34 found a weekly-analogue gain of 0.05 shrank to 0.01
-  under monthly retraining, so a conclusion about recent-data features, the 14-day correction, the
-  training window, or the half-life can change with the schedule. Check it on this weekly refit.
-- **Absolute scores and tail scores:** quote them from weekly retraining only. Monthly refits on a
-  12-month window score 0.16 points above weekly (5.563 against 5.405) and 0.05 above at q95
-  pinball loss, so the same arm reads worse on every schedule except weekly.
-- **Quarterly refits:** do not use them. They lose 0.26 points to monthly and 0.38 to weekly, and
-  this experiment cannot show that they rank any contrast correctly.
-- **Contrasts under 0.05 points:** this experiment cannot say which schedule keeps them, because
-  the only one tested, the zero-start gap, was -0.017.
+  with 150 rounds and learning rate 0.15. The schedule reproduced the cadence gap to within 0.01
+  and repeated to within 0.001. A weekly year costs about 1,590 compute minutes and this schedule
+  saves 1,420 to 1,545 of them (90 to 97%). Only the cadence contrast was tested, so a feature
+  contrast is assumed to carry over.
+- **Contrasts about cadence, retraining rules, or how fast a model adapts:** use the weekly refit
+  on the whole history with 150 rounds and learning rate 0.15. The schedule scored within 0.003 of
+  full weekly and saves about 1,090 minutes (69%). Experiment 34 found a weekly-analogue gain of
+  0.05 shrank to 0.01 under monthly retraining, so a conclusion about recent-data features, the
+  14-day correction, the training window, or the half-life can change with the schedule. Check
+  such a conclusion on the weekly 150-round refit.
+- **Absolute scores and tail scores:** quote them from weekly retraining at the full setting.
+  Monthly refits on a 12-month window score 0.16 points above that (5.563 against 5.405) and 0.05
+  above at the q95 pinball loss, so a model reads worse under any cheaper schedule than under
+  weekly retraining.
+- **Quarterly refits:** do not use them. Quarterly refits score 0.26 above monthly refits, and the
+  experiment cannot show that quarterly refits rank any contrast correctly.
+- **Contrasts under 0.05 points:** the experiment cannot say which schedule keeps such contrasts,
+  because the only one tested, the zero-start gap, was -0.017.

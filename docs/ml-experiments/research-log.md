@@ -1511,15 +1511,15 @@ hours of a refit (+0.431 there, -0.005 elsewhere).
 
 ### 00085: do cheaper retraining schedules rank arms the way weekly retraining does? (SPD1)
 
-**A monthly refit on the latest 12 months of data, or a weekly refit with 150 larger rounds on the
-whole history, ranks cadence contrasts the way full weekly retraining does, at 0.03 to 0.31 of its
-fit time; a quarterly refit does not.** For the 16 Primary substations, monthly minus weekly
-retraining scored +0.125 points of capacity at the full setting (95% interval +0.036 to +0.229),
-+0.118 with a 12-month window, and +0.125 with 150 rounds. Quarterly refits lost 0.38 points to
-weekly. The zero-start gap was -0.017 (-0.062 to +0.037) at full weekly retraining, too small to
-rank any schedule. The experiment does not cover the `am`-against-`d0` or five-model-blend
-contrasts. Use the cheap schedules for research contrasts and keep full weekly retraining for the
-best-guess experiments and production.
+**A monthly refit on the latest 12 months of data, or a weekly refit with 150 rounds at a higher
+learning rate on the whole history, gives the same monthly-minus-weekly gap as full weekly
+retraining, at 0.03 to 0.31 of its fit time; a quarterly refit scores much worse.** For the 16
+Primary substations, monthly minus weekly retraining scored +0.125 points of capacity at the full
+setting (95% interval +0.036 to +0.229), +0.118 with a 12-month window, and +0.125 with 150 rounds.
+Quarterly refits scored 0.38 above weekly refits on the same window. The zero-start gap was -0.017
+(-0.062 to +0.037) at full weekly retraining, too small to rank any schedule. The experiment does
+not cover the `am`-against-`d0` or five-model-blend contrasts. Cheap schedules suit research
+contrasts, and full weekly retraining stays for the best-guess experiments and production.
 
 - **Write-up:** [the full result page](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md).
 

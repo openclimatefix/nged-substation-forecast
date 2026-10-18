@@ -64,6 +64,16 @@ def arm_rows(
 ) -> pl.DataFrame:
     """Return one series' quantiles for an arm: each run from the refit the regime assigns it.
 
+    Args:
+        root: The folder of refit predictions.
+        config: The configuration folder under `root`.
+        regime: A key of `regimes.REGIMES`.
+        site: The series label.
+        origins: The `power_fcst_init_time` of the runs to cover.
+
+    Returns:
+        The quantiles keyed by series, run, valid time, and seed.
+
     Raises:
         ValueError: If a refit file lacks a run assigned to it.
         FileNotFoundError: If a refit file is missing.

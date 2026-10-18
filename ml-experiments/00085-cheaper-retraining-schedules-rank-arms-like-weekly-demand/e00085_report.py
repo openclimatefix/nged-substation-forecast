@@ -8,6 +8,7 @@ the cost is given as the range over the configurations that share a schedule.
     uv run python ml-experiments/00085-*/e00085_report.py
 """
 
+import statistics
 from typing import Final
 
 import e00085_common as common
@@ -37,6 +38,7 @@ def cost_table() -> pl.DataFrame:
             {
                 "schedule": name,
                 "minutes_low": refits * N_SERIES * min(seconds.to_list()) / 60.0,
+                "minutes_mean": refits * N_SERIES * statistics.fmean(seconds.to_list()) / 60.0,
                 "minutes_high": refits * N_SERIES * max(seconds.to_list()) / 60.0,
             }
         )
