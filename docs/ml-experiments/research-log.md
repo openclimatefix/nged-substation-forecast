@@ -122,6 +122,8 @@ the maintainer to confirm.
 | [00074 - Sunshine analogues against the explicit solar forecast (AN1)](00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md) | Under monthly retraining, do same-time sunshine analogues lower the daylight error of a Primary substation more than an explicit forecast of its solar panels' output, and do they add anything once that forecast is in the model? | Inconclusive: both lower the error (by 0.149 and 0.095 points against a monthly refit without sunshine inputs), and the analogues add 0.066 points of gain (-0.149 to +0.015) on top of the explicit forecast | Not for production | 2026-10-17 |
 | [00075 - Normal running arrangement forecast, SW2-11](00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md) | With labelled switching removed from the training targets, does the weekly-refitted Primary demand model forecast the normal running arrangement as well outside switching as the plain model, and does the signed MW moved at each lag help? | Inconclusive: removing the switching changed the quantile score by +0.004 points of capacity (98.33% interval -0.026 to +0.025); the signed MW and the corrected lags did not help | Not for production | 2026-10-17 |
 | [00086 - Normal running arrangement forecast with detector labels, SW2-12](00086-sw2-12-detector-labels-for-nra-forecast/result.md) | Do the XL detector's switching labels give the same gain as NGED's logs when each lag is corrected for switching? | Inconclusive: detector labels raised the score by 0.48 points of capacity on rows with a lag inside a logged event (98.33% interval -0.06 to +1.72) and by 0.056 outside switching (+0.016 to +0.126); oracle labels changed it by -0.29 (-2.06 to +0.68) | Not for production | 2026-10-18 |
+| [00090 - Lag unusualness inputs, SW2-28](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) | Does giving the Primary demand model the PIT of each lag against a climatology improve the forecast on all rows, and widen the quantiles on rows with a lag inside a logged switching event? | Refuted: the PIT inputs raised the score by 0.355 points of capacity on all rows outside switching (97.5% interval +0.209 to +0.513); on rows with a lag inside a logged event +0.795 (-0.325 to +2.787, inconclusive) | Not for production | 2026-10-18 |
+| [00088 - Normal running arrangement forecast on injected switches, SW2-21](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md) | When a Primary substation is inside a switching transfer or has just left one, does the NRA forecast recover the true unmodified power, with the MW from the injection and from the refit-offset neighbour-count detector run only on data before the origin? | Inconclusive: with the true MW, a booster trained on NGED's logged transfers closes 83% (70% to 91%) of the error a transfer adds; with the MW from the refit-offset neighbour-count detector as built, a booster trained on that detector's transfers closes 16% (-17% to 67%), -0.149 points of capacity against the plain forecast (98.75% interval -1.174 to +0.148) | Not for production | 2026-10-18 |
 | [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
@@ -2099,6 +2101,59 @@ moved MW as three columns.
   logs?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1322).
 
 ![Contrasts on the rows with a lag inside a logged event](00086-sw2-12-detector-labels-for-nra-forecast/figure_1.svg)
+
+### 00090: lag unusualness inputs
+
+**Telling the Primary demand XGBoost model how unusual each lag is made the forecast worse; the
+verdict is refuted.** The experiment refitted the XGBoost demand model monthly for 16 Primary substations,
+trained on half-hours outside switching, and scored 292 daily runs with and without the PIT (the
+share of ordinary readings below the lag, at the same time of day, kind of day, and month) of each
+of the three lags.
+
+- **Headline result:** on the 2,928,842 half-hours outside switching, the PIT arm scored 0.355
+  points of capacity worse than the plain arm (97.5% interval +0.209 to +0.513). On the 37,394 of
+  them with a lag inside a logged event, +0.795 (-0.325 to +2.787).
+- **Tails:** coverage of the 5%-to-95% band fell from 0.888 to 0.874 outside switching and from
+  0.770 to 0.740 on rows with a lag inside a logged event, so the XGBoost model did not widen its band.
+- **Finding for later experiments:** widening the quantiles when a lag may be inside an abnormal
+  arrangement needs an explicit rule (SW2-27) rather than an input to the booster. The lag-free
+  booster PIT and neighbour arms were not run.
+- **Write-up and pull request:**
+  [result](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md).
+
+![Contrasts on all rows and on rows with a lag inside a logged event](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/figure_1.svg)
+
+### 00088: does the normal running arrangement forecast recover the true power during a switch?
+
+**A demand forecast whose input lags are corrected for a switching transfer (load that NGED moves
+from one Primary substation to its neighbours) recovers the power the substation would have drawn
+only when the megawatts (MW) moved are known, and the detector's MW, as built, is not yet good
+enough, so the verdict is inconclusive.** The normal running arrangement (NRA) is the network as it
+is when no transfer is on. The experiment injected known transfers into the recorded power of 16
+Primary substations and scored forecasts against the true unmodified power, only at forecast
+origins inside a transfer: 613 cases per shape from 172 transfers that start in four of the
+even-numbered months of the validation year (13% of the year's substation-origin pairs, not the
+whole year).
+
+- **Headline result:** with the true MW, an XGBoost model trained on NGED's logged transfers closes
+  83% (70% to 91%) of the gap between the plain forecast and a forecast made from lags the transfer
+  never touched (-0.790 points of capacity against the plain forecast, 98.75% interval -1.397 to
+  -0.412). With the MW from the refit-offset neighbour-count detector as built, the same kind of
+  model trained on that detector's transfers closes 16% (-17% to 67%), -0.149 points of capacity
+  (-1.174 to +0.148).
+- **Finding for later experiments:** from the second day after a transfer began, the detector's MW
+  was about 1.5 times the true MW, because overlapping detector intervals are added, and the
+  detector kept reporting MW for days after a transfer ended (a rise in error of 0.35 to 0.46
+  points of capacity over the plain forecast). Taking the largest of the overlapping steps instead,
+  a choice made after seeing the results, gave -0.406 (-1.223 to -0.083) during a transfer.
+  Dropping the transfer's half-hours from the training data added nothing (+0.070, -0.015 to
+  +0.171).
+- **Write-up and pull request:**
+  [result](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md),
+  [PR #1328 (Experiment 88: does the full NRA forecast recover the normal running arrangement
+  during and after injected switches?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1328).
+
+![Error by time since the transfer began](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/figure_1.svg)
 
 ### 00091: a probability that a past half-hour lies inside a switching period
 
