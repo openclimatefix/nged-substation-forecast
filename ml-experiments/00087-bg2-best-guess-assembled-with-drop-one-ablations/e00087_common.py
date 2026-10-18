@@ -612,16 +612,36 @@ def log_gpu_seconds(*, job: str, seconds: float, workers: int) -> None:
 
 
 def gpu_hours_total(*, log: Path = GPU_HOURS_LOG) -> float:
-    """Return the running total of logged GPU hours (the sum of the jobs' wall-clock seconds).
+    """Return the running total of GPU hours: the hours during which at least one job was running.
+
+    Each log line holds a job's end time (`logged_at`) and its wall-clock seconds, so its interval
+    is known. Jobs that ran side by side on the GPU are counted once, as the design's table counts
+    experiment 48's weekly fits.
 
     Args:
         log: The log file; a missing file counts as zero hours.
 
     Returns:
-        Hours. Jobs that ran side by side on the GPU are each counted in full, so the total
-        overstates the GPU's busy time when more than one worker runs.
+        Hours in the union of the jobs' intervals.
     """
     if not log.exists():
         return 0.0
-    seconds = sum(json.loads(line)["seconds"] for line in log.read_text().splitlines() if line)
-    return float(seconds) / 3600.0
+    intervals = []
+    for line in log.read_text().splitlines():
+        if not line:
+            continue
+        entry = json.loads(line)
+        end = datetime.fromisoformat(entry["logged_at"]).timestamp()
+        intervals.append((end - entry["seconds"], end))
+    total = 0.0
+    current_start, current_end = None, None
+    for start, end in sorted(intervals):
+        if current_end is None or start > current_end:
+            if current_end is not None:
+                total += current_end - current_start
+            current_start, current_end = start, end
+        else:
+            current_end = max(current_end, end)
+    if current_end is not None:
+        total += current_end - current_start
+    return total / 3600.0
