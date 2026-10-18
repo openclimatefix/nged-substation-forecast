@@ -283,8 +283,18 @@ def report_variant(*, injected: pl.DataFrame, name: str) -> dict[str, np.ndarray
         print(reliability(p=predictions[arm][head], y=y[head]))
     sums = cluster_sums(frame=test, predictions=predictions)
     print("\n-- planned contrasts: relative change in Brier score against arm 1 (97.5%)")
+    saved = []
     for arm in ("latest", "latest_x1", "best"):
-        print(arm, bootstrap_contrast(sums=sums, arm=arm))
+        contrast = bootstrap_contrast(sums=sums, arm=arm)
+        print(arm, contrast)
+        saved.append({"variant": name, "arm": arm, **contrast})
+    pl.DataFrame(saved).write_parquet(OUT_DIR / f"contrasts_{name}.parquet")
+    pl.concat(
+        [
+            reliability(p=predictions[arm][head], y=y[head]).with_columns(arm=pl.lit(arm))
+            for arm in ("flag", "latest", "latest_x1")
+        ]
+    ).write_parquet(OUT_DIR / f"reliability_{name}.parquet")
     print(
         "latest_x1 against latest", bootstrap_contrast(sums=sums, arm="latest_x1", versus="latest")
     )
@@ -295,7 +305,11 @@ def report_variant(*, injected: pl.DataFrame, name: str) -> dict[str, np.ndarray
     print(
         "\n-- by hours since onset (covering transfer for positives, newest active transfer else)"
     )
-    age = test["age_hours"].to_numpy()
+    age = np.where(
+        np.isfinite(test["ev_age_hours"].to_numpy()),
+        test["ev_age_hours"].to_numpy(),
+        test["cut_age_hours"].to_numpy(),
+    )
     for label, low, high in (("<24h", 0, 24), ("1-3d", 24, 72), (">3d", 72, 1e9)):
         m = head & (age >= low) & (age < high)
         print(
@@ -348,6 +362,7 @@ def report_durations(*, frame: pl.DataFrame) -> None:
     y = test["y"].to_numpy().astype(float)
     hours = test["ref_hours"].to_numpy()
     recall = test["flag"].to_numpy()
+    saved = []
     for name, low, high in DURATION_BINS:
         m = np.isfinite(hours) & (hours >= low) & (hours < high)
         print(f"\n-- {name}: rows {m.sum():,}, positives {int(y[m].sum()):,}")
@@ -364,7 +379,18 @@ def report_durations(*, frame: pl.DataFrame) -> None:
                 f"   {arm:10s} Brier {brier(p=p, y=y[m]):.5f}  AUC {auc(p=p, y=y[m]):.4f}  "
                 f"max gap {rel['gap'].max():.3f}"
             )
+            saved.append(
+                {
+                    "bin": name,
+                    "arm": arm,
+                    "brier": brier(p=p, y=y[m]),
+                    "auc": auc(p=p, y=y[m]),
+                    "positives": int(y[m].sum()),
+                    "rows": int(m.sum()),
+                }
+            )
         print(reliability(p=predictions["latest"][m], y=y[m]))
+    pl.DataFrame(saved).write_parquet(OUT_DIR / "duration_bins.parquet")
     test.select(
         "seed", "shape", "cut", "series", "lag_stamp", "y", "ref_hours", "flag"
     ).write_parquet(OUT_DIR / "test_rows_duration.parquet")
