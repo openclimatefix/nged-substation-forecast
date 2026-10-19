@@ -35,6 +35,8 @@ from studies.dp_gam_pooled import PoolingStrength
 TARGETS: Final[tuple[str, ...]] = common.HELD_OUT_SITES
 HEATING_FACTORS: Final[tuple[float, ...]] = (0.1, 1.0, 10.0)
 """The 3 by 3 grid of `n2l_*` multiplies `lambda*` by these, for heating and for the others."""
+FACTOR_NAMES: Final[dict[float, str]] = {0.1: "tenth", 1.0: "same", 10.0: "tenfold"}
+"""Set names cannot hold a decimal point, so the factors are named."""
 
 
 @dataclass(frozen=True)
@@ -84,7 +86,7 @@ def catalogue(*, tuned: dict[str, Any], cut_name: str) -> list[arms.ArmConfig]:
     ]
     configs += [
         arms.ArmConfig(
-            name=f"n2l_h{heating:g}_o{other:g}",
+            name=f"n2l_h{FACTOR_NAMES[heating]}_o{FACTOR_NAMES[other]}",
             strength=PoolingStrength(
                 heating=tuned["lambda_star"] * heating, other=tuned["lambda_star"] * other
             ),
