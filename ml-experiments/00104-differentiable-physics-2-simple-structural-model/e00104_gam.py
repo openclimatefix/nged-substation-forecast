@@ -158,7 +158,10 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
             season_years=common.SEASON_YEARS,
         )
         spread = ResidualSpread.fit(
-            residuals=replica.residuals, band=replica.band, quarter=replica.quarter
+            residuals=replica.residuals,
+            band=replica.band,
+            quarter=replica.quarter,
+            centre=False,
         )
         mean = predict_gam(cache=cache, fit=fit, index=index)
         quantiles = spread.quantiles(
