@@ -3,7 +3,11 @@
 One frozen fit per arm and substation on data before the cut, scored on every row with a reading
 after it. The quantiles are the fitted mean plus empirical quantiles of the residuals of a replica
 of the scored forecast (a fit 12 months before the cut, predicting the following 12 months), per
-hour band and calendar quarter (`studies.dp_gam.replica_residuals`). The penalties come from
+hour band and calendar quarter (`studies.dp_gam.replica_residuals`), centred on each group's median
+so that the replica year's mean bias is not carried into the scored year. The sets are stored as
+`<arm>_centred`. The first run of this script (before the audit) stored the uncentred quantiles
+under the plain arm names (`g1`, `g_all`, ...); `common.stored_name` maps between the two. The
+penalties come from
 `work/tuned.json` (`e00104_tune.py`).
 
 Arms: `g1` (12-month window, no drift), `g_all` (all years, no drift), `g_all_d1` (all years,
@@ -161,14 +165,15 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
             residuals=replica.residuals,
             band=replica.band,
             quarter=replica.quarter,
-            centre=False,
+            centre=True,
         )
         mean = predict_gam(cache=cache, fit=fit, index=index)
         quantiles = spread.quantiles(
             mean=mean, band=cache.calendar.band[index], quarter=cache.calendar.quarter[index]
         )
         name = f"cold_{arm.name}" if cold else arm.name
-        frames[name] = common.prediction_frame(
+        stored = f"{name}_centred"
+        frames[stored] = common.prediction_frame(
             cache=cache, site=site, index=index, quantiles=quantiles
         ).with_columns(mean=pl.Series(mean.astype(np.float32)))
         effective = cache.sites[site].table.effective_capacity_mw

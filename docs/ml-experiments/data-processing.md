@@ -199,6 +199,15 @@ furthest.** The grey band is the fixed lockdown window. The figure does not isol
 month-to-month level that the correlations above describe, because the seasonal cycle dominates the
 figure.
 
+**Centre the residual quantiles of a replica fit before adding them to a forecast's mean.** The raw
+quantiles carry the replica year's mean bias, so adding them shifts every quantile of the scored
+year by that bias. In experiment 104 the shift moved the median forecast by -21.3 to +3.6 points at
+the six long-history Primaries and reversed the sign of two contrasts (all years against 12 months,
+and drift against no drift)
+([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction).
+Applies to experiments and to production. Confidence: high, because the centred and uncentred sets
+differ only in this shift.
+
 ## Timestamps and availability
 
 **Treat ERA5 as available about 5 days after the event, so ERA5 at lag times is a ceiling and not an
@@ -355,6 +364,14 @@ run from January 2022, and the raw log holds many events too small to matter ([e
 101](00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md), filtering the labelled
 set of [experiment 41](00041-sw2-0a-labeller-gate/result.md)). Applies to experiments, and to
 production once a detector runs there.
+
+**Expect D10 to carry unlabelled jumps of 15 to 20 points.** D10's night-time floor rose from 25 to
+45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to
+20 points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and
+both are probably unlabelled switching. Dropping the 2025 window lowered D10's scores by 0.09 to 0.53
+points and moved the five-site contrasts by under 0.08 points ([experiment
+104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction). Applies to
+experiments scoring D10. Confidence: medium, because the cause is not confirmed.
 
 **Do not conclude that a logged closure moved no load because no detector flagged the closure.** Of
 381,830 logged half-hours on 16 series, 80.5% lie in closures over 60 days that no label covers, and
