@@ -10,7 +10,7 @@ assigns to it, and writes for each arm and series the mixture of the 51 members'
 `work/anchor_preds/<arm>/<site>_s0_<refit>.parquet`. Existing files stay, so a stopped run
 resumes. Seed 0 only.
 
-The ARA is the union of the XL detector's intervals, NGED's logged events, and NGED's logged
+The ARA is the union of the RO-NC detector's intervals, NGED's logged events, and NGED's logged
 closures. Training rows come from three places: the control-member backfill frames of experiment
 00081 (2021-03-21 to 2024-03-31, every `BACKFILL_STRIDE`-th run), the stage 1 pilot's every-5-days
 training runs (2024-04-01 to 2025-06-30), and experiment 00034's daily control-member runs
@@ -112,7 +112,7 @@ def input_columns() -> list[str]:
 
 
 def ara_array(*, labels: dict[str, labelling.SeriesLabels]) -> np.ndarray:
-    """Return the half-hours inside an ARA: an XL event, a logged event, or a logged closure."""
+    """Return the half-hours inside an ARA: an RO-NC event, a logged event, or a logged closure."""
     return labels["xl"].in_event | labels["oracle"].in_event | labels["oracle"].closed
 
 

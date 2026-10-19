@@ -60,7 +60,7 @@ def input_columns(*, arm: str) -> list[str]:
 
 
 def ara_mask(*, labels: dict[str, labelling.SeriesLabels]) -> np.ndarray:
-    """Return the grid half-hours inside an oracle event, a logged closure, or an XL event."""
+    """Return the grid half-hours inside an oracle event, a logged closure, or an RO-NC event."""
     return labels["oracle"].in_event | labels["oracle"].closed | labels["xl"].in_event
 
 
@@ -116,7 +116,7 @@ def training_rows(
         The rows keyed by series, run, and valid time, with `ensemble_member`, `power` (in MW),
         the weather columns, the derived columns, `lead_hours`, the three lags and their grid
         indices, and `ara_target` (the valid time lies inside an oracle event, a logged closure,
-        or an XL event).
+        or an RO-NC event).
     """
     series_id = row["time_series_id"]
     before = (
