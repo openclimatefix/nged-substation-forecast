@@ -1,0 +1,104 @@
+{
+  "lambda_star": {
+    "base": 300.0,
+    "tau_x10": 0.0,
+    "tau_x0.1": 3000.0
+  },
+  "checks": {
+    "a_fleet_mean": {
+      "passed": true,
+      "band_relative_error": [
+        0.08837241108636254,
+        0.06179492935817047,
+        0.07477087417843467,
+        0.07089999256455827
+      ],
+      "profile_rms_points": 0.4048365423423516
+    },
+    "c_full_history_keeps_own": {
+      "passed": false,
+      "slope": 0.749030352816149
+    },
+    "b_shrinkage_on_4_weeks": {
+      "passed": false,
+      "slope": 0.05206827485414909,
+      "closed_form_factor": 0.260193819252732,
+      "rmse": 2.2558333415697036,
+      "oracle_rmse": 2.8639873948287433,
+      "note": "scale not rebuilt, to isolate shrinkage"
+    },
+    "e_capacity_from_a_short_window": {
+      "passed": true,
+      "within_25_percent_of_8": {
+        "4w": 7,
+        "3m": 8,
+        "g_4w": 0,
+        "g_3m": 7
+      },
+      "ratios": {
+        "4w": [
+          1.043157468803973,
+          1.0046387796483283,
+          0.6721526124626169,
+          1.1144799325141186,
+          0.9952298392271107,
+          1.0590100379576528,
+          0.8853498690488977,
+          0.8576217019787712
+        ],
+        "3m": [
+          1.0182299043058922,
+          1.036312808281497,
+          1.0003903015671451,
+          1.0498248706090065,
+          1.0221244471688256,
+          0.9940330789699057,
+          0.9849098754299417,
+          0.9381014793267429
+        ],
+        "g_4w": [
+          0.4925134871042058,
+          0.46729060642493525,
+          0.3048069672692257,
+          0.5347436572626265,
+          0.4464813096991451,
+          0.4975465256693918,
+          0.395093032306324,
+          0.40214837597447517
+        ],
+        "g_3m": [
+          0.7991715554242552,
+          0.8120749100797511,
+          0.7932824015396367,
+          0.8317769417721176,
+          0.7995479874817609,
+          0.7713687761837861,
+          0.769884565510138,
+          0.7233585912986144
+        ]
+      }
+    },
+    "discrimination_g_4w_heating": {
+      "passed": true,
+      "blocking": false,
+      "note": "reported only; passes by construction",
+      "g_4w_heating_rmse": 3.533250630892233
+    },
+    "discrimination_small_tau": {
+      "passed": true,
+      "blocking": false,
+      "note": "reported only; passes by construction",
+      "n_4w_heating_rmse": 0.9796533833325008,
+      "g_4w_heating_rmse": 3.125839911473819
+    },
+    "d_tuning_responds": {
+      "passed": true,
+      "lambda_base": 300.0,
+      "lambda_tau_x10": 0.0,
+      "lambda_tau_x0.1": 3000.0,
+      "all_rows_delta_tau_x10": 0.0
+    }
+  },
+  "passed": false,
+  "minutes": 8.56297725
+}

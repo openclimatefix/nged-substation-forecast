@@ -1,0 +1,105 @@
+{
+  "lambda_star": {
+    "base": 300.0,
+    "tau_x10": 0.0,
+    "tau_x0.1": 3000.0
+  },
+  "checks": {
+    "a_fleet_mean": {
+      "passed": true,
+      "band_relative_error": [
+        0.0011350642864401273,
+        0.0014435132526890054,
+        0.014856398038092368,
+        0.01204758430058728
+      ],
+      "profile_rms_points": 0.3917945718257652
+    },
+    "c_full_history_keeps_own": {
+      "passed": true,
+      "slope_on_heating_contribution": 1.0130493001422267,
+      "slope_on_coefficients_reported": 0.6923788742915561
+    },
+    "b_shrinkage_on_4_weeks": {
+      "passed": false,
+      "slope_on_heating_contribution": 0.20555791328258569,
+      "closed_form_slope": 0.680419879610641,
+      "rmse": 2.27896323369853,
+      "oracle_rmse": 4.420258338967675,
+      "note": "scale not rebuilt, to isolate shrinkage"
+    },
+    "e_capacity_from_a_short_window": {
+      "passed": true,
+      "within_25_percent_of_8": {
+        "4w": 7,
+        "3m": 8,
+        "g_4w": 0,
+        "g_3m": 7
+      },
+      "ratios": {
+        "4w": [
+          0.9301519188688144,
+          0.9470806979141897,
+          0.9789049694741698,
+          1.0486769739433142,
+          0.8804853629076498,
+          1.135287080178552,
+          0.936354327192908,
+          0.7335330020126163
+        ],
+        "3m": [
+          1.0156682391911411,
+          1.0105521000605313,
+          1.0663764080853428,
+          1.0119475425475695,
+          0.9059885164999445,
+          0.9891460729612923,
+          0.9879190247899612,
+          1.0913437855563433
+        ],
+        "g_4w": [
+          0.4348010666992469,
+          0.42119995495764606,
+          0.46678653400451275,
+          0.5015965488126404,
+          0.4035197493098225,
+          0.5142990043182762,
+          0.41751991810341604,
+          0.3445481228439959
+        ],
+        "g_3m": [
+          0.7913699579093977,
+          0.7853600712369403,
+          0.8438163810503547,
+          0.7924059381430132,
+          0.7049445440917683,
+          0.7647283550329361,
+          0.7711563358053393,
+          0.8639338291807858
+        ]
+      }
+    },
+    "discrimination_g_4w_heating": {
+      "passed": true,
+      "blocking": false,
+      "note": "reported only; passes by construction",
+      "g_4w_heating_rmse": 3.9228640218544157
+    },
+    "discrimination_small_tau": {
+      "passed": true,
+      "blocking": false,
+      "note": "reported only; passes by construction",
+      "n_4w_heating_rmse": 0.5269836350502449,
+      "g_4w_heating_rmse": 3.456732351050477
+    },
+    "d_tuning_responds": {
+      "passed": true,
+      "lambda_base": 300.0,
+      "lambda_tau_x10": 0.0,
+      "lambda_tau_x0.1": 3000.0,
+      "all_rows_delta_tau_x10": 0.0
+    }
+  },
+  "passed": false,
+  "minutes": 8.006847866666666
+}
