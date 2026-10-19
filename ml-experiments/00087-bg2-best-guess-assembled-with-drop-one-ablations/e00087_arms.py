@@ -77,10 +77,10 @@ ARMS: Final[tuple[ArmSpec, ...]] = (
     _arm("p_a6_capacity_held", "Primary", "ablation", "A6 Capacity held at its 2024/25 value"),
     _arm("p_a7_three_members", "Primary", "ablation", "A7 Three-model blend (exploratory)"),
     _arm(
-        "p_noise_repeat_weekly",
+        "p_noise_repeat_monthly",
         "Primary",
         "addon",
-        "Repeat fit of the weekly model (noise floor)",
+        "Repeat fit of the monthly model (noise floor)",
     ),
     # BSP and GSP.
     _arm("b_frozen", "BSP/GSP", "step", "Frozen model"),

@@ -33,11 +33,13 @@ the maintainer to confirm.
 | [00078 - Current capacity and a zero start, PVDIS-5 check 2](00078-pvdis-5-current-capacity-vintages/result.md) | Refresh the capacity table that feeds the base margin once per season-year, and test a base margin of zero in the production XGBoost recipe | Re-estimating the capacity lowers the score by 0.018 points (-0.036 to -0.004); a zero start lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) in this experiment, and has not been tested on other series types |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Retrain the Primary demand model weekly and drop the 14-day correction | Second set of runs (control-only, 2023-07 to 2024-03): weekly scores 0.24 points below the stack (99.17% interval -0.36 to -0.15) and 0.04 below monthly (control member of the ECMWF ensemble only) |
+| [00087 - Best guess assembled (BG2)](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) | Serve the BG2 recipe: weekly refits, a five-model blend for Primary demand, weekly refits with no correction for supply points | Gains 0.283 points at Primaries and 0.634 at supply points over the previous best; the farm models cannot yet be ranked |
 
 ## The experiments so far
 
 | Experiment | Question | Verdict | Production status | Merged |
 |---|---|---|---|---|
+| [00087 - Best guess assembled (BG2)](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) | Do the best ideas of the last experiments, combined, beat the previous best forecast of each target class, and which idea gives which part of the gain? | Partly supported | Candidate | Pending |
 | [00001 - ERA5-trained stage 1, solar and wind, part 1](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
 | [00002 - Stage 2 calibrator for solar and wind](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
 | [00003 - ERA5-trained stage 1, demand, part 2](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
@@ -129,6 +131,26 @@ the maintainer to confirm.
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
+
+### 00087: the best guess so far and what each part contributes (BG2)
+
+**Weekly refitting and a blend of five models make the Primary-substation and supply-point
+forecasts clearly better than the previous best, while the farm forecasts are still too close to
+call.** The experiment combined the best ideas of the last experiments, refitted each model on its
+own schedule, and scored 292 daily runs from July 2025 to June 2026. The verdict is partly
+supported.
+
+- **Headline result:** Primary substations 5.260 points of capacity against 5.543 for the stack (-0.283,
+  98.75% interval -0.425 to -0.146); supply points 12.925 against 13.559 (-0.634, -1.111 to -0.279);
+  solar +0.050 (-0.125 to +0.168) and wind +0.228 (-0.178 to +0.653) against the ERA5-trained mixture.
+- **Finding for later experiments:** the solar offset adds only 0.010 points over the whole year, and
+  the 14-day correction hurts at supply points by 0.305 (0.060 to 0.594). Coverage at the 0.95
+  quantile of the Primary forecast is 0.937, so the upper tail is still narrow.
+- **Write-up and pull request:** [result](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md),
+  [PR #1326 (Experiment 87: how well does the best guess so far do, and what does each part add?
+  (BG2))](https://github.com/openclimatefix/nged-substation-forecast/pull/1326).
+
+![How we got to the best guess](00087-bg2-best-guess-assembled-with-drop-one-ablations/figure_3_staircase.svg)
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
 

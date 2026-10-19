@@ -717,9 +717,9 @@ def build_primary(*, ctx: Context, only: Collection[str] | None = None) -> None:
 
 
 def build_noise_repeat(*, ctx: Context) -> None:
-    """Write the repeat fit of the weekly model, if `work/anchor_preds_repeat` holds one."""
+    """Write the repeat fit of the monthly model, if `work/anchor_preds_repeat` holds one."""
     if not (REPEAT_DIR / "n1h").exists() or ctx.demand_root.name != "anchor_preds":
-        print("p_noise_repeat_weekly: no repeat fit found, skipped", flush=True)
+        print("p_noise_repeat_monthly: no repeat fit found, skipped", flush=True)
         return
     started = time.monotonic()
     pieces = []
@@ -729,7 +729,7 @@ def build_noise_repeat(*, ctx: Context) -> None:
                 regime_rows(
                     root=REPEAT_DIR,
                     config="n1h",
-                    regime="weekly",
+                    regime="monthly",
                     site=site,
                     origins=ctx.origins,
                     strict=False,
@@ -739,10 +739,10 @@ def build_noise_repeat(*, ctx: Context) -> None:
         except FileNotFoundError:
             continue
     if not pieces:
-        print("p_noise_repeat_weekly: no repeat fit found, skipped", flush=True)
+        print("p_noise_repeat_monthly: no repeat fit found, skipped", flush=True)
         return
     table = stack.stack(frame=pl.concat(pieces), correct=False, spread=True)
-    emit(ctx=ctx, name="p_noise_repeat_weekly", table=table, started=started)
+    emit(ctx=ctx, name="p_noise_repeat_monthly", table=table, started=started)
 
 
 def build_bspgsp(*, ctx: Context, only: Collection[str] | None = None) -> None:

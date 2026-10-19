@@ -960,7 +960,8 @@ def noise_floor_table(
 ) -> pl.DataFrame:
     """Return the repeat fit of the weekly model against the first fit, at the series it covers.
 
-    The repeat is `p_noise_repeat_weekly` (a second fit of the weekly model; `e00087_assemble`
+    The repeat is `p_noise_repeat_monthly` (a second fit of the monthly model;
+    `e00087_assemble`
     writes it when `work/anchor_preds_repeat` exists). The table holds the paired difference in
     `qs` and `mae`, repeat minus first fit, with 95% month-resampled intervals; the absolute value
     of the difference is the noise floor of the fitting seed.
@@ -972,8 +973,8 @@ def noise_floor_table(
     Returns:
         One row per metric, or an empty frame if the repeat or the first fit is absent.
     """
-    repeat = read_arm(arms_dir=arms_dir, name="p_noise_repeat_weekly", groups=("Primary",))
-    first = read_arm(arms_dir=arms_dir, name="p_s4_weekly", groups=("Primary",))
+    repeat = read_arm(arms_dir=arms_dir, name="p_noise_repeat_monthly", groups=("Primary",))
+    first = read_arm(arms_dir=arms_dir, name="p_s3_monthly", groups=("Primary",))
     if repeat is None or first is None:
         return pl.DataFrame()
     joined = first.join(
@@ -1014,7 +1015,7 @@ def noise_floor_table(
         rows.append(
             {
                 "metric": metric,
-                "series": joined["site"].n_unique(),
+                "series": joined["time_series_id"].n_unique(),
                 "cases": joined.height,
                 "first_fit": float(metrics_first[metric].mean()),
                 "repeat_fit": float(metrics_repeat[metric].mean()),
@@ -1436,7 +1437,7 @@ def analyse(*, arms_dir: Path, results_dir: Path, classes: Sequence[str]) -> Non
             )
     noise = noise_floor_table(arms_dir=arms_dir, thresholds=thresholds)
     write_table(frame=noise, results_dir=results_dir, name="noise_floor")
-    lines += ["## Noise floor (repeat fit of the weekly model)", "", markdown(frame=noise), ""]
+    lines += ["## Noise floor (repeat fit of the monthly model)", "", markdown(frame=noise), ""]
     report = "\n".join(lines)
     (results_dir / "report.txt").write_text(report)
     print(report)
