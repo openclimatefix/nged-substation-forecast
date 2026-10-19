@@ -46,8 +46,9 @@ production-style 0.95 quantile was exceeded in 49% of Primary cases, against 7% 
 **BG2 beats the previous best forecast at Primaries and supply points.** BG2 lowered the score by
 0.283 at the 16 Primaries (98.75% interval -0.425 to -0.146) and by 0.634 at the 4 [supply
 points](../../glossary.md#bulk-supply-point-and-grid-supply-point) (-1.111 to -0.279). Adding the
-five-model blend lowered the Primary score by 0.086 (0.038 to 0.135), and the solar offset by only
-0.010, against 0.10 to 0.15 predicted.
+five-model blend lowered the Primary score by 0.086 (0.038 to 0.135). The solar offset lowered it by
+only 0.010 over all scored rows, but only 5 of the 16 Primaries carry an offset, and only on daylight
+rows from April to September, so the all-row figure dilutes it.
 
 ![The Primary and supply-point score after each added idea](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/figure_3_staircase.svg)
 
