@@ -9,7 +9,6 @@ correction (`studies.dp_assimilation.post_filter_lead_spread`).
 """
 
 import json
-from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Final, Literal
@@ -23,6 +22,7 @@ from studies.dp_assimilation import (
     CorrectionTrace,
     FilterHyperparameters,
     LeadSpread,
+    TraceBuilder,
     correction_at,
     day_ahead_initialisation,
     lead_band_of_days_ahead,
@@ -160,7 +160,8 @@ class SiteRun:
         pinned: The pinned capacity, or `None` for a fitted-capacity arm.
         index: The scored grid rows: those with a reading in the year after the cut.
         mean: The mean forecast at `index`, in points.
-        replica: The replica residuals with the switching rows kept and flagged.
+        replica: The replica residuals with the switching rows kept and flagged, or `None` when
+            the run was made without one.
     """
 
     site: str
@@ -170,7 +171,7 @@ class SiteRun:
     pinned: PinnedCapacity | None
     index: np.ndarray
     mean: np.ndarray
-    replica: ReplicaResiduals
+    replica: ReplicaResiduals | None
 
     def residual_stream(self, *, cache: FeatureCache) -> np.ndarray:
         """Return observed minus forecast on the grid over the scored year, `NaN` elsewhere."""
@@ -179,7 +180,14 @@ class SiteRun:
         return stream
 
     def uncorrected_spread(self) -> ResidualSpread:
-        """Return the replica's centred residual quantiles outside the switching masks."""
+        """Return the replica's centred residual quantiles outside the switching masks.
+
+        Raises:
+            ValueError: If the run was made without a replica.
+        """
+        if self.replica is None:
+            msg = "this run was made without a replica"
+            raise ValueError(msg)
         keep = ~self.replica.switching
         return ResidualSpread.fit(
             residuals=self.replica.residuals[keep],
@@ -196,6 +204,7 @@ def run_site(
     site: str,
     cut: datetime,
     definition: ArmDefinition,
+    with_replica: bool = True,
 ) -> SiteRun:
     """Fit one arm for one substation at one cut and predict the year after.
 
@@ -205,6 +214,7 @@ def run_site(
         site: The substation's label.
         cut: The fit's cut.
         definition: The arm.
+        with_replica: False to skip the replica, for a run that only supplies residuals.
 
     Returns:
         The run.
@@ -224,15 +234,19 @@ def run_site(
     index = common.scoring_index(
         cache=cache, site=site, after=cut, through=common.year_end(cut=cut)
     )
-    replica = replica_residuals(
-        cache=cache,
-        site=site,
-        spec=definition.spec,
-        cut=cut,
-        window=definition.window,
-        season_years=common.SEASON_YEARS,
-        capacity_vintages=vintages,
-        drop_switching=False,
+    replica = (
+        replica_residuals(
+            cache=cache,
+            site=site,
+            spec=definition.spec,
+            cut=cut,
+            window=definition.window,
+            season_years=common.SEASON_YEARS,
+            capacity_vintages=vintages,
+            drop_switching=False,
+        )
+        if with_replica
+        else None
     )
     return SiteRun(
         site=site,
@@ -248,7 +262,7 @@ def run_site(
 
 def trace_builder(
     *, kind: FilterKindType, hyper: FilterHyperparameters | None, part: FilterPartType = "both"
-) -> Callable[[np.ndarray, np.ndarray], CorrectionTrace]:
+) -> TraceBuilder:
     """Return the function that builds a correction trace from a residual stream.
 
     Args:
@@ -258,20 +272,21 @@ def trace_builder(
             The EWMA has only a level, so `anomaly` gives a zero correction.
 
     Returns:
-        A function taking the grid residuals and bands and returning a `CorrectionTrace`.
+        A function taking the grid residuals and bands (by keyword) and returning a
+        `CorrectionTrace`.
 
     Raises:
         ValueError: If the Kalman filter has no hyperparameters.
     """
 
-    def build(stream: np.ndarray, band: np.ndarray) -> CorrectionTrace:
+    def build(*, residual: np.ndarray, band: np.ndarray) -> CorrectionTrace:
         if kind == "ewma":
-            trace = run_ewma(residual=stream, band=band)
+            trace = run_ewma(residual=residual, band=band)
         elif hyper is None:
             msg = "the Kalman correction needs hyperparameters"
             raise ValueError(msg)
         else:
-            trace = run_kalman(residual=stream, band=band, hyper=hyper)
+            trace = run_kalman(residual=residual, band=band, hyper=hyper)
         if part == "level":
             return replace(trace, anomaly=tuple(np.zeros_like(a) for a in trace.anomaly))
         if part == "anomaly":
@@ -306,6 +321,7 @@ def filtered_forecast(
     delay_hours: float = DEFAULT_DELAY_HOURS,
     lead_spread: LeadSpread | None = None,
     part: FilterPartType = "both",
+    stream: np.ndarray | None = None,
 ) -> FilteredForecast:
     """Correct a run's mean from the readings usable at its day-ahead initialisation.
 
@@ -318,13 +334,17 @@ def filtered_forecast(
         delay_hours: The telemetry delay.
         lead_spread: The post-filter spread, built from the run's replica if not given.
         part: Which hidden states of the Kalman filter enter the correction.
+        stream: The grid residuals the filter runs on, such as a stitched stream that carries the
+            filter across refits; the run's own scored-year residuals if not given.
 
     Returns:
         The corrected mean, its quantiles, and the correction.
     """
     build = trace_builder(kind=kind, hyper=hyper, part=part)
     band = cache.calendar.band
-    trace: CorrectionTrace = build(run.residual_stream(cache=cache), band)
+    trace: CorrectionTrace = build(
+        residual=run.residual_stream(cache=cache) if stream is None else stream, band=band
+    )
     valid = cache.end_times[run.index]
     cutoff = usable_cutoff_positions(
         end_times=cache.end_times,
@@ -332,9 +352,14 @@ def filtered_forecast(
         delay_hours=delay_hours,
     )
     correction = correction_at(trace=trace, cutoff=cutoff, target=run.index, band=band[run.index])
-    spread = lead_spread or post_filter_lead_spread(
-        end_times=cache.end_times, replica=run.replica, run=build, delay_hours=delay_hours
-    )
+    if lead_spread is None:
+        if run.replica is None:
+            msg = "a run without a replica needs a lead spread"
+            raise ValueError(msg)
+        lead_spread = post_filter_lead_spread(
+            end_times=cache.end_times, replica=run.replica, run=build, delay_hours=delay_hours
+        )
+    spread = lead_spread
     corrected_mean = run.mean + correction.total
     quantiles = spread.quantiles(
         mean=corrected_mean,

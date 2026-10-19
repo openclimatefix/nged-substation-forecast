@@ -99,6 +99,7 @@ def _score_job(job: tuple[str, dict[str, g.ArmDefinition]]) -> dict[str, float]:
             site=site,
             cut=common.TUNING_CUT,
             definition=definition,
+            with_replica=False,
         )
         keep = ~cache.sites[site].switching_mask[run.index]
         quantiles = spread.quantiles(
@@ -136,10 +137,19 @@ def _hyper_job(arm: str) -> dict[str, list[float]]:
             site=site,
             cut=common.TUNING_CUT,
             definition=definition,
+            with_replica=False,
         ).residual_stream(cache=cache)
         for site in common.DECISION_SITES
     }
-    fitted = fit_filter_hyperparameters(residuals=streams, band=cache.calendar.band)
+    fitted = fit_filter_hyperparameters(
+        residuals=streams,
+        band=cache.calendar.band,
+        end_times=cache.end_times,
+        window=(
+            common.to_64(moment=common.TUNING_CUT),
+            common.to_64(moment=common.year_end(cut=common.TUNING_CUT)),
+        ),
+    )
     values = {site: hyper.as_array() for site, hyper in fitted.items()}
     values["D9"] = np.mean(list(values.values()), axis=0)
     return {site: array.tolist() for site, array in values.items()}

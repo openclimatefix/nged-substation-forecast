@@ -29,12 +29,21 @@ import e00106_common as common
 import e00106_g as g
 import numpy as np
 import polars as pl
-from studies.dp_assimilation import FilterHyperparameters, post_filter_lead_spread
+from studies.dp_assimilation import (
+    FilterHyperparameters,
+    post_filter_lead_spread,
+    stitch_out_of_sample_residuals,
+)
 from studies.dp_features import FeatureCache
 from studies.dp_gam import N_BANDS
 from studies.dp_pinned_capacity import read_vintages
 
 CUT_LABELS: Final[tuple[str, ...]] = ("replicate", "scored")
+CHAIN: Final[dict[str, tuple[str, ...]]] = {
+    "replicate": ("tuning", "replicate"),
+    "scored": ("tuning", "replicate", "scored"),
+}
+"""The cuts whose out-of-sample residuals a filter carries into each scored year."""
 STATIC_ARMS: Final[tuple[str, ...]] = (
     "a0",
     "a1",
@@ -83,8 +92,40 @@ FILTER_ARMS: Final[dict[str, FilterArm]] = {
 }
 
 
+def _filter_bases() -> tuple[str, ...]:
+    """Return the static arms whose frozen forecasts a filter arm corrects."""
+    return tuple(dict.fromkeys(arm.base for arm in FILTER_ARMS.values()))
+
+
+def _stitched_stream(
+    *, cache: FeatureCache, runs: dict[str, dict[str, g.SiteRun]], label: str, base: str
+) -> np.ndarray:
+    """Join the out-of-sample residuals of the base arm's fits up to the cut `label`.
+
+    The filter carries its state across the refits at the earlier cuts and switches to each new
+    fit's residuals at its cut, as `studies.dp_assimilation.stitch_out_of_sample_residuals` does.
+    A site with no fit at an earlier cut starts the chain at its first cut.
+    """
+    labels = [name for name in CHAIN[label] if name in runs]
+    cut_positions = [
+        int(np.searchsorted(cache.end_times, common.to_64(moment=common.CUTS[name]), side="right"))
+        - 1
+        for name in labels
+    ]
+    return stitch_out_of_sample_residuals(
+        cut_positions=cut_positions,
+        residuals=[runs[name][base].residual_stream(cache=cache) for name in labels],
+    )
+
+
 def fit_site(*, site: str) -> dict[str, Any]:
-    """Fit every arm of one substation at both cuts and return frames and side tables.
+    """Fit every arm of one substation at the cuts and return frames and side tables.
+
+    Static arms are fitted and scored at the replicate and scored cuts. The base arms of the
+    filters are also fitted at the tuning cut, so the filter's chain of out-of-sample residuals
+    starts a year earlier. D9 has no history at the tuning cut, and none for the replica of the
+    replicate cut, so it is scored in the scored year only; its replicate-year fit supplies
+    residuals to the chain.
 
     Args:
         site: The substation's label.
@@ -99,16 +140,27 @@ def fit_site(*, site: str) -> dict[str, Any]:
     frames: dict[str, pl.DataFrame] = {}
     capacities: list[dict] = []
     drift: list[dict] = []
-    for label in CUT_LABELS:
-        cut = common.CUTS[label]
-        runs = {
+    runs: dict[str, dict[str, g.SiteRun]] = {}
+    scored_labels = [label for label in CUT_LABELS if not (site == "D9" and label == "replicate")]
+    for label in ("tuning", *CUT_LABELS):
+        if site == "D9" and label == "tuning":
+            continue
+        scored = label in scored_labels
+        names = dict.fromkeys([*STATIC_ARMS, *_filter_bases()]) if scored else _filter_bases()
+        runs[label] = {
             name: g.run_site(
-                cache=cache, vintages=vintages, site=site, cut=cut, definition=definitions[name]
+                cache=cache,
+                vintages=vintages,
+                site=site,
+                cut=common.CUTS[label],
+                definition=definitions[name],
+                with_replica=scored,
             )
-            for name in dict.fromkeys([*STATIC_ARMS, *(arm.base for arm in FILTER_ARMS.values())])
+            for name in names
         }
+    for label in scored_labels:
         for name in STATIC_ARMS:
-            run = runs[name]
+            run = runs[label][name]
             frames[f"{label}_{name}"] = common.prediction_frame(
                 cache=cache,
                 site=site,
@@ -120,15 +172,17 @@ def fit_site(*, site: str) -> dict[str, Any]:
             capacities += _capacity_rows(cache=cache, run=run, arm=name)
             drift += _drift_rows(run=run, arm=name)
         for name, arm in FILTER_ARMS.items():
-            run = runs[arm.base]
+            run = runs[label][arm.base]
             hyper = FilterHyperparameters.from_array(
                 values=np.array(tuned["filter_hyper"][arm.hyper_from][site])
             )
+            assert run.replica is not None
             spread = post_filter_lead_spread(
                 end_times=cache.end_times,
                 replica=run.replica,
                 run=g.trace_builder(kind=arm.kind, hyper=hyper, part=arm.part),
             )
+            stream = _stitched_stream(cache=cache, runs=runs, label=label, base=arm.base)
             days = range(1, MAX_DAYS_AHEAD + 1) if name in LEAD_CURVE_ARMS else (1,)
             for days_ahead in days:
                 result = g.filtered_forecast(
@@ -139,6 +193,7 @@ def fit_site(*, site: str) -> dict[str, Any]:
                     days_ahead=days_ahead,
                     lead_spread=spread,
                     part=arm.part,
+                    stream=stream,
                 )
                 suffix = "" if days_ahead == 1 else f"_d{days_ahead}"
                 frames[f"{label}_{name}{suffix}"] = common.prediction_frame(
@@ -152,7 +207,7 @@ def fit_site(*, site: str) -> dict[str, Any]:
                     level=result.correction.level,
                     anomaly=result.correction.anomaly,
                 )
-        print(f"{site} {label}: {len(runs)} fits, {len(frames)} sets so far", flush=True)
+        print(f"{site} {label}: {len(runs[label])} fits, {len(frames)} sets so far", flush=True)
     return {"frames": frames, "capacities": capacities, "drift": drift}
 
 
