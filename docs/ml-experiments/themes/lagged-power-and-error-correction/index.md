@@ -33,10 +33,10 @@ pre-registered idea that stage 1b is the better place was refuted. Using both pl
 the score by at most 0.12 more. Stage 1b scored better at 8 of the 16 series, so the average hides
 a mixed result ([experiment 5](../../00005-lag-placement-stage1b-vs-stage2-demand/result.md)).
 
-**Summaries of recent power added no resolvable gain to the raw lags.** Adding the minimum, mean, and maximum of
-the last 24 hours and of the same weekday changed the score by -0.02 (-0.14 to +0.13 at 98.75%;
-inconclusive). Replacing the raw lags with the summaries worsened it by 0.29 (+0.11 to +0.51).
-Summaries alone still beat no recent power (-1.18, -1.83 to -0.58) ([experiment
+**Summaries of recent power added no resolvable gain to the raw lags.** Adding the minimum, mean,
+and maximum of the last 24 hours and of the same weekday changed the score by -0.02 (-0.14 to +0.13
+at 98.75%; inconclusive). Replacing the raw lags with the summaries worsened it by 0.29 (+0.11 to
++0.51). Summaries alone still beat no recent power (-1.18, -1.83 to -0.58) ([experiment
 8](../../00008-lag-summaries-in-stage2-calibrator-demand/result.md)). [Experiment
 30](../../00030-lagged-power-feature-sets-primary-demand/result.md) tested more lag columns in
 [N1](../../glossary.md#n1) and is on the [demand inputs](../demand-inputs/index.md) page.
@@ -49,8 +49,8 @@ weather available at the forecast origin and from NGED's real telemetry delay (t
 power reading arrives; 7 hours). Over all leads the chain minus N1 was +0.08 (-0.11 to +0.25 at
 99.17%; inconclusive). Up to 48 hours it was -0.27 (-0.62 to +0.03), and beyond 3 days +0.15 (-0.07
 to +0.36). The chain scored 0.52 above the [`manual_heuristic`](../../glossary.md#manual_heuristic)
-baseline (-0.25 to +1.25; interval includes zero). Lag anomalies lowered the score by only 0.04 against raw lagged power
-(-0.12 to +0.07).
+baseline (-0.25 to +1.25; interval includes zero). Lag anomalies lowered the score by only 0.04
+against raw lagged power (-0.12 to +0.07).
 
 ![The chain is level with N1 and above manual_heuristic beyond 3 days](../../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/figure_1.svg)
 
@@ -58,13 +58,14 @@ baseline (-0.25 to +1.25; interval includes zero). Lag anomalies lowered the sco
 interval includes zero).** Source: [experiment
 18](../../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md).
 
-**The 14-day correction lowered the Primary score by about 1 point, a gain of similar size to
-lagged power in the calibrator against a different reference.** Experiments 19 and 21 scored the
-correction on the same 73 runs and 16 Primary substations as experiments 5 and 18. N1 plus the
-correction scored 5.34 over all leads, against 6.33 for N1. The chain of experiment 18 scored 6.41,
-and lagged power in that chain gained -1.05 (-1.64 to -0.58) against a calibrator without lags
-(experiment 18, C2). The references differ and no paired interval compares them. [Experiment 19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md) (power
-3.5 hours old) gave -0.99 (-1.84 to -0.15 at 99.44%). [Experiment
+**The 14-day correction lowered the Primary score by about 1 point, a gain of similar size to lagged
+power in the calibrator against a different reference.** Experiments 19 and 21 scored the correction
+on the same 73 runs and 16 Primary substations as experiments 5 and 18. N1 plus the correction
+scored 5.34 over all leads, against 6.33 for N1. The chain of experiment 18 scored 6.41, and lagged
+power in that chain gained -1.05 (-1.64 to -0.58) against a calibrator without lags (experiment 18,
+C2). The references differ and no paired interval compares them. [Experiment
+19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md) (power 3.5 hours old) gave -0.99
+(-1.84 to -0.15 at 99.44%). [Experiment
 21](../../00021-error-correction-variants-bsp-gsp-demand/result.md) gave -0.99 (-1.82 to -0.18 at
 99.375%) with power 2 days old. Experiment 19 is on the [production reference and best
 guess](../production-reference-and-best-guess/index.md) page.
@@ -129,10 +130,10 @@ old, so the service need not wait for fresher telemetry. It supports no use at s
 
 ## Gotchas and implementation details
 
-- **Compare a lagged arm with a calibrated arm that has no lags.** A calibrator without lags
-  lowered the stage 1a score by 1.02 up to 48 hours (exploratory contrast E4, whose interval
-  includes zero at some leads), and stage 1a alone scored 8.12 against 8.14 for day-type
-  climatology. Against stage 1a alone, lags look about 1 point better than they are ([experiment
+- **Compare a lagged arm with a calibrated arm that has no lags.** A calibrator without lags lowered
+  the stage 1a score by 1.02 up to 48 hours (exploratory contrast E4, whose interval includes zero
+  at some leads), and stage 1a alone scored 8.12 against 8.14 for day-type climatology. Against
+  stage 1a alone, lags look about 1 point better than they are ([experiment
   5](../../00005-lag-placement-stage1b-vs-stage2-demand/result.md)). Look for a lagged arm whose
   comparison has no calibrator.
 - **Label an arm a ceiling when its lag residuals use estimates of past weather.** The arms of
@@ -140,13 +141,14 @@ old, so the service need not wait for fresher telemetry. It supports no use at s
   score by 0.13 (+0.02 to +0.25; [experiment
   18](../../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md)). Re-check with
   a different weather source for the lag times.
-- **State the telemetry delay of every lagged arm.** Experiment 5 used 0.5 hours (the newest half-hour before the
-  origin), experiment 13 3.5 hours, and experiment 18 7 hours. Three and a half hours more delay worsened the chain by 0.13
-  over all leads and 0.16 up to 48 hours, so scores with different delays do not compare
-  ([experiment 18](../../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md)).
-  Re-check on a different delay.
-- **Report how many series agree with the mean.** C1 of experiment 5 (above) was +0.84 on average while
-  stage 1b was better at 8 of the 16 Primary substations ([experiment
+- **State the telemetry delay of every lagged arm.** Experiment 5 used 0.5 hours (the newest
+  half-hour before the origin), experiment 13 3.5 hours, and experiment 18 7 hours. Three and a half
+  hours more delay worsened the chain by 0.13 over all leads and 0.16 up to 48 hours, so scores with
+  different delays do not compare ([experiment
+  18](../../00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/result.md)). Re-check on a
+  different delay.
+- **Report how many series agree with the mean.** C1 of experiment 5 (above) was +0.84 on average
+  while stage 1b was better at 8 of the 16 Primary substations ([experiment
   5](../../00005-lag-placement-stage1b-vs-stage2-demand/result.md)). Look for a mean over series
   with mixed signs.
 - **Do not correct a skewed target by the mean of observed minus median.** That shift raised the
@@ -157,22 +159,25 @@ old, so the service need not wait for fresher telemetry. It supports no use at s
   pre-registered median shift.
 - **Check the base forecast's bias before applying the correction.** N1's two bulk supply point
   series had a bias of +0.01, so the correction only added noise ([experiment
-  21](../../00021-error-correction-variants-bsp-gsp-demand/result.md)), and in experiment 87 a [frozen
-  model](../../glossary.md#frozen-xgboost-model) with the correction scored 13.559 against 13.369
-  without it ([experiment 87](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)).
-  Look for a base forecast with little bias.
+  21](../../00021-error-correction-variants-bsp-gsp-demand/result.md)), and in experiment 87 a
+  [frozen model](../../glossary.md#frozen-xgboost-model) with the correction scored 13.559 against
+  13.369 without it ([experiment
+  87](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)). Look for a base
+  forecast with little bias.
 - **Build the correction's error history from the runs a live service would have.** Experiments 19
   and 21 measured each past half-hour's error from a run 0 to 5 days earlier, with runs 5 days
-  apart, and applied it up to 15 days ahead. A daily service sees smaller errors at shorter leads, and
-  experiment 87 scored the correction on 292 daily runs ([experiment 19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md), [experiment
-  21](../../00021-error-correction-variants-bsp-gsp-demand/result.md)). Look for a run schedule other than
-  every 5 days.
+  apart, and applied it up to 15 days ahead. A daily service sees smaller errors at shorter leads,
+  and experiment 87 scored the correction on 292 daily runs ([experiment
+  19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md), [experiment
+  21](../../00021-error-correction-variants-bsp-gsp-demand/result.md)). Look for a run schedule
+  other than every 5 days.
 - **Keep a control that keeps the event rows when testing masked lags.** Dropping event and closure
-  rows from training (the `mask` arm, which also sets lags inside labelled events to missing) narrowed the band on unmasked rows by 4% and lowered its
-  coverage from 0.906 to 0.894, so the masked arms differ from the plain model in more than the
-  dropout ([experiment 100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md)). The
-  masked rows came from an estimated 15 to 20 events, mostly at three substations. Look for a
-  masked arm without a control that keeps the rows.
+  rows from training (the `mask` arm, which also sets lags inside labelled events to missing)
+  narrowed the band on unmasked rows by 4% and lowered its coverage from 0.906 to 0.894, so the
+  masked arms differ from the plain model in more than the dropout ([experiment
+  100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md)). The masked rows came from
+  an estimated 15 to 20 events, mostly at three substations. Look for a masked arm without a control
+  that keeps the rows.
 
 ## What we have not settled
 
