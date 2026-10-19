@@ -8,6 +8,7 @@ the quantiles of every scored row. Onboarding and short-history arms build on th
 """
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -270,6 +271,7 @@ def per_site_forecasts(
     cut: datetime,
     through: datetime,
     all_present_rows: bool = True,
+    override_for: Callable[[str, datetime, PooledBatch], torch.Tensor | None] | None = None,
 ) -> tuple[dict[str, SiteForecast], dict[str, float]]:
     """Fit the model one substation at a time and forecast each substation's scored rows.
 
@@ -284,6 +286,8 @@ def per_site_forecasts(
         cut: The cut.
         through: The last scored instant.
         all_present_rows: Also score the rows inside switching masks.
+        override_for: Given a substation, the cut of a fit, and its training batch, the capacities
+            (points, shape (1, season-years)) to hold fixed in that fit, or `None` to learn them.
 
     Returns:
         The forecasts, and the summed fit record.
@@ -294,7 +298,10 @@ def per_site_forecasts(
     record = {"seconds": 0.0, "rows": 0.0, "peak_gpu_gb": 0.0}
     for site in sites:
         train = common.pooled_batch_for(cache=cache, sites=(site,), cut=cut, months=months)
-        model, seconds, peak = fit(batch=train, config=config)
+        pinned = override_for(site, cut, train) if override_for else None
+        model, seconds, peak = fit(
+            batch=train, config=config, copy=FitCopy(name=site, capacity_override=pinned)
+        )
         score = common.scoring_batch_for(
             cache=cache,
             sites=(site,),
@@ -311,7 +318,10 @@ def per_site_forecasts(
             cache=cache, sites=(site,), after=cut_r, through=cut
         )
         if train_r.n_rows >= MIN_SPREAD_GROUP_ROWS and replica_year.n_rows:
-            model_r, seconds_r, _ = fit(batch=train_r, config=config)
+            pinned_r = override_for(site, cut_r, train_r) if override_for else None
+            model_r, seconds_r, _ = fit(
+                batch=train_r, config=config, copy=FitCopy(name=site, capacity_override=pinned_r)
+            )
             residuals[site] = pooled_residuals(model=model_r, batch=replica_year)
             record["seconds"] += seconds_r
     forecasts: dict[str, SiteForecast] = {}

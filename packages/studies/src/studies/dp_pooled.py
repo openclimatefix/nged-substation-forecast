@@ -791,6 +791,8 @@ def fit_pooled(
     """
     device = batch.y.device
     model.to(device=device, dtype=batch.y.dtype)
+    if model.capacity_override is not None:
+        model.capacity_override = model.capacity_override.to(device=device, dtype=batch.y.dtype)
     model.mark_trained_years(batch=batch)
     model.start_from_batch(batch=batch)
     optimiser = torch.optim.Adam(model.parameters(), lr=learning_rate)

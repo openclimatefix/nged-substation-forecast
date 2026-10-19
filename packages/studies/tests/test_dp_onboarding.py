@@ -204,6 +204,21 @@ def test_a_capacity_override_replaces_the_capacity_in_the_forecast(batch: Pooled
     assert float(np.abs(nothing - base)[daylight].mean()) > 0.0
 
 
+def test_a_capacity_override_with_nan_leaves_those_capacities_learned(batch: PooledBatch):
+    override = torch.full((len(batch.site_labels), batch.n_season_years), float("nan"))
+    override[0] = 3.0
+    models, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="o", capacity_override=override)],
+        config=DpConfig(population_scales=PopulationScales()),
+        initial_level=_level(batch),
+        steps=2,
+    )
+    capacity = models[0].capacities().detach()
+    assert torch.allclose(capacity[0], torch.full_like(capacity[0], 3.0))
+    assert not torch.allclose(capacity[2], torch.full_like(capacity[2], 3.0))
+
+
 def test_a_capacity_start_is_copied_into_the_model_before_fitting(batch: PooledBatch):
     start = torch.full((len(batch.site_labels), batch.n_season_years), 1.25)
     models, _ = fit_many(
