@@ -39,7 +39,6 @@ from studies.dp_gam import (  # noqa: E402
     solve_bounded_quadratic,
     training_rows,
 )
-from studies.sources import ML_EXPERIMENTS_DATA_DIR  # noqa: E402
 
 from studies import dp_gam  # noqa: E402
 
@@ -269,6 +268,11 @@ def test_the_bounded_solver_matches_scipy_on_a_random_problem():
     assert np.allclose(solved[0].numpy(), reference.x, atol=1e-7)
     assert (solved[0].numpy()[constrained] >= 0.0).all()
     assert (solved[0].numpy()[constrained] == 0.0).any()
+
+
+def test_the_default_tolerance_is_tight_in_float64_and_loose_in_float32():
+    assert dp_gam.default_tolerance(dtype=torch.float64) == 1e-7
+    assert 1e-4 < dp_gam.default_tolerance(dtype=torch.float32) < 1e-2
 
 
 def test_the_default_tolerance_loosens_in_float32_and_a_wellconditioned_problem_still_solves():
@@ -609,11 +613,9 @@ def test_cpu_and_gpu_fits_agree_within_a_hundredth_of_a_point(dp_synthetic_cache
 @pytest.mark.skipif(
     not default_input_paths().rows.exists(), reason="experiment 103's private row sets are absent"
 )
-def test_the_gram_solve_matches_numpy_on_one_real_substation_with_drift():
+def test_the_gram_solve_matches_numpy_on_one_real_substation_with_drift(tmp_path):  # noqa: ANN001
     # CI has no private data; where it exists this is the plan's test 1 on real tensors.
-    cache = load_or_build_feature_cache(
-        paths=default_input_paths(), cache_dir=ML_EXPERIMENTS_DATA_DIR / "dp_test_cache"
-    )
+    cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=tmp_path)
     spec = GamSpec(drift="d1")
     layout, index = prepare_fit(
         cache=cache,
@@ -637,3 +639,20 @@ def test_the_gram_solve_matches_numpy_on_one_real_substation_with_drift():
     assert np.abs(x @ solved[0].numpy() - x @ reference).max() < 1e-4
     well_determined = np.abs(reference) > 1e-3
     assert np.allclose(solved[0].numpy()[well_determined], reference[well_determined], rtol=1e-6)
+
+
+def test_a_fit_with_no_solar_signal_in_its_training_rows_names_the_problem(
+    dp_synthetic_cache: FeatureCache,
+):
+    features = dp_synthetic_cache.sites["S1"]
+    dark = replace(features, pv_unit_shape=np.zeros_like(features.pv_unit_shape))
+    cache = replace(dp_synthetic_cache, sites={"S1": dark})
+    with pytest.raises(ValueError, match="solar signal"):
+        fit_gam(
+            cache=cache,
+            site="S1",
+            specs=[GamSpec()],
+            cut=CUT,
+            window=TrainingWindow(months=12),
+            season_years=SEASON_YEARS,
+        )
