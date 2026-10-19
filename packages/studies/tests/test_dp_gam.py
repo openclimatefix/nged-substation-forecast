@@ -6,11 +6,12 @@ the truth shows the design, the penalties, the constraints, and the solver agree
 """
 
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Final
 from zoneinfo import ZoneInfo
 
 import numpy as np
+import polars as pl
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -39,6 +40,7 @@ from studies.dp_gam import (  # noqa: E402
     solve_bounded_quadratic,
     training_rows,
 )
+from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity  # noqa: E402
 
 from studies import dp_gam  # noqa: E402
 
@@ -64,8 +66,9 @@ def _truth_theta(*, layout: dp_gam.GamLayout, generator: np.random.Generator) ->
     lighting = layout.slices["lighting"]
     theta[lighting] = (0.5, 0.3, 0.2, 0.1)
     capacity = layout.slices["capacity"]
-    for year, increment in {2020: 8.0, 2022: 10.0, 2023: 5.0}.items():
-        theta[capacity.start + layout.season_years.index(year)] = increment
+    if capacity.stop > capacity.start:
+        for year, increment in {2020: 8.0, 2022: 10.0, 2023: 5.0}.items():
+            theta[capacity.start + layout.season_years.index(year)] = increment
     if "drift" in layout.slices:
         n_knots = len(layout.knot_days)
         drift = layout.slices["drift"]
@@ -701,6 +704,223 @@ def test_a_fit_with_no_solar_signal_in_its_training_rows_names_the_problem(
             cache=cache,
             site="S1",
             specs=[GamSpec()],
+            cut=CUT,
+            window=TrainingWindow(months=12),
+            season_years=SEASON_YEARS,
+        )
+
+
+def _pinned_capacity(*, cache: FeatureCache, cut: datetime) -> PinnedCapacity:
+    """Pin S1's capacity to a weekly vintage that rises from 1 MW at 0.01 MW a week."""
+    weeks = []
+    week = date(2019, 9, 2)
+    while week <= cut.date():
+        weeks.append(week)
+        week += timedelta(days=7)
+    vintages = pl.DataFrame(
+        {
+            "time_series_id": cache.sites["S1"].table.time_series_id,
+            "variant": "frozen",
+            "origin_monday": cut.date(),
+            "week_start": weeks,
+            "capacity_mw": [1.0 + 0.01 * i for i in range(len(weeks))],
+            "unobserved": False,
+        }
+    )
+    return pinned_capacity(vintages=vintages, table=cache.sites["S1"].table, cut=cut)
+
+
+def _pinned_truth_cache(
+    *, cache: FeatureCache, spec: GamSpec, pinned: PinnedCapacity
+) -> tuple[FeatureCache, dp_gam.GamLayout, np.ndarray]:
+    """Return the cache with power made from a pinned-capacity truth, and the truth's layout."""
+    layout, _ = _layout_for(cache=cache, spec=spec)
+    theta = _truth_theta(layout=layout, generator=np.random.default_rng(11))
+    features = cache.sites["S1"]
+    usable = np.flatnonzero(
+        np.isfinite(features.pv_unit_shape)
+        & np.isfinite(features.smoothed_temperature_c).all(axis=1)
+    )
+    y = np.full(len(cache.end_times), np.nan)
+    for start in range(0, len(usable), 20000):
+        rows = usable[start : start + 20000]
+        y[rows] = design_matrix(cache=cache, features=features, layout=layout, index=rows) @ theta
+        y[rows] -= dp_gam.pinned_solar_points(
+            cache=cache, features=features, pinned=pinned, index=rows
+        )
+    y = y + NOISE_POINTS * np.random.default_rng(12).normal(size=len(y))
+    return replace(cache, sites={"S1": replace(features, y=y)}), layout, theta
+
+
+def test_a_pinned_capacity_fit_has_no_capacity_columns_and_recovers_the_truth(
+    dp_synthetic_cache: FeatureCache,
+):
+    spec = GamSpec(capacity="pinned", ridge=0.01)
+    pinned = _pinned_capacity(cache=dp_synthetic_cache, cut=CUT)
+    cache, layout, truth = _pinned_truth_cache(cache=dp_synthetic_cache, spec=spec, pinned=pinned)
+    assert layout.slices["capacity"].stop == layout.slices["capacity"].start
+    fit = fit_gam(
+        cache=cache,
+        site="S1",
+        specs=[spec],
+        cut=CUT,
+        window=TrainingWindow(),
+        season_years=SEASON_YEARS,
+        pinned=pinned,
+    )
+    assert fit.capacity_points() == {}
+    heating = layout.slices["heating"]
+    assert np.allclose(
+        fit.theta[0][heating][N_BANDS : 2 * N_BANDS],
+        truth[heating][N_BANDS : 2 * N_BANDS],
+        rtol=0.10,
+    )
+    index = np.flatnonzero(
+        (cache.end_times > np.datetime64("2024-07-01T00:00", "us"))
+        & (cache.end_times <= np.datetime64("2024-09-01T00:00", "us"))
+        & np.isfinite(cache.sites["S1"].y)
+    )
+    predicted = predict_gam(cache=cache, fit=fit, index=index)
+    assert np.abs(predicted - cache.sites["S1"].y[index]).mean() < 4 * NOISE_POINTS
+
+
+def test_a_pinned_spec_needs_a_pinned_capacity_and_a_fitted_spec_refuses_one(
+    dp_synthetic_cache: FeatureCache,
+):
+    pinned = _pinned_capacity(cache=dp_synthetic_cache, cut=CUT)
+    common = {
+        "cache": dp_synthetic_cache,
+        "site": "S1",
+        "cut": CUT,
+        "window": TrainingWindow(months=12),
+        "season_years": SEASON_YEARS,
+    }
+    with pytest.raises(ValueError, match="pinned capacity is required"):
+        fit_gam(specs=[GamSpec(capacity="pinned")], **common)
+    with pytest.raises(ValueError, match="pinned capacity is required"):
+        fit_gam(specs=[GamSpec()], pinned=pinned, **common)
+    other_cut = datetime(2024, 6, 3, tzinfo=UTC)
+    with pytest.raises(ValueError, match="was built for"):
+        fit_gam(
+            specs=[GamSpec(capacity="pinned")],
+            pinned=_pinned_capacity(cache=dp_synthetic_cache, cut=other_cut),
+            **common,
+        )
+
+
+def test_the_covid_flag_keeps_the_lockdown_rows_and_recovers_an_injected_shift(
+    dp_synthetic_cache: FeatureCache,
+):
+    spec = GamSpec(covid_flag=True)
+    in_lockdown = (dp_synthetic_cache.end_times > np.datetime64("2021-01-01T00:00", "us")) & (
+        dp_synthetic_cache.end_times <= np.datetime64("2021-07-19T00:00", "us")
+    )
+    plain = dp_synthetic_cache.sites["S1"]
+    features = replace(plain, lockdown=in_lockdown, default_rows=plain.default_rows & ~in_lockdown)
+    dp_synthetic_cache = replace(dp_synthetic_cache, sites={"S1": features})
+    plain_rows = training_rows(
+        features=features, cache=dp_synthetic_cache, cut=CUT, window=TrainingWindow()
+    )
+    flagged_rows = training_rows(
+        features=features,
+        cache=dp_synthetic_cache,
+        cut=CUT,
+        window=TrainingWindow(),
+        keep_lockdown=True,
+    )
+    assert not features.lockdown[plain_rows].any()
+    assert features.lockdown[flagged_rows].any()
+    layout, _ = _layout_for(cache=dp_synthetic_cache, spec=spec)
+    truth = _truth_theta(layout=layout, generator=np.random.default_rng(13))
+    truth[layout.slices["covid"]] = (-6.0, -3.0, -2.0, -1.0)
+    cache = _with_truth(
+        cache=dp_synthetic_cache, theta=truth, layout=layout, noise=NOISE_POINTS, seed=14
+    )
+    fit = fit_gam(
+        cache=cache,
+        site="S1",
+        specs=[spec],
+        cut=CUT,
+        window=TrainingWindow(),
+        season_years=SEASON_YEARS,
+    )
+    assert np.allclose(fit.theta[0][layout.slices["covid"]], (-6.0, -3.0, -2.0, -1.0), atol=0.5)
+
+
+def test_a_pinned_final_knot_is_tied_to_the_one_before_it(dp_synthetic_cache: FeatureCache):
+    free = GamSpec(drift="d1", final_knot="free")
+    tied = GamSpec(drift="d1", final_knot="pinned")
+    layout, _ = _layout_for(cache=dp_synthetic_cache, spec=tied, window=TrainingWindow(months=12))
+    truth = _truth_theta(layout=layout, generator=np.random.default_rng(15))
+    n_knots = len(layout.knot_days)
+    drift = layout.slices["drift"]
+    for band in range(N_BANDS):
+        truth[drift.start + band * n_knots + n_knots - 1] += 4.0
+    cache = _with_truth(
+        cache=dp_synthetic_cache, theta=truth, layout=layout, noise=NOISE_POINTS, seed=16
+    )
+    fits = {
+        name: fit_gam(
+            cache=cache,
+            site="S1",
+            specs=[spec],
+            cut=CUT,
+            window=TrainingWindow(months=12),
+            season_years=SEASON_YEARS,
+        )
+        for name, spec in {"free": free, "pinned": tied}.items()
+    }
+    for name, expected_tie in (("free", False), ("pinned", True)):
+        knots = fits[name].theta[0][drift].reshape(N_BANDS, n_knots)
+        last_step = np.abs(knots[:, -1] - knots[:, -2])
+        assert (last_step.max() < 0.01) == expected_tie
+
+
+def test_a_shrunk_final_knot_moves_the_forecast_towards_the_recent_mean_and_zero_shrink_is_free(
+    dp_synthetic_cache: FeatureCache,
+):
+    window = TrainingWindow(months=24)
+    layout, _ = _layout_for(cache=dp_synthetic_cache, spec=GamSpec(drift="d1"), window=window)
+    truth = _truth_theta(layout=layout, generator=np.random.default_rng(17))
+    cache = _with_truth(
+        cache=dp_synthetic_cache, theta=truth, layout=layout, noise=NOISE_POINTS, seed=18
+    )
+    fits = {
+        shrink: fit_gam(
+            cache=cache,
+            site="S1",
+            specs=[GamSpec(drift="d1", final_knot="shrunk", final_knot_shrink=shrink)],
+            cut=CUT,
+            window=window,
+            season_years=SEASON_YEARS,
+        )
+        for shrink in (0.0, 1.0)
+    }
+    free = fit_gam(
+        cache=cache,
+        site="S1",
+        specs=[GamSpec(drift="d1")],
+        cut=CUT,
+        window=window,
+        season_years=SEASON_YEARS,
+    )
+    index = np.flatnonzero(
+        (cache.end_times > np.datetime64("2024-07-02T00:00", "us"))
+        & (cache.end_times <= np.datetime64("2024-07-20T00:00", "us"))
+    )
+    free_prediction = predict_gam(cache=cache, fit=free, index=index)
+    assert np.allclose(predict_gam(cache=cache, fit=fits[0.0], index=index), free_prediction)
+    full = predict_gam(cache=cache, fit=fits[1.0], index=index)
+    assert np.abs(full - free_prediction).max() > 0.1
+    assert np.allclose(free.theta[0], fits[1.0].theta[0])
+
+
+def test_the_replica_of_a_pinned_arm_needs_the_vintages(dp_synthetic_cache: FeatureCache):
+    with pytest.raises(ValueError, match="needs the capacity vintages"):
+        replica_residuals(
+            cache=dp_synthetic_cache,
+            site="S1",
+            spec=GamSpec(capacity="pinned"),
             cut=CUT,
             window=TrainingWindow(months=12),
             season_years=SEASON_YEARS,
