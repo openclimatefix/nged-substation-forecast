@@ -75,7 +75,7 @@ separate the two explanations.
 
 **This is the cheap first test that decides whether to carry out the later steps of proposal P2 (the
 embedded-solar-capacity proposal) in the [research
-plan](../research-plan.md#p2-embedded-solar-capacity-from-lagged-residuals).** The result says
+plan](../themes/solar-disaggregation/plan.md#p2-embedded-solar-capacity-from-lagged-residuals).** The result says
 whether the daytime residual of the stage 1a demand model tracks a fixed error in the ERA5
 irradiance input (the sunlight estimate that stage 1a was trained on), or a change in embedded solar
 capacity that a correction with fixed coefficients cannot follow. The plan was committed before the

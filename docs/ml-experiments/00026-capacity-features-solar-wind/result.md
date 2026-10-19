@@ -88,7 +88,7 @@ for wind. The data could not tell either change from no effect, and could not ru
 **Verdict: inconclusive.** A feature stating each farm's recent effective capacity moved the
 continuous ranked probability score (CRPS) by -0.018 points of capacity for solar and +0.013 for
 wind, and the intervals include both no effect and the 0.03-point threshold. The experiment is
-proposal P30 of the [research plan](../research-plan.md). The farms are 6 solar farms and 3 wind
+proposal P30 of the [research plan](../themes/generator-forecasting/plan.md). The farms are 6 solar farms and 3 wind
 farms. ENS is the European Centre for Medium-Range Weather Forecasts ensemble, ERA5 its reanalysis
 of past weather, and CAMS the Copernicus Atmosphere Monitoring Service's satellite irradiance
 estimate.

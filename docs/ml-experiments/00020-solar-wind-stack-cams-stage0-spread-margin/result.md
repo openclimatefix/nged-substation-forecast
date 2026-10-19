@@ -102,7 +102,7 @@ points higher, with an interval that does not rule out a gain of 0.075. ENS is t
 for Medium-Range Weather Forecasts ensemble, ERA5 its reanalysis of past weather, and CAMS the
 Copernicus Atmosphere Monitoring Service's satellite irradiance estimate. The production recipe (arm
 `base`) is the pooled ERA5-trained mixture of experiment 00002. This is proposal P22 of the
-[research plan](../research-plan.md). This experiment combines the changes that [experiment
+[research plan](../themes/calibration-and-uncertainty/plan.md). This experiment combines the changes that [experiment
 00012](../00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md), [experiment
 00014](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md), and [experiment
 00016](../00016-pooled-mixture-calibration-solar-wind/result.md) flagged as candidates or small

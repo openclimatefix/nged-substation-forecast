@@ -88,7 +88,7 @@ separately for each of the 51 ensemble members, and measured the change in error
 0.067 points of capacity (1% of a series' effective capacity), but mismatches remained in individual
 months.
 
-**This experiment is P20 of the [research plan](../research-plan.md), the follow-up to [experiment
+**This experiment is P20 of the [research plan](../themes/weather-products-and-blending/plan.md), the follow-up to [experiment
 00009](../00009-cams-trained-stage1a-vs-era5-trained-demand/result.md).** Experiment 00009 found
 that a stage 1a trained on CAMS irradiance lowered the Primary quantile score by only 0.035 points
 when fed ENS shortwave, and measured the ENS daylight shortwave at 281 W/m² against 263 for CAMS.

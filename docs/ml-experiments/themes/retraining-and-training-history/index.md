@@ -35,82 +35,82 @@ write-up.
 rows help.** The chart plots the mean signed error (observed minus forecast) of the all-history
 model by calendar year. It runs from about -3.8 points in 2022 and 2023 (forecast too high) to +1.8
 in the first half of 2026 (forecast too low). The 14-day correction stays within 0.2 points of zero
-in every year. [Experiment 17](../00017-training-window-and-retraining-rule-drift-demand/result.md)
+in every year. [Experiment 17](../../00017-training-window-and-retraining-rule-drift-demand/result.md)
 drew the chart, on ERA5 weather.
 
-![Mean signed error by calendar year](../00017-training-window-and-retraining-rule-drift-demand/figure_2.svg)
+![Mean signed error by calendar year](../../00017-training-window-and-retraining-rule-drift-demand/figure_2.svg)
 
 **Retraining helps at every lead time, and most beyond two days.** The chart plots the quantile
 score by lead band. Monthly refits score 4.39
 against 4.51 for the stack in the first 24 hours, and 5.26 against 5.46 at 6 to 10 days.
-[Experiment 34](../00034-retraining-cadence-and-cheap-proxies-demand/result.md) drew the chart.
+[Experiment 34](../../00034-retraining-cadence-and-cheap-proxies-demand/result.md) drew the chart.
 
-![Quantile score by lead band](../00034-retraining-cadence-and-cheap-proxies-demand/figure_2.svg)
+![Quantile score by lead band](../../00034-retraining-cadence-and-cheap-proxies-demand/figure_2.svg)
 
 **The reference baselines are `manual_heuristic` (5.89 in experiment 19), which forecasts from the
 power at the same time of day in earlier weeks, and `climatology` (7.46).** The production recipe
 scored 9.52, and its 5% to 95% band covered 10% of cases. [Experiment
-19](../00019-primary-demand-stack-vs-manual-heuristic/result.md) drew the chart.
+19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md) drew the chart.
 
-![Quantile score by arm](../00019-primary-demand-stack-vs-manual-heuristic/figure_1.svg)
+![Quantile score by arm](../../00019-primary-demand-stack-vs-manual-heuristic/figure_1.svg)
 
 **A frozen model's lead over `manual_heuristic` swings by month, so a single month cannot show a
 change in the weather product.** The chart plots the frozen model's score relative to
 `manual_heuristic` by month, across the move of the ECMWF ensemble from 18 km to 9 km resolution on
 2023-06-27. The lead swings from 11.6% (April) to 1.2% (June) to 8.8% (August). [Experiment
-81](../00081-r11-control-member-second-validation-year-demand/result.md) drew the chart.
+81](../../00081-r11-control-member-second-validation-year-demand/result.md) drew the chart.
 
-![The frozen model's score relative to manual_heuristic by month](../00081-r11-control-member-second-validation-year-demand/figure_5.svg)
+![The frozen model's score relative to manual_heuristic by month](../../00081-r11-control-member-second-validation-year-demand/figure_5.svg)
 
 ## What the experiments found
 
 **What worked: a 14-day error correction put a model that is fitted once ahead of
 `manual_heuristic`, and it supplied nearly all of the stack's gain.** [Experiment
-17](../00017-training-window-and-retraining-rule-drift-demand/result.md) found that every rule that
+17](../../00017-training-window-and-retraining-rule-drift-demand/result.md) found that every rule that
 follows recent data beat training on all history, and the 14-day correction beat all of them: 6.10
 against 7.62 (-1.52, 99.44% interval -1.95 to -1.13), on ERA5 weather that arrives about 5 days
-late. [Experiment 19](../00019-primary-demand-stack-vs-manual-heuristic/result.md) repeated the
+late. [Experiment 19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md) repeated the
 test with forecast-time ENS weather. The stack scored 5.32 against `manual_heuristic`'s 5.89 (-0.56,
 99.44% interval -0.93 to -0.26), and the correction supplied -0.99 of the stack's -1.00 against
 N1, the same XGBoost model without the correction.
 
-![The nine planned contrasts](../00019-primary-demand-stack-vs-manual-heuristic/figure_2.svg)
+![The nine planned contrasts](../../00019-primary-demand-stack-vs-manual-heuristic/figure_2.svg)
 
 **What worked: refitting the XGBoost model monthly scored below the stack at 95%, and refitting
 weekly scored below monthly.** [Experiment
-34](../00034-retraining-cadence-and-cheap-proxies-demand/result.md) refitted the model once a year,
+34](../../00034-retraining-cadence-and-cheap-proxies-demand/result.md) refitted the model once a year,
 every 6 months, quarterly, monthly, weekly, and daily, and scored 73 runs. Monthly minus the stack
 was -0.20 (95% interval -0.38 to -0.01; the stricter 99.375% interval, -0.44 to +0.08, included
 zero, so the verdict was inconclusive). Weekly minus monthly was -0.07 (99.375% interval -0.18 to
 -0.00). Daily scored within 0.01 of weekly on three months. The gain per step shrinks as refits
 become more frequent.
 
-![Difference from the stack by retraining cadence](../00034-retraining-cadence-and-cheap-proxies-demand/figure_1.svg)
+![Difference from the stack by retraining cadence](../../00034-retraining-cadence-and-cheap-proxies-demand/figure_1.svg)
 
 **The 14-day correction stops helping once the XGBoost model is refitted often, and hurts at weekly
 cadence.** Experiment 34 found the correction raised the score (worse) by +0.11 at monthly cadence
 (unresolved) and +0.23 at weekly cadence (99.375% interval +0.03 to +0.44). [Experiment
-48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) found a 7-day
+48](../../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) found a 7-day
 correction +0.16 worse (-0.06 to +0.36) and a 14-day correction +0.08 worse (-0.13 to +0.27) on the
 weekly model, neither resolved. The correction still lowered the frozen model's score by 1.45 points
 (95% interval -1.87 to -0.98), so the correction helps an XGBoost model that is not refitted.
 
 **Weekly refitting held on 292 further daily runs, and on a second period.** [Experiment
-48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) scored the
+48](../../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) scored the
 292 daily runs experiment 34 left out. Weekly refitting scored 5.44 against the stack's 5.64 (-0.20,
 99.44% interval -0.40 to -0.035) and beat monthly (5.57) by 0.13 (-0.24 to -0.03). At the 2 bulk
 supply point and 2 grid supply point substations, weekly refitting scored 0.66 below the stack
 (-1.23 to -0.27). [Experiment
-81](../00081-r11-control-member-second-validation-year-demand/result.md) repeated the test on 274
+81](../../00081-r11-control-member-second-validation-year-demand/result.md) repeated the test on 274
 runs from 2023-07 to 2024-03, with the control member of the ensemble only, on 13 substations.
 Weekly minus the stack was -0.240 (99.17% interval -0.360 to -0.145), and weekly minus monthly was
 -0.039 (-0.064 to -0.012; the 95% t-interval over months, -0.078 to -0.000, only just excludes
 zero). In experiment 48 the weekly-minus-stack gap crosses zero under a t-interval over months
 (-0.43 to +0.04) and without substation D8 (-0.14, interval -0.34 to +0.04).
 
-![Planned contrasts, experiment 48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/figure_1.svg)
+![Planned contrasts, experiment 48](../../00048-weekly-retraining-confirmation-and-extension-demand-generators/figure_1.svg)
 
-![Weekly retraining beat the stack in fold B; fold C has the same sign with wider intervals](../00081-r11-control-member-second-validation-year-demand/figure_1.svg)
+![Weekly retraining beat the stack in fold B; fold C has the same sign with wider intervals](../../00081-r11-control-member-second-validation-year-demand/figure_1.svg)
 
 **The gain is concentrated in a few substations.** Without the three substations that carry it (D8,
 D12, and D5 in experiment 81), the gain over the stack is 0.09 points (95% interval -0.189 to
@@ -120,7 +120,7 @@ the same sign with an interval that includes zero. Experiment 81 found no sign t
 adapts to the 9 km weather product: its gain over the stack fell from -0.552 in December to -0.137
 in March.
 
-![Each series' own difference for the stack and monthly contrasts](../00081-r11-control-member-second-validation-year-demand/figure_4.svg)
+![Each series' own difference for the stack and monthly contrasts](../../00081-r11-control-member-second-validation-year-demand/figure_4.svg)
 
 **A cheaper schedule reproduces the gap between weekly and monthly refitting, at a fraction of the
 compute.** Experiment 34 tested four stand-ins for monthly refitting and found that only the rolling
@@ -128,27 +128,27 @@ compute.** Experiment 34 tested four stand-ins for monthly refitting and found t
 P-roll) matched full monthly refitting on all three rank tests, at 0.03 points of score and about a
 third of the GPU time. Warm-start boosting (updating the previous model) failed, and got worse with
 more updates. [Experiment
-85](../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) tested six cheaper
+85](../../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) tested six cheaper
 schedules against the gap full weekly retraining gives between monthly and weekly refits (+0.125,
 95% interval +0.036 to +0.229). The monthly 12-month window gave +0.118 and a weekly whole-history
 refit with 150 rounds gave +0.125. Quarterly refits on the 12-month window scored 0.381 above weekly
 (+0.207 to +0.565). The starting-value gap (-0.017) was too small to rank any schedule, so agreement
 on that contrast says nothing.
 
-![Contrasts under each schedule, with the full-weekly reference](../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_1.svg)
+![Contrasts under each schedule, with the full-weekly reference](../../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_1.svg)
 
-![Fit cost of each schedule](../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_3.svg)
+![Fit cost of each schedule](../../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_3.svg)
 
 **An average of retrained models gained a small amount that varies between periods.** [Experiment
-35](../00035-lead-weighted-quantile-blend-of-stored-models/result.md) averaged the quantiles of the
+35](../../00035-lead-weighted-quantile-blend-of-stored-models/result.md) averaged the quantiles of the
 monthly-retrained model, a weekly-analogue model, and the stack: -0.097 (98.33% interval -0.187 to
 -0.026) against the best member. [Experiment
-49](../00049-vp1-screening-reference-under-p-roll-demand/result.md) blended five models and gained
+49](../../00049-vp1-screening-reference-under-p-roll-demand/result.md) blended five models and gained
 -0.076 (99.17% interval -0.135 to -0.023) against the best single model, weekly refits.
 Experiment 81 blended four models and gained -0.038 (-0.070 to -0.007), short of the -0.05 threshold
 that justifies serving a blend.
 
-![The six pre-registered contrasts](../00049-vp1-screening-reference-under-p-roll-demand/figure_1.svg)
+![The six pre-registered contrasts](../../00049-vp1-screening-reference-under-p-roll-demand/figure_1.svg)
 
 **What did not work, so the next experiment need not try it:**
 
@@ -167,14 +167,24 @@ that justifies serving a blend.
 
 | Experiment | Question | Verdict | Headline number |
 |---|---|---|---|
-| [17](../00017-training-window-and-retraining-rule-drift-demand/result.md) | Do a recent training window, recency weights, monthly retraining, or a 14-day correction lower the demand error? | Supported | 14-day correction -1.52 (-1.95 to -1.13) against all-history monthly retraining; mean absolute error, ERA5 weather |
-| [19](../00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does the stack (correction, half-life, spread factor) beat `manual_heuristic` for Primary demand? | Supported | Stack minus `manual_heuristic` -0.56 (-0.93 to -0.26); the correction supplies -0.99 of -1.00 |
-| [21](../00021-error-correction-variants-bsp-gsp-demand/result.md) | Which correction variant works best, and does it help BSP and GSP demand? | Inconclusive | BSP and GSP +0.36 (-0.19 to +0.98); no variant beat the 14-day additive form |
-| [23](../00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent power, or a 14-day correction, help solar and wind forecasts? | Inconclusive | Lags within about 0.1; correction about 0.4 worse (CRPS) |
-| [34](../00034-retraining-cadence-and-cheap-proxies-demand/result.md) | How often should the Primary demand model be refitted, and which cheap proxy stands in? | Inconclusive at the planned level | Monthly minus the stack -0.20 (95% -0.38 to -0.01); weekly minus monthly -0.07 |
-| [35](../00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted blend of stored models beat the best single model? | Supported for Primary demand only | -0.097 (-0.187 to -0.026); solar -0.039 and wind -0.074, both null |
-| [48](../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly refitting still beat the stack on the 292 runs experiment 34 left out? | Supported | Weekly minus the stack -0.20 (-0.40 to -0.035); minus monthly -0.13 (-0.24 to -0.03) |
-| [49](../00049-vp1-screening-reference-under-p-roll-demand/result.md) | Which Primary demand components still help under monthly retraining? | Supported for the blend only | Blend -0.076 (-0.135 to -0.023); spread factor, fingerprints, half-life, and Christmas column null or unresolved |
-| [80](../00080-bm0-zero-base-margin-xgboost-quantile-models/result.md) | Does a zero starting value lower the error of the production-style XGBoost models? | Inconclusive | Primary -0.017 (-0.072 to +0.054); wind +0.049 worse |
-| [81](../00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings hold on 274 runs from 2023-07 to 2024-03? | Supported | Weekly minus the stack -0.240 (-0.360 to -0.145); without three substations -0.093 |
-| [85](../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) | Do cheaper schedules rank arms like weekly retraining? | Partly supported | Cadence gap +0.118 and +0.125 against +0.125; quarterly +0.381 |
+| [17](../../00017-training-window-and-retraining-rule-drift-demand/result.md) | Do a recent training window, recency weights, monthly retraining, or a 14-day correction lower the demand error? | Supported | 14-day correction -1.52 (-1.95 to -1.13) against all-history monthly retraining; mean absolute error, ERA5 weather |
+| [19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md) | Does the stack (correction, half-life, spread factor) beat `manual_heuristic` for Primary demand? | Supported | Stack minus `manual_heuristic` -0.56 (-0.93 to -0.26); the correction supplies -0.99 of -1.00 |
+| [21](../../00021-error-correction-variants-bsp-gsp-demand/result.md) | Which correction variant works best, and does it help BSP and GSP demand? | Inconclusive | BSP and GSP +0.36 (-0.19 to +0.98); no variant beat the 14-day additive form |
+| [23](../../00023-lagged-power-and-error-correction-solar-wind/result.md) | Does recent power, or a 14-day correction, help solar and wind forecasts? | Inconclusive | Lags within about 0.1; correction about 0.4 worse (CRPS) |
+| [34](../../00034-retraining-cadence-and-cheap-proxies-demand/result.md) | How often should the Primary demand model be refitted, and which cheap proxy stands in? | Inconclusive at the planned level | Monthly minus the stack -0.20 (95% -0.38 to -0.01); weekly minus monthly -0.07 |
+| [35](../../00035-lead-weighted-quantile-blend-of-stored-models/result.md) | Does a lead-weighted blend of stored models beat the best single model? | Supported for Primary demand only | -0.097 (-0.187 to -0.026); solar -0.039 and wind -0.074, both null |
+| [48](../../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly refitting still beat the stack on the 292 runs experiment 34 left out? | Supported | Weekly minus the stack -0.20 (-0.40 to -0.035); minus monthly -0.13 (-0.24 to -0.03) |
+| [49](../../00049-vp1-screening-reference-under-p-roll-demand/result.md) | Which Primary demand components still help under monthly retraining? | Supported for the blend only | Blend -0.076 (-0.135 to -0.023); spread factor, fingerprints, half-life, and Christmas column null or unresolved |
+| [80](../../00080-bm0-zero-base-margin-xgboost-quantile-models/result.md) | Does a zero starting value lower the error of the production-style XGBoost models? | Inconclusive | Primary -0.017 (-0.072 to +0.054); wind +0.049 worse |
+| [81](../../00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings hold on 274 runs from 2023-07 to 2024-03? | Supported | Weekly minus the stack -0.240 (-0.360 to -0.145); without three substations -0.093 |
+| [85](../../00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md) | Do cheaper schedules rank arms like weekly retraining? | Partly supported | Cadence gap +0.118 and +0.125 against +0.125; quarterly +0.381 |
+
+## What would change in production
+
+**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for the maintainer to confirm.
+
+- **[00017 - Retraining and error correction, part 1](../../00017-training-window-and-retraining-rule-drift-demand/result.md):** Train the stage 1a demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day error correction. The correction needs live power 2 days old, and every gain is on ERA5 weather.
+- **[00049 - Screening reference under monthly retraining](../../00049-vp1-screening-reference-under-p-roll-demand/result.md):** Serve an average of the quantiles of five XGBoost models for Primary demand (weekly refits, monthly refits, the weekly-analogue model, the pooled model, the stack). Lowers the quantile score by 0.08 points (-0.14 to -0.02) against the weekly-retrained N1 on one validation year; needs five models; the spread factor and the fingerprints do not change the score.
+- **[00034 - Retraining cadence](../../00034-retraining-cadence-and-cheap-proxies-demand/result.md):** Retrain the Primary demand model monthly (or weekly) and drop the 14-day correction. Monthly scores 0.20 points below the stack (95% interval -0.38 to -0.01, unresolved at 99.375%); weekly 0.07 lower again.
+- **[00048 - Retraining cadence, part 2](../../00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md):** Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction. Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly.
+- **[00081 - Weekly retraining, part 3](../../00081-r11-control-member-second-validation-year-demand/result.md):** Retrain the Primary demand model weekly and drop the 14-day correction. Second set of runs (control-only, 2023-07 to 2024-03): weekly scores 0.24 points below the stack (99.17% interval -0.36 to -0.15) and 0.04 below monthly (control member of the ECMWF ensemble only).

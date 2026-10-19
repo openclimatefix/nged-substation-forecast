@@ -87,7 +87,7 @@ on the satellite estimate was better by only 0.035 points of capacity, far short
 we had predicted. A point of capacity is 1% of a series' effective capacity, roughly its usual
 maximum output.
 
-**This experiment is the second stage of P2 in the [research plan](../research-plan.md).**
+**This experiment is the second stage of P2 in the [research plan](../themes/solar-disaggregation/plan.md).**
 Experiment 00007 found that a fixed correction on CAMS irradiance removes 46.6% of the next year's
 daylight squared residual (the squared forecast error) of the ERA5-trained stage 1a (98.33% interval
 38.4% to 53.1%), that a fixed bias alone removes 39.1%, and that one substation sets the pooled

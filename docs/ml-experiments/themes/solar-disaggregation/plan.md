@@ -1,44 +1,19 @@
-# Research plan of the ML experiments
+# Solar disaggregation: research plan
 
-**This page lists the ml-experiments that are planned or proposed, sorted by priority.** The
-[research log](research-log.md) holds the finished experiments, their verdicts, and the lessons so
-far. The design under test is on the [staged probabilistic
-forecast](../roadmap/staged-probabilistic-forecast.md) page. In this plan, CRPS is the continuous
-ranked probability score, MAE is the mean absolute error, ENS is the ECMWF ensemble, ERA5 and CAMS
-are estimates of past weather, stage 1a is stage 1 as the experiments train it, and ECC-Q is
-ensemble copula coupling by sorting quantiles. The maintainer adds proposals to this page, and the
-ML experiment manager orders them, merges proposals that test the same hypothesis, and discards the
-ones an earlier result has answered.
+**This page lists the experiments in this theme that are planned or proposed.** The [Experiments](experiments.md) page holds the finished ones. A lower number in the "Priority" column runs sooner.
 
-Each planned experiment has a `result.md` with status `planned`, committed before any code runs. An
-idea that has no folder yet is marked "proposed" and carries a tentative id, P1, P2, and so on,
-which the sections below use as headings. A proposal receives its numeric id when its plan is
-committed, and the tentative id then disappears. A lower number in the "Priority" column runs
-sooner.
+## Priority
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
-## Deferred until the first results are in
+## Planned experiments
 
-**These proposals wait for a decision on the shape of the production
-model.** Each keeps its section below, and a result may promote it.
-
-| Id | Question | Priority | Waits for | State |
-|---|---|---|---|---|
-| [P11](#p11-ensemble-statistics-as-inputs) | Do ensemble statistics (the member mean, spread, and percentiles of temperature and irradiance) beat control-member rows? | 5 | Nothing | Deferred; an ERA5-trained stage 1 cannot take ensemble spread as an input, and experiment 00018 found the staged chain level with N1 for demand |
-| [P13](#p13-perfect-prognosis-and-ceiling-checks) | Does a stage 1 trained on ENS early leads beat the ERA5-trained stage 1 at long leads, and how much skill remains with ERA5, CAMS, or short-lead fields as inputs? | 5 | Nothing | Deferred; 00001 found no gain beyond day 6, and 9 generator series cannot resolve smaller gains |
-| [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
-| [P15](#p15-a-second-weather-product-already-on-disk) | For solar and wind, does a shared stage 2 calibrator with a learned blend let a second weather product already on disk (CEDA UKV or Open-Meteo) enter without retraining? | 5 | A decision on the shape of the production model | Deferred; run for solar and wind only, ENS against ENS plus one product, because demand depends less on weather than generation does |
-| [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
+<!-- planned-table -->
 
 ## Proposals in detail
-
-**Resolution limits.** The sections below flag the experiments whose planned contrasts the available
-sample cannot resolve. The sample is 16 Primary substations, 9 generator series, and one validation
-year with 12 months, and it resolves gains of roughly 0.3 points of capacity or more.
 
 ### P2: embedded-solar capacity from lagged residuals
 
@@ -123,65 +98,6 @@ hypothesis is refuted. The thresholds are proposals for the planning step to con
 substations, so a rule of "70% of them" means 3 of 4, which no interval can support. The slope
 statistics need more substations or a continuous measure of capacity.
 
-### SW2: switching-event detection
-
-**The SW2 line improves the switching-event detector first, scored by event-level F1 against a
-labelled set of visible events, and leaves the use of the detector until the detector works.** The
-detector serves two purposes later. The first is a lower forecast error, if switching periods act as
-unexplained noise for the XGBoost model and corrupt its lagged power inputs. The second, and the
-more important to NGED, is a forecast under the normal running arrangement (NRA), into which NGED
-can add its own switching. The [switching events](../roadmap/switching-events.md) roadmap page
-proposes building that forecast by excluding switching periods from the training target. An event
-table for NGED is a third purpose, at lower priority. The production detector has to run on power
-alone, because the switching logs exist only for the trial area, so the logs are used here for
-evaluation only.
-
-**The line reopens a question that experiment 00038 closed, because experiment 00038 tested a
-different use of the detector.** Experiment 00038 masked detected switching from the history of the
-error correction that runs after the XGBoost model, and the mask made the forecast worse. No
-experiment has yet masked switching from an XGBoost training target or from a lagged input.
-Experiment 00037 confirmed 37 of 612 logged closures of 2 hours to 60 days as visible in its own
-residual, and scored its detectors on the 18 of them in the validation months. That reference set is
-small, about 6 of the 37 are expected by chance, and the label was built from the residual the
-detectors use, so a detector that shares the residual's blind spots is flattered by the label. The
-line therefore starts by building a reference set independent of the detectors.
-
-The full labeller design is in the private file `data/ml-experiments/briefs/sw2_labeller_design.md`.
-
-#### SW2-4 to SW2-9: detector iterations
-
-**Each iteration tests one change to the detector against the [experiment
-43](00043-sw2-1-detector-scoreboard/result.md) scoreboard, tuned on injections and odd months,
-scored on even months, with recall weighted by the MW moved as the headline from SW2-7 onwards.**
-The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
-confirm:
-
-- **SW2-5 (done, [experiment 68](00068-sw2-5-train-detect-retrain-loop/result.md)):** three rounds
-  of refitting the lagless XGBoost model without the detected intervals changed the share of the
-  moved MW found by +0.011 and the forecast error by -0.175%, and a random mask did as well.
-- **SW2-6 (done, [experiment 61](00061-sw2-6-paired-step-intervals/result.md)):** pairing the
-  onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
-  the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
-  the moved MW.
-- **SW2-7 (done, [experiment 60](00060-sw2-7-profile-weighted-step-detector/result.md)):** a
-  step statistic that weights each half-hour by the expected power found the same transfers as the
-  constant step on five injection shapes, so the step's shape does not limit the 24-hour detector.
-  About a third of the transfers with a donor step of 6 noise units or more have the right onset and
-  the wrong end, which SW2-6 (paired-step intervals) addresses.
-- **SW2-8 (done, [experiment 55](00055-sw2-8-neighbour-veto-single-series-detector/result.md)):** a
-  single-series detector first, with neighbour balance as a sense check, not a gate.
-  Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's
-  confidence and names the receiver, a same-sign step on the neighbours vetoes the alarm as a
-  common-mode weather or calendar miss, and an alarm with no metered neighbour keeps its
-  single-series confidence. Experiment 00043 found the neighbour-balance detector D1, which uses
-  the neighbour test as a gate, finding almost none of the injected transfers without a metered
-  receiver. The sum of the neighbourhood's residuals and a subset-sum over neighbours for a split
-  feed the confidence score.
-- **SW2-9 (done, [experiment 62](00062-sw2-9-whitened-residual-step-detector/result.md)):**
-  whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and
-  hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
-  24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
-
 ### PVDIS: separating embedded solar from Primary demand
 
 **The PVDIS line estimates how much unmetered solar capacity sits behind each Primary substation, how
@@ -199,9 +115,9 @@ first:
 
 **The capacity estimate runs offline, weekly or monthly, and the production forecast only reads the
 latest capacity table.** Nothing in this line adds a fitting step to the serving path. [Experiment
-73](00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) (PVDIS-6) found that the mix of panel
+73](../../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) (PVDIS-6) found that the mix of panel
 orientations behind each Primary, the quantity the `UniversalSolarFleetNode` sketched in
-[differentiable physics](../techniques/differentiable-physics.md) would fit, is not stable across
+[differentiable physics](../../../techniques/differentiable-physics.md) would fit, is not stable across
 season-years, so the explicit solar forecast keeps one south-facing shape.
 
 **Experiments 00039 and 00040 are parts 1 and 2 of the series, and the parts below follow the
@@ -235,7 +151,7 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   a Primary is free of a confound; Trusthorpe is marked low-power. The 8 Primaries metered only in
   MVA fold solar into the magnitude of the flow, and experiment 00039 fitted a negative capacity at
   Stickney in every year. [Experiment
-  00079](00079-pvdis-7-mw-at-mva-only-primaries/result.md) (PVDIS-7) treats them separately.
+  00079](../../00079-pvdis-7-mw-at-mva-only-primaries/result.md) (PVDIS-7) treats them separately.
 - **Service areas.** `TimeSeriesMetadata.area_wkt` holds one polygon per Primary. Wrangle T1 and
   Wrangle T2 are two transformers at one substation, feeding different circuits, and share one
   polygon. Each transformer keeps its own capacity fit, and any comparison against an outside count
@@ -243,7 +159,7 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   check reports overlaps and gaps between neighbouring polygons, whether each Primary's location
   falls inside its own polygon, and how the union of the polygons compares with the two BSPs' area.
 - **Irradiance.** CAMS for past weather, because the [past-weather solar
-  study](../studies/past-weather/solar.md) found the CAMS solar estimate the most accurate of the
+  study](../../../studies/past-weather/solar.md) found the CAMS solar estimate the most accurate of the
   products it compared. ENS for forecasts. Where a capacity fitted on CAMS is applied to ENS, the ENS
   irradiance is first calibrated against CAMS, by lead, on data from the fold's training window only.
 - **Capacity used in a forecast is a real-time vintage.** A forecast experiment reads the capacity
@@ -270,54 +186,5 @@ and replace it with PVDIS-4's weekly series once that part has run.** NGED's nee
 almost no information, so the season-year table is useful before the weekly series exists. The
 study reports C as the capacity, keeps sampling uncertainty separate from the named systematic
 scenarios, and carries each Primary's status from the earlier review. The joint fit of
-[experiment 00063](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) read the same
+[experiment 00063](../../00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) read the same
 capacities.
-
-### P11: ensemble statistics as inputs
-
-**The arms are the member mean, spread, and 10th and 90th percentiles of temperature and irradiance,
-against rows from the control member only.** The planned contrast is the statistics arm against the
-control-member arm.
-
-### P13: perfect-prognosis and ceiling checks
-
-**Experiment 00001 found no gain from ERA5 training beyond day 6.** The arms are the ERA5-trained
-stage 1, a stage 1 trained on ENS early leads, and ceiling inputs (ERA5, CAMS, both, and each
-product's short-lead fields).
-
-**Resolution limit.** 9 generator series cannot resolve gains smaller than about 0.3 points of
-capacity, and few solar farms share a weather cell.
-
-### P14: coupling
-
-**The coupling step turns calibrated quantiles back into 51 coherent members.** The arms are ECC-Q
-with the interpolation, tail, and tie rules of the [staged forecast roadmap
-page](../roadmap/staged-probabilistic-forecast.md), and the Schaake shuffle, scored by the variogram
-score and the CRPS of summed solar farms in a weather cell, by lead band.
-
-### P15: a second weather product already on disk
-
-**Blending products is the maintainer's strongest hunch for improving the forecast, and it can be
-tested before any ingest.** CEDA UKV and products downloaded from Open-Meteo are already on disk.
-The CEDA UKV archive differs statistically from the live feed, so a result may not carry over. The
-arms are ENS alone; ENS plus the second product with the shared calibrator and the learned blend;
-the per-product-columns control; a fixed equal-weight mixture; and a learning curve at 1, 2, 3, 6,
-and 12 months of the second product's history, rotated across seasons. The planned contrast is ENS
-plus the second product against ENS alone, with a safe-entry check at 1 and 2 months (the interval
-lies inside plus or minus 0.15 points).
-
-**Resolution limit.** With 9 generator series, a safe-entry interval of plus or minus 0.15 points is
-not reachable at 1 or 2 months of history. The experiment compares ENS alone with ENS plus one
-product, and does not run the learning curve.
-
-### P16: a longer ENS history
-
-**The ENS backfill from Source Cooperative (2021-03 to 2024-03) could give an earlier validation
-fold, and the full fetch cannot run autonomously.** [Issue #959 (Extend ECMWF ENS training
-history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959) describes the
-fetch. The archive is in `us-west-2`. Fetching the control member alone is about 530 GB and 4 to 5
-hours, and fetching all 51 members is about 30 TB, which needs a cloud machine in that region and
-the maintainer's approval of the cost. The issue also ties autonomous use of the fetch to the
-scorer-protection work in issue 958. Every experiment since 00003 scores the same year on the same
-16 series, so choices tuned there overfit it, and an earlier fold is the remedy. For demand, a
-longer training history has hurt so far, so the backfill is valuable first as validation data.

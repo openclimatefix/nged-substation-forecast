@@ -94,7 +94,7 @@ pooled mixture from 94% to 95% coverage to about 90% in every lead band, at no c
 For wind, no planned arm brings the first two lead bands within 2.5 points of 90. A post hoc arm
 that pools the lead bands into two groups does. ENS is the ECMWF ensemble, ERA5 its reanalysis of
 past weather, CRPS the continuous ranked probability score, and stage 1a an XGBoost model per series
-trained on ERA5. The page is proposal P12 in the [research plan](../research-plan.md), and the
+trained on ERA5. The page is proposal P12 in the [research plan](../themes/calibration-and-uncertainty/plan.md), and the
 corrected pooled mixture of 00002's ERA5-trained stage 1a, with no new fit, is the input.
 
 ## Results
