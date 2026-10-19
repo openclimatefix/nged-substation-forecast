@@ -33,6 +33,22 @@ parameters, and it has one global optimum:
   pulled towards the mean of the last 12 knots), or `pinned` (the fit ties the last knot to the one
   before it).
 
+**Part 5 options (experiment 110), all off by default so that a default `GamSpec` reproduces Parts 2
+to 4 exactly.**
+
+- **Routes by which demand terms imitate solar.** `orthogonal_penalty` adds a quadratic penalty on
+  the covariance of the harmonics block and of the heating block with the unit PV shape, within
+  each calendar quarter and half-hour cell of the daylight rows. `shared_harmonics` gives the
+  day-of-year harmonics one coefficient for all hour bands, and `slow_heating_only` keeps only the
+  72 and 168 hour temperatures. `solar="anomaly"` writes the solar term as capacity times the
+  anomaly of the unit PV shape from its month-by-half-hour mean, plus a free non-negative
+  climatology per month and half-hour.
+- **The export clip.** `clip` applies a smooth clip to the pinned solar output, and `profile_clip`
+  profiles the clip's capacity multiplier and ceiling on a grid, one convex fit each.
+- **The unmetered generator node.** `node` adds a non-negative daily level path `g_d` and its
+  positive and negative daily steps, joined by a stiff quadratic tie and a linear (L1) cost on the
+  steps, so the fit stays a bounded quadratic program and the level never goes below zero.
+
 **The solver works on the Gram matrix.** `accumulate_gram` builds the design in chunks and sums
 `X^T W X` and `X^T W y`, with a leading batch dimension of weightings (a month-block bootstrap
 resample is a row of weights). `solve_bounded_quadratic` then minimises `theta^T A theta - 2 b^T
@@ -97,6 +113,10 @@ CapacityType = Literal["fitted", "pinned"]
 FinalKnotType = Literal["free", "shrunk", "pinned"]
 """How the drift's last knot is treated: free, shrunk at forecast time, or tied in the fit."""
 
+SolarFormType = Literal["capacity", "anomaly"]
+"""The solar term's form: capacity times the unit shape, or capacity times its anomaly plus a
+climatology."""
+
 QUANTILE_LEVELS: Final[tuple[float, ...]] = (
     0.01,
     0.05,
@@ -155,6 +175,81 @@ float64 (the default).
 """
 SHRINK_KNOTS: Final[int] = 12
 """A shrunk final knot is pulled towards the mean of this many last knots."""
+SLOW_SMOOTHING_COLUMNS: Final[tuple[int, ...]] = (2, 3)
+"""The columns of `SMOOTHING_HOURS` (72 and 168 hours) that `slow_heating_only` keeps."""
+N_MONTHS: Final[int] = 12
+"""Months of the year, for the solar climatology of the anomaly form."""
+NODE_TIE_RATIO: Final[float] = 100.0
+"""The weight of the quadratic tie between a node level's daily change and its two step parts,
+as a multiple of the linear cost of a point of step.
+
+With cost `c` per point of step and tie weight `w`, the steps carry the level's daily change less
+`c / (2 w)` points, so a ratio of 100 lets a step of 0.005 points go uncharged. A larger ratio
+makes the system worse conditioned.
+"""
+NODE_RIDGE: Final[float] = 1e-3
+"""A tiny ridge on the node's columns, which keeps the step columns (with no design) well posed."""
+NODE_MAX_ITERATIONS: Final[int] = 20000
+"""The most pivoting iterations of a fit with a node, whose many step columns sit at their bound."""
+NODE_NEGATIVE_TOLERANCE: Final[float] = 1e-6
+"""A node level this far below zero, in points, is a bug and raises."""
+CLIP_BETA_PER_POINT: Final[float] = 2.0
+"""The sharpness of the smooth clip, per point of effective capacity."""
+CLIP_MULTIPLIERS: Final[tuple[float, ...]] = tuple(round(0.7 + 0.05 * i, 2) for i in range(13))
+"""The grid of the clip's capacity multiplier m, from 0.7 to 1.3."""
+CLIP_SHARES: Final[tuple[float, ...]] = tuple(round(0.4 + 0.05 * i, 2) for i in range(13))
+"""The grid of the clip's ceiling as a share of m times the held capacity, from 40 to 100%."""
+ORTHOGONAL_BLOCKS: Final[tuple[str, ...]] = ("harmonics", "heating")
+"""The demand terms whose covariance with the unit PV shape the orthogonal penalty constrains."""
+MIN_ORTHOGONAL_CELL_ROWS: Final[int] = 20
+"""A quarter-by-half-hour cell with fewer daylight rows is left out of the orthogonal penalty."""
+
+
+@dataclass(frozen=True)
+class ClipSpec:
+    """A smooth export clip on the pinned solar output.
+
+    The solar term becomes `P_max - softplus(beta * (P_max - m * C * u)) / beta`, where `C` is the
+    pinned capacity, `u` the derated unit PV shape, and `P_max` is `p_max_share * m * H` with `H`
+    the pinned capacity held after the cut.
+
+    Attributes:
+        multiplier: The capacity multiplier `m`.
+        p_max_share: The ceiling as a share of `m * H`; 1 is the top of the profile grid.
+        beta: The sharpness, per point.
+    """
+
+    multiplier: float = 1.0
+    p_max_share: float = 1.0
+    beta: float = CLIP_BETA_PER_POINT
+
+
+@dataclass(frozen=True)
+class NodeSpec:
+    """The penalties of the unmetered generator node.
+
+    Attributes:
+        step_penalty: The linear cost of each point of daily step, per training site-year.
+        level_penalty: The linear cost of each point of level, per training site-year, which
+            settles the level that the profile also explains.
+        step_days: The length of one level block in days. Each block is one more unknown with a
+            tie and two step parts, so a longer block makes the fit smaller and faster, and cannot
+            resolve an outage shorter than the block.
+    """
+
+    def __post_init__(self) -> None:
+        """Refuse a block shorter than one day.
+
+        Raises:
+            ValueError: If `step_days` is below 1.
+        """
+        if self.step_days < 1:
+            msg = f"step_days must be at least 1, not {self.step_days}"
+            raise ValueError(msg)
+
+    step_penalty: float = 300.0
+    level_penalty: float = 1.0
+    step_days: int = 1
 
 
 @dataclass(frozen=True)
@@ -175,6 +270,15 @@ class GamSpec:
         final_knot: How the drift's last knot is treated.
         final_knot_shrink: For `final_knot="shrunk"`, the share of the way a forecast moves the
             last knot towards the mean of the last 12 knots, between 0 and 1.
+        solar: The solar term's form; `anomaly` needs a fitted capacity.
+        anomaly_ridge: The ridge on the anomaly form's climatology, per training site-year.
+        shared_harmonics: True to give the day-of-year harmonics one coefficient for all bands.
+        slow_heating_only: True to keep only the 72 and 168 hour temperatures in the heating hinge.
+        orthogonal_penalty: The weight of the covariance penalty, in units of the Gram matrix's
+            mean diagonal over the penalty matrix's mean diagonal; 0 switches the penalty off.
+        clip: The export clip on the pinned solar output, or `None` for none; needs a pinned
+            capacity.
+        node: The unmetered generator node, or `None` for none.
     """
 
     drift: DriftType = "none"
@@ -187,19 +291,38 @@ class GamSpec:
     covid_flag: bool = False
     final_knot: FinalKnotType = "free"
     final_knot_shrink: float = 0.5
+    solar: SolarFormType = "capacity"
+    anomaly_ridge: float = 1.0
+    shared_harmonics: bool = False
+    slow_heating_only: bool = False
+    orthogonal_penalty: float = 0.0
+    clip: ClipSpec | None = None
+    node: NodeSpec | None = None
 
     def __post_init__(self) -> None:
-        """Refuse a shrink outside 0 to 1, and a final-knot option on a spec with no drift.
+        """Refuse inconsistent options.
 
         Raises:
-            ValueError: If `final_knot_shrink` is outside 0 to 1, or `final_knot` is not `free`
-                while `drift` is `none`.
+            ValueError: If `final_knot_shrink` is outside 0 to 1, `final_knot` is not `free` while
+                `drift` is `none`, the anomaly form is asked for with a pinned capacity, a clip
+                is asked for without a pinned capacity, or the orthogonal penalty is negative.
         """
         if not 0.0 <= self.final_knot_shrink <= 1.0:
             msg = f"final_knot_shrink must be between 0 and 1, not {self.final_knot_shrink}"
             raise ValueError(msg)
         if self.final_knot != "free" and self.drift == "none":
             msg = f"final_knot={self.final_knot!r} needs a drift term, but drift is 'none'"
+            raise ValueError(msg)
+        if self.solar == "anomaly" and self.capacity != "fitted":
+            msg = (
+                "the anomaly form of the solar term fits the capacity, so capacity must be 'fitted'"
+            )
+            raise ValueError(msg)
+        if self.clip is not None and self.capacity != "pinned":
+            msg = "the export clip acts on the pinned solar output, so capacity must be 'pinned'"
+            raise ValueError(msg)
+        if self.orthogonal_penalty < 0.0:
+            msg = f"orthogonal_penalty must not be negative, not {self.orthogonal_penalty}"
             raise ValueError(msg)
 
 
@@ -229,6 +352,10 @@ class GamLayout:
         slices: Each term's columns.
         n_columns: The number of columns.
         constrained: True for the columns that must be non-negative.
+        anomaly_mean: For the anomaly form, the training mean of the derated unit shape by month
+            (0 to 11) and local half-hour, shape (12, 48); `None` otherwise.
+        node_first_day: The first day of the node's level path, as days since 1970-01-01.
+        n_node_steps: The number of level blocks of the node's path, 0 without a node.
     """
 
     spec: GamSpec
@@ -237,10 +364,18 @@ class GamLayout:
     slices: dict[str, slice]
     n_columns: int
     constrained: np.ndarray
+    anomaly_mean: np.ndarray | None = None
+    node_first_day: float = 0.0
+    n_node_steps: int = 0
 
 
 def make_layout(
-    *, spec: GamSpec, season_years: Sequence[int], cut: datetime, earliest: np.datetime64
+    *,
+    spec: GamSpec,
+    season_years: Sequence[int],
+    cut: datetime,
+    earliest: np.datetime64,
+    anomaly_mean: np.ndarray | None = None,
 ) -> GamLayout:
     """Lay out the design's columns.
 
@@ -250,20 +385,31 @@ def make_layout(
         cut: The end of the training window; the last drift knot is here.
         earliest: The earliest instant any training row can have, as UTC microseconds, which
             sets how many monthly knots are needed.
+        anomaly_mean: The training mean of the derated unit shape by month and half-hour, shape
+            (12, 48); required exactly when `spec.solar` is `anomaly`.
 
     Returns:
         The layout.
+
+    Raises:
+        ValueError: If `anomaly_mean` is missing for the anomaly form, or given for another form.
     """
+    if (anomaly_mean is not None) != (spec.solar == "anomaly"):
+        msg = "an anomaly mean is required exactly when the solar term has the anomaly form"
+        raise ValueError(msg)
     n_bands = N_BANDS
+    n_heating = len(SLOW_SMOOTHING_COLUMNS) if spec.slow_heating_only else len(SMOOTHING_HOURS)
     sizes: dict[str, int] = {
         "profile": len(DAY_TYPES) * HALF_HOURS_PER_DAY,
         "holiday": len(HOLIDAY_PERIODS) * n_bands,
         "tent": 2 * n_bands,
-        "harmonics": 4 * n_bands,
-        "heating": len(SMOOTHING_HOURS) * n_bands,
+        "harmonics": 4 if spec.shared_harmonics else 4 * n_bands,
+        "heating": n_heating * n_bands,
         "lighting": 4,
         "capacity": len(season_years) if spec.capacity == "fitted" else 0,
     }
+    if spec.solar == "anomaly":
+        sizes["climatology"] = N_MONTHS * HALF_HOURS_PER_DAY
     if spec.covid_flag:
         sizes["covid"] = n_bands
     cut_day = naive_utc(moment=cut).astype("datetime64[s]").astype(np.int64) / 86400.0
@@ -274,13 +420,30 @@ def make_layout(
         sizes["drift"] = n_bands * n_knots
     if spec.drift == "d1_steps":
         sizes["steps"] = 2 * n_bands * (n_knots - 1)
+    n_node_steps = 0
+    node_first_day = 0.0
+    if spec.node is not None:
+        node_first_day = float(np.floor(first_day))
+        n_days = max(int(np.floor(cut_day - node_first_day - 1.0 / HALF_HOURS_PER_DAY)) + 1, 1)
+        n_node_steps = -(-n_days // spec.node.step_days)
+        sizes["node_level"] = n_node_steps
+        sizes["node_up"] = n_node_steps
+        sizes["node_down"] = n_node_steps
     slices: dict[str, slice] = {}
     start = 0
     for name, size in sizes.items():
         slices[name] = slice(start, start + size)
         start += size
     constrained = np.zeros(start, dtype=bool)
-    for name in ("heating", "capacity", "steps"):
+    for name in (
+        "heating",
+        "capacity",
+        "steps",
+        "climatology",
+        "node_level",
+        "node_up",
+        "node_down",
+    ):
         if name in slices:
             constrained[slices[name]] = True
     return GamLayout(
@@ -290,6 +453,9 @@ def make_layout(
         slices=slices,
         n_columns=start,
         constrained=constrained,
+        anomaly_mean=anomaly_mean,
+        node_first_day=node_first_day,
+        n_node_steps=n_node_steps,
     )
 
 
@@ -308,6 +474,79 @@ def derated_unit_shape(*, features: SiteFeatures, index: np.ndarray) -> np.ndarr
     return unit * np.clip(
         1.0 - DERATING_PER_KELVIN * (cell - REFERENCE_CELL_TEMPERATURE_C), 0, None
     )
+
+
+def _month_index(*, cache: FeatureCache, index: np.ndarray) -> np.ndarray:
+    """Return the local month of the rows, 0 for January to 11 for December."""
+    months = cache.calendar.local_date[index].astype("datetime64[M]").astype(np.int64)
+    return (months % N_MONTHS).astype(np.int64)
+
+
+def solar_shape(
+    *, cache: FeatureCache, features: SiteFeatures, layout: GamLayout, index: np.ndarray
+) -> np.ndarray:
+    """Return the shape the capacity columns multiply: the derated unit shape, or its anomaly.
+
+    Args:
+        cache: The cache, for the rows' local month and half-hour.
+        features: The substation's arrays.
+        layout: The columns; the anomaly form subtracts its training mean.
+        index: Row positions on the grid.
+
+    Returns:
+        `derated_unit_shape`, minus the layout's month-by-half-hour mean for the anomaly form.
+    """
+    shape = derated_unit_shape(features=features, index=index)
+    if layout.anomaly_mean is None:
+        return shape
+    month = _month_index(cache=cache, index=index)
+    return shape - layout.anomaly_mean[month, cache.calendar.half_hour[index].astype(np.int64)]
+
+
+def month_half_hour_mean(
+    *, cache: FeatureCache, features: SiteFeatures, index: np.ndarray
+) -> np.ndarray:
+    """Return the mean derated unit shape by local month and half-hour over the rows `index`.
+
+    Args:
+        cache: The cache.
+        features: The substation's arrays.
+        index: The training rows; no other row contributes.
+
+    Returns:
+        An array of shape (12, 48); a cell with no row is 0.
+    """
+    shape = derated_unit_shape(features=features, index=index)
+    cell = _month_index(cache=cache, index=index) * HALF_HOURS_PER_DAY + cache.calendar.half_hour[
+        index
+    ].astype(np.int64)
+    n_cells = N_MONTHS * HALF_HOURS_PER_DAY
+    totals = np.bincount(cell, weights=shape, minlength=n_cells)
+    counts = np.bincount(cell, minlength=n_cells)
+    return (totals / np.maximum(counts, 1)).reshape(N_MONTHS, HALF_HOURS_PER_DAY)
+
+
+def node_step_index(*, cache: FeatureCache, layout: GamLayout, index: np.ndarray) -> np.ndarray:
+    """Return the node-path block of each row, held at the first and last block beyond them.
+
+    Args:
+        cache: The cache.
+        layout: The columns, with a node.
+        index: Row positions on the grid.
+
+    Returns:
+        The block of the half-hour's start, counted from the node path's first day.
+
+    Raises:
+        ValueError: If the layout has no node.
+    """
+    node = layout.spec.node
+    if node is None:
+        msg = "the layout's spec has no node"
+        raise ValueError(msg)
+    start = _days_since_epoch(cache=cache, index=index) - 1.0 / HALF_HOURS_PER_DAY
+    block = np.floor((start - layout.node_first_day) / node.step_days).astype(np.int64)
+    return np.clip(block, 0, layout.n_node_steps - 1)
 
 
 def _band_one_hot(*, band: np.ndarray) -> np.ndarray:
@@ -363,17 +602,30 @@ def design_matrix(
     tent = np.stack([calendar.tent[index], calendar.signed_tent[index]], axis=1)
     x[:, layout.slices["tent"]] = (tent[:, :, None] * band_hot[:, None, :]).reshape(n, -1)
     harmonics = calendar.harmonics[index]
-    x[:, layout.slices["harmonics"]] = (harmonics[:, :, None] * band_hot[:, None, :]).reshape(n, -1)
-    hinge = (
-        np.clip(HEATING_THRESHOLD_C - features.smoothed_temperature_c[index], 0.0, None)
-        / HEATING_SCALE_C
-    )
+    if layout.spec.shared_harmonics:
+        x[:, layout.slices["harmonics"]] = harmonics
+    else:
+        x[:, layout.slices["harmonics"]] = (harmonics[:, :, None] * band_hot[:, None, :]).reshape(
+            n, -1
+        )
+    smoothed = features.smoothed_temperature_c[index]
+    if layout.spec.slow_heating_only:
+        smoothed = smoothed[:, SLOW_SMOOTHING_COLUMNS]
+    hinge = np.clip(HEATING_THRESHOLD_C - smoothed, 0.0, None) / HEATING_SCALE_C
     x[:, layout.slices["heating"]] = (hinge[:, :, None] * band_hot[:, None, :]).reshape(n, -1)
     x[:, layout.slices["lighting"]] = lighting_ramps(elevation_deg=features.elevation_deg[index])
-    shape = derated_unit_shape(features=features, index=index)
+    shape = solar_shape(cache=cache, features=features, layout=layout, index=index)
     season = calendar.season_year[index]
     years = np.array(layout.season_years)
     x[:, layout.slices["capacity"]] = -shape[:, None] * (season[:, None] >= years[None, :])
+    if "climatology" in layout.slices:
+        cell = _month_index(cache=cache, index=index) * HALF_HOURS_PER_DAY + calendar.half_hour[
+            index
+        ].astype(np.int64)
+        x[rows, layout.slices["climatology"].start + cell] = -1.0
+    if "node_level" in layout.slices:
+        block = node_step_index(cache=cache, layout=layout, index=index)
+        x[rows, layout.slices["node_level"].start + block] = -1.0
     if "covid" in layout.slices:
         x[:, layout.slices["covid"]] = features.lockdown[index][:, None] * band_hot
     if "drift" in layout.slices:
@@ -424,6 +676,9 @@ def penalty_matrix(*, layout: GamLayout, n_rows: int) -> tuple[np.ndarray, np.nd
     n_years = capacity.stop - capacity.start
     cumulative = np.tril(np.ones((n_years, n_years)))
     matrix[capacity, capacity] = spec.ridge * cumulative.T @ cumulative
+    if "climatology" in layout.slices:
+        block = layout.slices["climatology"]
+        matrix[block, block] = spec.anomaly_ridge * scale * np.eye(block.stop - block.start)
     if "drift" in layout.slices:
         n_knots = len(layout.knot_days)
         second = np.diff(np.eye(n_knots), n=2, axis=0)
@@ -440,7 +695,39 @@ def penalty_matrix(*, layout: GamLayout, n_rows: int) -> tuple[np.ndarray, np.nd
         block = layout.slices["steps"]
         matrix[block, block] = 1e-6 * np.eye(block.stop - block.start)
         cost[block] = spec.step_penalty * scale
+    if spec.node is not None:
+        _add_node_penalty(matrix=matrix, cost=cost, layout=layout, scale=scale)
     return matrix, cost
+
+
+def _add_node_penalty(
+    *, matrix: np.ndarray, cost: np.ndarray, layout: GamLayout, scale: float
+) -> None:
+    """Add the node's tie, ridge, and linear costs to the penalty `matrix` and `cost` in place.
+
+    The tie `NODE_TIE_RATIO * c * (g_d - g_(d-1) - up_d + down_d)^2` makes the two step parts carry
+    the level's change from one block to the next, and the linear cost on the steps then charges its
+    absolute value.
+    """
+    node = layout.spec.node
+    if node is None:
+        msg = "the layout's spec has no node"
+        raise ValueError(msg)
+    level = layout.slices["node_level"]
+    up = layout.slices["node_up"]
+    down = layout.slices["node_down"]
+    for block in (level, up, down):
+        matrix[block, block] += NODE_RIDGE * np.eye(block.stop - block.start)
+    cost[level] += node.level_penalty * scale
+    cost[up] += node.step_penalty * scale
+    cost[down] += node.step_penalty * scale
+    for day in range(1, layout.n_node_steps):
+        tie = np.zeros(layout.n_columns)
+        tie[level.start + day] = 1.0
+        tie[level.start + day - 1] = -1.0
+        tie[up.start + day] = -1.0
+        tie[down.start + day] = 1.0
+        matrix += NODE_TIE_RATIO * node.step_penalty * scale * np.outer(tie, tie)
 
 
 def training_rows(
@@ -538,8 +825,29 @@ def _chunks(*, index: np.ndarray) -> Iterator[slice]:
         yield slice(start, min(start + CHUNK_ROWS, len(index)))
 
 
+def clipped_pv(*, unclipped: np.ndarray, p_max: float, beta: float) -> np.ndarray:
+    """Return `P_max - softplus(beta * (P_max - x)) / beta`, the smooth clip of `x` at `P_max`.
+
+    Args:
+        unclipped: The unclipped solar output `x`, in points.
+        p_max: The ceiling `P_max`, in points; infinity means no clip.
+        beta: The sharpness, per point.
+
+    Returns:
+        The clipped output: `x` far below the ceiling, and `P_max` far above it.
+    """
+    if np.isinf(p_max):
+        return unclipped
+    return p_max - np.logaddexp(0.0, beta * (p_max - unclipped)) / beta
+
+
 def pinned_solar_points(
-    *, cache: FeatureCache, features: SiteFeatures, pinned: PinnedCapacity, index: np.ndarray
+    *,
+    cache: FeatureCache,
+    features: SiteFeatures,
+    pinned: PinnedCapacity,
+    index: np.ndarray,
+    clip: ClipSpec | None = None,
 ) -> np.ndarray:
     """Return the pinned capacity times the derated unit PV shape at the rows `index`, in points.
 
@@ -548,12 +856,22 @@ def pinned_solar_points(
         features: The substation's arrays.
         pinned: The pinned capacity.
         index: Grid rows.
+        clip: The export clip, or `None` for none.
 
     Returns:
-        The solar output the model subtracts from demand, never negative.
+        The solar output the model subtracts from demand, never negative. With a clip, the output
+        of `m * C * u` clipped at `p_max_share * m * H`, where `H` is the capacity held after the
+        cut.
     """
-    return pinned.at_rows(cache=cache, index=index) * derated_unit_shape(
+    solar = pinned.at_rows(cache=cache, index=index) * derated_unit_shape(
         features=features, index=index
+    )
+    if clip is None:
+        return solar
+    return clipped_pv(
+        unclipped=clip.multiplier * solar,
+        p_max=clip.p_max_share * clip.multiplier * pinned.held_points,
+        beta=clip.beta,
     )
 
 
@@ -608,7 +926,7 @@ def accumulate_gram(
         target = features.y[rows]
         if pinned is not None:
             target = target + pinned_solar_points(
-                cache=cache, features=features, pinned=pinned, index=rows
+                cache=cache, features=features, pinned=pinned, index=rows, clip=layout.spec.clip
             )
         y = torch.as_tensor(target, dtype=dtype, device=device)
         w = weight_tensor[:, chunk]
@@ -834,7 +1152,18 @@ def prepare_fit(
         raise ValueError(msg)
     assert_no_lookahead(cache=cache, index=index, cut=cut)
     earliest = cache.end_times[index[0]]
-    layout = make_layout(spec=spec, season_years=season_years, cut=cut, earliest=earliest)
+    anomaly_mean = (
+        month_half_hour_mean(cache=cache, features=cache.sites[site], index=index)
+        if spec.solar == "anomaly"
+        else None
+    )
+    layout = make_layout(
+        spec=spec,
+        season_years=season_years,
+        cut=cut,
+        earliest=earliest,
+        anomaly_mean=anomaly_mean,
+    )
     return layout, index
 
 
@@ -880,9 +1209,25 @@ def fit_gam(
             another cut, or no row can train.
     """
     features = cache.sites[site]
-    structure = {(spec.drift, spec.capacity, spec.covid_flag, spec.final_knot) for spec in specs}
+    structure = {
+        (
+            spec.drift,
+            spec.capacity,
+            spec.covid_flag,
+            spec.final_knot,
+            spec.solar,
+            spec.shared_harmonics,
+            spec.slow_heating_only,
+            spec.clip,
+            None if spec.node is None else spec.node.step_days,
+        )
+        for spec in specs
+    }
     if len(structure) != 1:
-        msg = "all specs of one call must share a drift form, capacity mode, COVID flag, and knot"
+        msg = (
+            "all specs of one call must share a drift form, capacity mode, COVID flag, final knot,"
+            " solar form, harmonics and heating options, clip, and node presence"
+        )
         raise ValueError(msg)
     if (pinned is not None) != (specs[0].capacity == "pinned"):
         msg = "a pinned capacity is required exactly when the specs pin the capacity"
@@ -928,10 +1273,21 @@ def fit_gam(
     if penalty.shape[0] == 1 and batch > 1:
         penalty = penalty.expand(batch, -1, -1)
         linear = linear.expand(batch, -1)
+    if any(spec.orthogonal_penalty > 0.0 for spec in specs):
+        penalty = penalty + _orthogonal_term(
+            specs=specs,
+            gram=gram,
+            matrix=orthogonal_penalty_matrix(
+                cache=cache, features=features, layout=layout, index=index
+            ),
+            dtype=dtype,
+            device=device,
+        )
     theta, violation = solve_bounded_quadratic(
         matrix=gram + penalty,
         rhs=rhs - 0.5 * linear,
         constrained=torch.as_tensor(layout.constrained),
+        max_iterations=NODE_MAX_ITERATIONS if specs[0].node is not None else 500,
     )
     signal = derated_unit_shape(features=features, index=index) > LAST_TRAINED_MIN_SHAPE
     if not signal.any() and pinned is None:
@@ -952,7 +1308,12 @@ def fit_gam(
 
 
 def predict_gam(
-    *, cache: FeatureCache, fit: GamFit, index: np.ndarray, member: int = 0
+    *,
+    cache: FeatureCache,
+    fit: GamFit,
+    index: np.ndarray,
+    member: int = 0,
+    columns: np.ndarray | None = None,
 ) -> np.ndarray:
     """Predict net power in points at the grid rows `index`.
 
@@ -968,6 +1329,9 @@ def predict_gam(
         fit: The fitted batch.
         index: The grid rows to predict.
         member: Which fit of the batch.
+        columns: A boolean mask over the layout's columns. If given, only those columns
+            contribute, and a pinned capacity's solar output is not subtracted, so the prediction
+            is the sum of the chosen terms (for example the demand terms alone).
 
     Returns:
         The predictions, float64, one per row.
@@ -981,6 +1345,9 @@ def predict_gam(
     out = np.empty(len(index))
     theta = _forecast_theta(fit=fit, member=member)
     free_theta = fit.theta[member]
+    if columns is not None:
+        theta = np.where(columns, theta, 0.0)
+        free_theta = np.where(columns, free_theta, 0.0)
     after_cut = cache.end_times > naive_utc(moment=fit.cut)
     for chunk in _chunks(index=index):
         rows = index[chunk]
@@ -988,14 +1355,16 @@ def predict_gam(
         capacity = layout.slices["capacity"]
         held_year = np.minimum(cache.calendar.season_year[rows], fit.last_season_year)
         held = held_year[:, None] >= np.array(layout.season_years)[None, :]
-        x[:, capacity] = -derated_unit_shape(features=features, index=rows)[:, None] * held
+        x[:, capacity] = (
+            -solar_shape(cache=cache, features=features, layout=layout, index=rows)[:, None] * held
+        )
         if not np.isfinite(x).all():
             msg = f"{fit.site} has a non-finite input among the rows to predict"
             raise ValueError(msg)
         out[chunk] = np.where(after_cut[rows], x @ theta, x @ free_theta)
-        if fit.pinned is not None:
+        if fit.pinned is not None and columns is None:
             out[chunk] -= pinned_solar_points(
-                cache=cache, features=features, pinned=fit.pinned, index=rows
+                cache=cache, features=features, pinned=fit.pinned, index=rows, clip=layout.spec.clip
             )
     return out
 
@@ -1022,6 +1391,261 @@ def _forecast_theta(*, fit: GamFit, member: int) -> np.ndarray:
         block = theta[start + band * n_knots : start + (band + 1) * n_knots]
         block[-1] += spec.final_knot_shrink * (block[-SHRINK_KNOTS:].mean() - block[-1])
     return theta
+
+
+def orthogonal_penalty_matrix(
+    *, cache: FeatureCache, features: SiteFeatures, layout: GamLayout, index: np.ndarray
+) -> np.ndarray:
+    """Return `sum cov(term, u)^2` as a quadratic form in the coefficients.
+
+    For each of `ORTHOGONAL_BLOCKS` and each calendar quarter by local half-hour cell of the
+    daylight training rows (derated unit shape above `LAST_TRAINED_MIN_SHAPE`), the covariance of
+    the block's contribution `x_block theta` with the derated unit shape `u` is linear in theta:
+    `c theta`, with `c = mean(u x_block) - mean(u) mean(x_block)` over the cell's rows. The matrix
+    is the sum of `c^T c` over blocks and cells, so the penalty keeps the fit convex. A cell with
+    fewer than `MIN_ORTHOGONAL_CELL_ROWS` rows is left out. Only the training rows `index`
+    contribute.
+
+    Args:
+        cache: The cache.
+        features: The substation's arrays.
+        layout: The columns.
+        index: The training rows.
+
+    Returns:
+        A positive semi-definite matrix of shape (p, p), unscaled.
+    """
+    p = layout.n_columns
+    shape = derated_unit_shape(features=features, index=index)
+    daylight = shape > LAST_TRAINED_MIN_SHAPE
+    rows = index[daylight]
+    unit = shape[daylight]
+    n_cells = 4 * HALF_HOURS_PER_DAY
+    cell = cache.calendar.quarter[rows].astype(
+        np.int64
+    ) * HALF_HOURS_PER_DAY + cache.calendar.half_hour[rows].astype(np.int64)
+    counts = np.bincount(cell, minlength=n_cells).astype(np.float64)
+    unit_sums = np.bincount(cell, weights=unit, minlength=n_cells)
+    unit_times_x = np.zeros((n_cells, p))
+    x_sums = np.zeros((n_cells, p))
+    for chunk in _chunks(index=rows):
+        chunk_rows = rows[chunk]
+        x = design_matrix(cache=cache, features=features, layout=layout, index=chunk_rows)
+        one_hot = (cell[chunk, None] == np.arange(n_cells)[None, :]).astype(np.float64)
+        unit_times_x += one_hot.T @ (unit[chunk, None] * x)
+        x_sums += one_hot.T @ x
+    enough = counts >= MIN_ORTHOGONAL_CELL_ROWS
+    safe = np.maximum(counts, 1.0)[:, None]
+    covariance = unit_times_x / safe - (unit_sums[:, None] / safe) * (x_sums / safe)
+    covariance[~enough] = 0.0
+    matrix = np.zeros((p, p))
+    for name in ORTHOGONAL_BLOCKS:
+        block = layout.slices[name]
+        c = covariance[:, block]
+        matrix[block, block] += c.T @ c
+    return matrix
+
+
+def _orthogonal_term(
+    *,
+    specs: Sequence[GamSpec],
+    gram: torch.Tensor,
+    matrix: np.ndarray,
+    dtype: torch.dtype,
+    device: torch.device | str,
+) -> torch.Tensor:
+    """Return each batch member's scaled orthogonal penalty.
+
+    The weight is `lambda * mean(diag(gram)) / mean(diag(matrix))`, so lambda is in units of the
+    Gram matrix's mean diagonal over the penalty matrix's mean diagonal.
+
+    Args:
+        specs: The specs, whose `orthogonal_penalty` values are the lambdas; one spec is shared
+            across the whole batch.
+        gram: The Gram matrices, shape (batch, p, p).
+        matrix: The unscaled penalty matrix of `orthogonal_penalty_matrix`.
+        dtype: The floating-point type.
+        device: Where the arithmetic runs.
+
+    Returns:
+        The penalty of each batch member, shape (batch, p, p).
+
+    Raises:
+        ValueError: If the matrix is all zero.
+    """
+    mean_diagonal = float(np.diag(matrix).mean())
+    if mean_diagonal <= 0.0:
+        msg = "the orthogonal penalty matrix is zero: no daylight cell has enough rows"
+        raise ValueError(msg)
+    batch = gram.shape[0]
+    weights = torch.as_tensor(
+        [spec.orthogonal_penalty for spec in specs], dtype=dtype, device=device
+    ).expand(batch)
+    gram_diagonal = torch.diagonal(gram, dim1=-2, dim2=-1).mean(dim=-1)
+    scale = weights * gram_diagonal / mean_diagonal
+    return scale[:, None, None] * torch.as_tensor(matrix, dtype=dtype, device=device)[None]
+
+
+def generator_path(*, fit: GamFit, member: int = 0) -> np.ndarray:
+    """Return the node's level path, one value per block of `step_days` days, in points.
+
+    Args:
+        fit: A fit whose spec has a node.
+        member: Which fit of the batch.
+
+    Returns:
+        The level of each block from the node path's first day, as the fit holds it.
+
+    Raises:
+        ValueError: If the fit has no node, or a level is below zero.
+    """
+    if "node_level" not in fit.layout.slices:
+        msg = "the fit has no unmetered generator node"
+        raise ValueError(msg)
+    path = fit.theta[member, fit.layout.slices["node_level"]]
+    if path.min() < -NODE_NEGATIVE_TOLERANCE:
+        msg = f"the generator level of {fit.site} is {path.min():.3g} points: below zero"
+        raise ValueError(msg)
+    return path
+
+
+@dataclass(frozen=True)
+class ClipProfile:
+    """The profile of the export clip's capacity multiplier and ceiling.
+
+    Attributes:
+        multipliers: The grid of the capacity multiplier m, shape (M,).
+        shares: The grid of the ceiling as a share of m times the held capacity, shape (S,).
+        objective: The penalised training objective of each (m, share), shape (M, S).
+        open_objective: The same objective with no clip.
+        best: The (m, share) with the lowest objective; a tie goes to the larger share.
+    """
+
+    multipliers: np.ndarray
+    shares: np.ndarray
+    objective: np.ndarray
+    open_objective: float
+    best: ClipSpec
+
+
+def profile_clip(
+    *,
+    cache: FeatureCache,
+    site: str,
+    spec: GamSpec,
+    cut: datetime,
+    window: TrainingWindow,
+    season_years: Sequence[int],
+    pinned: PinnedCapacity,
+    multipliers: Sequence[float] = CLIP_MULTIPLIERS,
+    shares: Sequence[float] = CLIP_SHARES,
+    beta: float = CLIP_BETA_PER_POINT,
+) -> ClipProfile:
+    """Fit the pinned-capacity model once for each (multiplier, ceiling) of a grid.
+
+    For given `(m, P_max)` the clipped solar output is a fixed column that moves to the target, so
+    the design and Gram matrix are shared and only the right-hand side differs: one pass over the
+    training rows builds `X^T y` and `X^T pv` for every grid point, and one batched solve fits them
+    all. The penalised objective `sum (y + pv - X theta)^2 + theta^T P theta + c^T theta` is
+    compared across grid points (and against the open model with no clip), which is a
+    likelihood-style comparison because the target of each fit is `y + pv`.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        spec: A spec with a pinned capacity and no clip.
+        cut: The cut; training rows end no later.
+        window: The window rule.
+        season_years: The season-years (unused columns for a pinned capacity).
+        pinned: The pinned capacity built for `cut`.
+        multipliers: The grid of m.
+        shares: The grid of the ceiling share.
+        beta: The clip's sharpness, per point.
+
+    Returns:
+        The profile.
+
+    Raises:
+        ValueError: If the spec has a clip or does not pin the capacity, or the pinned capacity
+            was built for another site or cut.
+    """
+    features = cache.sites[site]
+    if spec.clip is not None or spec.capacity != "pinned":
+        msg = "profile_clip needs a spec with a pinned capacity and no clip"
+        raise ValueError(msg)
+    if pinned.cut != cut or pinned.site != features.table.site:
+        msg = (
+            f"the pinned capacity was built for {pinned.site} at {pinned.cut}, not {site} at {cut}"
+        )
+        raise ValueError(msg)
+    layout, index = prepare_fit(
+        cache=cache, site=site, spec=spec, cut=cut, window=window, season_years=season_years
+    )
+    grid = [
+        ClipSpec(multiplier=m, p_max_share=share, beta=beta)
+        for m in multipliers
+        for share in shares
+    ]
+    n_models = len(grid) + 1
+    p = layout.n_columns
+    gram = np.zeros((p, p))
+    x_y = np.zeros(p)
+    x_pv = np.zeros((p, n_models))
+    target_squares = np.zeros(n_models)
+    for chunk in _chunks(index=index):
+        rows = index[chunk]
+        x = design_matrix(cache=cache, features=features, layout=layout, index=rows)
+        y = features.y[rows]
+        pv = np.stack(
+            [
+                pinned_solar_points(
+                    cache=cache, features=features, pinned=pinned, index=rows, clip=clip
+                )
+                for clip in [*grid, None]
+            ],
+            axis=1,
+        )
+        gram += x.T @ x
+        x_y += x.T @ y
+        x_pv += x.T @ pv
+        target_squares += np.square(y[:, None] + pv).sum(axis=0)
+    matrix, cost = penalty_matrix(layout=layout, n_rows=len(index))
+    system = np.broadcast_to(gram + matrix, (n_models, p, p))
+    right = x_y[None, :] + x_pv.T
+    theta, _ = solve_bounded_quadratic(
+        matrix=torch.as_tensor(np.ascontiguousarray(system), dtype=torch.float64),
+        rhs=torch.as_tensor(right - 0.5 * cost[None, :], dtype=torch.float64),
+        constrained=torch.as_tensor(layout.constrained),
+    )
+    theta = theta.numpy()
+    objective = (
+        target_squares
+        - 2.0 * np.einsum("bp,bp->b", theta, right)
+        + np.einsum("bp,pq,bq->b", theta, gram + matrix, theta)
+        + theta @ cost
+    )
+    surface = objective[:-1].reshape(len(multipliers), len(shares))
+    best_m, best_share = _best_cell(surface=surface)
+    return ClipProfile(
+        multipliers=np.array(multipliers),
+        shares=np.array(shares),
+        objective=surface,
+        open_objective=float(objective[-1]),
+        best=ClipSpec(
+            multiplier=float(multipliers[best_m]),
+            p_max_share=float(shares[best_share]),
+            beta=beta,
+        ),
+    )
+
+
+def _best_cell(*, surface: np.ndarray) -> tuple[int, int]:
+    """Return the (row, column) of the lowest objective, preferring the larger column on a tie."""
+    lowest = surface.min()
+    close = np.flatnonzero(surface.ravel() <= lowest + 1e-9 * max(abs(lowest), 1.0))
+    rows, columns = np.unravel_index(close, surface.shape)
+    best = np.lexsort((rows, columns))[-1]
+    return int(rows[best]), int(columns[best])
 
 
 @dataclass(frozen=True)
