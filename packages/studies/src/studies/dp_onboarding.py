@@ -104,9 +104,7 @@ class FitCopy:
             `None` for the default start. It moves only the site-level values: the population
             means of the `map` and `variational` priors keep their default start.
         capacity_override: Capacities in points held fixed in this copy, shape (substations,
-            season-years), with `NaN` where the capacity is learned; or `None`. The override and
-            the weeks recorded by `onboard_site` live on the model object and are not saved with
-            its state dict.
+            season-years), with `NaN` where the capacity is learned; or `None`.
     """
 
     name: str
@@ -434,6 +432,8 @@ def pooled_residuals(
     Returns:
         The residuals, tagged with the substations the fit excluded and the weeks of history.
     """
+    # A model that was never onboarded records no weeks, so a weeks value given for it is not
+    # checked.
     recorded = model.weeks_of_history[model.weeks_of_history >= 0].tolist()
     if any(weeks != weeks_of_history for weeks in recorded):
         msg = f"the model was onboarded with {recorded} weeks, not {weeks_of_history}"

@@ -252,6 +252,7 @@ def test_a_capacity_override_with_nan_leaves_those_capacities_learned(batch: Poo
     )
     capacity = models[0].capacities().detach()
     assert torch.allclose(capacity[0], torch.full_like(capacity[0], 3.0))
+    assert torch.isfinite(capacity[2]).all()
     assert not torch.allclose(capacity[2], torch.full_like(capacity[2], 3.0))
 
 
