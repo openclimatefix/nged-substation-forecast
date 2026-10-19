@@ -529,6 +529,62 @@ def weights_figure(*, results_dir: Path) -> alt.Chart:
     )
 
 
+def lag_by_series_figure(*, results_dir: Path) -> alt.Chart:
+    """Return the cost of removing the lags at each of the 16 Primary substations."""
+    frames = [
+        pl.read_parquet(results_dir / f"checks_by_site_{name}.parquet").with_columns(
+            schedule=pl.lit(schedule)
+        )
+        for name, schedule in (
+            ("p_nl_weekly_p_s4_weekly", "Weekly refits"),
+            ("p_nl_monthly_p_s3_monthly", "Monthly refits"),
+        )
+    ]
+    data = pl.concat(frames).to_pandas()
+    order = (
+        pl.concat(frames)
+        .filter(pl.col("schedule") == "Weekly refits")
+        .sort("value", descending=True)["label"]
+        .to_list()
+    )
+    return (
+        alt.Chart(data)
+        .mark_point(filled=True, size=70, aria=False)
+        .encode(
+            x=alt.X(
+                "value:Q",
+                axis=alt.Axis(values=[0, 1, 2, 3, 4, 5, 6]),
+                title=wrapped(
+                    text="Score of the model without lags minus the score of the same model with "
+                    "lags (points of capacity; positive means removing the lags hurts)",
+                    width=80,
+                ),
+            ),
+            y=alt.Y("label:N", sort=order, title=None),
+            color=alt.Color(
+                "schedule:N",
+                scale=alt.Scale(
+                    domain=["Weekly refits", "Monthly refits"],
+                    range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE],
+                ),
+                legend=alt.Legend(orient="top", title=None),
+            ),
+        )
+        .properties(
+            width=PLOT_WIDTH - 60,
+            height=300,
+            title=alt.TitleParams(
+                text="Removing the three power lags, by Primary substation",
+                subtitle=wrapped(
+                    text="Positive means removing the lags makes the forecast worse. Two "
+                    f"substations carry most of the cost. {SCOPE}",
+                    width=95,
+                ),
+            ),
+        )
+    )
+
+
 def figures(*, results_dir: Path) -> dict[str, Callable[[], alt.TopLevelMixin]]:
     """Return the drawing function of every figure."""
     absolute = pl.read_parquet(results_dir / "absolute.parquet")
@@ -540,6 +596,7 @@ def figures(*, results_dir: Path) -> dict[str, Callable[[], alt.TopLevelMixin]]:
         )
     out["figure_2_by_lead"] = lambda: lead_figure(absolute=absolute)
     out["figure_3_midday_summer"] = lambda: midday_figure(absolute=absolute, contrasts=contrasts)
+    out["figure_7_lag_cost_by_series"] = lambda: lag_by_series_figure(results_dir=results_dir)
     out["figure_6_blend_weights"] = lambda: weights_figure(results_dir=results_dir)
     return out
 
