@@ -164,10 +164,10 @@ calibration (`figure_7*`), and the side panels of experiments 81 and 54 (`figure
 ## Deviations, caveats, and next steps
 
 - **Schedule:** full production recipe (500 rounds, learning rate 0.05, half-life 0.5 years), weekly
-  refits for the best guess. The generator models refit monthly, not weekly, because the 16 GPU-hour
-  budget (raised to 20) did not hold 52 weekly refits of each of the 9 farm models. The monthly refit is what the generator
-  rows show. The noise-floor repeat also used the monthly schedule. GPU use was 14.4 hours of wall
-  time.
+  refits for the best guess. The generator models refit monthly, not weekly, because the 16
+  GPU-hour budget (raised to 20) did not hold 52 weekly refits of each of the 9 farm models. The
+  generator rows show the monthly refit. The noise-floor repeat also used the monthly schedule. GPU
+  use was 14.4 hours of wall time.
 - **Offset:** weights come from experiment 64's fit before the validation year (the design says to
   refit them), the capacity per run comes from experiment 78's vintages, and offset models start
   from the median of the training labels plus the offset. Ablation A6 holds the capacity at its
