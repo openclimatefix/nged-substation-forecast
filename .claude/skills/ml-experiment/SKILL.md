@@ -353,50 +353,56 @@ skill and not on that page.
 
 **A review that checks the printed numbers against the stored predictions cannot catch a method that
 is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.**
-Experiment 104 showed why. Its numbers review confirmed every printed number, yet the residual spread
-shifted each forecast by the previous year's bias. That shift reversed two of the headline
-conclusions, and three failed controls had been explained away instead of investigated.
+Experiment 104 showed why. Its numbers review confirmed every printed number. An audit afterwards
+(`data/ml-experiments/briefs/e104_audit.md`) found that the residual spread shifted each forecast by
+the previous year's bias, which reversed two of the headline conclusions. Three failed controls had
+been explained away instead of investigated.
 
 **An audit is triggered when any of these holds:**
 
 1. **A control fails:** a positive control, a known-answer test, or a placebo.
-2. **A result contradicts its own prediction or an earlier experiment's finding** without a tested
-   explanation. Experiment 87's solar offset gained 0.010 points against a predicted 0.10 to 0.15
-   and experiment 64's 0.152.
+2. **A result contradicts its own prediction or an earlier experiment's finding,** and the
+   experiment's session has not tested an explanation and recorded it in the write-up. Experiment
+   87's solar offset lowered the score by 0.010 points against a predicted 0.10 to 0.15, although
+   experiment 64 had found a gain of 0.152.
 3. **The quantile-score contrast and the same contrast on the error of the mean or median forecast
    point in different directions.**
 4. **Leaving one site out flips the sign or the verdict of a planned contrast.** Experiment 104's C1
-   rested on D14 alone. Also flag any site whose score is more than twice the median across sites;
-   with five sites that ratio is noisy, so a flag alone does not trigger an audit.
-5. **A nested arm beats the arm that contains it,** such as the same model given less information,
-   **or a control that should change nothing moves the score by more than the noise floor.**
-6. **A headline interval is much wider or narrower than the noise floor,** or than the same contrast
-   in a sister experiment.
-7. **The result changes the plan for later experiments,** as experiment 104 changed the plan for
-   part 4 of its series.
+   was −0.20 with D14 and +0.13 without it. A site scoring more than twice the median across sites
+   is a prompt to run the leave-one-out check, not a trigger, because with five sites that ratio is
+   noisy.
+5. **A nested arm beats the arm that contains it,** such as an arm with the same model given less
+   input, **or a control that should change nothing moves the score by more than its own paired
+   interval's half-width.**
+6. **A headline interval is more than twice as wide, or less than half as wide,** as the same
+   contrast's interval in a sister experiment on the same rows.
+7. **A later experiment's design depends on this result's headline number or sign, and the result has
+   not been replicated.** The ordinary "what the next experiment should answer" handoff of an
+   exploratory series does not count on its own.
 
-**Who runs it.** The manager, or the experiment's owner when no manager is running, starts a fresh
-Opus agent with the audit brief. The experiment's author never runs its own audit. The audit brief
-differs from a review brief: the agent re-derives the headline contrasts from the raw stored
-predictions, by its own code, and tries to break them. It checks each method's assumptions, such as
-how quantiles are built, how a base margin enters, and how a held value is extrapolated. It does not
-re-check the printed arithmetic. The audit report goes in the private
+**Who runs it, and when.** The manager, or the experiment's own session when no manager is running,
+starts a fresh Opus agent with the audit brief. The agent that wrote the experiment never audits it.
+The audit runs after the code and write-up reviews and before the prose review. Opus is justified
+here even when credits are short, because a wrong method poisons every experiment built on it. The
+audit brief differs from a review brief: the agent re-derives the headline contrasts from the raw
+stored predictions, by its own code, and tries to break them. It checks each method's assumptions,
+such as how quantiles are built, how a base margin enters, and how a held value is extrapolated. It
+does not re-check the printed arithmetic. The audit report goes in the private
 `data/ml-experiments/briefs/` folder, and the PR triages each finding.
 
 **A shared method is audited once, where it lives.** A method reused from `packages/studies/`, such
 as a spread model or a base-margin helper, counts as checked only once its own tests or an audit
 cover the property in question. An experiment that is first to depend on an unchecked property
-audits it there, and the fix goes into the package.
+audits it there. The fix lands in its own reviewed PR to `packages/studies/` first, as "Merging"
+requires. The experiment either waits for that PR or records the unchecked property as a caveat.
 
-**Two checks go in every write-up, triggered or not:**
+**Every write-up carries a short "Checks" list of bullets after its figures, triggered or not:**
 
 - **the median forecast minus the mean forecast, per site,** which exposes a spread that shifts the
   forecast;
 - **the error of the mean or median forecast beside every quantile-score contrast,** which exposes
-  trigger 3.
-
-**The write-up says which triggers fired,** and links the audit's findings and how each was
-triaged.
+  trigger 3;
+- **which triggers fired,** with a link to the audit's findings and how each was triaged.
 
 ## Merging
 
