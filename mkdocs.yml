@@ -170,6 +170,10 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/plan.md
+          - Embedded generation:
+              - Summary: ml-experiments/themes/differentiable-physics-embedded-generation/index.md
+              - Experiments: ml-experiments/themes/differentiable-physics-embedded-generation/experiments.md
+              - Research plan: ml-experiments/themes/differentiable-physics-embedded-generation/plan.md
           - Long history and drift:
               - Summary: ml-experiments/themes/differentiable-physics-long-history-and-drift/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-long-history-and-drift/experiments.md
