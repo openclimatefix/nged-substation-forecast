@@ -162,9 +162,9 @@ ERA5 temperature at D5 minus its trailing 30-day mean. The table is in [report.t
 
 - **Cold spell:** 9 of the 20 days fall in January 2024, and 4 of those 9 days (8, 13, 14, and 15
   January) are 3 °C or more below the 30-day mean, with 15 January at −7.5 °C. Two more days (22
-  September 2023 and 21 October 2023) also meet the 3 °C criterion, so 6 of 20 do. A news report of a Met Office
-  reading puts the lowest January temperature since 2019 on 16 January 2024, at Dalwhinnie in
-  Scotland, not in the trial area
+  September 2023 and 21 October 2023) also meet the 3 °C criterion, so 6 of 20 do. A news report
+  of a Met Office reading puts the lowest January temperature since 2019 on 16 January 2024, at
+  Dalwhinnie in Scotland, not in the trial area
   ([LBC](https://www.lbc.co.uk/news/exact-location-met-office-weather-alert-snow)).
   No source was found for 8 to 15 January itself.
 - **Bank holidays and the Christmas run:** none of the 20 days.
