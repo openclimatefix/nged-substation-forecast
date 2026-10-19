@@ -8,7 +8,8 @@ distinguishable from zero) with the MW from the RO-NC detector.**
 A [load transfer](../../glossary.md#injected-and-real-load-transfers) moves part of one [Primary
 substation's](../../glossary.md#primary-substation) demand onto its neighbours for hours or days.
 The question is whether telling the XGBoost forecast about transfers lets it forecast the demand the
-[normal running arrangement](../../glossary.md#abnormal-running-arrangement-ara-and-normal-running-arrangement-nra)
+[normal running
+arrangement](../../glossary.md#abnormal-running-arrangement-ara-and-normal-running-arrangement-nra)
 would have carried. The labels come from NGED's logs or from the [RO-NC](../../glossary.md#ro-nc)
 detector, whose own results are on the [switching detectors](../switching-detectors/index.md) page.
 All results are from the lab: 16 Primary series, one validation year (292 daily forecast runs, July
@@ -17,7 +18,7 @@ All results are from the lab: 16 Primary series, one validation year (292 daily 
 ![Share of the gap closed, by correction and source of MW](../../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/figure_3.svg)
 
 **The share of the extra error recovered depends on where the MW comes from: 50% to 83% with the
-true MW, 16% to 23% with RO-NC's MW as built (intervals include zero), and 43% with the largest
+true MW, 16% to 36% with RO-NC's MW as built (intervals include zero), and 43% with the largest
 overlapping step (chosen after seeing the results).** The extra error (the "gap") is the error of
 the plain forecast minus the error of the same forecast on unmodified lags (the "ceiling"). Source:
 [experiment
@@ -31,8 +32,8 @@ source is "oracle" when it is NGED's logs and "detector" when it is RO-NC. The s
 [points of capacity](../../glossary.md#capacity-and-points-of-capacity); a positive change is a
 worse forecast.
 
-- **Dropping labelled switching from the training targets, or adding the moved MW, changed the
-  score outside switching by under 0.06.** Masked minus plain was +0.004 (98.33% interval -0.026 to
+- **Dropping labelled switching from the training targets, or adding the moved MW, changed the score
+  outside switching by under 0.06.** Masked minus plain was +0.004 (98.33% interval -0.026 to
   +0.025); only 22 of the 82 labelled events fall in the scored year ([experiment
   75](../../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)).
 - **On the 37,394 half-hours whose lag (an earlier power reading used as an input) lies inside a
@@ -43,9 +44,10 @@ worse forecast.
   86](../../00086-sw2-12-detector-labels-for-nra-forecast/result.md)).
 - **A perfect detector would lower the [best guess's](../../glossary.md#best-guess) quantile score
   by 0.42% (95% interval -0.47% to 1.96%)** on events moving 25% or more of the receiver's load for
-  over a day, against a 3% threshold. Those events touch 3 of the 16 series. For all 22 visible
-  events the bound is 2.35% (-0.22% to 5.73%), resting on a few short events ([experiment
-  44](../../00044-sw2-2-switching-share-of-best-guess-score/result.md)).
+  over a day, against a 3% threshold. Those events touch 3 of the 16 series, and if events on badly
+  metered substations are dropped, 2 remain and every bound's point estimate lies between -0.3% and
+  -0.1%. For all 22 visible events the bound is 2.35% (-0.22% to 5.73%), resting on a few short
+  events ([experiment 44](../../00044-sw2-2-switching-share-of-best-guess-score/result.md)).
 
 ![Fall in score a perfect switching detector would give](../../00044-sw2-2-switching-share-of-best-guess-score/figure_4_bound.svg)
 
@@ -67,9 +69,9 @@ The cases are forecast origins inside a transfer (2,452 cases from four onset mo
 against the unmodified power. The XGBoost model trained on NGED's logged transfers and given the
 true MW scored -0.790 points against plain (98.75% interval -1.397 to -0.412), closing 83% (70% to
 91%) of the gap. With RO-NC's MW, the model trained on RO-NC's transfers scored -0.149 (-1.174 to
-+0.148). Counting overlapping detector intervals once, chosen after seeing the results, gave -0.406
-(-1.223 to -0.083). After a transfer ended, the as-built MW raised the error by 0.35 to 0.46 for up
-to 7 days (experiment 88).
++0.148, negative in 2 of 4 months). Counting overlapping detector intervals once, chosen after
+seeing the results, gave -0.406 (-1.223 to -0.083). After a transfer ended, the as-built MW raised
+the error by 0.35 to 0.46 for up to 7 days (experiment 88).
 
 ![Error by arm and source of MW at forecast time](../../00096-sw2-23-synthetic-switches-injected-into-training/figure_2.svg)
 
@@ -117,9 +119,9 @@ does not support a detector or a label table in the forecast.
   with such a lag and on rows outside switching ([experiment
   89](../../00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/result.md), +0.054
   outside switching; the `mask` arm of [experiment
-  100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md) lost 1.36 points on
-  injected transfers). Random dropout in 30% of training rows removed that loss. Re-check with a
-  model trained to read missing lags.
+  100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md) lost 1.36 points on injected
+  transfers). Random dropout in 30% of training rows removed that loss. Re-check with a model
+  trained to read missing lags.
 - **Count the half-hours a label source marks before using it to mask or correct.** The union of
   RO-NC and the logs marks 9% to 16% of half-hours per year from 2022, RO-NC alone marks 8.1 times
   the logged half-hours, and masking on the union raised the error ([experiment
@@ -128,41 +130,46 @@ does not support a detector or a label table in the forecast.
   marks about as many half-hours as the logs.
 - **Take one MW per half-hour from the largest overlapping detector step, not the sum.** The
   as-built MW, which adds overlapping intervals, did not beat the plain forecast (-0.149, -1.174 to
-  +0.148), and the largest step did (-0.406, -1.223 to -0.083), though that choice was post hoc.
-  A lingering return step kept the correction on after a transfer ended ([experiment
+  +0.148), and the largest step did (-0.406, -1.223 to -0.083), though that choice was post hoc. A
+  lingering return step kept the correction on after a transfer ended ([experiment
   88](../../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md);
-  how much the MW is over-estimated is under audit). Re-check once the audit is merged.
-- **A detected transfer is known late.** At the newest usable lag the detector had marked 32% of
-  the moved MW in the first 24 hours after onset, against 73% in days 1 to 3 (experiment 88), and
-  its probability separated poorly in that first day (area under the curve 0.60; [experiment
+  how much the MW is over-estimated is under audit). Re-check the 83% against 16% gap with the
+  audit's corrected MW once the audit is published.
+- **A detected transfer is known late.** At the newest usable lag the detector had marked 32% of the
+  moved MW in the first 24 hours after onset, against 73% in days 1 to 3 (experiment 88), and its
+  probability separated poorly in that first day (area under the curve 0.61 for the calibrated
+  probability and 0.60 for the flag; [experiment
   91](../../00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md)). A gain scored
   with hindsight ends is therefore an upper bound ([experiment
   75](../../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)). Re-check on live
   data or with an end rule that needs no hindsight.
-- **Score a forecast of the normal running arrangement against real data only outside events.**
-  Real rows inside an event have no valid normal-arrangement truth, so experiments 75, 86, and 100
-  score real rows outside events and use injected transfers for the rest ([experiment
+- **Score a forecast of the normal running arrangement against real data only outside events.** Real
+  rows inside an event have no valid normal-arrangement truth, so experiments 75, 86, and 100 score
+  real rows outside events and use injected transfers for the rest ([experiment
   100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md)). Re-check if a source of
   the true normal-arrangement power appears.
 - **Count events, not half-hours, and expect wide intervals.** The 37,394 rows with a lag in a
   logged event come from an estimated 15 to 20 events, 81% of them from 3 substations ([experiment
   100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md)). Six trustworthy events
-  fall in the scored year ([experiment
+  fall in the scored year, and without those where a donor or receiver has over half its readings
+  missing, 2 remain and every bound lies between -0.3% and -0.1% ([experiment
   44](../../00044-sw2-2-switching-share-of-best-guess-score/result.md)). Injected scores rest on 4
   onset months (experiments 88 and 96), so read the sign in each month. Re-check on a longer period.
-- **Run a same-code repeat of the control arm before reading a change under about 0.05.** Only 9%
-  of per-case scores from a graphics-card refit matched experiment 48's to 0.001, the largest gap
-  was 4.39 points, and the +0.004 of masked minus plain is at the level of that noise ([experiment
-  75](../../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)). Re-check if the
-  fit is made deterministic.
-- **Give any "drop the event rows" arm a control that keeps them.** Dropping 9% of training rows
-  narrowed the band on unmasked rows by 4% and lowered its coverage from 0.906 to 0.894 ([experiment
+- **Run a same-code repeat of the control arm before reading a change under about 0.05.** Only 9% of
+  per-case scores from a graphics-card refit matched experiment 48's to 0.001, the largest gap was
+  4.39 points, and the +0.004 of masked minus plain is at the level of that noise ([experiment
+  75](../../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)). Re-check if the fit
+  is made deterministic.
+- **Give any "drop the event rows" arm a control that keeps them.** The `mask` arm, which also
+  dropped 9% of training rows, narrowed the band on unmasked rows by 4% and lowered its coverage
+  from 0.906 to 0.894 ([experiment
   100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md)). Without the control, the
   effect of dropping rows is credited to masking lags. Re-check with the control run.
 - **Report the pre-registered rows first, and name a post hoc subset.** Experiment 91's 11.2% gain
   is on rows chosen after seeing the results; the planned rows gave 3.3% with an interval including
-  zero ([experiment 91](../../00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md)).
-  Re-check against the plan's decision rule.
+  zero ([experiment
+  91](../../00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md)). Re-check
+  against the plan's decision rule.
 
 ## What we have not settled
 
