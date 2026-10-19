@@ -510,7 +510,7 @@ def fit_centred_spread(
         The spread around the mean forecast, with mean zero in each group.
     """
     centred = centre_by_group(residual=residual, band=band, quarter=quarter)
-    return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter)
+    return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter, centre=False)
 
 
 def centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:

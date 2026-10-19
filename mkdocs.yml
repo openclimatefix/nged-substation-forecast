@@ -151,6 +151,7 @@ nav:
   - ML experiments:
       - Overview: ml-experiments/README.md
       - Data processing: ml-experiments/data-processing.md
+      - Glossary: ml-experiments/glossary.md
       - Calibration and uncertainty:
           - Summary: ml-experiments/themes/calibration-and-uncertainty/index.md
           - Experiments: ml-experiments/themes/calibration-and-uncertainty/experiments.md
@@ -164,6 +165,7 @@ nav:
           - Experiments: ml-experiments/themes/demand-inputs/experiments.md
           - Research plan: ml-experiments/themes/demand-inputs/plan.md
       - Differentiable physics:
+          - Background: ml-experiments/themes/differentiable-physics-background.md
           - Demand, calendar, and weather:
               - Summary: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/experiments.md

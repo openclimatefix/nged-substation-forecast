@@ -11,6 +11,7 @@ written once, against a day-ahead initialisation at 09:00 UTC on the previous da
 one.
 """
 
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal
@@ -70,6 +71,30 @@ TELEMETRY_DELAY_STEPS: Final[int] = 7
 """A reading is usable once it is 3.5 hours old: 7 half-hours."""
 STEPS_PER_DAY: Final[int] = 48
 STEPS_PER_WEEK: Final[int] = 7 * STEPS_PER_DAY
+
+
+GAM_ARMS: Final[tuple[str, ...]] = ("g1", "g_all", "g_all_d1", "g_all_d1_steps")
+"""The convex-model arms, whose stored quantiles depend on how the spread was fitted."""
+SPREAD: Final[Literal["centred", "uncentred"]] = (
+    "uncentred" if os.environ.get("E104_SPREAD") == "uncentred" else "centred"
+)
+"""Which spread the report reads for the convex-model arms. `E104_SPREAD=uncentred` reads the sets
+the first run stored (raw replica quantiles, which carry the replica year's mean bias)."""
+
+
+def stored_name(*, name: str) -> str:
+    """Return the stored set's name for an arm, given the chosen spread.
+
+    Args:
+        name: An arm name such as `g1`, `cold_g_all`, or `x_12`.
+
+    Returns:
+        The same name for a non-GAM arm or for the uncentred spread, else the name with the
+        `_centred` suffix.
+    """
+    if SPREAD == "uncentred" or name.removeprefix("cold_") not in GAM_ARMS:
+        return name
+    return f"{name}_centred"
 
 
 def load_cache() -> FeatureCache:

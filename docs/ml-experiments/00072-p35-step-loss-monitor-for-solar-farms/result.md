@@ -100,6 +100,11 @@ headline: >-
   interval -0.015 to +0.090). Change-point monitor minus the hysteresis rule: +0.050 (-0.010 to
   +0.105). False alarms: 0.29 per farm-year on the scored placebo and 0.54 on the unmodified
   record.
+take_home_message: >-
+  A change-point monitor of a solar farm's daily output found 0.84 of 25% losses lasting 90 days
+  and 0.45 of those lasting 30 days, below the 0.80 the plan needed, so the verdict is refuted. On
+  10% losses it did not beat a rolling median by an interval that excludes zero (+0.045, 97.5%
+  interval -0.015 to +0.090).
 lessons: >-
   The daily signal of a solar farm wanders by 6% to 11% (robust standard deviation) and the 5 farms
   average 3.1 valid days a week from April to September and 2.0 from October to March. A 30-day loss

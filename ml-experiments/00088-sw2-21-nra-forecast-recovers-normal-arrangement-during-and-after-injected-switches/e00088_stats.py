@@ -49,7 +49,7 @@ ARMS: Final[dict[str, str]] = {
     "arm4_cmax": "nra_xl_cmax",
     "arm5": "ceiling",
 }
-"""The brief's arm numbers (1 plain, 2 lag correction, 3 oracle-trained NRA, 4 XL-trained NRA, 5
+"""The brief's arm numbers (1 plain, 2 lag correction, 3 oracle-trained NRA, 4 RO-NC-trained NRA, 5
 ceiling) and the variant of `e00088_cases.py` that each is."""
 
 

@@ -32,7 +32,7 @@ LABELS: Final[dict[str, str]] = {
     "PF14": "PF14: the single-series detector (benchmark)",
     "X": "X: refit-offset step statistic (experiment 71)",
     "LOGIT_SAME": "LOGIT_SAME: same-sign neighbour count (experiment 70)",
-    "XL": "XL: both together",
+    "XL": "RO-NC: both together",
 }
 COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN, ocf.DATA_PURPLE]
 POPULATIONS: Final[dict[str, str]] = {

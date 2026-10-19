@@ -6,17 +6,18 @@ also_relevant_to: []
 status: done
 size: medium
 take_home_message: >-
-  A probability built from the causal switching detector beat the detector's yes-or-no flag only on
-  injected transfers large enough to see (Brier score 11.2% lower, interval -20.3% to -2.0%).
-  Against NGED's switching logs it has almost no skill (area under the curve 0.52 to 0.53), so a
+  A probability built from the causal switching detector was not shown to beat the detector's
+  yes-or-no flag: on the planned rows its Brier score was 3.3% lower (97.5% interval -7.6% to +1.6%),
+  against the 20% the plan required. Only in a post hoc subset of injected transfers large enough to
+  see was the gain 11.2% (-20.3% to -2.0%). Against NGED's switching logs it has almost no skill
+  (area under the curve 0.52 to 0.53), so a
   rule that widened the uncertainty bands when the probability is high would cover only about 8% of
   the half-hours that the logs mark as switching.
 hypothesis: >-
-  The refit-offset neighbour-count detector (RO-NC, called XL on the pages of experiments 70, 71,
-  and 82), run causally (with only the data before a forecast origin), can give for each past
-  half-hour in the lag window a probability that the half-hour lies inside an abnormal running
-  arrangement (ARA). The probability is calibrated, and it separates better than the detector's
-  yes-or-no flag.
+  The refit-offset neighbour-count detector (RO-NC), run causally (with only the data before a
+  forecast origin), can give for each past half-hour in the lag window a probability that the
+  half-hour lies inside an abnormal running arrangement (ARA). The probability is calibrated, and it
+  separates better than the detector's yes-or-no flag.
 prediction: >-
   Isotonic calibration fitted on injected transfers that start in odd calendar months gives a
   reliability curve within 0.1 of the diagonal on injected transfers that start in even months. The
@@ -82,12 +83,12 @@ adopted_in: none
 
 **Take-home message: a probability built from the causal switching detector is not reliably better
 than the detector's yes-or-no flag, and against NGED's switching logs it has almost no skill.** The
-detector is called RO-NC here (the refit-offset neighbour-count detector, called XL in experiments
-70, 71, and 82) and is "causal" because it sees only data before the forecast origin. A rule that
-widened the forecast's uncertainty bands whenever the probability is high would widen them for only
-about 8% of the half-hours that NGED's logs mark as switching. The probability beats the flag only
-for injected transfers large enough for the detector to see. One option for a later experiment is a
-warning signal that needs no switching label, such as how unusual the recent power readings are.
+detector is called RO-NC here (the refit-offset neighbour-count detector) and is "causal" because it
+sees only data before the forecast origin. A rule that widened the forecast's uncertainty bands
+whenever the probability is high would widen them for only about 8% of the half-hours that NGED's
+logs mark as switching. The probability beats the flag only for injected transfers large enough for
+the detector to see. One option for a later experiment is a warning signal that needs no switching
+label, such as how unusual the recent power readings are.
 
 An abnormal running arrangement (ARA) is a period when a network operator has closed a normally
 open switch, so that one Primary substation (a substation that steps down to the local
