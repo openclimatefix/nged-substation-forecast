@@ -838,6 +838,37 @@ def prepare_fit(
     return layout, index
 
 
+def check_pinned_capacity(
+    *,
+    capacity: CapacityType,
+    pinned: PinnedCapacity | None,
+    site: str,
+    features: SiteFeatures,
+    cut: datetime,
+) -> None:
+    """Raise unless a pinned capacity is given exactly when the capacity is pinned, for this fit.
+
+    Args:
+        capacity: The spec's capacity mode.
+        pinned: The pinned capacity given to the fit, or `None`.
+        site: The substation's label.
+        features: The substation's arrays.
+        cut: The fit's cut.
+
+    Raises:
+        ValueError: If the pinned capacity is missing, unexpected, or built for another
+            substation or cut.
+    """
+    if (pinned is not None) != (capacity == "pinned"):
+        msg = "a pinned capacity is required exactly when the specs pin the capacity"
+        raise ValueError(msg)
+    if pinned is not None and (pinned.cut != cut or pinned.site != features.table.site):
+        msg = (
+            f"the pinned capacity was built for {pinned.site} at {pinned.cut}, not {site} at {cut}"
+        )
+        raise ValueError(msg)
+
+
 def fit_gam(
     *,
     cache: FeatureCache,
@@ -884,14 +915,9 @@ def fit_gam(
     if len(structure) != 1:
         msg = "all specs of one call must share a drift form, capacity mode, COVID flag, and knot"
         raise ValueError(msg)
-    if (pinned is not None) != (specs[0].capacity == "pinned"):
-        msg = "a pinned capacity is required exactly when the specs pin the capacity"
-        raise ValueError(msg)
-    if pinned is not None and (pinned.cut != cut or pinned.site != features.table.site):
-        msg = (
-            f"the pinned capacity was built for {pinned.site} at {pinned.cut}, not {site} at {cut}"
-        )
-        raise ValueError(msg)
+    check_pinned_capacity(
+        capacity=specs[0].capacity, pinned=pinned, site=site, features=features, cut=cut
+    )
     layout, index = prepare_fit(
         cache=cache,
         site=site,
@@ -1159,6 +1185,36 @@ def replica_cut(*, cut: datetime) -> datetime:
     return _months_before(moment=cut, months=REPLICA_MONTHS)
 
 
+def replica_rows(
+    *, cache: FeatureCache, site: str, fit_cut: datetime, cut: datetime, drop_switching: bool = True
+) -> np.ndarray:
+    """Return the rows a replica fit's residuals are taken over.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        fit_cut: The replica fit's cut.
+        cut: The final fit's cut.
+        drop_switching: True to leave out the rows inside the switching masks.
+
+    Returns:
+        The rows that have a reading and finite inputs, end after the replica's cut and after the
+        substation's first usable instant, and end no later than the final cut.
+    """
+    features = cache.sites[site]
+    keep = (
+        features.present
+        & (~features.switching_mask | (not drop_switching))
+        & np.isfinite(features.y)
+        & np.isfinite(features.pv_unit_shape)
+        & np.isfinite(features.smoothed_temperature_c).all(axis=1)
+        & (cache.end_times > naive_utc(moment=fit_cut))
+        & (cache.end_times > naive_utc(moment=features.table.first_usable))
+        & (cache.end_times <= naive_utc(moment=cut))
+    )
+    return np.flatnonzero(keep)
+
+
 def replica_residuals(
     *,
     cache: FeatureCache,
@@ -1216,17 +1272,9 @@ def replica_residuals(
         season_years=season_years,
         pinned=pinned,
     )
-    keep = (
-        features.present
-        & (~features.switching_mask | (not drop_switching))
-        & np.isfinite(features.y)
-        & np.isfinite(features.pv_unit_shape)
-        & np.isfinite(features.smoothed_temperature_c).all(axis=1)
-        & (cache.end_times > naive_utc(moment=fit_cut))
-        & (cache.end_times > naive_utc(moment=features.table.first_usable))
-        & (cache.end_times <= naive_utc(moment=cut))
+    index = replica_rows(
+        cache=cache, site=site, fit_cut=fit_cut, cut=cut, drop_switching=drop_switching
     )
-    index = np.flatnonzero(keep)
     predicted = predict_gam(cache=cache, fit=fit, index=index)
     return ReplicaResiduals(
         residuals=features.y[index] - predicted,
