@@ -1,6 +1,6 @@
 """Print every number the write-up of experiment 82 quotes, and the verdict the decision rule gives.
 
-Reads the tables that `e00098_run.py` wrote: MW-weighted recall of PF14, X, LOGIT_SAME, and XL on
+Reads the tables that `e00098_run.py` wrote: MW-weighted recall of PF14, X, LOGIT_SAME, and RO-NC on
 the fresh headline-band and long draws, by injection shape, with month-resampled intervals; the
 planned contrasts C1, C2, and C3; recall by donor step; the labelled real transfers; and the alarm
 counts.
@@ -309,19 +309,19 @@ def main() -> None:
         "C2": contrast(frames=base, arm="XL", base="X"),
         "C3": contrast(frames=base, arm="XL", base="LOGIT_SAME"),
     }
-    print("\nPlanned contrasts, XL minus PF14 / X / LOGIT_SAME (98.33% interval, even months)")
+    print("\nPlanned contrasts, RO-NC minus PF14 / X / LOGIT_SAME (98.33% interval, even months)")
     for name, value in c.items():
         print(f"  {name}: {fmt(*value)}")
     print("Descriptive contrasts")
     for label, frames, arm, ref in (
         ("base, X minus PF14", base, "X", "PF14"),
         ("base, LOGIT_SAME minus PF14", base, "LOGIT_SAME", "PF14"),
-        ("long, XL minus PF14", long, "XL", "PF14"),
-        ("long, XL minus X", long, "XL", "X"),
-        ("long, XL minus LOGIT_SAME", long, "XL", "LOGIT_SAME"),
+        ("long, RO-NC minus PF14", long, "XL", "PF14"),
+        ("long, RO-NC minus X", long, "XL", "X"),
+        ("long, RO-NC minus LOGIT_SAME", long, "XL", "LOGIT_SAME"),
     ):
         print(f"  {label}: {fmt(*contrast(frames=frames, arm=arm, base=ref))}")
-    print("XL minus PF14 by shape, base, even months")
+    print("RO-NC minus PF14 by shape, base, even months")
     for shape in SHAPES:
         frame = wide(data=data, shape=shape, population="base", parity="even")
         print(f"  {shape}: {fmt(*contrast(frames=[frame], arm='XL', base='PF14'))}")
@@ -329,7 +329,7 @@ def main() -> None:
     for population in ("base", "long"):
         frames = pooled(data=data, population=population, parity="odd")
         print(
-            f"  {population} odd, XL minus PF14: "
+            f"  {population} odd, RO-NC minus PF14: "
             f"{fmt(*contrast(frames=frames, arm='XL', base='PF14'))}"
         )
     print_by_step(data=data, population="base")

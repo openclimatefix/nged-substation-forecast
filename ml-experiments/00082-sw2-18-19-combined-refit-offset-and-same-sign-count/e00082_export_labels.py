@@ -1,8 +1,8 @@
-"""Export the XL detector's intervals on the real history, for experiment 00086's labels.
+"""Export the RO-NC detector's intervals on the real history, for experiment 00086's labels.
 
-XL (the logistic same-sign score on the refit-offset detector's candidates) is pickled in
+RO-NC (the logistic same-sign score on the refit-offset detector's candidates) is pickled in
 `models.pkl`, whose classes live in `e00082_combined`, so the intervals are written from this
-folder. For each XL alarm the script builds the alarm series' interval with the first-return end
+folder. For each RO-NC alarm the script builds the alarm series' interval with the first-return end
 rule, exactly as `e00082_run.build_detectors` does, and adds one interval for each partner: a
 neighbour whose own 24-hour step has the opposite sign and exceeds `NEIGHBOUR_Z` noise units
 (`e00082_detectors._balance`), whose own level then holds at least half that step for 24 hours
@@ -36,7 +36,7 @@ from e00082_variants import load_both, tracked_relative, variant_inputs
 
 
 def main() -> None:
-    """Write the XL intervals on the real residual panel."""
+    """Write the RO-NC intervals on the real residual panel."""
     panel, offset_panel = load_both()
     scales = all_scales(panel=panel, offset_panel=offset_panel)
     residual, offset = panel["residual"], offset_panel["residual"]
@@ -96,7 +96,7 @@ def main() -> None:
     )
     target = WORK_DIR / "xl_intervals.parquet"
     table.write_parquet(target)
-    print(f"{kept.height} XL alarms -> {table.height} intervals -> {target}")
+    print(f"{kept.height} RO-NC alarms -> {table.height} intervals -> {target}")
     print(
         table.group_by("role").agg(pl.len(), hours=((pl.col("end") - pl.col("onset")).mean() / 2))
     )

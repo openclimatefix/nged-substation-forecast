@@ -7,7 +7,7 @@ Steps:
    per-case scores plus the
    flags `nra` (the valid time is outside every oracle event and every logged closure of the
    series), `lag_oracle` (one of the three lag times is inside an oracle event), and `lag_xl` (one
-   is inside an XL event) to `work/metrics/<arm>.parquet`.
+   is inside an RO-NC event) to `work/metrics/<arm>.parquet`.
 2. `results`: the planned contrasts C1 and C2 at the Bonferroni level, the descriptive contrasts,
    the absolute scores and tail table, and the label coverage counts, in
    `work/results/*.parquet`.
@@ -50,7 +50,7 @@ class Contrast:
         treatment: The arm whose score is differenced.
         reference: The arm it is differenced against.
         subset: `all`, `nra` (rows outside switching), `lag_oracle` (`nra` rows with a lag in an
-            oracle event), `lag_xl` (`nra` rows with a lag in an XL event), or `lag_xl_only`
+            oracle event), `lag_xl` (`nra` rows with a lag in an RO-NC event), or `lag_xl_only`
             (`lag_xl` and not `lag_oracle`).
     """
 

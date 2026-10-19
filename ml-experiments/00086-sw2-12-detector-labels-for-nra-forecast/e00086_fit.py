@@ -14,8 +14,8 @@ Arms:
 - `plain`: nothing removed, nothing added.
 - `lagmw_oracle`: each lag replaced by the lag minus the signed MW that NGED-log-based (oracle)
   events moved at that lag time, plus the three MW columns; trained on all rows.
-- `lagmw_xl`: the same with the XL detector's events and MW.
-- `mask_xl`: training rows whose valid time lies inside an XL event are dropped; nothing else.
+- `lagmw_xl`: the same with the RO-NC detector's events and MW.
+- `mask_xl`: training rows whose valid time lies inside an RO-NC event are dropped; nothing else.
 
     uv run python ml-experiments/00086-*/e00086_fit.py [--workers 4] [--smoke]
 """
@@ -137,7 +137,7 @@ def training_rows(
     Returns:
         The rows keyed by series, run, and valid time, with `ensemble_member`, `power` (in MW),
         the weather columns, the derived columns, `lead_hours`, the three lags, the three signed
-        MW columns of each label source, and `in_event_xl` (the valid time lies inside an XL
+        MW columns of each label source, and `in_event_xl` (the valid time lies inside an RO-NC
         event).
     """
     series_id = row["time_series_id"]
