@@ -454,7 +454,11 @@ def fit_and_score_site(
         replicas = replica_of(
             cache=cache, vintages=vintages, cut=cut, config=config, held_out=None, history=None
         )
-        spread = _centre_spread(replica=replicas[target].residuals)
+        spread = (
+            _centre_spread(replica=replicas[target].residuals)
+            if target in replicas
+            else _pooled_spread(replicas=replicas)
+        )
     else:
         short_replicas = []
         for other in decision_pool:
@@ -531,6 +535,21 @@ def _to_scale(
     rebuilt = rebuilt_effective_capacity_mw(cache=cache, site=other, cut=fit_cut, window=window)
     scale = cache.sites[other].table.effective_capacity_mw / rebuilt
     return replace(replica, residuals=replica.residuals / scale)
+
+
+def _pooled_spread(*, replicas: dict[str, PooledReplica]) -> ResidualSpread:
+    """Return the median-centred spread of every site's replica residuals together.
+
+    A site with no rows at the replica cut (D9 at the replicate cut) has no replica of its own,
+    so it takes the spread of the sites that do.
+    """
+    parts = [replica.residuals for replica in replicas.values()]
+    return ResidualSpread.fit(
+        residuals=np.concatenate([part.residuals for part in parts]),
+        band=np.concatenate([part.band for part in parts]),
+        quarter=np.concatenate([part.quarter for part in parts]),
+        centre=True,
+    )
 
 
 def centred_spread_of(*, replica: ReplicaResiduals) -> ResidualSpread:

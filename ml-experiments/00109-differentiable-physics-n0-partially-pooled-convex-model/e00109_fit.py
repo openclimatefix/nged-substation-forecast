@@ -110,14 +110,15 @@ def catalogue(*, tuned: dict[str, Any], cut_name: str) -> list[arms.ArmConfig]:
     return configs
 
 
-def run_job(job: FitJob) -> tuple[str, pl.DataFrame, dict[str, dict[str, str]]]:
+def run_job(job: FitJob) -> tuple[str, dict[str, dict[str, str]]]:
     """Fit one arm at one cut for every target site.
 
     Args:
         job: The arm and cut.
 
     Returns:
-        The stored set's name, its predictions, and how each target's fit set the capacities.
+        The stored set's name and how each target's fit set the capacities. The worker stores the
+        set itself, so a later failure cannot lose an arm that finished.
     """
     import torch
 
@@ -135,13 +136,16 @@ def run_job(job: FitJob) -> tuple[str, pl.DataFrame, dict[str, dict[str, str]]]:
                 target=site,
                 decision_pool=common.DECISION_SITES,
             )
-        except ValueError as error:
+        except (ValueError, KeyError) as error:
             print(f"{job.cut_name}_{job.config.name} {site}: skipped ({error})", flush=True)
             continue
         frames.append(frame)
         sources[site] = capacity
         print(f"{job.cut_name}_{job.config.name} {site}: {len(frame)} rows", flush=True)
-    return f"{job.cut_name}_{job.config.name}", pl.concat(frames), sources
+    name = f"{job.cut_name}_{job.config.name}"
+    if frames:
+        common.store_arm(name=name, frame=pl.concat(frames))
+    return name, sources
 
 
 def main() -> None:
@@ -157,11 +161,11 @@ def main() -> None:
         FitJob(cut_name=cut_name, config=config)
         for cut_name in arguments.cuts
         for config in catalogue(tuned=tuned, cut_name=cut_name)
+        if not (common.DATA_DIR / "predictions" / f"{cut_name}_{config.name}").exists()
     ]
     capacity_sources = {}
     with ProcessPoolExecutor(max_workers=arguments.workers) as pool:
-        for name, frame, sources in pool.map(run_job, jobs):
-            common.store_arm(name=name, frame=frame)
+        for name, sources in pool.map(run_job, jobs):
             capacity_sources[name] = sources
     (common.WORK_DIR / "capacity_sources.json").write_text(
         json.dumps(capacity_sources, indent=2) + "\n"
