@@ -52,6 +52,7 @@ STATIC_ARMS: Final[tuple[str, ...]] = (
     "a1_fc",
     "a1_cov",
     "a1_smooth",
+    "w_smooth",
     "a1s_smooth",
     "a1_knot_shrunk25",
     "a1_knot_shrunk50",

@@ -96,7 +96,7 @@ def arm_definitions(*, tuned: dict) -> dict[str, ArmDefinition]:
 
     Returns:
         The arms keyed by name: `a0`, `a1`, `a1s`, `w`, `a1_fc`, `a1_cov`, `a1_smooth`,
-        `a1s_smooth`, and one `a1_knot_*` arm per final-knot variant.
+        `w_smooth`, `a1s_smooth`, and one `a1_knot_*` arm per final-knot variant.
     """
     base = GamSpec(
         ridge=DEFAULT_RIDGE,
@@ -117,6 +117,16 @@ def arm_definitions(*, tuned: dict) -> dict[str, ArmDefinition]:
         "w": ArmDefinition(
             "w",
             replace(base, drift="d1" if window["drift"] else "none", final_knot="free"),
+            window_rule,
+        ),
+        "w_smooth": ArmDefinition(
+            "w_smooth",
+            replace(
+                base,
+                drift="d1" if window["drift"] else "none",
+                drift_step=SMOOTH_DRIFT_STEP,
+                final_knot="free",
+            ),
             window_rule,
         ),
         "a1_fc": ArmDefinition("a1_fc", replace(a1, capacity="fitted"), all_years),

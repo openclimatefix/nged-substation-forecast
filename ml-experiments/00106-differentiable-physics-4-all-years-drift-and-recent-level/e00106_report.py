@@ -75,6 +75,8 @@ CONTRASTS: Final[tuple[Contrast, ...]] = (
     Contrast("A1s - A1 (tuned steps)", "a1s", "a1"),
     Contrast("A1s smooth - A1 smooth (steps, Part 2's drift)", "a1s_smooth", "a1_smooth"),
     Contrast("A1 - A1 smooth (drift step 30 against 3000)", "a1", "a1_smooth"),
+    Contrast("Post hoc C1 with smooth drift: A1 smooth - W smooth", "a1_smooth", "w_smooth"),
+    Contrast("Post hoc: A1 smooth - A0", "a1_smooth", "a0"),
     Contrast("A1 shrunk 0.25 - A1", "a1_knot_shrunk25", "a1"),
     Contrast("A1 shrunk 0.50 - A1", "a1_knot_shrunk50", "a1"),
     Contrast("A1 shrunk 0.75 - A1", "a1_knot_shrunk75", "a1"),
