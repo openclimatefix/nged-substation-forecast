@@ -294,7 +294,9 @@ is taken from whichever of two residual models, refitted half a month apart, did
 stepping the same way as the alarming substation ([experiment
 82](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md), [experiment
 101](00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md)). X is the refit-offset
-detector alone.
+detector alone. The experiment scripts under `ml-experiments/` still name RO-NC `XL` in code, for
+example in the arm names `lagmw_xl` and `mask_xl` of experiment 86, so a search of the code for
+`XL` finds the RO-NC detector.
 
 ### Season-year
 
