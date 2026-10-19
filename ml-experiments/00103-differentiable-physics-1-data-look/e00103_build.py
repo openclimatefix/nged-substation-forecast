@@ -9,7 +9,7 @@ the hand-filtered switching mask) and `series_table.parquet`. The checks are pri
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import polars as pl
 from e00103_common import (
@@ -29,6 +29,8 @@ from e00103_common import (
     load_series,
 )
 
+MASK_PADDING = timedelta(hours=24)
+"""Each switching mask extends this far before the onset and after the end."""
 STUCK_RUN_LENGTH = 12
 """A run of this many identical half-hours counts as stuck."""
 
@@ -126,7 +128,8 @@ def add_switching_mask(*, panel: pl.DataFrame) -> pl.DataFrame:
     """Flag `switching_mask` on every series an event touches, from `onset_utc` to `end_utc`.
 
     The labelled set's `onset_utc` and `end_utc` are the power stamps (half-hour ends) of the first
-    and the last affected half-hours, so both are inside the mask.
+    and the last affected half-hours, so both are inside the mask. The mask is padded by 24 hours
+    on each side, because a transfer also moves the donor's solar output.
     """
     events = (
         hand_filtered_events()
@@ -138,8 +141,8 @@ def add_switching_mask(*, panel: pl.DataFrame) -> pl.DataFrame:
         panel.select("time_series_id", "time")
         .join(events, on="time_series_id")
         .filter(
-            pl.col("time") >= pl.col("onset_utc"),
-            pl.col("time") <= pl.col("end_utc"),
+            pl.col("time") >= pl.col("onset_utc") - MASK_PADDING,
+            pl.col("time") <= pl.col("end_utc") + MASK_PADDING,
         )
         .select("time_series_id", "time")
         .unique()

@@ -55,13 +55,13 @@ advice:
     COVID-flag arm, and do not try to detect it: weekday daytime levels sit 5 to 17 percentage
     points above a no-lockdown fit from August 2020 to September 2021 (figure 12).
   - >-
-    Admit all 8 MVA Primaries to Part 3: each holds 0.90 to 0.96 dark site-years in 2023-07 to
-    2025-06, above the 0.5 needed, and 2.36 to 2.68 over all history with the lockdown removed.
+    Admit all 8 MVA Primaries to Part 3: each holds 0.88 to 0.95 dark site-years in 2023-07 to
+    2025-06, above the 0.5 needed, and 2.34 to 2.68 over all history with the lockdown removed.
   - >-
     Count D9 as ineligible for tuning years that start before 2024-07-01 and eligible only
     from 2025-07-01 on (it holds 9.0 months before 2024-07-01 and 21.0 before 2025-07-01).
   - >-
-    Screen generators on rows after the early-calibration cuts and the switching masks: D18's 1.7%
+    Screen generators on rows after the early-calibration cuts and the switching masks: D18's 1.8%
     negative dark share is 0% from its first usable date (figure 9).
   - >-
     Do not read the plan's summer-midday timestamp test as evidence for or against a stamp offset:
@@ -125,36 +125,37 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
   `generator_case` for D15; `mva_dark` for D2, D3, D4, D8, D12, D19, D21, and D22; `excluded` for
   D1, D6, D13, D17, G-a, and G-b.
 - **First usable dates** come from the series design session's review of every series' start,
-  which Part 1 may only move later: D4 2021-05-01, D14 2020-07-01, D12 2020-05-01, D5 2020-02-01, D3
-  2020-01-01, D10 and D21 2019-12-01, D22 2019-11-01, D19 2019-10-15, D16 2021-02-01, D9 2023-10-01,
-  D18 and D15 2025-03-01, and 2019-09-17 at D2, D8, and D11.
-- **D12 keeps the rule's later date.** The review recommends no cut, and the 15-point rule cuts 7.4
-  months (figure 4), so D12 starts 2020-05-01.
-- **Months before a tuning year's first day** (2022-07-01, 2023-07-01, 2024-07-01, 2025-07-01): the
-  six long-history sites hold 12 or more months before 2025-07-01 (D9 21.0). Five hold 12 or more
-  before each of the other three days. D9 holds 9.0 months before 2024-07-01.
-- **Dark site-years per MVA Primary:** 2.44 to 3.27 over all history, 2.36 to 2.68 with the lockdown
-  window removed (20.3 in total), and 0.90 to 0.96 in 2023-07 to 2025-06, Part 3's training window.
-  The share at 16:00 to 21:59 local time is 27.3%, 27.9%, and 27.2% in those three windows.
-- **Row sets:** `dp_mw_v1` holds 513,379 half-hours and `dp_mva_dark_v1` holds 355,473 dark
-  half-hours (`rows.parquet`; rows in the lockdown window or under a switching mask are flagged and
-  left out of both).
+  which Part 1 may only move later: D4 2021-05-01, D14 2020-07-01, D12 2020-05-01, D5 2020-02-01,
+  D3 2020-01-01, D10 and D21 2019-12-01, D22 2019-11-01, D19 2019-10-15, D16 2021-02-01, D9
+  2023-10-01, D18 and D15 2025-03-01, and 2019-09-17 at D2, D8, and D11.
+- **D12 keeps the rule's later date.** The review recommends no cut, and the 15-point rule cuts
+  7.4 months (figure 4), so D12 starts 2020-05-01.
+- **Months before a tuning year's first day** (2022-07-01, 2023-07-01, 2024-07-01, 2025-07-01):
+  the six long-history sites hold 12 or more months before 2025-07-01 (D9 21.0). Five hold 12 or
+  more before each of the other three days. D9 holds 9.0 months before 2024-07-01.
+- **Dark site-years per MVA Primary:** 2.43 to 3.27 over all history, 2.34 to 2.68 with the
+  lockdown window removed (20.1 in total), and 0.88 to 0.95 in 2023-07 to 2025-06, Part 3's
+  training window. The share at 16:00 to 21:59 local time is 27.3%, 27.9%, and 27.2% in those
+  three windows.
+- **Row sets:** `dp_mw_v1` holds 508,341 half-hours and `dp_mva_dark_v1` holds 352,841 dark
+  half-hours (`rows.parquet`; rows in the lockdown window or under a switching mask are flagged
+  and left out of both).
 
 ## Decisions
 
-- **Early-calibration rule.** The rule drops leading months while the night band (00:00 to 04:59) or
-  the weekday daytime band (09:00 to 16:59) differs by more than 15 percentage points from the same
-  month a year later. It cuts D14 9, D12 8, D15 8, D4 3, D18 2, and 1 month at D9, D16, D21, and D22
-  (figure 4).
+- **Early-calibration rule.** The rule drops leading months while the night band (00:00 to 04:59)
+  or the weekday daytime band (09:00 to 16:59) differs by more than 15 percentage points from the
+  same month a year later. It cuts D14 9, D12 8, D15 8, D4 3, D18 2, and 1 month at D9, D16, D21,
+  and D22 (figure 4).
 - **Generator screen** (negative dark share above 1%, run after cuts and masks on MW series only).
   It flags D1 (73%), D6 (26%), D15 (82%), G-a (62%), and G-b (65%). It leaves the other 15
-  Primaries unflagged, among them D18 (0% after its cut, 1.7% before it with 201 of 202 negative
+  Primaries unflagged, among them D18 (0% after its cut, 1.8% before it with 201 of 202 negative
   rows in January 2025), and the bulk supply points D13 (0%) and D17 (0.09%). The MVA Primaries go
   unscreened.
 - **Timestamp, clear-sky hours in April to September.** The mean correlation is most negative at
-  zero shift, because demand falls as irradiance rises (-0.563 before the 2026-03-26 fix and -0.659
-  after). Per site, the peak is at +30 minutes at 6 of 8 before the fix, and at -30 minutes at D5
-  on both sides.
+  zero shift, because demand falls as irradiance rises (-0.563 before the 2026-03-26 fix and
+  -0.659 after). Per site, the peak is at +30 minutes at 6 of 8 before the fix, and at -30 minutes
+  at D5 on both sides.
 - **Timestamp, size of the effect.** The correlation at +30 minutes is weaker than at zero by
   0.007 before the fix and 0.013 after, and at -30 minutes by 0.042 and 0.037. The parabola vertex
   is at +10.6 minutes before the fix and +6.9 after.
@@ -163,8 +164,8 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
   across shifts, so the test cannot locate a peak.
 - **Timestamp, caveats.** The after side holds only April to 10 September 2026 (about 8,170 hourly
   rows), and no known-answer check was run.
-- **Clip** (daytime power flattening above a ceiling): yes at D5 (4 of 7 summers) and D15 (2 of 2),
-  and no at the other six MW Primaries; D14 meets the rule in 1 of 6 summers.
+- **Clip** (daytime power flattening above a ceiling): yes at D5 (4 of 7 summers) and D15 (2 of
+  2), and no at the other six MW Primaries; D14 meets the rule in 1 of 6 summers.
 - **Heating-slope drift** is not detectable. No long-history site has a last-minus-first winter
   difference whose 95% interval excludes zero (D9's runs from -0.06 to +0.26 points per °C). The
   test uses the interval of the difference, which is stricter than the plan's non-overlap test.
@@ -173,21 +174,23 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
   fit and D10 7, but from August 2020 to September 2021 the four sites with 2019 history sit
   mostly 5 to 17 percentage points above it (figure 12). The fit leaves similar excursions in
   months it was fitted on, so the departures show a poor fit as much as drift.
-- **Correlation of monthly levels** across D5, D10, D11, D14, and D16: the mean pairwise correlation
-  is 0.56 for the night band (60 months) and 0.47 for the evening band (17:00 to 20:59; 59 months),
-  and the first principal component holds 66% and 58% of the variance (figure 8).
-- **Switching masks.** 16,963 half-hours on the full grid are masked on the 16 Primaries, 15,522 of
-  them in rows with data, the most at D5 (3,682) and the least at D2 (17). The 66 events start in
-  2022-03, so no mask precedes then.
+- **Correlation of monthly levels** across D5, D10, D11, D14, and D16: the mean pairwise
+  correlation is 0.56 for the night band (60 months) and 0.46 for the evening band (17:00 to
+  20:59; 59 months), and the first principal component holds 66% and 58% of the variance (figure
+  8).
+- **Switching masks.** 28,543 half-hours on the full grid are masked on the 16 Primaries, 26,763
+  of them in rows with data, the most at D5 (5,202) and the least at D2 (113). Each mask runs from
+  24 hours before the onset to 24 hours after the end. The 66 events start in 2022-03, so no mask
+  precedes then.
 
 ## Predictions
 
-- **Held:** the six sites hold 12 months or more before 2025-07-01 and D18 fewer; about 27% of dark
-  half-hours fall at 16:00 to 21:59; the screen flags D1, D6, D15, G-a, and G-b and none of the
-  other 15 Primaries; heating-slope drift is not detectable; D14 and D15 are cut.
+- **Held:** the six sites hold 12 months or more before 2025-07-01 and D18 fewer; about 27% of
+  dark half-hours fall at 16:00 to 21:59; the screen flags D1, D6, D15, G-a, and G-b and none of
+  the other 15 Primaries; heating-slope drift is not detectable; D14 and D15 are cut.
 - **Failed:** the timestamp peak is at zero per site only after the fix at 5 of 8 sites; 13
-  Primaries are cut, not 2; the MVA Primaries hold 2.44 to 3.27 dark site-years with the lockdown
-  kept (24.4 in total), and 5 of 8 are below 3.2; D15's winter night slope is +0.48 points per °C,
+  Primaries are cut, not 2; the MVA Primaries hold 2.43 to 3.27 dark site-years with the lockdown
+  kept (24.3 in total), and 6 of 8 are below 3.2; D15's winter night slope is +0.48 points per °C,
   not within ±0.1; clip is at D5 and D15, not D5 only.
 - **Superseded:** the lockdown prediction, now a fixed window.
 
@@ -232,7 +235,7 @@ keeping, given the correlations above.
   for the correlations, the masks); `rows.parquet` carries `early_cut`; `sites.parquet` carries
   the clip and generator flags; `decisions.json` carries the cut dates, screen flags, dark counts,
   and masks.
-- **Accepted as caveats:** the timestamp stop rule is left to the maintainer, the summer-midday test
-  is reported beside the clear-sky one, and the eligibility count is a proposal.
+- **Accepted as caveats:** the timestamp stop rule is left to the maintainer, the summer-midday
+  test is reported beside the clear-sky one, and the eligibility count is a proposal.
 - **Not changed:** the heating-drift test and the one-criterion generator screen differ from the
   plan, and both follow the series brief or are stricter.
