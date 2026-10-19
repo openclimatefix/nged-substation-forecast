@@ -129,7 +129,7 @@ def causal_array(
         series_id: The series to mark.
         capacity: The series' effective capacity in MW.
         size: The length of the dense grid.
-        merge: `sum` adds overlapping intervals, as the XL training labels do; `max` takes the
+        merge: `sum` adds overlapping intervals, as the RO-NC training labels do; `max` takes the
             step of largest size at each half-hour (a post hoc variant).
 
     Returns:

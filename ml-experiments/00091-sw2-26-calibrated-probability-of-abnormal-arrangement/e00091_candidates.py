@@ -1,9 +1,10 @@
-"""The XL detector run causally, keeping every candidate above a low score floor.
+"""The RO-NC detector run causally, keeping every candidate above a low score floor.
 
-`e00091_causal.causal_intervals` keeps only candidates above the XL threshold. A probability needs
-the weaker candidates too, each with its score, so this module repeats that construction with the
-threshold lowered by `FLOOR_BELOW_THRESHOLD` log-odds and returns the score of every interval's
-alarm. Only residual values before the cut are visible. Nothing here reads a switching log.
+`e00091_causal.causal_intervals` keeps only candidates above the RO-NC threshold. A probability
+needs the weaker candidates too, each with its score, so this module repeats that construction
+with the threshold lowered by `FLOOR_BELOW_THRESHOLD` log-odds and returns the score of every
+interval's alarm. Only residual values before the cut are visible. Nothing here reads a
+switching log.
 """
 
 from dataclasses import dataclass
@@ -20,7 +21,7 @@ from e00091_run_constants import CAP_DAYS, WINDOW
 from e00091_variants import tracked_relative, variant_inputs
 
 FLOOR_BELOW_THRESHOLD: Final[float] = 4.0
-"""Candidates scoring at least this many log-odds below the XL threshold are dropped."""
+"""Candidates scoring at least this many log-odds below the RO-NC threshold are dropped."""
 
 
 @dataclass(frozen=True)
@@ -31,8 +32,8 @@ class Candidate:
         series: The series the interval masks.
         onset: First stamp of the interval.
         end: First stamp after the interval; the cut for an open interval.
-        score: The XL log-odds score of the alarm that started the interval.
-        above_threshold: Whether the score reaches the XL threshold (the binary flag).
+        score: The RO-NC log-odds score of the alarm that started the interval.
+        above_threshold: Whether the score reaches the RO-NC threshold (the binary flag).
         x1: The alarm series' 24-hour step in noise units.
         is_open: True when the interval was assumed to continue.
         return_z: Size in noise units of the step statistic at a closed interval's end, else 0.
@@ -51,7 +52,7 @@ class Candidate:
 def causal_candidates(
     *, state: dict, residual: causal.Arrays, offset: causal.Arrays, cut: int
 ) -> list[Candidate]:
-    """Return every interval above the score floor that XL reports at a cut.
+    """Return every interval above the score floor that RO-NC reports at a cut.
 
     Args:
         state: `e00091_harness.make_state()`.
@@ -150,7 +151,7 @@ def lag_rows(
     """Return one row per (series, lag stamp) with the arms' inputs, from the candidates at a cut.
 
     A candidate covers a lag stamp `t` of its series when `onset <= t < end` (an open interval
-    runs to the cut). The binary flag is true when a covering candidate is above the XL
+    runs to the cut). The binary flag is true when a covering candidate is above the RO-NC
     threshold. The `l_` columns describe the covering candidate with the latest onset, and the
     `b_` columns the covering candidate with the highest score (a post hoc variant). A lag stamp
     after a closed interval's end is not covered by it.
