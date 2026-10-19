@@ -47,6 +47,18 @@ D10_WINDOWS: Final[dict[str, tuple[str, str]]] = {
 }
 """D10's two unlabelled switching windows, dropped from scoring in one robustness row."""
 
+N2L_ARMS: Final[tuple[str, ...]] = (
+    "n2l_htenth_otenth",
+    "n2l_htenth_osame",
+    "n2l_htenth_otenfold",
+    "n2l_hsame_otenth",
+    "n2l_hsame_otenfold",
+    "n2l_htenfold_otenth",
+    "n2l_htenfold_osame",
+    "n2l_htenfold_otenfold",
+)
+"""The N-2lambda arms other than the one equal to N: heating and other `lambda` times these."""
+
 EXPERIMENT_105: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00105-differentiable-physics-3-pooled-and-per-site-demand-model"
 )
@@ -112,6 +124,7 @@ def contrasts() -> tuple[Contrast, ...]:
         Contrast(f"C4 N - {bar}", "n", bar, planned=True),
         Contrast("C5 N-4w - N-full-4w", "n_4w", "n_full_4w", planned=True),
         Contrast("N-full - N", "n_full", "n"),
+        *[Contrast(f"N-2lambda {name.removeprefix('n2l_')} - N", name, "n") for name in N2L_ARMS],
         Contrast("N-4w-pin - G-4w-pin", "n_4w_pin", "g_4w_pin"),
         Contrast("N-4w-cappool - N-4w", "n_4w_cappool", "n_4w"),
         Contrast("N-4w - X-pool-4w", "n_4w", "x_pool_4w"),
@@ -155,6 +168,17 @@ def load_arm(*, label: str, arm: str, drop_switching: bool = True) -> pl.DataFra
         The set with columns `site_name`, `qs`, and `ae` added.
     """
     frame = pl.read_parquet(_folder(label=label, arm=arm) / "predictions.parquet")
+    if arm == "l_2y_d1_105":
+        # Lagged XGBoost has its own initialisation time (00:00 UTC the day before the valid
+        # day). The pooled model has no lags, so its forecast does not depend on the
+        # initialisation: pair on the valid time by giving the reference the 09:00 UTC one.
+        frame = frame.with_columns(
+            power_fcst_init_time=(
+                (pl.col("valid_time") - pl.duration(minutes=30)).dt.truncate("1d")
+                - pl.duration(days=1)
+                + pl.duration(hours=9)
+            )
+        )
     if drop_switching:
         frame = frame.filter(~pl.col("switching_mask"))
     quantiles = frame.select(QUANTILE_COLUMNS).to_numpy().astype(np.float64)
@@ -497,9 +521,22 @@ def decision(*, gate_passed: bool) -> dict[str, object]:
 
 
 def capacity_sources() -> str:
-    """Return how each fit set its capacities, as stored by `e00109_fit.py`."""
+    """Return how the fits of N and N-4w set each site's capacity, one line per cut and site."""
     path = common.WORK_DIR / "capacity_sources.json"
-    return path.read_text() if path.exists() else "{}"
+    if not path.exists():
+        return "none\n"
+    stored = json.loads(path.read_text())
+    lines = ["cut,arm,target,site,source"]
+    for name in sorted(stored):
+        cut, _, arm = name.partition("_")
+        if arm not in ("n", "n_4w", "n_3m"):
+            continue
+        for target, by_site in sorted(stored[name].items()):
+            if arm == "n":
+                lines.extend(f"{cut},{arm},-,{site},{source}" for site, source in by_site.items())
+                break
+            lines.append(f"{cut},{arm},{target},{target},{by_site[target]}")
+    return "\n".join(lines) + "\n"
 
 
 def main() -> None:
@@ -526,7 +563,7 @@ def main() -> None:
     print("== Tail calibration on the five decision sites ==")
     print(tail_table().write_csv(float_precision=4), end="")
     print("== How each fit set its capacities ==")
-    print(capacity_sources())
+    print(capacity_sources(), end="")
 
 
 if __name__ == "__main__":

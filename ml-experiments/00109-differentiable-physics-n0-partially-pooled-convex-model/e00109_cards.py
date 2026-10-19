@@ -19,6 +19,7 @@ import e00109_common as common
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
+import torch
 from studies.dp_calendar import HALF_HOURS_PER_DAY, HEATING_THRESHOLD_C, SMOOTHING_HOURS
 from studies.dp_gam import N_BANDS, GamFit, GamLayout
 from studies.dp_gam_pooled import (
@@ -298,6 +299,7 @@ def short_capacity(*, strength: PoolingStrength, ridge: dict[str, float]) -> dic
 
 def main() -> None:
     """Draw the cards and write their numbers."""
+    torch.set_num_threads(4)
     tuned = json.loads((common.WORK_DIR / "tuned.json").read_text())
     strength = PoolingStrength.uniform(value=tuned["lambda_star"])
     joint, built = fleet_fit(cut_name="scored", strength=strength)

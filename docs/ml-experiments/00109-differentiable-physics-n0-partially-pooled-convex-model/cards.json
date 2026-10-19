@@ -1,0 +1,290 @@
+{
+  "pull": [
+    {
+      "site": "D5",
+      "family": "profile",
+      "pull": 0.28765955624458917
+    },
+    {
+      "site": "D10",
+      "family": "profile",
+      "pull": 0.24824202923741967
+    },
+    {
+      "site": "D11",
+      "family": "profile",
+      "pull": 0.16676396122878034
+    },
+    {
+      "site": "D14",
+      "family": "profile",
+      "pull": 0.20598911964849786
+    },
+    {
+      "site": "D16",
+      "family": "profile",
+      "pull": 0.17441241011315567
+    },
+    {
+      "site": "D5",
+      "family": "holiday",
+      "pull": 0.27748698184491905
+    },
+    {
+      "site": "D10",
+      "family": "holiday",
+      "pull": 0.03264631822046138
+    },
+    {
+      "site": "D11",
+      "family": "holiday",
+      "pull": -0.1479309261430255
+    },
+    {
+      "site": "D14",
+      "family": "holiday",
+      "pull": 0.01530688850395756
+    },
+    {
+      "site": "D16",
+      "family": "holiday",
+      "pull": 0.18085317154591118
+    },
+    {
+      "site": "D5",
+      "family": "tent",
+      "pull": 0.26086256625801296
+    },
+    {
+      "site": "D10",
+      "family": "tent",
+      "pull": 0.31111385654950274
+    },
+    {
+      "site": "D11",
+      "family": "tent",
+      "pull": 0.15185620538937394
+    },
+    {
+      "site": "D14",
+      "family": "tent",
+      "pull": 0.2175967571842342
+    },
+    {
+      "site": "D16",
+      "family": "tent",
+      "pull": 0.349236615079791
+    },
+    {
+      "site": "D5",
+      "family": "harmonics",
+      "pull": 0.17526949555236337
+    },
+    {
+      "site": "D10",
+      "family": "harmonics",
+      "pull": 0.05788570730072207
+    },
+    {
+      "site": "D11",
+      "family": "harmonics",
+      "pull": 0.2133140942028242
+    },
+    {
+      "site": "D14",
+      "family": "harmonics",
+      "pull": 0.430432013917185
+    },
+    {
+      "site": "D16",
+      "family": "harmonics",
+      "pull": 0.34029867226005195
+    },
+    {
+      "site": "D5",
+      "family": "heating",
+      "pull": 0.6190575532868369
+    },
+    {
+      "site": "D10",
+      "family": "heating",
+      "pull": 0.3514777713816719
+    },
+    {
+      "site": "D11",
+      "family": "heating",
+      "pull": 0.49357606913818464
+    },
+    {
+      "site": "D14",
+      "family": "heating",
+      "pull": 0.7240335458485744
+    },
+    {
+      "site": "D16",
+      "family": "heating",
+      "pull": 0.510877571379639
+    },
+    {
+      "site": "D5",
+      "family": "lighting",
+      "pull": 0.5505559725084448
+    },
+    {
+      "site": "D10",
+      "family": "lighting",
+      "pull": 0.17807292608091063
+    },
+    {
+      "site": "D11",
+      "family": "lighting",
+      "pull": 0.5237149700633508
+    },
+    {
+      "site": "D14",
+      "family": "lighting",
+      "pull": 0.7500108078657437
+    },
+    {
+      "site": "D16",
+      "family": "lighting",
+      "pull": 0.6605903131919248
+    }
+  ],
+  "capacity": [
+    {
+      "site": "D5",
+      "source": "Real-time vintage",
+      "points": 62.1176929964184
+    },
+    {
+      "site": "D5",
+      "source": "N-4w fit",
+      "points": 79.28644574740456
+    },
+    {
+      "site": "D5",
+      "source": "G-4w fit",
+      "points": 23.416910046322194
+    },
+    {
+      "site": "D5",
+      "source": "N-3m fit",
+      "points": 70.05801969358093
+    },
+    {
+      "site": "D5",
+      "source": "G-3m fit",
+      "points": 47.0190908109133
+    },
+    {
+      "site": "D10",
+      "source": "Real-time vintage",
+      "points": 51.427507766032754
+    },
+    {
+      "site": "D10",
+      "source": "N-4w fit",
+      "points": 61.29962144922561
+    },
+    {
+      "site": "D10",
+      "source": "G-4w fit",
+      "points": 30.790018296612324
+    },
+    {
+      "site": "D10",
+      "source": "N-3m fit",
+      "points": 69.78013661246212
+    },
+    {
+      "site": "D10",
+      "source": "G-3m fit",
+      "points": 54.91727015940878
+    },
+    {
+      "site": "D11",
+      "source": "Real-time vintage",
+      "points": 32.85790224005115
+    },
+    {
+      "site": "D11",
+      "source": "N-4w fit",
+      "points": 40.798005149157134
+    },
+    {
+      "site": "D11",
+      "source": "G-4w fit",
+      "points": 15.524068972231351
+    },
+    {
+      "site": "D11",
+      "source": "N-3m fit",
+      "points": 36.475290234327325
+    },
+    {
+      "site": "D11",
+      "source": "G-3m fit",
+      "points": 26.835426957992603
+    },
+    {
+      "site": "D14",
+      "source": "Real-time vintage",
+      "points": 29.616729340173908
+    },
+    {
+      "site": "D14",
+      "source": "N-4w fit",
+      "points": 42.71574401652535
+    },
+    {
+      "site": "D14",
+      "source": "G-4w fit",
+      "points": 19.282097591581916
+    },
+    {
+      "site": "D14",
+      "source": "N-3m fit",
+      "points": 43.2504895846134
+    },
+    {
+      "site": "D14",
+      "source": "G-3m fit",
+      "points": 33.19061471778729
+    },
+    {
+      "site": "D16",
+      "source": "Real-time vintage",
+      "points": 43.183487243939524
+    },
+    {
+      "site": "D16",
+      "source": "N-4w fit",
+      "points": 49.5730809923578
+    },
+    {
+      "site": "D16",
+      "source": "G-4w fit",
+      "points": 20.935104612192685
+    },
+    {
+      "site": "D16",
+      "source": "N-3m fit",
+      "points": 48.302833639575574
+    },
+    {
+      "site": "D16",
+      "source": "G-3m fit",
+      "points": 36.24842051947727
+    }
+  ],
+  "capacity_sources": {
+    "D5": "pinned",
+    "D9": "pinned",
+    "D10": "pinned",
+    "D11": "pinned",
+    "D14": "pinned",
+    "D16": "pinned",
+    "D18": "fitted_late_vintage"
+  }
+}
