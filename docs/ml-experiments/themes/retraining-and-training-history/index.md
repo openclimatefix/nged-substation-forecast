@@ -169,8 +169,9 @@ other experiments of the theme are `not-for-production`.
   window's errors moved it by +0.010 and -0.064, post hoc with intervals that include zero
   ([experiment
   23](../../00023-lagged-power-and-error-correction-solar-wind/result.md)). A 7-day window and a
-  multiplicative form were worse than the 14-day additive form, and the correction did not help 4 supply-point series
-  ([experiment 21](../../00021-error-correction-variants-bsp-gsp-demand/result.md)). Re-check with
+  multiplicative form were worse than the 14-day additive form, and the
+  correction did not help 4 supply-point series ([experiment
+  21](../../00021-error-correction-variants-bsp-gsp-demand/result.md)). Re-check with
   another correction window or model.
 - **Report every contrast with and without the series that carries it.** D8 alone gained 2.05
   (experiment 81) and has a 13.1-point old-year gap while the other 12 substations range from 0.0
