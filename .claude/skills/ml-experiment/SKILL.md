@@ -336,6 +336,17 @@ with status `planned`. The overnight session:
   take-home message, then its verdict and link, what failed, and the hypotheses it proposes for the
   next plan.
 
+**Record every new finding about data processing in `docs/ml-experiments/data-processing.md`, in the
+same PR as the write-up.** A finding about data processing is a step that the data needs before a
+model trains or scores on it: a period to cut or mask, a series to exclude, a unit, sign, or
+timestamp convention, a product that cannot be mixed with another, or a check that failed silently.
+Write it as an instruction with a bold lead, followed by where it applies (experiments, production,
+or both), the evidence with a link to the experiment, the series and period it covers, and the
+confidence. Update an existing entry instead of adding a second one, and mark the entry provisional
+until the experiment has had its reviews. A result that contradicts an entry changes the entry in the
+same PR. Keep a rule about how to run an experiment, such as a control arm or a scoring rule, in this
+skill and not on that page.
+
 ## Merging
 
 **An experiment's PR may be merged without waiting for the maintainer when all three hold:** the
