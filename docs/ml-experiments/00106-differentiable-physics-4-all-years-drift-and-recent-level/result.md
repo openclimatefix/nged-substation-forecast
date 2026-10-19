@@ -213,13 +213,20 @@ G-all+D1 (interval -0.125 to +0.367), which fitted its capacity and used a smoot
   (0.059 to 0.142), 5 of 5 substations worse.
 - **The filter works on XGBoost too.** X-best with the filter minus X-best is -0.571 (-1.005 to
   -0.235), 5 of 5. A3 minus X-best with the filter is -0.207 (-0.347 to -0.055), 4 of 5.
-- **Against lagged XGBoost, at leads of 24.5 to 48 hours.** A3 minus lagged XGBoost is -0.138
-  (-0.363 to +0.059), 4 of 5 substations better and 1 worse; the replicate year gives -0.245, 4 of
-  5. At 144.5 to 168 hours it is -0.110 (-0.336 to +0.102), 3 of 5 better; replicate -0.169, 5 of
-  5. The interval includes zero, so the claim is that A3 matches lagged XGBoost. Lagged XGBoost had
-  the same 3.5-hour lag, used ERA5 and CAMS inputs, and had no solar offset (the offset changed
-  nothing when CAMS irradiance is an input, below). A3 has the pinned-capacity solar term; the
-  XGBoost arms do not use it. A1 without the filter is 0.408 worse (-0.022 to +0.825).
+- **Against lagged XGBoost, at leads of 24.5 to 48 hours.** The two arms are compared at the same
+  initialisation, 00:00 UTC on the day before, so the pair is A3 at 2.349 and lagged XGBoost at
+  2.487. The difference is -0.138 (95% interval -0.363 to +0.059): **not significant alone**. It is
+  4 of 5 substations better and 1 worse, D5 is worse in both years, and the difference is -0.523 from
+  November to March and +0.111 from April to October. The replicate year gives -0.245, 4 of 5. At
+  144.5 to 168 hours it is -0.110 (-0.336 to +0.102), 3 of 5 better; replicate -0.169, 5 of 5. The
+  day-ahead 2.29 of A3 is at another lead (15.5 to 39 hours) and is not comparable with 2.487.
+  A1 without the filter is 0.408 worse than lagged XGBoost (-0.022 to +0.825).
+- **What the lagged XGBoost arm is.** It has the same 3.5-hour lag, XGBoost's 12-month window (not a
+  window tuned for it), the default start, and no solar offset, which changed nothing when CAMS
+  irradiance is an input. Its spread is too narrow: q05 coverage is 9.6% to 12.0% and q95 coverage
+  86% to 88%, and widening it would close only 0.02 to 0.05 points of the gap. A3 has the
+  pinned-capacity solar term; the XGBoost arms do not use it. Both arms read ERA5 and CAMS at the
+  target time, so every number here is a ceiling, not a live score.
 
 ## What did not help
 
@@ -244,7 +251,8 @@ G-all+D1 (interval -0.125 to +0.367), which fitted its capacity and used a smoot
 - **The step chosen on 2023-24 sat at a grid edge twice.** The planned grid (300 to 30,000) chose 300,
   and the extended grid chose 30, the lowest value tried. The tuning score changed by 0.04 points from
   100 to 30, mostly at D16.
-- **Out of sample the smooth step won.** A1 minus the arm with Part 2's drift step of 3,000 is +0.078
+- **Out of sample the smooth step won (post hoc arms).** A1 smooth scores 2.817 in the scored year
+  and 2.854 in the replicate year. A1 minus A1 smooth is +0.078
   (-0.157 to +0.332) in the scored year and +0.450 in the replicate year.
 - **With the smooth step the years contrast is near zero.** A1 smooth minus W smooth is +0.022
   (-0.101 to +0.133) in the scored year and -0.087 in the replicate year, 3 of 5 both times (post hoc).
@@ -296,9 +304,12 @@ G-all+D1 (interval -0.125 to +0.367), which fitted its capacity and used a smoot
 
 ## Known-answer gate
 
-All 49 blocking readings pass after four adjustments, which are listed here with the values before
+All 49 blocking readings pass after the adjustments below, which are listed with the values before
 and after. The convex model has no interaction network, so the plan's note about running each test
-with the network on does not apply.
+with the network on does not apply. Two tuning grids were also extended before any scored fit: the
+drift-step grid (the planned grid chose 300, its edge, and the extended grid chose 30, its edge) and
+the step-penalty grid (the planned grid chose 1,000, its edge, and the extended grid still chose
+1,000, with 3,000 and 10,000 giving the same scores).
 
 - **Test 2a, lag of the level behind an injected annual cycle.** First run 91.6 to 96.7 days at the
   five substations against a limit of 7. The cause was a wrong phase reference in the script, not
@@ -310,19 +321,21 @@ with the network on does not apply.
   reading is now the night band only: 0.004, 0.003, 0.008, and 0.011 points. The midday band moves
   by -7.0, -4.5, -3.8, and -5.4 points. The fitted-capacity arm recovered 0.91 to 0.96 of the
   injected capacity (limit 0.75 to 1.25). The farm is synthetic.
-- **Test 1, steps.** The tuned A1s has no steps, so it cannot place one: the step columns sum to 0.0
-  against a true step of 8. The blocking check moved to arm A1s smooth (drift step 3,000, step
-  penalty 100). With a penalty of 300, the step columns carried 4.1 to 5.7 points and the level path
-  5.6 to 6.0 (limit 6 to 10), which failed. With a penalty of 100 the level path rises 7.2 to 7.4 in
-  every band at both step series. The tuned arm's level path (drift plus steps) rises 5.9 to 6.8
-  and is reported, not blocking. The drift paths are recovered within 0.14 to 0.93 points
+- **Test 1, steps.** The tuned A1s has no steps, so the step columns sum to 0.0 against a true step
+  of 8, and its level path (drift plus steps) rises 5.94 and 5.90 in two hour bands at the first
+  step series against a floor of 6.0. The blocking check moved to arm A1s smooth (drift step 3,000,
+  step penalty 100), and the check reads the rise of the level path, not the step columns. With a
+  penalty of 300, the step columns carried 4.1 to 5.7 points and the level path 5.6 to 6.0 (limit 6
+  to 10), which failed. With a penalty of 100 the level path rises 7.2 to 7.4 in every band at both
+  step series. The tuned arm's level path rises 5.9 to 6.8 and is reported, not blocking. The drift paths are recovered within 0.14 to 0.93 points
   root mean square (limit 1.5), and the no-drift series adds 0.0 of steps.
 - **Test 3, injected transfers.** The script cannot import experiment 43's injection harness, so a
-  compact injector with the same shapes was written. The median share of the moved power that the
+  compact injector with the same shapes was written. It covers 24 injected transfers and the 4 real
+  ones, where the plan asked for the 66 real hand-filtered transfers; most of those are at other
+  substations or shorter than three days. The median share of the moved power that the
   filter's state carries is 0.94 by the end of day 2 (limit 0.5), 0.94 from day 2 to the end (limit
-  0.6 to 1.3), and 0.004 three days after the end (limit 0.25), over 24 transfers. The real
-  hand-filtered transfers of three days or more at these donors number 4 and are reported in
-  `gate.txt`, not scored.
+  0.6 to 1.3), and 0.004 three days after the end (limit 0.25), over 24 transfers. The 4 real
+  transfers are reported in `gate.txt`, not scored.
 
 ## Caveats
 
