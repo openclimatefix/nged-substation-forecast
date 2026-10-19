@@ -114,6 +114,13 @@ class PinnedCapacity:
 def _fill_unobserved(*, capacity: np.ndarray, unobserved: np.ndarray) -> np.ndarray:
     """Hold the last observed value through unobserved weeks; leading ones take the first observed.
 
+    Args:
+        capacity: The weekly capacity in points.
+        unobserved: True for a week with no usable observation.
+
+    Returns:
+        The capacity with every unobserved week filled.
+
     Raises:
         ValueError: If no week is observed.
     """

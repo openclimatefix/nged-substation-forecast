@@ -188,6 +188,11 @@ def _kalman_band(
     The state moves by the exact discretisation of the random walk and the AR(1) over the gap in
     half-hours between readings, so a band's daily gap needs no placeholder rows.
 
+    Args:
+        positions: The grid positions of the band's readings, ascending.
+        values: The residual at each position, in points.
+        hyper: The site's hyperparameters.
+
     Returns:
         The level and the transient after each reading, and the log likelihood.
     """
@@ -345,7 +350,13 @@ def day_ahead_initialisation(*, end_times: np.ndarray, days_ahead: int) -> np.nd
 
 
 def lead_band_of_days_ahead(*, days_ahead: int) -> int:
-    """Return the lead band of a number of days ahead: 0 for day 1, 1 for days 2 to 3, 2 for 4 to 7.
+    """Return the lead band of a number of days ahead.
+
+    Args:
+        days_ahead: How many days before the valid day the forecast is made.
+
+    Returns:
+        0 for day 1, 1 for days 2 to 3, and 2 for days 4 to 7.
 
     Raises:
         ValueError: If `days_ahead` is outside 1 to 7.
