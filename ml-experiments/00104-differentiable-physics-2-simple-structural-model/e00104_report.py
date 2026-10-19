@@ -513,7 +513,10 @@ def print_spread_bias() -> None:
 
     The uncentred sets (the first run's) add the replica year's mean bias to every quantile.
     """
-    print("\n== 12. The replica's mean bias as its own arm: uncentred minus centred spread ==")
+    print(
+        "\n== 12. The replica's mean bias as its own arm: uncentred minus centred spread =="
+        "\n(scores: five sites, rows outside the switching masks; q50 shifts: all rows)"
+    )
     sites = common.ELIGIBLE_SITES
     for name in common.GAM_ARMS:
         centred = pl.read_parquet(
@@ -598,6 +601,76 @@ def print_d10_window(*, arms: dict[str, pl.DataFrame]) -> None:
         print(f"  {treatment} - {reference}: {fmt(result)}")
 
 
+LEAVE_ONE_OUT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("g_all_d1", "g1"),
+    ("g1", "x_12am"),
+    ("g_all_d1", "x_allam"),
+    ("g_all", "g1"),
+    ("g_all_d1", "g_all"),
+)
+
+
+def print_checks_for_audit(*, arms: dict[str, pl.DataFrame]) -> None:
+    """Print the spread-free and leave-one-out checks of the `ml-experiment` skill's audit rule.
+
+    The error of the central forecast is the absolute error of the convex model's mean and of
+    XGBoost's median, so it does not depend on the spread. Each contrast is also repeated with one
+    decision site left out.
+    """
+    print("\n== 14. Checks: error of the central forecast, and leaving one site out ==")
+    print("median forecast minus mean forecast, headline rows, mean per site (points):")
+    for name in common.GAM_ARMS:
+        frame = arms[name].filter(pl.col("site").is_in(common.SCORED_SITES))
+        shift = dict(
+            frame.group_by("site")
+            .agg((pl.col("q50") - pl.col("mean")).mean())
+            .sort("site")
+            .iter_rows()
+        )
+        print(f"  {name:16}" + ", ".join(f"{k} {v:+.2f}" for k, v in shift.items()))
+    central = {}
+    for name, frame in arms.items():
+        column = "mean" if name in common.GAM_ARMS else "q50"
+        central[name] = frame.with_columns(
+            score=(pl.col("actual") - pl.col(column)).abs().cast(pl.Float64)
+        )
+    print("mean absolute error of the central forecast, five sites (GAM mean, XGBoost median):")
+    for name in ("g1", "g_all", "g_all_d1", "g_all_d1_steps", "x_12", "x_all", "x_12amq"):
+        mae = central[name].filter(pl.col("site").is_in(common.ELIGIBLE_SITES))["score"].mean()
+        print(f"  {name:16}{mae:8.3f}")
+    print("contrasts on the error of the central forecast (95% interval), five sites:")
+    for treatment, reference in LEAVE_ONE_OUT_CONTRASTS:
+        error = contrast(
+            arms=central,
+            treatment=treatment,
+            reference=reference,
+            sites=common.ELIGIBLE_SITES,
+            level=None,
+        )
+        quantile = contrast(
+            arms=arms,
+            treatment=treatment,
+            reference=reference,
+            sites=common.ELIGIBLE_SITES,
+            level=None,
+        )
+        print(
+            f"  {treatment} - {reference}: error {error['estimate']:+.3f} "
+            f"({error['low']:+.3f} to {error['high']:+.3f}); quantile score "
+            f"{quantile['estimate']:+.3f}"
+        )
+    print("leaving one decision site out, quantile score, point estimate and sites better:")
+    for treatment, reference in LEAVE_ONE_OUT_CONTRASTS:
+        cells = []
+        for left_out in common.ELIGIBLE_SITES:
+            kept = tuple(site for site in common.ELIGIBLE_SITES if site != left_out)
+            result = contrast(
+                arms=arms, treatment=treatment, reference=reference, sites=kept, level=None
+            )
+            cells.append(f"without {left_out} {result['estimate']:+.3f}")
+        print(f"  {treatment} - {reference}: " + "; ".join(cells))
+
+
 def main() -> None:
     """Print the whole report."""
     arms = {name: load_arm(name=name) for name in MAIN_ARMS}
@@ -625,6 +698,7 @@ def main() -> None:
     print_lagged(arms=arms)
     print_spread_bias()
     print_d10_window(arms=arms)
+    print_checks_for_audit(arms=arms)
     print("\nAll-rows scores (including rows inside the switching masks), decision set of five:")
     for name in MAIN_ARMS:
         frame = load_arm(name=name, headline=False)
