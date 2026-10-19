@@ -182,7 +182,7 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime) -> pl.DataFrame:
         The rows within the refit's window that were known at the refit.
 
     Raises:
-        ValueError: If no row is usable, or a kept row breaks the valid-time or run-start rule.
+        ValueError: If no row is usable.
     """
     latest_valid = refit - REFIT_CUTOFF_AGE
     known = rows.filter(
@@ -190,11 +190,8 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime) -> pl.DataFrame:
         & (pl.col("valid_time") > refit - timedelta(days=WINDOW_DAYS))
         & (pl.col("power_fcst_init_time") <= refit)
     )
-    too_new = known.filter(
-        (pl.col("valid_time") > latest_valid) | (pl.col("power_fcst_init_time") > refit)
-    ).height
-    if known.is_empty() or too_new:
-        msg = f"refit {refit}: no usable rows or a row from after the refit"
+    if known.is_empty():
+        msg = f"refit {refit}: no usable rows"
         raise ValueError(msg)
     return known
 

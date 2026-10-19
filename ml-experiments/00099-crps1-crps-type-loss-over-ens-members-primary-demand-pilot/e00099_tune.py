@@ -1,6 +1,7 @@
 """Tune the constant Hessian of the custom objectives on a held-out stretch of the training period.
 
-Nothing from the validation year (2025-07-01 onward) is read. Each arm is fitted at a refit on
+Nothing from the validation year (2025-07-01 onward) enters a fit or a score. The loader reads
+those rows into memory, and `known_rows` drops them before the fit. Each arm is fitted at a refit on
 2025-01-01 on the rows of runs whose date is a multiple of three days after 2024-04-01, as in the
 main fits, and scored on the 6-member rows of the runs one day later, from 2025-01-02 to 2025-03-31,
 which the fit has not seen. The held-out rows are pooled over their 6 members with the arm's masses.
