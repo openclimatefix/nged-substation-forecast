@@ -46,9 +46,9 @@ calibration to history, not a saving.
 
 **The two arms are experiment 84's, and match the glossary entries only in part.** The stack is the
 substation forecast fitted once and corrected from its own recent errors, with a generator forecast
-fitted once; it has no half-life. The best guess (weekly retrained) is the substation forecast
-retrained every week with each generator forecast retrained monthly. Experiment 84 does not state
-whether either arm applies the glossary's spread factor of 1.15.
+fitted once. The best guess (weekly retrained) is the substation forecast retrained every week
+with each generator forecast retrained monthly. Experiment 84 does not state whether either arm
+applies a half-life or the glossary's spread factor of 1.15.
 
 ![Avoidable cost per arm at three scaled limits](../../00084-substation-limit-curtailment-cost-worked-example/figure_4_avoidable_cost.svg)
 
