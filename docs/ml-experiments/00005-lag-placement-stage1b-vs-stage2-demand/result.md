@@ -1,6 +1,8 @@
 ---
 id: "00005"
 slug: lag-placement-stage1b-vs-stage2-demand
+theme: lagged-power-and-error-correction
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

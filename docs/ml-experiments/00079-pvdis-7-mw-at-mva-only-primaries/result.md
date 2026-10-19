@@ -1,6 +1,8 @@
 ---
 id: "00079"
 slug: pvdis-7-mw-at-mva-only-primaries
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

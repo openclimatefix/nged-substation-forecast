@@ -1,6 +1,8 @@
 ---
 id: "00010"
 slug: elexon-price-lags-stage1a-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

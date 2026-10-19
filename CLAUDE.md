@@ -433,8 +433,9 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
 - **GitHub** (issues + the OCF Project board) is the *complete, ordered* task list for the
   production code — task-level priority for that code lives only there. When current priorities
   matter, query it with `gh` (epics map 1:1 to roadmap milestones; dependencies are `blocked by`
-  issue links). The exception is ml-experiments: the research plan in `docs/ml-experiments/` owns
-  their queue and order, because experiments finish too quickly for GitHub issues to keep up.
+  issue links). The exception is ml-experiments: the Research plan page of each theme under
+  `docs/ml-experiments/themes/` owns that theme's queue and order, because experiments finish too
+  quickly for GitHub issues to keep up.
 - **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics sit
   inside each page under an "Implementation details (deleted when this ships)" section.
 - **`docs/design-philosophy/engineering-hypotheses.md`** holds the falsifiable claims the

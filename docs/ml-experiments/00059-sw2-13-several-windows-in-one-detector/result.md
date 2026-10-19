@@ -1,8 +1,14 @@
 ---
 id: "00059"
 slug: sw2-13-several-windows-in-one-detector
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Neither the maximum nor the sum of four window lengths found more of the moved power than the
+  24-hour window alone (0.423 and 0.451 against 0.473). Among large transfers with a metered
+  receiver, most misses are an interval end placed outside tolerance and not a missed alarm.
 hypothesis: >-
   One detector that combines the step statistic of experiment 43's detector D0 at windows of
   4, 12, 24, and 48 hours, after calibrating each window to the same false-alarm rate on odd

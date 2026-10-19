@@ -1,6 +1,8 @@
 ---
 id: "00012"
 slug: solar-wind-stage1a-inputs-cams-and-training-start
+theme: generator-forecasting
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-
@@ -97,8 +99,8 @@ block by less than 0.15 points for wind (C10) and unresolved for solar (C9). ENS
 Centre for Medium-Range Weather Forecasts' ensemble forecast, ERA5 is its reanalysis of past
 weather, and CAMS is the Copernicus Atmosphere Monitoring Service's satellite irradiance estimate.
 Arm `w` reproduces experiment 00001's scores exactly (7.641 for solar and 15.386 for wind). The page
-is proposal P17 in the [research plan](../research-plan.md). Stage 1a is an XGBoost model per series
-that turns weather into power.
+is proposal P17 in the [research plan](../themes/generator-forecasting/plan.md). Stage 1a is an
+XGBoost model per series that turns weather into power.
 
 ## Results
 

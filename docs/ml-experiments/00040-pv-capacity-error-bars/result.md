@@ -1,6 +1,8 @@
 ---
 id: "00040"
 slug: pv-capacity-error-bars
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

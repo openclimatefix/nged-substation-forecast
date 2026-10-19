@@ -1,6 +1,8 @@
 ---
 id: "00030"
 slug: lagged-power-feature-sets-primary-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

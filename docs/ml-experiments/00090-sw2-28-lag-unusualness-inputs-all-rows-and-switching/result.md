@@ -1,6 +1,8 @@
 ---
 id: "00090"
 slug: sw2-28-lag-unusualness-inputs-all-rows-and-switching
+theme: switching-labels-in-the-forecast
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-
