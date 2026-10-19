@@ -76,7 +76,7 @@ Alphabetical in the nav. Experiment numbers are first-pass. Each id has exactly 
 - **Calibration and uncertainty:** 2, 16, 20, 35, 80, 97, 99 (and 100 when its write-up lands)
 - **Curtailment cost:** 83, 84
 - **Demand inputs:** 6, 10, 11, 15, 25, 27, 28, 30, 31, 74, 94
-- **Differentiable physics:** a nav group only. Sub-themes (demand: calendar and weather; pooling and long history; embedded generation; forecast engine; network) get a flat folder and slug when each has its first experiment.
+- **Differentiable physics:** a nav group only. Sub-themes (demand: calendar and weather; pooling across substations; long history and drift; embedded generation; forecast engine; network, reserved) get a flat folder and slug when each has its first experiment.
 - **Generator forecasting (solar and wind farms):** 12, 23, 26, 29, 52, 54, 57, 72
 - **Hierarchy and pooling:** 24, 32, 36
 - **Lagged power and error correction:** 5, 8, 18, 21
