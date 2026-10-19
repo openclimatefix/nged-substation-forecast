@@ -43,6 +43,7 @@ from studies.dp_gam import (
     GamFit,
     GamLayout,
     GamSpec,
+    ReplicaResiduals,
     TrainingWindow,
     derated_unit_shape,
     design_matrix,
@@ -50,6 +51,8 @@ from studies.dp_gam import (
     penalty_matrix,
     predict_gam,
     prepare_fit,
+    replica_cut,
+    replica_rows,
     solve_bounded_quadratic,
 )
 from studies.dp_operator import (
@@ -283,6 +286,60 @@ def fit_gam_through_meter(
         loss=loss,
         starts=tuple(summaries),
         demand_columns=problem.demand_mask,
+    )
+
+
+def meter_replica_residuals(
+    *,
+    cache: FeatureCache,
+    site: str,
+    spec: GamSpec,
+    cut: datetime,
+    window: TrainingWindow,
+    season_years: Sequence[int],
+    qmode: QModeType,
+    drop_switching: bool = True,
+) -> ReplicaResiduals:
+    """Return the residuals of a replica of a meter fit: `|S|` minus the predicted `|S|`.
+
+    The replica is the same fit 12 months before the cut, frozen and used to predict the 12 months
+    that follow, exactly as `studies.dp_gam.replica_residuals` does for a signed series.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        spec: The penalties.
+        cut: The cut of the final fit.
+        window: The window rule.
+        season_years: The season-years with a capacity increment.
+        qmode: `zero` or `learned`.
+        drop_switching: True to leave out the rows inside the switching masks.
+
+    Returns:
+        The residuals, with the bands, quarters, and rows of the replica year.
+    """
+    fit_cut = replica_cut(cut=cut)
+    meter = fit_gam_through_meter(
+        cache=cache,
+        site=site,
+        spec=spec,
+        cut=fit_cut,
+        window=window,
+        season_years=season_years,
+        qmode=qmode,
+    )
+    index = replica_rows(
+        cache=cache, site=site, fit_cut=fit_cut, cut=cut, drop_switching=drop_switching
+    )
+    features = cache.sites[site]
+    predicted = predict_meter(cache=cache, meter=meter, index=index)
+    return ReplicaResiduals(
+        residuals=features.y[index] - predicted.apparent_power,
+        band=cache.calendar.band[index],
+        quarter=cache.calendar.quarter[index],
+        index=index,
+        fit_cut=fit_cut,
+        switching=features.switching_mask[index],
     )
 
 

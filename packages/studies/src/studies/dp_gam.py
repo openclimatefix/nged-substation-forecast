@@ -335,10 +335,13 @@ class TrainingWindow:
             first usable instant.
         months: If set, the window is the last `months` months before the cut and `start` is
             ignored.
+        dark_only: True to train only on the rows whose CAMS irradiance is below 1 W/m², where an
+            MVA substation's reading holds no solar signal.
     """
 
     start: datetime | None = None
     months: int | None = None
+    dark_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -764,6 +767,8 @@ def training_rows(
     else:
         start64 = naive_utc(moment=features.table.first_usable)
     allowed = features.default_rows
+    if window.dark_only:
+        allowed = allowed & features.dark
     if keep_lockdown:
         allowed = allowed | (features.lockdown & features.in_pool & ~features.switching_mask)
     keep = (
@@ -1757,6 +1762,36 @@ def replica_cut(*, cut: datetime) -> datetime:
     return _months_before(moment=cut, months=REPLICA_MONTHS)
 
 
+def replica_rows(
+    *, cache: FeatureCache, site: str, fit_cut: datetime, cut: datetime, drop_switching: bool
+) -> np.ndarray:
+    """Return the grid rows a replica fitted at `fit_cut` predicts: the year up to `cut`.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        fit_cut: The replica fit's cut.
+        cut: The cut of the final fit.
+        drop_switching: True to leave out the rows inside the switching masks.
+
+    Returns:
+        The rows that have a reading and end after both the replica's cut and the substation's
+        first usable instant, and no later than `cut`.
+    """
+    features = cache.sites[site]
+    keep = (
+        features.present
+        & (~features.switching_mask | (not drop_switching))
+        & np.isfinite(features.y)
+        & np.isfinite(features.pv_unit_shape)
+        & np.isfinite(features.smoothed_temperature_c).all(axis=1)
+        & (cache.end_times > naive_utc(moment=fit_cut))
+        & (cache.end_times > naive_utc(moment=features.table.first_usable))
+        & (cache.end_times <= naive_utc(moment=cut))
+    )
+    return np.flatnonzero(keep)
+
+
 def replica_residuals(
     *,
     cache: FeatureCache,
@@ -1814,17 +1849,9 @@ def replica_residuals(
         season_years=season_years,
         pinned=pinned,
     )
-    keep = (
-        features.present
-        & (~features.switching_mask | (not drop_switching))
-        & np.isfinite(features.y)
-        & np.isfinite(features.pv_unit_shape)
-        & np.isfinite(features.smoothed_temperature_c).all(axis=1)
-        & (cache.end_times > naive_utc(moment=fit_cut))
-        & (cache.end_times > naive_utc(moment=features.table.first_usable))
-        & (cache.end_times <= naive_utc(moment=cut))
+    index = replica_rows(
+        cache=cache, site=site, fit_cut=fit_cut, cut=cut, drop_switching=drop_switching
     )
-    index = np.flatnonzero(keep)
     predicted = predict_gam(cache=cache, fit=fit, index=index)
     return ReplicaResiduals(
         residuals=features.y[index] - predicted,

@@ -24,14 +24,17 @@ from studies.dp_gam import (  # noqa: E402
     fit_gam,
     predict_gam,
     prepare_fit,
+    training_rows,
 )
 from studies.dp_meter import (  # noqa: E402
     CAPACITY_START_MULTIPLIERS,
     demand_column_mask,
     fit_gam_through_meter,
+    meter_replica_residuals,
     predict_meter,
 )
 from studies.dp_operator import DEFAULT_EPSILON, tan_phi_from_power_factor  # noqa: E402
+from studies.dp_pinned_capacity import no_solar_capacity  # noqa: E402
 
 CUT: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 SEASON_YEARS: Final[range] = range(2019, 2026)
@@ -236,3 +239,68 @@ def test_a_unity_power_factor_truth_keeps_the_ratio_of_reactive_to_real_power_no
     meter = _meter(cache=cache, qmode="learned")
     assert meter.tan_phi >= 0.0
     assert meter.power_factor <= 1.0
+
+
+def test_the_meter_replica_fits_twelve_months_earlier_and_predicts_only_the_year_after(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, _, _, _ = _cache_with_reading(
+        cache=dp_synthetic_cache, capacity={2020: 8.0, 2022: 10.0, 2023: 5.0}, reactive=False
+    )
+    final_cut = datetime(2025, 7, 1, tzinfo=UTC)
+    replica = meter_replica_residuals(
+        cache=cache,
+        site="S1",
+        spec=SPEC,
+        cut=final_cut,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+        qmode="zero",
+    )
+    assert replica.fit_cut == CUT
+    ends = cache.end_times[replica.index]
+    assert ends.min() > np.datetime64("2024-07-01T00:00", "us")
+    assert ends.max() <= np.datetime64("2025-07-01T00:00", "us")
+    assert np.abs(replica.residuals).mean() < 1.0
+    assert replica.band.shape == replica.residuals.shape
+
+
+def test_a_dark_only_window_trains_on_dark_rows_and_a_zero_capacity_removes_the_solar_term(
+    dp_synthetic_cache: FeatureCache,
+):
+    features = dp_synthetic_cache.sites["S1"]
+    dark = (features.pv_unit_shape < 1e-6) & np.isfinite(features.pv_unit_shape)
+    cache = replace(dp_synthetic_cache, sites={"S1": replace(features, dark=dark)})
+    all_rows = training_rows(
+        features=cache.sites["S1"], cache=cache, cut=CUT, window=TrainingWindow(months=12)
+    )
+    dark_rows = training_rows(
+        features=cache.sites["S1"],
+        cache=cache,
+        cut=CUT,
+        window=TrainingWindow(months=12, dark_only=True),
+    )
+    assert 0 < len(dark_rows) < len(all_rows)
+    assert cache.sites["S1"].dark[dark_rows].all()
+    zero = no_solar_capacity(table=cache.sites["S1"].table, cut=CUT)
+    assert zero.held_points == 0.0
+    assert zero.at_rows(cache=cache, index=dark_rows[:10]) == pytest.approx(0.0)
+    fit = fit_gam(
+        cache=cache,
+        site="S1",
+        specs=[GamSpec(capacity="pinned")],
+        cut=CUT,
+        window=TrainingWindow(months=12, dark_only=True),
+        season_years=SEASON_YEARS,
+        pinned=zero,
+    )
+    sunny = np.flatnonzero(
+        (features.pv_unit_shape > 0.5)
+        & (cache.end_times > np.datetime64("2023-06-01", "us"))
+        & (cache.end_times <= np.datetime64("2024-07-01", "us"))
+    )[:20]
+    reading = predict_gam(cache=cache, fit=fit, index=sunny)
+    demand_only = predict_gam(
+        cache=cache, fit=fit, index=sunny, columns=np.ones(fit.layout.n_columns, dtype=bool)
+    )
+    assert reading == pytest.approx(demand_only)

@@ -211,3 +211,30 @@ def pinned_capacity(*, vintages: pl.DataFrame, table: SiteTable, cut: datetime) 
 def read_vintages() -> pl.DataFrame:
     """Read experiment 45's capacity vintages, the `frozen` variant only."""
     return pl.read_parquet(VINTAGES_PATH).filter(pl.col("variant") == VINTAGE_VARIANT)
+
+
+def no_solar_capacity(*, table: SiteTable, cut: datetime) -> PinnedCapacity:
+    """Return a pinned capacity of zero, for an arm with no solar term.
+
+    A fit with `capacity="pinned"` subtracts the pinned capacity times the unit PV shape, so a zero
+    capacity leaves the fit with demand alone, which is the rule for an MVA substation's dark rows.
+
+    Args:
+        table: The substation's identity.
+        cut: The fit's cut.
+
+    Returns:
+        A capacity of zero points in every week.
+    """
+    first = np.datetime64(table.first_usable.date().isoformat(), "D")
+    first = first - ((first.astype(np.int64) + 3) % 7).astype("timedelta64[D]")
+    return PinnedCapacity(
+        site=table.site,
+        cut=cut,
+        source="vintage",
+        origin=cut.date(),
+        weeks=np.array([first]),
+        points=np.zeros(1),
+        held_points=0.0,
+        n_unobserved=0,
+    )
