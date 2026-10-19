@@ -1,7 +1,7 @@
 ---
 id: "00100"
 slug: drop1-random-lag-dropout-widens-intervals
-status: planned
+status: done
 theme: calibration-and-uncertainty
 also_relevant_to:
   - switching-labels-in-the-forecast
@@ -53,9 +53,164 @@ sizing:
     Yes (augmentation or replacement, per-lag or interval masks, rate), so the design is fixed in
     `opus_design.md`.
   callers_not_nameable: No; the scripts copy experiments 89 and 96 and import reviewed packages only.
+verdict: inconclusive
+best_arm: >-
+  None separable from `plain11` on the planned contrasts. On the 37,394 real half-hours with a masked
+  lag, the 5% to 95% band covered 0.799 (`plain11`), 0.769 (`mask`), 0.802 (`drop10`), and 0.836
+  (`drop30`) of actuals, against a nominal 0.90. On the injected transfers the quantile score was
+  3.790 (`plain11`, contaminated lags), 3.435 (ceiling), 5.149 (`mask`), 4.046 (`drop10`), and 3.770
+  (`drop30`) points of capacity.
+headline: >-
+  P1, `drop10` minus `plain11`, 5% to 95% coverage on real masked rows: +0.003 (98.75% interval
+  -0.093 to +0.101). P2, the same on injected transfers: +0.017 (-0.013 to +0.055). G1, quantile
+  score on injected transfers: +0.256 points (-0.148 to +0.847). G2, quantile score on real rows
+  without a masked lag: +0.017 (-0.013 to +0.046), upper end above the +0.02 guard.
+lessons: >-
+  Random dropout taught the model to use a missing lag without losing accuracy (on injected
+  transfers `drop30` matched `plain11` where `mask` lost 1.36 points), but the band on rows with a
+  masked lag did not widen: its width changed by -0.5 to +1.5 points against a mean of 45.
+  Coverage on real masked rows stayed near 0.80 in every arm.
+advice:
+  - >-
+    Do not expect random lag dropout to widen the 5% to 95% band on rows with a masked lag: width
+    changed by +1.11 points (-1.53 to +3.68) at 10% and -0.50 (-3.85 to +2.64) at 30% (figure 2).
+  - >-
+    If a model must run with lags masked, train it with lags missing on 30% of rows rather than
+    10%: on injected transfers the quantile score fell from +0.26 to -0.02 points against
+    `plain11` (figure 3).
+  - >-
+    Compare any arm that drops event and closure rows from training against a control that keeps
+    them: `mask` alone narrowed the band on ordinary rows by 4% and lowered its coverage from 0.906
+    to 0.894 (figures 2 and 4).
+  - >-
+    Test missingness indicator columns, or a separate uncertainty model for rows with a masked lag,
+    before more dropout rates, because dropout moved the point forecast but not the width (figure
+    2).
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  Training the demand forecast with lags hidden at random did not make its band wider on half-hours
+  where a lag is missing: on real rows the band still covered about 0.80 of actuals, against a
+  nominal 0.90. Dropout did remove the accuracy loss that masking alone causes, so a model run with
+  missing lags can match one that reads contaminated lags. A way to make the band widen has to come
+  from an input that tells the model a lag is missing, or from a separate uncertainty model.
+boosters: data/ml-experiments/00100-drop1-random-lag-dropout-widens-intervals/work/boosters/
 ---
 
 # Experiment 100: does random lag dropout make the demand forecast widen its band when a lag is missing?
+
+**Take-home message: training with lags hidden at random did not make the band wider where a lag is
+missing, so the model's stated uncertainty on those half-hours stayed as it was.** On the 37,394
+real half-hours with a masked lag, the band from the 5% to the 95% quantile covered 0.799 of actuals
+in `plain11` and 0.802 with 10% dropout (change +0.003, 98.75% interval -0.093 to +0.101). A nominal
+band covers 0.90. Dropout did fix a different problem: masking lags without it made the forecast
+worse on injected switching transfers (+1.36 points of capacity), and dropout at a 30% rate brought
+that to -0.02 (95% interval -0.35 to +0.38), the same as the plain model. A forecast that must run
+with missing lags can therefore be trained to do so. The widening has to come from elsewhere, for
+example an input column that flags a missing lag. The verdict is **inconclusive**: the planned
+coverage contrasts did not exclude zero, and the no-harm guard on ordinary rows failed.
+
+An electricity network operator sometimes closes a normally open switch, so that a Primary
+substation carries a neighbour's load for hours or days. We asked whether an XGBoost demand forecast
+for 16 Primary substations, trained with some of its past power readings (lags) set to missing,
+would learn that a missing lag means more uncertainty. Four models were refitted monthly on a
+12-month window: `plain11` (no masking), `mask` (switching half-hours removed from the training
+targets and lags inside a labelled event set to missing), and `drop10` and `drop30`, which add lags
+set to missing inside random intervals during training. Real rows were scored on 292 daily forecast
+runs (July 2025 to June 2026). Injected transfers of known size, from experiment 88, supplied rows
+where the true unmodified series is known.
+
+![Change in band coverage against plain11](figure_1.svg)
+
+![Change in band width against plain11](figure_2.svg)
+
+![Change in quantile score against plain11](figure_3.svg)
+
+![Absolute coverage of the 5% to 95% band](figure_4.svg)
+
+![Coverage on real masked rows by lead time](figure_5.svg)
+
+- **Rows with valid truth.** Real rows whose target lies outside every labelled event and logged
+  closure (2,928,842). Of these, 37,394 have a lag inside a labelled event (masked rows, 81% from
+  three substations, 89% in five months) and 2,891,448 do not (unmasked rows). Real rows with the
+  target inside an event or closure have no valid normal-arrangement truth and are never scored.
+  Point accuracy during a real abnormal arrangement is not a metric.
+- **Injected rows.** 3,000 family A cases (forecast origin inside the transfer; shapes S2, S3, S4,
+  and S6 pooled with equal weight), from every second batch of experiment 88's events, in 10 onset
+  months. Truth is the unmodified series. The lag mask is the injected interval plus the labelled
+  real events (oracle masking).
+- **Arms.** All at seed 0, 150 rounds, learning rate 0.15, half-life 0.5 years, 11 quantile levels,
+  spread factor 1.15, mixture of 51 members (injected cases: 11). `plain11`: all rows, no masking.
+  `mask`: 9% of rows dropped as targets; lags inside a labelled event set to missing in training and
+  test. `drop10` and `drop30`: `mask` plus pseudo-event intervals (durations drawn from the 82
+  labelled events) inside which lags are also set to missing in training only, covering 9.3% to
+  10.1% and 29.3% to 31.1% of each series' training rows. At test time every arm masks only the lags
+  inside a labelled event. The rows and weights of `mask`, `drop10`, and `drop30` are identical (the
+  script checks the row counts).
+- **Reproduction.** `plain11` minus experiment 86's stored `plain` on 2,928,842 shared rows: +0.0000
+  points of quantile score (stored mean 5.408). The masked rows number 37,394, as in experiment 86.
+- **Absolute scores, real masked rows** (`plain11` / `mask` / `drop10` / `drop30`). Quantile score
+  10.726 / 11.820 / 11.718 / 10.291. Coverage of the 5% to 95% band 0.799 / 0.769 / 0.802 / 0.836.
+  Mean width of that band 44.9 / 46.6 / 46.0 / 44.4 points of capacity.
+- **Absolute scores, real unmasked rows.** Quantile score 5.339 / 5.381 / 5.356 / 5.374. Coverage
+  0.906 / 0.894 / 0.893 / 0.892. Width 31.2 / 30.0 / 29.8 / 29.9.
+- **Absolute scores, injected family A** (`plain11` on contaminated lags / ceiling / `mask` /
+  `drop10` / `drop30`). Quantile score 3.790 / 3.435 / 5.149 / 4.046 / 3.770. Coverage 0.906 / 0.938
+  / 0.815 / 0.923 / 0.936. Width 23.6 / 23.2 / 25.7 / 25.0 / 24.3. The plain model with its lags
+  masked (never trained with a missing lag) scored 5.453, covered 0.867, and was 27.6 wide.
+- **Planned contrasts, `drop10` minus `plain11` (98.75%).** P1, coverage on real masked rows: +0.003
+  (-0.093 to +0.101). P2, coverage on injected cases: +0.017 (-0.013 to +0.055). G1, quantile score
+  on injected cases: +0.256 (-0.148 to +0.847). G2, quantile score on real unmasked rows: +0.017
+  (-0.013 to +0.046); its upper end exceeds the +0.02 guard. Width on real unmasked rows: ratio
+  0.956 (0.940 to 0.969), so the guard of at most 1.03 holds, because the band narrowed.
+- **Descriptive contrasts (95%).** On real masked rows `drop30` minus `drop10`: coverage +0.034
+  (+0.000 to +0.069), quantile score -1.43 (-2.67 to -0.28). `drop10` minus `mask`: coverage +0.033
+  (+0.011 to +0.062), quantile score -0.10 (-0.74 to +0.39). On injected cases `drop10` minus `mask`
+  quantile score -1.10 (-1.66 to -0.44), coverage +0.108 (+0.039 to +0.168); `drop30` minus `drop10`
+  -0.28 (-0.41 to -0.17). Injected cases with the target inside the transfer give the same signs
+  (`drop10` minus `plain11`: coverage +0.012, quantile score +0.267). Family B (after the transfer
+  ends): `drop10` minus `plain11` quantile score -0.033 (-0.121 to +0.013).
+- **Tails on real masked rows** (`plain11` / `mask` / `drop10` / `drop30`). Coverage of the 1% to
+  99% band 0.983 / 0.977 / 0.975 / 0.979 (nominal 0.98). Share of actuals above q99 0.0166 / 0.0234
+  / 0.0249 / 0.0208 (nominal 0.01). Pinball loss at q01 0.503 / 0.508 / 0.508 / 0.510 and at q99
+  0.654 / 0.629 / 0.692 / 0.680. Quantiles crossed before sorting in no member forecast, in any arm.
+- **Why the verdict is `inconclusive`.** The planned rule needs P1 and P2 to exclude zero for
+  `supported`, P2 to exclude zero for `small gain`, and P2's upper end below zero or G1's lower end
+  above +0.02 for `refuted`. P2's interval contains zero and G1's lower end is -0.148, so none
+  applies. G2's upper end of +0.046 exceeds the +0.02 guard, so the experiment is flagged
+  `not-for-production`.
+- **A confound the plan did not isolate.** `mask` alone lowered the coverage of the 5% to 95% band
+  on ordinary rows from 0.906 to 0.894 and narrowed it by 4%. The cause is probably the 9% of
+  training rows (event and closure half-hours) dropped as targets, which leaves the model fitted to
+  quieter data. A control that drops the same rows but leaves every lag unmasked would separate the
+  two causes.
+- **Schedule, weather, and lab shortcuts.** Monthly P-roll refits; the dropout contrasts could
+  depend on the cadence only through which refits contain pseudo events. Weather is the forecast's
+  own control-member weather at forecast time. Labels are hindsight labels at training and test, and
+  the injected mask is the true interval, so no arm is a live service. Causal-detector masks and the
+  curtailment-cost metric were not scored (see the changes below).
+- **Caveats.** The real masked rows come from an estimated 15 to 20 events, mostly at three
+  substations, in 10 months, so P1's interval is wide (nearly +/-0.1). The injected cases are 3,000
+  cases from 10 onset months. Coverage is not a proper score: a wider band reaches 0.90 without
+  being better, so every coverage read is beside the quantile score.
+- **Changes made after the plan.** (1) The first fit run failed at one substation, whose 30% pseudo
+  share overshot (0.345), because the bisection over a prefix of intervals jumped over the target.
+  The pseudo-event masks were rebuilt by accepting intervals greedily until the share is within 1.5
+  points, and both dropout arms were refitted (`plain11` and `mask` were kept). (2) The injected
+  scoring ran on shapes S2, S3, S4, and S6 and on every second batch of events, because the full run
+  would have taken more than 12 hours; the planned causal-detector (RO-NC) masks were dropped for
+  the same reason. (3) The `manual_heuristic` and `climatology` reference rows were not scored. (4)
+  The plain model with masked lags was added as a descriptive variant.
+- **Reviews.** One Sonnet code review found no leakage and no bug; it noted that the pseudo-event
+  share is measured on each series' whole training history rather than on each refit's window
+  (accepted: shares are printed per series, and the per-refit share was not computed), and that the
+  same-rows check compares row counts only (accepted as sufficient, since the three arms share one
+  filter). An Opus design review preceded the fits.
+- **What to try next.** Add a missingness indicator column for each lag (so a tree can give a masked
+  lag its own leaf), or fit a separate model of the quantile spread on rows with a masked lag. Test
+  dropout at rates above 30%, since the 30% arm had the higher coverage and the lower quantile score
+  than the 10% arm on both the real masked rows and the injected cases. Run a control that drops the
+  event and closure rows but leaves every lag unmasked.
 
 ## Plan (written before any code ran)
 
