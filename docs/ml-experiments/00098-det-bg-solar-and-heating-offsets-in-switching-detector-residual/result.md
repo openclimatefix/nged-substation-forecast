@@ -1,8 +1,16 @@
 ---
 id: "00098"
 slug: det-bg-solar-and-heating-offsets-in-switching-detector-residual
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Giving the demand forecast behind the switching detector explicit solar and heating corrections
+  did not detectably raise the share of moved power that the detector finds. The solar correction
+  made the summer midday residual 12% smaller at the 5 solar series, but recall moved by only
+  +0.003, because most remaining misses are small transfers from substations whose neighbours are
+  unmetered.
 hypothesis: >-
   The refit-offset neighbour-count switching detector (RO-NC, experiment 82's XL) subtracts a
   lagless XGBoost demand forecast (experiment 17's H0.5, trained on ERA5) from each Primary

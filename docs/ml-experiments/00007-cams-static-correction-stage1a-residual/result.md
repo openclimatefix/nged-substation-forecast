@@ -1,6 +1,8 @@
 ---
 id: "00007"
 slug: cams-static-correction-stage1a-residual
+theme: weather-products-and-blending
+also_relevant_to: [demand-inputs]
 status: done
 size: medium
 hypothesis: >-
@@ -73,13 +75,13 @@ separate the two explanations.
 
 **This is the cheap first test that decides whether to carry out the later steps of proposal P2 (the
 embedded-solar-capacity proposal) in the [research
-plan](../research-plan.md#p2-embedded-solar-capacity-from-lagged-residuals).** The result says
-whether the daytime residual of the stage 1a demand model tracks a fixed error in the ERA5
-irradiance input (the sunlight estimate that stage 1a was trained on), or a change in embedded solar
-capacity that a correction with fixed coefficients cannot follow. The plan was committed before the
-code ran; the Results section reports the run. ERA5 is a reanalysis, an estimate of past weather.
-Stage 1a is an XGBoost model per series that turns weather into power. In the body below, "P2" also
-names one of the 13 substations.
+plan](../themes/solar-disaggregation/plan.md#p2-embedded-solar-capacity-from-lagged-residuals).**
+The result says whether the daytime residual of the stage 1a demand model tracks a fixed error in
+the ERA5 irradiance input (the sunlight estimate that stage 1a was trained on), or a change in
+embedded solar capacity that a correction with fixed coefficients cannot follow. The plan was
+committed before the code ran; the Results section reports the run. ERA5 is a reanalysis, an
+estimate of past weather. Stage 1a is an XGBoost model per series that turns weather into power. In
+the body below, "P2" also names one of the 13 substations.
 
 ## Size
 

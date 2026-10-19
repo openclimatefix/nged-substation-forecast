@@ -1,6 +1,8 @@
 ---
 id: "00081"
 slug: r11-control-member-second-validation-year-demand
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

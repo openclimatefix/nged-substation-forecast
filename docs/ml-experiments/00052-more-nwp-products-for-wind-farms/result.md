@@ -1,8 +1,15 @@
 ---
 id: "00052"
 slug: more-nwp-products-for-wind-farms
+theme: generator-forecasting
+also_relevant_to: [weather-products-and-blending]
 status: done
 size: complex
+take_home_message: >-
+  Averaging the wind best guess with two extra weather forecasts, ICON-EU and the ECMWF
+  high-resolution forecast, scored 0.055 points of capacity better at lead days 1 and 2, but the 95%
+  interval (-0.200 to +0.072) includes zero. Three wind farms cannot show whether the extra
+  forecasts help, and the blend scored 0.122 worse at days 3 to 6.
 hypothesis: >-
   For the three metered wind farms, averaging the quantiles of the experiment 33 wind best guess (the
   ERA5-trained mixture over the 51 ENS members, with the power-curve margin and the spread factor)

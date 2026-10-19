@@ -1,8 +1,15 @@
 ---
 id: "00062"
 slug: sw2-9-whitened-residual-step-detector
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Removing the residual's half-hour-to-half-hour memory made the switching detector find fewer load
+  transfers: 0.34 to 0.37 of the moved power against 0.44 to 0.47 without the filter. The filter
+  shrinks a day-long step faster than it shrinks the noise, and a first-order filter cannot fix
+  that.
 hypothesis: >-
   Removing the half-hour-to-half-hour memory of the residual before the step statistic is taken
   (a first-order autoregressive filter, fitted per series and half-hour of day on odd months)

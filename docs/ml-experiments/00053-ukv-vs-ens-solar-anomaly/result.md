@@ -1,6 +1,8 @@
 ---
 id: "00053"
 slug: ukv-vs-ens-solar-anomaly
+theme: weather-products-and-blending
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

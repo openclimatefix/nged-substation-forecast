@@ -1,6 +1,8 @@
 ---
 id: "00031"
 slug: embedded-pv-features-primary-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

@@ -1,6 +1,8 @@
 ---
 id: "00017"
 slug: training-window-and-retraining-rule-drift-demand
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

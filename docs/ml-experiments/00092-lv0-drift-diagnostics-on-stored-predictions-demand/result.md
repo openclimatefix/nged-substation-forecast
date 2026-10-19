@@ -1,6 +1,8 @@
 ---
 id: "00092"
 slug: lv0-drift-diagnostics-on-stored-predictions-demand
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

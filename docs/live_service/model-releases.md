@@ -31,7 +31,8 @@ them together, and planning the port.
    `model_release` as output metadata, so check the number there.
 4. Tag the commit `model-N`, and add a row to the log below in the same pull request. That pull
    request also sets `production_status` to `adopted` and `adopted_in` to N in each incorporated
-   experiment's `result.md`, and updates the [research log](../ml-experiments/research-log.md).
+   experiment's `result.md`, and checks that the candidates table on the [ML experiments
+   overview](../ml-experiments/README.md) no longer lists them.
 
 A cross-validation run that is not a release leaves `model_release` at its default `0`. Nothing
 checks that the number in the config matches the run's name, so the log is the record of the

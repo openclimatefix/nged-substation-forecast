@@ -119,6 +119,12 @@ repos:
         language: pygrep
         types_or: [python, markdown]
         exclude: ^docs/architecture/code-style\.md$
+      - id: check-experiment-front-matter
+        name: experiment front matter (experiment_tables --check)
+        entry: uv run python scripts/mkdocs_hooks/experiment_tables.py --check
+        language: system
+        files: ^docs/ml-experiments/
+        pass_filenames: false
       - id: check-docs-links
         name: docs links (check_docs_links)
         entry: uv run python scripts/lint/check_docs_links.py

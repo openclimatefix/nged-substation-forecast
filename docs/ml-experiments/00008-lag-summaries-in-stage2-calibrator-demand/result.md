@@ -1,6 +1,8 @@
 ---
 id: "00008"
 slug: lag-summaries-in-stage2-calibrator-demand
+theme: lagged-power-and-error-correction
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

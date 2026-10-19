@@ -1,6 +1,8 @@
 ---
 id: "00020"
 slug: solar-wind-stack-cams-stage0-spread-margin
+theme: calibration-and-uncertainty
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-
@@ -100,12 +102,12 @@ points higher, with an interval that does not rule out a gain of 0.075. ENS is t
 for Medium-Range Weather Forecasts ensemble, ERA5 its reanalysis of past weather, and CAMS the
 Copernicus Atmosphere Monitoring Service's satellite irradiance estimate. The production recipe (arm
 `base`) is the pooled ERA5-trained mixture of experiment 00002. This is proposal P22 of the
-[research plan](../research-plan.md). This experiment combines the changes that [experiment
-00012](../00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md), [experiment
-00014](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md), and [experiment
-00016](../00016-pooled-mixture-calibration-solar-wind/result.md) flagged as candidates or small
-gains, and drops each in turn. Gains of this size may not add, because the CAMS-trained stage 1a
-XGBoost model and the stage 0 mapping act on the same ENS irradiance bias.
+[research plan](../themes/calibration-and-uncertainty/plan.md). This experiment combines the changes
+that [experiment 00012](../00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md),
+[experiment 00014](../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md), and
+[experiment 00016](../00016-pooled-mixture-calibration-solar-wind/result.md) flagged as candidates
+or small gains, and drops each in turn. Gains of this size may not add, because the CAMS-trained
+stage 1a XGBoost model and the stage 0 mapping act on the same ENS irradiance bias.
 
 ## Size
 
