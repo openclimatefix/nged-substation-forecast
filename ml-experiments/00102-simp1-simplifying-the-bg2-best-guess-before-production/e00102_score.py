@@ -222,6 +222,7 @@ class ClassCases:
         self.qs: dict[str, np.ndarray] = {}
         self.mae: dict[str, np.ndarray] = {}
         self.tails: dict[str, pl.DataFrame] = {}
+        self.skew: dict[str, pl.DataFrame] = {}
 
     @staticmethod
     def _reference_arm(*, cls: str) -> str:
@@ -257,6 +258,19 @@ class ClassCases:
         mae[present] = np.abs(quantiles[present, common.MEDIAN] - actual[present]) * POINTS
         self.qs[name], self.mae[name] = qs, mae
         self.tails[name] = self._tails(quantiles=quantiles, actual=actual, present=present)
+        use = present & self.gap
+        mean_forecast = quantiles[use] @ common.ATOM_MASSES
+        self.skew[name] = (
+            pl.DataFrame(
+                {
+                    "site": self.keys["site"].filter(pl.Series(use)),
+                    "median_minus_mean": (quantiles[use, common.MEDIAN] - mean_forecast) * POINTS,
+                }
+            )
+            .group_by("site")
+            .agg(pl.col("median_minus_mean").mean())
+            .sort("site")
+        )
         return True
 
     def _tails(
@@ -475,7 +489,8 @@ def score_class(
         cls: The class name.
 
     Returns:
-        The absolute-score tables, the contrast tables, the tail tables, and report notes.
+        The absolute-score tables, the contrast tables, the tail tables, the median-minus-mean
+        tables, and report notes.
     """
     notes: list[str] = []
     cases = ClassCases(cls=cls)
@@ -492,8 +507,9 @@ def score_class(
         best_pair, best_triple = choose_best(cases=cases, size=2), choose_best(cases=cases, size=3)
         notes.append(f"Best pair on every5d runs: {best_pair}; best triple: {best_triple}")
         contrasts = primary_contrasts(best_pair=best_pair, best_triple=best_triple)
-    absolute, tails = [], []
+    absolute, tails, skews = [], [], []
     for name in cases.qs:
+        skews.append(cases.skew[name].with_columns(cls=pl.lit(cls), arm=pl.lit(name)))
         for metric, values in (("qs", cases.qs[name]), ("mae", cases.mae[name])):
             absolute.append(
                 cases.scope_stats(values=values, level=LEVEL_95).with_columns(
@@ -527,7 +543,7 @@ def score_class(
                     level=pl.lit(level),
                 )
             )
-    return absolute, rows, tails, notes
+    return absolute, rows, tails, skews, notes
 
 
 SCOPES_OF_INTEREST: Final[tuple[str, ...]] = (
@@ -618,18 +634,21 @@ def report_lines(
 def analyse(*, results_dir: Path) -> None:
     """Score every arm of every class and write the tables and the report."""
     results_dir.mkdir(parents=True, exist_ok=True)
-    absolute_rows, contrast_rows, tail_rows, notes = [], [], [], []
+    absolute_rows, contrast_rows, tail_rows, skew_rows, notes = [], [], [], [], []
     for cls in CLASS_GROUPS:
-        absolute, rows, tails, class_notes = score_class(cls=cls)
+        absolute, rows, tails, skews, class_notes = score_class(cls=cls)
         absolute_rows += absolute
         contrast_rows += rows
         tail_rows += tails
+        skew_rows += skews
         notes += class_notes
     absolute_table = pl.concat(absolute_rows)
     contrast_table = pl.concat(contrast_rows).with_columns(
         safe=pl.col("upper") < pl.col("cls").replace_strict(THRESHOLDS, return_dtype=pl.Float64)
     )
     tail_table = pl.concat(tail_rows)
+    skew_table = pl.concat(skew_rows)
+    skew_table.write_parquet(results_dir / "median_minus_mean.parquet")
     absolute_table.write_parquet(results_dir / "absolute.parquet")
     contrast_table.write_parquet(results_dir / "contrasts.parquet")
     tail_table.write_parquet(results_dir / "tails.parquet")
@@ -637,6 +656,8 @@ def analyse(*, results_dir: Path) -> None:
         lines = [
             *notes,
             *report_lines(absolute=absolute_table, contrasts=contrast_table, tails=tail_table),
+            "== Median forecast minus mean forecast, per site (points of capacity) ==",
+            str(skew_table.filter(pl.col("arm").is_in(list(TAIL_ARMS))).sort("cls", "arm", "site")),
         ]
     (results_dir / "report.txt").write_text("\n".join(lines))
     print("\n".join(lines))
