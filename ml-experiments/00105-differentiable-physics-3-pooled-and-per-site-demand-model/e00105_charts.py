@@ -86,8 +86,8 @@ def figure_headline() -> alt.TopLevelMixin:
     rows = []
     for label, key, kind in (
         ("C1 full history: P minus S", "C1 pooled vs per-site, all rows", "verdict"),
-        ("C2 4 weeks: P-onb4w minus S-4w", "C2 onboarding, 4 weeks", "verdict"),
-        ("C3 3 months: P-short3m minus S-3m", "C3 short history, 3 months", "verdict"),
+        ("C2 4 weeks: P-onb4w minus S-4w", "C2 five sites", "verdict"),
+        ("C3 3 months: P-short3m minus S-3m", "C3 five sites", "verdict"),
         ("4 weeks: P-onb4w minus X-4w", "p_onb4w-x_4w", "exploratory"),
         ("3 months: P-short3m minus X-3m", "p_short3m-x_3m", "exploratory"),
         ("C4 full history: P minus X-2y", "C4 vs x_2y", "exploratory"),
@@ -140,11 +140,11 @@ def figure_headline() -> alt.TopLevelMixin:
         width=WIDTH - 150,
         height=26 * len(order),
         title=_title(
-            text="Pooling helps a new or short-history substation and costs at full history",
+            text="Pooling helps a new or short-history substation, and is worse at full history",
             subtitle=(
-                "Dot: difference in mean quantile score over the decision substations (five for "
-                "C1; the six scored for the rest), 1 July 2025 to 30 June 2026, rows outside "
-                "the switching events. Line: 98.33% interval (verdict contrasts) or 95% "
+                "Dot: difference in mean quantile score over the five decision substations (the "
+                "six scored for the XGBoost comparisons), 1 July 2025 to 30 June 2026, rows "
+                "outside the switching events. Line: 98.33% interval (verdict contrasts) or 95% "
                 "interval, from resampling whole calendar months. Gate failed: see the page."
             ),
         ),
@@ -237,7 +237,7 @@ def figure_onboarding() -> alt.TopLevelMixin:
         width=WIDTH - 60,
         height=240,
         title=_title(
-            text="Two to four weeks of history bring a new substation close to full history",
+            text="Four weeks of history put a new substation within 0.8 points of full history",
             subtitle=(
                 "Orange: the pooled model fitted without the substation, then given its last "
                 "0, 2, 4, or 8 weeks. Dashed lines: references scored on the same six "

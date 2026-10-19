@@ -142,14 +142,50 @@ def test_the_kl_term_matches_its_closed_form():
 def test_a_site_specific_capacity_prior_centres_the_first_capacity_increment(batch: PooledBatch):
     (model,), _ = _fit(batch, DpConfig(population_scales=PopulationScales()), [FitCopy(name="m")])
     site = batch.site_labels.index("S1")
-    base = float(model.site_prior_term())
     with torch.no_grad():
         model.capacity_prior[site] = float(model.capacity_raw[site].max())
         near = float(model.site_prior_term())
         model.capacity_prior[site] = 50.0
         far = float(model.site_prior_term())
     assert far > near
-    assert near != base or far != base
+
+
+def test_a_capacity_prior_given_through_a_fit_copy_pulls_the_first_increment(batch: PooledBatch):
+    site = batch.site_labels.index("S1")
+    prior = torch.full((len(batch.site_labels),), float("nan"))
+    prior[site] = 40.0
+    config = DpConfig(population_scales=PopulationScales(capacity_first=0.5))
+    free, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="free")],
+        config=config,
+        initial_level=_level(batch),
+        steps=STEPS,
+    )
+    pulled, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="pulled", capacity_prior=prior)],
+        config=config,
+        initial_level=_level(batch),
+        steps=STEPS,
+    )
+    assert float(pulled[0].capacity_prior[site]) == 40.0
+    assert float(pulled[0].capacity_raw[site].max()) > float(free[0].capacity_raw[site].max())
+
+
+def test_the_capacity_override_is_saved_with_the_model_and_moves_with_it(batch: PooledBatch):
+    model = PooledDemandModel(
+        config=DpConfig(population_scales=PopulationScales()),
+        n_sites=3,
+        n_season_years=batch.n_season_years,
+        initial_level=_level(batch),
+    )
+    assert "capacity_override" not in model.state_dict()
+    model.capacity_override = torch.ones(3, batch.n_season_years)
+    assert "capacity_override" in model.state_dict()
+    moved = model.to(dtype=torch.float64).capacity_override
+    assert moved is not None
+    assert moved.dtype == torch.float64
 
 
 def test_the_first_trained_years_capacity_uses_its_own_population_mean(batch: PooledBatch):
@@ -627,6 +663,8 @@ def test_an_onboarded_model_still_names_the_site_it_excluded_and_checks_the_week
     assert result.fit_excluded == (HELD_OUT,)
     with pytest.raises(ValueError, match="onboarded with"):
         pooled_residuals(model=model, batch=others, weeks_of_history=8)
+    with pytest.raises(ValueError, match="onboarded with"):
+        pooled_residuals(model=model, batch=others)
 
 
 def test_all_present_rows_adds_the_rows_the_default_rows_leave_out(cache: FeatureCache):
