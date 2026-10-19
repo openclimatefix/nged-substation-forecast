@@ -8,7 +8,7 @@ part: n/a
 theme: differentiable-physics-long-history-and-drift
 also_relevant_to: [differentiable-physics-demand-calendar-and-weather, calibration-and-uncertainty,
 retraining-and-training-history]
-status: planned
+status: done
 size: >-
   medium. Stored: private files only. Serving path and degradation rules: not touched. Designs:
   more than one for the spread pool and tail model, one pre-registered. Callers: own scripts only.
@@ -18,8 +18,8 @@ hypothesis: >-
   origin. A second claim, labelled separately as C5 and not part of the verdict: a level-dependent
   spread brings its 95% and 99% quantiles within 1 point of nominal coverage without worsening the
   quantile score.
-prediction: see "Predictions"
-decision_rule: see "Decision rule"
+prediction: see "Pre-registered predictions"
+decision_rule: see "Pre-registered decision rule"
 benchmark: >-
   Lagless XGBoost (12 months, same inputs, same origins): default start, no day-of-year column, and
   experiment 64's solar offset with a quantile start; climatology; manual_heuristic
@@ -30,310 +30,301 @@ metric: >-
   Quantile score (twice the mean pinball loss over experiment 87's 11 quantiles) in points of
   effective capacity, on rows outside the hand-filtered switching events at the scored site; tail
   coverage and pinball loss at q01, q05, q95, and q99
-verdict: planned
+verdict: partly supported
+best_arm: >-
+  G-all+D1 (all years, drift D1, pinned capacity), quantile score 2.776 points; the exploratory drift
+  step 10,000 scored 2.753
+headline: >-
+  Drift minus no drift on all years (C2) is -0.451 points, 99% interval -0.681 to -0.232, with 10 of
+  12 origins below zero; all years minus 12 months without drift (C1) is unstable.
 production_status: not-for-production
+adopted_in: none
 take_home_message: >-
-  Planned: written after the results.
+  Giving the convex demand model a drift term lowered its score at 10 of 12 quarterly refits, by
+  0.45 points over all years (interval 0.23 to 0.68), so drift is worth keeping. More years without
+  drift raised the score at 8 of 12 origins, almost entirely because of one substation (D10), and
+  more years with drift against 12 months stays unresolved (winter-quarter origins favour more
+  years, summer ones are level). The level-dependent and conformal spreads made the 95% and 99%
+  quantiles worse, not better, so the tails still need another idea.
 date: 2026-10-19
 pr: 0
-advice: []
+advice:
+  - >-
+    Give a convex demand model a drift term when it trains on all years and refits quarterly: G-all+D1
+    minus G-all was -0.451 points (99% interval -0.681 to -0.232), with 10 of 12 origins below zero
+    and all 3 origin years negative (C2).
+  - >-
+    Never judge a history window on one site or one year: D10 alone made all years without drift
+    score worse than 12 months (+1.139 at D10, +0.031 without it, C1), and three of the five
+    substations flip the sign of C2's stability when left out.
+  - >-
+    Leave the day-of-year column out of lagless XGBoost trained on 12 months: it raised the score by
+    0.118 points over 12 origins (K3) and by 0.75 points over the four burn-in windows, and the bar
+    without it is the fairer benchmark for the convex model (C4).
+  - >-
+    Keep the two day-of-year harmonics in the all-years convex model with drift: removing them raised
+    the score by 0.389 points (K2).
+  - >-
+    Do not adopt the level-tercile spread (S1) or the conformal shift (S2): S1 raised the score by
+    0.050 points and S2 by 0.489 (C5q, T1), and both moved the 95% and 99% coverage further from
+    nominal (S1 89.7% and 95.4%, S2 84.0% and 91.5%, against 91.8% and 97.3% for the rolling-pool
+    spread S0). Tail calibration needs a different idea, such as a spread that grows with the age of
+    the fit.
+  - >-
+    Score every history-window contrast at many refit origins, split into winter-quarter and
+    summer-quarter origins: C3 was -0.461 at winter-quarter origins and +0.058 at summer-quarter
+    ones, and the pooled value hides both.
 code: >-
   ml-experiments/00107-differentiable-physics-rolling-origin-history-and-tails/
 ---
 
-**Differentiable physics: rolling-origin replication of the history contrasts, and tail calibration
-of the convex model.**
+**Giving the convex model a drift term is the one history decision that held up across 12 quarterly
+refits.** Drift lowered the quantile score at 10 of 12 origins, by 0.45 points over all years. More
+years without drift did not help: it raised the score at 8 of 12 origins, and one substation (D10)
+caused almost all of that. More years with drift against the last 12 months is unresolved, because
+winter-quarter origins favour more years and summer-quarter origins are level. The new spreads did
+not fix the tails, so the 95% and 99% quantiles still cover 91.8% and 97.3% of outcomes. Verdict
+`partly supported`.
 
-**This page is the plan, committed before any code runs.** It replaces experiment 104's single scored
-year with 12 quarterly origins, and calibrates the convex model's tails on the same fits. No
-substation cards: D-labels only, and no result exists yet.
+We asked whether the two history contrasts of [experiment
+104](../00104-differentiable-physics-2-simple-structural-model/result.md), which had reversed sign
+between its tuning year and its scored year, keep one sign when a convex model of demand minus solar
+output is refitted every quarter. We refitted it at 12 quarterly cuts, from 1 July 2023 to 1 April
+2026, and scored each fit on the 3 months after its cut, at five Primary substations (D5, D10, D11,
+D14, and D16). Four earlier cuts (2022-07 to 2023-04) only supply the first spread pools. We also
+asked whether a spread that depends on the forecast level brings the upper quantiles to their
+nominal coverage. In the figures, "score" means the quantile score: twice the mean pinball loss
+over 11 quantiles, in percentage points of each substation's effective capacity, where lower is
+better.
 
-## What N1+N2 asks, and why
+![Per-origin contrasts C1 to C4](figure_01_headline.svg)
 
-**Experiment 104 cannot say whether more history helps, because two of its three history contrasts
-reverse sign between its scored year and its tuning year** (second audit, error of the mean
-forecast: G-all minus G1 −0.25 against +0.31; drift +0.06 against −0.38). Twelve origins in three
-years can separate a stable effect from an origin-dependent one. The origins are not independent
-(adjacent fits share most of their training; D16's rising demand persists), so no sign-test p-value
-is quoted; the rule asks for agreement within each year and a pooled interval instead.
+**Figure 1 shows C2 below zero at 10 of 12 origins and C1 above zero at 8 of 12.** Each panel is one
+planned contrast at the 12 origins, with a 95% interval from week blocks, the tie band, and the
+pooled estimate at the right. C3 and C4 move with the season of the scored months.
 
-**The origin-by-origin sign count is the primary read; the pooled 36-month score is secondary**,
-because winter and summer pull opposite ways (Part 2's C1 −0.40 in November to March, +0.19 in
-April to October), so a pooled estimate near zero can hide a gain at every winter origin.
+![Every arm's score per origin and substation](figure_02_absolute.svg)
 
-**N2 asks a separate question on the same fits.** Part 2's centred spread left G-all+D1 covering
-89.5% at q95 and 96.2% at q99, with opposite errors between substations hidden in the pooled
-figure. Nothing Part 4 tunes is tuned here; no steps arm, no Kalman filter arm.
+**Figure 2 shows that no arm leads at every substation, and that climatology and the manual heuristic
+trail the rest.** Arm scores run from 2.75 to 3.23; climatology scores 3.95 and the manual heuristic
+3.92.
 
-## Origins, sites, and rows
+![Leave-one-site-out sign counts](figure_03_leave_one_out.svg)
 
-**Twelve quarterly origins, each with its own cut and its own fit, scored on the 3 months after
-the cut:**
+**Figure 3 shows that leaving one substation out changes the sign counts of C1, C2, and C4.** Without
+D10, C1 has 3 negative, 5 positive, and 4 tied origins.
 
-| Origins (the cut) | Scored window | Role |
+![Tail coverage by origin](figure_04_tails.svg)
+
+**Figure 4 shows that none of the three spreads reaches the nominal 95% and 99% coverage at most
+origins.** The conformal spread (S2) is furthest away and swings most between origins.
+
+![Summer and winter weeks](figure_05_weeks.svg)
+
+**Figure 5 shows the forecasts in one summer week and one winter week.** The three forecasts differ
+by less than the gap to the measured power at D16 in the winter week.
+
+![Controls, replication, and tail-model contrasts](figure_06_exploratory.svg)
+
+**Figure 6 shows that day-of-year terms help the convex model with drift and hurt XGBoost.**
+
+![D16's mean forecast error per origin](figure_07_d16_bias.svg)
+
+**Figure 7 shows that the forecasts without drift miss low at D16 by 3 to 4 points on average.**
+
+![Pinned and fitted PV capacity](figure_08_capacity.svg)
+
+**Figure 8 shows pinned PV capacity above the fitted capacity at four of five substations.**
+
+## Results
+
+**Arms and rows.**
+
+- **Convex arms** (nine, all at Part 2's tuned penalties: ridge 0.1, drift step 3,000): G1 (12 months),
+  G-all (all years), G-all+D1 (all years, drift D1), each with PV capacity pinned to experiment 45's
+  real-time vintage, and the same three with fitted capacity (`-fc`, Part 2's configuration); G-all+D1
+  with drift step 10,000; and G1 and G-all+D1 without the two day-of-year harmonics (`-noharm`).
+- **XGBoost arms:** X-12 (12 months, default start), X-12-nodoy (without the day-of-year column),
+  and X-12amq (quantile start plus experiment 64's solar offset, from the 2023-10-01 cut on). The
+  XGBoost bar is X-12-nodoy, chosen on the four burn-in windows before any scored window was read
+  (burn-in score 3.82 against 4.58 for X-12).
+- **Spreads:** S0 is Part 2's centred spread, fitted on a rolling pool of the arm's own out-of-sample
+  residuals over the 12 months before each origin. S1 adds a tercile of the predicted mean. S2 is S0
+  plus a conformal shift calibrated on the newest 3 months of the pool.
+- **Rows:** experiment 103's `dp_mw_v1` rows outside the hand-filtered switching events, 254,756
+  half-hours at the five decision substations. Fits are frozen from their cut to the next origin
+  and run on the CPU.
+- **Past weather:** ERA5 temperature and CAMS irradiance, which exist only after the event, so every
+  score is a ceiling for a forecast made on a weather forecast.
+- **Not run:** D18 (its data start on 2025-03-01, so a 12-month pool of out-of-sample residuals cannot
+  exist), and the bank-holiday, Christmas-run, and days-below-0°C rows.
+
+**Absolute scores** (pooled over 12 origins and five substations; mean forecast error is measured
+minus forecast, in points):
+
+| Arm | Score | Mean forecast error |
 |---|---|---|
-| 2022-07-01, 2022-10-01, 2023-01-01, 2023-04-01 | 2022-07 to 2023-06 | burn-in: the first scored origins' spread pool, the XGBoost bar choice, and the XGBoost seed floor; never scored |
-| 2023-07-01, 2023-10-01, …, 2026-04-01 (12) | the 3 months after each cut, 2023-07-01 to 2026-06-30 | scored |
+| G-all+D1, drift step 10,000 | 2.753 | +0.137 |
+| G-all+D1, fitted capacity | 2.768 | +0.014 |
+| G-all+D1 | 2.776 | -0.018 |
+| G1, fitted capacity | 2.907 | +1.046 |
+| G1 | 2.972 | +1.495 |
+| X-12-nodoy (the bar) | 3.024 | +0.911 |
+| G-all, fitted capacity | 3.067 | +0.094 |
+| X-12 | 3.142 | +0.994 |
+| G-all | 3.227 | -0.118 |
+| Manual heuristic | 3.917 | +0.919 |
+| Climatology | 3.954 | -1.075 |
 
-- **Two season splits, named apart in every figure:** an origin's *quarter type* (six
-  winter-quarter origins score October to March, six summer-quarter origins April to September),
-  and the *row season* (November to March against April to October, as in Parts 2 and 4).
-- **Origin years:** 2023-24 (origins 2023-07-01 to 2024-04-01), 2024-25, and 2025-26, four each.
-- **Causality of Part 2's penalties, by origin year.** Part 2 tuned its penalties on 2024-07 to
-  2025-06. So the 2023-24 origins use penalties chosen on later data (*pre-tuning*, a hyperparameter
-  lookahead), the 2024-25 origins are in-sample (*in-tuning*), and only the 2025-26 origins are
-  strictly causal (*post-tuning*). **The headline table gives the 4 post-tuning origins and the 8
-  out-of-tuning origins (pre-tuning plus post-tuning), each labelled with its causality;** the
-  verdict's sign count uses all 12 and is repeated over the 8 out-of-tuning origins.
-- **Decision sites:** D5, D10, D11, D14, and D16. **Descriptive:** D9 from the 2025-10-01 origin
-  (12 months of training from 2023-10-01, then 12 months of pool), and D18 with its `growth_prior`
-  capacity flagged at every cut and the December 2024 to early February 2025 rows cut
-  applied in training at every later cut.
-- **Rows** as Part 2: experiment 103's cut dates, `default_rows == True`, the lockdown window
-  2020-03-23 to 2021-07-19 out, the 66 hand-filtered transfers masked (24-hour padding) in training
-  and scoring, and the all-rows score beside the masked headline. Nothing scores a valid time on or
-  after 2026-07-01. The arms have no power lags and use past weather, so every scored half-hour
-  counts once; `lead_hours` is the time since the cut.
-- **Predictions written:** `time_series_id`, `valid_time`, `power_fcst_init_time` (the cut),
-  `origin`, all 11 levels (`q01`, `q05` to `q95`, `q99`), `mean`, `actual`, `lead_hours`, `arm`,
-  `seed`, and `spread`.
+**Planned contrasts** (treatment minus reference; negative favours the treatment; 99% intervals
+resample whole months; labels follow the pre-registered rule):
 
-## Arms
-
-**Every fit is frozen from its cut to the next origin, one seed, on the CPU,** with Part 2's
-penalties (`work/tuned.json`: ridge 0.1, drift step 3,000), the `free` final knot, and D1 knots
-counted back from each cut. **Capacity is pinned in every primary convex arm** by
-`studies.dp_pinned_capacity` at each cut. The 2023-07-01 cut uses a vintage 37 days later
-(`early_vintage`, disclosed). The burn-in cuts use the growth prior, whose level is hindsight;
-each burn-in site's growth-prior capacity is printed beside the 2023-08 vintage.
-
-| Arm | Model | Window | Notes |
+| Contrast | Pooled 12 origins | Origins below / above / tied | Label |
 |---|---|---|---|
-| G1 | convex, pinned capacity | 12 months | |
-| G-all | convex, pinned capacity | all years | |
-| G-all+D1 | convex, pinned capacity, D1 drift | all years | the arm N2 calibrates |
-| G1-fc, G-all-fc, G-all+D1-fc | convex, fitted capacity | as above | Part 2's configuration; replication column |
-| G-all+D1-s10k | as G-all+D1, drift step 10,000 | all years | exploratory: Part 2's step sat at its grid edge |
-| G1-noharm, G-all+D1-noharm | without the two day-of-year harmonics | as base | calendar controls: on 12 months the harmonics can carry a within-year trend into the next quarter |
-| X-12 | lagless XGBoost, default start | 12 months | experiment 104's `x_12` recipe |
-| X-12-nodoy | X-12 without the day-of-year column | 12 months | calendar-memorisation control and bar candidate |
-| X-12amq | quantile start plus the solar offset | 12 months | experiment 104's `x_12amq`; from the 2023-10-01 origin only (below) |
-| climatology, `manual_heuristic` | references | | refitted per origin where they fit anything |
+| C1: G-all minus G1 | +0.255 [-0.003, +0.463] | 3 / 8 / 1 | unstable |
+| C2: G-all+D1 minus G-all | -0.451 [-0.681, -0.232] | 10 / 0 / 2 | stable |
+| C3: G-all+D1 minus G1 | -0.196 [-0.440, +0.037] | 6 / 3 / 3 | unstable |
+| C4: G1 minus bar | -0.052 [-0.267, +0.148] | 6 / 6 / 0 | seasonally stable |
+| C4b: G-all+D1 minus bar | -0.249 [-0.579, +0.048] | 5 / 4 / 3 | unstable |
+| C5 (score): S1 minus S0 on G-all+D1 | +0.050 [+0.031, +0.069] | 0 / 11 / 1 | worse |
 
-**The XGBoost recipe is `e00104_xgb.py`'s,** including its `nthread: 1`: experiment 87's Primary
-hyperparameters without the power lags, 500 rounds, 11 quantiles, one thread per fit.
+- **C1 rests on D10.** Per substation, G-all minus G1 is +1.139 at D10, +0.275 at D16, +0.087 at D11,
+  -0.048 at D5, and -0.187 at D14. Without D10 the pooled value is +0.031 (99% interval -0.114 to
+  +0.174); without D16 it is +0.250. Experiment 104's audit blamed D16, and this experiment does not
+  reproduce that.
+- **C2 holds in every origin year.** Pre-tuning (2023-24) -0.813, in-tuning (2024-25) -0.243, and
+  post-tuning (2025-26) -0.295 (each 95%, all excluding zero); on the 8 out-of-tuning origins -0.556
+  [-0.792, -0.326]. Winter rows (November to March) -0.560 and other rows -0.377. Leaving out D5, D10,
+  or D16 turns the label from stable to unstable; leaving out D11 or D14 keeps it stable.
+- **C3 depends on the season.** Winter-quarter origins -0.461 [-0.736, -0.184], summer-quarter
+  origins +0.058 [-0.129, +0.239]; rows from November to March -0.528 and from April to October
+  +0.031. The label is unstable and the pooled interval spans zero.
+- **C4's lead over the bar mostly vanishes.** G1 beat X-12-nodoy by 0.052 points (a tie), against
+  0.170 [0.011, 0.334] over X-12 with the day-of-year column (E7, exploratory; experiment 104 found
+  0.25 on one year). Winter-quarter origins favour G1 (-0.279) and summer-quarter origins the bar
+  (+0.166). G-all+D1 minus the bar is -0.249, with an interval that spans zero.
+- **Seasonal labels:** C1 and C3 are not seasonally stable under the rule (C3 has 5 of 6
+  winter-quarter origins below zero but its summer-quarter origins are mixed); C4 is, with G1 ahead
+  in winter and the bar ahead in summer.
+- **The 2025-26 origins reproduce Part 2:** C1 +0.279 [+0.096, +0.432] (Part 2 +0.25), C2 -0.295
+  [-0.520, -0.085] (-0.29), C3 -0.016 [-0.345, +0.278] (-0.04).
+- **D10 with its two jump windows masked** (training and scoring): C2 -0.512 [-0.728, -0.306] with
+  11 of 12 origins below zero, C1 +0.274 [+0.059, +0.474], C3 -0.238 [-0.480, +0.000], and C4 -0.034.
+  No label changes.
 
-**The XGBoost bar for C4 is whichever of X-12 and X-12-nodoy scores better over the four burn-in
-origins,** recorded in `decisions.json` before any scored window is read. If X-12-nodoy wins, the
-X-12 minus X-12-nodoy control is reported unchanged and the write-up says C4's bar has no
-day-of-year column.
+**Tail model (C5) fails.** S1's coverage is 89.7% at q95 and 95.4% at q99, further from nominal than
+S0's 91.8% and 97.3%, and its score is worse in 11 of 12 origins. Four of the pass rule's four
+conditions fail (pooled coverage within 1 point, 4 of 5 substations within tolerance, lower tails no
+worse, and the score's upper bound at most +0.03). S2 is worse still (T1: +0.489 [+0.335, +0.660]).
+From 2024-07-01 on, S1's gaps are -6.3 points at q95 and -4.3 at q99.
 
-**X-12amq cannot be built before the 2023-10-01 cut:** its offset weight `w` comes from a
-median-only replica trained on the 12 months ending 12 months before the cut, and before 2023-10-01
-that window overlaps the lockdown window. It runs at the 11 origins from 2023-10-01, enters no bar
-choice and no planned contrast, and reports `w` per site and origin.
+| Arm and spread | q01 | q05 | q95 | q99 | Pinball at q01, q05, q95, q99 |
+|---|---|---|---|---|---|
+| G-all+D1, S0 | 3.9 | 10.0 | 91.8 | 97.3 | 0.232, 0.729, 0.732, 0.220 |
+| G-all+D1, S1 | 5.4 | 11.6 | 89.7 | 95.4 | 0.258, 0.756, 0.786, 0.280 |
+| G-all+D1, S2 | 9.3 | 15.8 | 84.0 | 91.5 | 0.403, 0.926, 1.058, 0.438 |
+| G1, S0 | 2.2 | 6.1 | 85.8 | 94.2 | 0.189, 0.668, 0.920, 0.327 |
+| G-all, S0 | 6.7 | 12.9 | 87.4 | 94.7 | 0.345, 0.917, 0.873, 0.288 |
+| X-12-nodoy | 1.3 | 11.1 | 82.5 | 97.8 | 0.243, 0.732, 1.013, 0.339 |
+| Climatology | 2.0 | 6.3 | 94.6 | 98.0 | 0.226, 0.864, 0.977, 0.265 |
+| Manual heuristic | 9.0 | 11.0 | 80.8 | 83.6 | 0.417, 0.893, 1.223, 0.754 |
 
-**Robustness variants, every planned contrast:** leave one decision site out; the three causality
-groups; the 8 origins from 2024-07-01 (pools free of burn-in residuals); all rows; and:
+Cells are the percentage of outcomes at or below the quantile (nominal 1, 5, 95, and 99). The
+curtailment-cost saving is not computed: these are demand substations, and the metric scores
+generators.
 
-- **Without D16**, whose rising demand drove most of G-all's loss in Part 2 (G-all minus G1 +0.03
-  without D16). D16's mean forecast error per origin is printed for G1 and G-all.
-- **D10 with its two unlabelled jumps masked:** 2024-11-08 to 2024-12-01 and 2025-11-17 to
-  2025-12-14 dropped from training (every arm refitted at D10 at the cuts after each window) and
-  from scoring. Both windows fall inside scored windows (origins 2024-10-01 and 2025-10-01).
+**Controls and replication.**
 
-## The spread (N1's default, and N2's baseline)
+- **Calendar controls do not change nothing.** G1 without harmonics +0.027 [-0.090, +0.153]
+  (tied at 2 of 12 origins); G-all+D1 without harmonics +0.389 [+0.258, +0.521] (tied at 1);
+  X-12 minus X-12-nodoy +0.118 [+0.035, +0.213] (tied at 4).
+- **Replication column:** fitted capacity shares C1's sign at 12 of 12 origins, C2's at 8 of 12, and
+  C3's at 10 of 12. Pinning capacity did not lower G1's or G-all's score (2.972 against 2.907, and
+  3.227 against 3.067 with fitted capacity), and left G-all+D1's unchanged (2.776 against 2.768).
+- **Drift step 10,000 against 3,000** is -0.023 [-0.048, +0.003]. XGBoost's seed floor is 0.006.
+- **X-12amq minus X-12** is -0.008 [-0.019, +0.001]: the solar offset adds nothing.
 
-**The spread pool for origin c is the arm's own out-of-sample residuals over the 12 months before
-c**, the scored windows of the four origins before it. No residual comes from a fit that saw its
-target. Each forecast in the pool was made 0 to 3 months after its own cut, but the calendar-quarter
-group that serves scored quarter Q is that quarter one year earlier, so it describes the site's level
-9 to 12 months before c. A drifting level (D16) can therefore still bias the spread; S0's coverage is
-reported by origin year so that shift is visible.
+## Checks
 
-- **S0, the baseline:** Part 2's centred spread, `ResidualSpread.fit(centre=True)` per hour band
-  and calendar quarter, fitted on the pool. Every N1 contrast uses S0.
-- **S1, the pre-registered alternative tail model:** residual quantiles per hour band × calendar
-  quarter × tercile of the arm's predicted mean, centred on each group's median. **The tercile cut
-  points come from the pool's predicted means only;** each scored row is assigned by those cut
-  points. A group under `MIN_SPREAD_GROUP_ROWS` (200) falls back to its band × quarter group. Each
-  group's size, its q99 exceedance count in the pool, and the fallback count are printed: groups
-  hold roughly 240 to 365 rows per site, so q99 rests on 2 to 4 exceedances.
-- **S2, exploratory:** S0 plus a split-conformal shift per level (q50 excluded) and hour band that
-  makes the pool's coverage nominal, keeping S0's quarter shape.
+- **Median forecast minus mean forecast, per site:** exactly 0.000 for every arm with S0 or S1,
+  because the centred spread has a zero median, and for XGBoost, whose mean forecast is its median.
+  S2 moves the median by -0.034 points. The check therefore cannot expose a shifted forecast here;
+  the mean forecast error in the absolute-score table does: G1 misses low by +1.495 points and the
+  bar by +0.911, while G-all+D1 is unbiased (-0.018).
+- **Error of the mean forecast beside each score contrast** (pooled MAE, same level): C1 +0.351
+  [+0.007, +0.644]; C2 -0.644 [-0.959, -0.334]; C3 -0.293 [-0.675, +0.088]; **C4 +0.093 [-0.209,
+  +0.385], which has the opposite sign to C4's score (-0.052)**; C4b -0.201 [-0.687, +0.242]; C5 0.
+  No origin has opposite sides for the score and the error of the mean.
+- **Leaving one site out:** changes C1's counts (without D14: 2 below, 10 above; without D10: 3, 5,
+  4 tied) and C2's label (unstable without D5, D10, or D16); see Figure 3 and `report.txt`.
+- **Blocking checks, all passed** (`checks_report.txt`): Part 2 reproduces (0.0 difference over
+  22,080 rows for each `-fc` arm), no lookahead (every row in its window, no D1 knot after its cut,
+  no pool row after its origin), the pool rule (60 of 60 fitted tables unchanged when data after
+  the origin change, and S0 moves when the pool changes), and the pinned capacity source per cut
+  (22 growth-prior, 6 early-vintage, 59 vintage).
+- **Audit triggers fired: 1, 2, 3, 4, and 5; not 6 or 7.**
+    1. Controls fail: the three calendar controls and replication of C2.
+    2. Contradictions: C1's driver is D10, not D16 (Part 2's audit); C2's pooled -0.451 is larger
+       than predicted (-0.05 to -0.20) and than Part 2's -0.29; experiment 104's tuning-year
+       replicate found drift +0.06, but here the 2024-25 origins give -0.243 (quarterly refits keep
+       the drift level current, which one frozen year does not; not separately tested).
+    3. C4's score and mean-error contrasts differ in sign.
+    4. Leaving one site out flips C2's label and C1's counts.
+    5. G1 beats G-all (C1), a nested arm, and the calendar controls move the score.
+  An Opus audit is requested before the prose review; its findings will be triaged here.
 
-**S1 and S2 are fitted for G-all+D1 and G1;** XGBoost's quantiles are its own and get no spread.
+## Pre-registered predictions and what happened
 
-## Planned contrasts
+- **C1** not stable, 3 or more ties, interval spanning zero, D16 out moves it by 0.10: unstable and
+  spanning zero (barely), but 1 tie, and D16 out moves it 0.005. **Failed in part.**
+- **C2** negative at 7 to 11 origins, most in winter, pooled -0.05 to -0.20: 10 origins, winter larger
+  (-0.592 against -0.315), pooled -0.451. **Held except the size.**
+- **C3** negative at 4 or more of 6 winter-quarter origins, pooled -0.05 to -0.20: 5 of 6 negative,
+  pooled -0.196. **Held.**
+- **C4** negative at 8 or more of 12, pooled -0.10 to -0.30, mean error within 0.10: 6 of 12, -0.052,
+  +0.093. **Failed in part.**
+- **C5** S0 coverage 89 to 93% at q95 and 95 to 98% at q99, S1 passes: S0 91.8% and 97.3%, S1 fails.
+- **Controls** change nothing, replication shares sign at 10 or more, step 10,000 ties, seed floor
+  under 0.03: only the seed floor held.
+- **Run time:** the convex grid took 90 seconds and all fits about 15 minutes.
 
-**Five planned contrasts, read in this order of weight:** the sign at each origin, by quarter type
-and origin year; the pooled 36-month estimate with a 99% interval (Bonferroni over five,
-`studies.bootstrap`, whole months, paired); the row-season split. Each carries site counts,
-absolute scores, the error of the mean (median for XGBoost) forecast, and the robustness rows.
+## Pre-registered decision rule
 
-- **C1, old years without drift:** G-all minus G1.
-- **C2, drift on all years:** G-all+D1 minus G-all.
-- **C3, does more history help a model with drift (Part 2's C1):** G-all+D1 minus G1.
-- **C4, the convex model's lead over lagless XGBoost at the same window:** G1 minus the XGBoost
-  bar. G-all+D1 minus the bar is reported beside it.
-- **C5, the tail model (N2):** S1 minus S0 on G-all+D1, on coverage at all four tail levels and on
-  the quantile score.
+- **Verdict:** `supported` needed both C1 and C2 stable; `partly supported` applies when exactly one
+  is stable (here C2). Labels follow the rule on the plan page: stable means 10 of 12 origins on one
+  side outside the tie band, 3 of 4 in each origin year, and a 99% interval excluding zero. The
+  Cochran Q test marks every contrast "sign varies" because the per-origin standard errors count
+  only within-window noise, so it did not decide any label here.
+- **Tie bands** are one week-block standard error per origin, written to `tie_bands.parquet` before
+  any sign table (hash in `decisions.json`).
 
-**The tie band is each origin's own sampling noise.** A week-block bootstrap inside each scored
-window (13 one-week blocks, 1,000 draws, paired, five decision sites) gives each contrast's
-per-origin standard error and 95% interval; an estimate within one standard error of zero is a
-**tie**. The script writes `tie_bands.parquet` and its hash to `decisions.json` before computing any
-sign table. For C4 the band is at least twice the XGBoost seed floor (X-12 refitted with a second
-seed at the burn-in origins). Part 2's interval implies a quarterly standard error near 0.18
-points. **A calendar control "changes nothing"** if it is a tie at 10 or more of 12 origins and its
-pooled 95% interval spans zero.
+## Caveats
 
-**Exploratory at 95%,** grouped:
+- **Past weather** (ERA5 and CAMS) at forecast time is a ceiling.
+- **Penalties:** Part 2's penalties were tuned on 2024-07 to 2025-06, so the 2023-24 origins have a
+  lookahead and the 2024-25 origins are in-sample; only 4 origins are strictly causal.
+- **Burn-in and the first vintage:** the first four cuts use a hindsight capacity level, and the
+  2023-07-01 cut uses a vintage dated 37 days later.
+- **Spread pools** describe the site 9 to 12 months before the origin, so a drifting level can bias
+  them.
+- **Hindsight switching masks** apply to training and scoring. Refits are quarterly, not weekly.
+- **The harmonic controls** zero the harmonic design columns inside the experiment's script rather
+  than through the framework module.
+- **Reference rows:** the manual heuristic counts an analogue only if it ended before the cut.
 
-- **Replication and controls:** the `-fc` arms' C1 to C3; G-all+D1-s10k; the 2025-26 origins
-  against Part 2; the three calendar controls; X-12amq minus X-12 over its 11 origins.
-- **Tails:** S2 minus S0; S1 and S2 on G1; coverage by origin year; per-site coverage and pinball
-  at the four tail levels for every arm and spread; q95 coverage by calendar month.
-- **Staleness and descriptive rows:** score by month since the cut; D9; D18; bank holidays, the
-  Christmas run, days below 0 °C; climatology and `manual_heuristic`.
+## What to try next
 
-## Known-answer checks (blocking, before any scored window is read)
+- **Quote C2 as stable only with its leave-one-out caveat,** and give Part 4 the finding that
+  quarterly refits restore the drift gain that one frozen year lost.
+- **Replace the 12-month G1 against all-years contrast** with a per-season one, since the sign
+  follows the winter and summer split.
+- **For tails,** try a spread that widens with the age of the fit or with the weather forecast's
+  error, because conditioning on the predicted level (S1) and a conformal shift (S2) both lowered
+  coverage.
 
-1. **Part 2 reproduces.** At the 2025-07-01 cut, the three `-fc` arms with Part 2's replica spread
-   match experiment 104's stored `*_centred` predictions for July to September 2025 to 1e-6 points.
-2. **No lookahead, per cut:** `assert_no_lookahead` on every fit; no D1 knot after its cut; no
-   residual in a spread pool from a valid time at or after the origin it serves.
-3. **The pool rule,** a unit test: changing any actual or any predicted mean at or after origin c
-   leaves every quantile issued at c unchanged, for S0, S1 (its tercile cut points included), and
-   S2.
-4. **Pinned capacity source per cut and site** printed (`vintage`, `early_vintage`,
-   `growth_prior`), with the held value beside the `-fc` fit's capacity.
-
-## Predictions
-
-Written before any fit; each can fail, and none overrides the decision rule.
-
-- **C1:** not stable, ties at 3 or more origins, pooled interval spanning zero; dropping D16 moves
-  the pooled estimate towards zero by at least 0.10.
-- **C2:** negative at 7 to 11 of 12 origins, most at winter-quarter origins; pooled −0.05 to −0.20,
-  smaller than Part 2's −0.29, since a quarterly refit leaves drift less to correct.
-- **C3:** negative at 4 or more of 6 winter-quarter origins, mixed in summer; pooled −0.05 to −0.20.
-- **C4:** negative at 8 or more of 12 origins, pooled −0.10 to −0.30; within ±0.10 on the error of
-  the mean forecast, since Part 2 found the convex model's lead mostly in the spread.
-- **C5:** S0's pooled coverage on G-all+D1 is 89 to 93% at q95 and 95 to 98% at q99; S1 meets the
-  pass rule below.
-- **Controls and replication:** each calendar control changes nothing (rule above); the `-fc` arms
-  share the pinned arms' sign at 10 or more of 12 origins for C1 to C3; G-all+D1-s10k is a tie with
-  G-all+D1 at 10 or more origins; the XGBoost seed floor is under 0.03 points.
-- **Run time:** the convex grid under 45 minutes of wall clock; all compute under 5 hours.
-
-## Decision rule
-
-**The verdict is on whether C1 and C2 keep one sign across origins.** C3 (the headline answer to
-"does more history help"), C4, and C5 are labelled in the take-home, not in `verdict`.
-
-**Labels for one contrast:**
-
-- **Stable:** at least 10 of 12 origins on one side outside the tie band, at least 3 of 4 on that
-  side in each origin year, and the pooled 99% interval excluding zero on that side.
-- **Seasonally stable:** not stable; at least 5 of 6 winter-quarter origins on one side and at
-  least 5 of 6 summer-quarter origins on the other; and each quarter type's pooled 95% interval
-  excluding zero in its own direction.
-- **Too small to sign:** 5 or more ties.
-- **Unstable:** none of the above.
-- **Sign varies (evidence):** at least 2 origins on each side whose per-origin 95% interval
-  excludes zero, or a between-origin heterogeneity test (Cochran's Q on the 12 per-origin estimates
-  with their bootstrap variances) at p < 0.01.
-
-**Verdict:**
-
-- **`supported`:** C1 and C2 are both stable, and each keeps at least 9 of 12 origins on its side
-  whichever decision site is left out.
-- **`partly supported`,** in three cases: (a) exactly one of C1 and C2 is stable; (b) neither is
-  stable and at least one is seasonally stable; (c) both are stable but leaving one site out drops
-  one of them below 9 of 12.
-- **`refuted`:** C1 and C2 are both unstable and both show "sign varies". The finding is then that
-  the sign of a history contrast depends on the origin, so no single-year history contrast in this
-  series is evidence either way.
-- **`not supported`:** C1 and C2 are each unstable or too small to sign, neither shows "sign
-  varies", and both pooled 99% intervals lie inside ±0.10: the history contrasts are near zero.
-- **`inconclusive`:** anything else, or an unfixed blocking check.
-
-**The 8 out-of-tuning origins.** The write-up says whether each label survives on them (stable
-needs at least 7 of 8 on its side there); a label that does not survive is reported as resting on
-the in-tuning origins.
-
-**C3's label, for the take-home:** "more history helps" if C3 is stable and negative; "helps in
-winter only" if it is seasonally stable with negative winter-quarter origins; "level" if its pooled
-interval lies inside ±0.10; "no stable answer" otherwise. If C1 or C3 is seasonally stable, the
-write-up advises Part 4 to read its own C1 per season first; this plan does not change Part 4's
-decision rule.
-
-**C4's label:** "the lead holds" if C4 is stable and negative; "the lead is in the spread" if, in
-addition, the same contrast on the error of the mean forecast spans zero.
-
-**C5 passes only if all of these hold:**
-
-- S1's pooled coverage is within 1 point of nominal at q95 and at q99, and the month-block 95%
-  interval of each coverage lies within ±1.5 points of nominal;
-- at least 4 of 5 decision sites are within 2 points at q95 and within 1.5 points at q99;
-- q01 and q05 coverage are each no further from nominal than under S0;
-- the upper end of the 99% interval of S1 minus S0 on the quantile score is at most +0.03 points.
-
-C5 is also reported from 2024-07-01 on. A pass sends S1 to Part 6 ("Decisions"); S2 meeting the
-rule is an exploratory pass only.
-
-## Audit triggers (the `ml-experiment` skill's seven, checked on these results)
-
-1. **A control fails:** the known-answer checks, the calendar controls, the replication column.
-2. **A contradiction:** with experiment 104 (the 2025-26 origins), its second audit (the 2024-25
-   origins), or Part 2's tails.
-3. **Quantile score and error of the mean disagree in sign:** every planned contrast.
-4. **Leaving one site out flips a planned contrast's sign count or label.**
-5. **A nested arm wins** (G1 beating G-all pooled), or a calendar control does not change nothing.
-6. **Interval width:** the 2025-26 origins' pooled interval against experiment 104's.
-7. **A later experiment depends on it:** fires if C5 passes; the audit runs before Part 6 uses S1.
-
-If any trigger fires, a fresh Opus audit runs before the prose review.
-
-## Run order, compute, and time
-
-**Check `uptime` first.** At most 8 cores, no GPU; the 2 reserved cores stay free.
-
-1. **Scripts and checks** (about 3 hours of agent time): copy the `e00104_*.py` patterns, add the
-   origin loop, the pool builder, S1, S2, the week-block tie bands, and the pool-rule test; run
-   checks 1 to 4.
-2. **Convex grid:** 9 arms × 16 cuts × up to 7 sites plus the D10 refits, about 2.5 CPU-hours at
-   3 s per site-year; 8 workers with one torch thread each, about 20 to 30 minutes of wall clock.
-3. **XGBoost** at `nthread: 1`, 8 workers, after the convex grid: X-12 and X-12-nodoy at 16 cuts
-   and 5 sites plus D9 (about 166 fits), X-12amq at 11 origins (55, plus 55 median-only replicas at
-   about a tenth of a fit each), the seed check (20), and the D10 refits (12): about 255 full fits.
-   At about 2 minutes per single-thread fit (experiment 104's timestamps) that is about 64 minutes,
-   or 1.5 hours allowing for memory contention.
-4. **Bar choice, tie bands, spreads, and scoring:** under 30 minutes.
-5. **Write-up:** one Opus code review (leakage first: each cut's window, the pool rule, S1's cut
-   points), a numbers review, any audit, and the Sonnet prose review, about 5 hours of agent time.
-
-**The compute budget is 5 hours** (about 2.5 expected). **Cut in this order if needed:** D18; the
-D10-masked XGBoost refits; X-12amq; G-all+D1-s10k; the seed check (C4's band then uses the
-bootstrap alone, disclosed). Decision arms, calendar controls, and spreads are never cut. About a
-day from approval to a merge-ready PR.
-
-## What the write-up must contain (beyond the standing rules of the differentiable-physics series)
-
-The take-home says plainly whether more years help at most origins, in winter only, or at none;
-whether the lead over lagless XGBoost holds; and whether S1 fixes the tails. No substation cards;
-D-labels only.
-
-- **Figures, headline first:** a dot per origin for C1 to C4 with its interval (quarter types in two
-  colours, tie bands shaded, causality groups marked, pooled estimate at the right); every arm's
-  absolute score per origin and site; leave-one-site-out sign counts; tail coverage per origin and
-  site for S0 to S2; a winter and a summer week at three sites (actual, G1, G-all+D1, bar).
-- **Bullets:** arms and rows; absolute scores; C1 to C5 with intervals, sign counts, and labels by
-  causality group; the tail table (coverage and pinball at q01, q05, q95, q99); the replication
-  column; the calendar controls; caveats; what to try next.
-- **Checks:** median minus mean forecast per site and arm; the error of the mean forecast beside
-  each quantile-score contrast; leaving one site out; which triggers fired.
-- **Caveats:** past weather; the penalties' causality groups; the burn-in's hindsight capacity
-  (first four pools, the bar choice) and the 37-day vintage leak at 2023-07-01; the pool's quarter
-  groups lag the level by 9 to 12 months; hindsight switching masks; quarterly, not weekly, refits.
+The code is in `ml-experiments/00107-differentiable-physics-rolling-origin-history-and-tails/`; the
+printed report is `report.txt`, the D10-masked variant is `report_d10_masked.txt`, and the bar
+choice and tie-band hash are `decisions.json`. To reproduce: run `e00107_gam.py`, `e00107_xgb.py`
+(both with `--variant base`, then `d10_masked`), `e00107_decisions.py`, `e00107_assemble.py`
+(`--variant base` then `d10_masked`), `e00107_references.py`, `e00107_checks.py`, `e00107_score.py`
+(both variants), and `e00107_charts.py`.

@@ -27,3 +27,10 @@ message, and the [Research plan](plan.md) lists what is planned next.
   contrasts, because its forecast spread carried the previous year's mean bias; the page now carries
   a Correction section. The experiment belongs mainly to the [demand: calendar and weather
   theme](../differentiable-physics-demand-calendar-and-weather/index.md).
+- **[00107 - Differentiable physics, rolling-origin history and
+  tails](../../00107-differentiable-physics-rolling-origin-history-and-tails/result.md):** Refitting
+  the convex model every quarter at 12 origins, adding a drift term to the all-years model lowered
+  the score at 10 of 12 origins (0.45 points, 99% interval 0.23 to 0.68 better). All years without
+  drift scored worse than 12 months at 8 of 12 origins, almost entirely because of D10, and all
+  years with drift against 12 months stayed unresolved, with winter-quarter origins favouring more
+  years. Two new spreads for the 95% and 99% quantiles made their coverage worse.
