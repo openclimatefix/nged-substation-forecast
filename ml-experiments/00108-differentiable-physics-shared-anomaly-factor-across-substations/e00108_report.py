@@ -138,7 +138,7 @@ def figure_gate(*, gate: dict) -> alt.Chart:
         width=WIDTH,
         height=22 * len(rows),
         title=[
-            "The shared part had not released after 3 days in any of the 12 episodes",
+            "Three days after the end, the shared part held about 74% of its peak",
             "(dashed line: the pre-registered limit of 25% of the peak)",
         ],
     )
@@ -151,16 +151,14 @@ def figure_response(*, response: dict[str, list[float]]) -> alt.Chart:
         alt.Chart(frame)
         .mark_line(point=True, color=ocf.DATA_BLUE)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("day:Q", title="Target day (the factor is 1 on days 1 to 3, then 0)"),
+            x=alt.X("day:Q", title="Target day (the factor is 1 on days 0 to 2, then 0)"),
             y=alt.Y("level:Q", title="Shared state at day-ahead cutoff"),
         )
     )
     return line.properties(
         width=WIDTH,
         height=200,
-        title=[
-            "The tuned shared filter rises slowly during a three-day step and falls slowly after it"
-        ],
+        title=["The tuned shared filter rises within a day and then falls by about 30% a day"],
     )
 
 

@@ -1,8 +1,8 @@
 == known-answer gate (tuning-year injections) ==
 1_recovery: PASS {'slope': 1.0997730598285422, 'pass': True, 'range': [0.8, 1.2]}
-2_shared_carry: FAIL {'ratio': 0.18004168560161593, 'pass': False, 'range': [0.4, 1.2], 'diagnostic_ratio_to_perfect_tracking_of_the_factor': 0.3933322535708178, 'diagnostic_ratio_by_episode_day': {'1': 0.029912120852924065, '2': 0.1621431673714063}}
+2_shared_carry: FAIL {'ratio': 0.047051209805257434, 'pass': False, 'range': [0.4, 1.2], 'diagnostic_ratio_to_perfect_tracking_of_the_factor': 0.10279151922008643, 'diagnostic_ratio_by_episode_day': {'1': 0.029912120852924065, '2': 0.1621431673714063}}
 3_shared_release: FAIL {'worst_ratio': 0.7544563144815483, 'pass': False}
-4_factor_adds_value: FAIL {'kf_mean_abs_error': 1.999431653054255, 'a2_mean_abs_error': 1.993803162190562, 'pass': False}
+4_factor_adds_value: FAIL {'kf_mean_abs_error': 2.4017354514741305, 'a2_mean_abs_error': 2.397028497616688, 'pass': False}
 5_no_foresight: PASS {'cases_checked': 218160, 'bit_identical': True, 'pass': True}
 6_locality: PASS {'own_site_shared_max_change': 0.0, 'others_mean_abs_move_points': 0.043255431829540635, 'pass': True}
 7a_nesting: PASS {'max_abs_gap': 0.0, 'pass': True, 'tolerance': 1e-06}

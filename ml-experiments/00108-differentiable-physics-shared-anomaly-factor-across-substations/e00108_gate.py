@@ -384,7 +384,11 @@ def test_carry(*, gate: Gate) -> dict:
                 gate.setup.beta[site] * gate.panel.sigma[site][index] * np.median(others, axis=0)
             )
             second_on = case_mask(
-                cache=gate.cache, index=index, episode=episode, first_day=1, last_day=episode.n_days
+                cache=gate.cache,
+                index=index,
+                episode=episode,
+                first_day=1,
+                last_day=episode.n_days - 1,
             )
             numerator += float(delta[second_on].sum())
             denominator += float(truth[second_on].sum())
@@ -453,7 +457,11 @@ def test_factor_value(*, gate: Gate) -> dict:
             index = gate.inputs[site].index
             truth = gate.injected[site][index]
             window = case_mask(
-                cache=gate.cache, index=index, episode=episode, first_day=1, last_day=2
+                cache=gate.cache,
+                index=index,
+                episode=episode,
+                first_day=1,
+                last_day=min(2, episode.n_days - 1),
             )
             delta_kf = gate.everything[site].kf_total - gate.base[site].kf_total
             delta_a2 = gate.everything[site].a2 - gate.base[site].a2
