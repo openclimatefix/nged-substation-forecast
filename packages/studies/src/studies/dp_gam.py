@@ -31,15 +31,17 @@ resample is a row of weights). `solve_bounded_quadratic` then minimises `theta^T
 theta` over the box `theta_j >= 0` for the constrained parameters with a projected-Newton
 active-set method, batched over the leading dimension, in float64 by default.
 
-**The spread is a forward cross-fitted residual quantile model.** `crossfit_residuals` predicts each
-quarter of the last year of the training window from a fit on the data before the quarter, with the
-arm's own window rule and the drift held, so the residuals have the staleness of a forecast.
-`ResidualSpread` turns them into quantiles per hour band and calendar quarter.
+**The spread is a residual quantile model fitted on a replica of the scored forecast.**
+`replica_residuals` fits the arm 12 months before the cut, with the arm's own window rule, holds its
+drift, and predicts the 12 months that follow. Those residuals are as stale as the scored forecast
+(0 to 12 months), because the scored fit is frozen for the whole year. `ResidualSpread` turns them
+into quantiles per hour band and calendar quarter.
 """
 
+import calendar
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Final, Literal
 
 import numpy as np
@@ -56,6 +58,25 @@ from studies.dp_calendar import (
 )
 from studies.dp_features import FeatureCache, SiteFeatures
 from studies.experiment_store import HOLDOUT_START
+
+
+def naive_utc(*, moment: datetime) -> np.datetime64:
+    """Return a timezone-aware datetime as a naive UTC `datetime64[us]`.
+
+    Args:
+        moment: An aware datetime in any time zone.
+
+    Returns:
+        The same instant as UTC microseconds.
+
+    Raises:
+        ValueError: If `moment` has no time zone, since a naive wall time could be local.
+    """
+    if moment.tzinfo is None:
+        msg = "a cut or window bound must carry a time zone"
+        raise ValueError(msg)
+    return np.datetime64(moment.astimezone(UTC).replace(tzinfo=None), "us")
+
 
 DriftType = Literal["none", "d1", "d1_steps"]
 """The drift form: no drift, the smooth level path, or the smooth path plus sparse steps."""
@@ -106,7 +127,10 @@ CHUNK_ROWS: Final[int] = 4000
 """Rows of the design built at once."""
 MIN_SPREAD_GROUP_ROWS: Final[int] = 200
 """A (band, quarter) group with fewer residuals falls back to its band, then to all residuals."""
-N_CROSSFIT_QUARTERS: Final[int] = 4
+REPLICA_MONTHS: Final[int] = 12
+"""The scored forecast is frozen for this many months, and so is its replica."""
+LAST_TRAINED_MIN_SHAPE: Final[float] = 1e-3
+"""A training row carries solar signal when its derated unit shape is above this."""
 
 
 @dataclass(frozen=True)
@@ -169,7 +193,7 @@ class GamLayout:
 
 
 def make_layout(
-    *, spec: GamSpec, season_years: Sequence[int], cut: datetime, earliest: datetime
+    *, spec: GamSpec, season_years: Sequence[int], cut: datetime, earliest: np.datetime64
 ) -> GamLayout:
     """Lay out the design's columns.
 
@@ -177,8 +201,8 @@ def make_layout(
         spec: The penalties and drift form.
         season_years: The season-years that get a capacity increment.
         cut: The end of the training window; the last drift knot is here.
-        earliest: The earliest instant any training row can have, which sets how many monthly
-            knots are needed.
+        earliest: The earliest instant any training row can have, as UTC microseconds, which
+            sets how many monthly knots are needed.
 
     Returns:
         The layout.
@@ -193,14 +217,8 @@ def make_layout(
         "lighting": 4,
         "capacity": len(season_years),
     }
-    cut_day = (
-        np.datetime64(cut.replace(tzinfo=None), "us").astype("datetime64[s]").astype(np.int64)
-        / 86400.0
-    )
-    first_day = (
-        np.datetime64(earliest.replace(tzinfo=None), "us").astype("datetime64[s]").astype(np.int64)
-        / 86400.0
-    )
+    cut_day = naive_utc(moment=cut).astype("datetime64[s]").astype(np.int64) / 86400.0
+    first_day = earliest.astype("datetime64[s]").astype(np.int64) / 86400.0
     n_knots = int(np.ceil((cut_day - first_day) / KNOT_SPACING_DAYS)) + 1
     knot_days = cut_day - KNOT_SPACING_DAYS * np.arange(n_knots)[::-1]
     if spec.drift != "none":
@@ -390,15 +408,13 @@ def training_rows(
         Sorted grid positions.
     """
     end = cache.end_times
-    cut64 = np.datetime64(cut.replace(tzinfo=None), "us")
+    cut64 = naive_utc(moment=cut)
     if window.months is not None:
-        start64 = np.datetime64(
-            _months_before(moment=cut, months=window.months).replace(tzinfo=None), "us"
-        )
+        start64 = naive_utc(moment=_months_before(moment=cut, months=window.months))
     elif window.start is not None:
-        start64 = np.datetime64(window.start.replace(tzinfo=None), "us")
+        start64 = naive_utc(moment=window.start)
     else:
-        start64 = np.datetime64(features.table.first_usable.replace(tzinfo=None), "us")
+        start64 = naive_utc(moment=features.table.first_usable)
     keep = (
         features.default_rows
         & features.present
@@ -412,9 +428,11 @@ def training_rows(
 
 
 def _months_before(*, moment: datetime, months: int) -> datetime:
-    """Return the instant `months` calendar months before `moment`."""
+    """Return the instant `months` calendar months before `moment`, clamping the day of month."""
     total = moment.year * 12 + (moment.month - 1) - months
-    return moment.replace(year=total // 12, month=total % 12 + 1)
+    year, month = total // 12, total % 12 + 1
+    day = min(moment.day, calendar.monthrange(year, month)[1])
+    return moment.replace(year=year, month=month, day=day)
 
 
 def assert_no_lookahead(*, cache: FeatureCache, index: np.ndarray, cut: datetime) -> None:
@@ -428,7 +446,7 @@ def assert_no_lookahead(*, cache: FeatureCache, index: np.ndarray, cut: datetime
     Raises:
         ValueError: If a row ends after `cut`.
     """
-    cut64 = np.datetime64(cut.replace(tzinfo=None), "us")
+    cut64 = naive_utc(moment=cut)
     if len(index) and cache.end_times[index].max() > cut64:
         msg = f"a training row ends after the cut {cut}: lookahead"
         raise ValueError(msg)
@@ -444,7 +462,7 @@ def assert_before_holdout(*, cache: FeatureCache, index: np.ndarray) -> None:
     Raises:
         ValueError: If a row ends on or after 2026-07-01 00:00 UTC.
     """
-    holdout = np.datetime64(HOLDOUT_START.replace(tzinfo=None), "us")
+    holdout = naive_utc(moment=HOLDOUT_START)
     if len(index) and cache.end_times[index].max() >= holdout:
         msg = "a row to score is on or after 2026-07-01, which is held out"
         raise ValueError(msg)
@@ -503,13 +521,17 @@ def accumulate_gram(
     return gram, rhs
 
 
+PIVOT_PATIENCE: Final[int] = 3
+"""Iterations without fewer broken conditions before block pivoting falls back to a single move."""
+
+
 def solve_bounded_quadratic(
     *,
     matrix: torch.Tensor,
     rhs: torch.Tensor,
     constrained: torch.Tensor,
     max_iterations: int = 500,
-    tolerance: float = 1e-7,
+    tolerance: float | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Minimise `theta^T A theta - 2 b^T theta` with `theta_j >= 0` where `constrained[j]`.
 
@@ -526,7 +548,10 @@ def solve_bounded_quadratic(
         rhs: `b`, shape (batch, p).
         constrained: Boolean, shape (p,), True for the non-negative parameters.
         max_iterations: The most pivoting iterations.
-        tolerance: The optimality tolerance, relative to the largest entry of `b`.
+        tolerance: The optimality tolerance, relative to the largest entry of `b`. The default is
+            1e-7 in float64 and 10,000 machine epsilons (about 1e-3) in float32. The matrix of a
+            real fit is badly conditioned, so float32 is only safe on well-conditioned problems and
+            the fits of this series use float64.
 
     Returns:
         `(theta, violation)`: the solution of shape (batch, p), and for each problem the largest
@@ -536,6 +561,9 @@ def solve_bounded_quadratic(
         ValueError: If a problem has not converged after `max_iterations`.
     """
     constrained = constrained.to(matrix.device)
+    epsilon = float(torch.finfo(matrix.dtype).eps)
+    if tolerance is None:
+        tolerance = max(1e-7, 1e4 * epsilon)
     batch, p = rhs.shape
     scale = rhs.abs().amax(dim=1).clamp(min=1.0)
     unconstrained = torch.linalg.solve(matrix, rhs[:, :, None])[:, :, 0]
@@ -547,7 +575,7 @@ def solve_bounded_quadratic(
     for _ in range(max_iterations):
         theta = _solve_on_free_set(matrix=matrix, rhs=rhs, free=free)
         gradient = torch.einsum("bpq,bq->bp", matrix, theta) - rhs
-        theta_tolerance = 1e-12 * theta.abs().amax(dim=1, keepdim=True).clamp(min=1.0)
+        theta_tolerance = 100.0 * epsilon * theta.abs().amax(dim=1, keepdim=True).clamp(min=1.0)
         broken = (free & constrained[None, :] & (theta < -theta_tolerance)) | (
             ~free & (gradient < -tolerance * scale[:, None])
         )
@@ -573,10 +601,6 @@ def solve_bounded_quadratic(
         msg = f"the bounded solver did not converge: worst violation {float(violation.max()):.3g}"
         raise ValueError(msg)
     return theta, violation
-
-
-PIVOT_PATIENCE: Final[int] = 3
-"""Iterations without fewer broken conditions before block pivoting falls back to a single move."""
 
 
 def _solve_on_free_set(
@@ -616,6 +640,8 @@ class GamFit:
         cut: The fit's cut; every training row ends no later.
         n_rows: The number of training rows.
         site: The substation's label.
+        last_season_year: The latest season-year with a training row that carries solar signal.
+            A later season-year takes this one's capacity.
         violation: Each fit's optimality violation.
     """
 
@@ -624,6 +650,7 @@ class GamFit:
     cut: datetime
     n_rows: int
     site: str
+    last_season_year: int
     violation: np.ndarray = field(default_factory=lambda: np.zeros(0))
 
     def capacity_points(self, *, member: int = 0) -> dict[int, float]:
@@ -669,7 +696,7 @@ def prepare_fit(
         msg = f"{site} has no training rows before {cut}"
         raise ValueError(msg)
     assert_no_lookahead(cache=cache, index=index, cut=cut)
-    earliest = cache.end_times[index[0]].astype("datetime64[us]").astype(datetime)
+    earliest = cache.end_times[index[0]]
     layout = make_layout(spec=spec, season_years=season_years, cut=cut, earliest=earliest)
     return layout, index
 
@@ -754,12 +781,14 @@ def fit_gam(
         rhs=rhs - 0.5 * linear,
         constrained=torch.as_tensor(layout.constrained),
     )
+    signal = derated_unit_shape(features=features, index=index) > LAST_TRAINED_MIN_SHAPE
     return GamFit(
         layout=layout,
         theta=theta.cpu().numpy(),
         cut=cut,
         n_rows=len(index),
         site=site,
+        last_season_year=int(cache.calendar.season_year[index[signal]].max()),
         violation=violation.cpu().numpy(),
     )
 
@@ -769,9 +798,9 @@ def predict_gam(
 ) -> np.ndarray:
     """Predict net power in points at the grid rows `index`.
 
-    The drift is held at its last knot and the capacity of a season-year after the last trained
-    one is the last trained season-year's capacity, both because the layout's knots end at the cut
-    and the capacity columns are cumulative in the season-year.
+    The drift is held at its last knot, because the layout's knots end at the cut and the hat
+    functions are clipped there. The capacity of a season-year after `fit.last_season_year` is set
+    explicitly to that season-year's capacity.
 
     Args:
         cache: The cache.
@@ -790,12 +819,11 @@ def predict_gam(
     layout = fit.layout
     out = np.empty(len(index))
     theta = fit.theta[member]
-    last_trained = _last_trained_season_year(cache=cache, fit=fit)
     for chunk in _chunks(index=index):
         rows = index[chunk]
         x = design_matrix(cache=cache, features=features, layout=layout, index=rows)
         capacity = layout.slices["capacity"]
-        held_year = np.minimum(cache.calendar.season_year[rows], last_trained)
+        held_year = np.minimum(cache.calendar.season_year[rows], fit.last_season_year)
         held = held_year[:, None] >= np.array(layout.season_years)[None, :]
         x[:, capacity] = -derated_unit_shape(features=features, index=rows)[:, None] * held
         if not np.isfinite(x).all():
@@ -803,13 +831,6 @@ def predict_gam(
             raise ValueError(msg)
         out[chunk] = x @ theta
     return out
-
-
-def _last_trained_season_year(*, cache: FeatureCache, fit: GamFit) -> int:
-    """Return the season-year of the fit's cut, which is the last one it could train on."""
-    cut64 = np.datetime64(fit.cut.replace(tzinfo=None), "us")
-    position = int(np.searchsorted(cache.end_times, cut64, side="right")) - 1
-    return int(cache.calendar.season_year[max(position, 0)])
 
 
 @dataclass(frozen=True)
@@ -830,7 +851,7 @@ class ResidualSpread:
         residuals, and a band with fewer uses all residuals.
 
         Args:
-            residuals: Cross-fitted residuals in points.
+            residuals: Replica residuals in points.
             band: The hour band of each residual.
             quarter: The calendar quarter of each residual.
 
@@ -841,7 +862,7 @@ class ResidualSpread:
             ValueError: If there are no residuals.
         """
         if len(residuals) == 0:
-            msg = "no cross-fitted residuals to fit the spread on"
+            msg = "no residuals to fit the spread on"
             raise ValueError(msg)
         levels = np.array(QUANTILE_LEVELS)
         everything = np.quantile(residuals, levels)
@@ -877,25 +898,32 @@ class ResidualSpread:
         return mean[:, None] + self.table[band, quarter]
 
 
-def crossfit_cuts(*, cut: datetime) -> list[tuple[datetime, datetime]]:
-    """Return the (start, end) of the four quarters of the 12 months before `cut`.
+@dataclass(frozen=True)
+class ReplicaResiduals:
+    """Residuals of a replica of the scored forecast.
 
-    Args:
-        cut: The cut of the final fit.
-
-    Returns:
-        Four pairs, earliest first; each quarter's end is the next quarter's start.
+    Attributes:
+        residuals: Actual minus predicted mean, in points.
+        band: The hour band of each residual.
+        quarter: The calendar quarter of each residual.
+        index: The grid rows of the residuals.
+        fit_cut: The replica fit's cut, 12 months before the final cut; every residual row ends
+            after it, and none ends after the final cut.
     """
-    return [
-        (
-            _months_before(moment=cut, months=12 - 3 * q),
-            _months_before(moment=cut, months=9 - 3 * q),
-        )
-        for q in range(N_CROSSFIT_QUARTERS)
-    ]
+
+    residuals: np.ndarray
+    band: np.ndarray
+    quarter: np.ndarray
+    index: np.ndarray
+    fit_cut: datetime
 
 
-def crossfit_residuals(
+def replica_cut(*, cut: datetime) -> datetime:
+    """Return the cut of the replica fit: `REPLICA_MONTHS` months before the final cut."""
+    return _months_before(moment=cut, months=REPLICA_MONTHS)
+
+
+def replica_residuals(
     *,
     cache: FeatureCache,
     site: str,
@@ -903,11 +931,15 @@ def crossfit_residuals(
     cut: datetime,
     window: TrainingWindow,
     season_years: Sequence[int],
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return forward cross-fitted residuals over the last 12 months before `cut`.
+) -> ReplicaResiduals:
+    """Return the residuals of a replica of the scored forecast.
 
-    Each quarter is predicted by a fit whose cut is the quarter's start, with the arm's window
-    rule applied at that cut and the drift held, so the residuals carry the staleness of a forecast.
+    The scored forecast is one fit frozen for the 12 months after the cut. Its replica is the same
+    arm fitted at the cut 12 months earlier, with the arm's window rule applied at that earlier
+    cut and the drift held, and used to predict the 12 months up to the final cut. The residuals
+    are therefore as stale as the scored forecast: 0 to 12 months, not the 0 to 3 months of a
+    quarter-by-quarter fit. The replica year is the year before the cut, so the spread is
+    fitted on a year that tuning may also have used.
 
     Args:
         cache: The cache.
@@ -918,38 +950,38 @@ def crossfit_residuals(
         season_years: The season-years with a capacity increment.
 
     Returns:
-        `(residuals, band, quarter)` over the rows that have a reading and sit outside the
-        switching masks: actual minus predicted mean in points, the hour band, and the calendar
-        quarter of each.
+        The residuals over the rows that have a reading, sit outside the switching masks, and end
+        after the substation's first usable instant.
     """
     features = cache.sites[site]
-    residuals, bands, quarters = [], [], []
-    for start, end in crossfit_cuts(cut=cut):
-        fit = fit_gam(
-            cache=cache,
-            site=site,
-            specs=[spec],
-            cut=start,
-            window=window,
-            season_years=season_years,
-        )
-        start64 = np.datetime64(start.replace(tzinfo=None), "us")
-        end64 = np.datetime64(end.replace(tzinfo=None), "us")
-        keep = (
-            features.present
-            & ~features.switching_mask
-            & np.isfinite(features.y)
-            & np.isfinite(features.pv_unit_shape)
-            & np.isfinite(features.smoothed_temperature_c).all(axis=1)
-            & (cache.end_times > start64)
-            & (cache.end_times <= end64)
-        )
-        index = np.flatnonzero(keep)
-        predicted = predict_gam(cache=cache, fit=fit, index=index)
-        residuals.append(features.y[index] - predicted)
-        bands.append(cache.calendar.band[index])
-        quarters.append(cache.calendar.quarter[index])
-    return np.concatenate(residuals), np.concatenate(bands), np.concatenate(quarters)
+    fit_cut = replica_cut(cut=cut)
+    fit = fit_gam(
+        cache=cache,
+        site=site,
+        specs=[spec],
+        cut=fit_cut,
+        window=window,
+        season_years=season_years,
+    )
+    keep = (
+        features.present
+        & ~features.switching_mask
+        & np.isfinite(features.y)
+        & np.isfinite(features.pv_unit_shape)
+        & np.isfinite(features.smoothed_temperature_c).all(axis=1)
+        & (cache.end_times > naive_utc(moment=fit_cut))
+        & (cache.end_times > naive_utc(moment=features.table.first_usable))
+        & (cache.end_times <= naive_utc(moment=cut))
+    )
+    index = np.flatnonzero(keep)
+    predicted = predict_gam(cache=cache, fit=fit, index=index)
+    return ReplicaResiduals(
+        residuals=features.y[index] - predicted,
+        band=cache.calendar.band[index],
+        quarter=cache.calendar.quarter[index],
+        index=index,
+        fit_cut=fit_cut,
+    )
 
 
 def month_block_weights(

@@ -38,7 +38,6 @@ import torch
 from torch import nn
 
 from studies.dp_calendar import (
-    BAND_NAMES,
     DAY_TYPES,
     HALF_HOURS_PER_DAY,
     HEATING_THRESHOLD_C,
@@ -47,7 +46,7 @@ from studies.dp_calendar import (
     lighting_ramps,
 )
 from studies.dp_features import FeatureCache
-from studies.dp_gam import DriftType, derated_unit_shape
+from studies.dp_gam import HEATING_SCALE_C, N_BANDS, DriftType, derated_unit_shape
 from studies.dp_operator import (
     ApparentPowerParameters,
     observe,
@@ -55,16 +54,21 @@ from studies.dp_operator import (
     tan_phi_from_power_factor,
 )
 
-N_BANDS: Final[int] = len(BAND_NAMES)
 N_PROFILE: Final[int] = len(DAY_TYPES) * HALF_HOURS_PER_DAY
+"""Entries of a daily profile: one per day type and local half-hour."""
 N_PERIODS: Final[int] = len(HOLIDAY_PERIODS)
-HEATING_SCALE_C: Final[float] = 10.0
+"""The number of named holiday periods (one more embedding row stands for an ordinary day)."""
 THRESHOLD_PRIOR_SCALE_C: Final[float] = 2.0
 """The prior on a substation's heating threshold is a normal around 15.5 degrees, this wide."""
 INITIAL_POWER_FACTOR: Final[float] = 0.97
 """The power factor that the MVA substations' `tan(phi)` starts from."""
-INTERACTION_INPUTS: Final[int] = 4 + 2 + 2 + len(DAY_TYPES) + 1 + 1
-"""Harmonics, tent, half-hour sine and cosine, day-type one-hot, mixed temperature, elevation."""
+INTERACTION_INPUTS: Final[int] = 4 + 2 + 2 + len(DAY_TYPES) + 1
+"""Harmonics, tent, half-hour sine and cosine, day-type one-hot, and the mixed temperature.
+
+The sun's elevation is not an input: the lighting ramps already carry how dark it is, and an
+elevation input would let the network learn the fleet-average solar curve and compete with the
+solar term.
+"""
 
 
 @dataclass(frozen=True)
@@ -216,6 +220,9 @@ def build_pooled_batch(
         if apparent:
             keep &= features.dark
         rows = np.flatnonzero(keep)
+        if len(rows) and cache.end_times[rows].max() > cut_end:
+            msg = f"{label} has a pooled row that ends after the cut: lookahead"
+            raise ValueError(msg)
         n = len(rows)
         calendar = cache.calendar
         holiday = calendar.holiday_period[rows].astype(np.int64)
@@ -275,6 +282,11 @@ _BATCH_KEYS: Final[tuple[str, ...]] = (
 class PooledDemandModel(nn.Module):
     """The pooled demand-minus-solar model, in points of effective capacity."""
 
+    trained: torch.Tensor
+    """1 for each substation and season-year that has training rows, else 0 (a buffer)."""
+    centre_means: torch.Tensor
+    """The mean of the centred terms over each substation and season-year, from training."""
+
     def __init__(
         self,
         *,
@@ -314,6 +326,8 @@ class PooledDemandModel(nn.Module):
         )
         self.q0 = nn.Parameter(torch.zeros(n_sites))
         self.interaction = self._interaction_network(hidden=config.interaction_hidden)
+        self.register_buffer("trained", torch.ones(n_sites, n_season_years))
+        self.register_buffer("centre_means", torch.zeros(n_sites * n_season_years))
 
     @staticmethod
     def _interaction_network(*, hidden: tuple[int, ...]) -> nn.Sequential | None:
@@ -332,7 +346,20 @@ class PooledDemandModel(nn.Module):
 
     def capacities(self) -> torch.Tensor:
         """Return the capacity of each substation and season-year, shape (sites, years)."""
-        return torch.cumsum(nn.functional.softplus(self.capacity_raw), dim=1)
+        return torch.cumsum(nn.functional.softplus(self.capacity_raw) * self.trained, dim=1)
+
+    def mark_trained_years(self, *, batch: PooledBatch) -> None:
+        """Allow a capacity increment only in the season-years that have training rows.
+
+        An untrained season-year then adds nothing, so its capacity is the last trained
+        season-year's: the vintage rule's hold, which a forecast of a later season-year needs.
+
+        Args:
+            batch: The training rows.
+        """
+        trained = torch.zeros(self.n_sites * self.n_season_years, device=batch.y.device)
+        trained[torch.unique(batch.season_slot)] = 1.0
+        self.trained.copy_(trained.reshape(self.n_sites, self.n_season_years))
 
     def demand(self, *, batch: PooledBatch) -> torch.Tensor:
         """Return the modelled demand of each row, in points."""
@@ -340,19 +367,39 @@ class PooledDemandModel(nn.Module):
         mix = torch.softmax(self.site_logits, dim=1)[batch.site]
         shared = (mix * self.shapes[:, profile].T).sum(dim=1) if self.config.shared_shapes else 0.0
         value = self.level[batch.site] + shared + self.deviation[batch.site, profile]
-        value = value + self.holiday[batch.holiday, batch.band]
-        value = value + (batch.tent * self.tent_coef[:, batch.band].T).sum(dim=1)
-        value = value + (batch.harmonics * self.harmonic_coef[:, batch.band].T).sum(dim=1)
-        value = value + batch.lighting @ self.lighting_coef
+        calendar = self.holiday[batch.holiday, batch.band]
+        calendar = calendar + (batch.tent * self.tent_coef[:, batch.band].T).sum(dim=1)
+        calendar = calendar + (batch.harmonics * self.harmonic_coef[:, batch.band].T).sum(dim=1)
+        calendar = calendar + batch.lighting @ self.lighting_coef
         inertia = torch.softmax(self.inertia_logits, dim=0)
         mixed = batch.smoothed_temperature @ inertia
         hinge = torch.relu(self.threshold[batch.site] - mixed) / HEATING_SCALE_C
         value = value + nn.functional.softplus(self.slope_raw[batch.site, batch.band]) * hinge
         if self.interaction is not None:
-            value = (
-                value + self.interaction(self._interaction_inputs(batch=batch, mixed=mixed))[:, 0]
+            calendar = (
+                calendar
+                + self.interaction(self._interaction_inputs(batch=batch, mixed=mixed))[:, 0]
             )
-        return value
+        return value + self._centred(values=calendar, slot=batch.season_slot)
+
+    def _centred(self, *, values: torch.Tensor, slot: torch.Tensor) -> torch.Tensor:
+        """Subtract the mean of `values` over each substation and season-year.
+
+        The shared calendar, lighting, and interaction terms are centred per site-year, so that
+        neither a level nor a drift enters them: those belong to the substation's level and, in
+        Part 4, to its drift. In training mode the means come from the batch itself and are stored;
+        in evaluation mode the stored means are used, which are the training rows' and never a
+        forecast row's.
+        """
+        n_slots = self.n_sites * self.n_season_years
+        if not self.training:
+            return values - self.centre_means[slot]
+        counts = torch.bincount(slot, minlength=n_slots).clamp(min=1).to(values.dtype)
+        sums = torch.zeros(n_slots, dtype=values.dtype, device=values.device)
+        means = sums.index_add(0, slot, values) / counts
+        with torch.no_grad():
+            self.centre_means.copy_(means.detach())
+        return values - means[slot]
 
     @staticmethod
     def _interaction_inputs(*, batch: PooledBatch, mixed: torch.Tensor) -> torch.Tensor:
@@ -367,7 +414,6 @@ class PooledDemandModel(nn.Module):
                 torch.cos(angle)[:, None],
                 day_type,
                 ((mixed - HEATING_THRESHOLD_C) / HEATING_SCALE_C)[:, None],
-                (batch.elevation / 60.0)[:, None],
             ],
             dim=1,
         )
@@ -429,6 +475,8 @@ def fit_pooled(
         The loss history, the wall-clock time, and the peak GPU memory.
     """
     device = batch.y.device
+    model.to(device=device, dtype=batch.y.dtype)
+    model.mark_trained_years(batch=batch)
     optimiser = torch.optim.Adam(model.parameters(), lr=learning_rate)
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)

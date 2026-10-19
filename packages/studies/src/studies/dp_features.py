@@ -30,6 +30,7 @@ valid time on or after it.
 """
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -76,7 +77,11 @@ PART_1_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00103-differentiable-physic
 ERA5_PATH: Final[Path] = (
     REPO_DATA_DIR / "studies/per_study/stage1_pilot/demand/inputs/era5_features.parquet"
 )
-"""ERA5 hourly weather at each series' location; the temperature is `temperature_2m`."""
+"""ERA5 weather at each series' location on a half-hourly grid; the temperature is `temperature_2m`.
+
+The reanalysis is hourly. The :30 value of each half-hour is the mean of the two neighbouring hourly
+values, so a half-hour ending at :30 uses the next hour's value (weather is an exogenous input).
+"""
 
 CAMS_PATH: Final[Path] = (
     REPO_DATA_DIR / "studies/downloads/reanalysis/CAMS/demand_points/cams_demand_points.parquet"
@@ -96,7 +101,7 @@ class DpInputPaths:
         rows: Experiment 103's `rows.parquet`.
         series_table: Its `series_table.parquet` (coordinates, units, effective capacity).
         sites: Its `sites.parquet` (role and first usable date).
-        era5: ERA5 hourly weather per `time_series_id`.
+        era5: ERA5 weather per `time_series_id` on a half-hourly grid.
         cams: CAMS hourly irradiance per site label.
     """
 
@@ -228,11 +233,15 @@ def input_key(*, paths: DpInputPaths) -> str:
     return digest.hexdigest()[:16]
 
 
-def _interpolate_hourly(
-    *, hourly_stamps: np.ndarray, values: np.ndarray, grid: np.ndarray
+def _interpolate_to_grid(
+    *, reading_stamps: np.ndarray, values: np.ndarray, grid: np.ndarray
 ) -> np.ndarray:
-    """Interpolate hourly values linearly onto the grid, `NaN` outside the hourly range."""
-    seconds_hourly = hourly_stamps.astype("datetime64[s]").astype(np.int64)
+    """Interpolate readings linearly onto the grid, `NaN` outside their range.
+
+    The readings are already on the grid today, so this returns them unchanged; it keeps a coarser
+    series (hourly, say) usable.
+    """
+    seconds_hourly = reading_stamps.astype("datetime64[s]").astype(np.int64)
     seconds_grid = grid.astype("datetime64[s]").astype(np.int64)
     known = np.isfinite(values)
     return np.interp(
@@ -245,7 +254,7 @@ def _mask_column(*, joined: pl.DataFrame, column: str) -> np.ndarray:
     return joined[column].fill_null(False).to_numpy()
 
 
-def _site_table(*, row: dict, sites_row: dict) -> SiteTable:
+def _site_table(*, row: Mapping[str, Any], sites_row: Mapping[str, Any]) -> SiteTable:
     """Combine one series-table row and one sites-table row into a `SiteTable`."""
     return SiteTable(
         site=row["site"],
@@ -300,26 +309,26 @@ def _site_features(
         validate="1:1",
         maintain_order="left",
     )
-    hourly = trailing_mean_temperatures(
+    readings = trailing_mean_temperatures(
         series=era5.filter(pl.col("time_series_id") == table.time_series_id).select(
             "valid_time", temperature_c=pl.col("temperature_2m").cast(pl.Float64)
         )
     )
-    stamps = hourly["valid_time"].dt.replace_time_zone(None).to_numpy()
+    stamps = readings["valid_time"].dt.replace_time_zone(None).to_numpy()
     grid_numpy = grid.dt.replace_time_zone(None).to_numpy()
     smoothed = np.stack(
         [
-            _interpolate_hourly(
-                hourly_stamps=stamps,
-                values=hourly[f"temperature_c_k{k}"].to_numpy(),
+            _interpolate_to_grid(
+                reading_stamps=stamps,
+                values=readings[f"temperature_c_k{k}"].to_numpy(),
                 grid=grid_numpy,
             )
             for k in SMOOTHING_HOURS
         ],
         axis=1,
     )
-    temperature = _interpolate_hourly(
-        hourly_stamps=stamps, values=hourly["temperature_c"].to_numpy(), grid=grid_numpy
+    temperature = _interpolate_to_grid(
+        reading_stamps=stamps, values=readings["temperature_c"].to_numpy(), grid=grid_numpy
     )
     midpoints = grid.dt.offset_by("-15m")
     zenith, _ = solar_position(stamps=midpoints, latitude=table.latitude, longitude=table.longitude)
