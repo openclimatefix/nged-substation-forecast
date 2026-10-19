@@ -159,6 +159,9 @@ class DpConfig:
         drift: Drift form of the pooled model (only `none` is built).
         clip: The smooth export-limit clip of the solar term (not built).
         generator_node: The unmetered generator node (not built).
+        network_temperature_dark_only: The interaction network sees the mixed temperature only
+            when the sun is down. By day the network could otherwise use temperature as a proxy
+            for sunshine and trade off with the solar term.
     """
 
     shared_shapes: int = 4
@@ -168,6 +171,7 @@ class DpConfig:
     drift: DriftType = "none"
     clip: bool = False
     generator_node: bool = False
+    network_temperature_dark_only: bool = False
 
     @property
     def site_prior(self) -> SitePrior:
@@ -277,6 +281,7 @@ def build_pooled_batch(
     after: np.datetime64 | None = None,
     device: torch.device | str = "cpu",
     dtype: torch.dtype = torch.float32,
+    all_present_rows: bool = False,
 ) -> PooledBatch:
     """Gather the pooled rows: default rows of MW substations and dark default rows of MVA ones.
 
@@ -288,6 +293,9 @@ def build_pooled_batch(
             rows of a forecast year.
         device: Where the tensors live.
         dtype: The floating-point type of the real-valued tensors.
+        all_present_rows: Keep every row that has a reading, whatever the pool, the lockdown window,
+            and the switching masks say (the pool filter is dropped as well as the other two), which
+            scoring can include beside the default rows. MVA substations still keep only dark rows.
 
     Returns:
         The batch.
@@ -300,8 +308,7 @@ def build_pooled_batch(
         features = cache.sites[label]
         apparent = features.table.units == "MVA"
         keep = (
-            features.default_rows
-            & features.present
+            (features.present if all_present_rows else features.default_rows & features.present)
             & np.isfinite(features.y)
             & np.isfinite(features.pv_unit_shape)
             & np.isfinite(features.smoothed_temperature_c).all(axis=1)
@@ -384,8 +391,27 @@ class PooledDemandModel(nn.Module):
     """The mean of the centred terms over each substation and season-year, from training."""
     site_active: torch.Tensor
     """1 for each substation that has training rows, else 0 (a buffer)."""
+    weeks_of_history: torch.Tensor
+    """The weeks of history `onboard_site` gave each substation, or -1 for none (a buffer)."""
+    capacity_override: torch.Tensor | None
+    """Capacities in points that replace the learned ones where not `NaN`; `None` for none.
+
+    A buffer, so it moves with the model and is saved in its state dict.
+    """
+    fit_had_rows: torch.Tensor
+    """1 for each substation that had training rows in the pooled fit, else 0 (a buffer).
+
+    Onboarding sets `site_active` for the new substation but never this flag, so it still names
+    the substations the fit excluded.
+    """
     solar_sites: torch.Tensor
     """1 for each substation that has training rows with the solar term on, else 0 (a buffer)."""
+    capacity_prior: torch.Tensor
+    """A site-specific centre for the first capacity increment, before the softplus; `NaN` for none.
+
+    The population mean centres a site with `NaN`. The values are inputs, not fitted parameters:
+    they carry a prior capacity, such as an earlier vintage's, into the fit.
+    """
 
     def __init__(
         self,
@@ -430,6 +456,12 @@ class PooledDemandModel(nn.Module):
         self.register_buffer("centre_means", torch.zeros(n_sites * n_season_years))
         self.register_buffer("site_active", torch.ones(n_sites))
         self.register_buffer("solar_sites", torch.ones(n_sites))
+        self.register_buffer("fit_had_rows", torch.ones(n_sites))
+        self.register_buffer("weeks_of_history", torch.full((n_sites,), -1.0))
+        # Starts as `None`, so a strict `load_state_dict` fails between a model with an override and
+        # one without.
+        self.register_buffer("capacity_override", None)
+        self.register_buffer("capacity_prior", torch.full((n_sites,), float("nan")))
         self._build_site_prior(initial_level=initial_level)
 
     def _build_site_prior(self, *, initial_level: torch.Tensor) -> None:
@@ -499,6 +531,9 @@ class PooledDemandModel(nn.Module):
     ) -> torch.Tensor:
         """Return one family's prior term over the entries where `active` is 1."""
         centre = self.population_mean.get(name, 0.0)
+        if name == "capacity_first":
+            own = self.capacity_prior.to(mean.dtype)[:, None]
+            centre = torch.where(torch.isnan(own), centre, own)
         log_scale = self.population_log_scale[name]
         scale_sq = torch.exp(2.0 * log_scale)
         squared = (mean - centre) ** 2
@@ -536,9 +571,12 @@ class PooledDemandModel(nn.Module):
 
     def capacities(self) -> torch.Tensor:
         """Return the capacity of each substation and season-year, shape (sites, years)."""
-        return torch.cumsum(
+        learned = torch.cumsum(
             nn.functional.softplus(self._site("capacity_raw")) * self.trained, dim=1
         )
+        if self.capacity_override is None:
+            return learned
+        return torch.where(torch.isnan(self.capacity_override), learned, self.capacity_override)
 
     def finalise_centres(self, *, batch: PooledBatch) -> None:
         """Store the final centring means of the training rows, and carry them to later years.
@@ -584,6 +622,7 @@ class PooledDemandModel(nn.Module):
         self.trained.copy_(trained.reshape(self.n_sites, self.n_season_years))
         per_site = torch.bincount(batch.site, minlength=self.n_sites)
         self.site_active.copy_((per_site > 0).to(self.site_active.dtype))
+        self.fit_had_rows.copy_((per_site > 0).to(self.fit_had_rows.dtype))
         solar = torch.bincount(batch.site[batch.solar_gate], minlength=self.n_sites)
         self.solar_sites.copy_((solar > 0).to(self.solar_sites.dtype))
 
@@ -661,9 +700,11 @@ class PooledDemandModel(nn.Module):
             self.centre_means.copy_(means.detach())
         return values - means[slot]
 
-    @staticmethod
-    def _interaction_inputs(*, batch: PooledBatch, mixed: torch.Tensor) -> torch.Tensor:
+    def _interaction_inputs(self, *, batch: PooledBatch, mixed: torch.Tensor) -> torch.Tensor:
         """Stack the calendar and weather inputs of the interaction network."""
+        temperature = (mixed - HEATING_THRESHOLD_C) / HEATING_SCALE_C
+        if self.config.network_temperature_dark_only:
+            temperature = temperature * (batch.elevation <= 0).to(temperature.dtype)
         angle = 2.0 * torch.pi * batch.half_hour.to(mixed.dtype) / HALF_HOURS_PER_DAY
         day_type = nn.functional.one_hot(batch.day_type, num_classes=len(DAY_TYPES)).to(mixed.dtype)
         return torch.cat(
@@ -673,7 +714,7 @@ class PooledDemandModel(nn.Module):
                 torch.sin(angle)[:, None],
                 torch.cos(angle)[:, None],
                 day_type,
-                ((mixed - HEATING_THRESHOLD_C) / HEATING_SCALE_C)[:, None],
+                temperature[:, None],
             ],
             dim=1,
         )
@@ -744,7 +785,8 @@ def fit_pooled(
 
     The levels start from the training rows' own means (`start_from_batch`), whatever
     `initial_level` the model was built with. Adam is not deterministic on the GPU, because
-    `index_add` adds in an unspecified order; the tests that need exact agreement run on the CPU.
+    `index_add` adds in an unspecified order. CPU runs agree closely, not exactly (two default CPU
+    runs differed by up to 0.015), so the tests that need agreement use a tolerance.
 
     Args:
         model: The model, already on the batch's device.
