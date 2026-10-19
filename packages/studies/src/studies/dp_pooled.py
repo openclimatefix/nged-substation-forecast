@@ -6,9 +6,9 @@ a shared calendar and weather module, an optional interaction network, a solar t
 and season-year, and a per-row observation operator (`studies.dp_operator`).
 
 **Every later module is a switch in `DpConfig`.** The switches for modules that are not built
-(the variational posterior, the smooth clip, the unmetered generator node, and drift in the pooled
-model) raise `NotImplementedError` when turned on, so a later part replaces one raise with code and
-changes no caller. `ResidualStates` and `WeatherInputLayer` are typed stubs for the per-site
+(the smooth clip, the unmetered generator node, and drift in the pooled model) raise
+`NotImplementedError` when turned on, so a later part replaces one raise with code and changes no
+caller. `ResidualStates` and `WeatherInputLayer` are typed stubs for the per-site
 residual states and the weather-input layer per product.
 
 **The model, in points of effective capacity:**
@@ -27,11 +27,21 @@ residual states and the weather-input layer per product.
   layer starts at zero, so the solar term and the drift are not absorbed by it at the start.
 - The capacity is the cumulative sum of softplus increments over the season-years, so it never
   decreases.
+
+**Site-level parameters and their prior.** Six families of parameters belong to a substation: the
+level, the style loadings (`site_logits`), the deviation, the heating threshold, the heating slope,
+and the capacity increments. Each family has a population mean and a population scale, and a
+substation's value is drawn around the population mean. Three site priors exist. `decay` is the
+Part 2 configuration (fixed weight decay and the threshold prior). `map` fixes the population scales
+and finds the maximum a posteriori fit. `variational` gives every site-level value a mean-field
+Gaussian posterior, learns the population scales through the evidence lower bound, and forecasts
+with the posterior mean. The shared network weights are point estimates with weight decay in all
+three.
 """
 
 import time
 from dataclasses import dataclass, field
-from typing import Final, Protocol
+from typing import Final, Literal, Protocol
 
 import numpy as np
 import torch
@@ -68,6 +78,20 @@ trained year: its capacity increment and centring mean would rest on them.
 """
 INITIAL_POWER_FACTOR: Final[float] = 0.97
 """The power factor that the MVA substations' `tan(phi)` starts from."""
+SITE_FAMILIES: Final[tuple[str, ...]] = (
+    "level",
+    "site_logits",
+    "deviation",
+    "threshold",
+    "slope_raw",
+    "capacity_raw",
+)
+"""The site-level parameter families; each has a population mean and a population scale."""
+MEAN_LEARNED_FAMILIES: Final[tuple[str, ...]] = ("level", "threshold", "slope_raw", "capacity_raw")
+"""Families whose population mean is learned; the loadings and the deviation centre on zero."""
+SitePrior = Literal["decay", "map", "variational"]
+INITIAL_POSTERIOR_LOG_SD: Final[float] = -3.0
+"""A site-level posterior starts this tight, so the first draws sit near the point fit."""
 INTERACTION_INPUTS: Final[int] = 4 + 2 + 2 + len(DAY_TYPES) + 1
 """Harmonics, tent, half-hour sine and cosine, day-type one-hot, and the mixed temperature.
 
@@ -78,6 +102,34 @@ solar term.
 
 
 @dataclass(frozen=True)
+class PopulationScales:
+    """The population scale of each site-level family: the spread of sites around their mean.
+
+    The values are standard deviations in each family's own units (points for the level and
+    the deviation, degrees for the threshold, and the softplus or softmax inputs for the rest).
+
+    Attributes:
+        level: The scale of the substations' levels.
+        site_logits: The scale of the style loadings.
+        deviation: The scale of the per-site deviation from the shared shapes.
+        threshold: The scale of the heating thresholds.
+        slope_raw: The scale of the heating slopes before the softplus.
+        capacity_raw: The scale of the capacity increments before the softplus.
+    """
+
+    level: float = 5.0
+    site_logits: float = 1.0
+    deviation: float = 0.3
+    threshold: float = THRESHOLD_PRIOR_SCALE_C
+    slope_raw: float = 1.0
+    capacity_raw: float = 1.0
+
+    def as_dict(self) -> dict[str, float]:
+        """Return the scales keyed by family name."""
+        return {name: float(getattr(self, name)) for name in SITE_FAMILIES}
+
+
+@dataclass(frozen=True)
 class DpConfig:
     """Switches for every module of the DP model.
 
@@ -85,7 +137,10 @@ class DpConfig:
         shared_shapes: The number of shared daily shapes `K`; 0 gives each substation its own
             profile only.
         interaction_hidden: The hidden-layer widths of the interaction network; empty means off.
-        variational: Mean-field variational posterior over site-level parameters (not built).
+        variational: Mean-field variational posterior over the site-level parameters, with
+            population scales learned through the evidence lower bound.
+        population_scales: The population scales. With `variational` on they are the starting
+            values; with it off, giving them selects the MAP fit with these scales held fixed.
         drift: Drift form of the pooled model (only `none` is built).
         clip: The smooth export-limit clip of the solar term (not built).
         generator_node: The unmetered generator node (not built).
@@ -94,9 +149,17 @@ class DpConfig:
     shared_shapes: int = 4
     interaction_hidden: tuple[int, ...] = ()
     variational: bool = False
+    population_scales: PopulationScales | None = None
     drift: DriftType = "none"
     clip: bool = False
     generator_node: bool = False
+
+    @property
+    def site_prior(self) -> SitePrior:
+        """Return which prior the site-level parameters have."""
+        if self.variational:
+            return "variational"
+        return "map" if self.population_scales is not None else "decay"
 
     def check_supported(self) -> None:
         """Raise if a switch that is not built is on.
@@ -105,7 +168,6 @@ class DpConfig:
             NotImplementedError: Naming the first switch that is on but not built.
         """
         for name, value in (
-            ("variational", self.variational),
             ("clip", self.clip),
             ("generator_node", self.generator_node),
             ("drift", self.drift != "none"),
@@ -158,6 +220,8 @@ class PooledBatch:
         solar_gate: True where the solar term applies.
         is_apparent: True where the meter reads apparent power (MVA substations).
         y: The reading in points.
+        quarter: The calendar quarter of each row (0 to 3).
+        row: The row of the feature cache's time grid.
         site_labels: The substation labels, in index order.
         first_season_year: The season-year of capacity slot 0.
         n_season_years: The number of season-years per substation.
@@ -178,6 +242,8 @@ class PooledBatch:
     solar_gate: torch.Tensor
     is_apparent: torch.Tensor
     y: torch.Tensor
+    quarter: torch.Tensor
+    row: torch.Tensor
     site_labels: tuple[str, ...]
     first_season_year: int
     n_season_years: int
@@ -254,6 +320,8 @@ def build_pooled_batch(
         columns["solar_gate"].append(np.full(n, not apparent))
         columns["is_apparent"].append(np.full(n, apparent))
         columns["y"].append(features.y[rows])
+        columns["quarter"].append(calendar.quarter[rows].astype(np.int64))
+        columns["row"].append(rows.astype(np.int64))
     joined = {key: np.concatenate(values) for key, values in columns.items()}
     real = {"tent", "harmonics", "smoothed_temperature", "lighting", "elevation", "pv_shape", "y"}
 
@@ -287,6 +355,8 @@ _BATCH_KEYS: Final[tuple[str, ...]] = (
     "solar_gate",
     "is_apparent",
     "y",
+    "quarter",
+    "row",
 )
 
 
@@ -297,6 +367,8 @@ class PooledDemandModel(nn.Module):
     """1 for each substation and season-year that has training rows, else 0 (a buffer)."""
     centre_means: torch.Tensor
     """The mean of the centred terms over each substation and season-year, from training."""
+    site_active: torch.Tensor
+    """1 for each substation that has training rows, else 0 (a buffer)."""
 
     def __init__(
         self,
@@ -339,6 +411,79 @@ class PooledDemandModel(nn.Module):
         self.interaction = self._interaction_network(hidden=config.interaction_hidden)
         self.register_buffer("trained", torch.ones(n_sites, n_season_years))
         self.register_buffer("centre_means", torch.zeros(n_sites * n_season_years))
+        self.register_buffer("site_active", torch.ones(n_sites))
+        self._build_site_prior(initial_level=initial_level)
+
+    def _build_site_prior(self, *, initial_level: torch.Tensor) -> None:
+        """Create the population parameters and the posterior spreads of the site-level families."""
+        mode = self.config.site_prior
+        self.log_noise = nn.Parameter(torch.zeros(()), requires_grad=mode != "decay")
+        scales = (self.config.population_scales or PopulationScales()).as_dict()
+        self.population_mean = nn.ParameterDict()
+        self.population_log_scale = nn.ParameterDict()
+        self.posterior_log_sd = nn.ParameterDict()
+        for name in SITE_FAMILIES:
+            site_values = getattr(self, name)
+            if name in MEAN_LEARNED_FAMILIES:
+                start = initial_level.mean() if name == "level" else site_values.detach().mean()
+                self.population_mean[name] = nn.Parameter(
+                    start.detach().clone().reshape(()), requires_grad=mode != "decay"
+                )
+            self.population_log_scale[name] = nn.Parameter(
+                torch.tensor(float(np.log(scales[name]))), requires_grad=mode == "variational"
+            )
+            self.posterior_log_sd[name] = nn.Parameter(
+                torch.full_like(site_values, INITIAL_POSTERIOR_LOG_SD),
+                requires_grad=mode == "variational",
+            )
+
+    def _site(self, name: str) -> torch.Tensor:
+        """Return a site-level family: the mean, or in training a draw from its posterior."""
+        mean: torch.Tensor = getattr(self, name)
+        if self.config.variational and self.training:
+            return mean + torch.exp(self.posterior_log_sd[name]) * torch.randn_like(mean)
+        return mean
+
+    def site_prior_term(self) -> torch.Tensor:
+        """Return the prior on the site-level parameters, in nats.
+
+        With `variational` on this is the Kullback-Leibler divergence of the posterior from the
+        population distribution, summed over the substations and season-years that have training
+        rows. With the MAP fit it is the Gaussian log prior at the point values. The heating
+        threshold's population mean carries a normal prior of 15.5 +- 2 degrees in both.
+        """
+        term = (
+            ((self.population_mean["threshold"] - HEATING_THRESHOLD_C) / THRESHOLD_PRIOR_SCALE_C)
+            ** 2
+        ) / 2
+        for name in SITE_FAMILIES:
+            mean = getattr(self, name)
+            centre = self.population_mean.get(name, 0.0)
+            log_scale = self.population_log_scale[name]
+            scale_sq = torch.exp(2.0 * log_scale)
+            active = self._active(name=name, like=mean)
+            squared = (mean - centre) ** 2
+            if self.config.variational:
+                log_sd = self.posterior_log_sd[name]
+                kl = (
+                    log_scale
+                    - log_sd
+                    + (torch.exp(2.0 * log_sd) + squared) / (2.0 * scale_sq)
+                    - 0.5
+                )
+                term = term + (kl * active).sum()
+            else:
+                term = term + (squared / (2.0 * scale_sq) * active).sum()
+        return term
+
+    def _active(self, *, name: str, like: torch.Tensor) -> torch.Tensor:
+        """Return 1 where a site-level value has training rows, else 0, in the shape of `like`."""
+        active = self.site_active.to(like.dtype)
+        if name == "capacity_raw":
+            return self.trained.to(like.dtype) * active[:, None]
+        if like.dim() == 2:
+            return active[:, None].expand_as(like)
+        return active
 
     @staticmethod
     def _interaction_network(*, hidden: tuple[int, ...]) -> nn.Sequential | None:
@@ -357,7 +502,9 @@ class PooledDemandModel(nn.Module):
 
     def capacities(self) -> torch.Tensor:
         """Return the capacity of each substation and season-year, shape (sites, years)."""
-        return torch.cumsum(nn.functional.softplus(self.capacity_raw) * self.trained, dim=1)
+        return torch.cumsum(
+            nn.functional.softplus(self._site("capacity_raw")) * self.trained, dim=1
+        )
 
     def finalise_centres(self, *, batch: PooledBatch) -> None:
         """Store the final centring means of the training rows, and carry them to later years.
@@ -385,33 +532,41 @@ class PooledDemandModel(nn.Module):
                 means[:, year] = torch.where(trained | ~seen, means[:, year], last)
         self.train(was_training)
 
-    def mark_trained_years(self, *, batch: PooledBatch) -> None:
+    def mark_trained_years(
+        self, *, batch: PooledBatch, min_rows: int = MIN_TRAINED_SLOT_ROWS
+    ) -> None:
         """Allow a capacity increment only in the season-years with enough training rows.
 
         An untrained season-year then adds nothing, so its capacity is the last trained
         season-year's: the vintage rule's hold, which a forecast of a later season-year needs.
+        A substation with no training rows is marked inactive, so the site prior leaves it alone.
 
         Args:
             batch: The training rows.
+            min_rows: The fewest rows of a site-year that count as trained.
         """
         counts = torch.bincount(batch.season_slot, minlength=self.n_sites * self.n_season_years)
-        trained = (counts >= MIN_TRAINED_SLOT_ROWS).to(self.trained.dtype)
+        trained = (counts >= min_rows).to(self.trained.dtype)
         self.trained.copy_(trained.reshape(self.n_sites, self.n_season_years))
+        per_site = torch.bincount(batch.site, minlength=self.n_sites)
+        self.site_active.copy_((per_site > 0).to(self.site_active.dtype))
 
     def demand(self, *, batch: PooledBatch) -> torch.Tensor:
         """Return the modelled demand of each row, in points."""
         profile = batch.day_type * HALF_HOURS_PER_DAY + batch.half_hour
-        mix = torch.softmax(self.site_logits, dim=1)[batch.site]
+        level, deviation = self._site("level"), self._site("deviation")
+        threshold, slope = self._site("threshold"), self._site("slope_raw")
+        mix = torch.softmax(self._site("site_logits"), dim=1)[batch.site]
         shared = (mix * self.shapes[:, profile].T).sum(dim=1) if self.config.shared_shapes else 0.0
-        value = self.level[batch.site] + shared + self.deviation[batch.site, profile]
+        value = level[batch.site] + shared + deviation[batch.site, profile]
         calendar = self.holiday[batch.holiday, batch.band]
         calendar = calendar + (batch.tent * self.tent_coef[:, batch.band].T).sum(dim=1)
         calendar = calendar + (batch.harmonics * self.harmonic_coef[:, batch.band].T).sum(dim=1)
         calendar = calendar + batch.lighting @ self.lighting_coef
         inertia = torch.softmax(self.inertia_logits, dim=0)
         mixed = batch.smoothed_temperature @ inertia
-        hinge = torch.relu(self.threshold[batch.site] - mixed) / HEATING_SCALE_C
-        value = value + nn.functional.softplus(self.slope_raw[batch.site, batch.band]) * hinge
+        hinge = torch.relu(threshold[batch.site] - mixed) / HEATING_SCALE_C
+        value = value + nn.functional.softplus(slope[batch.site, batch.band]) * hinge
         if self.interaction is not None:
             calendar = (
                 calendar
@@ -466,16 +621,31 @@ class PooledDemandModel(nn.Module):
         return torch.where(batch.is_apparent, apparent_reading, reading)
 
     def penalty(self) -> torch.Tensor:
-        """Return the weight decay and the prior on the heating threshold."""
-        decay = (
-            1e-4 * (self.shapes**2).sum()
-            + 1e-3 * (self.deviation**2).sum()
-            + 1e-3 * (self.holiday**2).sum()
-        )
-        prior = (((self.threshold - HEATING_THRESHOLD_C) / THRESHOLD_PRIOR_SCALE_C) ** 2).sum()
+        """Return the weight decay, and in the `decay` prior the deviation and threshold priors."""
+        decay = 1e-4 * (self.shapes**2).sum() + 1e-3 * (self.holiday**2).sum()
         if self.interaction is not None:
             decay = decay + 1e-5 * sum((p**2).sum() for p in self.interaction.parameters())
-        return decay + prior
+        if self.config.site_prior != "decay":
+            return decay
+        prior = (((self.threshold - HEATING_THRESHOLD_C) / THRESHOLD_PRIOR_SCALE_C) ** 2).sum()
+        return decay + 1e-3 * (self.deviation**2).sum() + prior
+
+    def loss(self, *, batch: PooledBatch) -> torch.Tensor:
+        """Return the training loss of `batch`.
+
+        The `decay` prior gives the mean squared error plus the penalty per row. The `map` and
+        `variational` priors give the negative evidence lower bound per row, with a learned
+        Gaussian noise scale: the squared error and the weight decay scaled by twice the noise
+        variance, the log noise scale, and the site prior's nats per row.
+        """
+        residual = self(batch) - batch.y
+        penalty = self.penalty()
+        n_rows = batch.n_rows
+        if self.config.site_prior == "decay":
+            return (residual**2).mean() + penalty / n_rows
+        noise_variance = torch.exp(2.0 * self.log_noise)
+        fit = ((residual**2).mean() + penalty / n_rows) / (2.0 * noise_variance)
+        return fit + self.log_noise + self.site_prior_term() / n_rows
 
 
 @dataclass(frozen=True)
@@ -522,8 +692,7 @@ def fit_pooled(
     losses: list[torch.Tensor] = []
     for _ in range(steps):
         optimiser.zero_grad(set_to_none=True)
-        residual = model(batch) - batch.y
-        loss = (residual**2).mean() + model.penalty() / batch.n_rows
+        loss = model.loss(batch=batch)
         loss.backward()
         optimiser.step()
         losses.append(loss.detach())
