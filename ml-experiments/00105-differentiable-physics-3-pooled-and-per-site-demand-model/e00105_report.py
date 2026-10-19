@@ -55,6 +55,7 @@ OWN_ARMS: Final[tuple[str, ...]] = (
     "s",
     "p_all",
     "s_all",
+    "s_equiv_all",
     "p_onb0w",
     "p_onb2w",
     "p_onb4w",
@@ -356,6 +357,8 @@ def main() -> None:
     print("\n== 4. Secondary and exploratory contrasts (95%) ==")
     for treatment, reference in (
         ("p_all", "s_all"),
+        ("s_equiv_all", "g_all"),
+        ("s_equiv_all", "s_all"),
         ("p_map", "p"),
         ("p_nonet", "p"),
         ("p_onb4w", "p"),
