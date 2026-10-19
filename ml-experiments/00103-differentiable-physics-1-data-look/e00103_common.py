@@ -44,7 +44,7 @@ PANEL_END: Final[datetime] = datetime(2026, 9, 11, tzinfo=UTC)
 """Exclusive end of the panel: CAMS runs to 2026-09-10, used only by the descriptive timestamp and
 early-calibration checks. Every scored or counted statistic stops at `PERIOD_END`."""
 STAMP_FIX_UTC: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)
-"""NGED's late stamps before this instant are corrected at ingest; the timestamp figure splits here."""
+"""NGED's late stamps before this instant are corrected at ingest; figure 10 splits here."""
 LOCAL_TIME_ZONE: Final[str] = "Europe/London"
 
 MW_PRIMARIES: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16", "D18", "D15")
@@ -75,8 +75,15 @@ def load_series() -> pl.DataFrame:
     return (
         pl.read_parquet(SERIES_PATH)
         .join(metadata, on="time_series_id", how="left")
-        .select("site", "time_series_id", "group", "units", "latitude", "longitude",
-                "effective_capacity_mw")
+        .select(
+            "site",
+            "time_series_id",
+            "group",
+            "units",
+            "latitude",
+            "longitude",
+            "effective_capacity_mw",
+        )
         .sort("site")
     )
 

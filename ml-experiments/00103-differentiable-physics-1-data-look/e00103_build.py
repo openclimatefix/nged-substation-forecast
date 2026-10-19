@@ -9,15 +9,20 @@ the hand-filtered switching mask) and `series_table.parquet`. The checks are pri
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import polars as pl
 from e00103_common import (
     CAMS_PATH,
     CLEANED_POWER_PATH,
     ERA5_PATH,
+    GENERATOR_SERIES,
     LOCAL_TIME_ZONE,
-    PANEL_PATH,
     PANEL_END,
+    PANEL_PATH,
+    PERIOD_END,
     PERIOD_START,
+    PRIMARIES,
     SERIES_TABLE_PATH,
     WORK_DIR,
     hand_filtered_events,
@@ -53,16 +58,18 @@ def temperature_columns(*, grid: pl.DataFrame) -> pl.DataFrame:
     both = pl.concat(
         [
             hourly.with_columns(temperature_c=pl.col("temperature_2m")),
-            grid.select("time_series_id", "time").with_columns(
-                temperature_2m=pl.lit(None, dtype=pl.Float32)
-            ).with_columns(temperature_c=pl.lit(None, dtype=pl.Float32)),
+            grid.select("time_series_id", "time")
+            .with_columns(temperature_2m=pl.lit(None, dtype=pl.Float32))
+            .with_columns(temperature_c=pl.lit(None, dtype=pl.Float32)),
         ],
         how="vertical_relaxed",
     )
     return (
         both.unique(subset=["time_series_id", "time"], keep="first", maintain_order=True)
         .sort("time_series_id", "time")
-        .with_columns(temperature_c=pl.col("temperature_c").interpolate_by("time").over("time_series_id"))
+        .with_columns(
+            temperature_c=pl.col("temperature_c").interpolate_by("time").over("time_series_id")
+        )
         .join(grid.select("time_series_id", "time"), on=["time_series_id", "time"], how="semi")
         .select("time_series_id", "time", "temperature_c")
     )
@@ -71,9 +78,11 @@ def temperature_columns(*, grid: pl.DataFrame) -> pl.DataFrame:
 def irradiance_columns(*, series: pl.DataFrame) -> pl.DataFrame:
     """CAMS irradiance per power half-hour: the half-hour ending in an hour joins that hour."""
     hourly = pl.read_parquet(CAMS_PATH, columns=["site", "time", "ghi_w_m2", "clear_sky_ghi_w_m2"])
-    return hourly.rename({"time": "cams_hour_end"}).join(
-        series.select("site", "time_series_id"), on="site"
-    ).drop("site")
+    return (
+        hourly.rename({"time": "cams_hour_end"})
+        .join(series.select("site", "time_series_id"), on="site")
+        .drop("site")
+    )
 
 
 def main() -> None:
@@ -88,9 +97,8 @@ def main() -> None:
         .with_columns(
             present=pl.col("power").is_not_null(),
             flagged=pl.col("drop_reason").is_not_null(),
-            cams_hour_end=pl.col("time").dt.truncate("1h") + pl.duration(
-                hours=pl.when(pl.col("time").dt.minute() == 0).then(0).otherwise(1)
-            ),
+            cams_hour_end=pl.col("time").dt.truncate("1h")
+            + pl.duration(hours=pl.when(pl.col("time").dt.minute() == 0).then(0).otherwise(1)),
         )
         .join(temperature_columns(grid=grid), on=["time_series_id", "time"], how="left")
         .join(irradiance_columns(series=series), on=["time_series_id", "cams_hour_end"], how="left")
@@ -102,8 +110,10 @@ def main() -> None:
     panel = panel.with_columns(
         local_hour=pl.col("local_time").dt.hour() + pl.col("local_time").dt.minute() / 60.0,
         # `time` marks the end of the half-hour, so a stamp of exactly 00:00 belongs to 23:30-24:00.
-        local_hour_start=((pl.col("local_time") - pl.duration(minutes=30)).dt.hour()
-                          + (pl.col("local_time") - pl.duration(minutes=30)).dt.minute() / 60.0),
+        local_hour_start=(
+            (pl.col("local_time") - pl.duration(minutes=30)).dt.hour()
+            + (pl.col("local_time") - pl.duration(minutes=30)).dt.minute() / 60.0
+        ),
         local_date=(pl.col("local_time") - pl.duration(minutes=30)).dt.date(),
     ).drop("local_time", "drop_reason")
     panel = add_switching_mask(panel=panel)
@@ -137,28 +147,57 @@ def add_switching_mask(*, panel: pl.DataFrame) -> pl.DataFrame:
 
 
 def print_validation(*, panel: pl.DataFrame) -> None:
-    """Print duplicates, nulls, stuck runs, zeros, month steps, and negative MVA values."""
+    """Print duplicates, nulls, stuck runs, zeros, month steps, and negative MVA values.
+
+    Every table names a series by its `series` label: the D-label, or G-a and G-b for the two
+    metered generators, so the printed report can be published.
+    """
     pl.Config.set_tbl_rows(60)
-    print("\n== duplicate (time_series_id, time) keys in the cleaned table ==")
+    pl.Config.set_tbl_cols(30)
+    pl.Config.set_tbl_width_chars(220)
+    panel = panel.filter(pl.col("time") <= PERIOD_END)
+    series = load_series()
+    labels = {
+        row["time_series_id"]: GENERATOR_SERIES.get(row["site"], row["site"])
+        for row in series.iter_rows(named=True)
+    }
+
+    def named(frame: pl.DataFrame) -> pl.DataFrame:
+        """`frame` with `time_series_id` replaced by the `series` label, sorted by label."""
+        return (
+            frame.with_columns(
+                series=pl.col("time_series_id").replace_strict(labels, return_dtype=pl.String)
+            )
+            .drop("time_series_id")
+            .select("series", pl.all().exclude("series"))
+            .sort("series")
+        )
+
+    print("\n== duplicate (series, time) keys in the cleaned table ==")
     duplicates = (
         pl.scan_delta(str(CLEANED_POWER_PATH))
-        .filter(pl.col("time") > PERIOD_START, pl.col("time") <= PANEL_END)
+        .filter(pl.col("time") > PERIOD_START, pl.col("time") <= PERIOD_END)
         .group_by("time_series_id", "time")
         .agg(pl.len().alias("n"))
         .filter(pl.col("n") > 1)
         .collect()
     )
     print(f"duplicate keys: {duplicates.height}")
-    print("\n== present, flagged, NaN counts per series ==")
+    print("\n== present, flagged, NaN, and missing-weather counts per series (to 2026-06-30) ==")
     print(
-        panel.group_by("time_series_id").agg(
-            rows=pl.len(),
-            present=pl.col("present").sum(),
-            flagged=pl.col("flagged").sum(),
-            nan_power=pl.col("power").is_nan().sum(),
-            ghi_null=pl.col("ghi_w_m2").is_null().sum(),
-            temp_null=pl.col("temperature_c").is_null().sum(),
-        ).sort("time_series_id")
+        named(
+            panel.group_by("time_series_id").agg(
+                rows=pl.len(),
+                present=pl.col("present").sum(),
+                flagged=pl.col("flagged").sum(),
+                nan_power=pl.col("power").is_nan().sum(),
+                ghi_null=pl.col("ghi_w_m2").is_null().sum(),
+                temp_null_to_2026_07=pl.col("temperature_c")
+                .filter(pl.col("time") <= datetime(2026, 7, 31, tzinfo=UTC))
+                .is_null()
+                .sum(),
+            )
+        )
     )
     print("\n== stuck runs of 12 or more identical half-hours (unflagged rows) ==")
     stuck = (
@@ -172,21 +211,30 @@ def print_validation(*, panel: pl.DataFrame) -> None:
         .filter(pl.col("length") >= STUCK_RUN_LENGTH)
     )
     print(
-        stuck.group_by("time_series_id").agg(
-            runs=pl.len(), longest=pl.col("length").max(), values=pl.col("value").unique().head(5)
-        ).sort("time_series_id")
+        named(
+            stuck.group_by("time_series_id").agg(
+                runs=pl.len(),
+                longest=pl.col("length").max(),
+                values=pl.col("value").unique().head(5),
+            )
+        )
     )
     print("\n== zeros outside the `substation_zero` flag (unflagged exact zeros) ==")
     print(
-        panel.filter(pl.col("present"), ~pl.col("flagged"), pl.col("power") == 0.0)
-        .group_by("time_series_id").len().sort("time_series_id")
+        named(
+            panel.filter(pl.col("present"), ~pl.col("flagged"), pl.col("power") == 0.0)
+            .group_by("time_series_id")
+            .len()
+        )
     )
     print("\n== MVA series with power below zero ==")
-    mva = load_series().filter(pl.col("units") == "MVA")["time_series_id"]
-    print(
+    mva = series.filter(pl.col("units") == "MVA")["time_series_id"]
+    negative = named(
         panel.filter(pl.col("time_series_id").is_in(mva.implode()), pl.col("power") < 0)
-        .group_by("time_series_id").len().sort("time_series_id")
+        .group_by("time_series_id")
+        .len()
     )
+    print(f"MVA rows with power below zero: {negative['len'].sum() if negative.height else 0}")
     print("\n== per-month step check: months whose mean moves > 3 monthly SDs from the last ==")
     monthly = (
         panel.filter(pl.col("present"), ~pl.col("flagged"))
@@ -198,14 +246,26 @@ def print_validation(*, panel: pl.DataFrame) -> None:
         .with_columns(step=(pl.col("mean") - pl.col("mean").shift()).over("time_series_id"))
     )
     spread = monthly.group_by("time_series_id").agg(sd=pl.col("step").std())
-    print(
+    steps = named(
         monthly.join(spread, on="time_series_id")
         .filter(pl.col("step").abs() > 3 * pl.col("sd"))
         .select("time_series_id", "month", "mean", "step", "sd")
-        .sort("time_series_id", "month")
+    ).sort("series", "month")
+    generator_labels = list(GENERATOR_SERIES.values())
+    print(steps.filter(~pl.col("series").is_in(generator_labels)))
+    counts = (
+        steps.filter(pl.col("series").is_in(generator_labels))
+        .group_by("series")
+        .len()
+        .sort("series")
     )
+    print("metered generators (dates withheld): months with a step over 3 SDs:")
+    print(counts)
     print("\n== switching mask half-hours per series ==")
-    print(panel.group_by("time_series_id").agg(masked=pl.col("switching_mask").sum()).sort("time_series_id"))
+    masked = named(panel.group_by("time_series_id").agg(masked=pl.col("switching_mask").sum()))
+    print(masked)
+    primaries = masked.filter(pl.col("series").is_in(PRIMARIES))
+    print(f"masked half-hours on the 16 Primaries: {primaries['masked'].sum()}")
 
 
 if __name__ == "__main__":
