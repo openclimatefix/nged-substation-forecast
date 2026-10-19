@@ -288,11 +288,10 @@ residual ([experiment 66](00066-sw2-16-end-rule-as-baseline/result.md)).
 
 ### RO-NC
 
-**RO-NC is the refit-offset neighbour-count detector.** Experiments 82, 86, 88 to 91, 98, and 101
-still call it XL, which was its first name. RO-NC is
-PF14 with two changes: the step is taken from whichever of two residual models, refitted half a
-month apart, did not refit within 24 hours, and the candidates are scored by a logistic regression
-that includes the count of neighbours stepping the same way as the alarming substation ([experiment
+**RO-NC is the refit-offset neighbour-count detector.** RO-NC is PF14 with two changes. The step
+is taken from whichever of two residual models, refitted half a month apart, did not refit within
+24 hours. The candidates are scored by a logistic regression that includes the count of neighbours
+stepping the same way as the alarming substation ([experiment
 82](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md), [experiment
 101](00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md)). X is the refit-offset
 detector alone.
