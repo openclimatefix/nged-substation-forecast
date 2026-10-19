@@ -115,7 +115,8 @@ Exploratory extras, labelled as such: X-allam with experiment 87's two-year half
   4 quarters; each quarter is predicted by a fit on the data before it, with the same window rule
   as the arm (G1 uses the 12 months ending at the quarter's start) and drift held.
 - **Tuning** on 2024-07-01 to 2025-06-30, fitting on data before 2024-07-01, by mean absolute
-  error of the mean: ridge penalty {1, 10, 100} on G-all; drift step {3×10³, 3×10⁴, 3×10⁵} (scaled
+  error of the mean: ridge penalty {0.1, 1, 10} on G-all (the grid first read {1, 10, 100}; a synthetic
+  check before any scored fit showed a ridge of 10 shrinking heating slopes by 30 to 45%, so the grid moved down); drift step {3×10³, 3×10⁴, 3×10⁵} (scaled
   by training site-years) on G-all+D1; step penalty {100, 300, 1000} (scaled the same way) on
   G-all+D1+steps. D9 is left out of the tuning score. The scoring year is never used to tune.
 - **XGBoost arms.** Experiment 87's Primary parameters (eta 0.05, depth 6, subsample 0.8, 500
