@@ -6,10 +6,10 @@ also_relevant_to: []
 status: done
 size: medium
 take_home_message: >-
-  Leaving the half-hours that a switching detector flags out of the 14-day error correction made the
-  forecast worse on half-hours outside logged switching: the error rose 57% (95% interval 0.4% to
-  134%), where a 5% fall was needed. Using this detector to mask the error correction is therefore
-  refuted.
+  Leaving the half-hours that an early switching detector (D1) flags out of the 7-day error
+  correction made the forecast worse on half-hours outside logged switching: the error rose 57%
+  (95% interval 0.4% to 134%), where a 5% fall was needed. The rise came from an interval builder
+  that ran one interval for 60 days, so masking with this detector is refuted as built.
 hypothesis: >-
   For the 16 Primary substation demand series, excluding the half-hours of detected switching
   events from the history of the stack's error correction lowers the stack's threshold-weighted

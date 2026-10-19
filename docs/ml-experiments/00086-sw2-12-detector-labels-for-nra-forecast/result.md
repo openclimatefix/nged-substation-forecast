@@ -47,11 +47,11 @@ best_arm: >-
   detector labels 11.260, and detector-masked training 10.736 points of capacity.
 headline: >-
   Lags corrected with the detector's labels did not lower the quantile score on rows with a lag
-  inside a logged event: it rose by 0.48 points of capacity against plain lags (98.33% interval
-  -0.06 to +1.72, C1). Oracle labels from NGED's logs did not help either (-0.29, -2.06 to +0.68, C2).
-  C3, detector minus oracle labels: +0.77 (+0.13 to +2.34).
-  minus plain: -0.29 (-2.06 to +0.68). C3, detector minus oracle labels: +0.77 (+0.13 to +2.34).
-  No-harm check N1, C1 on all rows outside switching: +0.056 (+0.016 to +0.126).
+  inside a logged event. The score, in points of capacity where a higher score is worse, rose by 0.48
+  against plain lags (98.33% interval -0.06 to +1.72, which includes zero; C1). Oracle labels from
+  NGED's logs did not help either (-0.29, -2.06 to +0.68; C2). C3, detector minus oracle labels:
+  +0.77 (+0.13 to +2.34). No-harm check N1, C1 on all rows outside switching: +0.056 (+0.016 to
+  +0.126).
 lessons: >-
   Corrected lags with the MW columns did not lower the error even with NGED's own logs, and the
   detector's labels raised the error slightly on all rows outside switching and were not shown to
