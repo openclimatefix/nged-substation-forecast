@@ -73,17 +73,6 @@ RAMP_WIDTH_DEG: Final[float] = 6.0
 HOLIDAY_YEARS: Final[range] = range(2018, 2029)
 """The years for which bank holidays are looked up."""
 
-_ONE_OFF_NAMES: Final[frozenset[str]] = frozenset(
-    {
-        "Platinum Jubilee of Elizabeth II",
-        "State Funeral of Queen Elizabeth II",
-        "Coronation of Charles III",
-        "Wedding of Prince William and Catherine Middleton",
-        "Diamond Jubilee of Elizabeth II",
-        "Silver Jubilee of Elizabeth II",
-    }
-)
-
 _OBSERVED_SUFFIX: Final[str] = " (observed)"
 
 SATURDAY: Final[int] = 5

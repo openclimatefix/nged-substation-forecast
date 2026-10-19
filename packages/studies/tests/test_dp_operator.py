@@ -1,3 +1,5 @@
+"""Tests of the per-row observation operators of the differentiable-physics series."""
+
 import pytest
 
 torch = pytest.importorskip("torch")

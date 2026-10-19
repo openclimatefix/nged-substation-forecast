@@ -5,10 +5,10 @@ the tests replace the power with a truth made from the model's own design, so a 
 the truth shows the design, the penalties, the constraints, and the solver agree.
 """
 
-import itertools
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Final
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
@@ -18,9 +18,8 @@ torch = pytest.importorskip("torch")
 from scipy.optimize import lsq_linear  # noqa: E402
 from studies.dp_features import (  # noqa: E402
     FeatureCache,
-    input_key,
-    load_feature_cache,
-    save_feature_cache,
+    default_input_paths,
+    load_or_build_feature_cache,
 )
 from studies.dp_gam import (  # noqa: E402
     GamSpec,
@@ -29,17 +28,18 @@ from studies.dp_gam import (  # noqa: E402
     accumulate_gram,
     assert_before_holdout,
     assert_no_lookahead,
-    crossfit_cuts,
-    crossfit_residuals,
     design_matrix,
     fit_gam,
     month_block_weights,
     penalty_matrix,
     predict_gam,
     prepare_fit,
+    replica_cut,
+    replica_residuals,
     solve_bounded_quadratic,
     training_rows,
 )
+from studies.sources import ML_EXPERIMENTS_DATA_DIR  # noqa: E402
 
 from studies import dp_gam  # noqa: E402
 
@@ -94,7 +94,9 @@ def _with_truth(
     return replace(cache, sites={"S1": replace(features, y=y)})
 
 
-def _layout_for(*, cache: FeatureCache, spec: GamSpec, window: TrainingWindow | None = None):  # noqa: ANN202
+def _layout_for(
+    *, cache: FeatureCache, spec: GamSpec, window: TrainingWindow | None = None
+) -> tuple[dp_gam.GamLayout, np.ndarray]:
     layout, index = prepare_fit(
         cache=cache,
         site="S1",
@@ -269,6 +271,21 @@ def test_the_bounded_solver_matches_scipy_on_a_random_problem():
     assert (solved[0].numpy()[constrained] == 0.0).any()
 
 
+def test_the_default_tolerance_loosens_in_float32_and_a_wellconditioned_problem_still_solves():
+    generator = np.random.default_rng(15)
+    factor = generator.normal(size=(60, 12))
+    target = generator.normal(size=60)
+    constrained = torch.as_tensor(np.arange(12) % 2 == 0)
+    gram = torch.as_tensor(factor.T @ factor + np.eye(12), dtype=torch.float32)[None]
+    rhs = torch.as_tensor(factor.T @ target, dtype=torch.float32)[None]
+    solved, violation = solve_bounded_quadratic(matrix=gram, rhs=rhs, constrained=constrained)
+    reference, _ = solve_bounded_quadratic(
+        matrix=gram.double(), rhs=rhs.double(), constrained=constrained
+    )
+    assert violation.max() < 1e-3
+    assert np.allclose(solved[0].numpy(), reference[0].numpy(), atol=1e-4)
+
+
 def test_no_training_row_ends_after_the_cut(dp_synthetic_cache: FeatureCache):
     features = dp_synthetic_cache.sites["S1"]
     index = training_rows(
@@ -302,25 +319,18 @@ def test_scoring_refuses_a_row_on_or_after_the_held_out_start(dp_synthetic_cache
     assert_before_holdout(cache=dp_synthetic_cache, index=np.array([len(shifted.end_times) - 1]))
 
 
-def test_the_cross_fit_predicts_each_quarter_from_a_fit_that_ends_at_its_start(
+def test_the_replica_fits_twelve_months_before_the_cut_and_predicts_only_the_year_after(
     dp_synthetic_cache: FeatureCache, monkeypatch: pytest.MonkeyPatch
 ):
-    recorded: list[tuple[datetime, int]] = []
+    recorded: list[datetime] = []
     original = dp_gam.fit_gam
 
     def spy(**kwargs):  # noqa: ANN003, ANN202
-        fit = original(**kwargs)
-        features = kwargs["cache"].sites[kwargs["site"]]
-        index = training_rows(
-            features=features, cache=kwargs["cache"], cut=kwargs["cut"], window=kwargs["window"]
-        )
-        recorded.append(
-            (kwargs["cut"], int(kwargs["cache"].end_times[index].max().astype("int64")))
-        )
-        return fit
+        recorded.append(kwargs["cut"])
+        return original(**kwargs)
 
     monkeypatch.setattr(dp_gam, "fit_gam", spy)
-    residuals, band, quarter = crossfit_residuals(
+    replica = replica_residuals(
         cache=dp_synthetic_cache,
         site="S1",
         spec=GamSpec(),
@@ -328,20 +338,53 @@ def test_the_cross_fit_predicts_each_quarter_from_a_fit_that_ends_at_its_start(
         window=TrainingWindow(months=12),
         season_years=SEASON_YEARS,
     )
-    starts = [start for start, _ in crossfit_cuts(cut=CUT)]
-    assert [cut for cut, _ in recorded] == starts
-    for cut, last_end in recorded:
-        assert last_end <= np.datetime64(cut.replace(tzinfo=None), "us").astype("int64")
-    assert len(residuals) == len(band) == len(quarter)
-    assert set(np.unique(quarter)) == {0, 1, 2, 3}
+    assert recorded == [datetime(2023, 7, 1, tzinfo=UTC)]
+    assert replica.fit_cut == replica_cut(cut=CUT)
+    ends = dp_synthetic_cache.end_times[replica.index]
+    # No residual row is in the replica fit's training window, and none is after the final cut.
+    assert ends.min() > np.datetime64("2023-07-01T00:00:00", "us")
+    assert ends.max() <= np.datetime64("2024-07-01T00:00:00", "us")
+    assert len(replica.residuals) == len(replica.band) == len(replica.quarter) == len(ends)
+    assert set(np.unique(replica.quarter)) == {0, 1, 2, 3}
 
 
-def test_the_cross_fit_quarters_tile_the_last_twelve_months():
-    quarters = crossfit_cuts(cut=CUT)
-    assert quarters[0][0] == datetime(2023, 7, 1, tzinfo=UTC)
-    assert quarters[-1][1] == CUT
-    for (_, end), (start, _) in itertools.pairwise(quarters):
-        assert end == start
+def test_the_replica_residuals_carry_the_staleness_of_a_frozen_forecast(
+    dp_synthetic_cache: FeatureCache,
+):
+    # A level that rises by 0.02 points a day after the replica fit's cut is invisible to a frozen
+    # fit, so its residuals must grow through the replica year, as the scored forecast's do.
+    features = dp_synthetic_cache.sites["S1"]
+    days = (dp_synthetic_cache.end_times - np.datetime64("2023-07-01", "us")) / np.timedelta64(
+        1, "D"
+    )
+    ramp = 0.02 * np.clip(days, 0.0, None)
+    truth = replace(features, y=40.0 + ramp)
+    cache = replace(dp_synthetic_cache, sites={"S1": truth})
+    replica = replica_residuals(
+        cache=cache,
+        site="S1",
+        spec=GamSpec(),
+        cut=CUT,
+        window=TrainingWindow(months=12),
+        season_years=SEASON_YEARS,
+    )
+    first = replica.residuals[replica.quarter == 2]
+    last = replica.residuals[replica.quarter == 1]
+    assert last.mean() - first.mean() > 3.0
+
+
+def test_the_replica_cut_clamps_the_day_of_the_month():
+    assert replica_cut(cut=datetime(2025, 3, 31, tzinfo=UTC)) == datetime(2024, 3, 31, tzinfo=UTC)
+    assert dp_gam._months_before(moment=datetime(2025, 5, 31, tzinfo=UTC), months=3) == datetime(
+        2025, 2, 28, tzinfo=UTC
+    )
+
+
+def test_a_cut_in_another_time_zone_is_converted_and_a_naive_cut_is_refused():
+    summer = datetime(2024, 7, 1, 1, 0, tzinfo=ZoneInfo("Europe/London"))
+    assert dp_gam.naive_utc(moment=summer) == np.datetime64("2024-07-01T00:00:00", "us")
+    with pytest.raises(ValueError, match="time zone"):
+        dp_gam.naive_utc(moment=datetime(2024, 7, 1))
 
 
 def test_drift_is_held_at_the_last_knot_after_the_cut():
@@ -352,20 +395,47 @@ def test_drift_is_held_at_the_last_knot_after_the_cut():
     assert held.tolist() == [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]
 
 
-def test_predictions_after_the_cut_use_the_last_trained_capacity(dp_synthetic_cache: FeatureCache):
-    spec = GamSpec(drift="none")
+def test_a_later_season_year_takes_the_last_trained_capacity_even_if_its_increment_is_nonzero(
+    dp_synthetic_cache: FeatureCache,
+):
+    spec = GamSpec(drift="none", ridge=0.01)
+    layout, _index = _layout_for(cache=dp_synthetic_cache, spec=spec)
+    truth = _truth_theta(layout=layout, generator=np.random.default_rng(13))
+    cache = _with_truth(
+        cache=dp_synthetic_cache, theta=truth, layout=layout, noise=NOISE_POINTS, seed=14
+    )
     fit = fit_gam(
-        cache=dp_synthetic_cache,
+        cache=cache,
         site="S1",
         specs=[spec],
         cut=CUT,
         window=TrainingWindow(),
         season_years=SEASON_YEARS,
     )
-    capacities = fit.capacity_points()
-    assert capacities[2025] == capacities[2023]
-    scoring = np.flatnonzero(dp_synthetic_cache.end_times > np.datetime64("2025-07-01", "us"))[:48]
-    assert np.isfinite(predict_gam(cache=dp_synthetic_cache, fit=fit, index=scoring)).all()
+    # The 2024-07-01 cut ends the 2023 season-year. The two half-hours that end at the cut start
+    # in British Summer Time on 1 July, and are dark, so they must not make 2024 look trained.
+    assert fit.last_season_year == 2023
+    assert fit.capacity_points()[2023] > 0.0
+    tampered = replace(fit, theta=fit.theta.copy())
+    capacity = fit.layout.slices["capacity"]
+    tampered.theta[0, capacity.start + fit.layout.season_years.index(2024)] += 7.0
+    tampered.theta[0, capacity.start + fit.layout.season_years.index(2025)] += 3.0
+    summer_2024 = np.flatnonzero(
+        (cache.end_times > np.datetime64("2024-07-01", "us"))
+        & (cache.end_times <= np.datetime64("2024-07-08", "us"))
+    )
+    summer_2023 = np.flatnonzero(
+        (cache.end_times > np.datetime64("2023-07-01", "us"))
+        & (cache.end_times <= np.datetime64("2023-07-08", "us"))
+    )
+    after = predict_gam(cache=cache, fit=tampered, index=summer_2024)
+    assert np.array_equal(after, predict_gam(cache=cache, fit=fit, index=summer_2024))
+    # A trained season-year does use its own increments, so the tampering is not invisible to it.
+    tampered.theta[0, capacity.start + fit.layout.season_years.index(2023)] += 2.0
+    assert not np.allclose(
+        predict_gam(cache=cache, fit=tampered, index=summer_2023),
+        predict_gam(cache=cache, fit=fit, index=summer_2023),
+    )
 
 
 def test_the_design_has_one_profile_column_per_row_and_a_negative_capacity_block(
@@ -478,17 +548,29 @@ def test_the_spread_reproduces_the_residual_quantiles_and_never_crosses():
         assert (fresh <= quantiles[:, position]).mean() == pytest.approx(level, abs=0.01)
 
 
-def test_a_small_group_falls_back_to_its_band():
+def test_a_small_group_falls_back_to_its_band_and_a_small_band_to_all_residuals():
     generator = np.random.default_rng(12)
-    band = np.zeros(1000, dtype=int)
-    quarter = np.where(np.arange(1000) < 5, 3, 0)
-    residuals = generator.normal(size=1000)
+    # Band 0 is wide, band 1 is narrow, and band 2 has too few residuals to stand alone.
+    band = np.concatenate([np.zeros(2000, int), np.ones(2000, int), np.full(10, 2)])
+    quarter = np.concatenate(
+        [np.where(np.arange(2000) < 5, 3, 0), np.zeros(2000, int), np.zeros(10, int)]
+    )
+    residuals = np.concatenate(
+        [
+            5.0 * generator.normal(size=2000),
+            0.5 * generator.normal(size=2000),
+            generator.normal(size=10),
+        ]
+    )
     spread = ResidualSpread.fit(residuals=residuals, band=band, quarter=quarter)
-    assert np.allclose(spread.table[0, 3], np.quantile(residuals, dp_gam.QUANTILE_LEVELS))
+    levels = dp_gam.QUANTILE_LEVELS
+    assert np.allclose(spread.table[0, 3], np.quantile(residuals[:2000], levels))
+    assert not np.allclose(spread.table[0, 3], np.quantile(residuals, levels))
+    assert np.allclose(spread.table[2, 0], np.quantile(residuals, levels))
 
 
 def test_the_spread_refuses_to_fit_on_nothing():
-    with pytest.raises(ValueError, match="no cross-fitted residuals"):
+    with pytest.raises(ValueError, match="no residuals"):
         ResidualSpread.fit(residuals=np.array([]), band=np.array([]), quarter=np.array([]))
 
 
@@ -524,35 +606,34 @@ def test_cpu_and_gpu_fits_agree_within_a_hundredth_of_a_point(dp_synthetic_cache
     assert difference.max() < 0.01
 
 
-def test_the_cache_key_changes_with_an_input_file(dp_synthetic_inputs, tmp_path):  # noqa: ANN001
-    key = input_key(paths=dp_synthetic_inputs)
-    copy = tmp_path / "sites.parquet"
-    copy.write_bytes(dp_synthetic_inputs.sites.read_bytes() + b"x")
-    changed = replace(dp_synthetic_inputs, sites=copy)
-    assert input_key(paths=changed) != key
-    assert input_key(paths=dp_synthetic_inputs) == key
-
-
-def test_the_cache_survives_a_round_trip_through_a_file(dp_synthetic_cache: FeatureCache, tmp_path):  # noqa: ANN001
-    path = tmp_path / "cache.npz"
-    save_feature_cache(cache=dp_synthetic_cache, path=path)
-    loaded = load_feature_cache(path=path)
-    original = dp_synthetic_cache.sites["S1"]
-    restored = loaded.sites["S1"]
-    assert loaded.key == dp_synthetic_cache.key
-    assert restored.table == original.table
-    assert np.array_equal(restored.y, original.y, equal_nan=True)
-    assert np.array_equal(
-        restored.smoothed_temperature_c, original.smoothed_temperature_c, equal_nan=True
+@pytest.mark.skipif(
+    not default_input_paths().rows.exists(), reason="experiment 103's private row sets are absent"
+)
+def test_the_gram_solve_matches_numpy_on_one_real_substation_with_drift():
+    # CI has no private data; where it exists this is the plan's test 1 on real tensors.
+    cache = load_or_build_feature_cache(
+        paths=default_input_paths(), cache_dir=ML_EXPERIMENTS_DATA_DIR / "dp_test_cache"
     )
-    assert np.array_equal(loaded.calendar.local_date, dp_synthetic_cache.calendar.local_date)
-    assert np.array_equal(loaded.end_times, dp_synthetic_cache.end_times)
-
-
-def test_the_builder_converts_power_to_points_of_effective_capacity(
-    dp_synthetic_cache: FeatureCache,
-):
-    features = dp_synthetic_cache.sites["S1"]
-    reading = features.y[np.isfinite(features.y)]
-    assert reading[0] == pytest.approx(100.0 * 5.0 / 10.0)
-    assert dp_synthetic_cache.end_times.max() < np.datetime64("2026-07-01", "us")
+    spec = GamSpec(drift="d1")
+    layout, index = prepare_fit(
+        cache=cache,
+        site="D10",
+        spec=spec,
+        cut=datetime(2025, 7, 1, tzinfo=UTC),
+        window=TrainingWindow(),
+        season_years=SEASON_YEARS,
+    )
+    features = cache.sites["D10"]
+    x = design_matrix(cache=cache, features=features, layout=layout, index=index)
+    y = features.y[index]
+    penalty, _ = penalty_matrix(layout=layout, n_rows=len(index))
+    reference = np.linalg.solve(x.T @ x + penalty, x.T @ y)
+    gram, rhs = accumulate_gram(cache=cache, features=features, layout=layout, index=index)
+    solved, _ = solve_bounded_quadratic(
+        matrix=gram + torch.as_tensor(penalty)[None],
+        rhs=rhs,
+        constrained=torch.zeros(layout.n_columns, dtype=torch.bool),
+    )
+    assert np.abs(x @ solved[0].numpy() - x @ reference).max() < 1e-4
+    well_determined = np.abs(reference) > 1e-3
+    assert np.allclose(solved[0].numpy()[well_determined], reference[well_determined], rtol=1e-6)

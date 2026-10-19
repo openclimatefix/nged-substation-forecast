@@ -10,6 +10,7 @@ torch = pytest.importorskip("torch")
 
 from studies.dp_features import FeatureCache  # noqa: E402
 from studies.dp_pooled import (  # noqa: E402
+    INTERACTION_INPUTS,
     DpConfig,
     PooledDemandModel,
     ResidualStates,
@@ -145,3 +146,64 @@ def test_cpu_and_gpu_pooled_fits_agree(dp_synthetic_cache: FeatureCache):
     gpu_model = _model(batch=cpu_batch, config=DpConfig(), seed=1).to("cuda")
     with torch.no_grad():
         assert torch.allclose(cpu_model(cpu_batch), gpu_model(gpu_batch).cpu(), atol=1e-3)
+
+
+def test_the_shared_terms_are_centred_per_site_year_in_training_and_use_stored_means_after(
+    dp_synthetic_cache: FeatureCache,
+):
+    batch = build_pooled_batch(
+        cache=_two_site_cache(dp_synthetic_cache), sites=("S1", "S2"), cut_end=CUT
+    )
+    model = _model(batch=batch, config=DpConfig(interaction_hidden=(8,)))
+    with torch.no_grad():
+        model.holiday.normal_()
+        model.harmonic_coef.normal_()
+        values = torch.randn(batch.n_rows, dtype=torch.float32) + 3.0
+        model.train()
+        centred = model._centred(values=values, slot=batch.season_slot)
+        sums = torch.zeros(model.n_sites * model.n_season_years).index_add(
+            0, batch.season_slot, centred
+        )
+        assert sums.abs().max() < 1e-2 * batch.n_rows**0.5
+        model.eval()
+        again = model._centred(values=values, slot=batch.season_slot)
+    assert torch.allclose(centred, again, atol=1e-4)
+
+
+def test_the_interaction_network_does_not_see_the_suns_elevation(dp_synthetic_cache: FeatureCache):
+    batch = build_pooled_batch(
+        cache=_two_site_cache(dp_synthetic_cache), sites=("S1", "S2"), cut_end=CUT
+    )
+    mixed = torch.zeros(batch.n_rows)
+    inputs = PooledDemandModel._interaction_inputs(batch=batch, mixed=mixed)
+    assert inputs.shape[1] == INTERACTION_INPUTS
+    changed = replace(batch, elevation=batch.elevation + 30.0)
+    assert torch.equal(PooledDemandModel._interaction_inputs(batch=changed, mixed=mixed), inputs)
+
+
+def test_a_season_year_without_training_rows_adds_no_capacity(dp_synthetic_cache: FeatureCache):
+    batch = build_pooled_batch(
+        cache=_two_site_cache(dp_synthetic_cache), sites=("S1", "S2"), cut_end=CUT
+    )
+    model = _model(batch=batch, config=DpConfig())
+    model.mark_trained_years(batch=batch)
+    with torch.no_grad():
+        model.capacity_raw.fill_(2.0)
+    capacities = model.capacities()
+    last_trained = int(batch.season_slot.max()) % batch.n_season_years
+    assert (
+        capacities[:, last_trained + 1 :] == capacities[:, last_trained : last_trained + 1]
+    ).all()
+    assert (capacities[:, last_trained] > capacities[:, 0]).all()
+
+
+def test_a_float64_batch_fits_without_a_dtype_mismatch(dp_synthetic_cache: FeatureCache):
+    batch = build_pooled_batch(
+        cache=_two_site_cache(dp_synthetic_cache),
+        sites=("S1", "S2"),
+        cut_end=CUT,
+        dtype=torch.float64,
+    )
+    model = _model(batch=batch, config=DpConfig())
+    result = fit_pooled(model=model, batch=batch, steps=3, learning_rate=0.05)
+    assert len(result.losses) == 3
