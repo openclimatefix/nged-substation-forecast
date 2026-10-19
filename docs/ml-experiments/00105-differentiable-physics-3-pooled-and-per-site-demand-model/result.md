@@ -217,9 +217,9 @@ D9).**
   scarce-data rows (bank holidays, the Christmas run, days below 0 °C); G-2y (the convex model on
   the same 2 years); X-pool-onb4w (one XGBoost fitted to the other substations plus the 4 weeks);
   a report of the lagged XGBoost arms; the coastal split; the score by month since the cut; the
-usable-row counts of each short history; the sunny-hour residual against temperature; a second-seed
-point of the capacity profile; the tuning-year winner of the XGBoost arms; the cards of the held-out
-onboarding substations; and the curtailment-cost metric.
+  usable-row counts of each short history; the sunny-hour residual against temperature; a
+  second-seed point of the capacity profile; the tuning-year winner of the XGBoost arms; the cards
+  of the held-out onboarding substations; and the curtailment-cost metric.
 
 ### Predictions held and failed
 
@@ -298,12 +298,15 @@ test 1 runs P with the interaction network off.
   774,771, against 767,141 with the capacities pinned. Variant (a) closed 3,402 of the 4,553 nats;
   the combined variant (a+c) did not, so the evidence is mixed. The variants' capacities are in
   `work/diagnostics.json` and the losses in `work/variant_losses.json`. **None of the variants
-  clears the leak test (gate test 2):** (a) recovers 0.78 of the injected capacity and moves the
-  shared midday output by 0.07, 0.14, 0.16, and 0.18 points at D10, D11, D14, and D16; (c)
-  recovers 0.53 and moves it by 0.50, 0.20, 0.09, and 0.24; (a+c) recovers 0.54 and moves it by
-  0.21, 0.22, 0.10, and 0.83. Other substations' capacities move by 1% to 7% (limit 5%). Hiding
-  temperature from the network therefore does not remove the leak, and starting at the convex
-  capacities lowers the recovered capacity.
+  clears the leak test (gate test 2).** (a) recovers 0.78 of the injected capacity and moves other
+  substations' capacities by at most 3.2%, so it passes those two limits, and fails only the
+  midday limit, with shared midday output moves of 0.07, 0.14, 0.16, and 0.18 points at D10, D11,
+  D14, and D16. (c) recovers 0.53 (fails) and moves the midday output by 0.50, 0.20, 0.09, and 0.24
+  (fails), with other capacities moving by at most 3.5%. (a+c) recovers 0.54 (fails), moves other
+  capacities by up to 6.7% (fails the 5% limit; the only variant to do so), and moves the midday
+  output by 0.21, 0.22, 0.10, and 0.83 (fails), so it fails all three. Hiding temperature from the
+  network therefore does not remove the leak, and starting at the convex capacities lowers the
+  recovered capacity.
 
 ## Post hoc comparison with per-site convex and fleet-profile baselines on the same short history
 
