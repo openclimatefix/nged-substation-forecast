@@ -234,7 +234,7 @@ def _score_job(job: tuple[str, str, arms.ArmDefinition]) -> dict[str, Any]:
             definition=definition,
         )
     except ValueError as error:
-        if "no training rows" not in str(error):
+        if "no training row" not in str(error):
             raise
         return {"site": site, "arm": name, "score": float("nan"), "stream": np.array([np.nan])}
     keep = ~cache.sites[site].switching_mask[run.index]

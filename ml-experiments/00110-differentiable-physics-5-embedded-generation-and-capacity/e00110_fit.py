@@ -56,7 +56,7 @@ def _job(job: tuple[str, str, str]) -> dict[str, Any]:
             definition=definition,
         )
     except ValueError as error:
-        if "no training rows" not in str(error) and "no row" not in str(error):
+        if "no training row" not in str(error):
             raise
         return {"job": job, "skipped": str(error), "frame": None}
     extra: dict[str, np.ndarray] = {"dark": cache.sites[site].dark[run.index]}
