@@ -295,7 +295,7 @@ def build_pooled_batch(
         dtype: The floating-point type of the real-valued tensors.
         all_present_rows: Keep every row that has a reading, whatever the pool, the lockdown window,
             and the switching masks say (the pool filter is dropped as well as the other two), which
-            scoring wants beside the default rows. MVA substations still keep only dark rows.
+            scoring can include beside the default rows. MVA substations still keep only dark rows.
 
     Returns:
         The batch.
@@ -391,6 +391,13 @@ class PooledDemandModel(nn.Module):
     """The mean of the centred terms over each substation and season-year, from training."""
     site_active: torch.Tensor
     """1 for each substation that has training rows, else 0 (a buffer)."""
+    weeks_of_history: torch.Tensor
+    """The weeks of history `onboard_site` gave each substation, or -1 for none (a buffer)."""
+    capacity_override: torch.Tensor | None
+    """Capacities in points that replace the learned ones where not `NaN`; `None` for none.
+
+    A buffer, so it moves with the model and is saved in its state dict.
+    """
     fit_had_rows: torch.Tensor
     """1 for each substation that had training rows in the pooled fit, else 0 (a buffer).
 
@@ -450,9 +457,8 @@ class PooledDemandModel(nn.Module):
         self.register_buffer("site_active", torch.ones(n_sites))
         self.register_buffer("solar_sites", torch.ones(n_sites))
         self.register_buffer("fit_had_rows", torch.ones(n_sites))
-        self.onboarding_weeks: dict[str, int] = {}
-        self.capacity_override: torch.Tensor | None = None
-        """Capacities in points that replace the learned ones where not `NaN`; `None` for none."""
+        self.register_buffer("weeks_of_history", torch.full((n_sites,), -1.0))
+        self.register_buffer("capacity_override", None)
         self.register_buffer("capacity_prior", torch.full((n_sites,), float("nan")))
         self._build_site_prior(initial_level=initial_level)
 
@@ -793,8 +799,6 @@ def fit_pooled(
     """
     device = batch.y.device
     model.to(device=device, dtype=batch.y.dtype)
-    if model.capacity_override is not None:
-        model.capacity_override = model.capacity_override.to(device=device, dtype=batch.y.dtype)
     model.mark_trained_years(batch=batch)
     model.start_from_batch(batch=batch)
     optimiser = torch.optim.Adam(model.parameters(), lr=learning_rate)

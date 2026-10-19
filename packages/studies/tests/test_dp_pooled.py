@@ -218,7 +218,7 @@ def test_the_dark_only_option_hides_temperature_from_the_network_by_day(
     temperature = model._interaction_inputs(batch=batch, mixed=mixed)[:, -1]
     day = batch.elevation > 0
     assert bool((temperature[day] == 0).all())
-    assert bool((temperature[~day & (batch.elevation <= 0)] != 0).all())
+    assert bool((temperature[~day] != 0).all())
 
 
 def test_a_season_year_without_training_rows_adds_no_capacity(dp_synthetic_cache: FeatureCache):

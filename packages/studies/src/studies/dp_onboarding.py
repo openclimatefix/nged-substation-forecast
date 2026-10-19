@@ -96,12 +96,13 @@ class FitCopy:
         y: Replacement readings for every row of the batch, or `None` to keep the real ones.
         capacity_prior: A prior centre for each substation's first capacity increment before the
             softplus, with `NaN` for none (see `PooledDemandModel.capacity_prior`), or `None`.
+            `onboard_site` does not use it: an onboarded substation starts at the population mean.
         fixed_scales: Population scales to hold fixed (not learned) in this copy, keyed by family
             name, or `None`. A larger scale is a weaker prior. The scale applies to every
             substation, including those with no `capacity_prior` centre.
         capacity_init: Starting values of `capacity_raw`, shape (substations, season-years), or
-            `None` for the default start. In the `decay` prior the start does not follow the
-            frozen population mean.
+            `None` for the default start. It moves only the site-level values: the population
+            means of the `map` and `variational` priors keep their default start.
         capacity_override: Capacities in points held fixed in this copy, shape (substations,
             season-years), with `NaN` where the capacity is learned; or `None`. The override and
             the weeks recorded by `onboard_site` live on the model object and are not saved with
@@ -284,7 +285,7 @@ def onboard_site(
     )
     n_years = model.n_season_years
     if weeks_of_history is not None:
-        model.onboarding_weeks[label] = weeks_of_history
+        model.weeks_of_history[site] = float(weeks_of_history)
     saved_trained = model.trained.clone()
     saved_centres = model.centre_means.clone()
     saved_flags = {name: p.requires_grad for name, p in model.named_parameters()}
@@ -407,7 +408,8 @@ class PooledResiduals:
         quarter: The calendar quarter of each residual.
         fit_excluded: The substations that had no rows in the fit that made the residuals.
         weeks_of_history: The weeks of history the held-out substation had in that fit's
-            onboarding, or `None` when the fit is not an onboarding arm.
+            onboarding, or `None` when the fit is not an onboarding arm. It must equal the weeks
+            recorded on an onboarded model; `None` fails for one.
     """
 
     site: np.ndarray
@@ -426,16 +428,15 @@ def pooled_residuals(
     Args:
         model: The replica fit.
         batch: The replica year's rows.
-        weeks_of_history: The weeks of history of the onboarding arm, if the model was onboarded;
-            it must match the weeks recorded when the model was onboarded.
+        weeks_of_history: The weeks of history of the onboarding arm. If the model was onboarded,
+            this must equal the weeks recorded then (so `None` fails for an onboarded model).
 
     Returns:
         The residuals, tagged with the substations the fit excluded and the weeks of history.
     """
-    if weeks_of_history is not None and any(
-        weeks != weeks_of_history for weeks in model.onboarding_weeks.values()
-    ):
-        msg = f"the model was onboarded with {model.onboarding_weeks} weeks, not {weeks_of_history}"
+    recorded = model.weeks_of_history[model.weeks_of_history >= 0].tolist()
+    if any(weeks != weeks_of_history for weeks in recorded):
+        msg = f"the model was onboarded with {recorded} weeks, not {weeks_of_history}"
         raise ValueError(msg)
     predicted = predict_pooled(model=model, batch=batch)
     labels = np.array(batch.site_labels)[batch.site.cpu().numpy()]
@@ -466,7 +467,7 @@ def cross_fitted_spread(
     The residuals must come from a replica fit in which `held_out` had no rows, and from the
     onboarding arm with the same weeks of history, so the spread for a new substation carries
     neither its own history nor another arm's staleness. The residuals are centred per group
-    first (see `centre_by_group`), so the spread is a spread around the mean forecast and carries
+    first (see `_centre_by_group`), so the spread is a spread around the mean forecast and carries
     no shift.
 
     Args:
@@ -513,11 +514,11 @@ def fit_centred_spread(
     Returns:
         The spread around the mean forecast, with mean zero in each group.
     """
-    centred = centre_by_group(residual=residual, band=band, quarter=quarter)
+    centred = _centre_by_group(residual=residual, band=band, quarter=quarter)
     return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter, centre=False)
 
 
-def centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:
+def _centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:
     """Subtract the mean residual of each (band, quarter) group, so the spread has mean zero.
 
     The forecast is a mean forecast, so a group's mean residual in the replica year is the replica
