@@ -227,11 +227,11 @@ join by 30 minutes earlier weakens the correlation between hourly power and irra
 experiments and production.
 
 **Do not shift power timestamps: the `time` column of the cleaned power table marks the end of the
-half-hour (high confidence that no 30-minute error exists).** Power timestamps are correct to within
-a few minutes on both sides of NGED's fix of 2026-03-26 08:30 UTC, and the ingest's correction of
-the earlier late stamps goes the right way by the right amount. The test used clear days and the
-change in net power against a sun-height predictor at sunrise and sunset, with an offset search from
--120 to +120 minutes and 95% intervals from resampling days, on the aggregate of the 6 metered solar
+half-hour (high confidence that no 30-minute error exists).** Power timestamps show no 30-minute
+error on either side of NGED's fix of 2026-03-26 08:30 UTC, and the ingest's correction of the
+earlier late stamps goes the right way by the right amount. The test used clear days and the change
+in net power against a sun-height predictor at sunrise and sunset, with an offset search from -120
+to +120 minutes and 95% intervals from resampling days, on the aggregate of the 6 metered solar
 farms. Before the fix, the corrected stamps read 0.9 minutes late (series from -0.2 to +2.9), so the
 raw feed was about 31 minutes late and the 30-minute ingest correction is right to within about 3
 minutes. After the fix, from April to 2026-09-10, the median is +4.7 minutes (+1.5 to +13.3). The
