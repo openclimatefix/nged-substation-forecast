@@ -423,7 +423,7 @@ def figure_7_tails(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         height=170,
         title=_title(
             text="Tail calibration at the 0.01, 0.05, 0.95, and 0.99 quantiles",
-            subtitle="Zero means the quantile covers exactly its nominal share. Five decision sites.",
+            subtitle="Zero means a quantile covers its nominal share exactly. Five decision sites.",
         ),
     )
 
