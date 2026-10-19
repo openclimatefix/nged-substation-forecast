@@ -196,16 +196,47 @@ def figure_2_headline() -> alt.TopLevelMixin:
                 "sites": f"{result['better']} of 5 sites better",
             }
         )
+    uncentred_arms = {
+        name: report.load_arm(name=name, uncentred=name in common.GAM_ARMS)
+        for name in ("g1", "g_all", "g_all_d1", "x_12am", "x_allam")
+    }
+    for label, treatment, reference in (
+        ("C1 years: G-all+D1 minus G1", "g_all_d1", "g1"),
+        ("C2: G1 minus X-12am", "g1", "x_12am"),
+        ("C3: G-all+D1 minus X-allam", "g_all_d1", "x_allam"),
+        ("G-all minus G1", "g_all", "g1"),
+    ):
+        result = report.contrast(
+            arms=uncentred_arms,
+            treatment=treatment,
+            reference=reference,
+            sites=common.ELIGIBLE_SITES,
+            level=None,
+        )
+        rows.append(
+            {
+                "contrast": label,
+                "estimate": result["estimate"],
+                "low": result["low"],
+                "high": result["high"],
+                "kind": "uncentred spread (first run, 95%)",
+                "sites": f"{result['better']} of 5 sites better",
+            }
+        )
     table = pl.DataFrame(rows)
-    order = table["contrast"].to_list()
+    order = list(dict.fromkeys(table["contrast"].to_list()))
     base = alt.Chart(table).encode(
         y=alt.Y("contrast:N", sort=order, title=None, axis=alt.Axis(labelLimit=330)),
+        yOffset=alt.YOffset("kind:N"),
         color=alt.Color(
             "kind:N",
             scale=alt.Scale(
-                domain=["planned", "exploratory"], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]
+                domain=["planned", "exploratory", "uncentred spread (first run, 95%)"],
+                range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, "#888888"],
             ),
-            legend=alt.Legend(title="Interval", orient="top", direction="horizontal"),
+            legend=alt.Legend(
+                title="Interval", orient="top", direction="horizontal", labelLimit=300
+            ),
         ),
     )
     rule = base.mark_rule(strokeWidth=2).encode(x="low:Q", x2="high:Q")  # ty: ignore[unresolved-attribute]
@@ -218,7 +249,12 @@ def figure_2_headline() -> alt.TopLevelMixin:
     text = (
         alt.Chart(table)  # ty: ignore[unresolved-attribute]
         .mark_text(align="left", dx=6, fontSize=10)
-        .encode(y=alt.Y("contrast:N", sort=order), x="high:Q", text="sites:N")
+        .encode(
+            y=alt.Y("contrast:N", sort=order),
+            yOffset=alt.YOffset("kind:N"),
+            x="high:Q",
+            text="sites:N",
+        )
     )
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
@@ -227,14 +263,17 @@ def figure_2_headline() -> alt.TopLevelMixin:
     )
     return (zero + rule + dot + text).properties(
         width=WIDTH - 150,
-        height=26 * len(order),
+        height=34 * len(order),
         title=_title(
             text="Years of history, and the convex model against XGBoost",
             subtitle=(
                 "Dot: difference in mean quantile score over the five decision sites (D5, D10, "
                 "D11, D14, D16), scored 1 July 2025 to 30 June 2026 on rows outside the switching"
                 " events. Line: 98.33% interval (planned, Bonferroni for three) or 95% interval "
-                "(exploratory) from resampling whole calendar months. Dashed line: no difference."
+                "(exploratory) from resampling whole calendar months. Grey: the first run's "
+                "forecasts, "
+                "whose spread carried the replica year's mean bias (95%). Dashed line: no "
+                "difference."
             ),
         ),
     )
@@ -492,7 +531,7 @@ def figure_7_staleness() -> alt.TopLevelMixin:
         panel("coverage", "Share at or below q95", nominal=0.95),
     ).properties(
         title=_title(
-            text="Forecasts get worse and narrower as the fit gets older",
+            text="Score and upper-tail coverage by month since the fit was frozen",
             subtitle=(
                 "Mean quantile score (top; smaller is better) and the share of measured values at"
                 " or below the 95% quantile (bottom; the dashed line is the nominal 95%), by "
