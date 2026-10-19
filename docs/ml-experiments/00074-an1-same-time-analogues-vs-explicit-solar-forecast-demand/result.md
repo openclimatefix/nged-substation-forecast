@@ -2,7 +2,7 @@
 id: "00074"
 slug: an1-same-time-analogues-vs-explicit-solar-forecast-demand
 theme: demand-inputs
-also_relevant_to: []
+also_relevant_to: [solar-disaggregation]
 status: done
 size: complex
 hypothesis: >-

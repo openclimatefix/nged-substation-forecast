@@ -5,6 +5,10 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Refitting the lagless XGBoost model without the load transfers that the detector had found barely
+  changed what the detector finds or the forecast error. In these 16 series the limit on the
+  detector is therefore not that the forecast has learned the transfers.
 hypothesis: >-
   When the lagless XGBoost model (the model whose forecast residual the switching detector reads)
   is refitted with zero weight on the half-hours inside detected switching intervals, and the

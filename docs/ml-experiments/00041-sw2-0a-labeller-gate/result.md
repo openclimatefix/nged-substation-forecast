@@ -5,6 +5,10 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: complex
+take_home_message: >-
+  The AI model Sonnet called none of 120 placebo windows a switching event and timed starts and ends
+  well, but it found 0.74 of the large, long fake transfers, under the 0.80 bar. It found 0.89 of
+  them where the receiving substation has its own power readings and 0.60 where it does not.
 hypothesis: >-
   A labeller that reads features computed from raw power and the switching logs, and that uses no
   forecasting model as its deciding evidence, can find injected load transfers and reject placebo

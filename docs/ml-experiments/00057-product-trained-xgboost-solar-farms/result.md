@@ -2,9 +2,14 @@
 id: "00057"
 slug: product-trained-xgboost-solar-farms
 theme: generator-forecasting
-also_relevant_to: []
+also_relevant_to: [weather-products-and-blending]
 status: done
 size: complex
+take_home_message: >-
+  Giving UKV forecasts to an ENS-trained solar-farm model changed the quantile score by -0.035
+  points of capacity at 1 to 2 days ahead (95% interval -0.119 to +0.037), which is too small to
+  resolve. The data cannot show a gain and cannot rule out the 0.10-point gain that would justify a
+  new weather feed. UKV helped the six solar farms far less than it helped the three wind farms.
 hypothesis: >-
   For the six metered solar farms, an XGBoost quantile model trained on ENS and given UKV's
   shortwave radiation, total cloud, and temperature as extra input columns scores lower on the

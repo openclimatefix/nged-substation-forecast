@@ -166,8 +166,8 @@ per substation type. On 16 Primary substations the score was 5.47 against 5.32 f
 (+0.15, 99.44% interval +0.03 to +0.26). One model for all series scored 5.61 (+0.29, +0.19 to
 +0.42). Without the identifier the by-type pool lost a further 0.82 points. A random grouping scored
 the same as the by-type grouping, so in this experiment the number of models mattered more than
-which substations share a model. The research log lists the experiment as a candidate for the next
-model release.
+which substations share a model. The Overview's candidates table lists the experiment as a candidate
+for the next model release.
 
 ![Quantile score by grouping](../../00024-pooling-groupings-demand-xgboost/figure_2.svg)
 

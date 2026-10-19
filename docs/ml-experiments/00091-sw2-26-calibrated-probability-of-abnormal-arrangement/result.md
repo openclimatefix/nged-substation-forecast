@@ -5,6 +5,12 @@ theme: switching-labels-in-the-forecast
 also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  A probability built from the causal switching detector beat the detector's yes-or-no flag only on
+  injected transfers large enough to see (Brier score 11.2% lower, interval -20.3% to -2.0%).
+  Against NGED's switching logs it has almost no skill (area under the curve 0.52 to 0.53), so a
+  rule that widened the uncertainty bands when the probability is high would cover only about 8% of
+  the half-hours that the logs mark as switching.
 hypothesis: >-
   The refit-offset neighbour-count detector (RO-NC, called XL on the pages of experiments 70, 71,
   and 82), run causally (with only the data before a forecast origin), can give for each past

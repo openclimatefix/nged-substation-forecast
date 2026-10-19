@@ -296,8 +296,9 @@ must clear a low bar. The risks are thin data per bucket and quantile jumps at b
   or sites are added.
 - **A new NWP with short history:** add an adapter table. Stage 1 is untouched. Stage 2's calibrator
   keeps its form: the new product's rows join the pooled fit with one new spread factor, and the
-  blend gains the product's weight, shrunk towards equal weights. The second-product experiments in
-  the research plan measure how few months of history this needs. The single-stage challenger
+  blend gains the product's weight, shrunk towards equal weights. The second-product experiments on
+  the [weather products Research plan](../ml-experiments/themes/weather-products-and-blending/plan.md)
+  measure how few months of history this needs. The single-stage challenger
   instead adds a correction (a few numbers per technology) to a frozen champion, and the
   per-product-columns control retrains in full.
 
@@ -486,7 +487,8 @@ and input/output still probably dominate wall-clock time and need chunking by se
 - Which uses need coherence across time, across series, or both, and does feeder-to-substation
   hierarchy data exist for scoring it?
 - Is the target overall CRPS or exceedance at the 95th percentile? The answer decides between the
-  location-and-scale form and a free quantile calibrator, which the research plan tests.
+  location-and-scale form and a free quantile calibrator, which the [calibration Research
+  plan](../ml-experiments/themes/calibration-and-uncertainty/plan.md) tests.
 - The final 51-member output fits `PowerForecast`, whose `ensemble_member` already has a different
   meaning for each forecaster (for `climatology` it is the rank of a quantile level). Should a
   docstring line say what the index means for the staged forecaster? The 19-level quantile table and

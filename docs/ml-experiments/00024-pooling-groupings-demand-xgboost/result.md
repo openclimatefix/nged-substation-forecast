@@ -2,7 +2,7 @@
 id: "00024"
 slug: pooling-groupings-demand-xgboost
 theme: hierarchy-and-pooling
-also_relevant_to: []
+also_relevant_to: [demand-inputs]
 status: done
 size: complex
 hypothesis: >-

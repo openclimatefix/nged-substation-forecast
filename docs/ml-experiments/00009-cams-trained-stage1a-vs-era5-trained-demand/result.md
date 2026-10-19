@@ -2,7 +2,7 @@
 id: "00009"
 slug: cams-trained-stage1a-vs-era5-trained-demand
 theme: weather-products-and-blending
-also_relevant_to: []
+also_relevant_to: [demand-inputs]
 status: done
 size: medium
 hypothesis: >-

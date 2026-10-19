@@ -102,8 +102,8 @@ number, or `none`). Every result has the same front matter, so a later session f
 
 **`theme` names exactly one theme folder under `docs/ml-experiments/themes/`, and `also_relevant_to`
 lists the other themes the result bears on (an empty list if none).** The experiment appears in the
-Experiments table of its own theme as "primary" and of each listed theme as "also relevant". A theme
-needs at least three related experiments, so an experiment that fits no existing theme takes the
+Experiments table of its own theme as "primary" and of each listed theme as "also relevant". A new theme
+should cover several related experiments, so an experiment that fits no existing theme takes the
 closest one rather than starting a theme of its own. A new theme is a folder under `themes/` with
 `index.md`, `experiments.md`, and `plan.md`, and an entry in the `mkdocs.yml` navigation.
 

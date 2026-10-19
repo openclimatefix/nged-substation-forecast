@@ -5,6 +5,11 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Taking the end of each alarm interval from the strongest opposite step in the next 14 days found
+  0.19 more of the moved power than the single-step detector. Scoring the onset step and the return
+  step as one pair found 0.13 to 0.21 less, so the end of the interval is the main limit on the
+  single-step detector's recall.
 hypothesis: >-
   A detector that looks for an onset step and its opposite return step together, scoring the pair
   and choosing the return stamp with a prior on the duration of real transfers, finds more of the MW

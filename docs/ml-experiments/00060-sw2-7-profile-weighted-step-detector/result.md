@@ -5,6 +5,12 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  A switching detector that weights each half-hour by the substation's predicted power found the
+  same share of the moved power as one that expects a constant step, within 0.005 on five shapes of
+  transfer (0.44 to 0.47). The shape of the moved load is therefore not why transfers are missed:
+  among transfers with a large step, about a third have an alarm at the right start but the wrong
+  end.
 hypothesis: >-
   A step statistic that weights each half-hour by the series' expected power (the daily profile of
   the fitted weather model), D3, finds more of the MW moved by injected load transfers than the

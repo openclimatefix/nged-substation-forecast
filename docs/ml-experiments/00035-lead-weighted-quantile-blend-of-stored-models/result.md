@@ -2,9 +2,14 @@
 id: "00035"
 slug: lead-weighted-quantile-blend-of-stored-models
 theme: calibration-and-uncertainty
-also_relevant_to: []
+also_relevant_to: [retraining-and-training-history]
 status: done
 size: medium
+take_home_message: >-
+  Averaging the quantiles of three stored demand models lowered the Primary demand error by 0.10
+  points of capacity against the best single model (98.33% interval -0.19 to -0.03), which clears
+  the 0.05 threshold for moving it into production. For solar and wind the gains were too small to
+  resolve on 6 solar farms and 3 wind farms.
 hypothesis: >-
   For Primary substation demand, solar farms, and wind farms, averaging the quantiles of two or
   three forecast models that experiments 19, 20, 30, and 33 already scored (N1 is the ENS-trained

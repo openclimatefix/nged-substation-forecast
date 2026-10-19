@@ -5,6 +5,11 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  A neighbour veto removed the alarms that look like a weather or calendar miss and let the
+  detector's threshold fall from 4.00 to 3.70, but the share of 620 injected transfers found rose
+  only from 0.355 to 0.363 (98.75% interval -0.003 to +0.022). The result is inconclusive, and a
+  stronger veto was not tried.
 hypothesis: >-
   Keeping every alarm of the single-series detector D0 at the 24-hour window, except those vetoed
   because at least two neighbouring Primary substations stepped the same way and none stepped the

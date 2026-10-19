@@ -5,6 +5,11 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Adding a bank-holiday column to the demand model raised the share of 89 simulated transfers that
+  the detector found by 0.011 (98.75% interval -0.010 to +0.044), which the experiment is too small
+  to tell from zero. The column lowered the demand error on bank holidays by about 1.15 points of
+  capacity, but the detector's matched threshold rose instead of falling.
 hypothesis: >-
   Adding one column, the signed days to the nearest bank holiday in England, to experiment 17's
   lagless ERA5-trained XGBoost demand model H0.5 (refitted monthly, with H0.5's absolute-error loss

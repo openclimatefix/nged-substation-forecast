@@ -2,7 +2,7 @@
 id: "00007"
 slug: cams-static-correction-stage1a-residual
 theme: weather-products-and-blending
-also_relevant_to: []
+also_relevant_to: [demand-inputs]
 status: done
 size: medium
 hypothesis: >-

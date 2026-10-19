@@ -5,6 +5,10 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: complex
+take_home_message: >-
+  Two simple switching detectors each found under a fifth of 600 simulated transfers, and no more
+  than 0.29 in any size group. Over a 24-hour window the neighbour check found fewer large transfers
+  than the single-series detector (0.21 against 0.29), and it helped only over the 4-hour window.
 hypothesis: >-
   Experiment 37's neighbour-balance detector D1 finds injected load transfers between Primary
   substations more often than its single-series detector D0, when a transfer counts as found only

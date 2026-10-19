@@ -5,6 +5,11 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: simple
+take_home_message: >-
+  Much of the gap in recall between injected transfers with a metered receiver (0.50) and without
+  one (0.17) comes from the injected step being too small to see: 211 of 274 transfers without a
+  metered receiver step by less than the alarm threshold. A stronger neighbour veto raised the share
+  found by only 0.013 (98.33% interval 0.000 to +0.029).
 hypothesis: >-
   (1) The gap in recall between injected load transfers with a metered receiver (0.50) and without
   one (0.17), seen in experiment 55, comes mostly from the injection giving the second group a

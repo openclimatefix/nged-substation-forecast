@@ -20,10 +20,11 @@ experiment is running.
 
 ## The state the manager keeps
 
-**Git holds the queue and the finished results, and a private folder holds everything else.** The
-`plan.md` page of each theme under `docs/ml-experiments/themes/` is that theme's queue, and the
-Experiments table of each theme, generated from the `result.md` front matter, is the finished work.
-The order across themes is kept in the private folder below. Under `data/ml-experiments/`, which is
+**Git holds each theme's queue and the finished results, and a private folder holds the order across
+themes and everything else.** The `plan.md` page of each theme under `docs/ml-experiments/themes/`
+holds that theme's queue, and the Experiments table of each theme, generated from the `result.md`
+front matter, is the finished work. The manager's brief in the private folder holds the order across
+themes. Under `data/ml-experiments/`, which is
 never committed:
 
 - `SLOTS.md` is the slot ledger.

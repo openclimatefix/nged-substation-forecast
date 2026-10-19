@@ -5,6 +5,11 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: simple
+take_home_message: >-
+  Counting the neighbours that step the same way as the alarming substation found 0.048 more of the
+  moved power on injected transfers than the single-series detector, at the same number of
+  unexplained alarms. The 35 labelled real transfers are too few to confirm the gain (7 found,
+  against 8 for the benchmark), and the gain does not extend to transfers lasting 15.6 to 60 days.
 hypothesis: >-
   One alarm score that adds the count of neighbouring substations stepping the same way as the
   alarming substation to the substation's own 24-hour step and the largest opposite neighbour step

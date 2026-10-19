@@ -5,6 +5,12 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: simple
+take_home_message: >-
+  Using the refit offset and the same-sign neighbour count together found 0.770 of the moved power
+  on injected transfers, against 0.656 for the benchmark detector. The gain of 0.114 is about the
+  sum of the gains of 0.056 and 0.050 from each change alone. On the 35 labelled real transfers of
+  more than 1 day the combined detector found 12 and the benchmark 8, and transfers lasting 15.6 to
+  60 days gain nothing.
 hypothesis: >-
   Experiment 71's refit-offset detector X (the 24-hour step statistic taken from whichever of two
   monthly-refit residual models did not refit within 24 hours of the stamp) and experiment 70's

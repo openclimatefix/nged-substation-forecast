@@ -199,3 +199,7 @@ def test_placeholder_is_replaced_on_theme_pages(experiments_dir: Path) -> None:
     assert "(../../00003-slug-00003/result.md)" in experiments_page
     assert "(00003-slug-00003/result.md)" in overview
     assert other_page == "Nothing.\n"
+
+
+def test_cell_escapes_pipes_and_collapses_newlines() -> None:
+    assert experiment_tables._cell("a | b\n  c\n\nd") == "a \\| b c d"

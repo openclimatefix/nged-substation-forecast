@@ -5,6 +5,11 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: complex
+take_home_message: >-
+  Fitting one flow of power across every pair of neighbouring Primary substations at once found
+  0.108 of the moved power, against 0.646 for the single-series detector when both raised about 80
+  unexplained alarms. A change to the loss made after seeing the result lifted that to 0.527, still
+  0.120 lower, so a joint fit would have to start from the 24-hour step statistics.
 hypothesis: >-
   A single convex fit of block-shaped load flows across every boundary between neighbouring Primary
   substations, fitted to all the residuals at once, finds more of the MW moved by injected load
