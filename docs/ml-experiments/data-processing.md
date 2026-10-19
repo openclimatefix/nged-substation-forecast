@@ -253,6 +253,17 @@ Applies to experiments and production. Scope: all power series, 2019 to 2026. Th
 the metered solar farms lie within one 25 km area, the side after the fix has under 50 clear days,
 and the only known-answer check is the 30-minute sign test.
 
+**Assume a power reading reaches the forecast 3.5 hours after the half-hour it covers, and treat
+the number as an assumption.** The recent-level filter of [experiment
+106](00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md) sees only the
+residuals whose half-hour ended at least 3.5 hours before the 09:00 UTC initialisation, the delay
+that experiments 87 and 104 use for lagged power (3 hours plus the half-hour a reading covers). No
+experiment has measured the delay of the live telemetry. Readings 0 hours old instead of 3.5
+lowered the score by 0.035 points (95% interval -0.060 to -0.016). Readings 9 hours old raised it by
+0.026 (0.000 to 0.046), and readings 24 hours old raised it by 0.099 (0.059 to 0.142), on five
+Primaries in the scored year. Applies to experiments and production. Provisional: the delay was not
+measured on live telemetry. Confidence: low for the delay, medium for the size of its effect.
+
 ## Weather products
 
 **Train each model on the history of the weather product that will serve it, and do not train on the
@@ -341,6 +352,32 @@ before then has no real-time capacity. Take the latest origin on or before the c
 week afterwards, and hold the last observed value through unobserved weeks. Applies to experiments.
 Scope: six MW Primaries. Confidence: high for the difference, which was measured week by week;
 medium for the size near the cut, which comes from five Primaries.
+
+**Pin the capacity in a model to the real-time vintage.** A capacity fitted together with the other
+terms moves with the optimiser's starting point (experiment 105's pooled model reached different
+capacities at nearly the same fit). [Experiment
+106](00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md) therefore takes the
+weekly capacity from the latest `frozen` vintage whose origin is on or before the cut, holds the
+median of the last 13 weeks up to the cut afterwards, and holds the last observed value through
+unobserved weeks. The latest week's capacity has 3.63 times the path error of the final fit's
+capacity for the same week ([experiment 45](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md)),
+which is why the median of 13 weeks is held and not the last week. Applies to experiments. Scope:
+the six MW Primaries and D18. Confidence: medium. The fitted capacity scored 0.04 points better in
+the scored year and 0.16 worse in the replicate year, so the two choices are not separable on this
+evidence.
+
+**A cut before the first real-time origin uses hindsight, and the amount differs by substation.**
+The first origin is 2023-08-07 at the five long-history Primaries. A cut up to 6 weeks before an
+origin uses that vintage as it is (5 weeks at the tuning cut of 2023-07-01). A cut more than 6 weeks
+before the first origin takes the median of the vintage's last 13 weeks and scales it back at 5% a
+year, the median of 12 season-year (1 July to 30 June) increments at five Primaries. That
+level is hindsight: D9 at 2024-07-01 looks 9.5 months ahead, D15 at 2025-07-01 370 days, D18 at
+every cut up to the whole scored year, and every Primary at the tuning year's replica (2022-07-01)
+13 months. D14's vintage stops at 2023-04-17 at every origin, so its capacity is held from then.
+
+**With the capacity pinned, a drift term absorbs an injected solar farm in the hours the farm
+produces.** The morning, midday, and evening bands move, and the night band does not (0.004 to 0.011
+points in experiment 106's test). Applies to experiments.
 
 **Do not count a season-year as trained because a few half-hours of it precede the cut.** A
 season-year runs from 1 July to 30 June. A training cut at 1 July 00:00 UTC leaves two night-time
