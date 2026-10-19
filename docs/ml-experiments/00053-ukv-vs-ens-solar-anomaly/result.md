@@ -5,6 +5,12 @@ theme: weather-products-and-blending
 also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  At 5 Primary substations, a fitted blend of the Met Office's UKV and ENS lowered the
+  cross-validated squared error of the sunshine anomaly by 7.6% over 0 to 54 hours (3.8% to 13.8%
+  in each band), but the validation year cannot confirm it (correlation gain +0.011, 95% interval
+  -0.006 to +0.027). UKV alone was worse than ENS, and the UKV data are a research archive, so any
+  gain is an upper limit.
 hypothesis: >-
   At the five Primary substations metered in MW that decide experiment 00046's verdict (D9, D10,
   D11, D14, and D16), the Met Office UKV forecast of the solar anomaly (the output of a generic
