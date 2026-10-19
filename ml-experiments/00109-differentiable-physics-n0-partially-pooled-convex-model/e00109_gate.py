@@ -73,12 +73,14 @@ TUNING_DECISION: Final[tuple[str, ...]] = SYNTHETIC_LABELS[:5]
 VARIANTS: Final[dict[str, float]] = {"base": 1.0, "tau_x10": 10.0, "tau_x0.1": 0.1}
 WEEK_ROWS: Final[int] = 7 * HALF_HOURS_PER_DAY
 FLEET_CUT: Final[datetime] = common.SCORED_CUT
-SEED: Final[int] = 20261021
+SEED: Final[int] = 20261022
 """The seed of the synthetic fleets. Run 1 used 20261019 with shrinkage measured on raw heating
 coefficients. Run 2 used 20261020 with shrinkage measured on the heating contribution to the
-prediction and an independent-noise closed form. This run, 20261021, keeps the contribution and
-uses a closed form that accounts for the noise's persistence. The earlier results are kept in
-`work/gate/gate_run1.json` and `gate_run2.json`."""
+prediction and an independent-noise closed form. Run 3, 20261021, kept the contribution and used a
+closed form that accounts for the noise's persistence (kept in `gate_run3_first.json`). This run,
+20261022, compares with a joint oracle posterior mean, which estimates every pooled coefficient as
+the pooled model does and knows none of them. The earlier
+results are kept in `work/gate/gate_run1.json` and `gate_run2.json`."""
 
 
 def _g_fits(*, cache: FeatureCache, vintages: pl.DataFrame) -> tuple[Any, dict[str, np.ndarray]]:
@@ -349,8 +351,9 @@ def posterior_factor_and_oracle(
     window: TrainingWindow,
     cut: datetime,
     pinned_points: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return the closed-form shrinkage matrix and the oracle posterior-mean heating slopes.
+    noise_variance: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return the closed-form shrinkage matrices and the oracle posterior-mean heating slopes.
 
     The oracle knows every other coefficient, the fleet mean of the heating slopes, `tau`, and the
     covariance of the least-squares slopes under the realised, serially correlated noise.
@@ -365,10 +368,12 @@ def posterior_factor_and_oracle(
         window: The substation's window.
         cut: The cut.
         pinned_points: The synthetic capacity in points.
+        noise_variance: The noise variance the independent-noise reference assumes.
 
     Returns:
-        The shrinkage matrix `S` (so the posterior mean is `mean + S (theta_ols - mean)`), and the
-        posterior mean.
+        The shrinkage matrix `S` under the realised noise (so the posterior mean is
+        `mean + S (theta_ols - mean)`), the matrix under independent noise of the same variance (the
+        original reference, kept for the record), and the posterior mean.
     """
     features = cache.sites[label]
     index = training_rows(features=features, cache=cache, cut=cut, window=window)
@@ -387,14 +392,66 @@ def posterior_factor_and_oracle(
     prior_variance = tau_heating**2
     shrink = prior_variance * np.linalg.inv(prior_variance * np.eye(len(covariance)) + covariance)
     ols = np.linalg.solve(x_h.T @ x_h + 1e-6 * np.eye(x_h.shape[1]), x_h.T @ residual)
-    return shrink, mean_heating + shrink @ (ols - mean_heating)
+    precision = x_h.T @ x_h / noise_variance
+    independent = np.linalg.solve(precision + np.eye(len(precision)) / prior_variance, precision)
+    return shrink, independent, mean_heating + shrink @ (ols - mean_heating)
 
 
-def run_checks(*, workers: int) -> dict[str, Any]:
+def joint_oracle_heating(
+    *,
+    cache: FeatureCache,
+    layout: GamLayout,
+    label: str,
+    truth: dict[str, Any],
+    window: TrainingWindow,
+    cut: datetime,
+    pinned_points: float,
+) -> np.ndarray:
+    """Return the heating slopes of the oracle posterior mean given the window's rows.
+
+    The oracle knows the population fleet mean, each family's true scale `tau_f`, and the noise
+    variance (independent noise of the true variance). It estimates every pooled coefficient
+    jointly, as the pooled model does, with a Gaussian prior of mean `mu` and precision
+    `1 / tau_f^2` on each family's deviations (on the profile's shape only, so the band means
+    stay free). It does not know any coefficient.
+
+    Args:
+        cache: The synthetic cache.
+        layout: The design's columns.
+        label: The substation.
+        truth: The truth of the synthetic fleet.
+        window: The substation's window.
+        cut: The cut.
+        pinned_points: The synthetic capacity in points.
+
+    Returns:
+        The posterior mean of the heating slopes.
+    """
+    features = cache.sites[label]
+    index = training_rows(features=features, cache=cache, cut=cut, window=window)
+    x = design_matrix(cache=cache, features=features, layout=layout, index=index)
+    y = features.y[index] + pinned_points * derated_unit_shape(features=features, index=index)
+    prior_mean = np.zeros(layout.n_columns)
+    precision = np.zeros((layout.n_columns, layout.n_columns))
+    for family in POOLED_FAMILIES:
+        block = layout.slices[family]
+        centre = centring_matrix(family=family, size=block.stop - block.start)
+        prior_mean[block] = truth["mean_fit"][family]
+        precision[block, block] = centre.T @ centre / truth["scale"][family] ** 2
+    variance = truth["noise_variance"]
+    posterior = np.linalg.solve(
+        x.T @ x / variance + precision + 1e-6 * np.eye(layout.n_columns),
+        x.T @ y / variance + precision @ prior_mean,
+    )
+    return posterior[layout.slices["heating"]]
+
+
+def run_checks(*, workers: int, reuse_tuning: bool = False) -> dict[str, Any]:
     """Run every line of the gate and return the results.
 
     Args:
         workers: Worker processes for the tuning grids.
+        reuse_tuning: True to read the tuning grids stored by an earlier run of the same seed.
 
     Returns:
         A dict with each line's numbers and `passed`.
@@ -405,15 +462,18 @@ def run_checks(*, workers: int) -> dict[str, Any]:
         sources[variant], truths[variant] = build_variant(
             cache=cache, vintages=vintages, variant=variant, multiplier=multiplier
         )
-        jobs = tune.grid_jobs(
-            source=sources[variant],
-            cut_name="tuning",
-            pool=SYNTHETIC_LABELS,
-            decision=TUNING_DECISION,
-            tag=f"gate_{variant}",
-        )
-        table = tune.run_grid(jobs=jobs, workers=workers)
-        table.write_parquet(GATE_DIR / f"tuning_{variant}.parquet")
+        if reuse_tuning:
+            table = pl.read_parquet(GATE_DIR / f"tuning_{variant}.parquet")
+        else:
+            jobs = tune.grid_jobs(
+                source=sources[variant],
+                cut_name="tuning",
+                pool=SYNTHETIC_LABELS,
+                decision=TUNING_DECISION,
+                tag=f"gate_{variant}",
+            )
+            table = tune.run_grid(jobs=jobs, workers=workers)
+            table.write_parquet(GATE_DIR / f"tuning_{variant}.parquet")
         tuned[variant] = tune.choose(table=table)
         print(f"{variant}: lambda* = {tuned[variant]['lambda_star']:g}", flush=True)
     result = {"lambda_star": {v: t["lambda_star"] for v, t in tuned.items()}}
@@ -473,6 +533,85 @@ def fleet_family(*, joint: Any, layout: GamLayout, family: str) -> np.ndarray:
     raise ValueError(msg)
 
 
+def shrinkage_on_four_weeks(
+    *,
+    source: arms.Source,
+    truth: dict[str, Any],
+    strength: PoolingStrength,
+    cache: FeatureCache,
+    designs: dict[str, np.ndarray],
+) -> dict[str, Any]:
+    """Return line (b): the pooled fit's shrinkage of the heating slopes on 4 June weeks."""
+    layout: GamLayout = truth["layout"]
+    heating = layout.slices["heating"]
+    true_heating = np.stack([theta[heating] for theta in truth["thetas"]])
+    true_mean = true_heating.mean(axis=0)
+    true_by_site = dict(zip(SYNTHETIC_LABELS, true_heating - true_mean, strict=True))
+    base_source = source
+    deltas, errors, oracle_errors, shrinks, shrinks_iid = {}, [], [], {}, {}
+    oracle_hac_errors: list[np.ndarray] = []
+    oracle_delta: dict[str, np.ndarray] = {}
+    for number, label in enumerate(SYNTHETIC_LABELS):
+        joint, built = _fleet_fit(
+            source=base_source,
+            variant="base",
+            strength=strength,
+            held_out=label,
+            history=common.FOUR_WEEKS,
+            rebuild_scale=False,
+        )
+        fitted = joint.fits[label].theta[0, heating]
+        deltas[label] = fitted - fleet_family(joint=joint, layout=layout, family="heating")
+        errors.append(fitted - true_heating[number])
+        shrink, independent, posterior = posterior_factor_and_oracle(
+            cache=built.cache,
+            layout=layout,
+            label=label,
+            truth_theta=truth["thetas"][number],
+            mean_heating=true_mean,
+            tau_heating=truth["scale"]["heating"],
+            window=common.FOUR_WEEKS.window(cut=FLEET_CUT),
+            cut=FLEET_CUT,
+            pinned_points=truth["capacity_points"][label],
+            noise_variance=truth["noise_variance"],
+        )
+        shrinks[label] = shrink
+        shrinks_iid[label] = independent
+        oracle_hac_errors.append(posterior - true_heating[number])
+        joint = joint_oracle_heating(
+            cache=built.cache,
+            layout=layout,
+            label=label,
+            truth=truth,
+            window=common.FOUR_WEEKS.window(cut=FLEET_CUT),
+            cut=FLEET_CUT,
+            pinned_points=truth["capacity_points"][label],
+        )
+        oracle_errors.append(joint - true_heating[number])
+        oracle_delta[label] = joint - true_mean
+    slope_short = contribution_slope(estimated=deltas, truth=true_by_site, design=designs)
+    expected = {s: shrinks[s] @ true_by_site[s] for s in SYNTHETIC_LABELS}
+    closed_form = contribution_slope(estimated=expected, truth=true_by_site, design=designs)
+    expected_iid = {s: shrinks_iid[s] @ true_by_site[s] for s in SYNTHETIC_LABELS}
+    closed_form_iid = contribution_slope(estimated=expected_iid, truth=true_by_site, design=designs)
+    rmse = float(np.sqrt((np.stack(errors) ** 2).mean()))
+    oracle_rmse = float(np.sqrt((np.stack(oracle_errors) ** 2).mean()))
+    oracle_hac_rmse = float(np.sqrt((np.stack(oracle_hac_errors) ** 2).mean()))
+    oracle_slope = contribution_slope(estimated=oracle_delta, truth=true_by_site, design=designs)
+    return {
+        "passed": bool(abs(slope_short - oracle_slope) <= 0.15 and rmse <= 1.2 * oracle_rmse),
+        "reference": "joint oracle posterior mean, independent noise, true tau and sigma",
+        "oracle_slope_on_heating_contribution": oracle_slope,
+        "slope_on_heating_contribution": slope_short,
+        "closed_form_slope": closed_form,
+        "closed_form_slope_independent_noise_original": closed_form_iid,
+        "rmse": rmse,
+        "oracle_rmse": oracle_rmse,
+        "rmse_of_heating_only_oracle_that_knows_other_coefficients": oracle_hac_rmse,
+        "note": "scale not rebuilt, to isolate shrinkage",
+    }
+
+
 def shrinkage_checks(
     *, sources: dict[str, arms.Source], truths: dict[str, Any], tuned: dict[str, Any]
 ) -> dict[str, Any]:
@@ -521,74 +660,27 @@ def shrinkage_checks(
         "slope_on_coefficients_reported": slope_full_coefficients,
     }
 
-    deltas, errors, oracle_errors, shrinks = {}, [], [], {}
-    ratios: dict[str, list[float]] = {"4w": [], "3m": [], "g_4w": [], "g_3m": []}
-    for number, label in enumerate(SYNTHETIC_LABELS):
-        joint, built = _fleet_fit(
+    checks["b_shrinkage_on_4_weeks"] = shrinkage_on_four_weeks(
+        source=base_source,
+        truth=truth,
+        strength=strength,
+        cache=cache,
+        designs=designs,
+    )
+    checks["diagnostic_heating_lambda_sweep"] = {
+        "passed": True,
+        "blocking": False,
+        "note": "diagnostic only; decides nothing",
+        "rows": heating_sweep(
             source=base_source,
-            variant="base",
-            strength=strength,
-            held_out=label,
-            history=common.FOUR_WEEKS,
-            rebuild_scale=False,
-        )
-        fitted = joint.fits[label].theta[0, heating]
-        deltas[label] = fitted - fleet_family(joint=joint, layout=layout, family="heating")
-        errors.append(fitted - true_heating[number])
-        shrink, posterior = posterior_factor_and_oracle(
-            cache=built.cache,
-            layout=layout,
-            label=label,
-            truth_theta=truth["thetas"][number],
-            mean_heating=true_mean,
-            tau_heating=truth["scale"]["heating"],
-            window=common.FOUR_WEEKS.window(cut=FLEET_CUT),
-            cut=FLEET_CUT,
-            pinned_points=truth["capacity_points"][label],
-        )
-        shrinks[label] = shrink
-        oracle_errors.append(posterior - true_heating[number])
-    slope_short = contribution_slope(estimated=deltas, truth=true_by_site, design=designs)
-    expected = {s: shrinks[s] @ true_by_site[s] for s in SYNTHETIC_LABELS}
-    closed_form = contribution_slope(estimated=expected, truth=true_by_site, design=designs)
-    rmse = float(np.sqrt((np.stack(errors) ** 2).mean()))
-    oracle_rmse = float(np.sqrt((np.stack(oracle_errors) ** 2).mean()))
-    checks["b_shrinkage_on_4_weeks"] = {
-        "passed": bool(abs(slope_short - closed_form) <= 0.15 and rmse <= 1.2 * oracle_rmse),
-        "slope_on_heating_contribution": slope_short,
-        "closed_form_slope": closed_form,
-        "rmse": rmse,
-        "oracle_rmse": oracle_rmse,
-        "note": "scale not rebuilt, to isolate shrinkage",
+            truth=truth,
+            designs=designs,
+            other_lambda=tuned["base"]["lambda_star"],
+        ),
     }
-    for label in SYNTHETIC_LABELS:
-        for key, history in (("4w", common.FOUR_WEEKS), ("3m", common.THREE_MONTHS)):
-            joint, built = _fleet_fit(
-                source=base_source,
-                variant="base",
-                strength=strength,
-                held_out=label,
-                history=history,
-            )
-            ratios[key].append(_capacity_ratio(joint=joint, built=built, truth=truth, label=label))
-            alone, alone_built = _fleet_fit(
-                source=base_source,
-                variant="base",
-                strength=PoolingStrength.uniform(value=0.0),
-                held_out=label,
-                history=history,
-                alone=True,
-                ridge=tuned["base"]["g_short_ridge"][history.label],
-            )
-            ratios[f"g_{key}"].append(
-                _capacity_ratio(joint=alone, built=alone_built, truth=truth, label=label)
-            )
-    within = {key: int(sum(abs(r - 1.0) <= 0.25 for r in values)) for key, values in ratios.items()}
-    checks["e_capacity_from_a_short_window"] = {
-        "passed": bool(within["4w"] >= 6 and within["3m"] >= 6),
-        "within_25_percent_of_8": within,
-        "ratios": ratios,
-    }
+    checks["e_capacity_from_a_short_window"] = capacity_check(
+        source=base_source, truth=truth, tuned=tuned["base"], strength=strength
+    )
     checks["discrimination_g_4w_heating"] = {
         "passed": True,
         "blocking": False,
@@ -609,6 +701,112 @@ def shrinkage_checks(
         ),
     }
     return checks
+
+
+HEATING_SWEEP: Final[tuple[float, ...]] = (0.0, 10.0, 30.0, 100.0, 300.0, 1000.0, 10_000.0)
+"""Heating `lambda` values of the diagnostic sweep, rows of evidence."""
+
+
+def heating_sweep(
+    *,
+    source: arms.Source,
+    truth: dict[str, Any],
+    designs: dict[str, np.ndarray],
+    other_lambda: float,
+) -> list[dict[str, float]]:
+    """Return the 4-week heating shrinkage and error for a sweep of the heating `lambda`.
+
+    This is a diagnostic and decides nothing: it shows which heating `lambda` reproduces the
+    closed-form shrinkage, with the other families held at the tuned `lambda`.
+
+    Args:
+        source: The base synthetic fleet.
+        truth: Its truth.
+        designs: Each substation's heating design over its two-year window.
+        other_lambda: The tuned `lambda`, used for every other family.
+
+    Returns:
+        One row per heating `lambda`: the slope on the heating contribution and the heating RMSE.
+    """
+    layout: GamLayout = truth["layout"]
+    heating = layout.slices["heating"]
+    strengths = [PoolingStrength(heating=h, other=other_lambda) for h in HEATING_SWEEP]
+    true_heating = np.stack([theta[heating] for theta in truth["thetas"]])
+    true_delta = dict(zip(SYNTHETIC_LABELS, true_heating - true_heating.mean(axis=0), strict=True))
+    estimated: list[dict[str, np.ndarray]] = [{} for _ in strengths]
+    errors: list[list[np.ndarray]] = [[] for _ in strengths]
+    cache, vintages = arms.load_source(source=source)
+    for number, label in enumerate(SYNTHETIC_LABELS):
+        config = arms.ArmConfig(
+            name="sweep",
+            history=common.FOUR_WEEKS,
+            tag="gate_base",
+            pool=SYNTHETIC_LABELS,
+            rebuild_scale=False,
+        )
+        built = arms.build_arm(
+            cache=cache,
+            vintages=vintages,
+            cut=FLEET_CUT,
+            config=config,
+            held_out=label,
+            history=common.FOUR_WEEKS,
+        )
+        joint = fit_pooled(cache=built.cache, sites=built.sites, cut=FLEET_CUT, strengths=strengths)
+        offset = sum(
+            layout.slices[f].stop - layout.slices[f].start
+            for f in POOLED_FAMILIES[: POOLED_FAMILIES.index("heating")]
+        )
+        for member in range(len(strengths)):
+            fitted = joint.fits[label].theta[member, heating]
+            mu = joint.fleet_mean[member][offset : offset + (heating.stop - heating.start)]
+            estimated[member][label] = fitted - mu
+            errors[member].append(fitted - true_heating[number])
+    return [
+        {
+            "heating_lambda": h,
+            "slope_on_heating_contribution": contribution_slope(
+                estimated=estimated[member], truth=true_delta, design=designs
+            ),
+            "heating_rmse": float(np.sqrt((np.stack(errors[member]) ** 2).mean())),
+        }
+        for member, h in enumerate(HEATING_SWEEP)
+    ]
+
+
+def capacity_check(
+    *, source: arms.Source, truth: dict[str, Any], tuned: dict[str, Any], strength: PoolingStrength
+) -> dict[str, Any]:
+    """Return line (e): the capacity recovered from a short window, pooled and per site."""
+    ratios: dict[str, list[float]] = {"4w": [], "3m": [], "g_4w": [], "g_3m": []}
+    for label in SYNTHETIC_LABELS:
+        for key, history in (("4w", common.FOUR_WEEKS), ("3m", common.THREE_MONTHS)):
+            joint, built = _fleet_fit(
+                source=source,
+                variant="base",
+                strength=strength,
+                held_out=label,
+                history=history,
+            )
+            ratios[key].append(_capacity_ratio(joint=joint, built=built, truth=truth, label=label))
+            alone, alone_built = _fleet_fit(
+                source=source,
+                variant="base",
+                strength=PoolingStrength.uniform(value=0.0),
+                held_out=label,
+                history=history,
+                alone=True,
+                ridge=tuned["g_short_ridge"][history.label],
+            )
+            ratios[f"g_{key}"].append(
+                _capacity_ratio(joint=alone, built=alone_built, truth=truth, label=label)
+            )
+    within = {key: int(sum(abs(r - 1.0) <= 0.25 for r in values)) for key, values in ratios.items()}
+    return {
+        "passed": bool(within["4w"] >= 6 and within["3m"] >= 6),
+        "within_25_percent_of_8": within,
+        "ratios": ratios,
+    }
 
 
 def _capacity_ratio(*, joint: Any, built: arms.Built, truth: dict[str, Any], label: str) -> float:
@@ -698,11 +896,12 @@ def main() -> None:
     """Run the gate and write `work/gate/gate.json`."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--reuse-tuning", action="store_true")
     arguments = parser.parse_args()
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     GATE_DIR.mkdir(parents=True, exist_ok=True)
     started = datetime.now(UTC)
-    result = run_checks(workers=arguments.workers)
+    result = run_checks(workers=arguments.workers, reuse_tuning=arguments.reuse_tuning)
     result["minutes"] = (datetime.now(UTC) - started) / timedelta(minutes=1)
     (GATE_DIR / "gate.json").write_text(json.dumps(result, indent=2, default=str) + "\n")
     print(json.dumps(result["checks"], indent=2, default=str))
