@@ -19,6 +19,7 @@ sooner.
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
+| [SIMP1 (experiment 102)](ml-experiments/00102-simp1-simplifying-the-bg2-best-guess-before-production/result.md) | Which parts of the BG2 best guess (the blend, the lags, the solar offset, the 14-day correction, the spread factor) can be removed before production, and how much does the solar offset help at midday in summer? | 1 | Nothing | Planned; slot B |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
 ## Deferred until the first results are in
