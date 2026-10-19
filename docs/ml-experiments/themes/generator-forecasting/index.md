@@ -1,9 +1,10 @@
 # Generator forecasting
 
-**For 6 solar farms and 3 wind farms over one validation year, the one input that clearly lowered the
-forecast error was the Met Office's UKV weather forecast at wind farms, by about 0.2 points of
-capacity at 1 to 2 days ahead, and that gain comes from a research archive and not the live feed.**
-No other input met its pre-registered gain threshold. Seven of the eight experiments scored
+**For 6 solar farms and 3 wind farms over one validation year, the largest gain was from the Met
+Office's UKV weather forecast at wind farms, about 0.2 points of capacity at 24 to 54 hours ahead (a
+`small gain`: its interval excludes zero but not the pre-registered 0.15), measured on a research
+archive and not the live feed, so it is an upper limit.**
+No input met its pre-registered gain threshold. Seven of the eight experiments scored
 forecasts for Tuesday runs from July 2025 to June 2026. The eighth tested a monitor for a lost
 inverter at the solar farms, and it reliably found only large, long losses. No experiment in this
 theme is a candidate for production.
@@ -47,8 +48,7 @@ because of the [spread factor](../../glossary.md#spread-factor).
 23](../../00023-lagged-power-and-error-correction-solar-wind/result.md), giving the second-stage
 calibrator (see [stages 0, 1a, and 2](../../glossary.md#stages-0-1a-and-2)) the farm's lagged power
 changed the [CRPS](../../glossary.md#crps) by -0.012 for solar (99.58% interval -0.122 to +0.088) and
-+0.012 for wind (-0.090 to +0.146). The [14-day correction](../../glossary.md#14-day-correction),
-which helps Primary substations, raised the CRPS of the
++0.012 for wind (-0.090 to +0.146). The [14-day correction](../../glossary.md#14-day-correction) raised the CRPS of the
 [pooled mixture](../../glossary.md#pooled-mixture) by +0.437 for solar (+0.215 to +0.664) and
 +0.413 for wind (-0.003 to +0.924), and cut the 5% to 95% band's coverage to 53% to 77%.
 
@@ -65,18 +65,19 @@ of the 51-member average.
   -0.015 to +0.018).
 - **Satellite sunlight (CAMS) as the training input** ([experiment
   12](../../00012-solar-wind-stage1a-inputs-cams-and-training-start/result.md)): -0.140 (99.5%
-  interval -0.277 to -0.044) for solar, just short of the pre-registered -0.15. A power-curve
+  interval -0.277 to -0.044) for solar (6 farms), just short of the pre-registered -0.15. A power-curve
   [base margin](../../glossary.md#base-margin) for wind gave -0.030 (-0.061 to -0.007), and a
   training start in 2023 or 2024 moved the error by under 0.3 points.
 
 ![Share of planted losses detected, by loss size and duration](../../00072-p35-step-loss-monitor-for-solar-farms/figure_1_detection_by_loss_size.svg)
 
-**Only a loss of 25% of a solar farm's output that lasts 90 days or more is reliably found from the
-farm's daily power.** Source: [experiment
+**On 5 solar farms with artificial losses added, only a 25% loss was found reliably (0.84 to 0.86
+for the best monitor at 90 days, and 0.86 for the hysteresis rule at 30 days), and a 10% loss mostly
+was not.** Source: [experiment
 72](../../00072-p35-step-loss-monitor-for-solar-farms/result.md). The change-point monitor found 0.84
 of 25% losses lasting 90 days and 0.45 of those lasting 30 days, which breached the pre-registered
 stop rule of 0.80, so the verdict is `refuted`. A hysteresis rule (alarm after 7 valid days at least
-10% below normal) found 0.86 of the 30-day losses but 0.13 or less of 10% losses. The monitor beat
+10% below normal) found 0.86 of the 25% losses lasting 30 days but 0.13 or less of 10% losses. The monitor beat
 neither baseline by an interval that excludes zero: against the rolling median its difference in
 detection rate was +0.045 (97.5% interval -0.015 to +0.090). A farm gives about 3 usable days a week
 from April to September, and the only real losses held were one farm's three low months.
@@ -86,7 +87,7 @@ from April to September, and the only real losses held were one farm's three low
 **No recipe tested here beat the best guess by a pre-registered, resolved margin, so the best guess
 remains the reference for solar and wind farms.** The best guess for farms is a pooled mixture over
 the 51 ENS members of XGBoost quantile models trained on ERA5, with a spread factor and, for wind, a
-power-curve base margin. Experiments 23, 26, and 29 used that mixture as their benchmark.
+power-curve base margin. Experiments 23, 26, and 29 used the same mixture without the spread factor as their benchmark.
 
 - **Wind, 24 to 54 hours:** an XGBoost model trained on ENS and given UKV's wind scored 5.921,
   against 6.119 for the same model without UKV and 6.337 for the best guess ([experiment
@@ -128,8 +129,8 @@ the experiment found reaches lead day 0 only.
   23](../../00023-lagged-power-and-error-correction-solar-wind/result.md)). Re-check: a daily
   history, which experiment 23 lacked, because its weekly runs left at most two runs in a window.
 - **Test recent power in a calibrator trained on pooled members.** The calibrator trained on the ENS
-  control member alone scored 0.276 (solar) and 0.417 (wind) worse than the pooled mixture, so the
-  lag test used a weaker baseline ([experiment
+  control member alone scored 0.27 (solar) and 0.31 (wind) points worse than the pooled mixture in the absolute
+  scores (the contrast interval for wind includes zero), so the lag test used a weaker baseline ([experiment
   23](../../00023-lagged-power-and-error-correction-solar-wind/result.md)). Re-check: a calibrator
   trained on pooled members.
 - **Fit a spread factor under the weights the blend will use.** A factor fitted on earlier months
@@ -142,12 +143,12 @@ the experiment found reaches lead day 0 only.
   of the ENS run's date, with bias-corrected winds.
 - **Read per-farm contrasts, and treat intervals as covering these farms only.** The intervals
   resample months and not farms. The UKV gain was -0.413 at one wind farm and +0.018 at another, and
-  one solar farm drove experiment 26's gain ([experiment
+  one solar farm drove the point estimate of experiment 26 ([experiment
   54](../../00054-product-trained-xgboost-wind-farms/result.md), [experiment
   26](../../00026-capacity-features-solar-wind/result.md)). Re-check: more than 6 solar and 3 wind
   farms.
-- **Test fitted orientation against a different data-generating chain.** A test with the fitted
-  model's own physics showed a tilt bias of +0.11 degrees, and a different sky model showed +6.2
+- **Test fitted orientation against a different irradiance-transposition model.** A test with the
+  fitted model's own physics showed a tilt bias of +0.11 degrees, and a different sky model showed +6.2
   ([experiment 29](../../00029-physics-stage1-solar-pytorch/result.md)). Re-check: a different
   fitted physics model.
 - **Score a monitor on the unmodified record as well as on a placebo.** The change-point monitor's
@@ -161,10 +162,10 @@ the experiment found reaches lead day 0 only.
 - Whether the live UKV feed gives wind farms the gain the research archive did, which needs a matched
   live history at lead days 1 and 2.
 - Whether solar farms gain from a source of a different kind, such as a satellite-based nowcast,
-  since UKV here and a second global ensemble in experiment 50 (as experiment 57 reports it) added
-  little.
+  since UKV here added little, and a second global ensemble added under 1% to the sunshine forecast
+  at five Primary substations (experiment 50, as experiment 57 reports it).
 - Whether a wind feature of 75th-percentile power over wind speed cubed helps. It scored -0.061
-  (-0.107 to -0.025) in one of 12 exploratory contrasts of experiment 26.
+  (-0.107 to -0.025) in experiment 26's contrast C5, one of its 12 contrasts and outside the 4 that decide the verdict.
 - Whether CAMS-trained solar models hold their -0.140 on more than 6 farms or a second year.
 - Whether a loss of 10% or less at a solar farm can be found from outage notices or trip logs, which
   need labelled events.
