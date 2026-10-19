@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [00100](../../00100-drop1-random-lag-dropout-widens-intervals/result.md) | Does training with lags set to missing in random intervals make the Primary demand forecast widen its 5% to 95% band when a lag is missing? | 1 | Nothing | Fitted; scoring the injected cases |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments

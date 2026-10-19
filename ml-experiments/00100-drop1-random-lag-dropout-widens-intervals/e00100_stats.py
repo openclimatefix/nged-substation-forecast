@@ -327,6 +327,9 @@ def compute_results(*, smoke: bool) -> None:
 def reproduction_check(*, smoke: bool) -> None:
     """Compare `plain11`'s q05 to q95 quantile score with experiment 00086's stored `plain`.
 
+    Args:
+        smoke: True to read the smoke-test folders.
+
     Raises:
         ValueError: If the two scores differ by more than `REPRODUCTION_MARGIN` points.
     """

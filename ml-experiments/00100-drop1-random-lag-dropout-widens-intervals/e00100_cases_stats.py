@@ -60,7 +60,6 @@ class Scope:
     Attributes:
         family: `A` (the newest usable lag is inside the transfer) or `B` (after its end).
         target: `all` valid times, or only the valid times `inside` the transfer.
-        hours: A name for a range of hours since onset (family A) or `all`.
     """
 
     family: str

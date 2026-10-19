@@ -66,10 +66,10 @@ headline: >-
   score on injected transfers: +0.256 points (-0.148 to +0.847). G2, quantile score on real rows
   without a masked lag: +0.017 (-0.013 to +0.046), upper end above the +0.02 guard.
 lessons: >-
-  Random dropout taught the model to use a missing lag without losing accuracy (on injected
+  Random dropout taught the XGBoost model to use a missing lag without losing accuracy (on injected
   transfers `drop30` matched `plain11` where `mask` lost 1.36 points), but the band on rows with a
-  masked lag did not widen: its width changed by -0.5 to +1.5 points against a mean of 45.
-  Coverage on real masked rows stayed near 0.80 in every arm.
+  masked lag did not widen: its width changed by -0.5 points (30%) and +1.1 points (10%) against a
+  mean of 45 points of capacity. Coverage on real masked rows stayed near 0.80 in every arm.
 advice:
   - >-
     Do not expect random lag dropout to widen the 5% to 95% band on rows with a masked lag: width
@@ -80,12 +80,12 @@ advice:
     `plain11` (figure 3).
   - >-
     Compare any arm that drops event and closure rows from training against a control that keeps
-    them: `mask` alone narrowed the band on ordinary rows by 4% and lowered its coverage from 0.906
+    them: `mask` alone narrowed the band on unmasked rows by 4% and lowered its coverage from 0.906
     to 0.894 (figures 2 and 4).
   - >-
-    Test missingness indicator columns, or a separate uncertainty model for rows with a masked lag,
-    before more dropout rates, because dropout moved the point forecast but not the width (figure
-    2).
+    Missingness indicator columns, or a separate model of the quantile spread for rows with a
+    masked lag, are untested routes to a wider band, because dropout moved the point forecast but
+    not the width (figure 2).
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
@@ -93,32 +93,40 @@ take_home_message: >-
   where a lag is missing: on real rows the band still covered about 0.80 of actuals, against a
   nominal 0.90. Dropout did remove the accuracy loss that masking alone causes, so a model run with
   missing lags can match one that reads contaminated lags. A way to make the band widen has to come
-  from an input that tells the model a lag is missing, or from a separate uncertainty model.
+  from an input that tells the XGBoost model a lag is missing, or from a separate XGBoost model of
+  the quantile spread.
 boosters: data/ml-experiments/00100-drop1-random-lag-dropout-widens-intervals/work/boosters/
 ---
 
 # Experiment 100: does random lag dropout make the demand forecast widen its band when a lag is missing?
 
-**Take-home message: training with lags hidden at random did not make the band wider where a lag is
-missing, so the model's stated uncertainty on those half-hours stayed as it was.** On the 37,394
-real half-hours with a masked lag, the band from the 5% to the 95% quantile covered 0.799 of actuals
-in `plain11` and 0.802 with 10% dropout (change +0.003, 98.75% interval -0.093 to +0.101). A nominal
-band covers 0.90. Dropout did fix a different problem: masking lags without it made the forecast
-worse on injected switching transfers (+1.36 points of capacity), and dropout at a 30% rate brought
-that to -0.02 (95% interval -0.35 to +0.38), the same as the plain model. A forecast that must run
-with missing lags can therefore be trained to do so. The widening has to come from elsewhere, for
-example an input column that flags a missing lag. The verdict is **inconclusive**: the planned
-coverage contrasts did not exclude zero, and the no-harm guard on ordinary rows failed.
+**Take-home message: training the XGBoost demand forecast with its earlier power readings (lags)
+hidden at random did not make its forecast interval wider where a lag is missing.** On the 37,394
+real half-hours for which a lag is set to missing, the forecast's 5% to 95% interval contained 0.799
+of the actual demand readings for the plain model (`plain11`, which never masks a lag) and 0.802 for
+the model trained with lags hidden in 10% of its training rows (`drop10`). A well-calibrated
+interval contains 0.90. The change was +0.003 (98.75% interval -0.093 to +0.101; the level is 98.75%
+because four contrasts were planned). Dropout did fix a different problem. On synthetic switching
+transfers of known size (from experiment 88), masking lags without dropout raised the quantile score
+by 1.36 points of capacity against the plain model. Dropout in 30% of training rows brought that
+difference to -0.02 (95% interval -0.35 to +0.38), which is no detectable difference. A forecast
+that must run with missing lags can therefore be trained to do so. An input column that flags a
+missing lag is one untested way to get the widening. The verdict is **inconclusive**: the planned
+coverage contrasts did not exclude zero, and the quantile score on rows without a masked lag rose by
+up to 0.046 points, above the 0.02-point limit set in the plan.
 
 An electricity network operator sometimes closes a normally open switch, so that a Primary
-substation carries a neighbour's load for hours or days. We asked whether an XGBoost demand forecast
-for 16 Primary substations, trained with some of its past power readings (lags) set to missing,
-would learn that a missing lag means more uncertainty. Four models were refitted monthly on a
-12-month window: `plain11` (no masking), `mask` (switching half-hours removed from the training
-targets and lags inside a labelled event set to missing), and `drop10` and `drop30`, which add lags
-set to missing inside random intervals during training. Real rows were scored on 292 daily forecast
-runs (July 2025 to June 2026). Injected transfers of known size, from experiment 88, supplied rows
-where the true unmodified series is known.
+substation (a substation that steps down to the local distribution network) carries a neighbour's
+load for hours or days. We asked whether an XGBoost demand forecast for 16 Primary substations,
+trained with some lags set to missing, would learn that a missing lag means more uncertainty. Four
+XGBoost models were refitted each month on the preceding 12 months of data. `plain11` masks nothing
+and has 11 quantile levels. `mask` drops the training rows whose target lies inside a labelled
+switching event or logged closure (9% of rows) and sets to missing every lag inside a labelled
+event. `drop10` and `drop30` add lags set to missing inside random intervals during training, in 10%
+and 30% of training rows. Real rows were scored on 292 daily forecast runs (July 2025 to June
+2026). The synthetic transfers supplied rows where the true unmodified series is known. The
+quantile score is the mean pinball loss over the quantile levels, in points of capacity, and smaller
+is better.
 
 ![Change in band coverage against plain11](figure_1.svg)
 
@@ -132,7 +140,7 @@ where the true unmodified series is known.
 
 - **Rows with valid truth.** Real rows whose target lies outside every labelled event and logged
   closure (2,928,842). Of these, 37,394 have a lag inside a labelled event (masked rows, 81% from
-  three substations, 89% in five months) and 2,891,448 do not (unmasked rows). Real rows with the
+  3 substations, 89% in 5 months) and 2,891,448 do not (unmasked rows). Real rows with the
   target inside an event or closure have no valid normal-arrangement truth and are never scored.
   Point accuracy during a real abnormal arrangement is not a metric.
 - **Injected rows.** 3,000 family A cases (forecast origin inside the transfer; shapes S2, S3, S4,
@@ -144,11 +152,13 @@ where the true unmodified series is known.
   `mask`: 9% of rows dropped as targets; lags inside a labelled event set to missing in training and
   test. `drop10` and `drop30`: `mask` plus pseudo-event intervals (durations drawn from the 82
   labelled events) inside which lags are also set to missing in training only, covering 9.3% to
-  10.1% and 29.3% to 31.1% of each series' training rows. At test time every arm masks only the lags
+  10.1% and 29.3% to 30.1% of each series' training rows. At test time every arm masks only the lags
   inside a labelled event. The rows and weights of `mask`, `drop10`, and `drop30` are identical (the
   script checks the row counts).
-- **Reproduction.** `plain11` minus experiment 86's stored `plain` on 2,928,842 shared rows: +0.0000
-  points of quantile score (stored mean 5.408). The masked rows number 37,394, as in experiment 86.
+- **Reproduction.** Experiment 86's stored `plain` had nine quantile levels and covered 0.784 on the
+  masked rows; `plain11` has 11 levels and covers 0.799. `plain11` minus experiment 86's stored
+  `plain` on 2,928,842 shared rows: +0.0000 points of quantile score (stored mean 5.408). The masked
+  rows number 37,394, as in experiment 86.
 - **Absolute scores, real masked rows** (`plain11` / `mask` / `drop10` / `drop30`). Quantile score
   10.726 / 11.820 / 11.718 / 10.291. Coverage of the 5% to 95% band 0.799 / 0.769 / 0.802 / 0.836.
   Mean width of that band 44.9 / 46.6 / 46.0 / 44.4 points of capacity.
@@ -177,18 +187,21 @@ where the true unmodified series is known.
 - **Why the verdict is `inconclusive`.** The planned rule needs P1 and P2 to exclude zero for
   `supported`, P2 to exclude zero for `small gain`, and P2's upper end below zero or G1's lower end
   above +0.02 for `refuted`. P2's interval contains zero and G1's lower end is -0.148, so none
-  applies. G2's upper end of +0.046 exceeds the +0.02 guard, so the experiment is flagged
-  `not-for-production`.
+  applies. G1's upper end (+0.847) and G2's upper end (+0.046) both exceed the +0.02 guard. The plan
+  sets `not-for-production` when G2 fails, which is a production status and not a verdict word, so
+  the verdict word stays `inconclusive` and `production_status` is `not-for-production`.
 - **A confound the plan did not isolate.** `mask` alone lowered the coverage of the 5% to 95% band
-  on ordinary rows from 0.906 to 0.894 and narrowed it by 4%. The cause is probably the 9% of
-  training rows (event and closure half-hours) dropped as targets, which leaves the model fitted to
-  quieter data. A control that drops the same rows but leaves every lag unmasked would separate the
-  two causes.
-- **Schedule, weather, and lab shortcuts.** Monthly P-roll refits; the dropout contrasts could
-  depend on the cadence only through which refits contain pseudo events. Weather is the forecast's
-  own control-member weather at forecast time. Labels are hindsight labels at training and test, and
-  the injected mask is the true interval, so no arm is a live service. Causal-detector masks and the
-  curtailment-cost metric were not scored (see the changes below).
+  on unmasked rows from 0.906 to 0.894 and narrowed it by 4%. The cause is probably the 9% of
+  training rows (event and closure half-hours) dropped as targets. Dropping them leaves the XGBoost
+  model fitted to quieter data. A control that drops the same rows but leaves every lag unmasked
+  would separate the effect of dropping rows from the effect of masking lags. The plan did not
+  include that control.
+- **Schedule, weather, and lab shortcuts.** The models are refitted each month on a rolling 12-month
+  window (the P-roll schedule). The dropout contrasts could depend on that schedule only through
+  which refits contain pseudo-event intervals. Weather is the control (unperturbed) member of the
+  ECMWF ensemble forecast, available at forecast time. Labels are hindsight labels at training and
+  test, and the injected mask is the true interval, so no arm is a live service. Causal-detector
+  masks and the curtailment-cost metric were not scored (see the changes below).
 - **Caveats.** The real masked rows come from an estimated 15 to 20 events, mostly at three
   substations, in 10 months, so P1's interval is wide (nearly +/-0.1). The injected cases are 3,000
   cases from 10 onset months. Coverage is not a proper score: a wider band reaches 0.90 without
@@ -201,16 +214,21 @@ where the true unmodified series is known.
   would have taken more than 12 hours; the planned causal-detector (RO-NC) masks were dropped for
   the same reason. (3) The `manual_heuristic` and `climatology` reference rows were not scored. (4)
   The plain model with masked lags was added as a descriptive variant.
-- **Reviews.** One Sonnet code review found no leakage and no bug; it noted that the pseudo-event
-  share is measured on each series' whole training history rather than on each refit's window
-  (accepted: shares are printed per series, and the per-refit share was not computed), and that the
-  same-rows check compares row counts only (accepted as sufficient, since the three arms share one
-  filter). An Opus design review preceded the fits.
-- **What to try next.** Add a missingness indicator column for each lag (so a tree can give a masked
-  lag its own leaf), or fit a separate model of the quantile spread on rows with a masked lag. Test
-  dropout at rates above 30%, since the 30% arm had the higher coverage and the lower quantile score
-  than the 10% arm on both the real masked rows and the injected cases. Run a control that drops the
-  event and closure rows but leaves every lag unmasked.
+- **Reviews.** One Sonnet code review found no leakage and no bug. The pseudo-event share is
+  measured on each series' whole training history and not on each refit's window (accepted: the
+  per-series shares are printed). The same-rows check compares row counts only (accepted: the three
+  arms share one filter). An Opus design review preceded the fits. A Sonnet numbers review found
+  two wrong figures (the 30% pseudo share range and a width range in `lessons`), both corrected, and
+  asked that the verdict follow the plan's order of rules (rejected, because `not-for-production` is
+  a production status and not a verdict word; the page now says so). A Sonnet prose review's
+  findings on undefined terms in the opening, bare "model", numerals, and the claim that the
+  widening "has to" come from elsewhere were applied.
+- **Options for a next experiment.** Add one missingness-indicator column for each lag, so that a
+  tree can give a masked lag its own leaf. Alternatively, fit a separate XGBoost model of the quantile
+  spread on rows with a masked lag. Dropout rates above 30% are a third option, because the 30% arm
+  had the higher coverage and the lower quantile score than the 10% arm on both the real masked rows
+  and the injected cases. A control that drops the event and closure rows but leaves every lag
+  unmasked would separate the effect of dropping rows from the effect of masking lags.
 
 ## Plan (written before any code ran)
 
