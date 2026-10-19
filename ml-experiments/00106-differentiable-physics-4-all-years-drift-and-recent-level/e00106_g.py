@@ -322,6 +322,7 @@ def filtered_forecast(
     lead_spread: LeadSpread | None = None,
     part: FilterPartType = "both",
     stream: np.ndarray | None = None,
+    initialisation: np.ndarray | None = None,
 ) -> FilteredForecast:
     """Correct a run's mean from the readings usable at its day-ahead initialisation.
 
@@ -336,6 +337,8 @@ def filtered_forecast(
         part: Which hidden states of the Kalman filter enter the correction.
         stream: The grid residuals the filter runs on, such as a stitched stream that carries the
             filter across refits; the run's own scored-year residuals if not given.
+        initialisation: The initialisation time of each scored row as `datetime64[us]`, for a
+            forecast not made at 09:00 UTC the day before; the day-ahead one if not given.
 
     Returns:
         The corrected mean, its quantiles, and the correction.
@@ -348,7 +351,11 @@ def filtered_forecast(
     valid = cache.end_times[run.index]
     cutoff = usable_cutoff_positions(
         end_times=cache.end_times,
-        initialisation=day_ahead_initialisation(end_times=valid, days_ahead=days_ahead),
+        initialisation=(
+            day_ahead_initialisation(end_times=valid, days_ahead=days_ahead)
+            if initialisation is None
+            else initialisation
+        ),
         delay_hours=delay_hours,
     )
     correction = correction_at(trace=trace, cutoff=cutoff, target=run.index, band=band[run.index])
