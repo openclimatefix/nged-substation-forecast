@@ -19,6 +19,7 @@ from typing import Final
 
 import e00104_common as common
 import numpy as np
+from studies.dp_features import FeatureCache
 from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
 
 RIDGE_GRID: Final[tuple[float, ...]] = (0.1, 1.0, 10.0)
@@ -34,7 +35,7 @@ three grids.
 """
 
 
-def grid_errors(*, specs: list[GamSpec], cache) -> np.ndarray:  # noqa: ANN001
+def grid_errors(*, specs: list[GamSpec], cache: FeatureCache) -> np.ndarray:
     """Return the mean absolute error of each spec at each tuning site, shape (specs, sites).
 
     Args:

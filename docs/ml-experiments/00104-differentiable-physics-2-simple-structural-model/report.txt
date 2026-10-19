@@ -1,0 +1,190 @@
+Experiment 104 report. Rows outside the switching masks; points of effective capacity.
+tuned: ridge 0.1 drift step 3000.0 step penalty 300.0 steps gain over D1 on the tuning year 0.215
+
+== 1. Absolute quantile score, points of capacity (rows outside the switching masks) ==
+arm                     D5     D10     D11     D14     D16      D9    five     six
+g1                   3.341   3.341   2.721   3.801   2.429   2.247   3.125   2.974
+g_all                3.099   2.995   2.355   2.734   2.485   2.190   2.726   2.633
+g_all_d1             3.197   3.882   2.679   2.277   2.589   6.392   2.922   3.522
+g_all_d1_steps       3.043   4.435   2.620   2.310   2.498  15.674   2.986   5.177
+x_12                 2.969   3.637   2.862   2.984   2.863   2.119   3.068   2.904
+x_12z                3.317   3.878   3.053   3.399   3.155   2.274   3.363   3.175
+x_12am               3.310   3.900   3.061   3.411   3.150   2.257   3.369   3.177
+x_12amq              2.971   3.613   2.867   2.980   2.862   2.100   3.063   2.897
+x_all                3.065   3.914   2.620   2.518   3.644   2.016   3.151   2.955
+x_allz               3.216   3.803   2.727   2.628   3.850   2.124   3.241   3.048
+x_allam              3.214   3.752   2.712   2.621   3.801   2.109   3.215   3.024
+x_allamq             3.066   3.879   2.610   2.499   3.591   1.999   3.127   2.932
+x_12z_ng             4.682   4.521   3.518   3.979   3.773   2.859   4.082   3.871
+x_12am_ng            4.289   4.230   3.299   3.718   3.515   2.487   3.800   3.573
+climatology          4.486   4.937   3.559   3.211   4.198   3.036   4.068   3.890
+manual_heuristic     3.886   4.129   3.381   2.931   3.142   2.899   3.488   3.387
+
+(five = D5, D10, D11, D14, D16 pooled; six adds D9)
+
+== 2. Planned contrasts (Bonferroni, 3 contrasts), decision set of five ==
+C1 years: g_all_d1 - g1: -0.203 (-0.683 to +0.216, 98.33%); 3 sites better, 2 worse
+   per site: {'D10': 0.541, 'D11': -0.042, 'D14': -1.523, 'D16': 0.16, 'D5': -0.144}
+   with D9 (six sites): +0.548 (+0.178 to +0.896, 98.33%); 3 sites better, 3 worse
+C2 GAM vs XGBoost, 12 months: g1 - x_12am: -0.244 (-0.802 to +0.238, 98.33%); 3 sites better, 2 worse
+   per site: {'D16': -0.72, 'D14': 0.39, 'D11': -0.34, 'D10': -0.559, 'D5': 0.031}
+   with D9 (six sites): -0.203 (-0.687 to +0.217, 98.33%); 4 sites better, 2 worse
+C3 GAM vs XGBoost, all years: g_all_d1 - x_allam: -0.293 (-0.668 to +0.033, 98.33%); 4 sites better, 1 worse
+   per site: {'D11': -0.033, 'D16': -1.212, 'D14': -0.343, 'D10': 0.129, 'D5': -0.017}
+   with D9 (six sites): +0.497 (+0.172 to +0.894, 98.33%); 4 sites better, 2 worse
+
+== 3. Exploratory contrasts (95%), decision set of five ==
+g_all - g1: -0.399 (-0.658 to -0.148, 95.00%); 4 sites better, 1 worse
+g_all_d1_steps - g_all_d1: +0.063 (+0.023 to +0.105, 95.00%); 3 sites better, 2 worse
+g_all_d1 - g_all: +0.196 (-0.050 to +0.430, 95.00%); 1 sites better, 4 worse
+x_12z - x_12: +0.295 (+0.155 to +0.472, 95.00%); 0 sites better, 5 worse
+x_allz - x_all: +0.090 (+0.019 to +0.174, 95.00%); 1 sites better, 4 worse
+x_12am - x_12z: +0.006 (-0.010 to +0.023, 95.00%); 2 sites better, 3 worse
+x_allam - x_allz: -0.025 (-0.045 to -0.006, 95.00%); 5 sites better, 0 worse
+x_12amq - x_12: -0.005 (-0.018 to +0.008, 95.00%); 3 sites better, 2 worse
+x_allamq - x_all: -0.023 (-0.045 to -0.002, 95.00%); 4 sites better, 1 worse
+x_12am_ng - x_12z_ng: -0.282 (-0.481 to -0.078, 95.00%); 5 sites better, 0 worse
+x_all - x_12: +0.083 (-0.238 to +0.343, 95.00%); 2 sites better, 3 worse
+x_allam - x_12am: -0.154 (-0.585 to +0.193, 95.00%); 4 sites better, 1 worse
+g_all - x_allam: -0.489 (-0.647 to -0.327, 95.00%); 4 sites better, 1 worse
+g1 - x_12: +0.058 (-0.251 to +0.374, 95.00%); 3 sites better, 2 worse
+g1 - x_12amq: +0.063 (-0.246 to +0.371, 95.00%); 3 sites better, 2 worse
+g_all - x_all: -0.425 (-0.561 to -0.288, 95.00%); 3 sites better, 2 worse
+g_all - x_allamq: -0.401 (-0.542 to -0.263, 95.00%); 3 sites better, 2 worse
+g_all_d1 - x_all: -0.228 (-0.452 to -0.009, 95.00%); 3 sites better, 2 worse
+g_all_d1 - x_allamq: -0.205 (-0.436 to +0.019, 95.00%); 2 sites better, 3 worse
+
+== 3b. The coastal substations (D5 and D9) ==
+g_all_d1 - g1: +2.151 (+1.154 to +3.208, 95.00%); 1 sites better, 1 worse; per site {'D5': -0.1440186521216877, 'D9': 4.144303728841259}
+g1 - x_12am: +0.010 (-0.392 to +0.354, 95.00%); 1 sites better, 1 worse; per site {'D9': -0.00938514183067444, 'D5': 0.03133957354895533}
+g_all_d1 - x_allam: +2.284 (+1.457 to +3.266, 95.00%); 1 sites better, 1 worse; per site {'D9': 4.282411164268942, 'D5': -0.016627195952153607}
+
+== 4. Prediction checks ==
+FAILED old years without drift hurt (G-all - G1 +0.3 to +0.8, interval above zero): -0.399 (-0.658 to -0.148, 95.00%); 4 sites better, 1 worse
+FAILED solar offset (X-12am - X-12z -0.40 to -0.10, interval below zero): +0.006 (-0.010 to +0.023, 95.00%); 2 sites better, 3 worse
+HELD   solar offset without the irradiance input (X-12am-ng - X-12z-ng -0.40 to -0.10): -0.282 (-0.481 to -0.078, 95.00%); 5 sites better, 0 worse
+FAILED zero start (X-12z - X-12 between -0.10 and +0.02): +0.295 (+0.155 to +0.472, 95.00%); 0 sites better, 5 worse
+FAILED C1 +0.0 to +0.4, interval spanning zero: -0.203 (-0.683 to +0.216, 98.33%); 3 sites better, 2 worse
+FAILED C2 +0.1 to +0.5: -0.244 (-0.802 to +0.238, 98.33%); 3 sites better, 2 worse
+FAILED C3 +0.0 to +0.5: -0.293 (-0.668 to +0.033, 98.33%); 4 sites better, 1 worse
+HELD   steps within +-0.1 of D1: +0.063 (+0.023 to +0.105, 95.00%); 3 sites better, 2 worse
+FAILED baselines worse than every model arm at every site: g1 vs climatology at D14 (3.80 vs 3.21); g1 vs manual_heuristic at D14 (3.80 vs 2.93); g_all_d1 vs climatology at D9 (6.39 vs 3.04); g_all_d1 vs manual_heuristic at D9 (6.39 vs 2.90); g_all_d1_steps vs climatology at D9 (15.67 vs 3.04); g_all_d1_steps vs manual_heuristic at D9 (15.67 vs 2.90); g_all_d1_steps vs manual_heuristic at D10 (4.43 vs 4.13); x_12 vs manual_heuristic at D14 (2.98 vs 2.93); x_12z vs manual_heuristic at D16 (3.15 vs 3.14); x_12z vs climatology at D14 (3.40 vs 3.21); x_12z vs manual_heuristic at D14 (3.40 vs 2.93); x_12am vs manual_heuristic at D16 (3.15 vs 3.14); x_12am vs climatology at D14 (3.41 vs 3.21); x_12am vs manual_heuristic at D14 (3.41 vs 2.93); x_12amq vs manual_heuristic at D14 (2.98 vs 2.93); x_all vs manual_heuristic at D16 (3.64 vs 3.14); x_allz vs manual_heuristic at D16 (3.85 vs 3.14); x_allam vs manual_heuristic at D16 (3.80 vs 3.14); x_allamq vs manual_heuristic at D16 (3.59 vs 3.14)
+
+Verdict by the Phase A rule on C1 (before positive controls): inconclusive
+
+== 5. Tails: coverage (nominal 1%, 5%, 95%, 99%) and pinball loss at each level ==
+arm                     q01      q05      q95      q99   |   pinball
+g1                    0.027    0.092    0.895    0.950   |   0.190 0.697 0.994 0.348
+g_all                 0.015    0.045    0.884    0.955   |   0.176 0.624 0.795 0.259
+g_all_d1              0.042    0.120    0.936    0.978   |   0.212 0.702 0.783 0.221
+g_all_d1_steps        0.050    0.136    0.940    0.979   |   0.236 0.757 0.779 0.219
+x_12                  0.014    0.097    0.793    0.977   |   0.261 0.716 1.078 0.338
+x_12z                 0.002    0.076    0.662    0.731   |   0.365 0.688 1.537 1.095
+x_12am                0.002    0.076    0.661    0.729   |   0.364 0.685 1.547 1.116
+x_12amq               0.012    0.096    0.793    0.976   |   0.256 0.711 1.072 0.338
+x_all                 0.020    0.082    0.838    0.985   |   0.276 0.727 0.968 0.305
+x_allz                0.003    0.067    0.770    0.840   |   0.368 0.710 1.105 0.569
+x_allam               0.002    0.065    0.770    0.841   |   0.365 0.698 1.093 0.563
+x_allamq              0.016    0.080    0.839    0.985   |   0.262 0.709 0.963 0.304
+x_12z_ng              0.003    0.081    0.648    0.722   |   0.372 0.817 1.845 1.282
+x_12am_ng             0.003    0.079    0.650    0.718   |   0.368 0.757 1.761 1.274
+climatology           0.012    0.041    0.915    0.968   |   0.229 0.902 1.032 0.302
+manual_heuristic      0.042    0.061    0.906    0.933   |   0.248 0.762 0.916 0.355
+
+== 6. Staleness: score and tail coverage by month of the scored year ==
+score | q05 coverage | q95 coverage
+ month                    g1                 g_all              g_all_d1                x_12am               x_allam
+     0    2.18 0.079 0.951    2.36 0.054 0.900    2.54 0.133 0.956    2.17 0.061 0.767    2.39 0.066 0.876
+     1    2.23 0.092 0.945    2.25 0.085 0.930    2.93 0.205 0.970    2.46 0.109 0.783    3.16 0.156 0.864
+     2    2.18 0.105 0.974    2.05 0.074 0.963    2.71 0.183 0.983    2.16 0.103 0.824    2.54 0.096 0.908
+     3    3.32 0.149 0.945    2.25 0.049 0.963    3.19 0.188 0.991    2.22 0.040 0.767    2.68 0.029 0.812
+     4    3.46 0.147 0.934    2.65 0.018 0.909    2.71 0.073 0.973    3.57 0.093 0.653    3.42 0.029 0.715
+     5    3.73 0.074 0.838    3.23 0.011 0.868    2.94 0.069 0.977    5.85 0.076 0.385    4.28 0.030 0.612
+     6    5.10 0.123 0.726    3.77 0.010 0.729    3.47 0.073 0.801    4.82 0.044 0.474    4.21 0.027 0.614
+     7    3.95 0.018 0.752    3.25 0.004 0.770    2.75 0.029 0.856    5.65 0.007 0.344    3.98 0.005 0.602
+     8    3.19 0.046 0.832    2.54 0.027 0.881    2.75 0.112 0.945    2.99 0.068 0.719    3.03 0.070 0.827
+     9    2.61 0.086 0.961    2.53 0.075 0.945    2.86 0.140 0.966    2.86 0.083 0.703    2.81 0.085 0.805
+    10    3.07 0.091 0.925    2.97 0.050 0.873    3.11 0.103 0.910    3.44 0.113 0.713    3.28 0.086 0.791
+    11    3.03 0.095 0.899    3.18 0.063 0.834    3.18 0.106 0.881    3.18 0.106 0.685    3.23 0.078 0.744
+
+== 7. Capacity per season-year, MW (fitted by the convex model, and experiment 45) ==
+D5: vintage 'frozen' over hindsight season-year constant, 299 weeks: min 0.9011, max 1.1068, share within 0.1%: 0.000
+   g1 2024-25: 3.17 MW; vintage 3.55; ratio 0.89
+   g_all 2024-25: 3.31 MW; vintage 3.55; ratio 0.93
+   g_all_d1 2024-25: 3.35 MW; vintage 3.55; ratio 0.94
+D9: vintage 'frozen' over hindsight season-year constant, 92 weeks: min 0.9525, max 1.1180, share within 0.1%: 0.000
+   g1 2024-25: 2.05 MW; vintage 2.70; ratio 0.76
+   g_all 2024-25: 2.10 MW; vintage 2.70; ratio 0.78
+   g_all_d1 2024-25: 2.09 MW; vintage 2.70; ratio 0.77
+D10: vintage 'frozen' over hindsight season-year constant, 299 weeks: min 0.6708, max 1.1699, share within 0.1%: 0.000
+   g1 2024-25: 2.10 MW; vintage 2.33; ratio 0.90
+   g_all 2024-25: 2.49 MW; vintage 2.33; ratio 1.07
+   g_all_d1 2024-25: 2.34 MW; vintage 2.33; ratio 1.00
+D11: vintage 'frozen' over hindsight season-year constant, 294 weeks: min 0.3042, max 1.1036, share within 0.1%: 0.000
+   g1 2024-25: 2.73 MW; vintage 3.55; ratio 0.77
+   g_all 2024-25: 3.09 MW; vintage 3.55; ratio 0.87
+   g_all_d1 2024-25: 2.85 MW; vintage 3.55; ratio 0.80
+D14: vintage 'frozen' over hindsight season-year constant, 183 weeks: min 0.5189, max 1.4797, share within 0.1%: 0.000
+D16: vintage 'frozen' over hindsight season-year constant, 225 weeks: min 0.3431, max 1.1819, share within 0.1%: 0.000
+   g1 2024-25: 2.87 MW; vintage 3.60; ratio 0.80
+   g_all 2024-25: 2.48 MW; vintage 3.60; ratio 0.69
+   g_all_d1 2024-25: 2.90 MW; vintage 3.60; ratio 0.81
+
+== 8. Solar offset weights (fitted on a replica's April-to-September residuals) ==
+shape: (30, 9)
+┌──────┬───────────┬───────────┬──────┬───┬──────────────────┬────────────────┬───────────┬────────┐
+│ site ┆ arm       ┆ w         ┆ rows ┆ … ┆ unobserved_weeks ┆ vintage_origin ┆ start     ┆ window │
+│ ---  ┆ ---       ┆ ---       ┆ ---  ┆   ┆ ---              ┆ ---            ┆ ---       ┆ ---    │
+│ str  ┆ str       ┆ f64       ┆ i64  ┆   ┆ i64              ┆ str            ┆ str       ┆ str    │
+╞══════╪═══════════╪═══════════╪══════╪═══╪══════════════════╪════════════════╪═══════════╪════════╡
+│ D10  ┆ x_12am    ┆ -0.14953  ┆ 5577 ┆ … ┆ 104              ┆ 2025-06-09     ┆ zero      ┆ 12     │
+│ D10  ┆ x_12am_ng ┆ -0.709621 ┆ 5577 ┆ … ┆ 104              ┆ 2025-06-09     ┆ zero      ┆ 12     │
+│ D10  ┆ x_12amq   ┆ -0.180177 ┆ 5577 ┆ … ┆ 104              ┆ 2025-06-09     ┆ estimated ┆ 12     │
+│ D10  ┆ x_allamq  ┆ -0.37865  ┆ 5577 ┆ … ┆ 104              ┆ 2025-06-09     ┆ estimated ┆ all    │
+│ D10  ┆ x_allam   ┆ -0.34341  ┆ 5577 ┆ … ┆ 104              ┆ 2025-06-09     ┆ zero      ┆ all    │
+│ …    ┆ …         ┆ …         ┆ …    ┆ … ┆ …                ┆ …              ┆ …         ┆ …      │
+│ D9   ┆ x_12am_ng ┆ -0.607803 ┆ 5798 ┆ … ┆ 28               ┆ 2025-06-09     ┆ zero      ┆ 12     │
+│ D9   ┆ x_12amq   ┆ -0.125353 ┆ 5798 ┆ … ┆ 28               ┆ 2025-06-09     ┆ estimated ┆ 12     │
+│ D9   ┆ x_12am    ┆ -0.129421 ┆ 5798 ┆ … ┆ 28               ┆ 2025-06-09     ┆ zero      ┆ 12     │
+│ D9   ┆ x_allamq  ┆ -0.142837 ┆ 5798 ┆ … ┆ 28               ┆ 2025-06-09     ┆ estimated ┆ all    │
+│ D9   ┆ x_allam   ┆ -0.14266  ┆ 5798 ┆ … ┆ 28               ┆ 2025-06-09     ┆ zero      ┆ all    │
+└──────┴───────────┴───────────┴──────┴───┴──────────────────┴────────────────┴───────────┴────────┘
+
+== 9. Scarce-data rows (descriptive, no interval): mean score by kind ==
+kind              rows               g1            g_all         g_all_d1           x_12am          x_allam manual_heuristic
+bank_holiday      1728            3.484            2.620            2.499            3.417            3.039            6.049
+christmas_run     1009            3.715            2.718            2.750            3.400            2.455            5.300
+cold_day           576            4.513            4.340            2.965            4.239            3.613            7.508
+other            80552            3.100            2.717            2.933            3.362            3.226            3.382
+
+== 10. Cold block, November 2022 to February 2023 (descriptive) ==
+Mean absolute error of the central forecast (GAM mean; XGBoost median), points:
+site           cold_g1      cold_g_all   cold_g_all_d1       cold_x_12
+D5               6.718           6.370           4.392           5.859
+D10             11.904           8.373           3.561          11.077
+D11             10.283           8.242           5.185          10.440
+D14              4.409           4.430           4.290           4.334
+D16              4.679           4.504           3.285           4.468
+pooled: {'cold_g1': 7.664, 'cold_g_all': 6.412, 'cold_g_all_d1': 4.148, 'cold_x_12': 7.306}
+
+== 11. Lagged reference (descriptive): lagged XGBoost minus the lagless arm ==
+leads 24.5 to 48 h: -0.580 (-0.973 to -0.284, 95.00%); 5 sites better, 0 worse; absolute {'x_12_d1': 3.068, 'l_12_d1': 2.487}
+leads 144.5 to 168 h: -0.320 (-0.563 to -0.145, 95.00%); 5 sites better, 0 worse; absolute {'x_12_d6': 3.068, 'l_12_d6': 2.747}
+
+All-rows scores (including rows inside the switching masks), decision set of five:
+  g1                   3.315
+  g_all                2.977
+  g_all_d1             3.139
+  g_all_d1_steps       3.201
+  x_12                 3.369
+  x_12z                3.679
+  x_12am               3.686
+  x_12amq              3.363
+  x_all                3.463
+  x_allz               3.572
+  x_allam              3.547
+  x_allamq             3.439
+  x_12z_ng             4.379
+  x_12am_ng            4.110
+  climatology          4.297
+  manual_heuristic     3.703

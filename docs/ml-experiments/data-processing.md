@@ -311,6 +311,25 @@ donor substation's solar output and looks like a capacity step ([experiment
 45](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md) applies this mask). Applies to
 experiments. Confidence: medium, because the write-up states the rule and does not test the rule.
 
+**Do not treat the real-time `frozen` capacity vintage as the season-year constant.** Over the
+weeks that experiment 45's real-time vintage and its hindsight season-year constant share, the
+ratio of the two runs from 0.30 to 1.48 across six Primaries and no week agrees to 0.1%
+([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md)). Each origin of
+the vintage lists weekly capacities back to 2019-09, but the first origin is 2023-08, so a cut
+before then has no real-time capacity. Take the latest origin on or before the cut, hold its last
+week afterwards, and hold the last observed value through unobserved weeks. Applies to experiments.
+Scope: six MW Primaries.
+
+**Do not count a season-year as trained because a few half-hours of it precede the cut.** A cut on
+1 July 00:00 UTC leaves two dark half-hours that start on 1 July in British Summer Time, so they
+fall in the next season-year. Count a season-year as trained only when it holds enough rows with
+solar signal (experiment 104 uses at least 30 days of half-hours for centring and any solar signal
+for capacity). Applies to experiments.
+
+**Treat the ERA5 half-hourly file's :30 values as interpolated.** Each :30 value is the mean of the
+neighbouring hourly values, so a half-hour ending at :30 uses the next hour's reading (experiment
+104). Applies to experiments.
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers

@@ -110,48 +110,55 @@ def figure_1_raw_weeks() -> alt.TopLevelMixin:
                 )
     table = pl.concat(frames).filter(pl.col("site").is_in(SITE_ORDER))
     order = ["Actual", "G1", "G-all+D1", "X-allamq"]
-    return (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_line(strokeWidth=1)
-        .encode(
-            x=alt.X(
-                "day:Q",
-                title="Days since Monday 00:00 UTC",
-                axis=alt.Axis(values=list(range(8))),
-                scale=alt.Scale(domain=[0, 7]),
-            ),
-            y=alt.Y("value:Q", title=None),
-            color=alt.Color(
-                "series:N",
-                scale=alt.Scale(
-                    domain=order,
-                    range=["#333333", ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE],
+
+    def week_chart(week: str, *, legend: bool) -> alt.FacetChart:
+        return (
+            alt.Chart(table.filter(pl.col("week") == week))  # ty: ignore[unresolved-attribute]
+            .mark_line(strokeWidth=1)
+            .encode(
+                x=alt.X(
+                    "day:Q",
+                    title="Days since Monday 00:00 UTC",
+                    axis=alt.Axis(values=list(range(8))),
+                    scale=alt.Scale(domain=[0, 7]),
                 ),
-                legend=alt.Legend(title="Line", orient="top", direction="horizontal"),
-            ),
-        )
-        .properties(width=WIDTH - 40, height=62)
-        .facet(
-            row=alt.Row(
-                "site:N",
-                sort=SITE_ORDER,
-                title=None,
-                header=alt.Header(labelAngle=0, labelAlign="left"),
-            ),
-            column=alt.Column("week:N", title=None, sort=list(weeks)),
-        )
-        .properties(
-            title=_title(
-                text="Net power and three forecasts in a summer and a winter week",
-                subtitle=(
-                    "Half-hourly net power as a percentage of each site's effective capacity "
-                    "(negative is export). Forecast lines are the median of each frozen fit's "
-                    "forecast, made with data to 30 June 2025. Black: measured. Orange: convex "
-                    "model,"
-                    " 12 months. Blue: convex model, all years with drift. Purple: XGBoost, all "
-                    "years."
+                y=alt.Y("value:Q", title=None),
+                color=alt.Color(
+                    "series:N",
+                    scale=alt.Scale(
+                        domain=order,
+                        range=["#333333", ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE],
+                    ),
+                    legend=alt.Legend(title="Line", orient="top", direction="horizontal")
+                    if legend
+                    else None,
                 ),
             )
+            .properties(width=WIDTH - 40, height=60)
+            .facet(
+                row=alt.Row(
+                    "site:N",
+                    sort=SITE_ORDER,
+                    title=None,
+                    header=alt.Header(labelAngle=0, labelAlign="left"),
+                )
+            )
+            .properties(title=week)
+        )
+
+    return alt.vconcat(
+        *[week_chart(week, legend=position == 0) for position, week in enumerate(weeks)]
+    ).properties(
+        title=_title(
+            text="Net power and three forecasts in a summer and a winter week",
+            subtitle=(
+                "Half-hourly net power as a percentage of each site's effective capacity (negative "
+                "is export). Forecast lines are the median of each frozen fit's forecast, made "
+                "with "
+                "data to 30 June 2025. Black: measured. Orange: convex model, 12 months. Blue: "
+                "convex model, all years with drift. Purple: XGBoost, all years, with the solar "
+                "offset."
+            ),
         )
     )
 
@@ -341,7 +348,7 @@ def figure_5_capacity() -> alt.TopLevelMixin:
             for row in fitted.filter(pl.col("site") == site, pl.col("arm") == arm).iter_rows(
                 named=True
             ):
-                if row["capacity_mw"] > 0:
+                if row["capacity_mw"] > 0.05:
                     rows.append(  # noqa: PERF401 (one dict per fitted year)
                         {
                             "site": site,
@@ -519,7 +526,7 @@ def figure_8_benchmark() -> alt.TopLevelMixin | None:
     table = pl.DataFrame(rows)
     return (
         alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_bar()
+        .mark_point(filled=True, size=140)
         .encode(
             y=alt.Y("workload:N", sort=list(names.values()), title=None),
             yOffset="device:N",
@@ -541,7 +548,7 @@ def figure_8_benchmark() -> alt.TopLevelMixin | None:
                 text="CPU against GPU for the framework module",
                 subtitle=(
                     "Workloads 1 and 2 run in float64 on both devices; workload 3 runs in float32. "
-                    "The CPU uses 8 threads. A shorter bar is faster."
+                    "The CPU uses 8 threads. A dot further left is faster."
                 ),
             ),
         )
