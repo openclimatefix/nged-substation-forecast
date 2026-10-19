@@ -197,10 +197,11 @@ def pseudo_masks(
     """Return the pseudo-event masks of a series, and the achieved share of rows each masks.
 
     Intervals start uniformly over the span of the series' training rows and last as long as a
-    bootstrap draw from the labelled events' durations. The draw is seeded by the series. The
-    mask for 10% is the first `k10` intervals and the mask for 30% the first `k30`, with `k` found
-    by bisection so that the share of the series' training rows with at least one pseudo-masked
-    lag is within `SHARE_TOLERANCE` of the target.
+    bootstrap draw from the labelled events' durations. The draw is seeded by the series. Going
+    through the draw in order, an interval is accepted unless it would lift the share of the
+    series' training rows with at least one pseudo-masked lag above the target plus half the
+    tolerance, and drawing stops once the share reaches the target minus half the tolerance. The
+    mask for 10% comes first, and the mask for 30% continues from it, so the masks are nested.
 
     Args:
         site: The series label.
@@ -210,40 +211,37 @@ def pseudo_masks(
         The masks by percentage on the dense grid, and the achieved row shares.
 
     Raises:
-        ValueError: If the intervals cannot reach a target share within the tolerance.
+        ValueError: If the draw cannot reach a target share within the tolerance.
     """
     generator = np.random.default_rng(zlib.crc32(f"{common.SEED}:{site}".encode()))
     size = common.grid_times().len()
     target = np.asarray(common.grid_index(times=rows["valid_time"]))
     origin = np.asarray(common.grid_index(times=rows["power_fcst_init_time"]))
+    lag_index = common.origin_lags(
+        power=np.arange(size, dtype=np.float32), target=target, origin=origin
+    )
     first, last = int(target.min()), int(target.max())
     durations = generator.choice(event_durations(), size=MAX_PSEUDO_INTERVALS)
     onsets = generator.integers(first, last + 1, size=MAX_PSEUDO_INTERVALS)
-
-    def mask_of(count: int) -> np.ndarray:
-        difference = np.zeros(size + 1, dtype=np.int32)
-        np.add.at(difference, onsets[:count], 1)
-        np.add.at(difference, np.minimum(onsets[:count] + durations[:count], size), -1)
-        return np.cumsum(difference[:size]) > 0
-
-    def share_of(count: int) -> float:
-        return float(
-            lag_flags(mask=mask_of(count), target=target, origin=origin).any(axis=1).mean()
-        )
-
+    masked_rows = np.zeros(rows.height, dtype=bool)
+    mask = np.zeros(size, dtype=bool)
+    position = 0
     masks: dict[int, np.ndarray] = {}
     shares: dict[int, float] = {}
+    half = SHARE_TOLERANCE / 2.0
     for percent in PSEUDO_PERCENTS:
-        low, high = 0, MAX_PSEUDO_INTERVALS
-        while high - low > 1:
-            middle = (low + high) // 2
-            if share_of(middle) < percent / 100.0:
-                low = middle
-            else:
-                high = middle
-        masks[percent] = mask_of(high)
-        shares[percent] = share_of(high)
-        if abs(shares[percent] - percent / 100.0) > SHARE_TOLERANCE:
+        goal = percent / 100.0
+        while position < MAX_PSEUDO_INTERVALS and masked_rows.mean() < goal - half:
+            start, stop = int(onsets[position]), int(onsets[position] + durations[position])
+            position += 1
+            inside = ((lag_index >= start) & (lag_index < stop)).any(axis=1)
+            if (masked_rows | inside).mean() > goal + half:
+                continue
+            masked_rows |= inside
+            mask[start : min(stop, size)] = True
+        masks[percent] = mask.copy()
+        shares[percent] = float(masked_rows.mean())
+        if abs(shares[percent] - goal) > SHARE_TOLERANCE:
             msg = (
                 f"{site}: pseudo share {shares[percent]:.3f} is not within tolerance of {percent}%"
             )
@@ -252,7 +250,7 @@ def pseudo_masks(
 
 
 def mixture_quantiles(*, member_quantiles: np.ndarray) -> np.ndarray:
-    """Pool members' quantiles into the mixture's nine quantiles, as experiment 00019 does."""
+    """Pool members' quantiles into the mixture's 11 quantiles, as experiment 00019 does."""
     cases, members, levels = member_quantiles.shape
     values = member_quantiles.reshape(cases, members * levels)
     weights = np.tile(common.ATOM_MASSES, members) / members
@@ -440,7 +438,7 @@ def job_path(*, root: Path, arm: str, site: str, refit: datetime) -> Path:
 _CACHE: dict[str, object] = {}
 
 
-def _context() -> tuple[
+def context() -> tuple[
     pl.DataFrame,
     dict[str, common.SeriesArrays],
     dict[str, tuple[np.ndarray, np.ndarray]],
@@ -512,7 +510,7 @@ def run_job(
     Returns:
         One progress line per series and arm fitted.
     """
-    series, arrays, labels = _context()
+    series, arrays, labels = context()
     todo = [
         (site, arm)
         for site in sites
