@@ -8,9 +8,10 @@ and day of year.
 
 **The solar offset** (experiment 64's `am`) is a base margin `w * s(t) * a(t)` for every quantile,
 in April to September and zero outside. `s(t)` is the pinned capacity of
-`studies.dp_pinned_capacity`, the same capacity the convex model uses, and `a(t)` is the unit PV shape minus its
-month-by-half-hour mean over the training window. `w` is fitted per substation by least squares on
-the median residuals of a replica of the matching offset-free arm over April to September rows.
+`studies.dp_pinned_capacity`, the same capacity the convex model uses, and `a(t)` is the unit PV
+shape minus its month-by-half-hour mean over the training window. `w` is fitted per substation
+by least squares on the median residuals of a replica of the matching offset-free arm over April
+to September rows.
 
 **Two stages.**
 
