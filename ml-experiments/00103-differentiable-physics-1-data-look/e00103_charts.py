@@ -1106,8 +1106,118 @@ def figure_12_lockdown() -> alt.TopLevelMixin:
     )
 
 
+def figure_13_offsets() -> alt.TopLevelMixin:
+    """Stamp offsets from the sunrise and sunset ramps, per MW Primary and for the PV series."""
+    table = pl.read_parquet(TABLES / "timestamp_offsets.parquet").filter(
+        pl.col("days") > 0, pl.col("side") != "before the fix"
+    )
+    mw = table.filter(pl.col("kind") == "MW Primary").with_columns(
+        label=pl.col("series"),
+        saturated=(pl.col("morning").abs() >= 100) | (pl.col("evening").abs() >= 100),
+        low=pl.col("mean_low"),
+        high=pl.col("mean_high"),
+        estimate=pl.col("mean"),
+    )
+    pv = (
+        table.filter(pl.col("kind") == "metered PV")
+        .group_by("side")
+        .agg(
+            estimate=pl.col("mean").median(),
+            low=pl.col("mean").min(),
+            high=pl.col("mean").max(),
+        )
+        .with_columns(label=pl.lit("metered PV series (6)"), saturated=False)
+    )
+    rows = pl.concat(
+        [
+            mw.select("label", "side", "estimate", "low", "high", "saturated"),
+            pv.select("label", "side", "estimate", "low", "high", "saturated"),
+        ]
+    ).with_columns(
+        informative=pl.when(pl.col("saturated"))
+        .then(pl.lit("ramp at the search limit"))
+        .otherwise(pl.lit("usable")),
+        low=pl.col("low").clip(-120, 120),
+        high=pl.col("high").clip(-120, 120),
+    )
+    order = [*MW_ORDER, "metered PV series (6)"]
+    sides = ["before the fix, April to September", "after the fix"]
+    colour = alt.Color(
+        "side:N",
+        scale=alt.Scale(domain=sides, range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
+        legend=alt.Legend(title="Rows", orient="top", direction="vertical", labelLimit=400),
+    )
+    no_legend = alt.Color(
+        "side:N",
+        scale=alt.Scale(domain=sides, range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
+        legend=None,
+    )
+    y = alt.Y("label:N", sort=order, title=None)
+    offset = alt.YOffset("side:N", scale=alt.Scale(domain=sides))
+    rules = (
+        alt.Chart(pl.DataFrame({"x": [0, 30], "what": ["correct", "uncorrected feed"]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[4, 3], color="grey")
+        .encode(x="x:Q")
+    )
+    interval = (
+        alt.Chart(rows)  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeWidth=2)
+        .encode(
+            x=alt.X(
+                "low:Q",
+                title="Minutes the stored stamps run late (95% interval)",
+                scale=alt.Scale(domain=[-120, 120]),
+            ),
+            x2="high:Q",
+            y=y,
+            yOffset=offset,
+            color=no_legend,
+        )
+    )
+    dots = (
+        alt.Chart(rows)  # ty: ignore[unresolved-attribute]
+        .mark_point(filled=True, size=50)
+        .encode(
+            x="estimate:Q",
+            y=y,
+            yOffset=offset,
+            color=colour,
+            shape=alt.Shape(
+                "informative:N",
+                scale=alt.Scale(
+                    domain=["usable", "ramp at the search limit"], range=["circle", "cross"]
+                ),
+                legend=alt.Legend(title="Ramp fit", orient="top", direction="vertical"),
+            ),
+        )
+    )
+    return alt.layer(rules, interval, dots).properties(
+        width=WIDTH - 40,
+        height=260,
+        title=_title(
+            text="Stamp offsets from sunrise and sunset ramps: no 30-minute error",
+            lines=[
+                (
+                    "Blue: rows before the fix, April to September; orange: rows after the fix. "
+                    "Each mark: the mean of the morning-ramp and evening-ramp offsets that "
+                    "best match "
+                    "the change of net power to the change of sun height on clear-sky days, in"
+                    " minutes "
+                    "the stored stamps run late. Grey lines: 0 (the stamps are right) and +30 "
+                    "(the "
+                    "feed as NGED sent it before 2026-03-26 08:30 UTC). Crosses: a ramp hit "
+                    "the search "
+                    "limit (100 minutes or more), so the estimate is not reliable. The six "
+                    "metered PV "
+                    "series are shown as one median with the range of their estimates."
+                )
+            ],
+        ),
+    )
+
+
 def main() -> None:
-    """Draw figures 1 to 12."""
+    """Draw figures 1 to 13."""
     for name, function in (
         ("figure_01_availability", figure_1_availability),
         ("figure_02_raw_weeks", figure_2_raw_weeks),
@@ -1121,6 +1231,7 @@ def main() -> None:
         ("figure_10_timestamp", figure_10_timestamp),
         ("figure_11_mva_dark", figure_11_mva_dark),
         ("figure_12_lockdown", figure_12_lockdown),
+        ("figure_13_offsets", figure_13_offsets),
     ):
         _save(function(), name=name)
 

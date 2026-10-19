@@ -41,8 +41,9 @@ take_home_message: >-
   The data lets the series go ahead, with three changes. Cut leading months at 13 of the 16
   Primaries (19 months at D4). Fix the lockdown window in advance, because the data does not
   isolate it from drift. Count eligible long-history MW sites at each tuning year's first day, which
-  gives 5 at 2024-07-01 because D9 holds only 9.0 months then (6 at 2025-07-01). The timestamp
-  check is mixed per site, and whether that stops the series is the maintainer's decision.
+  gives 5 at 2024-07-01 because D9 holds only 9.0 months then (6 at 2025-07-01); Phase A needs 4
+  of 5. The sunrise and sunset ramps put the stored stamps within about 5 minutes of the sun on
+  both sides of the 2026-03-26 fix, so no 30-minute error is present and no Part 2 arm is touched.
 date: 2026-10-19
 pr: 1348
 advice:
@@ -64,9 +65,9 @@ advice:
     Screen generators on rows after the early-calibration cuts and the switching masks: D18's 1.8%
     negative dark share is 0% from its first usable date (figure 9).
   - >-
-    Do not read the plan's summer-midday timestamp test as evidence for or against a stamp offset:
-    its correlation is about -0.18 and flat across shifts, and the clear-sky-hours test peaks
-    between 0 and +30 minutes (figure 10).
+    Treat the power stamps as correct to within about 5 minutes on both sides of the 2026-03-26
+    fix: the sunrise and sunset ramps of the metered PV series give +0.9 minutes before it and
+    +4.7 after, and no arm needs a stamp correction (figure 13).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00103-differentiable-physics-1-data-look/
@@ -77,8 +78,9 @@ code: ml-experiments/00103-differentiable-physics-1-data-look/
 **The data lets the differentiable-physics series go ahead, with three changes.** Cut the leading
 months at 13 of the 16 Primary substations, fix the lockdown window in advance, and count eligible
 long-history MW sites at each tuning year's first day (5 at 2024-07-01, because D9 holds only 9.0
-months then). Verdict: `helps`, exactly at the minimum of 5 eligible sites. The timestamp check is
-mixed per site, and the manager has asked the maintainer whether that stops the series.
+months then). Verdict: `helps`, exactly at the minimum of 5 eligible sites, so Phase A needs 4 of 5.
+A sharper timestamp check, on the sunrise and sunset ramps of metered solar series, finds no
+30-minute error on either side of the fix.
 
 This experiment fits no model. It looks at the power records of 22 series (16 Primary substations,
 four grid or bulk supply points, and two metered generators), at ERA5 temperature (the European
@@ -92,7 +94,7 @@ half-hours. Power is shown as a percentage of each series' effective capacity.
 
 ## Figures
 
-Figures 4 and 12 carry the findings that change Part 2. Figures 1 and 2 show the raw data. The two
+Figures 4, 12, and 13 carry the findings. Figures 1 and 2 show the raw data. The two
 metered generators appear only in figure 9, as G-a and G-b, as aggregate statistics with no dates.
 
 ![Months with clean data per series, 2019 to 2026, with switching events](figure_01_availability.svg)
@@ -118,6 +120,8 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
 ![Dark site-years and dark-row profiles at the 8 MVA Primaries](figure_11_mva_dark.svg)
 
 ![Weekday daytime level against a no-lockdown fit](figure_12_lockdown.svg)
+
+![Stamp offsets from the sunrise and sunset ramps](figure_13_offsets.svg)
 
 ## Sites and dates
 
@@ -152,18 +156,10 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
   Primaries unflagged, among them D18 (0% after its cut, 1.8% before it with 201 of 202 negative
   rows in January 2025), and the bulk supply points D13 (0%) and D17 (0.09%). The MVA Primaries go
   unscreened.
-- **Timestamp, clear-sky hours in April to September.** The mean correlation is most negative at
-  zero shift, because demand falls as irradiance rises (-0.563 before the 2026-03-26 fix and
-  -0.659 after). Per site, the peak is at +30 minutes at 6 of 8 before the fix, and at -30 minutes
-  at D5 on both sides.
-- **Timestamp, size of the effect.** The correlation at +30 minutes is weaker than at zero by
-  0.007 before the fix and 0.013 after, and at -30 minutes by 0.042 and 0.037. The parabola vertex
-  is at +10.6 minutes before the fix and +6.9 after.
-- **Timestamp, the plan's test.** On summer middays (May to August, 10:00 to 14:00 UTC, clear-sky
-  irradiance above 400 W/m²) the mean correlation is about -0.18 before and -0.06 after, and flat
-  across shifts, so the test cannot locate a peak.
-- **Timestamp, caveats.** The after side holds only April to 10 September 2026 (about 8,170 hourly
-  rows), and no known-answer check was run.
+- **Timestamp.** The clear-sky-hours correlation with irradiance is most negative between 0 and
+  +30 minutes (parabola vertex +10.6 minutes before the fix and +6.9 after), and the plan's
+  summer-midday test is flat (about -0.18 and -0.06), so neither locates an offset; the follow-up
+  below does.
 - **Clip** (daytime power flattening above a ceiling): yes at D5 (4 of 7 summers) and D15 (2 of
   2), and no at the other six MW Primaries; D14 meets the rule in 1 of 6 summers.
 - **Heating-slope drift** is not detectable. No long-history site has a last-minus-first winter
@@ -183,12 +179,44 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
   24 hours before the onset to 24 hours after the end. The 66 events start in 2022-03, so no mask
   precedes then.
 
+## Timestamp follow-up
+
+- **Method.** On clear-sky days, the half-hour-to-half-hour change of net power while the sun is
+  between -3 and 25 degrees above the horizon is matched to the change of a sun-height predictor
+  shifted by a trial offset, from -120 to +120 minutes in 5-minute steps. The best offset comes
+  from the smallest residual sum of squares, with a slope of the physically expected sign, and a
+  95% interval comes from resampling whole days 1,000 times.
+- **Orientation effect removed.** A fixed south-facing panel makes the morning ramp read late and
+  the evening ramp early (the half-difference of the two is 40 to 70 minutes at the PV series). A
+  stamp error moves both the same way, so the stamp offset is the mean of the morning and evening
+  offsets.
+- **Direction and amount of the ingest correction.** At the 6 metered PV series (aggregate only,
+  no names, identifiers, or dates), the stored stamps before 2026-03-26 08:30 UTC run +0.9 minutes
+  late (series from -0.2 to +2.9; intervals within -2.7 to +5.0). The feed as NGED sent it is 30
+  minutes later than the stored stamps, so it reads about 31 minutes late, and the 30-minute
+  correction is the right direction and size to within 3 minutes.
+- **After the fix.** The PV series' median offset is +4.7 minutes (+1.5 to +13.3; intervals -5.3
+  to +20.0) on April to 10 September 2026 (34 to 47 clear days each). The like-for-like April to
+  September rows before the fix give +2.0 (-3.3 to +5.4), so the two sides do not differ.
+- **MW Primaries.** Only D5 and D18 give a usable fit; at the other six a ramp hits the 100-minute
+  search limit because demand ramps dominate. D5 gives +7.4 (3.1 to 11.3) minutes in April to
+  September before the fix and +8.1 (1.9 to 15.5) after; D18 gives +17.6 (11.5 to 24.4) and +12.3
+  (4.4 to 20.0). Both run 5 to 15 minutes above the PV series, which the demand ramps can explain,
+  and neither is near 30.
+- **Conclusion.** No 30-minute error is confirmed on either side. A residual of about 0 to +8
+  minutes is possible and agrees with the correlation vertex, but the method cannot separate it
+  from panel and horizon effects. It touches no Part 2 arm, because the CAMS and ERA5 joins work
+  on the half-hour and hourly grid and are unchanged by a few minutes.
+- **Limits.** The PV series lie in one 25 km by 23 km box, the after side holds under 50 clear
+  days, and there is no known-answer check beyond the 30-minute sign test the correction supplies.
+
 ## Predictions
 
 - **Held:** the six sites hold 12 months or more before 2025-07-01 and D18 fewer; about 27% of
   dark half-hours fall at 16:00 to 21:59; the screen flags D1, D6, D15, G-a, and G-b and none of
   the other 15 Primaries; heating-slope drift is not detectable; D14 and D15 are cut.
-- **Failed:** the timestamp peak is at zero per site only after the fix at 5 of 8 sites; 13
+- **Failed:** the clear-sky-hours correlation peaks at zero per site at only 1 of 8 sites before
+  the fix and 5 of 8 after (the ramp check below finds no offset beyond a few minutes); 13
   Primaries are cut, not 2; the MVA Primaries hold 2.43 to 3.27 dark site-years with the lockdown
   kept (24.3 in total), and 6 of 8 are below 3.2; D15's winter night slope is +0.48 points per °C,
   not within ±0.1; clip is at D5 and D15, not D5 only.
@@ -219,10 +247,10 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
 ## What the next experiment should answer
 
 Part 2 should use the site list above and count eligible long-history sites at each tuning year's
-first day, a proposal the series planner should confirm, because the series brief counts 6 sites
-(4 of 6 needed) and this count gives 5 at 2024-07-01 (4 of 5). All 8 MVA Primaries clear the 0.5
-dark site-year entry rule in Part 3's window. The shared slow factor (design item D2) is worth
-keeping, given the correlations above.
+first day, as the maintainer decided; this gives 5 eligible sites at 2024-07-01 (4 of 5 needed),
+where counting at 2025-07-01 would give 6 (4 of 6). All 8 MVA Primaries clear the 0.5 dark site-year
+entry rule in Part 3's window. The shared slow factor (design item D2) is worth keeping, given the
+correlations above.
 
 ## Review triage
 
@@ -234,8 +262,8 @@ keeping, given the correlations above.
   no longer enters the monthly levels; the correlations and census use rows after the cuts (and,
   for the correlations, the masks); `rows.parquet` carries `early_cut`; `sites.parquet` carries
   the clip and generator flags; `decisions.json` carries the cut dates, screen flags, dark counts,
-  and masks.
-- **Accepted as caveats:** the timestamp stop rule is left to the maintainer, the summer-midday
-  test is reported beside the clear-sky one, and the eligibility count is a proposal.
-- **Not changed:** the heating-drift test and the one-criterion generator screen differ from the
-  plan, and both follow the series brief or are stricter.
+  and masks. - **Accepted as caveats:** the maintainer decided not to stop the series and to run
+  the sharper timestamp check above, the summer-midday test is reported beside the clear-sky one,
+  and the eligibility count is the maintainer's. - **Not changed:** the heating-drift test and the
+  one-criterion generator screen differ from the plan, and both follow the series brief or are
+  stricter.

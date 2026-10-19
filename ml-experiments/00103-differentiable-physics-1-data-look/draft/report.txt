@@ -1,4 +1,4 @@
-# Experiment 103 printed report (build, decide, summary)
+# Experiment 103 printed report (build, decide, summary, offsets)
 panel: 2710752 rows, data/ml-experiments/00103-differentiable-physics-1-data-look/panel.parquet
 
 == duplicate (series, time) keys in the cleaned table ==
@@ -493,3 +493,63 @@ shape: (2, 3)
 D18 negative dark share before its cut: 1.7956% (11250 dark rows)
 D18 negative dark share from its first usable date 2025-03-01: 0.0000% (9683 dark rows)
 long-history sites holding 12+ months before each origin: {'months_before_2022-07': 5, 'months_before_2023-07': 5, 'months_before_2024-07': 5, 'months_before_2025-07': 6}
+measured D5
+measured D9
+measured D10
+measured D11
+measured D14
+measured D16
+measured D18
+measured D15
+measured a metered PV series
+measured a metered PV series
+measured a metered PV series
+measured a metered PV series
+measured a metered PV series
+measured a metered PV series
+measured a metered PV series
+
+== offsets in minutes the stored stamps run late: MW Primaries ==
+shape: (24, 10)
+┌────────┬─────────────────────────────────┬──────┬────────┬──────────┬───────────┬─────────┬─────────┬─────────────────┬───────────┐
+│ series ┆ side                            ┆ days ┆ mean   ┆ mean_low ┆ mean_high ┆ morning ┆ evening ┆ half_difference ┆ r_squared │
+│ ---    ┆ ---                             ┆ ---  ┆ ---    ┆ ---      ┆ ---       ┆ ---     ┆ ---     ┆ ---             ┆ ---       │
+│ str    ┆ str                             ┆ i64  ┆ f64    ┆ f64      ┆ f64       ┆ f64     ┆ f64     ┆ f64             ┆ f64       │
+╞════════╪═════════════════════════════════╪══════╪════════╪══════════╪═══════════╪═════════╪═════════╪═════════════════╪═══════════╡
+│ D5     ┆ before the fix                  ┆ 383  ┆ 15.2   ┆ 12.0     ┆ 19.4      ┆ 63.8    ┆ -33.5   ┆ 48.7            ┆ 0.4       │
+│ D5     ┆ before the fix, April to Septe… ┆ 198  ┆ 7.4    ┆ 3.1      ┆ 11.3      ┆ 87.0    ┆ -72.3   ┆ 79.6            ┆ 0.5       │
+│ D5     ┆ after the fix                   ┆ 47   ┆ 8.1    ┆ 1.9      ┆ 15.5      ┆ 91.3    ┆ -75.2   ┆ 83.3            ┆ 0.7       │
+│ D9     ┆ before the fix                  ┆ 143  ┆ 74.0   ┆ 69.5     ┆ 76.4      ┆ 120.0   ┆ 28.1    ┆ 46.0            ┆ 0.2       │
+│ D9     ┆ before the fix, April to Septe… ┆ 69   ┆ -107.9 ┆ -120.0   ┆ -100.1    ┆ -120.0  ┆ -95.7   ┆ -12.1           ┆ 0.1       │
+│ D9     ┆ after the fix                   ┆ 40   ┆ -114.8 ┆ -120.0   ┆ -105.5    ┆ -120.0  ┆ -109.6  ┆ -5.2            ┆ 0.1       │
+│ D10    ┆ before the fix                  ┆ 378  ┆ 45.9   ┆ 31.6     ┆ 63.7      ┆ 112.3   ┆ -20.5   ┆ 66.4            ┆ 0.1       │
+│ D10    ┆ before the fix, April to Septe… ┆ 203  ┆ 11.8   ┆ 5.5      ┆ 15.3      ┆ 120.0   ┆ -96.4   ┆ 108.2           ┆ 0.1       │
+│ D10    ┆ after the fix                   ┆ 40   ┆ 10.0   ┆ 4.7      ┆ 16.8      ┆ 120.0   ┆ -100.0  ┆ 110.0           ┆ 0.2       │
+│ D11    ┆ before the fix                  ┆ 358  ┆ 68.8   ┆ 33.1     ┆ 71.5      ┆ 120.0   ┆ 17.5    ┆ 51.2            ┆ 0.1       │
+│ D11    ┆ before the fix, April to Septe… ┆ 199  ┆ 6.6    ┆ 0.0      ┆ 11.1      ┆ 120.0   ┆ -106.7  ┆ 113.4           ┆ 0.1       │
+│ D11    ┆ after the fix                   ┆ 39   ┆ 2.2    ┆ 0.0      ┆ 20.9      ┆ 120.0   ┆ -115.6  ┆ 117.8           ┆ 0.2       │
+│ D14    ┆ before the fix                  ┆ 371  ┆ 62.6   ┆ 54.7     ┆ 66.6      ┆ 110.1   ┆ 15.1    ┆ 47.5            ┆ 0.1       │
+│ D14    ┆ before the fix, April to Septe… ┆ 202  ┆ 6.5    ┆ 0.0      ┆ 17.3      ┆ 120.0   ┆ -106.9  ┆ 113.5           ┆ 0.1       │
+│ D14    ┆ after the fix                   ┆ 44   ┆ 24.5   ┆ 0.0      ┆ 48.6      ┆ 120.0   ┆ -71.0   ┆ 95.5            ┆ 0.1       │
+│ D16    ┆ before the fix                  ┆ 280  ┆ 63.5   ┆ 50.2     ┆ 69.1      ┆ 115.0   ┆ 12.0    ┆ 51.5            ┆ 0.2       │
+│ D16    ┆ before the fix, April to Septe… ┆ 142  ┆ 7.8    ┆ 2.7      ┆ 14.6      ┆ 120.0   ┆ -104.5  ┆ 112.2           ┆ 0.2       │
+│ D16    ┆ after the fix                   ┆ 43   ┆ 20.7   ┆ 17.3     ┆ 25.0      ┆ 120.0   ┆ -78.5   ┆ 99.3            ┆ 0.4       │
+│ D18    ┆ before the fix                  ┆ 70   ┆ 30.4   ┆ 21.0     ┆ 44.5      ┆ 75.1    ┆ -14.2   ┆ 44.7            ┆ 0.4       │
+│ D18    ┆ before the fix, April to Septe… ┆ 35   ┆ 17.6   ┆ 11.5     ┆ 24.4      ┆ 94.8    ┆ -59.5   ┆ 77.2            ┆ 0.5       │
+│ D18    ┆ after the fix                   ┆ 43   ┆ 12.3   ┆ 4.4      ┆ 20.0      ┆ 111.9   ┆ -87.3   ┆ 99.6            ┆ 0.5       │
+│ D15    ┆ before the fix                  ┆ 64   ┆ 33.3   ┆ -83.4    ┆ 52.0      ┆ 120.0   ┆ -53.3   ┆ 86.7            ┆ 0.0       │
+│ D15    ┆ before the fix, April to Septe… ┆ 35   ┆ 7.1    ┆ -120.0   ┆ 17.1      ┆ 117.1   ┆ -103.0  ┆ 110.0           ┆ 0.0       │
+│ D15    ┆ after the fix                   ┆ 43   ┆ -120.0 ┆ -120.0   ┆ 0.0       ┆ -120.0  ┆ -120.0  ┆ 0.0             ┆ 0.0       │
+└────────┴─────────────────────────────────┴──────┴────────┴──────────┴───────────┴─────────┴─────────┴─────────────────┴───────────┘
+
+== metered PV series, aggregate over the series (no names, identifiers, or dates) ==
+shape: (3, 8)
+┌─────────────────────────────────┬────────┬────────────────────┬────────────────────┬─────────────────────┬─────────────────────┬──────────────────────┬────────────────────────┐
+│ side                            ┆ series ┆ median_mean_offset ┆ lowest_mean_offset ┆ highest_mean_offset ┆ lowest_interval_end ┆ highest_interval_end ┆ median_half_difference │
+│ ---                             ┆ ---    ┆ ---                ┆ ---                ┆ ---                 ┆ ---                 ┆ ---                  ┆ ---                    │
+│ str                             ┆ u32    ┆ f64                ┆ f64                ┆ f64                 ┆ f64                 ┆ f64                  ┆ f64                    │
+╞═════════════════════════════════╪════════╪════════════════════╪════════════════════╪═════════════════════╪═════════════════════╪══════════════════════╪════════════════════════╡
+│ after the fix                   ┆ 6      ┆ 4.7                ┆ 1.5                ┆ 13.3                ┆ -5.3                ┆ 20.0                 ┆ 69.0                   │
+│ before the fix                  ┆ 6      ┆ 0.9                ┆ -0.2               ┆ 2.9                 ┆ -2.7                ┆ 5.0                  ┆ 39.9                   │
+│ before the fix, April to Septe… ┆ 6      ┆ 2.0                ┆ -3.3               ┆ 5.4                 ┆ -9.3                ┆ 9.3                  ┆ 57.1                   │
+└─────────────────────────────────┴────────┴────────────────────┴────────────────────┴─────────────────────┴─────────────────────┴──────────────────────┴────────────────────────┘
