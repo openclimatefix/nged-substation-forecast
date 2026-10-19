@@ -134,6 +134,15 @@ Applies to experiments. Evidence: [experiment 37](00037-switching-first-look/res
 [experiment 38](00038-switching-mask-value/result.md) both state the delay and call their numbers
 retrospective.
 
+**Treat an ECMWF ensemble run as usable 9 hours after its `init_time`, and derive
+`power_fcst_init_time` from it.** The constant `NWP_PUBLICATION_DELAY_HOURS` in
+`packages/ml_core/src/ml_core/features/_nwp.py` is 9. A 00Z run reaches our disk at about 10:30 UTC,
+and 9 hours gives each of the four 6-hourly slots the run that a healthy ingest has landed by that
+slot. Bulk-mode training uses the same constant to derive `power_fcst_init_time`, so changing it
+changes the training features. A replay of a past `init_time` must apply it, because joining a run
+that landed afterwards is lookahead bias. Applies to experiments and production. Source: the
+constant's docstring in that file.
+
 ## Weather products
 
 **Train each model on the history of the weather product it will be served, and do not train on the
@@ -277,6 +286,16 @@ reporting. The cuts found so far cover 15 of the 20 series examined:
 | D9, D16 | about 1.3 months | Near zero, then a staged switch-on |
 | D13, D19, D22 | about 1 month | Low confidence |
 
+![Daily mean power of 7 Primaries, dropped months in grey and kept months in
+blue](data-processing/figure_1_trim.svg)
+
+**Figure 1 shows the dropped months sitting far from the kept months at D4, D14, D9, D16, and D18.**
+The cut dates are provisional, from the differentiable-physics design session and not from a
+reviewed experiment. The grey dropped months are read from the raw power table, because the cleaned
+table removes flagged rows and the early months are often flagged. The blue kept months are read
+from the cleaned table. At D10 and D5 the dropped months look less different from the kept months,
+which fits their medium confidence.
+
 **Count a series' history from its first unflagged row, which is later than its first row of any
 kind (provisional; high confidence).** D9 starts in 2023-04 and its first unflagged row is in
 2023-08. Only five Primaries hold long histories: D5, D10, and D11 start in 2019-09, D14 in 2019-10,
@@ -286,6 +305,15 @@ and D16 in 2020-12, and the late starters begin between 2023 and 2025.
 row is a half-hour where CAMS global horizontal irradiance is below 1 W/m². A winter filter of below
 100 W/m² keeps rows where 43% have irradiance above 100 W/m², so solar leaks in. This leaves about
 3.3 dark site-years per MVA Primary with the 2020 lockdown kept and about 2.65 without it.
+
+![Two summer weeks of half-hourly power at an MVA-only Primary, with dark half-hours in
+blue](data-processing/figure_2_dark_rows.svg)
+
+**Figure 2 shows that the daylight half-hours at an MVA-only Primary carry a solar dip that the dark
+half-hours lack.** The grey daylight half-hours sit in the middle of each day, where embedded solar
+output reduces the net flow and the apparent power cannot show its sign. The blue dark half-hours
+form the smooth evening and night curve that holds demand alone. The figure draws one Primary (D2)
+for two weeks of July 2025.
 
 **Do not treat grid supply points or bulk supply points as clean demand (provisional; high
 confidence).** The grid supply points are dominated by generation (D1 is below 5 points of capacity
@@ -322,3 +350,10 @@ monthly standard deviations occur at D6 (a drop of 218 MW in 2023-07) and D11 (2
 medium confidence).** Winter heating slopes of night power show no detectable drift between the
 first and last winter at the long-history sites, and monthly levels move together across sites (mean
 pairwise correlation 0.53 at night and 0.43 in the evening after removing the seasonal cycle).
+
+![Monthly mean night power at 5 long-history Primaries, as a percentage of each series' own
+mean](data-processing/figure_3_shared_level.svg)
+
+**Figure 3 shows the same seasonal swing at all 5 long-history Primaries, with D10 swinging
+furthest.** The grey band is the fixed lockdown window. The figure does not isolate the shared
+month-to-month level that the correlations above describe, because the seasonal cycle dominates it.
