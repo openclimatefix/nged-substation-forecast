@@ -392,8 +392,8 @@ def figure_cards_capacity() -> alt.TopLevelMixin:
                 subtitle=(
                     "Fitted to past weather on a screening run. Orange with 80% posterior "
                     "intervals: the pooled fit P. Blue: Part 2's convex model. The pooled fit's "
-                    "capacity is not identified by the data (a second seed or another start "
-                    "moves it by several points) and is not a measurement."
+                    "capacity follows its start (the loss has a minimum near the convex "
+                    "capacity, identified to about 15%) and is not a measurement."
                 ),
             )
         )
@@ -575,8 +575,8 @@ def figure_profile_check() -> alt.TopLevelMixin | None:
             text="Provisional: how well the data pin the capacity",
             subtitle=(
                 "Every scored substation's capacity held at a multiple of the convex model's "
-                "capacity, everything else refitted (tuning cut, 2024-07-01). A flat loss means "
-                "the pooled model does not identify the capacity."
+                "capacity, everything else refitted (tuning cut, 2024-07-01). The loss has a "
+                "minimum near the convex capacity, so the data pin the capacity to about 15%."
             ),
         )
     )
