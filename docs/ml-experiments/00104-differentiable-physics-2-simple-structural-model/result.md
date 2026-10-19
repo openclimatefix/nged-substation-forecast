@@ -40,7 +40,9 @@ take_home_message: >-
   interval 0.30 better to 0.21 worse, 2 of 5 substations better). A first version of this page
   reported the opposite sign for two of the years contrasts (all years against 12 months, and drift
   against no drift), because its forecast spread carried the previous year's mean bias; see the
-  Correction section.
+  Correction section. The lead over the zero-start XGBoost arm in the planned comparison C2 (0.55
+  points on the quantile score) is mostly in the tails and the spread: on the error of the mean
+  forecast it is 0.08 points (interval 0.40 better to 0.20 worse).
 advice:
   - >-
     Give a convex demand model a drift term when it trains on all years of history: all years
