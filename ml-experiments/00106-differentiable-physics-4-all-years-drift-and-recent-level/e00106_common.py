@@ -104,6 +104,7 @@ def prediction_frame(
     days_ahead: int = 1,
     level: np.ndarray | None = None,
     anomaly: np.ndarray | None = None,
+    init: np.ndarray | None = None,
 ) -> pl.DataFrame:
     """Return one substation's predictions as rows with the columns the scorers read.
 
@@ -117,6 +118,8 @@ def prediction_frame(
         days_ahead: How many days before the valid day the forecast is made.
         level: The filter's persistent part of the correction, for a filter arm.
         anomaly: The filter's transient part of the correction, for a filter arm.
+        init: The initialisation time of each row as `datetime64[us]`, for an arm that is not
+            made at 09:00 UTC the day before; the day-ahead initialisation if not given.
 
     Returns:
         Columns `time_series_id`, `valid_time`, `power_fcst_init_time`, `lead_hours`, `seed`,
@@ -133,7 +136,8 @@ def prediction_frame(
         raise ValueError(msg)
     ordered = np.sort(quantiles, axis=1)
     valid = cache.end_times[index]
-    init = day_ahead_initialisation(end_times=valid, days_ahead=days_ahead)
+    if init is None:
+        init = day_ahead_initialisation(end_times=valid, days_ahead=days_ahead)
     columns: dict[str, object] = {
         "time_series_id": np.full(len(index), features.table.time_series_id, dtype=np.int32),
         "valid_time": pl.Series(valid).dt.replace_time_zone("UTC"),
