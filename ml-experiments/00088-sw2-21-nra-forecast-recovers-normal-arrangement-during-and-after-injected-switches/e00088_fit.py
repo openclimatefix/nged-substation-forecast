@@ -12,7 +12,7 @@ Arms (training labels are hindsight labels, which is allowed):
 - `nra_oracle`: rows whose valid time lies inside an oracle (experiment 41) event are dropped, each
   lag is replaced by the lag minus the signed MW that the oracle events moved at that lag time, and
   the three signed MW values are added as columns.
-- `nra_xl`: the same with the XL detector's events and MW (experiment 82).
+- `nra_xl`: the same with the RO-NC detector's events and MW (experiment 82).
 
     uv run python ml-experiments/00088-*/e00088_fit.py [--workers 4] [--smoke]
 """

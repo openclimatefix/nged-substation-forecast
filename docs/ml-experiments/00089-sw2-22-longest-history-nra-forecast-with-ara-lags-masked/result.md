@@ -109,7 +109,7 @@ history since March 2021 beat training on the last 12 months? Second, does setti
 past power reading (lag) that was measured inside an ARA lower the error on forecasts that use such
 a lag? We refitted the model monthly and scored 292 daily forecast runs from July 2025 to June 2026
 on half-hours outside every ARA. The ARA is the union of the intervals of the refit-offset
-neighbour-count (RO-NC) detector (called XL in experiments 70, 71, and 82), NGED's logged events,
+neighbour-count (RO-NC) detector, NGED's logged events,
 and NGED's logged closures. The score is the quantile score in points of capacity (smaller is
 better).
 

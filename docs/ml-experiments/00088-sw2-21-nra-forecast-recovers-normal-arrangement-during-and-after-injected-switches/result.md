@@ -7,29 +7,27 @@ status: done
 size: complex
 hypothesis: >-
   When a Primary substation (a substation that steps down to the local distribution network) is
-  inside a load transfer, or has just left one, an XGBoost demand
-  model that was trained without the transfer's half-hours as targets, with the lags corrected by
-  the transfer's signed MW and the MW as a column ("full NRA", NRA being the normal running
-  arrangement), forecasts the power the substation would have drawn had no transfer happened
-  better than the plain model does. This holds when the MW comes from the XL detector of
-  experiment 82 (XL, a logistic score on the 24-hour residual step) run causally on data up to the
-  forecast origin, but by less than when the MW
-  comes from the injected truth.
+  inside a load transfer, or has just left one, an XGBoost demand model that was trained without the
+  transfer's half-hours as targets, with the lags corrected by the transfer's signed MW and the MW
+  as a column ("full NRA", NRA being the normal running arrangement), forecasts the power the
+  substation would have drawn had no transfer happened better than the plain model does. This holds
+  when the MW comes from the RO-NC detector of experiment 82 (a logistic score on the 24-hour
+  residual step) run causally on data up to the forecast origin, but by less than when the MW comes
+  from the injected truth.
 prediction: >-
   On injected transfers whose forecast origin falls inside the transfer (family A), the full NRA
-  booster trained on XL labels, given causal XL MW, closes 20% to 45% of the gap in MW-weighted
-  mean absolute error between the plain booster and the ceiling (the plain booster on lags with no
-  transfer). It closes about 0% in the first 24 hours after onset and little in the next 12 hours,
-  because the
-  24-hour step statistic needs 24 hours of data after the onset (plus the 3.5-hour telemetry delay),
-  and 40% to 70% from the second day. In family B the causal detector keeps an ended transfer open
-  for about a day after it ends, so arm 4 with causal XL MW is worse than the plain booster in the
-  first day after the end. With the
-  injected MW the oracle-trained booster closes 70% to 95%. Masking the training targets adds
-  nothing to the lag correction: the XL-trained full NRA booster minus the lag-correction booster,
-  both with causal XL MW, is between -2% and +2% of the plain booster's error (experiment 75
-  found the mask changes the NRA-row score by under 0.03 points of capacity). On forecast origins
-  with no transfer, false causal XL alarms raise the error by under 0.02 points of capacity.
+  booster trained on RO-NC labels, given causal RO-NC MW, closes 20% to 45% of the gap in
+  MW-weighted mean absolute error between the plain booster and the ceiling (the plain booster on
+  lags with no transfer). It closes about 0% in the first 24 hours after onset and little in the
+  next 12 hours, because the 24-hour step statistic needs 24 hours of data after the onset (plus the
+  3.5-hour telemetry delay), and 40% to 70% from the second day. In family B the causal detector
+  keeps an ended transfer open for about a day after it ends, so arm 4 with causal RO-NC MW is worse
+  than the plain booster in the first day after the end. With the injected MW the oracle-trained
+  booster closes 70% to 95%. Masking the training targets adds nothing to the lag correction: the
+  RO-NC-trained full NRA booster minus the lag-correction booster, both with causal RO-NC MW, is
+  between -2% and +2% of the plain booster's error (experiment 75 found the mask changes the NRA-row
+  score by under 0.03 points of capacity). On forecast origins with no transfer, false causal RO-NC
+  alarms raise the error by under 0.02 points of capacity.
 decision_rule: >-
   Four planned contrasts on the family A cases (forecast origin inside the injected interval),
   shapes
@@ -38,10 +36,10 @@ decision_rule: >-
   matches the harness. The measure is the MW-weighted mean absolute error of the median forecast
   against the true unmodified series, in points of capacity, over leads up to 10 days. Each
   contrast is read at 98.75% (Bonferroni across four), from 20,000 resamples of whole calendar
-  months of the transfer's onset. C1, arm 4 with causal XL MW minus arm 1 (what Flexpectation v2
+  months of the transfer's onset. C1, arm 4 with causal RO-NC MW minus arm 1 (what Flexpectation v2
   could run). C2, arm 3 with injected MW minus arm 1 (the oracle). C3, arm 4 minus arm 2, both
-  with causal XL MW (whether masking the targets adds to the lag correction). C4, arm 2 with
-  causal XL MW minus arm 1 (the lag correction alone). The verdict is `supported` when the upper
+  with causal RO-NC MW (whether masking the targets adds to the lag correction). C4, arm 2 with
+  causal RO-NC MW minus arm 1 (the lag correction alone). The verdict is `supported` when the upper
   end of C1 is below zero, C1's point value is at least 20% of the gap from arm 1 to the ceiling
   (arm 5), and C1 is negative in at least 3 of the 4 scored onset months. It is `small gain` when
   the
@@ -111,21 +109,21 @@ code: ml-experiments/00088-*/
 
 # Experiment 88: does the full NRA forecast recover the normal arrangement during a switch?
 
-**Take-home message: a demand forecast that corrects its inputs for a switching transfer
-recovers the power the substation would have drawn only when the megawatts (MW) moved are known,
-and the detector we have does not yet supply them well enough.** A switching transfer is load
-that the network operator NGED moves from one Primary substation to its neighbours for hours or
-days. The normal running arrangement (NRA) is the network as it is when no transfer is on. With
-the true MW, correcting the earlier half-hours of power that the forecast reads (the lags) closed
-about half of the extra error that a transfer causes, and an XGBoost model trained on NGED's logged
-transfers closed 83%. With the MW from the refit-offset neighbour-count detector (RO-NC, called XL
-in experiments 70, 71, and 82), run only on data from before the forecast, the gain was 16% and
-could not be told from zero. The detector's MW was about 1.5 times the true MW from the second day
-after a transfer began, because the detector reports overlapping time intervals for one transfer
-and their MW is added together. The detector also kept reporting MW for days after a transfer had
-ended. Counting overlapping intervals once, a choice made after seeing the results, closed 43%
-during a transfer but still raised the error after it ended. Dropping the transfer's half-hours
-from the training data added nothing. The verdict is **inconclusive**.
+**Take-home message: a demand forecast that corrects its inputs for a switching transfer recovers
+the power the substation would have drawn only when the megawatts (MW) moved are known, and the
+detector we have does not yet supply them well enough.** A switching transfer is load that the
+network operator NGED moves from one Primary substation to its neighbours for hours or days. The
+normal running arrangement (NRA) is the network as it is when no transfer is on. With the true MW,
+correcting the earlier half-hours of power that the forecast reads (the lags) closed about half of
+the extra error that a transfer causes, and an XGBoost model trained on NGED's logged transfers
+closed 83%. With the MW from the refit-offset neighbour-count detector (RO-NC), run only on data
+from before the forecast, the gain was 16% and could not be told from zero. The detector's MW was
+about 1.5 times the true MW from the second day after a transfer began, because the detector reports
+overlapping time intervals for one transfer and their MW is added together. The detector also kept
+reporting MW for days after a transfer had ended. Counting overlapping intervals once, a choice made
+after seeing the results, closed 43% during a transfer but still raised the error after it ended.
+Dropping the transfer's half-hours from the training data added nothing. The verdict is
+**inconclusive**.
 
 **The headline numbers cover only forecast origins inside an injected transfer, 13% of the
 year's forecast origins.** The forecasts are issued at 09:00 UTC each day from 2025-07-02 to
@@ -168,7 +166,8 @@ is the fall in error from arm 1 divided by that gap.
   profile reversed in time. The headline pools S2, S3, S4, and S6, the shapes that do not match how
   the sampler builds S1. Shape S5 of experiment 82 (the profile shifted by 12 hours) is not scored.
 - **Method: boosters and scoring.** Arms 1, 2, and 5 are experiment 86's `plain` and `lagmw_xl`
-  boosters. Arms 3 and 4 are two new boosters, `nra_oracle` and `nra_xl`. All are refitted monthly
+  boosters. Arms 3 and 4 are two new boosters, `nra_oracle` and `nra_xl`. (The `xl` in `lagmw_xl`
+  and `nra_xl` names the RO-NC detector's labels.) All are refitted monthly
   on a rolling 365-day window (150 rounds, eta 0.15, seed 0), because the contrasts are about lags
   and not retraining cadence. Each forecast uses 11 of the 51 ensemble members and leads to 10
   days. The error is the mean absolute error of the median forecast, in percentage points of the
@@ -228,7 +227,7 @@ is the fall in error from arm 1 divided by that gap.
 - **Caveats.** Four month blocks give a coarse interval, and intervals read as ranges. Injected
   transfers add a known MW to recorded power with the stored residual model unchanged (the fast
   path of experiment 43). The causal detector may fire up to a day before the true onset with the
-  step understated, which the code reproduces from experiment 82. Experiment 86's XL labels sum
+  step understated, which the code reproduces from experiment 82. Experiment 86's RO-NC labels sum
   overlapping intervals, as the as-built arm does. The oracle-trained arm 3 uses NGED's logged
   events at training, and the RO-NC-trained arm 4 uses hindsight labels, so neither is a live
   service.
@@ -302,16 +301,16 @@ is the fall in error from arm 1 divided by that gap.
   noise scale, bins 2-4, 4-6, 6+), shape, duration band, and metered receiver or not.
 - **Boosters.** Arms 1, 2, and 5 re-use experiment 86's boosters
   (`work/boosters/<arm>/<site>_s0_<refit>.ubj`, monthly refits from 2025-07-01, N1 recipe, 150
-  rounds, learning rate 0.15, seed 0): `plain` and `lagmw_xl`. Arms 3 and 4 are new boosters on
-  the same schedule and recipe as experiment 86: `nra_oracle` and `nra_xl` drop the training
-  rows whose valid time lies inside an oracle (arm 3) or XL (arm 4) event, replace each lag by the
-  lag minus the signed MW, and add the signed MW as three columns. Labels are the hindsight
-  labels of experiment 86 (oracle: experiment 41; XL: experiment 82's `xl_intervals.parquet`).
-  Arm 2 uses `lagmw_xl` so that arms 2 and 4 differ only in the training-target mask.
+  rounds, learning rate 0.15, seed 0): `plain` and `lagmw_xl`. Arms 3 and 4 are new boosters on the
+  same schedule and recipe as experiment 86: `nra_oracle` and `nra_xl` drop the training rows whose
+  valid time lies inside an oracle (arm 3) or RO-NC (arm 4) event, replace each lag by the lag minus
+  the signed MW, and add the signed MW as three columns. Labels are the hindsight labels of
+  experiment 86 (oracle: experiment 41; RO-NC: experiment 82's `xl_intervals.parquet`). Arm 2 uses
+  `lagmw_xl` so that arms 2 and 4 differ only in the training-target mask.
 - **Forecast-time MW.** Two sources for arms 2 to 4. (i) Injected: the event's median injected MW
   on each series (negative on the donor), constant over the interval, as the oracle labels
-  are; used for a lag whose valid time lies in the interval. (ii) Causal XL: experiment 82's
-  XL detector (refit-offset step statistic, logistic score `models.pkl`, threshold from
+  are; used for a lag whose valid time lies in the interval. (ii) Causal RO-NC: experiment 82's
+  RO-NC detector (refit-offset step statistic, logistic score `models.pkl`, threshold from
   `thresholds.json`), run on the injected residuals (fast path of experiment 43: the stored
   residual plus the injected MW) with every value at or after the cut stamp (the origin minus 3.5
   hours) set to missing, and with only the 45 days before the cut visible. The functions are those
@@ -338,14 +337,14 @@ is the fall in error from arm 1 divided by that gap.
   the pinball loss at the 0.05 and 0.95 quantiles are reported beside the MAE. The stored boosters
   have 9 quantile levels, so the 0.01 and 0.99 tails cannot be scored.
 - **False-alarm check (descriptive).** For 500 (series, origin) pairs drawn at random outside every
-  injected interval and outside logged closures, arm 4 and arm 2 with causal XL MW minus arm 5.
+  injected interval and outside logged closures, arm 4 and arm 2 with causal RO-NC MW minus arm 5.
   This is how much the NRA boosters raise the error when the causal detector raises an alarm that
   is not a transfer.
 - **Second check: real events.** The conserved two-sided events of experiment 41 in the
   validation year with both sides at most half missing (about 22). For each side the NRA
   estimate is the metered power minus the labelled signed MW of the other side of the event
   (the donor's estimate adds the receiver's step, and vice versa); inside the event the target is
-  this estimate and outside it the metered power. Arm 1 and arm 4 (causal XL MW, with the oracle
+  this estimate and outside it the metered power. Arm 1 and arm 4 (causal RO-NC MW, with the oracle
   MW beside it) are scored on family A origins with the same MAE. This truth is itself an
   estimate.
 - **Schedule.** The cheap monthly P-roll schedule of experiment 49: a refit on the 1st of each

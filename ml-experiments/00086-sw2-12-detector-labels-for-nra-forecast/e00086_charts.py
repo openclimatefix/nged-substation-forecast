@@ -24,7 +24,7 @@ WRAP_CHARACTERS: Final[int] = 92
 OUT_DIR: Final[Path] = common.CHART_DIR
 SCOPE: Final[str] = "16 Primary substations, 292 daily forecast runs, July 2025 to June 2026."
 LABELS: Final[dict[str, str]] = {
-    "C1": "Detector labels (XL) minus plain",
+    "C1": "Detector labels (RO-NC) minus plain",
     "C2": "Oracle labels minus plain",
     "C3": "Detector labels minus oracle labels",
 }
@@ -205,7 +205,7 @@ def figure_4(*, folder: Path) -> alt.TopLevelMixin:
         {
             "label": [
                 "Oracle labels (NGED's logs)",
-                "Detector labels (XL)",
+                "Detector labels (RO-NC)",
                 "Both",
                 "Detector only",
             ],

@@ -1,15 +1,15 @@
 """The two descriptive checks of experiment 00088: false alarms and the real events.
 
 - `false`: 500 random (series, origin) pairs far from any logged closure, where no transfer
-  exists. Arms 2 to 4 run with the causal XL MW on the unmodified power and are scored against
+  exists. Arms 2 to 4 run with the causal RO-NC MW on the unmodified power and are scored against
   the same power, so any rise over the ceiling is the harm of a false causal alarm.
 - `real`: the conserved two-sided transfers of experiment 41 in the validation year whose two
   sides are each at most half missing. For each side the normal-running-arrangement (NRA) estimate
   during the transfer is its metered power plus the other side's labelled step: the donor adds
   the receivers' steps, and each receiver adds the donor's (negative) step times its share. Outside
-  the transfer the target is the metered power. Arms 1, 2, and 4 with causal XL MW, and arm 3 with
-  the oracle labels' MW, are scored on forecast origins inside the transfer. The truth is itself
-  an estimate.
+  the transfer the target is the metered power. Arms 1, 2, and 4 with causal RO-NC MW, and arm 3
+  with the oracle labels' MW, are scored on forecast origins inside the transfer. The truth is
+  itself an estimate.
 
     uv run python ml-experiments/00088-*/e00088_controls.py false real
 """
@@ -51,7 +51,7 @@ MAX_MISSING: Final[float] = 0.5
 
 
 def false_alarms(*, state: dict) -> pl.DataFrame:
-    """Score arms 2 to 4 with causal XL MW on origins with no transfer."""
+    """Score arms 2 to 4 with causal RO-NC MW on origins with no transfer."""
     series, arrays, labels = fitting.context()
     rows_of = {int(r["time_series_id"]): r for r in series.iter_rows(named=True)}
     rng = np.random.default_rng(SEED)

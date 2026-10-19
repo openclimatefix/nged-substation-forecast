@@ -247,7 +247,7 @@ def lead_band_table(*, cells: pl.DataFrame, events: pl.DataFrame) -> pl.DataFram
 
 
 def odd_month_check(*, cases: pl.DataFrame) -> pl.DataFrame:
-    """Return the headline contrasts on events starting in the odd months (XL tuned there)."""
+    """Return the headline contrasts on events starting in the odd months (RO-NC tuned there)."""
     odd = cases.filter(~pl.col("scored") & (pl.col("family") == "A"))
     rows = []
     for name, arm_a, arm_b in (
