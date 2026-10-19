@@ -220,6 +220,7 @@ def onboard_site(
     history_end: np.datetime64,
     forecast_season_year: int,
     steps: int,
+    weeks_of_history: int | None = None,
     learning_rate: float = 0.05,
     seed: int = 0,
 ) -> dict[str, float]:
@@ -240,6 +241,8 @@ def onboard_site(
         history_end: The substation's history ends here; no row may end after it.
         forecast_season_year: The season-year of the forecast.
         steps: Optimiser steps.
+        weeks_of_history: The weeks of history this arm gives the substation, recorded on the
+            model so the pooled residuals can be checked against the arm they are used for.
         learning_rate: Adam's learning rate.
         seed: Seeds the posterior draws.
 
@@ -260,6 +263,8 @@ def onboard_site(
         forecast_season_year=forecast_season_year,
     )
     n_years = model.n_season_years
+    if weeks_of_history is not None:
+        model.onboarding_weeks[label] = weeks_of_history
     saved_trained = model.trained.clone()
     saved_centres = model.centre_means.clone()
     saved_flags = {name: p.requires_grad for name, p in model.named_parameters()}
@@ -401,16 +406,22 @@ def pooled_residuals(
     Args:
         model: The replica fit.
         batch: The replica year's rows.
-        weeks_of_history: The weeks of history of the onboarding arm, if the model was onboarded.
+        weeks_of_history: The weeks of history of the onboarding arm, if the model was onboarded;
+            it must match the weeks recorded when the model was onboarded.
 
     Returns:
         The residuals, tagged with the substations the fit excluded and the weeks of history.
     """
+    if weeks_of_history is not None and any(
+        weeks != weeks_of_history for weeks in model.onboarding_weeks.values()
+    ):
+        msg = f"the model was onboarded with {model.onboarding_weeks} weeks, not {weeks_of_history}"
+        raise ValueError(msg)
     predicted = predict_pooled(model=model, batch=batch)
     labels = np.array(batch.site_labels)[batch.site.cpu().numpy()]
     excluded = tuple(
         label
-        for label, active in zip(batch.site_labels, model.site_active.tolist(), strict=True)
+        for label, active in zip(batch.site_labels, model.fit_had_rows.tolist(), strict=True)
         if active == 0
     )
     return PooledResiduals(

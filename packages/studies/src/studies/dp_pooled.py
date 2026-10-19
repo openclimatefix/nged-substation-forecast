@@ -386,6 +386,12 @@ class PooledDemandModel(nn.Module):
     """The mean of the centred terms over each substation and season-year, from training."""
     site_active: torch.Tensor
     """1 for each substation that has training rows, else 0 (a buffer)."""
+    fit_had_rows: torch.Tensor
+    """1 for each substation that had training rows in the pooled fit, else 0 (a buffer).
+
+    Onboarding sets `site_active` for the new substation but never this flag, so it still names
+    the substations the fit excluded.
+    """
     solar_sites: torch.Tensor
     """1 for each substation that has training rows with the solar term on, else 0 (a buffer)."""
     capacity_prior: torch.Tensor
@@ -438,6 +444,8 @@ class PooledDemandModel(nn.Module):
         self.register_buffer("centre_means", torch.zeros(n_sites * n_season_years))
         self.register_buffer("site_active", torch.ones(n_sites))
         self.register_buffer("solar_sites", torch.ones(n_sites))
+        self.register_buffer("fit_had_rows", torch.ones(n_sites))
+        self.onboarding_weeks: dict[str, int] = {}
         self.register_buffer("capacity_prior", torch.full((n_sites,), float("nan")))
         self._build_site_prior(initial_level=initial_level)
 
@@ -596,6 +604,7 @@ class PooledDemandModel(nn.Module):
         self.trained.copy_(trained.reshape(self.n_sites, self.n_season_years))
         per_site = torch.bincount(batch.site, minlength=self.n_sites)
         self.site_active.copy_((per_site > 0).to(self.site_active.dtype))
+        self.fit_had_rows.copy_((per_site > 0).to(self.fit_had_rows.dtype))
         solar = torch.bincount(batch.site[batch.solar_gate], minlength=self.n_sites)
         self.solar_sites.copy_((solar > 0).to(self.solar_sites.dtype))
 

@@ -152,6 +152,47 @@ def test_a_site_specific_capacity_prior_centres_the_first_capacity_increment(bat
     assert near != base or far != base
 
 
+def test_the_first_trained_years_capacity_uses_its_own_population_mean(batch: PooledBatch):
+    model = PooledDemandModel(
+        config=DpConfig(population_scales=PopulationScales()),
+        n_sites=3,
+        n_season_years=batch.n_season_years,
+        initial_level=_level(batch),
+    )
+    model.mark_trained_years(batch=batch)
+    site = batch.site_labels.index("S1")
+    first_year = int((model.trained[site] > 0).to(torch.int64).argmax())
+    with torch.no_grad():
+        model.population_mean["capacity_first"].fill_(10.0)
+        model.population_mean["capacity_raw"].fill_(-3.0)
+        model.capacity_raw.fill_(-3.0)
+        growth_only = float(model.site_prior_term())
+        model.capacity_raw[site, first_year] = 10.0
+        first_at_first_mean = float(model.site_prior_term())
+    assert first_at_first_mean < growth_only
+
+
+def test_the_kl_term_matches_numpy_on_random_inputs():
+    generator = np.random.default_rng(1)
+    model = PooledDemandModel(
+        config=DpConfig(variational=True), n_sites=4, n_season_years=2, initial_level=torch.zeros(4)
+    )
+    for _ in range(20):
+        mean, centre = generator.normal(size=4), generator.normal()
+        sd, scale = np.exp(generator.normal(size=4)), float(np.exp(generator.normal()))
+        with torch.no_grad():
+            model.population_mean["level"].fill_(centre)
+            model.population_log_scale["level"].fill_(float(np.log(scale)))
+        term = model._family_term(
+            name="level",
+            mean=torch.as_tensor(mean, dtype=torch.float32),
+            log_sd=torch.as_tensor(np.log(sd), dtype=torch.float32),
+            active=torch.ones(4),
+        )
+        expected = np.log(scale / sd) + (sd**2 + (mean - centre) ** 2) / (2 * scale**2) - 0.5
+        assert float(term) == pytest.approx(float(expected.sum()), rel=1e-3, abs=1e-4)
+
+
 def test_the_loss_is_the_negative_elbo_per_row(batch: PooledBatch):
     (model,), _ = _fit(batch, DpConfig(variational=True), [FitCopy(name="v")])
     model.eval()
@@ -469,6 +510,29 @@ def test_the_pooled_residuals_are_actual_minus_the_predicted_mean_and_name_the_e
     assert set(result.site) == set(SITES)
     assert result.fit_excluded == (HELD_OUT,)
     assert result.weeks_of_history == 4
+
+
+def test_an_onboarded_model_still_names_the_site_it_excluded_and_checks_the_weeks(
+    solar_batch: PooledBatch, cache: FeatureCache
+):
+    config = DpConfig(population_scales=PopulationScales())
+    (model,), _ = _fit(solar_batch, config, [FitCopy(name="l", keep=_held_out_keep(solar_batch))])
+    own = select_rows(batch=solar_batch, keep=site_mask(batch=solar_batch, label=HELD_OUT))
+    onboard_site(
+        model=model,
+        batch=own,
+        label=HELD_OUT,
+        cache=cache,
+        history_end=CUT,
+        forecast_season_year=FORECAST_YEAR,
+        steps=1,
+        weeks_of_history=4,
+    )
+    others = select_rows(batch=solar_batch, keep=_held_out_keep(solar_batch))
+    result = pooled_residuals(model=model, batch=others, weeks_of_history=4)
+    assert result.fit_excluded == (HELD_OUT,)
+    with pytest.raises(ValueError, match="onboarded with"):
+        pooled_residuals(model=model, batch=others, weeks_of_history=8)
 
 
 def test_all_present_rows_adds_the_rows_the_default_rows_leave_out(cache: FeatureCache):

@@ -222,9 +222,9 @@ MVA_POOL: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21",
 POOL: Final[tuple[str, ...]] = (*MW_POOL, *MVA_POOL)
 WINDOW_MONTHS: Final[int] = 24
 """The 2-year window of every main arm."""
-FIT_STEPS: Final[int] = 800
+FIT_STEPS: int = 1200
 """Optimiser steps of a pooled fit: the training loss is still falling at 600 steps."""
-FIT_RATE: Final[float] = 0.05
+FIT_RATE: float = 0.15
 FINAL_RATE_FRACTION: Final[float] = 0.01
 """The cosine learning-rate schedule ends at this fraction of the starting rate."""
 INTERACTION: Final[tuple[int, ...]] = (64, 64)
