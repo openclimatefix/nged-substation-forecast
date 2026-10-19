@@ -90,9 +90,7 @@ def paired(
 ) -> pl.DataFrame:
     """Return the treatment and reference value per case in a scope."""
     base = cases.filter((pl.col("family") == scope.family) & (pl.col("target") == scope.target))
-    left = base.filter(pl.col("variant") == treatment).select(
-        *KEY, "shape", "onset_month", t=pl.col(metric)
-    )
+    left = base.filter(pl.col("variant") == treatment).select(*KEY, "onset_month", t=pl.col(metric))
     right = base.filter(pl.col("variant") == reference).select(*KEY, r=pl.col(metric))
     return left.join(right, on=list(KEY), how="inner", validate="1:1")
 

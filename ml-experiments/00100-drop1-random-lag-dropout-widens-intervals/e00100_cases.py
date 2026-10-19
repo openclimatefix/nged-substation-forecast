@@ -188,7 +188,7 @@ def run_frame(*, run: datetime, series_id: int, row: dict) -> pl.DataFrame:
 def predict(
     *,
     model: xgb.Booster,
-    arm: str,
+    masks_lags: bool,
     base: pl.DataFrame,
     power: np.ndarray,
     mask: np.ndarray,
@@ -197,7 +197,8 @@ def predict(
 
     Args:
         model: The booster.
-        arm: The booster's arm; its `mask_lags` decides whether lags inside the mask are dropped.
+        masks_lags: Whether lags inside the mask are set to missing. The `plain11` booster can be
+            given masked lags, although its training never saw a missing lag.
         base: The run's member rows for the series.
         power: The power over capacity the lags are read from.
         mask: The half-hours whose lags are set to missing if the arm masks lags.
@@ -206,7 +207,11 @@ def predict(
         An array of shape (valid times, 11).
     """
     frame = fitting.add_lags(frame=base, power=power, event=mask)
-    frame = fitting.for_arm(frame=frame, arm=fitting.ARMS[arm], training=False)
+    frame = fitting.for_arm(
+        frame=frame,
+        arm=fitting.Arm(mask_lags=masks_lags, drop_targets=False, pseudo_percent=None),
+        training=False,
+    )
     matrix = frame.select(fitting.input_columns()).to_numpy().astype(np.float32)
     members = len(MEMBERS)
     if frame.height != frame["valid_time"].n_unique() * members:
@@ -305,7 +310,7 @@ def forecast_cell(
         clean = name == "ceiling"
         quantiles = predict(
             model=booster(arm=arm, site=site, refit=refit),
-            arm=arm,
+            masks_lags=source is not None,
             base=base,
             power=arrays[site].power if clean else power,
             mask=labels[site][0] if source is None else masks[source],
