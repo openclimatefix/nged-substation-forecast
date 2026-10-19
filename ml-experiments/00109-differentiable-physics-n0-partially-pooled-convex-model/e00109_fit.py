@@ -163,13 +163,11 @@ def main() -> None:
         for config in catalogue(tuned=tuned, cut_name=cut_name)
         if not (common.DATA_DIR / "predictions" / f"{cut_name}_{config.name}").exists()
     ]
-    capacity_sources = {}
+    path = common.WORK_DIR / "capacity_sources.json"
+    capacity_sources = json.loads(path.read_text()) if path.exists() else {}
     with ProcessPoolExecutor(max_workers=arguments.workers) as pool:
-        for name, sources in pool.map(run_job, jobs):
-            capacity_sources[name] = sources
-    (common.WORK_DIR / "capacity_sources.json").write_text(
-        json.dumps(capacity_sources, indent=2) + "\n"
-    )
+        capacity_sources |= dict(pool.map(run_job, jobs))
+    path.write_text(json.dumps(capacity_sources, indent=2) + "\n")
 
 
 if __name__ == "__main__":
