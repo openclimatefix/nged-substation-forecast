@@ -464,14 +464,17 @@ def fit_and_score_site(
         for other in decision_pool:
             if other == target:
                 continue
-            others = replica_of(
-                cache=cache,
-                vintages=vintages,
-                cut=cut,
-                config=config,
-                held_out=other,
-                history=history,
-            )
+            try:
+                others = replica_of(
+                    cache=cache,
+                    vintages=vintages,
+                    cut=cut,
+                    config=config,
+                    held_out=other,
+                    history=history,
+                )
+            except ValueError:
+                continue  # `other` held too few rows in this window at the replica cut
             entry = short_history_replica(
                 replicas=others, short_site=other, weeks_of_history=history.weeks_of_history
             )
