@@ -81,9 +81,10 @@ the normal running arrangement, so neither removing the labelled switching from 
 telling the model how much load switching moved changed the quantile score by more than 0.06
 points of capacity.** The experiment cannot show that removing the switching is harmless within its
 0.02-point margin. It also cannot show a gain from either extra input. The plain weekly-refitted
-XGBoost demand model stays the v1 candidate. Subtracting the moved MW from each lag did help on the
-few half-hours whose lag sits inside a labelled event, so SW2-12 (the same test with a detector's
-labels) should try it first. The verdict is **inconclusive**.
+XGBoost demand model stays the v1 candidate. Subtracting the moved MW from each lag lowered the
+score by 0.42 points on the few half-hours whose lag sits inside a labelled event, but the interval
+(-1.51 to +0.02, not adjusted for several comparisons) does not show it, so SW2-12 (the same test
+with a detector's labels) should try it first. The verdict is **inconclusive**.
 
 An electricity network operator sometimes closes a normally open switch, so that one Primary
 substation (a substation that steps down to the local distribution network) carries load that
