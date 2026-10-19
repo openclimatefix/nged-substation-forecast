@@ -975,12 +975,13 @@ def make_vp_problem(
     }
     for name, weight in decay.items():
         diagonal[layout.shared[name]] = weight
-    frozen: dict[MeanType, float] = {
-        "level": float(model.population_mean["level"]),
-        "slope": float(nn.functional.softplus(model.population_mean["slope_raw"])),
-        "first": float(nn.functional.softplus(model.population_mean["capacity_first"])),
-        "growth": float(nn.functional.softplus(model.population_mean["capacity_raw"])),
-    }
+    with torch.no_grad():
+        frozen: dict[MeanType, float] = {
+            "level": float(model.population_mean["level"]),
+            "slope": float(nn.functional.softplus(model.population_mean["slope_raw"])),
+            "first": float(nn.functional.softplus(model.population_mean["capacity_first"])),
+            "growth": float(nn.functional.softplus(model.population_mean["capacity_raw"])),
+        }
 
     scales: dict[MeanType, float] = {
         "level": settings.level,
