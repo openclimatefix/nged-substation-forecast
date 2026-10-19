@@ -48,7 +48,7 @@ lessons:
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-19
-pr: <pr>
+pr: 1378
 take_home_message: >-
   Correcting each day-ahead demand forecast with the errors the model made up to 3.5 hours before
   the forecast lowered the quantile score by 0.61 points (from 2.90 to 2.29) in the scored year and
@@ -138,6 +138,9 @@ the scored year.
   plus the Kalman filter, A3 is A1 plus the filter, A4 is A1 plus a 14-day weighted mean of recent
   residuals, and A4-0 is A0 plus that mean. W is the best window, 24 months with drift, chosen on
   2023-24, and WK is W plus the filter. X-best is lagless XGBoost on 12 months, chosen on 2023-24.
+- **Post hoc arms.** A1 smooth, A1s smooth, and W smooth use Part 2's drift step of 3,000, and A1s
+  smooth also has steps at a penalty of 100. They were added after the tuned drift step sat at a grid
+  edge and the tuned steps switched off, so they are labelled post hoc wherever they appear.
 - **The filter.** Per site and hour band, a persistent level (a random walk) and a transient (an AR(1)
   decaying per half-hour) observed with noise. It sees only residuals whose half-hour ended at least
   3.5 hours before the 09:00 UTC initialisation, and no switching mask. Its four hyperparameters per
@@ -243,6 +246,8 @@ G-all+D1 (interval -0.125 to +0.367), which fitted its capacity and used a smoot
   100 to 30, mostly at D16.
 - **Out of sample the smooth step won.** A1 minus the arm with Part 2's drift step of 3,000 is +0.078
   (-0.157 to +0.332) in the scored year and +0.450 in the replicate year.
+- **With the smooth step the years contrast is near zero.** A1 smooth minus W smooth is +0.022
+  (-0.101 to +0.133) in the scored year and -0.087 in the replicate year, 3 of 5 both times (post hoc).
 - **The final knot.** The tuning year did not choose a shrunk final knot (it gained 0.012 to 0.026
   against the required 0.05). Out of sample, shrinking by 0.5 scored -0.164 (-0.326 to -0.003) in the
   scored year and -0.167 in the replicate year, 3 and 4 of 5 better. Tying the last knot scored
@@ -277,15 +282,17 @@ G-all+D1 (interval -0.125 to +0.367), which fitted its capacity and used a smoot
   The two scores agree in sign for C1 to C5. They disagree for C6 in the replicate year (-0.169 in the
   quantile score, +0.122 in the error of the median forecast).
 - **Triggers that fired.** Trigger 2: C1's replicate year contradicts the plan's prediction. The
-  explanation, tested after the fact, is the flexible drift step: with Part 2's smooth step both
-  years score A1 smooth below W smooth by @@PH_SCORED@@ points (scored year) and @@PH_REPLICATE@@
-  (replicate year). Trigger 3: C6 in the replicate year. Trigger 5: A0 (nested) beat A1 in the
-  replicate year (3.060 against 3.303), explained the same way, since A1 smooth (2.854) beats A0;
-  and A2
-  beat A3 by 0.015, inside the noise. Trigger 7: Part 6 depends on this result. The gate readings
-  below were also adjusted. **Triggers that did not fire:** trigger 4, since leaving out any one
-  site leaves the sign of every planned contrast in both years unchanged; trigger 6 was not checked.
-  The audit's findings and their triage go in the pull request.
+  explanation, tested after the fact, is the flexible drift step. With Part 2's smooth step, A1
+  smooth minus A0 is -0.228 (-0.345 to -0.109) in the scored year and -0.206 in the replicate year
+  (4 of 5 substations both times), and A1 smooth minus W smooth, the years contrast, is +0.022
+  (-0.101 to +0.133) and -0.087. So drift helps in both years, and the history window makes no
+  measurable difference in either. Trigger 3: C6 in the replicate year. Trigger 5: A0 (nested) beat
+  A1 in the replicate year (3.060 against 3.303), which the same explanation covers, since A1
+  smooth (2.854) beats A0; and A2 beat A3 by 0.015, inside the noise. Trigger 7: Part 6 depends on
+  this result. The gate readings below were also adjusted. **Triggers that did not fire:** trigger
+  4, since leaving out any one site leaves the sign of every planned contrast in both years
+  unchanged; trigger 6 was not checked. The audit's findings and their triage go in the pull
+  request.
 
 ## Known-answer gate
 

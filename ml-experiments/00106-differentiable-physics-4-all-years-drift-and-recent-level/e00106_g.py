@@ -192,6 +192,9 @@ class SiteRun:
     def uncorrected_spread(self) -> ResidualSpread:
         """Return the replica's centred residual quantiles outside the switching masks.
 
+        Returns:
+            The spread fitted on the replica's residuals.
+
         Raises:
             ValueError: If the run was made without a replica.
         """
