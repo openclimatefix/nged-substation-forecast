@@ -9,7 +9,7 @@ with eight variants:
 - `plain`: arm 1, the experiment 00086 `plain` booster on the contaminated lags;
 - `ceiling`: arm 5, the same booster on the unmodified lags;
 - `lagmw_xl_<mw>`, `nra_oracle_<mw>`, `nra_xl_<mw>`: arms 2, 3, and 4, each with the forecast-time
-  MW from the injection (`inj`) or from the causal XL detector (`caus`).
+  MW from the injection (`inj`) or from the causal RO-NC detector (`caus`).
 
 Each variant's mixture quantiles are scored against the unmodified power over lead bands. One
 parquet file per batch and shape holds the cells. The causal detector runs once per (shape, batch,
@@ -132,7 +132,7 @@ def causal_array(
         series_id: The series to mark.
         capacity: The series' effective capacity in MW.
         size: The length of the dense grid.
-        merge: `sum` adds overlapping intervals, as the XL training labels do; `max` takes the
+        merge: `sum` adds overlapping intervals, as the RO-NC training labels do; `max` takes the
             step of largest size at each half-hour (a post hoc variant).
 
     Returns:

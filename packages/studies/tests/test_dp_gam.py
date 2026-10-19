@@ -561,7 +561,7 @@ def test_the_spread_reproduces_the_residual_quantiles_and_never_crosses():
     quarter = generator.integers(0, 4, size=n)
     scale = 1.0 + band
     residuals = generator.laplace(scale=scale)
-    spread = ResidualSpread.fit(residuals=residuals, band=band, quarter=quarter)
+    spread = ResidualSpread.fit(residuals=residuals, band=band, quarter=quarter, centre=False)
     fresh_band = generator.integers(0, 4, size=n)
     fresh = generator.laplace(scale=1.0 + fresh_band)
     quantiles = spread.quantiles(
@@ -586,16 +586,45 @@ def test_a_small_group_falls_back_to_its_band_and_a_small_band_to_all_residuals(
             generator.normal(size=10),
         ]
     )
-    spread = ResidualSpread.fit(residuals=residuals, band=band, quarter=quarter)
+    spread = ResidualSpread.fit(residuals=residuals, band=band, quarter=quarter, centre=False)
     levels = dp_gam.QUANTILE_LEVELS
     assert np.allclose(spread.table[0, 3], np.quantile(residuals[:2000], levels))
     assert not np.allclose(spread.table[0, 3], np.quantile(residuals, levels))
     assert np.allclose(spread.table[2, 0], np.quantile(residuals, levels))
 
 
+def test_a_centred_spread_has_median_zero_in_every_group_and_keeps_the_shape():
+    generator = np.random.default_rng(13)
+    n = 40000
+    band = generator.integers(0, 4, size=n)
+    quarter = generator.integers(0, 4, size=n)
+    biased = generator.laplace(scale=1.0 + band) + 5.0
+    raw = ResidualSpread.fit(residuals=biased, band=band, quarter=quarter, centre=False)
+    centred = ResidualSpread.fit(residuals=biased, band=band, quarter=quarter, centre=True)
+    median = dp_gam.QUANTILE_LEVELS.index(0.5)
+    assert np.allclose(centred.table[:, :, median], 0.0)
+    assert np.allclose(raw.table[:, :, median], 5.0, atol=0.5)
+    assert np.allclose(centred.table, raw.table - raw.table[:, :, [median]])
+    mean = np.full(n, 10.0)
+    quantiles = centred.quantiles(mean=mean, band=band, quarter=quarter)
+    assert np.allclose(quantiles[:, median], 10.0)
+
+
+def test_a_fallback_group_of_a_centred_spread_is_centred_too():
+    generator = np.random.default_rng(14)
+    band = np.concatenate([np.zeros(2000, int), np.full(10, 1)])
+    quarter = np.zeros(2010, int)
+    residuals = np.concatenate([generator.normal(size=2000) + 3.0, generator.normal(size=10) + 3.0])
+    spread = ResidualSpread.fit(residuals=residuals, band=band, quarter=quarter, centre=True)
+    median = dp_gam.QUANTILE_LEVELS.index(0.5)
+    assert spread.table[1, 0, median] == 0.0
+
+
 def test_the_spread_refuses_to_fit_on_nothing():
     with pytest.raises(ValueError, match="no residuals"):
-        ResidualSpread.fit(residuals=np.array([]), band=np.array([]), quarter=np.array([]))
+        ResidualSpread.fit(
+            residuals=np.array([]), band=np.array([]), quarter=np.array([]), centre=True
+        )
 
 
 def test_cpu_and_gpu_fits_agree_within_a_hundredth_of_a_point(dp_synthetic_cache: FeatureCache):

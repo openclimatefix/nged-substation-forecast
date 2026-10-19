@@ -872,6 +872,15 @@ def predict_gam(
 class ResidualSpread:
     """Empirical quantiles of residuals, per hour band and calendar quarter.
 
+    **Centred or not.** The residuals of a replica fitted 12 months earlier carry that replica's
+    mean bias. Added raw to the scored year's mean forecast, they shift every quantile by last
+    year's bias. A centred spread subtracts each (band, quarter) group's median from its quantiles,
+    so the median of the spread is zero and only the shape of the error around the forecast is
+    kept. Centring on the median keeps the forecast's mean-to-median skew out of the spread, whereas
+    the onboarding spread (`studies.dp_onboarding`) centres its residuals on the mean before calling
+    `fit` with `centre=False`. The uncentred spread stays available (`centre=False`) so that the
+    bias can be reported as its own result.
+
     Attributes:
         table: Shape (4 bands, 4 quarters, 11 levels).
     """
@@ -879,16 +888,21 @@ class ResidualSpread:
     table: np.ndarray
 
     @staticmethod
-    def fit(*, residuals: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> ResidualSpread:
+    def fit(
+        *, residuals: np.ndarray, band: np.ndarray, quarter: np.ndarray, centre: bool
+    ) -> ResidualSpread:
         """Fit the quantiles of `residuals` (actual minus predicted mean).
 
         A (band, quarter) group with fewer than `MIN_SPREAD_GROUP_ROWS` residuals uses its band's
-        residuals, and a band with fewer uses all residuals.
+        residuals, and a band with fewer uses all residuals. The fallback is applied before the
+        centring, so every group of a centred spread has median zero.
 
         Args:
             residuals: Replica residuals in points.
             band: The hour band of each residual.
             quarter: The calendar quarter of each residual.
+            centre: True to subtract each group's median from its quantiles; False to keep the raw
+                quantiles, which carry the replica's mean bias.
 
         Returns:
             The fitted spread.
@@ -917,6 +931,8 @@ class ResidualSpread:
                     if len(group) >= MIN_SPREAD_GROUP_ROWS
                     else band_quantiles
                 )
+        if centre:
+            table -= table[:, :, [QUANTILE_LEVELS.index(0.5)]]
         return ResidualSpread(table=table)
 
     def quantiles(self, *, mean: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:

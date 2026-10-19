@@ -56,6 +56,11 @@ markdown.
 **The [data-processing page](data-processing.md) lists the processing that the experiments showed
 the data needs.** Each entry says whether it applies to experiments, to production, or to both.
 
+## Glossary
+
+**The [glossary](glossary.md) defines the terms that the experiment pages and the theme Summary pages
+use without redefining.** Each definition links the experiment or code that fixes its meaning.
+
 ## Planned experiments and their order
 
 **Each theme's Research plan page holds its own priority table and the detailed proposals for that

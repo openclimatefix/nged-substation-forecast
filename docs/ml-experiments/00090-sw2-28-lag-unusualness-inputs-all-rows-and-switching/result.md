@@ -99,7 +99,7 @@ better), over 11 quantile levels from q01 to q99.
   readings outside switching in the refit's training window, in cells of local month, weekday or
   weekend, and half-hour of day, each pooled with the two half-hours either side.
 - **Training rows.** Both arms drop half-hours inside an oracle event, a logged closure, or an
-  event of the RO-NC detector (called XL on earlier pages). This is a lab shortcut: these are
+  event of the RO-NC detector. This is a lab shortcut: these are
   hindsight labels, and the weather inputs are ERA5 at lag times, which a live service would not
   have.
 - **Rows scored.** 2,928,842 half-hours outside switching (the general headline). 37,394 of them
