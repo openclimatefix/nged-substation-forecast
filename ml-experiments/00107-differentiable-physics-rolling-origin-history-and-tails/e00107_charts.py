@@ -342,8 +342,9 @@ def figure_4_tails() -> alt.TopLevelMixin:
                 text="Neither spread brings the 95% and 99% quantiles to their nominal coverage",
                 subtitle=(
                     "Coverage of the upper quantiles of the all-years convex model with drift "
-                    "(G-all+D1) per origin, under two spreads; five substations. The dashed line is "
-                    "the nominal level (95% and 99%); below it the quantile is exceeded too often."
+                    "(G-all+D1) per origin, under two spreads, five substations. The dashed line "
+                    "is the nominal level (95% and 99%); below it, outcomes exceed the quantile "
+                    "too often."
                 ),
             )
         )

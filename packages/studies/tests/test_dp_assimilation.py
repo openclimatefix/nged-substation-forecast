@@ -21,16 +21,20 @@ from studies.dp_assimilation import (  # noqa: E402
     CorrectionTrace,
     FilterHyperparameters,
     LeadSpread,
+    SharedTerm,
+    WeightedTrace,
     correction_at,
     day_ahead_initialisation,
     fit_filter_hyperparameters,
     fit_site_hyperparameters,
     lead_band_of_days_ahead,
     post_filter_lead_spread,
+    replica_corrections,
     run_ewma,
     run_kalman,
     site_log_likelihood,
     stitch_out_of_sample_residuals,
+    summed_correction_at,
     usable_cutoff_positions,
 )
 from studies.dp_gam import ReplicaResiduals, ResidualSpread  # noqa: E402
@@ -470,3 +474,349 @@ def test_a_fitting_window_without_the_grid_is_refused():
             band=np.zeros(48, dtype=int),
             window=(np.datetime64("2024-01-01", "us"), np.datetime64("2024-01-05", "us")),
         )
+
+
+def _summed_replica() -> tuple[np.ndarray, ReplicaResiduals, np.ndarray, np.ndarray]:
+    """Return a 60-day grid, its replica, a local stream, and a shared stream."""
+    end_times = np.arange(
+        np.datetime64("2024-01-01T00:30", "us"),
+        np.datetime64("2024-03-01T00:30", "us"),
+        np.timedelta64(30, "m"),
+    )
+    n = len(end_times)
+    generator = np.random.default_rng(21)
+    residual = _simulate(hyper=HYPER, n=n, seed=22) + generator.normal(0.0, 0.2, size=n)
+    shared = _simulate(hyper=HYPER, n=n, seed=23)
+    replica = ReplicaResiduals(
+        residuals=residual,
+        band=_bands(n=n),
+        quarter=np.zeros(n, dtype=int),
+        index=np.arange(n),
+        fit_cut=datetime(2024, 1, 1, tzinfo=UTC),
+        switching=np.zeros(n, dtype=bool),
+    )
+    return end_times, replica, residual - 0.5 * shared, shared
+
+
+def _shared_term(*, stream: np.ndarray, weights: tuple[float, ...]) -> SharedTerm:
+    return SharedTerm(
+        residual=stream, run=partial(run_kalman, hyper=HYPER), weight_by_band=np.array(weights)
+    )
+
+
+def _day_ahead_cutoff(*, end_times: np.ndarray, delay_hours: float, days_ahead: int) -> np.ndarray:
+    return usable_cutoff_positions(
+        end_times=end_times,
+        initialisation=day_ahead_initialisation(end_times=end_times, days_ahead=days_ahead),
+        delay_hours=delay_hours,
+    )
+
+
+def test_a_summed_correction_is_the_local_plus_the_weighted_shared_correction():
+    end_times, replica, local, shared = _summed_replica()
+    grid_band = _bands(n=len(end_times))
+    weights = np.array([0.5, 1.0, 1.5, 0.0])
+    summed = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=partial(run_kalman, hyper=HYPER),
+        grid_band=grid_band,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=tuple(weights))],
+    )
+    local_trace = run_kalman(residual=local, band=grid_band, hyper=HYPER)
+    shared_trace = run_kalman(residual=shared, band=grid_band, hyper=HYPER)
+    for days_ahead, total in enumerate(summed, start=1):
+        cutoff = _day_ahead_cutoff(end_times=end_times, delay_hours=3.5, days_ahead=days_ahead)
+        local_part = correction_at(
+            trace=local_trace, cutoff=cutoff, target=replica.index, band=replica.band
+        )
+        shared_part = correction_at(
+            trace=shared_trace, cutoff=cutoff, target=replica.index, band=replica.band
+        )
+        assert np.allclose(total, local_part.total + weights[replica.band] * shared_part.total)
+
+
+def test_a_shared_term_with_its_own_delay_reads_only_what_was_usable_that_much_earlier():
+    end_times, replica, local, shared = _summed_replica()
+    grid_band = _bands(n=len(end_times))
+    weights = np.array([0.6, 0.6, 0.6, 0.6])
+    run = partial(run_kalman, hyper=HYPER)
+    late = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        grid_band=grid_band,
+        local_residual=local,
+        shared=[replace(_shared_term(stream=shared, weights=tuple(weights)), delay_hours=9.0)],
+    )
+    common_delay = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        grid_band=grid_band,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=tuple(weights))],
+    )
+    local_trace = run(residual=local, band=grid_band)
+    shared_trace = run(residual=shared, band=grid_band)
+    cutoff = _day_ahead_cutoff(end_times=end_times, delay_hours=3.5, days_ahead=1)
+    shared_cutoff = _day_ahead_cutoff(end_times=end_times, delay_hours=9.0, days_ahead=1)
+    expected = (
+        correction_at(
+            trace=local_trace, cutoff=cutoff, target=replica.index, band=replica.band
+        ).total
+        + weights[replica.band]
+        * correction_at(
+            trace=shared_trace, cutoff=shared_cutoff, target=replica.index, band=replica.band
+        ).total
+    )
+    assert np.allclose(late[0], expected)
+    assert not np.allclose(late[0], common_delay[0])
+
+
+def test_the_helper_that_sums_a_forecast_correction_matches_the_replica_sum():
+    end_times, replica, local, shared = _summed_replica()
+    grid_band = _bands(n=len(end_times))
+    weights = np.array([0.4, 0.8, 1.2, 1.6])
+    run = partial(run_kalman, hyper=HYPER)
+    replica_total = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        grid_band=grid_band,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=tuple(weights))],
+    )[0]
+    cutoff = usable_cutoff_positions(
+        end_times=end_times,
+        initialisation=day_ahead_initialisation(end_times=end_times, days_ahead=1),
+        delay_hours=3.5,
+    )
+    helper = summed_correction_at(
+        local_trace=run(residual=local, band=grid_band),
+        shared_traces=[
+            WeightedTrace(trace=run(residual=shared, band=grid_band), weight_by_band=weights)
+        ],
+        cutoff=cutoff,
+        target=replica.index,
+        band=replica.band,
+    )
+    assert np.array_equal(helper.total, replica_total)
+    assert np.allclose(helper.total, helper.level + helper.anomaly)
+
+
+def _before_the_shared_term_existed(
+    *, end_times: np.ndarray, replica: ReplicaResiduals, run: partial
+) -> LeadSpread:
+    """Return the spread as `post_filter_lead_spread` built it before shared terms existed."""
+    stream = np.full(len(end_times), np.nan)
+    stream[replica.index] = replica.residuals
+    grid_band = np.zeros(len(end_times), dtype=np.int64)
+    grid_band[replica.index] = replica.band
+    trace = run(residual=stream, band=grid_band)
+    valid_times = end_times[replica.index]
+    kept = (valid_times > valid_times.min() + np.timedelta64(14, "D")) & ~replica.switching
+    residuals: list[list[np.ndarray]] = [[] for _ in range(N_LEAD_BANDS)]
+    bands: list[list[np.ndarray]] = [[] for _ in range(N_LEAD_BANDS)]
+    quarters: list[list[np.ndarray]] = [[] for _ in range(N_LEAD_BANDS)]
+    for days_ahead in range(1, 8):
+        cutoff = usable_cutoff_positions(
+            end_times=end_times,
+            initialisation=day_ahead_initialisation(end_times=valid_times, days_ahead=days_ahead),
+            delay_hours=3.5,
+        )
+        correction = correction_at(
+            trace=trace, cutoff=cutoff, target=replica.index, band=replica.band
+        )
+        lead_band = lead_band_of_days_ahead(days_ahead=days_ahead)
+        residuals[lead_band].append((replica.residuals - correction.total)[kept])
+        bands[lead_band].append(replica.band[kept])
+        quarters[lead_band].append(replica.quarter[kept])
+    return LeadSpread.fit(
+        residuals=[np.concatenate(r) for r in residuals],
+        band=[np.concatenate(b) for b in bands],
+        quarter=[np.concatenate(q) for q in quarters],
+    )
+
+
+def test_no_shared_term_and_a_zero_weight_both_match_the_spread_from_before_shared_terms():
+    end_times, replica, _local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    before = _before_the_shared_term_existed(end_times=end_times, replica=replica, run=run)
+    plain = post_filter_lead_spread(end_times=end_times, replica=replica, run=run)
+    zero = post_filter_lead_spread(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        grid_band=_bands(n=len(end_times)),
+        shared=[_shared_term(stream=shared, weights=(0.0, 0.0, 0.0, 0.0))],
+    )
+    for left, middle, right in zip(
+        before.by_lead_band, plain.by_lead_band, zero.by_lead_band, strict=True
+    ):
+        assert np.array_equal(left.table, middle.table)
+        assert np.array_equal(left.table, right.table)
+
+
+def test_readings_outside_the_replica_rows_go_to_their_own_band_not_band_zero():
+    end_times, replica, _local, _shared = _summed_replica()
+    n = len(end_times)
+    grid_band = _bands(n=n)
+    # A replica that covers only the second half of the grid, and a local stream that also
+    # holds the first half, as a stitched stream with a warm-up would.
+    second_half = np.arange(n // 2, n)
+    half = replace(
+        replica,
+        residuals=replica.residuals[second_half],
+        band=replica.band[second_half],
+        quarter=replica.quarter[second_half],
+        index=second_half,
+        switching=replica.switching[second_half],
+    )
+    stream = np.where(grid_band == 1, 5.0, 0.0)
+    run = partial(run_kalman, hyper=HYPER)
+    corrections = replica_corrections(
+        end_times=end_times, replica=half, run=run, grid_band=grid_band, local_residual=stream
+    )
+    in_band_one = half.band == 1
+    in_band_two = half.band == 2
+    assert np.mean(corrections[0][in_band_one]) > 4.9
+    assert abs(np.mean(corrections[0][in_band_two])) < 0.5
+    assert abs(np.mean(corrections[0][half.band == 0])) < 0.05
+
+
+def test_a_shared_trace_reads_every_reading_in_its_own_band():
+    end_times, replica, _local, _shared = _summed_replica()
+    n = len(end_times)
+    grid_band = _bands(n=n)
+    stream = np.where(grid_band == 1, 5.0, 0.0)
+    corrections = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=partial(run_kalman, hyper=HYPER),
+        grid_band=grid_band,
+        local_residual=np.zeros(n),
+        shared=[_shared_term(stream=stream, weights=(1.0, 1.0, 1.0, 1.0))],
+    )
+    assert np.mean(corrections[0][replica.band == 1]) > 4.5
+    assert abs(np.mean(corrections[0][replica.band == 0])) < 0.05
+
+
+def test_grid_bands_that_disagree_with_the_replica_bands_are_refused():
+    end_times, replica, local, _shared = _summed_replica()
+    wrong = (_bands(n=len(end_times)) + 1) % 4
+    with pytest.raises(ValueError, match="must agree with the replica"):
+        replica_corrections(
+            end_times=end_times,
+            replica=replica,
+            run=partial(run_kalman, hyper=HYPER),
+            grid_band=wrong,
+            local_residual=local,
+        )
+
+
+def test_a_weighted_trace_needs_one_weight_per_hour_band():
+    trace = run_kalman(residual=np.full(100, np.nan), band=np.zeros(100, dtype=int), hyper=HYPER)
+    with pytest.raises(ValueError, match="one per hour band"):
+        WeightedTrace(trace=trace, weight_by_band=np.ones(3))
+
+
+def test_a_local_stream_or_shared_term_without_grid_bands_is_refused():
+    end_times, replica, local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    with pytest.raises(ValueError, match="needs grid_band"):
+        replica_corrections(end_times=end_times, replica=replica, run=run, local_residual=local)
+    with pytest.raises(ValueError, match="needs grid_band"):
+        replica_corrections(
+            end_times=end_times,
+            replica=replica,
+            run=run,
+            shared=[_shared_term(stream=shared, weights=(1.0, 1.0, 1.0, 1.0))],
+        )
+
+
+def test_a_stream_that_does_not_cover_the_grid_and_a_wrong_weight_count_are_refused():
+    end_times, replica, local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    grid_band = _bands(n=len(end_times))
+    with pytest.raises(ValueError, match="one entry per grid row"):
+        replica_corrections(
+            end_times=end_times,
+            replica=replica,
+            run=run,
+            grid_band=grid_band,
+            local_residual=local[:-1],
+        )
+    with pytest.raises(ValueError, match="one entry per grid row"):
+        replica_corrections(
+            end_times=end_times,
+            replica=replica,
+            run=run,
+            grid_band=grid_band[:-1],
+            local_residual=local,
+        )
+    with pytest.raises(ValueError, match="one per hour band"):
+        _shared_term(stream=shared, weights=(1.0, 1.0))
+
+
+@pytest.mark.parametrize("which", ["local", "shared", "both"])
+def test_changing_a_local_or_shared_residual_after_each_cases_cutoff_changes_nothing(which: str):
+    end_times, replica, local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    grid_band = _bands(n=len(end_times))
+    weights = (0.7, 0.7, 0.7, 0.7)
+
+    def corrections(
+        *, local_stream: np.ndarray, shared_stream: np.ndarray
+    ) -> tuple[np.ndarray, ...]:
+        return replica_corrections(
+            end_times=end_times,
+            replica=replica,
+            run=run,
+            grid_band=grid_band,
+            local_residual=local_stream,
+            shared=[_shared_term(stream=shared_stream, weights=weights)],
+        )
+
+    base = corrections(local_stream=local, shared_stream=shared)
+    # Position 11 of a day is one half-hour after the 05:30 UTC cutoff of a case whose target is
+    # on the next UTC day, so a look-ahead of a half-hour or more reads the change.
+    after = 48 * 30 + 11
+    local_changed, shared_changed = local.copy(), shared.copy()
+    if which in {"local", "both"}:
+        local_changed[after:] += 25.0
+    if which in {"shared", "both"}:
+        shared_changed[after:] += 25.0
+    changed = corrections(local_stream=local_changed, shared_stream=shared_changed)
+    valid_times = end_times[replica.index]
+    for days_ahead, (left, right) in enumerate(zip(base, changed, strict=True), start=1):
+        cutoff = usable_cutoff_positions(
+            end_times=end_times,
+            initialisation=day_ahead_initialisation(end_times=valid_times, days_ahead=days_ahead),
+            delay_hours=3.5,
+        )
+        before_the_change = cutoff < after
+        assert before_the_change.any()
+        assert np.array_equal(left[before_the_change], right[before_the_change])
+        assert not np.allclose(left[~before_the_change], right[~before_the_change])
+
+
+def test_the_shared_term_changes_the_spread_it_is_summed_into():
+    end_times, replica, local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    grid_band = _bands(n=len(end_times))
+    local_only = post_filter_lead_spread(
+        end_times=end_times, replica=replica, run=run, grid_band=grid_band, local_residual=local
+    )
+    summed = post_filter_lead_spread(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        grid_band=grid_band,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=(0.5, 0.5, 0.5, 0.5))],
+    )
+    narrow = local_only.by_lead_band[0].table[0, 0]
+    with_shared = summed.by_lead_band[0].table[0, 0]
+    assert (with_shared[-1] - with_shared[0]) < (narrow[-1] - narrow[0])
