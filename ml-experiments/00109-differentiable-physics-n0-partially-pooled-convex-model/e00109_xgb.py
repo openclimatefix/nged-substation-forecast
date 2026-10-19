@@ -29,7 +29,7 @@ import argparse
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Final, Literal
 
 import e00109_common as common
@@ -43,6 +43,7 @@ from studies.dp_gam import (
     replica_cut,
     training_rows,
 )
+from studies.dp_pinned_capacity import EARLY_VINTAGE_MAX_GAP_DAYS
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 VINTAGES_PATH: Final = (
@@ -164,12 +165,13 @@ def vintage_capacity(*, cache: FeatureCache, site: str, cut: datetime) -> Vintag
     vintages = pl.read_parquet(VINTAGES_PATH).filter(
         pl.col("variant") == VINTAGE_VARIANT,
         pl.col("time_series_id") == table.time_series_id,
-        pl.col("origin_monday") <= cut.date(),
+        pl.col("origin_monday") <= cut.date() + timedelta(days=EARLY_VINTAGE_MAX_GAP_DAYS),
     )
     if vintages.is_empty():
-        msg = f"{site} has no capacity vintage with an origin on or before {cut.date()}"
+        msg = f"{site} has no capacity vintage with an origin near {cut.date()}"
         raise ValueError(msg)
-    origin = vintages["origin_monday"].max()
+    on_time = vintages.filter(pl.col("origin_monday") <= cut.date())
+    origin = (on_time if not on_time.is_empty() else vintages)["origin_monday"].max()
     if not isinstance(origin, date):
         msg = "the vintage origin is not a date"
         raise TypeError(msg)
