@@ -2,7 +2,8 @@
 
 **We can now score a demand forecast by the curtailment cost of its errors at a bulk supply point,
 but the two supply points of the pilot hold too few events to rank forecasts at the headline limit
-of 0.9 times their earlier maximum export, so no forecast has yet been shown to curtail less there.**
+of 0.9 times their earlier maximum export, so no forecast has yet been shown to curtail less
+there.**
 
 Curtailment is the capping of generators beneath a substation when its export would pass a limit.
 The scoring code plans the caps from a forecast of the substation's export, then charges the energy
@@ -17,13 +18,15 @@ Primary substations, 4 supply points).
 **Boston and Skegness together have 19 half-hours beyond 0.9 times their earlier maximum export in
 the scored year, and more than 100 per node only at half that maximum.** The scored year runs from
 2025-07-02 to 2026-06-30. The figure counts export and import in separate panels, and also plots
-Bicker Fen, which is not scored. Source: [experiment 84](../../00084-substation-limit-curtailment-cost-worked-example/result.md).
+Bicker Fen, which is not scored. Source: [experiment
+84](../../00084-substation-limit-curtailment-cost-worked-example/result.md).
 
 ## Does it work?
 
 **The code runs and reproduces a hand-worked answer exactly.** All eight quantities of a made-up
 half-hour (a 45.0 MW limit and two generators) agree with the hand calculation ([experiment
-84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). The verdict of both experiments is `inconclusive`, because neither registered a
+84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). The verdict of both
+experiments is `inconclusive`, because neither registered a
 contrast.
 
 **The pilot cannot rank forecasts at the headline limit.** Each arm is a pair of forecasts, one of
@@ -35,7 +38,9 @@ guess](../../glossary.md#best-guess) (95% interval 96,371 to 6,686,043). At 0.5 
 half-hours (268 scored), the best guess costs GBP 10,802,520 less than
 [climatology](../../glossary.md#climatology) (-20,880,964 to -3,342,553), and its gap to the NGED
 baseline includes zero. We have no evidence that NGED operates at 0.5 times, so that limit is a
-rehearsal ([experiment 84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). The costs are retrospective, from an energy proxy (generator
+rehearsal ([experiment
+84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). The costs are
+retrospective, from an energy proxy (generator
 energy cut plus 20 times the energy left over the limit, at GBP 2,000 per MWh), and are a
 calibration to history, not a saving.
 
@@ -82,7 +87,9 @@ months, no interval given; [experiment
 **The only metric design implemented plans caps from the 0.95 quantile of the substation's export
 forecast and scores at a limit scaled from the node's earlier maximum.** The generators beneath the
 node cut the excess in proportion to their capacity, and the cost is the energy proxy with a breach
-ratio of 20 ([experiment 84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). Experiment 84 compared the price and the DCUSA form only, and
+ratio of 20 ([experiment
+84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). Experiment 84
+compared the price and the DCUSA form only, and
 tried no other quantile, sharing rule, or breach ratio. This is a metric design, not a forecast
 design: no forecast design curtailed less with significance at the headline limit.
 
@@ -123,13 +130,15 @@ metrics](../../../roadmap/cost-savings-metrics.md)).
   reorder the arms, but the DCUSA form charges every instructed generator its whole headroom, and
   climatology's avoidable cost becomes negative under it ([experiment
   84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). Otherwise the
-  choice of cost form decides the ranking unnoticed. Re-check if a different price or cost form is added.
+  choice of cost form decides the ranking unnoticed. Re-check if a different price or cost form is
+added.
 - **Report how many generator-half-hours had no forecast.** Across the six arms, 13% had none, so
   those generators were not capped and added to breach ([experiment
   84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). Otherwise a
   forecast set with more gaps looks worse for that reason alone. Re-check with other forecast sets.
 - **Report the unscored half-hours.** Scoring needs a stored forecast at 12 to 36 hours lead, which
-  drops 5 of 46 events at 0.75 times, and the dropped half-hours hold 14% of the excess energy at 0.5
+  drops 5 of 46 events at 0.75 times, and the dropped half-hours hold 14% of the excess energy at
+0.5
   times ([experiment
   84](../../00084-substation-limit-curtailment-cost-worked-example/result.md)). Re-check if the
   forecast lead window or the stored forecast sets change.
