@@ -16,6 +16,7 @@ pairs arms row by row.
     uv run python ml-experiments/00106-*/e00106_report.py > docs/ml-experiments/00106-*/report.txt
 """
 
+import re
 from dataclasses import dataclass
 from functools import cache
 from typing import Final
@@ -337,7 +338,7 @@ def absolute_table() -> pl.DataFrame:
     rows = []
     for label in ("scored", "replicate"):
         for name in sorted(path.name for path in (common.DATA_DIR / "predictions").iterdir()):
-            if not name.startswith(f"{label}_") or "_d" in name.removeprefix(f"{label}_")[-3:]:
+            if not name.startswith(f"{label}_") or re.search(r"_d[2-7]$", name):
                 continue
             arm = name.removeprefix(f"{label}_")
             frame = load_arm(label=label, arm=arm)

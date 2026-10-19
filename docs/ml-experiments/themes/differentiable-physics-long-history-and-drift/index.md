@@ -1,16 +1,18 @@
 # Differentiable physics: long history and drift
 
-**The first experiment of this theme shows that the data lets the series go ahead, with three
-changes: start most Primary substation series later than their first record, fix the lockdown window
-in advance, and count eligible long-history sites at each tuning year's first day. The second shows
+**A Kalman filter on recent residuals lowered the quantile score by 0.61 points, using estimates of
+past weather, but whether old years of history help is still not settled.**
+
+The first experiment of this theme shows that the data lets the series go ahead, with three changes:
+start most Primary substation series later than their first record, fix the lockdown window in
+advance, and count eligible long-history sites at each tuning year's first day. The second shows
 that a simple model of demand minus solar does not clearly gain from every usable year: without a
 drift term it scored worse than on the last 12 months, and with a drift term the model was level
-with 12 months. The third shows that a Kalman filter on recent residuals lowers the score by 0.61
-points, and that the benefit of old years changed sign between two scored years.** This theme covers
-whether a differentiable-physics model of Primary substation demand can use old years of history and
-cope with drift in the demand level over the years. The [Experiments](experiments.md) page lists
-every experiment tried, with its verdict and a take-home message, and the [Research plan](plan.md)
-lists what is planned next.
+with 12 months. The third shows that the filter lowers the score, and that the benefit of old years
+changed sign between two scored years. This theme covers whether a differentiable-physics model of
+Primary substation demand can use old years of history and cope with drift in the demand level over
+the years. The [Experiments](experiments.md) page lists every experiment tried, with its verdict and
+a take-home message, and the [Research plan](plan.md) lists what is planned next.
 
 ## What the experiments found
 
@@ -33,6 +35,8 @@ lists what is planned next.
   4](../../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md):** A Kalman
   filter that corrects each day-ahead forecast with the errors observed up to 3.5 hours earlier
   lowered the quantile score by 0.61 points in the scored year and 1.02 in the year before, at all
-  five long-history substations, and with the filter running a drift term and refits added nothing
-  measurable. More years of history gave -0.22 points in the scored year and +0.32 in the year
-  before, so the verdict is partly supported. The filter's residuals use estimates of past weather.
+  five long-history substations. More years of history gave -0.22 points in the scored year and
+  +0.32 in the year before, so the verdict is partly supported. With the filter running, a drift
+  term added nothing measurable and refitting made the score slightly worse. Against lagged XGBoost
+  at the same lead, the filtered model was 0.138 points better, which is not significant. The
+  filter's residuals use estimates of past weather.
