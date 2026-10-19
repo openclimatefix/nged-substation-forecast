@@ -1,7 +1,7 @@
 """Write the lag-window rows of experiment 91: the causal detector's inputs and the truth.
 
 For each batch of injected events (series disjoint within 7 days) and each shape, the script
-injects the transfers, runs the causal XL detector at the cut of every daily origin that has an
+injects the transfers, runs the causal RO-NC detector at the cut of every daily origin that has an
 injected event in its lag window, and writes one row per (series, lag stamp, origin) with the
 inputs of the three arms and the truth. A `REAL` job does the same on the real residuals at every
 origin, where the truth is the logged closures and the labelled events.

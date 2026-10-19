@@ -12,7 +12,7 @@ take_home_message: >-
   +0.003, because most remaining misses are small transfers from substations whose neighbours are
   unmetered.
 hypothesis: >-
-  The refit-offset neighbour-count switching detector (RO-NC, experiment 82's XL) subtracts a
+  The refit-offset neighbour-count switching detector (RO-NC) subtracts a
   lagless XGBoost demand forecast (experiment 17's H0.5, trained on ERA5) from each Primary
   substation's measured power. Giving that forecast the best guess's two explicit offsets, an
   embedded-solar term (capacity times a solar anomaly) and a heating degree-hour term, removes
@@ -98,7 +98,7 @@ out a gain of the +0.02 that we set as worth porting, and the two solar-only arm
 
 A load transfer is a switching operation that moves part of one Primary substation's demand (the
 donor's) onto neighbouring substations (the receivers) for hours or days. A Primary substation
-steps 33 kV down to 11 kV. The refit-offset neighbour-count detector (RO-NC, called XL in
+steps 33 kV down to 11 kV. The refit-offset neighbour-count detector (RO-NC, defined in
 [experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md))
 subtracts an XGBoost forecast of demand, H0.5, from the measured power and raises an alarm when the
 24-hour average of the difference, the residual, steps by a set number of noise units. The best

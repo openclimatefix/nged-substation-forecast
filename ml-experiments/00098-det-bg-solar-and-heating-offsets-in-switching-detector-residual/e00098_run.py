@@ -2,13 +2,13 @@ r"""Train the logistic scores, then score four detectors on a fresh draw and the
 
 PF14 is the benchmark (experiment 69). X takes its step statistic from two residual models refitted
 half a month apart (experiment 71). LOGIT_SAME scores PF14's candidates with a logistic regression
-that includes the same-sign neighbour count (experiment 70). XL fits and applies the same logistic
-score to the candidates of X.
+that includes the same-sign neighbour count (experiment 70). RO-NC fits and applies the same
+logistic score to the candidates of X.
 
 Stages, in order. Each writes files to the private output folder.
 
 - `tune`: the thresholds of PF14 (must come back as 4.0) and X.
-- `train`: LOGIT_SAME on PF14's candidates and XL on X's candidates, from odd-month injections of
+- `train`: LOGIT_SAME on PF14's candidates and RO-NC on X's candidates, from odd-month injections of
   experiment 58's draw, and each one's threshold at 80 unexplained odd-month alarms.
 - `harness-check`: on experiment 71's draw, PF14 and X must reproduce experiment 71's `found` flags
   and LOGIT_SAME experiment 70's.
@@ -340,7 +340,7 @@ def tune(*, out: Path) -> None:
 
 
 def train(*, out: Path) -> None:
-    """Fit LOGIT_SAME on PF14's candidates and XL on X's, and set each one's threshold."""
+    """Fit LOGIT_SAME on PF14's candidates and RO-NC on X's, and set each one's threshold."""
     state = make_state(out=out, trained=False)
     state["thresholds"] = read_json(out=out, name="thresholds.json")
     panel, offset_panel = state["panel"], state["offset_panel"]
