@@ -7,6 +7,7 @@ the truth shows the design, the penalties, the constraints, and the solver agree
 
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+from functools import partial
 from typing import Final
 from zoneinfo import ZoneInfo
 
@@ -788,24 +789,21 @@ def test_a_pinned_spec_needs_a_pinned_capacity_and_a_fitted_spec_refuses_one(
     dp_synthetic_cache: FeatureCache,
 ):
     pinned = _pinned_capacity(cache=dp_synthetic_cache, cut=CUT)
-    common = {
-        "cache": dp_synthetic_cache,
-        "site": "S1",
-        "cut": CUT,
-        "window": TrainingWindow(months=12),
-        "season_years": SEASON_YEARS,
-    }
+    fit = partial(
+        fit_gam,
+        cache=dp_synthetic_cache,
+        site="S1",
+        cut=CUT,
+        window=TrainingWindow(months=12),
+        season_years=SEASON_YEARS,
+    )
     with pytest.raises(ValueError, match="pinned capacity is required"):
-        fit_gam(specs=[GamSpec(capacity="pinned")], **common)
+        fit(specs=[GamSpec(capacity="pinned")])
     with pytest.raises(ValueError, match="pinned capacity is required"):
-        fit_gam(specs=[GamSpec()], pinned=pinned, **common)
-    other_cut = datetime(2024, 6, 3, tzinfo=UTC)
+        fit(specs=[GamSpec()], pinned=pinned)
+    earlier = _pinned_capacity(cache=dp_synthetic_cache, cut=datetime(2024, 6, 3, tzinfo=UTC))
     with pytest.raises(ValueError, match="was built for"):
-        fit_gam(
-            specs=[GamSpec(capacity="pinned")],
-            pinned=_pinned_capacity(cache=dp_synthetic_cache, cut=other_cut),
-            **common,
-        )
+        fit(specs=[GamSpec(capacity="pinned")], pinned=earlier)
 
 
 def test_the_covid_flag_keeps_the_lockdown_rows_and_recovers_an_injected_shift(
