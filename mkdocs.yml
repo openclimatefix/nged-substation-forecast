@@ -178,6 +178,10 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-pooling-across-substations/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-pooling-across-substations/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-pooling-across-substations/plan.md
+          - Forecast engine:
+              - Summary: ml-experiments/themes/differentiable-physics-forecast-engine/index.md
+              - Experiments: ml-experiments/themes/differentiable-physics-forecast-engine/experiments.md
+              - Research plan: ml-experiments/themes/differentiable-physics-forecast-engine/plan.md
       - Generator forecasting:
           - Summary: ml-experiments/themes/generator-forecasting/index.md
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
