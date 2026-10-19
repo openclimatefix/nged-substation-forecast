@@ -89,10 +89,9 @@ take_home_message: >-
   reverse flow.
 lessons: >-
   A fit of the magnitude of demand minus solar recovers the solar capacity through zero flow, and
-  finds the direction of flow with a balanced accuracy of 0.78 to 0.86, except where reverse flow is
-  the
-  usual state, as at Wrangle T1. A reactive-power floor of 20% of midday power already lowers the
-  capacity recovery to a median error of 0.31 and the balanced accuracy to 0.67. On the real
+  finds the direction of flow with a balanced accuracy of 0.78 to 0.81 (0.82 to 0.86 without Wrangle
+  T1, where reverse flow is the usual state). A reactive-power floor of 20% of midday power already
+  lowers the capacity recovery to a median error of 0.31 and the balanced accuracy to 0.67. On the real
   series the fit finds no reverse flow at 7 of the 8 MVA-only Primaries, and finds a flow that is
   negative on 75% to 87% of daylight half-hours at Stickney from 2021, which cannot be checked.
 production_status: not-for-production
