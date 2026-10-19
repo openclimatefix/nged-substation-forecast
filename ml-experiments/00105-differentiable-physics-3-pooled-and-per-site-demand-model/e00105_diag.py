@@ -267,18 +267,24 @@ def main() -> None:
     cache = common.load_cache()
     convex = convex_capacities(cache=cache)
     vintages = vintage_season_means(cache=cache)
-    report: dict[str, Any] = {
+    path = common.WORK_DIR / "diagnostics.json"
+    report: dict[str, Any] = json.loads(path.read_text()) if path.exists() else {}
+    report |= {
         "convex_capacity_points": convex,
         "vintage_season_mean_points": vintages,
         "cut": date.isoformat(common.TUNING_CUT.date()),
     }
-    table: list[dict[str, Any]] = []
+    table_path = common.WORK_DIR / "diagnostic_capacities.parquet"
+    table: list[dict[str, Any]] = (
+        pl.read_parquet(table_path).to_dicts() if table_path.exists() else []
+    )
     if arguments.profile:
         common.write_json(
             name="capacity_profile.json", payload=capacity_profile(cache=cache, convex=convex)
         )
         return
     for name in arguments.variants:
+        table = [row for row in table if row["variant"] != name]
         table += run_variant(
             name=name,
             cache=cache,
