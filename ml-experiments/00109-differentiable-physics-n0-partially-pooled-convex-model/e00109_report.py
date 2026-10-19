@@ -248,6 +248,9 @@ def estimate(
     means = losses.group_by("arm").agg(
         pl.col("qs").mean(), pl.col("ae").mean(), pl.len().alias("n")
     )
+    if means.height < 2:
+        msg = f"no shared rows for {contrast.name} at {sites}"
+        raise ValueError(msg)
     treatment = means.filter(pl.col("arm") == contrast.treatment).row(0, named=True)
     reference = means.filter(pl.col("arm") == contrast.reference).row(0, named=True)
     return treatment["qs"] - reference["qs"], treatment["ae"] - reference["ae"], int(treatment["n"])
@@ -271,13 +274,21 @@ def interval(*, label: str, contrast: Contrast, level: float) -> tuple[float, fl
     )
 
 
-def sites_improving(*, label: str, contrast: Contrast) -> int:
-    """Return how many of the contrast's sites have a negative difference (treatment better)."""
-    count = 0
+def sites_improving(*, label: str, contrast: Contrast) -> tuple[int, int]:
+    """Return how many sites have a negative difference (treatment better), and how many have rows.
+
+    A site with no shared rows, because the short-history arm needs more usable half-hours than
+    the site holds in its window, is left out of both counts.
+    """
+    better, present = 0, 0
     for site in contrast.sites or DECISION:
-        difference, _, _ = estimate(label=label, contrast=contrast, sites=(site,))
-        count += int(difference < 0.0)
-    return count
+        try:
+            difference, _, _ = estimate(label=label, contrast=contrast, sites=(site,))
+        except ValueError:
+            continue
+        present += 1
+        better += int(difference < 0.0)
+    return better, present
 
 
 def _contrast_row(*, contrast: Contrast, level: float) -> dict[str, object]:
@@ -289,7 +300,8 @@ def _contrast_row(*, contrast: Contrast, level: float) -> dict[str, object]:
         row[f"{label} QS"] = difference
         row[f"{label} MAE of mean"] = mean_error
         row[f"{label} rows"] = n_rows
-        row[f"{label} sites better"] = sites_improving(label=label, contrast=contrast)
+        better, present = sites_improving(label=label, contrast=contrast)
+        row[f"{label} sites better"], row[f"{label} sites with rows"] = better, present
         row[f"{label} all rows"] = estimate(
             label=label, contrast=contrast, sites=sites, drop_switching=False
         )[0]
@@ -431,10 +443,11 @@ def decision(*, gate_passed: bool) -> dict[str, object]:
     """Apply the plan's decision rule to the planned contrasts.
 
     Args:
-        gate_passed: Whether every blocking line of the known-answer gate passed.
+        gate_passed: Whether the known-answer gate counts as passed. When it does not, the verdict
+            is capped at `inconclusive`, and the verdict the numbers alone give is named beside it.
 
     Returns:
-        Each rule's inputs and the resulting verdict word.
+        Each rule's inputs and the resulting verdict.
     """
     table = contrast_table(planned=True)
 
@@ -448,7 +461,6 @@ def decision(*, gate_passed: bool) -> dict[str, object]:
             entry["scored QS"] < 0.0  # ty: ignore[unsupported-operator]
             and entry["scored sites better"] >= 4  # ty: ignore[unsupported-operator]
             and entry["replicate QS"] < 0.0  # ty: ignore[unsupported-operator]
-            and gate_passed
         )
 
     def below_zero(entry: dict[str, object]) -> bool:
@@ -473,13 +485,13 @@ def decision(*, gate_passed: bool) -> dict[str, object]:
     else:
         verdict = "inconclusive"
     if not gate_passed:
-        verdict = "inconclusive"
+        verdict = f"inconclusive (capped by the failed gate; the numbers alone give {verdict})"
     return {
         "C1 passes": c1_passes,
         "C1 refuted": c1_refuted,
         "C2 supported": supported(c2),
         "C3 supported": supported(c3),
-        "gate passed": gate_passed,
+        "gate counted as passed": gate_passed,
         "verdict": verdict,
     }
 
@@ -492,15 +504,17 @@ def capacity_sources() -> str:
 
 def main() -> None:
     """Print every table of the report as comma-separated values."""
-    gate_path = common.WORK_DIR / "gate" / "gate.json"
-    gate_passed = bool(json.loads(gate_path.read_text())["passed"]) if gate_path.exists() else False
     print(f"== C4 bar (better of x_2y and x_2yamq on the tuning year): {x_bar()} ==")
     print("== Absolute quantile score by arm, points of capacity (rows outside the masks) ==")
     print(absolute_table().write_csv(float_precision=3), end="")
     print(f"== Planned contrasts ({PLANNED_LEVEL:.2f}% intervals), negative = treatment better ==")
     print(contrast_table(planned=True).write_csv(float_precision=3), end="")
     print("== Decision rule ==")
-    print(json.dumps(decision(gate_passed=gate_passed), indent=2))
+    print("The gate failed under the pre-registered definition (runs 1 to 3); a post hoc")
+    print("redefinition passes in run 4. The plan counts the gate as failed, so the verdict")
+    print("is capped at inconclusive. Beside it, the verdict if the post hoc gate were accepted:")
+    print(json.dumps(decision(gate_passed=False), indent=2))
+    print(json.dumps(decision(gate_passed=True), indent=2))
     print("== Exploratory contrasts (95% intervals) ==")
     print(contrast_table(planned=False).write_csv(float_precision=3), end="")
     print("== Onboarding curve ==")
