@@ -99,6 +99,7 @@ the maintainer to confirm.
 | [00070 - Switching event detector, part 11](00070-sw2-19-same-sign-neighbour-count/result.md) | Does counting the neighbours that step the same way as the alarming substation find more of the moved MW than the single-series detector with the PF14 end rule? | Supported: +0.048 of the moved MW (97.5% interval +0.021 to +0.096) on fresh headline-band transfers at 80 odd-month unexplained alarms; no gain on long transfers or the 35 real transfers (7 against 8) | Candidate | 2026-10-16 |
 | [00071 - Switching event detector, part 12](00071-sw2-18-refit-offset-and-gap-bridging/result.md) | Does taking the step statistic from two residual models refitted half a month apart, so that no alarm is suppressed at a refit, find more of the moved MW than the benchmark detector PF14? | Supported: +0.050 of the moved MW (98.33% interval +0.012 to +0.107) at no more than 80 odd-month unexplained alarms, all of it in transfers within 24 hours of a refit. Lifting the suppression alone gives +0.056, and gap bridging changes no outcome | Candidate | 2026-10-16 |
 | [00082 - Switching event detector, part 13](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md) | Do the refit offset (experiment 71) and the same-sign neighbour count (experiment 70) add up when used in one detector? | Supported: the combined detector XL finds 0.770 of the moved MW against 0.656 for PF14 (+0.114, 98.33% interval +0.074 to +0.182), and beats each part alone by +0.058 and +0.064; no gain on long transfers; 12 of 35 real transfers found against 8 | Candidate | 2026-10-17 |
+| [00101 - Switching event detector, part 14](00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md) | How well does RO-NC (the refit-offset neighbour-count detector, called XL in experiments 70 to 82) find the 66 real, hand-filtered switching transfers? | Partly supported: it finds 12 of the 35 real transfers over 1 day (0.34; 95% interval 0.21 to 0.51) and 0 of 31 shorter ones, against 0.770 of the moved MW on injected transfers; 6 of the 35 have no readings in the residual panel and 12 have a step under 4 noise units | Not for production | 2026-10-19 |
 | [00072 - Step-loss monitor for the solar farms, P35](00072-p35-step-loss-monitor-for-solar-farms/result.md) | Can a monitor find a loss of generating capacity at the 5 long-record solar farms from their daily power telemetry? | Refuted: it found 0.45 of 25% losses lasting 30 days (the plan required 0.80), 0.84 of 25% losses lasting 90 days, 0.26 of 10% losses lasting 90 days, and 3% losses barely above chance; false alarms 0.29 per farm-year on a placebo | Not for production | 2026-10-16 |
 | [00068 - Switching event detector, part 13](00068-sw2-5-train-detect-retrain-loop/result.md) | Does refitting the lagless XGBoost model without the detected switching intervals, for three rounds, raise the share of moved MW the detector finds and lower the forecast error? | Inconclusive, and no gain worth porting: recall gains +0.011 (97.5% interval +0.000 to +0.034) and the forecast's mean absolute error changes -0.175% (-1.145% to +0.603%); a random mask of about equal volume does as well | Not for production | 2026-10-16 |
 | [00067 - Switching event detector, part 14](00067-sw2-15-joint-edge-flow-estimator/result.md) | Does one convex fit of load flows across all boundaries between the 16 Primaries find more of the moved MW than the single-series 24-hour step detector? | Refuted: the joint estimator finds 0.108 of the moved MW against 0.646 (difference -0.538, 97.5% interval -0.605 to -0.421); a post hoc loss change lifts it to 0.527 (-0.120, -0.190 to -0.084) | Not for production | 2026-10-17 |
@@ -1657,6 +1658,36 @@ unexplained alarms. The verdict is `supported`.
   #1314](https://github.com/openclimatefix/nged-substation-forecast/pull/1314).
 
 ![Share of moved MW found, by detector](00082-sw2-18-19-combined-refit-offset-and-same-sign-count/figure_1_recall_by_arm.svg)
+
+### 00101: how well does the refit-offset neighbour-count detector find real switching events?
+
+**RO-NC finds about a third of the real load transfers lasting over 1 day (12 of 35) and none of the
+31 shorter ones, against 0.770 of the moved power on injected transfers, mostly because the real
+transfers are harder: 6 of the 35 sit where the residual panel holds no readings, and 12 have a
+step under 4 noise units.** RO-NC is the refit-offset neighbour-count detector, called XL in
+experiments 70 to 82. We scored it and four earlier detectors against the 66 real transfers that
+experiment 41's labeller judged visible, using the stored models and thresholds and no refits. The
+verdict is `partly supported`: the 14 real transfers of 25% or more of the receiving load lasting
+over 1 day are found at 0.559 of the moved MW (0.203 to 0.816), an interval that includes 0.770,
+but injected transfers of the same step size and metering predict 18.8 found of the 35, against 12.
+
+- **Headline numbers:** found over 1 day, with 95% Wilson intervals: RO-NC 12 of 35 (0.34; 0.21 to
+  0.51), X 10, PF14 8, LOGIT_SAME 7, D0 2. MW-weighted recall over 1 day: RO-NC 0.357 (0.169 to
+  0.553), X 0.350, PF14 0.156.
+- **Unexplained alarms:** RO-NC raised 286 alarms over the whole history, 147 with no logged
+  explanation; D0 and PF14 raised 297, with 160 unexplained.
+- **Logged half-hours:** 2.6% of the 381,830 logged half-hours over the whole history lie inside
+  labelled transfers of 25% or more of the receiving load, and 4.4% inside any labelled transfer,
+  but 80.5% lie in closures over 60 days that no label covers. For closures of 2 hours to 60 days
+  the shares are 13.0% and 19.2%.
+- **Finding for later experiments:** score detectors on real transfers only after the readings of
+  series 12 and 13 are restored in the residual panel, and aim the next detector at steps under 4
+  noise units.
+- **Write-up and pull request:** [the full result
+  page](00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md), [the event-by-event
+  table](00101-ro-nc-detector-on-real-hand-filtered-switching-events/events.md).
+
+![Share of moved MW found, by detector, on real transfers](00101-ro-nc-detector-on-real-hand-filtered-switching-events/figure_1_recall_by_detector.svg)
 
 ### 00080: does a zero starting value lower the error of the production XGBoost models? (BM0)
 

@@ -226,6 +226,7 @@ nav:
       - "Do the mechanical misses of the end rule come from monthly refits and data gaps?": ml-experiments/00071-sw2-18-refit-offset-and-gap-bridging/result.md
       - "Does the count of neighbours that step the same way find more of the moved load?": ml-experiments/00070-sw2-19-same-sign-neighbour-count/result.md
       - "Do the refit offset and the same-sign neighbour count add up in one switching detector?": ml-experiments/00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md
+      - "How well does the refit-offset neighbour-count detector find real, hand-filtered switching events?": ml-experiments/00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md
       - "Do the best guess's solar and heating offsets sharpen the switching detector?": ml-experiments/00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md
       - "Does the full NRA forecast recover the normal running arrangement during and after an injected switch?": ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md
       - "Does a step-loss monitor find a lost inverter at the solar farms?": ml-experiments/00072-p35-step-loss-monitor-for-solar-farms/result.md
