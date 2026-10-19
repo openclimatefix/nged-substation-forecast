@@ -72,6 +72,12 @@ advice:
     lowered the Primary quantile score (C7: +0.02, -0.04 to +0.06; C8: +0.04, -0.00 to +0.09).
 production_status: not-for-production
 adopted_in: none
+take_home_message: >-
+  The 14-day additive correction lowered the Primary quantile score by 0.99 points of capacity
+  (99.375% interval -1.82 to -0.18) when the newest power was 2 days old, as it did with 3.5-hour-
+  old power in experiment 19. On the 4 bulk and grid supply point series it raised the score by 0.36
+  (-0.19 to +0.98), so it is unproven there. No variant beat the plain additive 14-day form: a 7-day
+  window was worse (+0.19) and a multiplicative form far worse (+2.28).
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1228
 code: ml-experiments/00021-error-correction-variants-bsp-gsp-demand/
 ---

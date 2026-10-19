@@ -33,6 +33,13 @@ metric: >-
 verdict: refuted
 production_status: not-for-production
 adopted_in: none
+take_home_message: >-
+  For Primary substations, recent power lowered the forecast error more when it went into the
+  second-stage calibrator than when it went into a stage 1b correction model. Up to 48 hours ahead
+  the calibrator scored 5.31 against 6.14, so stage 1b was worse by 0.84 points of capacity (99%
+  interval +0.28 to +1.50); using both added at most 0.12 points. These are ceilings, because the
+  lagged inputs used estimates of past weather that a live service lacks, and stage 1b was better at
+  8 of the 16 series.
 best_arm: L3 (lagged power in the stage 2 calibrator; L2+L3 is within 0.12 points of it)
 headline: >-
   Primary substations, leads up to 48 h, C1 (L2c minus L3): +0.84 (+0.28 to +1.50 at 99%), 3 of 12
