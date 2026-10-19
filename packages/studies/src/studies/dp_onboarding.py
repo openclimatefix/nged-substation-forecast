@@ -109,6 +109,7 @@ def fit_many(
     initial_level: torch.Tensor,
     steps: int,
     learning_rate: float = 0.05,
+    final_rate_fraction: float = 1.0,
     seed: int = 0,
 ) -> tuple[list[PooledDemandModel], list[PooledFitResult]]:
     """Fit one independent pooled model per copy, every one from the same seed.
@@ -119,7 +120,8 @@ def fit_many(
         config: The model configuration shared by the copies.
         initial_level: The starting level of each substation, in points.
         steps: Optimiser steps per copy.
-        learning_rate: Adam's learning rate.
+        learning_rate: Adam's starting learning rate.
+        final_rate_fraction: The fraction of the rate left at the last step (see `fit_pooled`).
         seed: Seeds each copy's initialisation and posterior draws, so a copy's result does not
             depend on the others or on their order.
 
@@ -140,7 +142,13 @@ def fit_many(
             initial_level=initial_level,
         )
         results.append(
-            fit_pooled(model=model, batch=rows, steps=steps, learning_rate=learning_rate)
+            fit_pooled(
+                model=model,
+                batch=rows,
+                steps=steps,
+                learning_rate=learning_rate,
+                final_rate_fraction=final_rate_fraction,
+            )
         )
         models.append(model)
     return models, results

@@ -669,14 +669,17 @@ def fit_pooled(
     batch: PooledBatch,
     steps: int,
     learning_rate: float = 0.05,
+    final_rate_fraction: float = 1.0,
 ) -> PooledFitResult:
-    """Fit by full-batch Adam on the mean squared error plus the penalty.
+    """Fit by full-batch Adam on the model's loss.
 
     Args:
         model: The model, already on the batch's device.
         batch: The rows.
         steps: The number of optimiser steps.
-        learning_rate: Adam's learning rate.
+        learning_rate: Adam's starting learning rate.
+        final_rate_fraction: The fraction of `learning_rate` left at the last step; the rate
+            follows a cosine from 1 to this fraction, and 1.0 keeps it constant.
 
     Returns:
         The loss history, the wall-clock time, and the peak GPU memory.
@@ -685,6 +688,9 @@ def fit_pooled(
     model.to(device=device, dtype=batch.y.dtype)
     model.mark_trained_years(batch=batch)
     optimiser = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    schedule = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimiser, T_max=max(steps, 1), eta_min=learning_rate * final_rate_fraction
+    )
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
         torch.cuda.synchronize(device)
@@ -695,6 +701,7 @@ def fit_pooled(
         loss = model.loss(batch=batch)
         loss.backward()
         optimiser.step()
+        schedule.step()
         losses.append(loss.detach())
     if device.type == "cuda":
         torch.cuda.synchronize(device)
