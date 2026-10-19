@@ -9,6 +9,7 @@ intervals that start between 2024-07-01 and 2026-06-01. Test transfers start in 
 """
 
 import pickle
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Final
@@ -20,8 +21,8 @@ import e00096_labels as labelling
 import numpy as np
 import polars as pl
 from e00096_inject import BLOCK, QUIET_STAMPS, Event, draw_events
-from scipy.ndimage import maximum_filter1d
 from e00096_profile import Shape, fit_profile_shares, inject_shaped
+from scipy.ndimage import maximum_filter1d
 
 SEED: Final[int] = 9600
 FIRST_ID: Final[int] = 96_000
@@ -35,8 +36,8 @@ MULTIPLE: Final[int] = 3
 PER_MONTH_COUNTS: Final[tuple[int, int]] = (24, 12)
 """Events drawn per odd month: in the headline band, and in each of the other eight bands."""
 PAD_STAMPS: Final[int] = BLOCK
-"""A synthetic transfer keeps one day clear of every logged closure (a real transfer is corrected by
-its labels, so a nearby real transfer does no harm in training) and two days clear of every alarm."""
+"""A synthetic transfer keeps one day clear of every logged closure and two days clear of every
+alarm. A nearby real transfer does no harm, because its labelled MW corrects the lags."""
 PATH: Final = common.WORK_DIR / "synthetic.pkl"
 
 
@@ -123,7 +124,9 @@ def draw_training_events(*, power: dict[int, np.ndarray], quota: int) -> list[Ev
             power=power,
             seed=SEED + number,
             first_id=FIRST_ID + 1000 * number,
-            onset_ok=lambda onset, y=ym: int(year_months[onset]) == y and int(months[onset]) % 2 == 1,
+            onset_ok=lambda onset, y=ym: (
+                int(year_months[onset]) == y and int(months[onset]) % 2 == 1
+            ),
             counts=PER_MONTH_COUNTS,
         )
         by_month.append([e for e in drawn if harness.has_data(event=e, power=power)])
@@ -202,7 +205,7 @@ def load_or_build() -> tuple[list[Event], dict[str, SyntheticArrays]]:
     injected = sum(len(e.series) for e in events)
     print(
         f"real series-intervals in range: {real}; injected events: {len(events)} "
-        f"({injected} series-intervals), shapes {dict(zip(*np.unique(shapes, return_counts=True), strict=True))}"
+        f"({injected} series-intervals), shapes {dict(Counter(shapes))}"
     )
     PATH.parent.mkdir(parents=True, exist_ok=True)
     temporary = PATH.with_suffix(".tmp")

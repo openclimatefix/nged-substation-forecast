@@ -8,6 +8,7 @@ are scored: the synthetic training transfers start in odd months. Writes tables 
     uv run python ml-experiments/00096-*/e00096_report.py
 """
 
+from pathlib import Path
 from typing import Final
 
 import e00096_common as common
@@ -23,11 +24,9 @@ OLD_VARIANTS: Final[tuple[str, ...]] = ("plain", "ceiling", "nra_oracle_inj")
 OLD_CAUS_VARIANTS: Final[tuple[str, ...]] = ("nra_oracle_caus",)
 
 
-def _read(*, directory, pattern: str, variants: tuple[str, ...]) -> pl.DataFrame:
+def _read(*, directory: Path, pattern: str, variants: tuple[str, ...]) -> pl.DataFrame:
     frames = [
-        frame
-        for path in sorted(directory.glob(pattern))
-        if (frame := pl.read_parquet(path)).height
+        frame for path in sorted(directory.glob(pattern)) if (frame := pl.read_parquet(path)).height
     ]
     return pl.concat(frames, how="diagonal").filter(pl.col("variant").is_in(variants))
 
@@ -37,13 +36,10 @@ def load() -> tuple[pl.DataFrame, pl.DataFrame, list[pl.DataFrame]]:
     mine = _read(
         directory=common.CASES_DIR,
         pattern="cells_*.parquet",
-        variants=tuple(v for v in stats.ARMS.values() if v.startswith("nra_real")
-                       or v.startswith("nra_synth")),
+        variants=tuple(v for v in stats.ARMS.values() if v.startswith(("nra_real", "nra_synth"))),
     )
     old = _read(directory=OLD_CELLS_DIR, pattern="cells_*.parquet", variants=OLD_VARIANTS)
-    old_caus = _read(
-        directory=OLD_CAUS_DIR, pattern="cells_*.parquet", variants=OLD_CAUS_VARIANTS
-    )
+    old_caus = _read(directory=OLD_CAUS_DIR, pattern="cells_*.parquet", variants=OLD_CAUS_VARIANTS)
     events = pl.concat(
         [pl.read_parquet(path) for path in sorted(common.CASES_DIR.glob("events_*.parquet"))]
     )
@@ -98,7 +94,15 @@ def gap_shares(*, cases: pl.DataFrame) -> pl.DataFrame:
     """Return the share of the plain-to-ceiling gap each arm closes, family A."""
     frame = cases.filter(pl.col("scored") & (pl.col("family") == "A"))
     rows = []
-    for arm in ("old_inj", "real_inj", "real_caus", "real_cmax", "synth_inj", "synth_caus", "synth_cmax"):
+    for arm in (
+        "old_inj",
+        "real_inj",
+        "real_caus",
+        "real_cmax",
+        "synth_inj",
+        "synth_caus",
+        "synth_cmax",
+    ):
         share, gap = stats.share_of_gap(frame=frame, shapes=HEADLINE, arm=arm)
         rows.append(
             {
@@ -200,17 +204,33 @@ def reproduction(*, cases: pl.DataFrame) -> None:
 
 
 def tails(*, cases: pl.DataFrame) -> pl.DataFrame:
-    """Print the tail-calibration table (family A, headline shapes) of the real and synthetic arms."""
+    """Print the tail-calibration table of the real and synthetic arms (family A)."""
     frame = cases.filter(pl.col("scored") & (pl.col("family") == "A"))
     rows = []
     for arm in ("real_inj", "real_caus", "real_cmax", "synth_inj", "synth_caus", "synth_cmax"):
         row = {"arm": arm}
-        for metric in ("below01", "below05", "ex95", "ex99", "pin01", "pin05", "pin95", "pin99", "cov90", "cov98", "qs"):
-            work = frame.with_columns(pl.col(f"{metric}_{stats.ARMS[arm]}").alias("_v")).drop_nulls("_v")
+        for metric in (
+            "below01",
+            "below05",
+            "ex95",
+            "ex99",
+            "pin01",
+            "pin05",
+            "pin95",
+            "pin99",
+            "cov90",
+            "cov98",
+            "qs",
+        ):
+            work = frame.with_columns(pl.col(f"{metric}_{stats.ARMS[arm]}").alias("_v")).drop_nulls(
+                "_v"
+            )
             row[metric] = stats.mean_value(frame=work, shapes=HEADLINE, column="_v").point
         rows.append(row)
     table = pl.DataFrame(rows)
-    print("\nTail calibration, family A (nominal: below01 0.01, below05 0.05, ex95 0.05, ex99 0.01)")
+    print(
+        "\nTail calibration, family A (nominal: below01 0.01, below05 0.05, ex95 0.05, ex99 0.01)"
+    )
     print(table)
     return table
 
@@ -221,7 +241,10 @@ def main() -> None:
     pl.Config.set_tbl_rows(80)
     cases, events, cells = load()
     scored = cases.filter(pl.col("scored") & (pl.col("family") == "A"))
-    print(f"cases: {cases.height:,}; family A scored per shape: {scored.filter(pl.col('shape') == 'S2').height}")
+    print(
+        f"cases: {cases.height:,}; "
+        f"family A scored per shape: {scored.filter(pl.col('shape') == 'S2').height}"
+    )
     save(name="headline", frame=headline(cases=cases))
     save(name="absolute_a", frame=absolute(cases=cases, family="A"))
     save(name="absolute_b", frame=absolute(cases=cases, family="B"))

@@ -95,9 +95,7 @@ STEP: Final[timedelta] = timedelta(minutes=30)
 STEPS_PER_DAY: Final[int] = 48
 LAST_TRAINING_VALID: Final[datetime] = datetime(2025, 6, 30, 23, 30, tzinfo=UTC)
 HOLDOUT: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
-LEVELS: Final[np.ndarray] = np.array(
-    [0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99]
-)
+LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
 """The 11 quantile levels of the boosters: the 9 of experiment 00088 and the two tails."""
 LEVEL_COLUMNS: Final[tuple[str, ...]] = (
     "q01",
@@ -473,7 +471,7 @@ def load_series_arrays(*, series: pl.DataFrame) -> dict[str, SeriesArrays]:
 
 
 def pinball_quantile_score(*, quantiles: np.ndarray, actual: np.ndarray) -> np.ndarray:
-    """Return twice the mass-weighted mean pinball loss of the nine central levels (q05 to q95), per case.
+    """Return twice the mass-weighted mean pinball loss of q05 to q95 (nine levels), per case.
 
     Args:
         quantiles: Shape (cases, 11).

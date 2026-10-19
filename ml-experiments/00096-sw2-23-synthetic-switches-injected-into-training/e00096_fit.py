@@ -262,7 +262,7 @@ def _training_rows_cached(
     if key not in cache:
         if arm == "nra_synth" and "synthetic" not in _CACHE:
             _CACHE["synthetic"] = synth.load_or_build()[1]
-        synthetic = _CACHE["synthetic"][row["site"]] if arm == "nra_synth" else None  # ty: ignore[invalid-argument-type]
+        synthetic = _CACHE["synthetic"][row["site"]] if arm == "nra_synth" else None  # ty: ignore[not-subscriptable]
         cache[key] = training_rows(
             row=row, arrays=arrays, labels=labels["oracle"], synthetic=synthetic
         )

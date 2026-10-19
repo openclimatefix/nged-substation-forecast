@@ -1,4 +1,4 @@
-"""Forecast experiment 00088's injected cases with experiment 00096's boosters, and write cell scores.
+"""Forecast experiment 00088's injected cases with experiment 00096's boosters, and score them.
 
 For each batch of injected events (series disjoint within 7 days) and each shape, the script
 injects the transfers into the dense half-hourly power, rebuilds the lags from the injected power,

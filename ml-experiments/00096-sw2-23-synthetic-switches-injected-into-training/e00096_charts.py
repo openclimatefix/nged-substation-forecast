@@ -53,7 +53,7 @@ def _title(*, text: str, lines: list[str]) -> alt.TitleParams:
 def figure_1() -> alt.TopLevelMixin:
     """The planned contrasts."""
     data = pl.read_parquet(RESULTS / "headline.parquet")
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888").encode(x="x:Q")
+    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     base = alt.Chart(data).encode(
         y=alt.Y("contrast:N", sort=None, title=None, axis=alt.Axis(labelLimit=260))
     )
@@ -87,9 +87,7 @@ def figure_2() -> alt.TopLevelMixin:
     rows = []
     for arm, value, low, high in data.select("arm", "value", "low", "high").iter_rows():
         if arm in ("plain", "ceiling"):
-            rows.append(
-                {"group": arm, "mw": "ref", "value": value, "low": low, "high": high}
-            )
+            rows.append({"group": arm, "mw": "ref", "value": value, "low": low, "high": high})
         elif arm.startswith(("real_", "synth_")):
             kind, mw = arm.split("_")
             rows.append(
@@ -142,7 +140,7 @@ def figure_3() -> alt.TopLevelMixin:
     )
     data = data.with_columns(label=pl.col("mw").replace(MW_LABELS))
     scale = alt.Scale(domain=list(MW_LABELS.values()), range=list(MW_COLOURS.values()))
-    zero = alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color="#888").encode(y="y:Q")
+    zero = alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color="#888").encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     base = alt.Chart(data).encode(
         x=alt.X(
             "bin:N",

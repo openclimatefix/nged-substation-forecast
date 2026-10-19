@@ -92,7 +92,7 @@ def case_table(*, cells: list[pl.DataFrame], events: pl.DataFrame) -> pl.DataFra
 
     Args:
         cells: Frames of cells (one row per case, variant, and band): this experiment's, and
-            experiment 00088's for the variants it forecast. A frame lacking a metric leaves it null.
+            experiment 00088's for the variants it forecast. A missing metric is left null.
         events: The concatenated `events_*.parquet` files.
 
     Returns:
