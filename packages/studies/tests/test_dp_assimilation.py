@@ -21,12 +21,14 @@ from studies.dp_assimilation import (  # noqa: E402
     CorrectionTrace,
     FilterHyperparameters,
     LeadSpread,
+    SharedTerm,
     correction_at,
     day_ahead_initialisation,
     fit_filter_hyperparameters,
     fit_site_hyperparameters,
     lead_band_of_days_ahead,
     post_filter_lead_spread,
+    replica_corrections,
     run_ewma,
     run_kalman,
     site_log_likelihood,
@@ -470,3 +472,126 @@ def test_a_fitting_window_without_the_grid_is_refused():
             band=np.zeros(48, dtype=int),
             window=(np.datetime64("2024-01-01", "us"), np.datetime64("2024-01-05", "us")),
         )
+
+
+def _summed_replica() -> tuple[np.ndarray, ReplicaResiduals, np.ndarray, np.ndarray]:
+    """Return a 60-day grid, its replica, a local stream, and a shared stream."""
+    end_times = np.arange(
+        np.datetime64("2024-01-01T00:30", "us"),
+        np.datetime64("2024-03-01T00:30", "us"),
+        np.timedelta64(30, "m"),
+    )
+    n = len(end_times)
+    generator = np.random.default_rng(21)
+    residual = _simulate(hyper=HYPER, n=n, seed=22) + generator.normal(0.0, 0.2, size=n)
+    shared = _simulate(hyper=HYPER, n=n, seed=23)
+    replica = ReplicaResiduals(
+        residuals=residual,
+        band=_bands(n=n),
+        quarter=np.zeros(n, dtype=int),
+        index=np.arange(n),
+        fit_cut=datetime(2024, 1, 1, tzinfo=UTC),
+        switching=np.zeros(n, dtype=bool),
+    )
+    return end_times, replica, residual - 0.5 * shared, shared
+
+
+def _shared_term(*, stream: np.ndarray, weights: tuple[float, ...]) -> SharedTerm:
+    return SharedTerm(
+        residual=stream,
+        band=_bands(n=len(stream)),
+        run=partial(run_kalman, hyper=HYPER),
+        weight_by_band=np.array(weights),
+    )
+
+
+def test_a_summed_correction_is_the_local_plus_the_weighted_shared_correction():
+    end_times, replica, local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    weights = (0.5, 1.0, 1.5, 0.0)
+    summed = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=weights)],
+    )
+    local_only = replica_corrections(
+        end_times=end_times, replica=replica, run=run, local_residual=local
+    )
+    shared_only = replica_corrections(
+        end_times=end_times, replica=replica, run=run, local_residual=shared
+    )
+    for total, local_part, shared_part in zip(summed, local_only, shared_only, strict=True):
+        expected = local_part + np.array(weights)[replica.band] * shared_part
+        assert np.allclose(total, expected, atol=1e-12)
+
+
+def test_no_shared_term_and_a_zero_weight_both_give_the_local_correction():
+    end_times, replica, _local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    plain = replica_corrections(end_times=end_times, replica=replica, run=run)
+    zero = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        shared=[_shared_term(stream=shared, weights=(0.0, 0.0, 0.0, 0.0))],
+    )
+    for left, right in zip(plain, zero, strict=True):
+        assert np.array_equal(left, right)
+
+
+@pytest.mark.parametrize("which", ["local", "shared", "both"])
+def test_changing_a_local_or_shared_residual_after_each_cases_cutoff_changes_nothing(which: str):
+    end_times, replica, local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    weights = (0.7, 0.7, 0.7, 0.7)
+
+    def corrections(
+        *, local_stream: np.ndarray, shared_stream: np.ndarray
+    ) -> tuple[np.ndarray, ...]:
+        return replica_corrections(
+            end_times=end_times,
+            replica=replica,
+            run=run,
+            local_residual=local_stream,
+            shared=[_shared_term(stream=shared_stream, weights=weights)],
+        )
+
+    base = corrections(local_stream=local, shared_stream=shared)
+    after = 48 * 30
+    local_changed, shared_changed = local.copy(), shared.copy()
+    if which in {"local", "both"}:
+        local_changed[after:] += 25.0
+    if which in {"shared", "both"}:
+        shared_changed[after:] += 25.0
+    changed = corrections(local_stream=local_changed, shared_stream=shared_changed)
+    valid_times = end_times[replica.index]
+    for days_ahead, (left, right) in enumerate(zip(base, changed, strict=True), start=1):
+        cutoff = usable_cutoff_positions(
+            end_times=end_times,
+            initialisation=day_ahead_initialisation(end_times=valid_times, days_ahead=days_ahead),
+            delay_hours=3.5,
+        )
+        before_the_change = cutoff < after
+        assert before_the_change.any()
+        assert np.array_equal(left[before_the_change], right[before_the_change])
+        assert not np.allclose(left[~before_the_change], right[~before_the_change])
+
+
+def test_the_shared_term_changes_the_spread_it_is_summed_into():
+    end_times, replica, local, shared = _summed_replica()
+    run = partial(run_kalman, hyper=HYPER)
+    local_only = post_filter_lead_spread(
+        end_times=end_times, replica=replica, run=run, local_residual=local
+    )
+    summed = post_filter_lead_spread(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=(0.5, 0.5, 0.5, 0.5))],
+    )
+    narrow = local_only.by_lead_band[0].table[0, 0]
+    with_shared = summed.by_lead_band[0].table[0, 0]
+    assert (with_shared[-1] - with_shared[0]) < (narrow[-1] - narrow[0])
