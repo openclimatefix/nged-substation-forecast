@@ -582,7 +582,7 @@ def pooled_replica_residuals(
         cache: The cache.
         sites: The substations as they are at the replica's cut.
         cut: The cut of the final fit.
-        strength: The deviation penalty's weight.
+        strength: The deviation penalty's weight; unused for a tied fit.
         tied: True for complete pooling.
 
     Returns:
@@ -590,7 +590,9 @@ def pooled_replica_residuals(
         outside the switching masks, with the rows it trained on in the replica fit.
     """
     fit_cut = replica_cut(cut=cut)
-    joint = fit_pooled(cache=cache, sites=sites, cut=fit_cut, strengths=[strength], tied=tied)
+    joint = fit_pooled(
+        cache=cache, sites=sites, cut=fit_cut, strengths=() if tied else [strength], tied=tied
+    )
     out: dict[str, PooledReplica] = {}
     for site in sites:
         features = cache.sites[site.site]
