@@ -82,11 +82,20 @@ follows them:
 1. **Window.** The decision contrasts stay on the 2-year window, so pooling is measured apart from
    years. P-all against S-all is a secondary pooling contrast beside C1, and C5 is descriptive.
 2. **Contrasts.** C1 to C5 are defined as in "Planned contrasts"; C4 is not part of the verdict.
-3. **XGBoost bar.** The tuning-year winner of plain and solar-offset lagless XGBoost.
+3. **XGBoost bar.** The tuning-year winner of plain (either start) and solar-offset lagless XGBoost.
 4. **Variational fit.** The variational fit is the model, so it runs at the screening tier; its
    intervals still come from month-resampling the stored predictions. Seeds, refits, and posterior
    intervals wait for the confirmation tier.
 5. **Controls.** The placebo twin and shuffled-capacity tests are defined in the gate.
+
+## Caveats fixed in advance
+
+- The hyperparameters (K, penalties, step count, P-map scales) are tuned on a year that includes the
+  held-out site's history, which a genuinely new site would not bring.
+- P-all and S-all train on rows before 2023-08, which use the earliest capacity vintage scaled back
+  by the growth prior, and before 2022-03, which carry no switching masks.
+- Forecasts are issued at 09:00 UTC on the previous day, so on 30 June the last 15 hours before the
+  cut are in training; the effect on lagless forecasts is negligible.
 
 ## Size triggers
 
@@ -230,6 +239,12 @@ CPU with `nthread` within the slot.
 - **References:** Part 2's stored G-all and G1 predictions; `baseline_forecasters.climatology` and
   `manual_heuristic` on the same rows.
 
+**Per-site comparators are tuned fairly.** S-4w, S-3m, X-4w, and X-3m are not run with penalties
+tuned on full history: their deviation penalty (and XGBoost's rounds and depth) are tuned on the
+tuning year with the same truncation applied at the replica cut. All four get the same
+cross-fitted spread, stratified by weeks of history, as P-onb4w and P-short3m. P-onb4w minus
+X-pool-onb4w is reported beside C2 at the same level, outside the verdict.
+
 **Tuning (fitted on data before 2024-07-01, scored 2024-07-01 to 2025-06-30, by quantile score,
 not mean absolute error):** K in {2, 4, 6} shared daily shapes by 3 values of the deviation penalty
 (9 batched fits); the optimiser's step count and learning rate by early stopping on the same year;
@@ -267,25 +282,33 @@ verdict is `inconclusive`.
    from the same calendar day one year earlier (one year later where the earlier year is missing),
    keeping the solar geometry. Refit P. Pass if the summer-midday score (April to September, 10:00
    to 14:00 local) is worse with the placebo, with a month-resampled interval that excludes zero,
-   and the fitted capacity falls.
+   and the fitted capacity falls at 4 of 6 MW sites, for the 2024-25 season-year. The placebo is one
+   draw.
 4. **Shuffled capacity (ruling 5).** Permute the capacity priors across the MW sites (a derangement,
    in MW, converted to each site's points) and refit. Pass if, at two-thirds or more of the MW sites
    (4 of 6), the fitted capacity lies closer to the site's own experiment 45 `frozen` vintage than
-   to the shuffled prior.
+   to the shuffled prior, for the 2024-25 season-year and with P's own prior scale (a weakened prior
+   would pass trivially). For a pair whose own and shuffled priors differ by less than the prior's
+   standard deviation, closeness is undefined: the write-up reports the separation and excludes the
+   pair from the count.
 5. **Module tests 1 to 5** (above) pass.
 
 ## Planned contrasts
 
-Five planned contrasts plus one secondary contrast, Bonferroni-corrected (99% intervals from
-`studies.bootstrap`, resampling whole calendar months of the stored predictions, paired across arms),
-each with the count of sites moving each way and every arm's absolute score. Rulings of the design
-session (2026-10-19) fix the definitions:
+The verdict contrasts C1 to C3 form the Bonferroni family: 98.33% intervals from
+`studies.bootstrap`, resampling whole calendar months of the stored predictions, paired across arms,
+as in Part 2. C4, C5, and the secondary contrast are outside the family and use 95% intervals. Each
+is reported with the count of sites moving each way and every arm's absolute score. Rulings of the
+design session (2026-10-19) fix the definitions:
 
-- **C1, pooling on all rows (non-inferiority):** P minus S on all scored rows of the eligible MW
-  sites. C1 must not be `refuted`.
+- **C1, pooling on all rows (non-inferiority, margin +0.10 points):** P minus S on the five
+  decision sites' scored rows, with D9 reported beside them. At the screening tier, C1 passes if
+  its point estimate is at most +0.10 points and its interval does not lie wholly above zero. At
+  the confirmation tier, C1 passes only if the upper end of its interval is at most +0.10 points.
+  The margin is the design session's ruling. The take-home says which of the two C1 meets.
 - **C2, onboarding:** P-onb4w minus S-4w on each held-out site.
 - **C3, short history:** P-short3m minus S-3m.
-- **C4, the DP against lagless XGBoost:** P minus the tuning-year winner of X-2y and X-2yamq.
+- **C4, the DP against lagless XGBoost:** P minus the tuning-year winner of X-2y, X-2yq, and X-2yamq.
   Labelled and reported, not part of the verdict.
 - **C5, the DP against Part 2's bar:** P-all minus G-all (Part 2's stored predictions, same rows).
   Descriptive: the bar the pooled DP must clear before Part 4.
@@ -316,9 +339,11 @@ Written before any fit; each line can fail, and none of them overrides the decis
 - **P-all minus S-all:** within ±0.15 points, as for C1.
 - **Ablations:** P-map within ±0.1 points of P; P-nonet within ±0.15 points of P.
 - **The solar offset:** X-2yamq minus X-2yq within ±0.05 points, as in Part 2.
-- **Tails:** P's q01 and q99 coverage within 1.5 percentage points of nominal, and q05 and q95
-  within 3 points (Part 2's arms missed 1 and 2 points; the bands are wider here because no
-  spread change is planned).
+- **Tails:** P's q01 and q99 coverage within 1 percentage point of nominal, and q05 and q95 within
+  2 points; the same bands for P-onb4w and P-short3m, whose spread model is the least tested part.
+  Part 2's arms missed by 1 and 2 points, so these bands may fail, and the write-up says so
+  plainly. The tails stay outside the verdict. The q01 and q99 pinball loss of C1, C2, and C3 is
+  reported beside each headline estimate.
 - **Capacity:** P's 2024-25 capacities lie within ±20% of experiment 45's `frozen` vintage at D10,
   D11, and D16. The hindsight season-year constant in `capacity_weekly.parquet` is an
   after-the-fact check only, never an input; Part 2 found the two files disagree (ratio 0.30 to
@@ -330,41 +355,71 @@ Written before any fit; each line can fail, and none of them overrides the decis
 
 ## Decision rule
 
+**Every contrast is also reported per site and with each decision site dropped in turn** (C1 to C3,
+C5, and the P-all minus S-all contrast). Part 2's C1 rested on D14. A label that flips when one
+site is dropped is reported as such in the take-home. C2 and C3 are also reported by month since the
+cut. Both histories lie in April to June, so both measure summer onboarding; a winter-onboarding arm
+is a follow-up, not part of Part 3.
+
+**History windows.** "4 weeks" means the 28 calendar days ending at the cut (2025-06-03 to
+2025-06-30); "3 months" is 2025-04-01 to 2025-06-30; 0, 2, and 8 weeks follow the same rule.
+Masked or missing rows inside a window are not replaced by reaching further back, and the write-up
+reports each site's usable-row count.
+
 **The verdict applies the series brief's pooling success criterion, under its Phase A labels
-(history counted at 2024-07-01, so 4 of 5 decision sites).** Each of C1 to C5 is labelled
+(history counted at 2024-07-01, so 4 of 5 decision sites).** C1 to C3 are labelled
 `supported`, `partly supported`, `refuted`, or `inconclusive` by the Phase A rule; `not supported`
 and `small gain` are Phase B labels and are not reachable here.
 
-- **`supported`:** C2 or C3 is `supported` and C1 is not `refuted`, with the gate passed. Part 3
+- **`supported`:** C2 or C3 is `supported` and C1 passes, with the gate passed. Part 3
   then goes to the confirmation tier (8-week refits, three seeds, the coverage check of the
   variational intervals on at least 20 synthetic sites, and the prior-sensitivity check) before
   Part 4 relies on it.
-- **`partly supported`:** C1 is not `refuted`, and C2 or C3 has an estimate below zero with fewer
+- **`partly supported`:** C1 passes, and C2 or C3 has an estimate below zero with fewer
   than 4 of 5 sites improving, while neither is `supported`.
 - **`refuted`:** C1 is `refuted` (pooling costs accuracy on substations with full history), or C2
   and C3 are both `refuted`.
 - **`inconclusive`:** anything else, or a gate test that cannot be fixed inside the part.
 
-**C4, C5, and the P-all contrast are labelled in the bullets, not in the `verdict` field.** A DP
-gain over XGBoost is claimed only from C4. A pooled DP that loses C5 (P-all minus G-all above zero)
-is reported in the take-home whatever the verdict, because Part 4 would then start from the convex
-all-years model rather than the pooled DP.
+**C4, C5, and the P-all contrast get a label in the bullets and play no part in the `verdict`
+field.** A DP gain over XGBoost is claimed only from C4. C5 is labelled for the hand-on decision
+only. A pooled DP that loses C5 (the P-all minus G-all estimate above zero) is reported in the
+take-home whatever the verdict, because Part 4 would then start from the convex all-years model
+rather than the pooled DP.
 
-## Run order and time
+## Run order, budget, and stop rule
+
+The manager allows up to 10 GB of GPU for this part (SIMP1 holds about 5 GB of the 48 GB) and 8 CPU
+cores. The module PR measures peak memory at B = 1, 2, 4, and 6 copies; the run uses the largest B
+whose peak stays under 8 GB, so the pooled fits batch about 6 copies at a time.
 
 1. Module PR: variational posterior, MAP ablation, batched fits, onboarding, replica spread for
    the pooled model, tests 1 to 5.
-2. Gate tests 1 to 4 (about 20 minutes).
-3. Tuning (about 12 batched fits).
-4. Main arms P, P-map, P-nonet, S, G-2y, P-all, and their replicas.
-5. C2: one batched leave-one-site-out fit (B = 6) plus onboarding at 0, 2, 4, and 8 weeks, and its
-   replica. C3: one batched short-history fit (B = 6) and its replica; the 6-month arms last.
+2. Gate tests 1 to 4.
+3. Tuning.
+4. Main arms P, P-map, P-nonet, S, S-all, G-2y, P-all, and their replicas.
+5. C2 and C3 arms (leave-one-site-out, onboarding lengths, short-history fits, and their replicas;
+   the 6-month arms last).
 6. XGBoost arms, lagged reference, and references (CPU, alongside the GPU fits).
 7. Cold block.
 
-**Ask the manager for a GPU share before step 2** (about 10 GB covers a batch of 12 copies if the
-B = 6 measurement scales linearly; the module PR measures it). If the 2-hour budget is at risk, cut
-in this order: the 6-month arms, P-onb2w and P-onb8w, P-nonet, the cold block.
+**Budget (planning estimates, replaced by the module PR's measurements before step 2).** A "copy"
+is one fitted model; P-all and S-all copies hold about three times the rows of a 2-year copy.
+
+| Step | Copies | Estimated wall clock |
+|---|---|---|
+| Gate (synthetic, 4 injected farms, placebo, shuffled) | about 20 | 30 minutes |
+| Tuning (9 pooled, 3 P-map, 3 penalties for 6 per-site sites) | about 30 | 45 minutes |
+| Main arms with replicas (P, P-map, P-nonet, P-all; S, S-all, G-2y per site) | about 50 | 75 minutes |
+| C2 and C3 (6 + 6 batched fits, onboarding, replicas, per-site comparators) | about 30 | 45 minutes |
+| XGBoost and references (CPU, in parallel with the GPU) | 0 | 0 minutes extra |
+| Cold block | 4 | 15 minutes |
+
+The estimate is about 3.5 hours, so the part's budget is 4 hours of GPU wall clock. The 10-minute
+limit per arm applies to a batched fit as a whole, not to each copy. **Stop rule:** at the end of
+step 5, if more than 4 hours have passed, cut in this order: the 6-month arms, P-onb2w and P-onb8w,
+P-nonet, the cold block. If the gate and tuning alone pass 2 hours, message the manager before
+continuing.
 
 ## Data paths
 
@@ -379,7 +434,9 @@ in this order: the 6-month arms, P-onb2w and P-onb8w, P-nonet, the cold block.
   on PR 1349's branch until it merges.
 - **Capacity vintages:**
   `data/ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/capacity_weekly_vintages.parquet`,
-  variant `frozen`. Never read D14 for 2023-09-04 to 2025-08-25.
+  variant `frozen`. Never read D14 for 2023-09-04 to 2025-08-25; its last observed
+  vintage week is 2023-04-17 and that value is held. D14 counts in the shuffled-capacity 4 of 6, and
+  the write-up reports it separately because a two-year-stale vintage is a weak "own" target.
 - **Injected farms:** experiment 39's harness (`ml-experiments/00039-pv-disaggregation-cams-injection/e00039_inject.py`)
   with the farm output in the experiment 45 folder (`farm_half_hourly.parquet`). The farms are
   metered generators: no farm series, name, or identifier appears in any figure or in the
@@ -389,7 +446,7 @@ in this order: the 6-month arms, P-onb2w and P-onb8w, P-nonet, the cold block.
 
 ## What the write-up must contain
 
-Title "Differentiable physics, part 3: one pooled model across substations", front matter as above,
+Title "Differentiable physics, part 3: one pooled demand model across substations", front matter as above,
 at `docs/ml-experiments/<id>-<slug>/result.md`.
 
 - **The take-home paragraph first:** whether one model across substations matches a model per
