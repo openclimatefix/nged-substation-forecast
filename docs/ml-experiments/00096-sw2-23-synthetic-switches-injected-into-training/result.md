@@ -176,6 +176,8 @@ overlapping detector step.
   in an even month (accepted as immaterial: 1 of 94, stated above), that the median MW uses
   hindsight (stated above), and that the reproduction guard might trip on 11-level pooling (it did
   not). Findings on the unused `power` argument and on memory were not acted on.
+  A numbers review and a prose review followed; their valid findings (four rounding slips, one
+  mislabelled range, and an opening that used undefined terms) were applied.
 - **What to try next.** Train the booster with a MW that carries the detector's errors (about 1.5
   times too large, ending late) in the synthetic transfers, and score it with the detector's MW. A
   better MW estimate at forecast time is the other route.
