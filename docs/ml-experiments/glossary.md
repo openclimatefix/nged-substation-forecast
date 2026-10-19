@@ -46,10 +46,12 @@ power-curve base margin.
 
 **BG2 is the second best-guess recipe, assembled in [experiment
 87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) from the best earlier ideas.**
-For Primary substations it is a quantile blend of five XGBoost models with a solar offset at the 5
-Primaries that have a clean solar capacity estimate. For bulk and grid supply points it is the
-weekly-refitted XGBoost model with no correction. Experiment 97 recalibrates only the stored weekly-refitted
-forecast and calls it BG2.
+For Primary substations it is a quantile blend of five members, with a solar offset at the five
+Primaries that have a clean solar capacity estimate. The members are a weekly-refitted XGBoost
+model, a monthly-refitted XGBoost model, an analogue model (the experiment's summary does not state
+its type), a model pooled by substation type, and the stack. For bulk and grid supply points it is
+the weekly-refitted XGBoost model with no correction. Experiment 97 recalibrates only the stored
+weekly-refitted forecast and calls it BG2.
 
 ### Bulk supply point and grid supply point
 
@@ -57,9 +59,9 @@ forecast and calls it BG2.
 network, and a bulk supply point (BSP) is a substation one step further down.** NGED's GSPs step
 voltage from 400 kV or 275 kV to 132 kV, and its BSPs step from 132 kV to 33 kV or 66 kV ([NGED's
 network and its data](../background/network.md)). A Primary substation sits below a BSP. The trial
-area holds 2 GSPs and 2 BSPs, and the experiments report them together as "supply points" or "BSP
-and GSP". The [data-processing page](data-processing.md#decide-which-rows-are-demand) says not to
-treat them as clean demand.
+area holds two GSPs and two BSPs, and the experiments report them together as "supply points" or
+"BSP and GSP". The [data-processing page](data-processing.md#decide-which-rows-are-demand) says not
+to treat them as clean demand.
 
 ### Capacity and points of capacity
 
@@ -109,19 +111,24 @@ Primary substations, 4 bulk or grid supply points, and a battery and a biofuel g
 labels are defined in [experiment 3](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) and
 are used with the same meaning in the pages checked (experiments 5, 27, 46, 51, 53, 64, and 74 and
 the data-processing page), for example D1 is a grid supply point and D9, D10, D11, D14, and D16 are
-the 5 Primaries with a clean solar capacity estimate. A D code and a substation name are different
-labels. D codes are not the same as the detector names D0, D0M, D1, and D2 (see [Detectors D0, D0M,
-D1, and D2](#detectors-d0-d0m-d1-and-d2)), nor the labels P12 and P13 of [experiment
+the five Primaries with a clean solar capacity estimate. A D code and a substation name are
+different labels. D codes are not the same as the detector names D0, D0M, D1, and D2 (see [Detectors
+D0, D0M, D1, and D2](#detectors-d0-d0m-d1-and-d2)), nor the labels P12 and P13 of [experiment
 101](00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md). Generators carry
 separate anonymous labels such as "Solar farm A", assigned by `studies.anonymise`.
 
 ### Detectors D0, D0M, D1, and D2
 
 **In the switching experiments, D0, D0M, D1, and D2 are names of detectors, not series.** D0 is the
-single-series detector. It raises an alarm when the average residual over a window steps by more
-than a threshold. D0M is D0 at the thresholds of experiment 43 (4-hour window 6.0 noise units,
-24-hour window 4.0), and it ends each alarm interval with a level tracker. D1 also requires a
-neighbouring substation to step the opposite way. D2 is D0 with a neighbour veto ([experiment
+single-series detector. D0 raises an alarm when the average residual over a window steps by more
+than a threshold. D0M is D0 with its threshold chosen by the same search that sets D2's threshold
+and with no veto; at the 24-hour window it uses 4.0 noise units and ends each alarm interval with a
+level tracker that stops after 60 days. D0 at the thresholds of experiment 43 (6.0 noise units at
+the 4-hour window and 4.0 at the 24-hour window) is a separate arm, although the search returned
+those same thresholds. D1 is the neighbour-balance detector of experiment 37, which also requires a
+neighbouring substation to step the opposite way (thresholds 3.75 at the 4-hour window and 2.5 at
+the 24-hour window). D2 is D0M plus a neighbour veto ([experiment
+37](00037-switching-first-look/result.md), [experiment
 43](00043-sw2-1-detector-scoreboard/result.md), [experiment
 55](00055-sw2-8-neighbour-veto-single-series-detector/result.md), [experiment
 58](00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md), [experiment
@@ -136,14 +143,16 @@ of past weather.** ENS is a forecast issued before the weather happens, and the 
 given ENS. ERA5, the fifth-generation ECMWF reanalysis, arrives about 5 days late ([experiment
 10](00010-elexon-price-lags-stage1a-demand/result.md)), so a result that uses ERA5 as a forecast
 input is a ceiling and not a usable product. CAMS is a satellite-based estimate of sunlight
-([experiment 7](00007-cams-static-correction-stage1a-residual/result.md)). A model trained on ERA5
-or CAMS learns from weather that was not forecast.
+([experiment 7](00007-cams-static-correction-stage1a-residual/result.md)). An XGBoost model trained
+on ERA5 or CAMS learns from weather that was not forecast.
 
-### Frozen model
+### Frozen XGBoost model
 
-**A frozen model is trained once, on data up to the start of the validation year, and is not
-refitted during the validation year.** The frozen stack is the stack with this training
-([experiment 87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)).
+**A frozen XGBoost model is trained once, on data up to the start of the validation year, and is not
+refitted during that year.** In [experiment
+87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md), the frozen forecast without
+the 14-day correction scores 6.927 for Primary substations (S1), and the frozen forecast with the
+correction is the stack (S2, 5.543).
 
 ### Half-life
 
@@ -219,10 +228,10 @@ keeps the tracked end when no step qualifies ([experiment
 
 ### Pooled mixture
 
-**A pooled mixture applies the quantile model to each of the 51 ENS members and pools the resulting
-quantiles as equal-weight points.** The forecast quantiles are the weighted quantiles of the pooled
-values ([experiment 13](00013-primary-demand-against-stored-baselines/result.md), [experiment
-2](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md)).
+**A pooled mixture applies the XGBoost quantile model to each of the 51 ENS members and pools the
+resulting quantiles as equal-weight points.** The forecast quantiles are the weighted quantiles of
+the pooled values ([experiment 13](00013-primary-demand-against-stored-baselines/result.md),
+[experiment 2](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md)).
 
 ### Pre-registration, decision rule, and verdict words
 
@@ -238,10 +247,11 @@ write-up marks a verdict that its decision rule does not cover as not pre-regist
 
 ### Primary substation
 
-**A Primary substation steps voltage down from 33 kV or 66 kV to 11 kV.** NGED operates 1,161 of
-them ([NGED's network and its data](../background/network.md)), and 16 of the 32 trial series are
-Primaries. A Primary is fed from a bulk supply point, which is a higher-voltage substation (see
-[Bulk supply point and grid supply point](#bulk-supply-point-and-grid-supply-point)).
+**A Primary substation steps voltage down from 33 kV or 66 kV to 11 kV.** NGED operates 1,161
+Primary substations ([NGED's network and its data](../background/network.md)), and 16 of the 32
+trial series are Primaries. A Primary is fed from a bulk supply point, which is a higher-voltage
+substation (see [Bulk supply point and grid supply
+point](#bulk-supply-point-and-grid-supply-point)).
 
 ### Quantile score and pinball loss
 
@@ -249,9 +259,9 @@ Primaries. A Primary is fed from a bulk supply point, which is a higher-voltage 
 forecast quantile levels, in points of capacity.** The pinball loss of a quantile at level τ is τ
 times the shortfall of the forecast below the observation, or (1 − τ) times the excess of the
 forecast above it. Each level's weight is the probability mass between the mid-points to its
-neighbouring levels, so the score is not a plain mean over the levels. From experiment 87 onward the
-11 levels are 0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, and 0.99; earlier
-experiments use the nine levels 0.05 to 0.95 (`pinball_quantile_score` in
+neighbouring levels, so the score is not a plain mean over the levels. Experiments 33, 34, and 48
+use nine levels (0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, and 0.95), and experiment 87 and
+later use 11 levels (those nine plus 0.01 and 0.99) (`pinball_quantile_score` in
 `ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations/e00087_common.py`). Scores
 from experiments with different levels, row sets, or series cannot be compared.
 
@@ -278,7 +288,7 @@ residual ([experiment 66](00066-sw2-16-end-rule-as-baseline/result.md)).
 
 ### RO-NC
 
-**RO-NC is the refit-offset neighbour-count detector, called XL in experiments 70 to 82.** It is
+**RO-NC is the refit-offset neighbour-count detector, called XL in experiment 82.** RO-NC is
 PF14 with two changes: the step is taken from whichever of two residual models, refitted half a
 month apart, did not refit within 24 hours, and the candidates are scored by a logistic regression
 that includes the count of neighbours stepping the same way as the alarming substation ([experiment
@@ -288,8 +298,10 @@ detector alone.
 
 ### Season-year
 
-**A season-year is a 12-month period running from September to August**, such as 2019/20
-([experiment 39](00039-pv-disaggregation-cams-injection/result.md)).
+**A season-year is a 12-month period, and its start month depends on the series of work.** In the
+solar-disaggregation experiments it runs from September to August, such as 2019/20 ([experiment
+39](00039-pv-disaggregation-cams-injection/result.md)). In the differentiable-physics series it
+runs from July to June (`FIRST_SEASON_MONTH` in `packages/studies/src/studies/dp_calendar.py`).
 
 ### Skill
 
@@ -309,11 +321,12 @@ is fitted on earlier cases to bring the 5% to 95% coverage near its target
 
 ### Stack
 
-**The stack is N1 with the 14-day correction, a half-life of 0.5 years, and a spread factor of
-1.15.** It is the forecast for Primary demand in the best guess, except that the best guess of
-experiment 33 omits the half-life
-([experiment 19](00019-primary-demand-stack-vs-manual-heuristic/result.md),
-[experiment 33](00033-best-guess-architecture-vs-production/result.md)).
+**The stack is N1 with the 14-day correction and a spread factor of 1.15, and the experiments differ
+on a third component.** The stack of [experiment
+19](00019-primary-demand-stack-vs-manual-heuristic/result.md) also has a half-life of 0.5 years. The
+stack of experiments [33](00033-best-guess-architecture-vs-production/result.md), 48, and
+[87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) has no half-life and is
+trained once, and in experiment 87 it is the frozen forecast plus the 14-day correction.
 
 ### Stages 0, 1a, and 2
 
@@ -326,16 +339,17 @@ forecast](../roadmap/staged-probabilistic-forecast.md)).
 ### Tail coverage
 
 **Tail coverage is the coverage of a quantile in the tails: the share of observed values below the
-0.01 and 0.05 quantiles or above the 0.95 and 0.99 quantiles.** Each should equal the quantile's
-level on the lower tail and one minus the level on the upper tail. Experiment 87 reports it at
-those four levels beside the pinball loss there
-([experiment 87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)).
+0.01 and 0.05 quantiles or above the 0.95 and 0.99 quantiles.** A correct forecast has a tail
+coverage equal to the quantile's level on the lower tail, and equal to one minus the level on the
+upper tail. Experiment 87 reports it at those four levels beside the pinball loss there ([experiment
+87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)).
 
 ### `xgboost_baseline`
 
 **`xgboost_baseline` is the production-style forecast: the stored forecast of the XGBoost model that
 the project's production recipe produced.** The experiments read it from the `power_forecasts` Delta
 table for the fold `mid_2025_to_mid_2026`. Experiment 87 did not confirm whether the local Dagster
-cross-validation assets or S3 wrote that table, so no experiment confirms that the stored forecast
-matches the deployed one ([experiment 13](00013-primary-demand-against-stored-baselines/result.md),
-[experiment 87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)).
+cross-validation assets or S3 wrote that table, so none of the experiments we read confirms that the
+stored forecast matches the deployed one ([experiment
+13](00013-primary-demand-against-stored-baselines/result.md), [experiment
+87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)).
