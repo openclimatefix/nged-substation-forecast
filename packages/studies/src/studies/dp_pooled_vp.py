@@ -20,23 +20,33 @@ objective of the model for any parameter set, whether a gradient fit or this mod
 parameters: the squared error over twice the fixed noise variance, plus the weight decay and the
 site-level priors on the natural scale (the slopes and capacity increments themselves, not their
 pre-softplus values). Mean-field posteriors are not used, and the MVA operator is fixed at
-`tan(phi) = q0 = 0`, which makes it linear.
+`tan(phi) = q0 = 0`, which makes it linear wherever the demand is positive.
+
+**What is built.** `fit_pooled_vp` fits a pooled model (or one substation, as a pooled model of one
+site). A capacity override may pin some substation-years and leave the rest learned (`NaN`).
+`vp_site_fitter` plugs into `studies.dp_onboarding.onboard_site` to fit a new substation's
+site-level parameters with every shared parameter frozen. **What is not built:** a pre-softplus
+slope prior, slopes and the noise scale among `phi`, a heating basis of one slope per smoothing, and
+the batching of several fits in one solve.
 """
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, fields, replace
-from typing import Final
+from typing import Final, Literal
 
-import numpy as np
 import torch
 from torch import nn
 
 from studies.dp_calendar import HALF_HOURS_PER_DAY, HEATING_THRESHOLD_C
 from studies.dp_gam import HEATING_SCALE_C, N_BANDS, solve_bounded_quadratic
 from studies.dp_pooled import (
+    HOLIDAY_DECAY,
     N_PERIODS,
     N_PROFILE,
+    NETWORK_DECAY,
+    SHAPE_DECAY,
     THRESHOLD_PRIOR_SCALE_C,
     PooledBatch,
     PooledDemandModel,
@@ -44,12 +54,22 @@ from studies.dp_pooled import (
     fit_pooled,
 )
 
-SHAPE_DECAY: Final[float] = 1e-4
-"""Weight decay on the shared daily shapes, in nats per unit squared."""
-HOLIDAY_DECAY: Final[float] = 1e-3
-"""Weight decay on the holiday coefficients."""
-NETWORK_DECAY: Final[float] = 1e-5
-"""Weight decay on every parameter of the interaction network."""
+SharedBlockType = Literal["shapes", "holiday", "tent", "harmonics", "lighting", "network"]
+"""The shared linear blocks, in the order of their columns."""
+LocalBlockType = Literal["level", "deviation", "slope", "capacity"]
+"""A substation's own linear blocks, in the order of their columns."""
+MeanType = Literal["level", "slope", "first", "growth"]
+"""The population means that are linear coefficients."""
+SHARED_BLOCKS: Final[tuple[SharedBlockType, ...]] = (
+    "shapes",
+    "holiday",
+    "tent",
+    "harmonics",
+    "lighting",
+    "network",
+)
+LOCAL_BLOCKS: Final[tuple[LocalBlockType, ...]] = ("level", "deviation", "slope", "capacity")
+MEANS: Final[tuple[MeanType, ...]] = ("level", "slope", "first", "growth")
 CALENDAR_RIDGE: Final[float] = 1e-6
 """A ridge on the tent, harmonic, and lighting coefficients, so that each linear column has one.
 
@@ -58,14 +78,16 @@ strictly convex and is small enough (in nats) to leave the fit unchanged.
 """
 SOFTPLUS_FLOOR: Final[float] = 1e-12
 """A coefficient below this maps to the softplus pre-image of this value (the bound at zero)."""
-MAX_LINE_SEARCH_EVALUATIONS: Final[int] = 25
-"""The most objective evaluations one L-BFGS step may spend."""
 HISTORY_SIZE: Final[int] = 20
 """The number of curvature pairs L-BFGS keeps."""
 MAX_EVALUATIONS: Final[int] = 300
 """The most objective evaluations of one L-BFGS fit, line search included."""
 FALL_WINDOW: Final[int] = 10
-"""L-BFGS stops when the best objective fell under `RELATIVE_FALL` over this many evaluations."""
+"""L-BFGS stops when the best objective fell under `RELATIVE_FALL` over this many evaluations.
+
+The window counts objective evaluations, line-search evaluations included, where a count of
+iterations would not bound the work of one iteration.
+"""
 RELATIVE_FALL: Final[float] = 1e-7
 """The relative fall in the best objective that counts as progress."""
 SOLVER_TOLERANCE: Final[float] = 1e-10
@@ -87,8 +109,9 @@ class VpSettings:
     """The fixed hyperparameters of the variable-projection objective.
 
     The population scales are the MAP scales of experiment 105's P-map fit, written on the natural
-    scale: the pre-softplus scales of the slope and growth (both 1.0) times the softplus slope at
-    P-map's population means (0.985 and 0.946), and the first increment's 8.0 times 1.00.
+    scale: the pre-softplus scales of the slope and the growth increment (both 1.0) times the
+    softplus slope at P-map's population means (0.985 and 0.946), and the first increment's 8.0
+    times 1.00.
 
     Attributes:
         noise_sd: The standard deviation of the Gaussian noise, in points of effective capacity,
@@ -99,8 +122,9 @@ class VpSettings:
         threshold: The scale of the heating thresholds around their population mean, and of the
             population mean's prior around 15.5 degrees.
         slope: The scale of the heating slopes around their population mean.
-        growth: The scale of the capacity increments after a substation's first trained year.
-        first: The scale of the first trained season-year's capacity increment.
+        growth_increment: The scale of the capacity increments after a substation's first trained
+            year.
+        first_increment: The scale of the first trained season-year's capacity increment.
     """
 
     noise_sd: float
@@ -109,8 +133,8 @@ class VpSettings:
     deviation: float = 1.0
     threshold: float = THRESHOLD_PRIOR_SCALE_C
     slope: float = 0.985
-    growth: float = 0.946
-    first: float = 8.0
+    growth_increment: float = 0.946
+    first_increment: float = 8.0
 
 
 @dataclass(frozen=True)
@@ -119,31 +143,57 @@ class VpLayout:
 
     Attributes:
         sites: The substations that have training rows, ascending.
+        rows: The first and last-plus-one row of each substation in the batch.
         n_shapes: The number of shared daily shapes `K`.
-        shared: The slice of each shared block: `shapes`, `holiday`, `tent`, `harmonics`,
-            `lighting`, and `network` (the last layer's weights).
+        frozen_shared: True when the shared coefficients and the population means are held at the
+            model's values (onboarding), so the problem holds one substation's own block only.
+        shared: The slice of each shared block (empty slices when `frozen_shared`).
         n_shared: The number of shared columns.
-        means: The column of each population mean that has site columns: any of `level`, `slope`,
-            `first`, and `growth`.
+        means: The column of each population mean that has site columns (none when
+            `frozen_shared`).
         local_start: The first column of each substation's own block.
-        local: Each substation's slices within its block, relative to its start: `level`,
-            `deviation`, `slope`, and `capacity`.
-        capacity_years: Each substation's season-years that have a capacity increment column;
-            empty when the capacity is pinned or the substation has no solar rows.
+        local: Each substation's slices within its block, relative to its start.
+        capacity_years: Each substation's season-years that have a capacity increment column.
+        first_year: Each substation's first trained season-year, which holds its whole capacity.
         n_columns: The number of columns.
         constrained: True for the columns that must be non-negative.
     """
 
     sites: tuple[int, ...]
+    rows: dict[int, tuple[int, int]]
     n_shapes: int
-    shared: dict[str, slice]
+    frozen_shared: bool
+    shared: dict[SharedBlockType, slice]
     n_shared: int
-    means: dict[str, int]
+    means: dict[MeanType, int]
     local_start: dict[int, int]
-    local: dict[int, dict[str, slice]]
+    local: dict[int, dict[LocalBlockType, slice]]
     capacity_years: dict[int, tuple[int, ...]]
+    first_year: dict[int, int]
     n_columns: int
     constrained: torch.Tensor
+
+
+@dataclass(frozen=True)
+class VpProblem:
+    """A model, its rows, the columns, and the parts of the problem that do not depend on `phi`.
+
+    Attributes:
+        model: The pooled model, whose current `phi` sets the columns.
+        batch: The rows, sorted by substation.
+        layout: The columns.
+        settings: The noise standard deviation and the prior scales.
+        penalty: The quadratic prior matrix `R`, so the prior in nats is `theta^T R theta -
+            2 shift^T theta` plus a constant.
+        shift: The linear part of the prior, non-zero only for the frozen population means.
+    """
+
+    model: PooledDemandModel
+    batch: PooledBatch
+    layout: VpLayout
+    settings: VpSettings
+    penalty: torch.Tensor
+    shift: torch.Tensor
 
 
 @dataclass(frozen=True)
@@ -151,11 +201,11 @@ class SiteDesign:
     """One substation's part of the linear problem, `prediction = shared @ w + local @ v + offset`.
 
     Attributes:
-        shared: The columns of the shared coefficients, shape (rows, n_shared). The calendar,
-            lighting, and network columns are centred per season-year.
+        shared: The columns of the shared coefficients, shape (rows, shared columns). The
+            calendar, lighting, and network columns are centred per season-year.
         local: The substation's own columns, shape (rows, width of its block).
-        offset: The part of the prediction that does not depend on `theta` (a pinned capacity's
-            solar output, negative), shape (rows,).
+        offset: The part of the prediction that does not depend on `theta`: the solar output of
+            a pinned capacity, negative, shape (rows,).
     """
 
     shared: torch.Tensor
@@ -170,13 +220,15 @@ class VpFitResult:
     Attributes:
         objective: The final objective in nats (`vp_objective`).
         objective_per_row: The same, divided by the number of rows.
-        lbfgs_objective: The objective at the end of L-BFGS.
-        adam_objective: The objective after the Adam fallback, or `None` when it did not run.
+        lbfgs_objective: The objective in nats at the end of L-BFGS.
+        adam_objective: The objective in nats after the Adam fallback, or `None` when it did not
+            run.
         warm_start_objective: The objective in nats after the optional Adam warm start, or `None`
             when there was none.
         evaluations: The number of objective evaluations L-BFGS spent, line search included.
-        converged: True if L-BFGS stopped on its tolerance and not on the evaluation cap.
-        gradient_norm: The largest absolute entry of the final objective-per-row gradient on
+        converged: True only if the best objective fell by under a relative 1e-7 over the last 10
+            evaluations; a fit that reaches the evaluation cap or whose L-BFGS step fails is not.
+        gradient_max_abs: The largest absolute entry of the final per-row objective gradient on
             `phi`.
         kkt_violation: The solver's violation of the optimality conditions at the final `phi`,
             relative to the largest entry of the right-hand side.
@@ -192,7 +244,7 @@ class VpFitResult:
     warm_start_objective: float | None
     evaluations: int
     converged: bool
-    gradient_norm: float
+    gradient_max_abs: float
     kkt_violation: float
     seconds: float
     peak_memory_bytes: int
@@ -234,6 +286,73 @@ def phi_parameters(*, model: PooledDemandModel) -> list[nn.Parameter]:
     return parameters
 
 
+@contextmanager
+def trainable_only(*, model: PooledDemandModel, parameters: list[nn.Parameter]) -> Iterator[None]:
+    """Let only `parameters` train inside the block, and restore every flag afterwards."""
+    saved = {name: p.requires_grad for name, p in model.named_parameters()}
+    try:
+        for parameter in model.parameters():
+            parameter.requires_grad = False
+        for parameter in parameters:
+            parameter.requires_grad = True
+        yield
+    finally:
+        for name, parameter in model.named_parameters():
+            parameter.requires_grad = saved[name]
+
+
+def pinned_capacity(*, model: PooledDemandModel) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return the pinned capacities and where they are pinned, each of shape (sites, years).
+
+    A `NaN` in the model's `capacity_override` means the capacity is learned there. The values are
+    0 where the capacity is learned.
+    """
+    shape = (model.n_sites, model.n_season_years)
+    if model.capacity_override is None:
+        return torch.zeros(shape, dtype=model.level.dtype), torch.zeros(shape, dtype=torch.bool)
+    override = model.capacity_override.to(model.level.dtype)
+    pinned = ~torch.isnan(override)
+    return torch.where(pinned, override, torch.zeros_like(override)), pinned
+
+
+def learned_increment_mask(*, model: PooledDemandModel) -> torch.Tensor:
+    """Return where a capacity increment is a coefficient of the fit, shape (sites, years).
+
+    An increment of a trained season-year at a solar substation is one when some trained
+    season-year at or after it has a learned (not pinned) capacity, because only then does the
+    increment reach the prediction. With nothing pinned this is every trained season-year of a
+    solar substation.
+
+    Args:
+        model: The pooled model, with `trained` and `solar_sites` set.
+
+    Returns:
+        A boolean tensor of shape (sites, years).
+
+    Raises:
+        ValueError: If a solar substation has a learned capacity in a season-year but none in a
+            trained season-year, so no row could fit the increments that capacity rests on.
+    """
+    trained = model.trained > 0
+    solar = model.solar_sites[:, None] > 0
+    if model.capacity_override is None:
+        learned_year = trained
+    else:
+        unpinned = torch.isnan(model.capacity_override)
+        learned_year = trained & unpinned
+        orphan = solar[:, 0] & unpinned.any(dim=1) & ~learned_year.any(dim=1)
+        if bool(orphan.any()):
+            msg = (
+                "a solar substation has a learned capacity only in season-years without training "
+                "rows: pin it, or give it a learned trained season-year"
+            )
+            raise ValueError(msg)
+    reach = torch.flip(
+        torch.cummax(torch.flip(learned_year.to(torch.int64), dims=[1]), dim=1).values, dims=[1]
+    )
+    return trained & solar & (reach > 0)
+
+
 def vp_objective(
     *, model: PooledDemandModel, batch: PooledBatch, settings: VpSettings
 ) -> torch.Tensor:
@@ -244,7 +363,8 @@ def vp_objective(
     coefficients. The site priors are Gaussian on the natural scale around learned population
     means (the heating slope and the capacity increments are the softplus outputs themselves),
     with the heating threshold's population mean centred on 15.5 degrees. The MVA operator must
-    be fixed at zero reactive power (`freeze_operator_for_vp`).
+    be fixed at zero reactive power (`freeze_operator_for_vp`). The model's stored centring means
+    are left as they were.
 
     Args:
         model: The pooled model, in any state; it is put in training mode for the call so the
@@ -269,11 +389,14 @@ def vp_objective(
         msg = "the MVA operator must have tan(phi) = q0 = 0; call freeze_operator_for_vp"
         raise ValueError(msg)
     was_training = model.training
+    saved_means = model.centre_means.clone()
     model.train()
     try:
         residual = model(batch) - batch.y
     finally:
         model.train(was_training)
+        with torch.no_grad():
+            model.centre_means.copy_(saved_means)
     total = (residual**2).sum() / (2.0 * settings.noise_sd**2)
     total = total + _weight_decay(model=model)
     return total + _site_priors(model=model, settings=settings)
@@ -303,41 +426,26 @@ def _site_priors(*, model: PooledDemandModel, settings: VpSettings) -> torch.Ten
     both = active[:, None]
     mean_threshold = model.population_mean["threshold"]
     term = _tie(values=mean_threshold, centre=HEATING_THRESHOLD_C, scale=settings.threshold)
-    term = (
-        term
-        + (
-            _tie(values=model.level, centre=model.population_mean["level"], scale=settings.level)
-            * active
-        ).sum()
+    level_term = _tie(
+        values=model.level, centre=model.population_mean["level"], scale=settings.level
     )
-    term = (
-        term
-        + (
-            _tie(values=model.threshold, centre=mean_threshold, scale=settings.threshold) * active
-        ).sum()
-    )
+    threshold_term = _tie(values=model.threshold, centre=mean_threshold, scale=settings.threshold)
+    term = term + (level_term * active).sum() + (threshold_term * active).sum()
     term = term + (_tie(values=model.deviation, centre=0.0, scale=settings.deviation) * both).sum()
     if model.config.shared_shapes:
-        term = (
-            term
-            + (_tie(values=model.site_logits, centre=0.0, scale=settings.site_logits) * both).sum()
-        )
+        logit_term = _tie(values=model.site_logits, centre=0.0, scale=settings.site_logits)
+        term = term + (logit_term * both).sum()
     slope = nn.functional.softplus(model.slope_raw)
     slope_mean = nn.functional.softplus(model.population_mean["slope_raw"])
     term = term + (_tie(values=slope, centre=slope_mean, scale=settings.slope) * both).sum()
-    if model.capacity_override is None:
-        increment = nn.functional.softplus(model.capacity_raw)
-        first, growth = model.capacity_masks()
-        first_mean = nn.functional.softplus(model.population_mean["capacity_first"])
-        growth_mean = nn.functional.softplus(model.population_mean["capacity_raw"])
-        term = (
-            term + (_tie(values=increment, centre=first_mean, scale=settings.first) * first).sum()
-        )
-        term = (
-            term
-            + (_tie(values=increment, centre=growth_mean, scale=settings.growth) * growth).sum()
-        )
-    return term
+    increment = nn.functional.softplus(model.capacity_raw)
+    first, growth = model.capacity_masks()
+    learned = learned_increment_mask(model=model).to(increment.dtype)
+    first_mean = nn.functional.softplus(model.population_mean["capacity_first"])
+    growth_mean = nn.functional.softplus(model.population_mean["capacity_raw"])
+    first_term = _tie(values=increment, centre=first_mean, scale=settings.first_increment)
+    growth_term = _tie(values=increment, centre=growth_mean, scale=settings.growth_increment)
+    return term + (first_term * first * learned).sum() + (growth_term * growth * learned).sum()
 
 
 def vp_loss_function(
@@ -441,25 +549,34 @@ def _last_layer(*, model: PooledDemandModel) -> nn.Linear | None:
     return last
 
 
-def make_vp_layout(*, model: PooledDemandModel, batch: PooledBatch) -> VpLayout:
+def make_vp_layout(
+    *, model: PooledDemandModel, batch: PooledBatch, frozen_shared: bool = False
+) -> VpLayout:
     """Lay out the linear problem's columns for the substations that have rows in `batch`.
 
     The model's `trained` and `solar_sites` buffers must be set (`mark_trained_years`). A
-    substation gets capacity columns for its trained season-years, unless it has no solar rows
-    or the model pins the capacity (`capacity_override`).
+    substation gets capacity columns for its trained season-years that reach a learned capacity
+    (`learned_increment_mask`).
 
     Args:
         model: The pooled model.
         batch: The rows.
+        frozen_shared: Hold every shared coefficient and population mean at the model's values, so
+            the layout has only the substations' own blocks. For onboarding.
 
     Returns:
         The layout.
     """
-    n_shapes = model.config.shared_shapes
-    pinned = model.capacity_override is not None
+    rows = {
+        site: (start, stop)
+        for site, (start, stop) in enumerate(site_bounds(batch=batch, n_sites=model.n_sites))
+        if stop > start
+    }
+    sites = tuple(rows)
     last_layer = _last_layer(model=model)
     hidden = 0 if last_layer is None else last_layer.in_features
-    sizes = {
+    n_shapes = model.config.shared_shapes
+    sizes: dict[SharedBlockType, int] = {
         "shapes": n_shapes * N_PROFILE,
         "holiday": (N_PERIODS + 1) * N_BANDS,
         "tent": 2 * N_BANDS,
@@ -467,67 +584,68 @@ def make_vp_layout(*, model: PooledDemandModel, batch: PooledBatch) -> VpLayout:
         "lighting": 4,
         "network": hidden,
     }
-    shared: dict[str, slice] = {}
+    shared: dict[SharedBlockType, slice] = {}
     position = 0
-    for name, size in sizes.items():
+    for name in SHARED_BLOCKS:
+        size = 0 if frozen_shared else sizes[name]
         shared[name] = slice(position, position + size)
         position += size
     n_shared = position
-    sites = tuple(
-        site
-        for site, (start, stop) in enumerate(site_bounds(batch=batch, n_sites=model.n_sites))
-        if stop > start
-    )
-    first_years: dict[int, int] = {}
-    capacity_years: dict[int, tuple[int, ...]] = {}
-    for site in sites:
-        solar = bool(model.solar_sites[site] > 0) and not pinned
-        years = (
-            tuple(int(y) for y in torch.nonzero(model.trained[site] > 0).flatten()) if solar else ()
-        )
-        capacity_years[site] = years
-        if years:
-            first_years[site] = years[0]
-    wanted = {"level": True, "slope": True}
-    wanted["first"] = any(capacity_years[s] for s in sites)
-    wanted["growth"] = any(len(capacity_years[s]) > 1 for s in sites)
-    means: dict[str, int] = {}
-    for name, needed in wanted.items():
-        if needed:
-            means[name] = position
-            position += 1
+    learned = learned_increment_mask(model=model)
+    capacity_years = {
+        site: tuple(int(y) for y in torch.nonzero(learned[site]).flatten()) for site in sites
+    }
+    first_year = {
+        site: int(torch.nonzero(model.trained[site] > 0).flatten()[0])
+        for site in sites
+        if bool((model.trained[site] > 0).any())
+    }
+    means: dict[MeanType, int] = {}
+    if not frozen_shared:
+        wanted: dict[MeanType, bool] = {
+            "level": True,
+            "slope": True,
+            "first": any(first_year.get(s) in capacity_years[s] for s in sites),
+            "growth": any(y != first_year.get(s) for s in sites for y in capacity_years[s]),
+        }
+        for name in MEANS:
+            if wanted[name]:
+                means[name] = position
+                position += 1
     local_start: dict[int, int] = {}
-    local: dict[int, dict[str, slice]] = {}
+    local: dict[int, dict[LocalBlockType, slice]] = {}
     for site in sites:
         local_start[site] = position
-        widths = {
+        widths: dict[LocalBlockType, int] = {
             "level": 1,
             "deviation": N_PROFILE,
             "slope": N_BANDS,
             "capacity": len(capacity_years[site]),
         }
-        slices: dict[str, slice] = {}
+        slices: dict[LocalBlockType, slice] = {}
         offset = 0
-        for name, width in widths.items():
-            slices[name] = slice(offset, offset + width)
-            offset += width
+        for name in LOCAL_BLOCKS:
+            slices[name] = slice(offset, offset + widths[name])
+            offset += widths[name]
         local[site] = slices
         position += offset
     constrained = torch.zeros(position, dtype=torch.bool)
     for site in sites:
-        start = local_start[site]
         for name in ("slope", "capacity"):
             block = local[site][name]
-            constrained[start + block.start : start + block.stop] = True
+            constrained[local_start[site] + block.start : local_start[site] + block.stop] = True
     return VpLayout(
         sites=sites,
+        rows=rows,
         n_shapes=n_shapes,
+        frozen_shared=frozen_shared,
         shared=shared,
         n_shared=n_shared,
         means=means,
         local_start=local_start,
         local=local,
         capacity_years=capacity_years,
+        first_year=first_year,
         n_columns=position,
         constrained=constrained,
     )
@@ -541,11 +659,32 @@ def _centre_per_slot(*, values: torch.Tensor, slot: torch.Tensor, n_slots: int) 
     return values - means[slot]
 
 
-def _one_hot(*, index: torch.Tensor, width: int, dtype: torch.dtype) -> torch.Tensor:
-    """Return the (rows, width) one-hot matrix of `index`."""
-    out = torch.zeros((index.shape[0], width), dtype=dtype, device=index.device)
-    out[torch.arange(index.shape[0], device=index.device), index] = 1.0
-    return out
+def _capacity_terms(
+    *, model: PooledDemandModel, layout: VpLayout, rows: PooledBatch, site: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return a substation's capacity-increment columns and the solar offset of pinned years.
+
+    Args:
+        model: The pooled model.
+        layout: The columns, which name the substation's increment season-years.
+        rows: The substation's rows.
+        site: The substation.
+
+    Returns:
+        The columns, shape (rows, increments), and the offset, shape (rows,): minus the pinned
+        capacity times the solar shape on the rows of a pinned season-year, 0 elsewhere. A
+        pinned season-year's rows have no increment columns.
+    """
+    dtype = rows.y.dtype
+    slot = rows.season_slot - site * model.n_season_years
+    value, pinned = pinned_capacity(model=model)
+    row_pinned = pinned.to(rows.y.device)[site][slot]
+    solar = rows.solar_gate.to(dtype) * rows.pv_shape
+    offset = -solar * torch.where(row_pinned, value.to(rows.y.device)[site][slot], 0.0)
+    years = layout.capacity_years[site]
+    after = slot[:, None] >= torch.tensor(years, device=rows.y.device)[None, :]
+    columns = -(solar * (~row_pinned).to(dtype))[:, None] * after.to(dtype)
+    return columns, offset
 
 
 def linear_design(
@@ -553,9 +692,11 @@ def linear_design(
 ) -> SiteDesign:
     """Build the columns of one substation's rows for the model's current `phi`.
 
-    The prediction `shared @ w + local @ v + offset` equals `PooledDemandModel.forward` when `w`
-    and `v` hold the model's linear parameters on the natural scale (the heating slope and the
-    capacity increments as softplus outputs) and the MVA operator has zero reactive power.
+    This is the dense reference of the design: the prediction `shared @ w + local @ v + offset`
+    equals `PooledDemandModel.forward` when `w` and `v` hold the model's linear parameters on the
+    natural scale (the heating slope and the capacity increments as softplus outputs) and the MVA
+    operator has zero reactive power. The shared columns are all built, whether or not
+    `layout.frozen_shared` is set.
 
     Args:
         model: The pooled model, whose non-linear parameters `phi` set the columns.
@@ -566,29 +707,23 @@ def linear_design(
     Returns:
         The substation's columns and offset.
     """
-    start, stop = site_bounds(batch=batch, n_sites=model.n_sites)[site]
+    start, stop = layout.rows[site]
     rows = _slice_batch(batch=batch, start=start, stop=stop)
-    n = rows.n_rows
-    dtype = rows.y.dtype
+    n, dtype, device = rows.n_rows, rows.y.dtype, rows.y.device
     profile = rows.day_type * HALF_HOURS_PER_DAY + rows.half_hour
-    band_hot = _one_hot(index=rows.band, width=N_BANDS, dtype=dtype)
-    inertia = torch.softmax(model.inertia_logits, dim=0)
-    mixed = rows.smoothed_temperature @ inertia
+    band_hot = nn.functional.one_hot(rows.band, N_BANDS).to(dtype)
+    mixed = rows.smoothed_temperature @ torch.softmax(model.inertia_logits, dim=0)
     parts: list[torch.Tensor] = []
     if layout.n_shapes:
         mix = torch.softmax(model.site_logits[site], dim=0)
-        index = (
-            torch.arange(layout.n_shapes, device=profile.device)[None, :] * N_PROFILE
-            + profile[:, None]
-        )
-        shapes = torch.zeros((n, layout.n_shapes * N_PROFILE), dtype=dtype, device=profile.device)
+        index = torch.arange(layout.n_shapes, device=device)[None, :] * N_PROFILE + profile[:, None]
+        shapes = torch.zeros((n, layout.n_shapes * N_PROFILE), dtype=dtype, device=device)
         shapes.scatter_(1, index, mix[None, :].expand(n, -1).to(dtype))
         parts.append(shapes)
-    holiday = _one_hot(
-        index=rows.holiday * N_BANDS + rows.band, width=(N_PERIODS + 1) * N_BANDS, dtype=dtype
-    )
     calendar = [
-        holiday,
+        nn.functional.one_hot(rows.holiday * N_BANDS + rows.band, (N_PERIODS + 1) * N_BANDS).to(
+            dtype
+        ),
         (rows.tent[:, :, None] * band_hot[:, None, :]).reshape(n, -1),
         (rows.harmonics[:, :, None] * band_hot[:, None, :]).reshape(n, -1),
         rows.lighting,
@@ -602,84 +737,17 @@ def linear_design(
     )
     shared = torch.cat([*parts, centred], dim=1)
     hinge = torch.relu(model.threshold[site] - mixed) / HEATING_SCALE_C
-    gate = rows.solar_gate.to(dtype)
-    blocks = [
-        torch.ones((n, 1), dtype=dtype, device=profile.device),
-        _one_hot(index=profile, width=N_PROFILE, dtype=dtype),
-        hinge[:, None] * band_hot,
-    ]
-    years = layout.capacity_years[site]
-    if years:
-        after = slot[:, None] >= torch.tensor(years, device=slot.device)[None, :]
-        blocks.append(-(gate * rows.pv_shape)[:, None] * after.to(dtype))
-    offset = torch.zeros(n, dtype=dtype, device=profile.device)
-    if model.capacity_override is not None:
-        pinned = torch.nan_to_num(model.capacity_override.to(dtype))
-        offset = -gate * rows.pv_shape * pinned.reshape(-1)[rows.season_slot]
-    return SiteDesign(shared=shared, local=torch.cat(blocks, dim=1), offset=offset)
-
-
-def penalty_system(
-    *, layout: VpLayout, settings: VpSettings, dtype: torch.dtype, device: torch.device
-) -> torch.Tensor:
-    """Return the matrix `R` of the quadratic prior, so that the prior in nats is `theta^T R theta`.
-
-    The population means are columns of `theta`, and a site-level family is tied to its mean by
-    `(value - mean)^2 / (2 scale^2)`.
-
-    Args:
-        layout: The columns.
-        settings: The prior scales.
-        dtype: The floating-point type.
-        device: Where the matrix lives.
-
-    Returns:
-        The symmetric matrix, shape (columns, columns).
-    """
-    p = layout.n_columns
-    matrix = torch.zeros((p, p), dtype=dtype, device=device)
-    diagonal = torch.zeros(p, dtype=dtype, device=device)
-    decay = {
-        "shapes": SHAPE_DECAY,
-        "holiday": HOLIDAY_DECAY,
-        "tent": CALENDAR_RIDGE,
-        "harmonics": CALENDAR_RIDGE,
-        "lighting": CALENDAR_RIDGE,
-        "network": NETWORK_DECAY,
-    }
-    for name, weight in decay.items():
-        diagonal[layout.shared[name]] = weight
-
-    def tie(*, columns: list[int], mean: str | None, scale: float) -> None:
-        weight = 1.0 / (2.0 * scale**2)
-        index = torch.tensor(columns, dtype=torch.long, device=device)
-        if index.numel() == 0:
-            return
-        diagonal[index] += weight
-        if mean is not None:
-            centre = layout.means[mean]
-            diagonal[centre] += weight * index.numel()
-            matrix[index, centre] -= weight
-            matrix[centre, index] -= weight
-
-    for site in layout.sites:
-        start = layout.local_start[site]
-        block = layout.local[site]
-        tie(columns=[start + block["level"].start], mean="level", scale=settings.level)
-        tie(
-            columns=list(range(start + block["deviation"].start, start + block["deviation"].stop)),
-            mean=None,
-            scale=settings.deviation,
-        )
-        tie(
-            columns=list(range(start + block["slope"].start, start + block["slope"].stop)),
-            mean="slope",
-            scale=settings.slope,
-        )
-        capacity = list(range(start + block["capacity"].start, start + block["capacity"].stop))
-        tie(columns=capacity[:1], mean="first", scale=settings.first)
-        tie(columns=capacity[1:], mean="growth", scale=settings.growth)
-    return matrix + torch.diag(diagonal)
+    capacity, offset = _capacity_terms(model=model, layout=layout, rows=rows, site=site)
+    local = torch.cat(
+        [
+            torch.ones((n, 1), dtype=dtype, device=device),
+            nn.functional.one_hot(profile, N_PROFILE).to(dtype),
+            hinge[:, None] * band_hot,
+            capacity,
+        ],
+        dim=1,
+    )
+    return SiteDesign(shared=shared, local=local, offset=offset)
 
 
 def _sparse_columns(
@@ -694,6 +762,13 @@ def _sparse_columns(
 
     Every row has the same number of non-zero entries among these columns: one per shared shape,
     one holiday indicator, and one deviation indicator.
+
+    Args:
+        model: The pooled model, whose style loadings set the shapes' values.
+        layout: The columns.
+        rows: The substation's rows.
+        site: The substation.
+        profile: The daily-profile index of each row.
 
     Returns:
         The column and the value of each row's entries, both of shape (rows, entries per row), and
@@ -715,14 +790,14 @@ def _sparse_columns(
 
 def _dense_columns(
     *, model: PooledDemandModel, layout: VpLayout, rows: PooledBatch, site: int
-) -> tuple[torch.Tensor, int]:
-    """Return the continuous columns, and how many of their first columns are centred.
+) -> tuple[torch.Tensor, int, torch.Tensor]:
+    """Return the continuous columns, how many of their first columns are centred, and the offset.
 
     The order is tent, harmonics, lighting, network (all centred), then level, heating, and
     capacity (not centred).
     """
     n, dtype, device = rows.n_rows, rows.y.dtype, rows.y.device
-    band_hot = _one_hot(index=rows.band, width=N_BANDS, dtype=dtype)
+    band_hot = nn.functional.one_hot(rows.band, N_BANDS).to(dtype)
     mixed = rows.smoothed_temperature @ torch.softmax(model.inertia_logits, dim=0)
     dense = [
         (rows.tent[:, :, None] * band_hot[:, None, :]).reshape(n, -1),
@@ -733,14 +808,9 @@ def _dense_columns(
         dense.append(model.interaction[:-1](model.interaction_inputs(batch=rows, mixed=mixed)))
     n_centred = sum(block.shape[1] for block in dense)
     hinge = torch.relu(model.threshold[site] - mixed) / HEATING_SCALE_C
-    dense += [torch.ones((n, 1), dtype=dtype, device=device), hinge[:, None] * band_hot]
-    years = layout.capacity_years[site]
-    if years:
-        slot = rows.season_slot - site * model.n_season_years
-        after = slot[:, None] >= torch.tensor(years, device=device)[None, :]
-        solar = rows.solar_gate.to(dtype) * rows.pv_shape
-        dense.append(-solar[:, None] * after.to(dtype))
-    return torch.cat(dense, dim=1), n_centred
+    capacity, offset = _capacity_terms(model=model, layout=layout, rows=rows, site=site)
+    dense += [torch.ones((n, 1), dtype=dtype, device=device), hinge[:, None] * band_hot, capacity]
+    return torch.cat(dense, dim=1), n_centred, offset
 
 
 def _site_normal_equations(
@@ -749,18 +819,25 @@ def _site_normal_equations(
     """Return one substation's columns, `X^T X` block, and `X^T y` block of the normal equations.
 
     This is the fast twin of `linear_design`: the one-hot columns (the shared shapes, the holiday
-    indicators, and the deviation) go into a sparse matrix, so their products with every other
-    column cost a few operations per row, and only the continuous columns (tent, harmonics,
-    lighting, network, level, heating, capacity) form dense products. The calendar, lighting, and
-    network columns are centred per season-year by subtracting the slot means from the products
-    afterwards, which is exact: for a centred column `i`, `x_i^T x_j` loses `sum_slots n m_i m_j`
-    with `m` the slot means of the raw columns, and `x_i^T y` loses `sum_slots n m_i mean(y)`.
+    indicators, and the deviation) are handled row-wise from their few non-zero entries, so their
+    products with every other column cost a few operations per row, and only the continuous
+    columns (tent, harmonics, lighting, network, level, heating, capacity) form dense products.
+    The calendar, lighting, and network columns are centred per season-year by subtracting the
+    slot means from the products afterwards, which is exact: for a centred column `i`,
+    `x_i^T x_j` loses `sum_slots n m_i m_j` with `m` the slot means of the raw columns, and
+    `x_i^T y` loses `sum_slots n m_i mean(y)`.
+
+    Args:
+        model: The pooled model, whose current `phi` sets the columns.
+        batch: The rows of the whole fit, sorted by substation.
+        layout: The columns.
+        site: The substation.
 
     Returns:
         The system's column index of each of the substation's raw columns (sparse columns first,
         then dense), the block of `X^T X`, and the block of `X^T y`.
     """
-    start, stop = site_bounds(batch=batch, n_sites=model.n_sites)[site]
+    start, stop = layout.rows[site]
     rows = _slice_batch(batch=batch, start=start, stop=stop)
     dtype, device = rows.y.dtype, rows.y.device
     n_slots = model.n_season_years
@@ -769,13 +846,8 @@ def _site_normal_equations(
     column, value, width_sparse = _sparse_columns(
         model=model, layout=layout, rows=rows, site=site, profile=profile
     )
-    dense, n_centred = _dense_columns(model=model, layout=layout, rows=rows, site=site)
-    target = rows.y
-    if model.capacity_override is not None:
-        pinned = torch.nan_to_num(model.capacity_override.to(dtype))
-        gate = rows.solar_gate.to(dtype)
-        target = target + gate * rows.pv_shape * pinned.reshape(-1)[rows.season_slot]
-    # Products of the one-hot columns, from their row-wise entries.
+    dense, n_centred, offset = _dense_columns(model=model, layout=layout, rows=rows, site=site)
+    target = rows.y - offset
     entries = column.shape[1]
     g_ss = torch.zeros((width_sparse, width_sparse), dtype=dtype, device=device)
     g_sd = torch.zeros((width_sparse, dense.shape[1]), dtype=dtype, device=device)
@@ -791,7 +863,6 @@ def _site_normal_equations(
         [torch.cat([g_ss, g_sd], dim=1), torch.cat([g_sd.T, dense.T @ dense], dim=1)], dim=0
     )
     xty = torch.cat([xty_s, dense.T @ target])
-    # Centring, applied to the products from the slot means of the raw columns.
     counts = torch.bincount(slot, minlength=n_slots).to(dtype)
     sums_sparse = torch.zeros((n_slots, width_sparse), dtype=dtype, device=device)
     sums_sparse.index_put_(
@@ -840,60 +911,207 @@ def _system_columns(*, layout: VpLayout, site: int, device: torch.device) -> tor
     )
 
 
+def _tie_columns(
+    *,
+    matrix: torch.Tensor,
+    diagonal: torch.Tensor,
+    shift: torch.Tensor,
+    columns: list[int],
+    scale: float,
+    mean_column: int | None = None,
+    mean_value: float = 0.0,
+) -> None:
+    """Add the prior `(theta_j - mean)^2 / (2 scale^2)` of each column `j` to the prior matrix.
+
+    A `mean_column` is a free population mean: the prior couples the columns to that column of
+    `theta`. Without one the mean is the number `mean_value` (0 by default), which enters the
+    linear part `shift`.
+    """
+    weight = 1.0 / (2.0 * scale**2)
+    index = torch.tensor(columns, dtype=torch.long, device=matrix.device)
+    diagonal[index] += weight
+    if mean_column is not None:
+        diagonal[mean_column] += weight * index.numel()
+        matrix[index, mean_column] -= weight
+        matrix[mean_column, index] -= weight
+    else:
+        shift[index] += weight * mean_value
+
+
+def make_vp_problem(
+    *,
+    model: PooledDemandModel,
+    batch: PooledBatch,
+    settings: VpSettings,
+    frozen_shared: bool = False,
+) -> VpProblem:
+    """Lay out the columns and build the prior matrix for a model and its rows.
+
+    The model's `trained` and `solar_sites` buffers must be set before the call.
+
+    Args:
+        model: The pooled model.
+        batch: The rows, sorted by substation.
+        settings: The noise standard deviation and the prior scales.
+        frozen_shared: Hold the shared coefficients and population means at the model's values
+            (see `make_vp_layout`); the population means then centre the priors as constants.
+
+    Returns:
+        The problem.
+    """
+    layout = make_vp_layout(model=model, batch=batch, frozen_shared=frozen_shared)
+    dtype, device = batch.y.dtype, batch.y.device
+    p = layout.n_columns
+    matrix = torch.zeros((p, p), dtype=dtype, device=device)
+    diagonal = torch.zeros(p, dtype=dtype, device=device)
+    shift = torch.zeros(p, dtype=dtype, device=device)
+    decay: dict[SharedBlockType, float] = {
+        "shapes": SHAPE_DECAY,
+        "holiday": HOLIDAY_DECAY,
+        "tent": CALENDAR_RIDGE,
+        "harmonics": CALENDAR_RIDGE,
+        "lighting": CALENDAR_RIDGE,
+        "network": NETWORK_DECAY,
+    }
+    for name, weight in decay.items():
+        diagonal[layout.shared[name]] = weight
+    frozen: dict[MeanType, float] = {
+        "level": float(model.population_mean["level"]),
+        "slope": float(nn.functional.softplus(model.population_mean["slope_raw"])),
+        "first": float(nn.functional.softplus(model.population_mean["capacity_first"])),
+        "growth": float(nn.functional.softplus(model.population_mean["capacity_raw"])),
+    }
+
+    scales: dict[MeanType, float] = {
+        "level": settings.level,
+        "slope": settings.slope,
+        "first": settings.first_increment,
+        "growth": settings.growth_increment,
+    }
+    for site in layout.sites:
+        start = layout.local_start[site]
+        block = layout.local[site]
+        first = [
+            start + block["capacity"].start + i
+            for i, year in enumerate(layout.capacity_years[site])
+            if year == layout.first_year[site]
+        ]
+        growth = [
+            start + block["capacity"].start + i
+            for i, year in enumerate(layout.capacity_years[site])
+            if year != layout.first_year[site]
+        ]
+        ties: list[tuple[list[int], MeanType]] = [
+            ([start + block["level"].start], "level"),
+            (list(range(start + block["slope"].start, start + block["slope"].stop)), "slope"),
+            (first, "first"),
+            (growth, "growth"),
+        ]
+        for columns, name in ties:
+            if columns:
+                _tie_columns(
+                    matrix=matrix,
+                    diagonal=diagonal,
+                    shift=shift,
+                    columns=columns,
+                    scale=scales[name],
+                    mean_column=None if frozen_shared else layout.means[name],
+                    mean_value=frozen[name] if frozen_shared else 0.0,
+                )
+        deviation = list(range(start + block["deviation"].start, start + block["deviation"].stop))
+        _tie_columns(
+            matrix=matrix,
+            diagonal=diagonal,
+            shift=shift,
+            columns=deviation,
+            scale=settings.deviation,
+        )
+    return VpProblem(
+        model=model,
+        batch=batch,
+        layout=layout,
+        settings=settings,
+        penalty=matrix + torch.diag(diagonal),
+        shift=shift,
+    )
+
+
+def _shared_theta(*, model: PooledDemandModel, n_shapes: int) -> torch.Tensor:
+    """Return the model's shared linear coefficients in the order of the shared columns."""
+    parts = []
+    if n_shapes:
+        parts.append(model.shapes.reshape(-1))
+    parts += [
+        model.holiday.reshape(-1),
+        model.tent_coef.reshape(-1),
+        model.harmonic_coef.reshape(-1),
+        model.lighting_coef.reshape(-1),
+    ]
+    last = _last_layer(model=model)
+    if last is not None:
+        parts.append(last.weight.reshape(-1))
+    return torch.cat(parts)
+
+
 @torch.no_grad()
-def assemble_system(
-    *, model: PooledDemandModel, batch: PooledBatch, layout: VpLayout, settings: VpSettings
-) -> tuple[torch.Tensor, torch.Tensor]:
+def assemble_system(*, problem: VpProblem) -> tuple[torch.Tensor, torch.Tensor]:
     """Build `A` and `b` of the problem: minimise `theta^T A theta - 2 b^T theta`, bounds aside.
 
     The squared error and the prior are both multiplied by twice the noise variance, so `A` is the
     Gram matrix plus `2 sigma^2 R`. The Gram matrix is built one substation at a time, so no dense
     matrix of all the rows is formed; a substation's block touches the shared columns and its own.
+    With frozen shared coefficients the shared columns move into the offset and only the
+    substation's own block is solved.
 
     Args:
-        model: The pooled model, whose current `phi` sets the columns.
-        batch: The rows.
-        layout: The columns.
-        settings: The noise standard deviation and the prior scales.
+        problem: The model, the rows, the columns, and the prior.
 
     Returns:
         `(A, b)` of shapes (columns, columns) and (columns,).
     """
+    model, batch, layout = problem.model, problem.batch, problem.layout
     dtype, device = batch.y.dtype, batch.y.device
     p = layout.n_columns
     gram = torch.zeros((p, p), dtype=dtype, device=device)
     rhs = torch.zeros(p, dtype=dtype, device=device)
-    for site in layout.sites:
-        index, block, vector = _site_normal_equations(
-            model=model, batch=batch, layout=layout, site=site
-        )
-        gram[index[:, None], index[None, :]] += block
-        rhs[index] += vector
-    penalty = penalty_system(layout=layout, settings=settings, dtype=dtype, device=device)
-    return gram + 2.0 * settings.noise_sd**2 * penalty, rhs
+    if layout.frozen_shared:
+        for site in layout.sites:
+            design = linear_design(model=model, batch=batch, layout=layout, site=site)
+            start, stop = layout.rows[site]
+            frozen = design.shared @ _shared_theta(model=model, n_shapes=layout.n_shapes)
+            target = batch.y[start:stop] - design.offset - frozen
+            columns = slice(
+                layout.local_start[site], layout.local_start[site] + design.local.shape[1]
+            )
+            gram[columns, columns] = design.local.T @ design.local
+            rhs[columns] = design.local.T @ target
+    else:
+        for site in layout.sites:
+            index, block, vector = _site_normal_equations(
+                model=model, batch=batch, layout=layout, site=site
+            )
+            gram[index[:, None], index[None, :]] += block
+            rhs[index] += vector
+    scale = 2.0 * problem.settings.noise_sd**2
+    return gram + scale * problem.penalty, rhs + scale * problem.shift
 
 
-def solve_theta(
-    *, model: PooledDemandModel, batch: PooledBatch, layout: VpLayout, settings: VpSettings
-) -> tuple[torch.Tensor, float]:
+def solve_theta(*, problem: VpProblem) -> tuple[torch.Tensor, float]:
     """Return the exact linear coefficients for the model's current `phi`, and the KKT violation.
 
     Args:
-        model: The pooled model.
-        batch: The rows.
-        layout: The columns.
-        settings: The noise standard deviation and the prior scales.
+        problem: The model, the rows, the columns, and the prior.
 
     Returns:
         `theta*` of shape (columns,) and the solver's relative violation of the optimality
         conditions.
     """
+    matrix, rhs = assemble_system(problem=problem)
     with torch.no_grad():
-        matrix, rhs = assemble_system(model=model, batch=batch, layout=layout, settings=settings)
         theta, violation = solve_bounded_quadratic(
             matrix=matrix[None],
             rhs=rhs[None],
-            constrained=layout.constrained,
+            constrained=problem.layout.constrained,
             tolerance=SOLVER_TOLERANCE,
         )
     return theta[0], float(violation.max())
@@ -904,7 +1122,8 @@ def load_theta(*, model: PooledDemandModel, layout: VpLayout, theta: torch.Tenso
 
     The slopes and the capacity increments go through the softplus pre-image, so the model's
     softplus gives the coefficient back (to `SOFTPLUS_FLOOR` at a bound of zero). The last layer's
-    bias is set to zero, because the centred columns carry no constant.
+    bias is set to zero, because the centred columns carry no constant. With `frozen_shared` only
+    the substations' own blocks are written.
 
     Args:
         model: The pooled model.
@@ -912,36 +1131,14 @@ def load_theta(*, model: PooledDemandModel, layout: VpLayout, theta: torch.Tenso
         theta: The coefficients, shape (columns,).
     """
     with torch.no_grad():
-        shared = layout.shared
-        if layout.n_shapes:
-            model.shapes.copy_(theta[shared["shapes"]].reshape(layout.n_shapes, N_PROFILE))
-        model.holiday.copy_(theta[shared["holiday"]].reshape(N_PERIODS + 1, N_BANDS))
-        model.tent_coef.copy_(theta[shared["tent"]].reshape(2, N_BANDS))
-        model.harmonic_coef.copy_(theta[shared["harmonics"]].reshape(4, N_BANDS))
-        model.lighting_coef.copy_(theta[shared["lighting"]])
-        last = _last_layer(model=model)
-        if last is not None:
-            last.weight.copy_(theta[shared["network"]].reshape(1, -1))
-            last.bias.zero_()
-        for name, family in (
-            ("level", "level"),
-            ("slope", "slope_raw"),
-            ("first", "capacity_first"),
-            ("growth", "capacity_raw"),
-        ):
-            if name in layout.means:
-                value = theta[layout.means[name]]
-                if name == "level":
-                    model.population_mean[family].copy_(value)
-                else:
-                    model.population_mean[family].copy_(inverse_softplus(value=value))
+        if not layout.frozen_shared:
+            _load_shared(model=model, layout=layout, theta=theta)
         for site in layout.sites:
             start = layout.local_start[site]
             block = layout.local[site]
             model.level[site] = theta[start + block["level"].start]
-            model.deviation[site] = theta[
-                start + block["deviation"].start : start + block["deviation"].stop
-            ]
+            deviation = theta[start + block["deviation"].start : start + block["deviation"].stop]
+            model.deviation[site] = deviation
             slope = theta[start + block["slope"].start : start + block["slope"].stop]
             model.slope_raw[site] = inverse_softplus(value=slope)
             years = layout.capacity_years[site]
@@ -950,23 +1147,47 @@ def load_theta(*, model: PooledDemandModel, layout: VpLayout, theta: torch.Tenso
                 model.capacity_raw[site, list(years)] = inverse_softplus(value=increments)
 
 
+def _load_shared(*, model: PooledDemandModel, layout: VpLayout, theta: torch.Tensor) -> None:
+    """Write the shared coefficients and the population means into the model."""
+    shared = layout.shared
+    if layout.n_shapes:
+        model.shapes.copy_(theta[shared["shapes"]].reshape(layout.n_shapes, N_PROFILE))
+    model.holiday.copy_(theta[shared["holiday"]].reshape(N_PERIODS + 1, N_BANDS))
+    model.tent_coef.copy_(theta[shared["tent"]].reshape(2, N_BANDS))
+    model.harmonic_coef.copy_(theta[shared["harmonics"]].reshape(4, N_BANDS))
+    model.lighting_coef.copy_(theta[shared["lighting"]])
+    last = _last_layer(model=model)
+    if last is not None:
+        last.weight.copy_(theta[shared["network"]].reshape(1, -1))
+        last.bias.zero_()
+    families: dict[MeanType, str] = {
+        "level": "level",
+        "slope": "slope_raw",
+        "first": "capacity_first",
+        "growth": "capacity_raw",
+    }
+    for name, column in layout.means.items():
+        value = theta[column]
+        model.population_mean[families[name]].copy_(
+            value if name == "level" else inverse_softplus(value=value)
+        )
+
+
 def _evaluate(
-    *,
-    model: PooledDemandModel,
-    batch: PooledBatch,
-    layout: VpLayout,
-    settings: VpSettings,
-    phi: list[nn.Parameter],
+    *, problem: VpProblem, phi: list[nn.Parameter]
 ) -> tuple[float, list[torch.Tensor], float]:
-    """Solve `theta*` at the current `phi`, and return the objective per row and its `phi` gradient.
+    """Solve `theta*` at the current `phi`, and return the objective per row and its gradient.
 
     The objective is evaluated at `(phi, theta*)` with `theta*` held constant, and the centring
     means are recomputed inside the autograd graph, so the gradient is the envelope gradient
-    `dJ/dphi` of the projected objective.
+    `dJ/dphi` of the projected objective. The last value is the solver's KKT violation.
     """
-    theta, violation = solve_theta(model=model, batch=batch, layout=layout, settings=settings)
-    load_theta(model=model, layout=layout, theta=theta)
-    objective = vp_objective(model=model, batch=batch, settings=settings) / batch.n_rows
+    theta, violation = solve_theta(problem=problem)
+    load_theta(model=problem.model, layout=problem.layout, theta=theta)
+    objective = (
+        vp_objective(model=problem.model, batch=problem.batch, settings=problem.settings)
+        / problem.batch.n_rows
+    )
     gradients = torch.autograd.grad(objective, phi, allow_unused=True)
     filled = [torch.zeros_like(p) if g is None else g for p, g in zip(phi, gradients, strict=True)]
     return float(objective.detach()), filled, violation
@@ -982,26 +1203,26 @@ class _BestPoint:
 
 def _run_lbfgs(
     *,
-    model: PooledDemandModel,
-    batch: PooledBatch,
-    layout: VpLayout,
-    settings: VpSettings,
     phi: list[nn.Parameter],
+    evaluate: Callable[[], tuple[float, list[torch.Tensor]]],
     max_evaluations: int,
 ) -> tuple[list[float], _BestPoint, bool]:
     """Run L-BFGS on `phi`.
 
+    Args:
+        phi: The parameters to move.
+        evaluate: Gives the objective per row and its gradient on `phi` at the current values.
+        max_evaluations: The most evaluations, line search included.
+
     Returns:
-        The objective per row at every evaluation, the best point, and whether the objective
-        stopped falling (as against the evaluation cap or L-BFGS's own stop).
+        The objective per row at every evaluation, the best point, and whether the best objective
+        stopped falling by a relative `RELATIVE_FALL` over `FALL_WINDOW` evaluations.
     """
     history: list[float] = []
     best = _BestPoint(objective=float("inf"), phi=[p.detach().clone() for p in phi])
 
     def closure() -> torch.Tensor:
-        objective, gradients, _ = _evaluate(
-            model=model, batch=batch, layout=layout, settings=settings, phi=phi
-        )
+        objective, gradients = evaluate()
         for parameter, gradient in zip(phi, gradients, strict=True):
             parameter.grad = gradient
         history.append(objective)
@@ -1012,15 +1233,16 @@ def _run_lbfgs(
             reference = min(history[: len(history) - FALL_WINDOW])
             if reference - best.objective <= RELATIVE_FALL * abs(reference):
                 raise _StopFitError
-        return torch.tensor(objective)
+        # L-BFGS reads the loss with `float`, so a float32 tensor would round it to 7 digits.
+        return torch.tensor(objective, dtype=torch.float64)
 
     optimiser = torch.optim.LBFGS(
         phi,
         lr=1.0,
         max_iter=max_evaluations,
         max_eval=max_evaluations,
-        tolerance_grad=1e-12,
-        tolerance_change=1e-15,
+        tolerance_grad=0.0,
+        tolerance_change=0.0,
         history_size=HISTORY_SIZE,
         line_search_fn="strong_wolfe",
     )
@@ -1029,6 +1251,64 @@ def _run_lbfgs(
     except _StopFitError:
         return history, best, True
     return history, best, False
+
+
+def _restore_phi(*, phi: list[nn.Parameter], values: list[torch.Tensor]) -> None:
+    """Copy saved values back into the non-linear parameters."""
+    with torch.no_grad():
+        for parameter, value in zip(phi, values, strict=True):
+            parameter.copy_(value)
+
+
+def _adam_on_phi(
+    *,
+    phi: list[nn.Parameter],
+    evaluate: Callable[[], tuple[float, list[torch.Tensor]]],
+    steps: int,
+) -> float:
+    """Run Adam on `phi`, solving exactly each step; keep the best `phi`, return its objective."""
+    optimiser = torch.optim.Adam(phi, lr=ADAM_RATE)
+    best_objective, _ = evaluate()
+    best_phi = [p.detach().clone() for p in phi]
+    for _ in range(steps):
+        objective, gradients = evaluate()
+        if objective < best_objective:
+            best_objective = objective
+            best_phi = [p.detach().clone() for p in phi]
+        for parameter, gradient in zip(phi, gradients, strict=True):
+            parameter.grad = gradient
+        optimiser.step()
+    final, _ = evaluate()
+    if final < best_objective:
+        best_objective = final
+        best_phi = [p.detach().clone() for p in phi]
+    _restore_phi(phi=phi, values=best_phi)
+    return best_objective
+
+
+def _check_mva_demand(*, model: PooledDemandModel, batch: PooledBatch) -> None:
+    """Raise if a modelled MVA demand is not positive, where the linear operator would be wrong.
+
+    Args:
+        model: The fitted pooled model, with its centring means finalised.
+        batch: The training rows.
+
+    Raises:
+        ValueError: If any MVA row's modelled demand is zero or negative.
+    """
+    if not bool(batch.is_apparent.any()):
+        return
+    was_training = model.training
+    model.eval()
+    with torch.no_grad():
+        demand = model.demand(batch=batch)[batch.is_apparent]
+    model.train(was_training)
+    if float(demand.min()) <= 0.0:
+        msg = (
+            f"an MVA row has modelled demand {float(demand.min()):.3g} <= 0: the apparent-power "
+            "operator reads |P|, which is not the linear operator the fit assumes"
+        )
+        raise ValueError(msg)
 
 
 def fit_pooled_vp(
@@ -1052,11 +1332,12 @@ def fit_pooled_vp(
     solve at each step; the result keeps the lower objective and reports both.
 
     Training uses only `batch`: the centring means, the population means, and the starting
-    levels come from its rows (`finalise_centres`, `start_from_batch`).
+    levels come from its rows (`finalise_centres`, `start_from_batch`). The caller checks that no
+    row of `batch` ends after the training cut (`build_pooled_batch` does).
 
     Args:
-        model: The pooled model with a MAP or decay prior and no variational posterior, already
-            on the batch's device and in float64.
+        model: The pooled model with a MAP or decay prior and no variational posterior; it is
+            moved to the batch's device and dtype.
         batch: The training rows, sorted by substation, in float64.
         settings: The noise standard deviation and the prior scales.
         max_evaluations: The most L-BFGS objective evaluations.
@@ -1071,7 +1352,7 @@ def fit_pooled_vp(
         What the fit reports. The model holds the fitted parameters and the final centring means.
 
     Raises:
-        ValueError: If the batch is not float64.
+        ValueError: If the batch is not float64, or a modelled MVA demand is not positive.
     """
     if batch.y.dtype != torch.float64:
         msg = "the variable-projection fit needs float64: the Gram matrix is badly conditioned"
@@ -1093,122 +1374,107 @@ def fit_pooled_vp(
         )
         with torch.no_grad():
             warm_start_objective = float(vp_objective(model=model, batch=batch, settings=settings))
-    layout = make_vp_layout(model=model, batch=batch)
+    problem = make_vp_problem(model=model, batch=batch, settings=settings)
     phi = phi_parameters(model=model)
-    saved_flags = {name: p.requires_grad for name, p in model.named_parameters()}
-    for parameter in model.parameters():
-        parameter.requires_grad = False
-    for parameter in phi:
-        parameter.requires_grad = True
+
+    def evaluate() -> tuple[float, list[torch.Tensor]]:
+        objective, gradients, _ = _evaluate(problem=problem, phi=phi)
+        return objective, gradients
+
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
         torch.cuda.synchronize(device)
     started = time.perf_counter()
-    history, best, stopped_on_tolerance = _run_lbfgs(
-        model=model,
-        batch=batch,
-        layout=layout,
-        settings=settings,
-        phi=phi,
-        max_evaluations=max_evaluations,
-    )
-    evaluations = len(history)
-    # L-BFGS also ends by itself when the gradient or the step vanishes, before the cap.
-    converged = stopped_on_tolerance or evaluations < max_evaluations
-    _restore_phi(phi=phi, values=best.phi)
-    lbfgs_objective = best.objective
-    adam_objective: float | None = None
-    if not converged and adam_steps > 0:
-        adam_objective = _adam_on_phi(
-            model=model, batch=batch, layout=layout, settings=settings, phi=phi, steps=adam_steps
+    with trainable_only(model=model, parameters=phi):
+        history, best, converged = _run_lbfgs(
+            phi=phi, evaluate=evaluate, max_evaluations=max_evaluations
         )
-    _, gradients, violation = _evaluate(
-        model=model, batch=batch, layout=layout, settings=settings, phi=phi
-    )
-    for parameter in model.parameters():
-        parameter.requires_grad = False
-    for name, parameter in model.named_parameters():
-        parameter.requires_grad = saved_flags[name]
+        _restore_phi(phi=phi, values=best.phi)
+        adam_objective: float | None = None
+        if not converged and adam_steps > 0:
+            adam_objective = _adam_on_phi(phi=phi, evaluate=evaluate, steps=adam_steps)
+        _, gradients, violation = _evaluate(problem=problem, phi=phi)
     model.finalise_centres(batch=batch)
+    _check_mva_demand(model=model, batch=batch)
     if device.type == "cuda":
         torch.cuda.synchronize(device)
     seconds = time.perf_counter() - started
     with torch.no_grad():
         final = float(vp_objective(model=model, batch=batch, settings=settings))
+    n_rows = batch.n_rows
     return VpFitResult(
         objective=final,
-        objective_per_row=final / batch.n_rows,
-        lbfgs_objective=lbfgs_objective * batch.n_rows,
-        adam_objective=None if adam_objective is None else adam_objective * batch.n_rows,
+        objective_per_row=final / n_rows,
+        lbfgs_objective=best.objective * n_rows,
+        adam_objective=None if adam_objective is None else adam_objective * n_rows,
         warm_start_objective=warm_start_objective,
-        evaluations=evaluations,
+        evaluations=len(history),
         converged=converged,
-        gradient_norm=max(float(g.abs().max()) for g in gradients),
+        gradient_max_abs=max(float(g.abs().max()) for g in gradients),
         kkt_violation=violation,
         seconds=seconds,
-        peak_memory_bytes=int(torch.cuda.max_memory_allocated(device))
-        if device.type == "cuda"
-        else 0,
+        peak_memory_bytes=(
+            int(torch.cuda.max_memory_allocated(device)) if device.type == "cuda" else 0
+        ),
         history=history,
     )
 
 
-def _restore_phi(*, phi: list[nn.Parameter], values: list[torch.Tensor]) -> None:
-    """Copy saved values back into the non-linear parameters."""
-    with torch.no_grad():
-        for parameter, value in zip(phi, values, strict=True):
-            parameter.copy_(value)
+def vp_site_fitter(
+    *, settings: VpSettings, max_evaluations: int = MAX_EVALUATIONS
+) -> Callable[[PooledDemandModel, PooledBatch, int], float]:
+    """Return a fitter for `studies.dp_onboarding.onboard_site` that solves the site exactly.
 
-
-def _adam_on_phi(
-    *,
-    model: PooledDemandModel,
-    batch: PooledBatch,
-    layout: VpLayout,
-    settings: VpSettings,
-    phi: list[nn.Parameter],
-    steps: int,
-) -> float:
-    """Run Adam on `phi`, solving exactly each step; keep the best `phi`, return its objective."""
-    optimiser = torch.optim.Adam(phi, lr=ADAM_RATE)
-    start_objective, _, _ = _evaluate(
-        model=model, batch=batch, layout=layout, settings=settings, phi=phi
-    )
-    best_objective = start_objective
-    best_phi = [p.detach().clone() for p in phi]
-    for _ in range(steps):
-        objective, gradients, _ = _evaluate(
-            model=model, batch=batch, layout=layout, settings=settings, phi=phi
-        )
-        if objective < best_objective:
-            best_objective = objective
-            best_phi = [p.detach().clone() for p in phi]
-        for parameter, gradient in zip(phi, gradients, strict=True):
-            parameter.grad = gradient
-        optimiser.step()
-    final, _, _ = _evaluate(model=model, batch=batch, layout=layout, settings=settings, phi=phi)
-    if final < best_objective:
-        best_objective = final
-        best_phi = [p.detach().clone() for p in phi]
-    _restore_phi(phi=phi, values=best_phi)
-    return best_objective
-
-
-def assert_batch_before_cut(
-    *, batch: PooledBatch, end_times: np.ndarray, cut_end: np.datetime64
-) -> None:
-    """Raise if any row of `batch` ends after `cut_end`.
+    The fitter freezes every shared coefficient, every other substation, and the population means
+    at the model's values. It moves only the new substation's heating threshold and style loadings
+    by L-BFGS, solving its level, deviation, heating slopes, and capacity increments exactly at
+    each step, with the population means as fixed prior centres. The shared calendar terms are
+    centred on the substation's own rows, as in the gradient onboarding. A fit that does not meet
+    the convergence test keeps its best point.
 
     Args:
-        batch: The training rows; `batch.row` indexes the feature cache's time grid.
-        end_times: The cache's `end_times` (a NumPy datetime array).
-        cut_end: The instant training ends, in the same dtype.
+        settings: The noise standard deviation and the prior scales.
+        max_evaluations: The most objective evaluations, line search included.
 
-    Raises:
-        ValueError: If a training row ends after the cut (lookahead).
+    Returns:
+        A function of the model, the substation's rows, and its index that fits the substation in
+        place and returns the final loss per row.
     """
-    rows = batch.row.cpu().numpy()
-    latest = end_times[rows].max()
-    if latest > cut_end:
-        msg = f"a training row ends at {latest}, after the cut at {cut_end}: lookahead"
-        raise ValueError(msg)
+
+    def fitter(model: PooledDemandModel, batch: PooledBatch, site: int) -> float:
+        freeze_operator_for_vp(model=model)
+        problem = make_vp_problem(model=model, batch=batch, settings=settings, frozen_shared=True)
+        owned: list[nn.Parameter] = [model.threshold]
+        if model.config.shared_shapes:
+            owned.append(model.site_logits)
+        coordinates = nn.Parameter(
+            torch.cat(
+                [model.threshold[site : site + 1], *_logits_of(model=model, site=site)]
+            ).detach()
+        )
+
+        def evaluate() -> tuple[float, list[torch.Tensor]]:
+            with torch.no_grad():
+                model.threshold[site] = coordinates[0]
+                if model.config.shared_shapes:
+                    model.site_logits[site] = coordinates[1:]
+            objective, gradients, _ = _evaluate(problem=problem, phi=owned)
+            rows = [gradients[0][site : site + 1]]
+            if model.config.shared_shapes:
+                rows.append(gradients[1][site])
+            return objective, [torch.cat(rows)]
+
+        with trainable_only(model=model, parameters=owned):
+            _, best, _ = _run_lbfgs(
+                phi=[coordinates], evaluate=evaluate, max_evaluations=max_evaluations
+            )
+            _restore_phi(phi=[coordinates], values=best.phi)
+            final, _ = evaluate()
+        return final
+
+    return fitter
+
+
+def _logits_of(*, model: PooledDemandModel, site: int) -> list[torch.Tensor]:
+    """Return the substation's style loadings as a list of one tensor, or none without shapes."""
+    return [model.site_logits[site]] if model.config.shared_shapes else []

@@ -77,6 +77,12 @@ MIN_TRAINED_SLOT_ROWS: Final[int] = 1440
 A cut on 1 July leaves a few dark half-hours in the next season-year, which must not count as a
 trained year: its capacity increment and centring mean would rest on them.
 """
+SHAPE_DECAY: Final[float] = 1e-4
+"""Weight decay on the shared daily shapes, in nats per unit squared."""
+HOLIDAY_DECAY: Final[float] = 1e-3
+"""Weight decay on the holiday coefficients."""
+NETWORK_DECAY: Final[float] = 1e-5
+"""Weight decay on every parameter of the interaction network."""
 INITIAL_POWER_FACTOR: Final[float] = 0.97
 """The power factor that the MVA substations' `tan(phi)` starts from."""
 SITE_FAMILIES: Final[tuple[str, ...]] = (
@@ -731,9 +737,9 @@ class PooledDemandModel(nn.Module):
 
     def penalty(self) -> torch.Tensor:
         """Return the weight decay, and in the `decay` prior the deviation and threshold priors."""
-        decay = 1e-4 * (self.shapes**2).sum() + 1e-3 * (self.holiday**2).sum()
+        decay = SHAPE_DECAY * (self.shapes**2).sum() + HOLIDAY_DECAY * (self.holiday**2).sum()
         if self.interaction is not None:
-            decay = decay + 1e-5 * sum((p**2).sum() for p in self.interaction.parameters())
+            decay = decay + NETWORK_DECAY * sum((p**2).sum() for p in self.interaction.parameters())
         if self.config.site_prior != "decay":
             return decay
         prior = (((self.threshold - HEATING_THRESHOLD_C) / THRESHOLD_PRIOR_SCALE_C) ** 2).sum()
