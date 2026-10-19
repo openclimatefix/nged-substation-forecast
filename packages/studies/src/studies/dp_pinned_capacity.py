@@ -13,11 +13,12 @@ of experiment 45 instead, so the model fits everything else around a fixed solar
   at D18). When the earliest vintage's origin is at most `EARLY_VINTAGE_MAX_GAP_DAYS` after `c`,
   that vintage is used as it is, and the write-up discloses the leak of those weeks. When the gap is
   longer, the vintage's weekly shape is not used. The capacity is the median of the vintage's last
-  `HOLD_WEEKS` weeks (its level at its own origin), scaled back at `CAPACITY_GROWTH_PER_YEAR` per
-  year over the time between the origin and each week. **That level is hindsight:** the vintage
-  was fitted with every reading up to its origin, which is months after the cut. The cases are D9
-  at the 2024-07-01 cut (9.5 months), D18 at every cut (up to the whole scored year), and every
-  site at the 2022-07-01 cut of the tuning year's replica (13 months).
+  `HOLD_WEEKS` weeks (its level at its last week), scaled back at `CAPACITY_GROWTH_PER_YEAR` per
+  year over the time between that last week and each week. **That level is hindsight:** the
+  vintage was fitted with every reading up to its origin, which is months after the cut. The cases
+  are D9 at the 2024-07-01 cut (9.5 months), D15 at the 2025-07-01 cut (370 days), D18 at every
+  cut (up to the whole scored year), and every site at the 2022-07-01 cut of the tuning year's
+  replica (13 months).
 - **Unobserved weeks** hold the last observed value, and leading unobserved weeks take the first
   observed value.
 - **After the cut,** and for any week beyond the last week of the vintage (the vintage of D14 stops
@@ -184,11 +185,11 @@ def pinned_capacity(*, vintages: pl.DataFrame, table: SiteTable, cut: datetime) 
     )
     cut_day = np.datetime64(cut_date.isoformat(), "D")
     if source == "growth_prior":
-        origin_day = np.datetime64(origin.isoformat(), "D")
+        anchor = weeks[-1]
         level = float(np.median(points[-HOLD_WEEKS:]))
         growth = 1.0 + CAPACITY_GROWTH_PER_YEAR
-        points = level / growth ** ((origin_day - weeks).astype(np.float64) / DAYS_PER_YEAR)
-        held = level / growth ** ((origin_day - cut_day).astype(np.float64) / DAYS_PER_YEAR)
+        points = level / growth ** ((anchor - weeks).astype(np.float64) / DAYS_PER_YEAR)
+        held = level / growth ** ((anchor - cut_day).astype(np.float64) / DAYS_PER_YEAR)
     else:
         up_to_cut = np.flatnonzero(weeks <= cut_day)
         if len(up_to_cut) == 0:

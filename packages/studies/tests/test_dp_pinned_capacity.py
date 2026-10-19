@@ -143,11 +143,11 @@ def test_a_vintage_far_after_the_cut_scales_its_level_at_the_origin_back_at_the_
     points = [100.0 * (1.0 + 0.01 * i) / TABLE.effective_capacity_mw for i in range(n_weeks)]
     origin_level = float(np.median(points[-HOLD_WEEKS:]))
     growth = 1.0 + CAPACITY_GROWTH_PER_YEAR
-    origin = np.datetime64("2025-04-14")
-    years_to_cut = float((origin - np.datetime64("2024-07-01")).astype(float)) / 365.25
+    anchor = pinned.weeks[-1]  # the last week the level refers to
+    years_to_cut = float((anchor - np.datetime64("2024-07-01")).astype(float)) / 365.25
     assert pinned.held_points == pytest.approx(origin_level / growth**years_to_cut)
     week = 100
-    years_back = float((origin - pinned.weeks[week]).astype(float)) / 365.25
+    years_back = float((anchor - pinned.weeks[week]).astype(float)) / 365.25
     assert pinned.points[week] == pytest.approx(origin_level / growth**years_back)
     # The vintage's own weekly shape plays no part: the path is the growth prior alone.
     ratios = pinned.points[1:] / pinned.points[:-1]
