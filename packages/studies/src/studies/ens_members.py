@@ -30,6 +30,46 @@ ENSEMBLE_SIZE: Final[int] = 51
 CONTROL_MEMBER: Final[int] = 0
 """The ensemble member ECMWF runs from the unperturbed analysis."""
 
+MIXTURE_LEVELS: Final[tuple[float, ...]] = (
+    0.01,
+    0.05,
+    0.10,
+    0.25,
+    0.40,
+    0.50,
+    0.60,
+    0.75,
+    0.90,
+    0.95,
+    0.99,
+)
+"""The 11 quantile levels that `mixture_quantiles` pools, those of experiments 87 and 111."""
+
+
+def mixture_quantiles(*, member_quantiles: np.ndarray) -> np.ndarray:
+    """Pool the members' quantiles into the mixture's 11 quantiles (as experiment 87 does).
+
+    Each member contributes its 11 quantiles as atoms of mass `masses / members`, where a level's
+    mass is the interval between the mid-points to its neighbours. The mixture's level-`p` quantile
+    is the smallest atom value whose cumulative mass reaches `p`.
+
+    Args:
+        member_quantiles: Shape (cases, members, 11).
+
+    Returns:
+        Shape (cases, 11), sorted along the levels.
+    """
+    levels = np.array(MIXTURE_LEVELS)
+    masses = np.diff(np.concatenate([[0.0], (levels[:-1] + levels[1:]) / 2, [1.0]]))
+    cases, members, _ = member_quantiles.shape
+    values = member_quantiles.reshape(cases, members * len(levels))
+    weights = np.tile(masses, members) / members
+    order = np.argsort(values, axis=1)
+    sorted_values = np.take_along_axis(values, order, axis=1)
+    cumulative = np.cumsum(weights[order], axis=1)
+    picks = (cumulative[:, :, None] >= (levels - 1e-9)).argmax(axis=1)
+    return np.sort(np.take_along_axis(sorted_values, picks, axis=1), axis=1)
+
 
 def fields(*, domain: DomainType) -> tuple[str, ...]:
     """Return the weather fields an ENS arm is shown, in the order it is shown them.
