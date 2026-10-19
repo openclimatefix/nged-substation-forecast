@@ -20,9 +20,10 @@ in April to September and zero outside. `s` is the capacity over the effective c
 points per unit of PV shape: the real-time vintage of experiment 45, variant `frozen`, from the
 latest origin on or before the cut, held at its last week afterwards. `a(t)` is the unit PV shape
 minus its month-by-half-hour mean over the training window. `w` is fitted per substation by least
-squares on the forward cross-fitted median residuals of the matching zero-start arm over April to
-September rows. The cross-fit trains a median-only model with the arm's parameters, because only
-the median residual is used.
+squares on the median residuals of a replica of the matching zero-start arm over April to September
+rows. The replica is a median-only model with the arm's parameters, trained on the window that ends
+12 months before the cut and predicting the following 12 months, so its residuals are as stale as
+the scored forecast.
 
 **The lagged reference arms** add `lag_origin`, `lag_same_time_latest_day`,
 `lag_same_time_latest_week`, and `lead_hours` as experiment 87 defines them, with a telemetry
@@ -36,8 +37,8 @@ import argparse
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
-from typing import Final
+from datetime import date, datetime
+from typing import Any, Final
 
 import e00104_common as common
 import numpy as np
@@ -45,10 +46,9 @@ import polars as pl
 import xgboost as xgb
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (
-    DERATING_PER_KELVIN,
     QUANTILE_LEVELS,
     TrainingWindow,
-    crossfit_cuts,
+    replica_cut,
     training_rows,
 )
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -168,6 +168,9 @@ def vintage_capacity(*, cache: FeatureCache, site: str, cut: datetime) -> Vintag
         msg = f"{site} has no capacity vintage with an origin on or before {cut.date()}"
         raise ValueError(msg)
     origin = vintages["origin_monday"].max()
+    if not isinstance(origin, date):
+        msg = "the vintage origin is not a date"
+        raise TypeError(msg)
     weekly = vintages.filter(pl.col("origin_monday") == origin).sort("week_start")
     capacity = weekly["capacity_mw"].to_numpy().astype(np.float64)
     unobserved = weekly["unobserved"].to_numpy()
@@ -179,7 +182,7 @@ def vintage_capacity(*, cache: FeatureCache, site: str, cut: datetime) -> Vintag
         else:
             last = held[position]
     return VintageCapacity(
-        origin=np.datetime64(origin, "D"),
+        origin=np.datetime64(origin.isoformat(), "D"),
         weeks=weekly["week_start"].to_numpy().astype("datetime64[D]"),
         points=100.0 * held / table.effective_capacity_mw,
         n_unobserved=int(unobserved.sum()),
@@ -290,7 +293,9 @@ def fit_booster(
     return xgb.train(parameters, matrix, num_boost_round=N_ROUNDS)
 
 
-def predict(*, booster: xgb.Booster, x: np.ndarray, margin: np.ndarray | None, n_levels: int) -> np.ndarray:
+def predict(
+    *, booster: xgb.Booster, x: np.ndarray, margin: np.ndarray | None, n_levels: int
+) -> np.ndarray:
     """Return a booster's quantiles, sorted along the level axis, shape (rows, n_levels)."""
     raw = booster.predict(xgb.DMatrix(x, base_margin=margin))
     return np.sort(raw.reshape(len(x), n_levels), axis=1)
@@ -301,7 +306,7 @@ def tile_margin(*, offset: np.ndarray, weight: float, n_levels: int) -> np.ndarr
     return np.tile((weight * offset)[:, None], (1, n_levels)).astype(np.float32)
 
 
-def crossfit_weight(
+def replica_weight(
     *,
     cache: FeatureCache,
     site: str,
@@ -310,10 +315,12 @@ def crossfit_weight(
     final_train: np.ndarray,
     vintage: VintageCapacity,
 ) -> tuple[float, int]:
-    """Fit the solar weight `w` on forward cross-fitted median residuals of a zero-start model.
+    """Fit the solar weight `w` on the median residuals of a replica of the zero-start forecast.
 
-    Only the quarters of the last 12 months that hold April to September rows need a fit. Each
-    quarter is predicted by a median model trained on the window before the quarter's start.
+    A median-only model with the arm's parameters is trained on the window that ends 12 months
+    before the cut, and predicts the following 12 months, so its residuals are as stale as the
+    scored forecast. The weight is the least-squares slope of those residuals on the offset, over
+    the April to September rows outside the switching masks.
 
     Args:
         cache: The feature cache.
@@ -324,36 +331,31 @@ def crossfit_weight(
         vintage: The capacity vintage.
 
     Returns:
-        `w` and the number of residual rows it was fitted on.
+        `w` and the number of April to September residual rows it was fitted on.
     """
     features = cache.sites[site]
-    numerator = 0.0
-    denominator = 0.0
-    n_rows = 0
-    for start, end in crossfit_cuts(cut=cut):
-        quarter_months = {(start + timedelta(days=45 + 30 * i)).month for i in range(3)}
-        if not quarter_months & set(OFFSET_MONTHS):
-            continue
-        train = training_rows(features=features, cache=cache, cut=start, window=window)
-        booster = fit_booster(
-            x=feature_matrix(cache=cache, site=site, index=train),
-            y=features.y[train],
-            levels=(0.5,),
-            start="zero",
-            margin=None,
-        )
-        rows = common.scoring_index(cache=cache, site=site, after=start, through=end)
-        rows = rows[~features.switching_mask[rows]]
-        x = feature_matrix(cache=cache, site=site, index=rows)
-        median = predict(booster=booster, x=x, margin=None, n_levels=1)[:, 0]
-        shape = offset_per_unit_weight(
-            cache=cache, site=site, index=rows, train_index=final_train, vintage=vintage
-        )
-        residual = features.y[rows] - median
-        numerator += float((shape * residual).sum())
-        denominator += float((shape * shape).sum())
-        n_rows += int((shape != 0.0).sum())
-    return numerator / denominator, n_rows
+    fit_cut = replica_cut(cut=cut)
+    train = training_rows(features=features, cache=cache, cut=fit_cut, window=window)
+    booster = fit_booster(
+        x=feature_matrix(cache=cache, site=site, index=train),
+        y=features.y[train],
+        levels=(0.5,),
+        start="zero",
+        margin=None,
+    )
+    rows = common.scoring_index(cache=cache, site=site, after=fit_cut, through=cut)
+    rows = rows[~features.switching_mask[rows]]
+    median = predict(
+        booster=booster,
+        x=feature_matrix(cache=cache, site=site, index=rows),
+        margin=None,
+        n_levels=1,
+    )[:, 0]
+    shape = offset_per_unit_weight(
+        cache=cache, site=site, index=rows, train_index=final_train, vintage=vintage
+    )
+    residual = features.y[rows] - median
+    return float((shape * residual).sum() / (shape * shape).sum()), int((shape != 0.0).sum())
 
 
 def lag_columns(
@@ -402,7 +404,131 @@ def check_no_lookahead(*, cache: FeatureCache, train: np.ndarray, cut: datetime)
         raise ValueError(msg)
 
 
-def fit_site(*, site: str, cold: bool) -> dict[str, object]:
+@dataclass(frozen=True)
+class SiteJob:
+    """Everything the arms of one substation share.
+
+    Attributes:
+        cache: The feature cache.
+        site: The substation's label.
+        cut: The cut.
+        index: The rows to score.
+        x_score: The lagless inputs of the rows to score.
+    """
+
+    cache: FeatureCache
+    site: str
+    cut: datetime
+    index: np.ndarray
+    x_score: np.ndarray
+
+    def frame_of(
+        self, *, quantiles: np.ndarray, scheme: common.SchemeType = "day_ahead"
+    ) -> pl.DataFrame:
+        """Return the predictions of the rows to score as a prediction frame."""
+        return common.prediction_frame(
+            cache=self.cache, site=self.site, index=self.index, quantiles=quantiles, scheme=scheme
+        )
+
+
+def lagged_arms(
+    *,
+    job: SiteJob,
+    train: np.ndarray,
+    margin_train: np.ndarray,
+    margin_score: np.ndarray,
+    lagless_quantiles: np.ndarray,
+) -> dict[str, pl.DataFrame]:
+    """Fit the descriptive lagged reference arms, and re-key `x_12am` to their initialisations.
+
+    Args:
+        job: The substation's shared inputs.
+        train: The 12-month window's training rows.
+        margin_train: The solar offset on the training rows.
+        margin_score: The solar offset on the rows to score.
+        lagless_quantiles: The quantiles of `x_12am`.
+
+    Returns:
+        For each lagged scheme, `l_12am_<scheme>` and `x_12am_<scheme>` (the lagless arm's
+        quantiles under the same initialisation times, so the contrast pairs the same rows).
+    """
+    features = job.cache.sites[job.site]
+    x_train = feature_matrix(cache=job.cache, site=job.site, index=train)
+    levels = tuple(QUANTILE_LEVELS)
+    frames: dict[str, pl.DataFrame] = {}
+    for scheme in common.LAGGED_SCHEMES:
+        frames[f"x_12am_{scheme}"] = job.frame_of(quantiles=lagless_quantiles, scheme=scheme)
+        lag_train = lag_columns(cache=job.cache, site=job.site, index=train, scheme=scheme)
+        lag_score = lag_columns(cache=job.cache, site=job.site, index=job.index, scheme=scheme)
+        lagged = fit_booster(
+            x=np.column_stack([x_train, lag_train]),
+            y=features.y[train],
+            levels=levels,
+            start="zero",
+            margin=margin_train,
+        )
+        quantiles = predict(
+            booster=lagged,
+            x=np.column_stack([job.x_score, lag_score]),
+            margin=margin_score,
+            n_levels=len(levels),
+        )
+        frames[f"l_12am_{scheme}"] = job.frame_of(quantiles=quantiles, scheme=scheme)
+    return frames
+
+
+def offset_arm(
+    *, job: SiteJob, train: np.ndarray, window: TrainingWindow, vintage: VintageCapacity
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+    """Fit the solar weight and the `am` arm for one window.
+
+    Args:
+        job: The substation's shared inputs.
+        train: The window's training rows.
+        window: The window rule.
+        vintage: The capacity vintage.
+
+    Returns:
+        The quantiles of the arm, the offset margins on the training rows and on the rows to
+        score, and a record of the weight and how many rows needed the vintage's first week.
+    """
+    cache, site = job.cache, job.site
+    features = cache.sites[site]
+    levels = tuple(QUANTILE_LEVELS)
+    weight, n_fit = replica_weight(
+        cache=cache, site=site, cut=job.cut, window=window, final_train=train, vintage=vintage
+    )
+    _, before = capacity_points_at(cache=cache, vintage=vintage, index=train)
+    margins = [
+        tile_margin(
+            offset=offset_per_unit_weight(
+                cache=cache, site=site, index=rows, train_index=train, vintage=vintage
+            ),
+            weight=weight,
+            n_levels=len(levels),
+        )
+        for rows in (train, job.index)
+    ]
+    booster = fit_booster(
+        x=feature_matrix(cache=cache, site=site, index=train),
+        y=features.y[train],
+        levels=levels,
+        start="zero",
+        margin=margins[0],
+    )
+    quantiles = predict(booster=booster, x=job.x_score, margin=margins[1], n_levels=len(levels))
+    record = {
+        "site": site,
+        "w": weight,
+        "rows": n_fit,
+        "train_rows_before_vintage": before,
+        "unobserved_weeks": vintage.n_unobserved,
+        "vintage_origin": str(vintage.origin),
+    }
+    return quantiles, margins[0], margins[1], record
+
+
+def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
     """Fit every XGBoost arm of one substation.
 
     Args:
@@ -410,90 +536,57 @@ def fit_site(*, site: str, cold: bool) -> dict[str, object]:
         cold: True for the cold block, which runs `x_12` only.
 
     Returns:
-        `frames` (arm name to predictions), `weights` rows, and `capacity` diagnostics.
+        `frames` (arm name to predictions) and `weights` rows.
     """
     cache = common.load_cache()
     features = cache.sites[site]
     cut = common.COLD_CUT if cold else common.FINAL_CUT
     through = common.COLD_END if cold else common.SCORING_END
     index = common.scoring_index(cache=cache, site=site, after=cut, through=through)
-    x_score = feature_matrix(cache=cache, site=site, index=index)
-    n_levels = len(QUANTILE_LEVELS)
+    job = SiteJob(
+        cache=cache,
+        site=site,
+        cut=cut,
+        index=index,
+        x_score=feature_matrix(cache=cache, site=site, index=index),
+    )
     levels = tuple(QUANTILE_LEVELS)
     frames: dict[str, pl.DataFrame] = {}
     weights: list[dict] = []
-    windows = {"12": TrainingWindow(months=12), "all": TrainingWindow()}
-
-    def frame_of(*, quantiles: np.ndarray, scheme: common.SchemeType = "day_ahead") -> pl.DataFrame:
-        return common.prediction_frame(
-            cache=cache, site=site, index=index, quantiles=quantiles, scheme=scheme
-        )
-
     vintage = None if cold else vintage_capacity(cache=cache, site=site, cut=cut)
-    for label, window in windows.items():
+    for label, window in {"12": TrainingWindow(months=12), "all": TrainingWindow()}.items():
         if cold and label == "all":
             continue
         train = training_rows(features=features, cache=cache, cut=cut, window=window)
         check_no_lookahead(cache=cache, train=train, cut=cut)
         x_train = feature_matrix(cache=cache, site=site, index=train)
-        y_train = features.y[train]
-        starts = ("estimated", "zero") if label == "12" else ("zero",)
-        zero_quantiles: np.ndarray | None = None
-        for start in starts:
-            booster = fit_booster(x=x_train, y=y_train, levels=levels, start=start, margin=None)
-            quantiles = predict(booster=booster, x=x_score, margin=None, n_levels=n_levels)
-            name = {"estimated": f"x_{label}", "zero": f"x_{label}z"}[start]
-            frames[f"cold_{name}" if cold else name] = frame_of(quantiles=quantiles)
-            if start == "zero":
-                zero_quantiles = quantiles
-        if cold or vintage is None:
-            continue
-        weight, n_fit = crossfit_weight(
-            cache=cache, site=site, cut=cut, window=window, final_train=train, vintage=vintage
-        )
-        weights.append({"site": site, "window": label, "w": weight, "rows": n_fit})
-        _, before = capacity_points_at(cache=cache, vintage=vintage, index=train)
-        weights[-1]["train_rows_before_vintage"] = before
-        offset_train = offset_per_unit_weight(
-            cache=cache, site=site, index=train, train_index=train, vintage=vintage
-        )
-        offset_score = offset_per_unit_weight(
-            cache=cache, site=site, index=index, train_index=train, vintage=vintage
-        )
-        margin_train = tile_margin(offset=offset_train, weight=weight, n_levels=n_levels)
-        margin_score = tile_margin(offset=offset_score, weight=weight, n_levels=n_levels)
-        booster = fit_booster(
-            x=x_train, y=y_train, levels=levels, start="zero", margin=margin_train
-        )
-        quantiles = predict(booster=booster, x=x_score, margin=margin_score, n_levels=n_levels)
-        frames[f"x_{label}am"] = frame_of(quantiles=quantiles)
-        if label != "12":
-            continue
-        for scheme in common.LAGGED_SCHEMES:
-            # The lagless arm, re-keyed to the scheme's initialisation so the contrast pairs rows.
-            frames[f"x_12am_{scheme}"] = frame_of(quantiles=quantiles, scheme=scheme)
-            lag_train = lag_columns(cache=cache, site=site, index=train, scheme=scheme)
-            lag_score = lag_columns(cache=cache, site=site, index=index, scheme=scheme)
-            lagged = fit_booster(
-                x=np.column_stack([x_train, lag_train]),
-                y=y_train,
-                levels=levels,
-                start="zero",
-                margin=margin_train,
+        for start in ("estimated", "zero") if label == "12" else ("zero",):
+            booster = fit_booster(
+                x=x_train, y=features.y[train], levels=levels, start=start, margin=None
             )
-            lagged_quantiles = predict(
-                booster=lagged,
-                x=np.column_stack([x_score, lag_score]),
-                margin=margin_score,
-                n_levels=n_levels,
+            quantiles = predict(booster=booster, x=job.x_score, margin=None, n_levels=len(levels))
+            name = f"x_{label}" if start == "estimated" else f"x_{label}z"
+            frames[f"cold_{name}" if cold else name] = job.frame_of(quantiles=quantiles)
+        if vintage is None:
+            continue
+        quantiles, margin_train, margin_score, record = offset_arm(
+            job=job, train=train, window=window, vintage=vintage
+        )
+        weights.append({**record, "window": label})
+        frames[f"x_{label}am"] = job.frame_of(quantiles=quantiles)
+        if label == "12":
+            frames |= lagged_arms(
+                job=job,
+                train=train,
+                margin_train=margin_train,
+                margin_score=margin_score,
+                lagless_quantiles=quantiles,
             )
-            frames[f"l_12am_{scheme}"] = frame_of(quantiles=lagged_quantiles, scheme=scheme)
-        del zero_quantiles
     print(f"{site}: {sorted(frames)}", flush=True)
     return {"frames": frames, "weights": weights}
 
 
-def _worker(job: tuple[str, bool]) -> dict[str, object]:
+def _worker(job: tuple[str, bool]) -> dict[str, Any]:
     """Run `fit_site` in a worker process."""
     site, cold = job
     return fit_site(site=site, cold=cold)
@@ -513,7 +606,9 @@ def main() -> None:
         results = list(pool.map(_worker, [(site, arguments.cold) for site in sites]))
     names = [name for result in results for name in result["frames"]]
     for name in dict.fromkeys(names):
-        frame = pl.concat([result["frames"][name] for result in results if name in result["frames"]])
+        frame = pl.concat(
+            [result["frames"][name] for result in results if name in result["frames"]]
+        )
         common.store_arm(name=name, frame=frame)
     if not arguments.cold:
         pl.DataFrame([row for result in results for row in result["weights"]]).write_parquet(

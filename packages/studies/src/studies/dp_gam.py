@@ -525,6 +525,18 @@ PIVOT_PATIENCE: Final[int] = 3
 """Iterations without fewer broken conditions before block pivoting falls back to a single move."""
 
 
+def default_tolerance(*, dtype: torch.dtype) -> float:
+    """Return the solver's default optimality tolerance: 1e-7, or 10,000 machine epsilons if larger.
+
+    Args:
+        dtype: The floating-point type of the problem.
+
+    Returns:
+        1e-7 in float64 and about 1.2e-3 in float32.
+    """
+    return max(1e-7, 1e4 * float(torch.finfo(dtype).eps))
+
+
 def solve_bounded_quadratic(
     *,
     matrix: torch.Tensor,
@@ -563,7 +575,7 @@ def solve_bounded_quadratic(
     constrained = constrained.to(matrix.device)
     epsilon = float(torch.finfo(matrix.dtype).eps)
     if tolerance is None:
-        tolerance = max(1e-7, 1e4 * epsilon)
+        tolerance = default_tolerance(dtype=matrix.dtype)
     batch, p = rhs.shape
     scale = rhs.abs().amax(dim=1).clamp(min=1.0)
     unconstrained = torch.linalg.solve(matrix, rhs[:, :, None])[:, :, 0]
@@ -782,6 +794,9 @@ def fit_gam(
         constrained=torch.as_tensor(layout.constrained),
     )
     signal = derated_unit_shape(features=features, index=index) > LAST_TRAINED_MIN_SHAPE
+    if not signal.any():
+        msg = f"{site} has no training row that carries solar signal before {cut}"
+        raise ValueError(msg)
     return GamFit(
         layout=layout,
         theta=theta.cpu().numpy(),

@@ -57,7 +57,7 @@ SCHEMES: Final[dict[str, tuple[int, int]]] = {
 }
 """Days before the valid day and the UTC hour of the initialisation, for each scheme."""
 
-LAGGED_SCHEMES: Final[tuple[str, ...]] = ("d1", "d6")
+LAGGED_SCHEMES: Final[tuple[SchemeType, ...]] = ("d1", "d6")
 TELEMETRY_DELAY_STEPS: Final[int] = 7
 """A reading is usable once it is 3.5 hours old: 7 half-hours."""
 STEPS_PER_DAY: Final[int] = 48

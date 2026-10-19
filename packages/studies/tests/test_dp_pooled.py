@@ -148,26 +148,52 @@ def test_cpu_and_gpu_pooled_fits_agree(dp_synthetic_cache: FeatureCache):
         assert torch.allclose(cpu_model(cpu_batch), gpu_model(gpu_batch).cpu(), atol=1e-3)
 
 
-def test_the_shared_terms_are_centred_per_site_year_in_training_and_use_stored_means_after(
-    dp_synthetic_cache: FeatureCache,
-):
+def test_the_calendar_terms_of_demand_are_centred_per_site_year(dp_synthetic_cache: FeatureCache):
     batch = build_pooled_batch(
         cache=_two_site_cache(dp_synthetic_cache), sites=("S1", "S2"), cut_end=CUT
     )
-    model = _model(batch=batch, config=DpConfig(interaction_hidden=(8,)))
+    model = _model(batch=batch, config=DpConfig())
     with torch.no_grad():
-        model.holiday.normal_()
-        model.harmonic_coef.normal_()
-        values = torch.randn(batch.n_rows, dtype=torch.float32) + 3.0
-        model.train()
-        centred = model._centred(values=values, slot=batch.season_slot)
-        sums = torch.zeros(model.n_sites * model.n_season_years).index_add(
-            0, batch.season_slot, centred
-        )
-        assert sums.abs().max() < 1e-2 * batch.n_rows**0.5
-        model.eval()
-        again = model._centred(values=values, slot=batch.season_slot)
-    assert torch.allclose(centred, again, atol=1e-4)
+        for parameter in model.parameters():
+            parameter.zero_()
+        model.level.fill_(50.0)
+        model.slope_raw.fill_(-30.0)
+        model.holiday.fill_(5.0)  # a constant calendar term: centring must remove all of it
+    model.train()
+    demand = model.demand(batch=batch)
+    assert torch.allclose(demand, torch.full_like(demand, 50.0), atol=1e-3)
+
+
+def test_a_forecast_year_is_shifted_by_the_stored_training_mean_and_never_by_its_own_mean(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache = _two_site_cache(dp_synthetic_cache)
+    train = build_pooled_batch(cache=cache, sites=("S1", "S2"), cut_end=CUT)
+    forecast = build_pooled_batch(
+        cache=cache,
+        sites=("S1", "S2"),
+        cut_end=np.datetime64("2025-07-01T00:00:00", "us"),
+        after=CUT,
+    )
+    model = _model(batch=train, config=DpConfig(interaction_hidden=(8,)))
+    fit_pooled(model=model, batch=train, steps=3, learning_rate=0.01)
+    # The two dark half-hours that end at the 1 July cut start in the next season-year, which
+    # must not count as trained.
+    last_trained = int(model.trained[0].nonzero().max())
+    assert int(forecast.season_slot.min()) % forecast.n_season_years > last_trained
+    stored = model.centre_means.reshape(model.n_sites, model.n_season_years)
+    # The forecast year takes the mean of the site's last trained year, not zero.
+    assert (stored[:, last_trained + 1] == stored[:, last_trained]).all()
+    assert (stored[:, last_trained] != 0.0).all()
+    model.eval()
+    values = torch.randn(forecast.n_rows) + 3.0
+    centred = model._centred(values=values, slot=forecast.season_slot)
+    assert torch.allclose(centred, values - stored.reshape(-1)[forecast.season_slot])
+    # A live mean would leave the centred values with mean zero; the stored training mean does not.
+    assert abs(float(centred.mean())) > 0.5
+    # Shifting every forecast value shifts the centred values by the same amount: no live mean.
+    shifted = model._centred(values=values + 10.0, slot=forecast.season_slot)
+    assert torch.allclose(shifted - centred, torch.full_like(values, 10.0), atol=1e-4)
 
 
 def test_the_interaction_network_does_not_see_the_suns_elevation(dp_synthetic_cache: FeatureCache):

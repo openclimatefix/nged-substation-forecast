@@ -1,9 +1,10 @@
 """Fit the four convex-model arms per substation and write their quantiles, capacities, and drift.
 
 One frozen fit per arm and substation on data before the cut, scored on every row with a reading
-after it. The quantiles are the fitted mean plus empirical quantiles of forward cross-fitted
-residuals per hour band and calendar quarter (`studies.dp_gam.crossfit_residuals`). The penalties
-come from `work/tuned.json` (`e00104_tune.py`).
+after it. The quantiles are the fitted mean plus empirical quantiles of the residuals of a replica
+of the scored forecast (a fit 12 months before the cut, predicting the following 12 months), per
+hour band and calendar quarter (`studies.dp_gam.replica_residuals`). The penalties come from
+`work/tuned.json` (`e00104_tune.py`).
 
 Arms: `g1` (12-month window, no drift), `g_all` (all years, no drift), `g_all_d1` (all years,
 drift D1), and `g_all_d1_steps` (all years, D1 plus steps). `--cold` runs the cold block instead:
@@ -21,20 +22,21 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final
+from typing import Any, Final
 
 import e00104_common as common
 import numpy as np
 import polars as pl
 from studies.dp_gam import (
     N_BANDS,
+    DriftType,
     GamFit,
     GamSpec,
     ResidualSpread,
     TrainingWindow,
-    crossfit_residuals,
     fit_gam,
     predict_gam,
+    replica_residuals,
 )
 
 
@@ -49,7 +51,7 @@ class Arm:
     """
 
     name: str
-    drift: str
+    drift: DriftType
     window: TrainingWindow
 
 
@@ -117,7 +119,7 @@ def drift_rows(*, fit: GamFit, site: str, arm: str, cut: datetime) -> list[dict]
     ]
 
 
-def fit_site(*, site: str, cold: bool) -> dict[str, object]:
+def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
     """Fit every arm of one substation and return its predictions, capacities, and drift paths.
 
     Args:
@@ -147,7 +149,7 @@ def fit_site(*, site: str, cold: bool) -> dict[str, object]:
             window=arm.window,
             season_years=common.SEASON_YEARS,
         )
-        residuals, band, quarter = crossfit_residuals(
+        replica = replica_residuals(
             cache=cache,
             site=site,
             spec=spec,
@@ -155,7 +157,9 @@ def fit_site(*, site: str, cold: bool) -> dict[str, object]:
             window=arm.window,
             season_years=common.SEASON_YEARS,
         )
-        spread = ResidualSpread.fit(residuals=residuals, band=band, quarter=quarter)
+        spread = ResidualSpread.fit(
+            residuals=replica.residuals, band=replica.band, quarter=replica.quarter
+        )
         mean = predict_gam(cache=cache, fit=fit, index=index)
         quantiles = spread.quantiles(
             mean=mean, band=cache.calendar.band[index], quarter=cache.calendar.quarter[index]
@@ -180,7 +184,7 @@ def fit_site(*, site: str, cold: bool) -> dict[str, object]:
     return {"frames": frames, "capacities": capacities, "drift": drift}
 
 
-def _worker(job: tuple[str, bool]) -> dict[str, object]:
+def _worker(job: tuple[str, bool]) -> dict[str, Any]:
     """Run `fit_site` in a worker process with one thread."""
     import torch
 

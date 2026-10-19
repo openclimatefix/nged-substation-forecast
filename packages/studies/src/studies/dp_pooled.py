@@ -60,6 +60,12 @@ N_PERIODS: Final[int] = len(HOLIDAY_PERIODS)
 """The number of named holiday periods (one more embedding row stands for an ordinary day)."""
 THRESHOLD_PRIOR_SCALE_C: Final[float] = 2.0
 """The prior on a substation's heating threshold is a normal around 15.5 degrees, this wide."""
+MIN_TRAINED_SLOT_ROWS: Final[int] = 1440
+"""A site-year with fewer training rows (30 days of half-hours) counts as untrained.
+
+A cut on 1 July leaves a few dark half-hours in the next season-year, which must not count as a
+trained year: its capacity increment and centring mean would rest on them.
+"""
 INITIAL_POWER_FACTOR: Final[float] = 0.97
 """The power factor that the MVA substations' `tan(phi)` starts from."""
 INTERACTION_INPUTS: Final[int] = 4 + 2 + 2 + len(DAY_TYPES) + 1
@@ -187,6 +193,7 @@ def build_pooled_batch(
     cache: FeatureCache,
     sites: tuple[str, ...],
     cut_end: np.datetime64,
+    after: np.datetime64 | None = None,
     device: torch.device | str = "cpu",
     dtype: torch.dtype = torch.float32,
 ) -> PooledBatch:
@@ -196,6 +203,8 @@ def build_pooled_batch(
         cache: The cache.
         sites: The substations to pool; their units decide the operator.
         cut_end: Rows ending after this instant are left out.
+        after: If given, rows ending at or before this instant are left out too, which gathers the
+            rows of a forecast year.
         device: Where the tensors live.
         dtype: The floating-point type of the real-valued tensors.
 
@@ -217,6 +226,8 @@ def build_pooled_batch(
             & np.isfinite(features.smoothed_temperature_c).all(axis=1)
             & (cache.end_times <= cut_end)
         )
+        if after is not None:
+            keep &= cache.end_times > after
         if apparent:
             keep &= features.dark
         rows = np.flatnonzero(keep)
@@ -348,8 +359,34 @@ class PooledDemandModel(nn.Module):
         """Return the capacity of each substation and season-year, shape (sites, years)."""
         return torch.cumsum(nn.functional.softplus(self.capacity_raw) * self.trained, dim=1)
 
+    def finalise_centres(self, *, batch: PooledBatch) -> None:
+        """Store the final centring means of the training rows, and carry them to later years.
+
+        One forward pass in training mode with the final parameters refreshes the means of every
+        site-year that has training rows. A site-year without training rows, which is a forecast
+        year, then takes the mean of the site's last trained season-year, so a forecast row is
+        shifted by a training mean and never by a mean of the forecast rows.
+
+        Args:
+            batch: The training rows.
+        """
+        was_training = self.training
+        self.train()
+        with torch.no_grad():
+            self(batch)
+            self.mark_trained_years(batch=batch)
+            means = self.centre_means.reshape(self.n_sites, self.n_season_years)
+            seen = torch.zeros(self.n_sites, dtype=torch.bool, device=means.device)
+            last = torch.zeros(self.n_sites, dtype=means.dtype, device=means.device)
+            for year in range(self.n_season_years):
+                trained = self.trained[:, year] > 0
+                last = torch.where(trained, means[:, year], last)
+                seen = seen | trained
+                means[:, year] = torch.where(trained | ~seen, means[:, year], last)
+        self.train(was_training)
+
     def mark_trained_years(self, *, batch: PooledBatch) -> None:
-        """Allow a capacity increment only in the season-years that have training rows.
+        """Allow a capacity increment only in the season-years with enough training rows.
 
         An untrained season-year then adds nothing, so its capacity is the last trained
         season-year's: the vintage rule's hold, which a forecast of a later season-year needs.
@@ -357,8 +394,8 @@ class PooledDemandModel(nn.Module):
         Args:
             batch: The training rows.
         """
-        trained = torch.zeros(self.n_sites * self.n_season_years, device=batch.y.device)
-        trained[torch.unique(batch.season_slot)] = 1.0
+        counts = torch.bincount(batch.season_slot, minlength=self.n_sites * self.n_season_years)
+        trained = (counts >= MIN_TRAINED_SLOT_ROWS).to(self.trained.dtype)
         self.trained.copy_(trained.reshape(self.n_sites, self.n_season_years))
 
     def demand(self, *, batch: PooledBatch) -> torch.Tensor:
@@ -493,6 +530,7 @@ def fit_pooled(
     if device.type == "cuda":
         torch.cuda.synchronize(device)
     seconds = time.perf_counter() - started
+    model.finalise_centres(batch=batch)
     history = [float(value) for value in torch.stack(losses).cpu()]
     peak = int(torch.cuda.max_memory_allocated(device)) if device.type == "cuda" else 0
     return PooledFitResult(losses=history, seconds=seconds, peak_memory_bytes=peak)
