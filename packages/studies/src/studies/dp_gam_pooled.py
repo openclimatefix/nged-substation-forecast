@@ -22,16 +22,22 @@ column is added.
   the mean of each hour band over that band's columns, so the profile's shape pools and each
   substation's band means stay free. A substation's size therefore never pools.
 - **Scale `g_f`:** the mean diagonal of the family's Gram matrix per training row, over the rows the
-  fit itself trains on. The penalty weight `lambda` then reads as rows of evidence: a substation
-  with far more training rows than `lambda` keeps its own coefficients, and one with far fewer is
-  shrunk to the fleet mean.
+  fit itself trains on. The penalty weight `lambda` then reads as rows of evidence in prediction
+  space: a substation with far more training rows than `lambda` keeps its own predictions, and one
+  with far fewer is shrunk to the fleet mean. The reading is approximate. A family whose columns
+  are unequally active (the holiday periods and the Christmas tent) is shrunk less than
+  `n / (n + lambda)` where its columns are busier than the family's mean, and the four smoothing
+  windows of each heating band are nearly collinear, so their contrasts are shrunk harder than the
+  predictions are.
 - **Complete pooling (`tied=True`)** is exact tying, built as its own design with one coefficient
   vector per pooled family and a free band mean per substation. It is never a huge `lambda`, which
   would push the condition number towards the limit of float64.
 - **Mixed capacity modes:** each substation brings its own `GamSpec`, window, and pinned capacity,
   so one joint fit holds substations whose capacity is pinned beside substations whose capacity is
-  fitted from their own rows. A pinned capacity enters only its own substation's target, never the
-  fleet mean.
+  fitted from their own rows. A pinned capacity shifts its own substation's target and so its
+  coefficients, and at `lambda > 0` those move the fleet mean and every other substation's
+  forecast. A pinned capacity read from a vintage fitted long after the cut is refused for that
+  reason, unless the caller marks the arm as an oracle.
 
 **The spread follows `dp_gam`.** `pooled_replica_residuals` fits the joint model 12 months before
 the cut and predicts the 12 months that follow. A substation with a full history takes the centred
@@ -44,12 +50,12 @@ carries neither the short substation's own residuals nor those of a full-history
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Final
+from typing import Final, Literal
 
 import numpy as np
 import torch
 
-from studies.dp_calendar import BAND_FIRST_HOURS, DAY_TYPES, HALF_HOURS_PER_DAY
+from studies.dp_calendar import DAY_TYPES, HALF_HOURS_PER_DAY, band_of_hour
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (
     N_BANDS,
@@ -60,17 +66,22 @@ from studies.dp_gam import (
     ResidualSpread,
     TrainingWindow,
     accumulate_gram,
+    check_pinned_capacity,
     last_signal_season_year,
-    naive_utc,
     penalty_matrix,
     predict_gam,
     prepare_fit,
     replica_cut,
+    replica_rows,
     solve_bounded_quadratic,
+    training_rows,
 )
 from studies.dp_pinned_capacity import PinnedCapacity
 
-POOLED_FAMILIES: Final[tuple[str, ...]] = (
+PooledFamilyType = Literal["profile", "holiday", "tent", "harmonics", "heating", "lighting"]
+"""The coefficient families that share a fleet mean."""
+
+POOLED_FAMILIES: Final[tuple[PooledFamilyType, ...]] = (
     "profile",
     "holiday",
     "tent",
@@ -80,14 +91,20 @@ POOLED_FAMILIES: Final[tuple[str, ...]] = (
 )
 """The coefficient families that share a fleet mean; capacity and the COVID flag do not."""
 
-HEATING_FAMILY: Final[str] = "heating"
+HEATING_FAMILY: Final[PooledFamilyType] = "heating"
 """The family whose strength `PoolingStrength.heating` sets; every other family uses `other`."""
 
-FLEET_MEAN_RIDGE: Final[float] = 1e-3
-"""The ridge on the fleet mean, for the directions the deviation penalty does not reach.
+WEEK_ROWS: Final[int] = 7 * HALF_HOURS_PER_DAY
+"""Half-hours in a week."""
 
-These are the profile band means. The ridge matches `GamSpec.profile_ridge`; a smaller one would
-leave a condition number near 1e11 and limit a comparison with a dense solve to about 1e-6.
+FLEET_MEAN_RIDGE: Final[float] = 1e-3
+"""The ridge on every fleet-mean coordinate.
+
+It matters only where the deviation penalty does not reach: the profile band means, which no
+substation's coefficients read. Elsewhere it is negligible, because the penalty's own curvature,
+`lambda * g_f * S`, is at least about 0.6 for `lambda >= 100`; below `lambda` of about 1 it would
+shrink the fleet mean visibly. The ridge matches `GamSpec.profile_ridge`. A smaller one leaves a
+condition number near 1e11 and limits a comparison with a dense solve to about 1e-6.
 """
 
 
@@ -104,7 +121,12 @@ class PooledSite:
             starts at its first retained week.
         season_years: The season-years with a capacity increment (empty effect for pinned capacity).
         pinned: The pinned capacity built for the fit's cut, required exactly when
-            `spec.capacity == "pinned"`.
+            `spec.capacity == "pinned"`. Its source must not be `growth_prior`, a vintage fitted
+            more than six weeks after the cut: in a joint fit that hindsight level would move the
+            fleet mean and so every other substation's forecast. Give such a substation a fitted
+            capacity instead.
+        allow_late_vintage: True to accept a `growth_prior` pinned capacity, for an arm that is
+            disclosed as an oracle.
     """
 
     site: str
@@ -112,6 +134,7 @@ class PooledSite:
     window: TrainingWindow
     season_years: tuple[int, ...]
     pinned: PinnedCapacity | None = None
+    allow_late_vintage: bool = False
 
 
 @dataclass(frozen=True)
@@ -138,7 +161,7 @@ class PoolingStrength:
         """
         return PoolingStrength(heating=value, other=value)
 
-    def of(self, *, family: str) -> float:
+    def of(self, *, family: PooledFamilyType) -> float:
         """Return the weight of one family.
 
         Args:
@@ -157,7 +180,9 @@ class PooledFit:
     Attributes:
         fits: Each substation's fit; member `b` of every fit belongs to `strengths[b]`.
         fleet_mean: The fleet mean of the pooled families, shape (batch, m), in the order of
-            `POOLED_FAMILIES`; for a tied fit, the shared coefficient vector.
+            `POOLED_FAMILIES`; for a tied fit, the shared coefficient vector. Its profile block is
+            the centred shape: it carries no band means, which are about 0 and set only by the
+            fleet-mean ridge.
         strengths: The deviation penalty's weight of each batch member.
         scales: The scale `g_f` of each pooled family.
         tied: True for complete pooling.
@@ -167,7 +192,7 @@ class PooledFit:
     fits: dict[str, GamFit]
     fleet_mean: np.ndarray
     strengths: tuple[PoolingStrength, ...]
-    scales: dict[str, float]
+    scales: dict[PooledFamilyType, float]
     tied: bool
     cut: datetime
 
@@ -191,17 +216,23 @@ def _check_site(*, site: PooledSite, cache: FeatureCache, cut: datetime) -> None
     if spec.drift != "none" or spec.covid_flag or spec.final_knot != "free":
         msg = f"{site.site}: a pooled fit needs drift 'none', no COVID flag, and a free final knot"
         raise ValueError(msg)
-    if (site.pinned is not None) != (spec.capacity == "pinned"):
-        msg = f"{site.site}: a pinned capacity is required exactly when the capacity is pinned"
+    check_pinned_capacity(
+        capacity=spec.capacity,
+        pinned=site.pinned,
+        site=site.site,
+        features=cache.sites[site.site],
+        cut=cut,
+    )
+    if (
+        site.pinned is not None
+        and site.pinned.source == "growth_prior"
+        and not site.allow_late_vintage
+    ):
+        msg = (
+            f"{site.site}: the pinned capacity is a vintage fitted long after {cut}; give the "
+            "substation a fitted capacity, or set allow_late_vintage for an oracle arm"
+        )
         raise ValueError(msg)
-    if site.pinned is not None:
-        features = cache.sites[site.site]
-        if site.pinned.cut != cut or site.pinned.site != features.table.site:
-            msg = (
-                f"{site.site}: the pinned capacity was built for {site.pinned.site} at "
-                f"{site.pinned.cut}, not {site.site} at {cut}"
-            )
-            raise ValueError(msg)
 
 
 def _build_block(*, cache: FeatureCache, site: PooledSite, cut: datetime) -> _SiteBlock:
@@ -235,8 +266,7 @@ def _build_block(*, cache: FeatureCache, site: PooledSite, cut: datetime) -> _Si
 
 def _band_of_profile_column() -> np.ndarray:
     """Return the hour band of each profile column (day type major, half-hour minor)."""
-    hour = np.arange(HALF_HOURS_PER_DAY) // 2
-    band_of_half_hour = np.searchsorted(np.array(BAND_FIRST_HOURS), hour, side="right") - 1
+    band_of_half_hour = band_of_hour(hour=np.arange(HALF_HOURS_PER_DAY) // 2)
     return np.tile(band_of_half_hour, len(DAY_TYPES))
 
 
@@ -246,7 +276,7 @@ def _band_indicator() -> np.ndarray:
     return (band[:, None] == np.arange(N_BANDS)[None, :]).astype(np.float64)
 
 
-def centring_matrix(*, family: str, size: int) -> np.ndarray:
+def centring_matrix(*, family: PooledFamilyType, size: int) -> np.ndarray:
     """Return the centring projector `C_f` of a pooled family.
 
     Args:
@@ -265,22 +295,19 @@ def centring_matrix(*, family: str, size: int) -> np.ndarray:
     return np.eye(size) - average
 
 
-def _pooled_slices(*, blocks: Sequence[_SiteBlock]) -> dict[str, slice]:
-    """Return the pooled families' column slices, which must agree across substations."""
+def _pooled_slices(*, blocks: Sequence[_SiteBlock]) -> dict[PooledFamilyType, slice]:
+    """Return the pooled families' column slices.
+
+    `make_layout` places the pooled families before the capacity and COVID columns, so the slices
+    are the same for every substation whatever its capacity mode.
+    """
     reference = blocks[0].layout.slices
-    for block in blocks[1:]:
-        for family in POOLED_FAMILIES:
-            if block.layout.slices[family] != reference[family]:
-                msg = (
-                    f"{block.inputs.site}: the {family} columns differ from the other substations'"
-                )
-                raise ValueError(msg)
     return {family: reference[family] for family in POOLED_FAMILIES}
 
 
-def _pooled_offsets(*, slices: Mapping[str, slice]) -> dict[str, slice]:
+def _pooled_offsets(*, slices: Mapping[PooledFamilyType, slice]) -> dict[PooledFamilyType, slice]:
     """Return each pooled family's slice within the concatenated fleet-mean vector."""
-    offsets: dict[str, slice] = {}
+    offsets: dict[PooledFamilyType, slice] = {}
     start = 0
     for family in POOLED_FAMILIES:
         size = slices[family].stop - slices[family].start
@@ -290,8 +317,8 @@ def _pooled_offsets(*, slices: Mapping[str, slice]) -> dict[str, slice]:
 
 
 def _family_scales(
-    *, blocks: Sequence[_SiteBlock], slices: Mapping[str, slice]
-) -> dict[str, float]:
+    *, blocks: Sequence[_SiteBlock], slices: Mapping[PooledFamilyType, slice]
+) -> dict[PooledFamilyType, float]:
     """Return `g_f`, the mean diagonal of each pooled family's Gram matrix per training row.
 
     Args:
@@ -302,7 +329,7 @@ def _family_scales(
         The scale of each family, pooled over every substation's rows and columns of the family.
     """
     total_rows = sum(len(block.index) for block in blocks)
-    scales: dict[str, float] = {}
+    scales: dict[PooledFamilyType, float] = {}
     for family in POOLED_FAMILIES:
         columns = slices[family]
         diagonal_sum = sum(float(torch.diagonal(block.gram)[columns].sum()) for block in blocks)
@@ -315,7 +342,7 @@ def fit_pooled(
     cache: FeatureCache,
     sites: Sequence[PooledSite],
     cut: datetime,
-    strengths: Sequence[PoolingStrength],
+    strengths: Sequence[PoolingStrength] = (),
     tied: bool = False,
     device: torch.device | str = "cpu",
 ) -> PooledFit:
@@ -325,8 +352,9 @@ def fit_pooled(
         cache: The cache.
         sites: The substations, each with its own spec, window, and pinned capacity.
         cut: The cut; no training row ends after it.
-        strengths: One member per entry. Ignored (except for its length) when `tied` is True.
-        tied: True for complete pooling by exact tying, which has no deviation penalty.
+        strengths: One batch member per entry; at least one unless `tied` is True, when none.
+        tied: True for complete pooling by exact tying, which has no deviation penalty and so
+            takes no strengths.
         device: Where the solve runs.
 
     Returns:
@@ -334,11 +362,14 @@ def fit_pooled(
 
     Raises:
         ValueError: If there are no substations, a label repeats, a substation's inputs cannot
-            join a joint fit, or the pooled columns differ between substations.
+            join a joint fit, a partial fit has no strength, or a tied fit has one.
     """
     labels = [site.site for site in sites]
     if not labels or len(set(labels)) != len(labels):
         msg = "a joint fit needs at least one substation, and each label once"
+        raise ValueError(msg)
+    if tied == bool(strengths):
+        msg = "a partial fit needs at least one strength, and a tied fit takes none"
         raise ValueError(msg)
     for site in sites:
         _check_site(site=site, cache=cache, cut=cut)
@@ -346,9 +377,7 @@ def fit_pooled(
     slices = _pooled_slices(blocks=blocks)
     scales = _family_scales(blocks=blocks, slices=slices)
     if tied:
-        thetas, fleet_mean, violation = _solve_tied(
-            blocks=blocks, slices=slices, batch=len(strengths), device=device
-        )
+        thetas, fleet_mean, violation = _solve_tied(blocks=blocks, slices=slices, device=device)
     else:
         thetas, fleet_mean, violation = _solve_partial(
             blocks=blocks, slices=slices, scales=scales, strengths=strengths, device=device
@@ -385,8 +414,8 @@ def fit_pooled(
 def _solve_partial(
     *,
     blocks: Sequence[_SiteBlock],
-    slices: Mapping[str, slice],
-    scales: Mapping[str, float],
+    slices: Mapping[PooledFamilyType, slice],
+    scales: Mapping[PooledFamilyType, float],
     strengths: Sequence[PoolingStrength],
     device: torch.device | str,
 ) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray]:
@@ -446,7 +475,9 @@ def _solve_partial(
     return thetas, solved[:, mu_start:total], violation.cpu().numpy()
 
 
-def _tying_map(*, block: _SiteBlock, slices: Mapping[str, slice], n_shared: int) -> np.ndarray:
+def _tying_map(
+    *, block: _SiteBlock, slices: Mapping[PooledFamilyType, slice], n_shared: int
+) -> np.ndarray:
     """Return the matrix mapping a substation's own free columns to its `theta`.
 
     Its columns are the shared fleet vector (`n_shared` entries), then the substation's band means
@@ -468,8 +499,7 @@ def _tying_map(*, block: _SiteBlock, slices: Mapping[str, slice], n_shared: int)
 def _solve_tied(
     *,
     blocks: Sequence[_SiteBlock],
-    slices: Mapping[str, slice],
-    batch: int,
+    slices: Mapping[PooledFamilyType, slice],
     device: torch.device | str,
 ) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray]:
     """Solve complete pooling: one coefficient vector per pooled family, band means free."""
@@ -496,10 +526,8 @@ def _solve_tied(
         constrained[first_own : first_own + len(non_pooled)] = block.layout.constrained[non_pooled]
     matrix[np.arange(n_shared), np.arange(n_shared)] += FLEET_MEAN_RIDGE
     solution, violation = solve_bounded_quadratic(
-        matrix=torch.as_tensor(matrix, dtype=torch.float64, device=device)[None].repeat(
-            batch, 1, 1
-        ),
-        rhs=torch.as_tensor(rhs, dtype=torch.float64, device=device)[None].repeat(batch, 1),
+        matrix=torch.as_tensor(matrix, dtype=torch.float64, device=device)[None],
+        rhs=torch.as_tensor(rhs, dtype=torch.float64, device=device)[None],
         constrained=torch.as_tensor(constrained),
     )
     solved = solution.cpu().numpy()
@@ -516,12 +544,25 @@ def _solve_tied(
     return thetas, solved[:, :n_shared], violation.cpu().numpy()
 
 
-def _pooled_mask(*, block: _SiteBlock, slices: Mapping[str, slice]) -> np.ndarray:
+def _pooled_mask(*, block: _SiteBlock, slices: Mapping[PooledFamilyType, slice]) -> np.ndarray:
     """Return True for the columns of a substation that belong to a pooled family."""
     mask = np.zeros(block.layout.n_columns, dtype=bool)
     for family in POOLED_FAMILIES:
         mask[slices[family]] = True
     return mask
+
+
+@dataclass(frozen=True)
+class PooledReplica:
+    """One substation's residuals from a replica fit, and the rows that fit trained on.
+
+    Attributes:
+        residuals: The substation's replica residuals.
+        n_training_rows: The substation's training rows in the replica fit.
+    """
+
+    residuals: ReplicaResiduals
+    n_training_rows: int
 
 
 def pooled_replica_residuals(
@@ -531,7 +572,7 @@ def pooled_replica_residuals(
     cut: datetime,
     strength: PoolingStrength,
     tied: bool = False,
-) -> dict[str, ReplicaResiduals]:
+) -> dict[str, PooledReplica]:
     """Return every substation's residuals from a joint fit 12 months before the cut.
 
     The sites must carry the windows and pinned capacities built for the replica's own cut,
@@ -546,32 +587,25 @@ def pooled_replica_residuals(
 
     Returns:
         Each substation's replica residuals over the rows after the replica's cut and up to `cut`,
-        outside the switching masks.
+        outside the switching masks, with the rows it trained on in the replica fit.
     """
     fit_cut = replica_cut(cut=cut)
     joint = fit_pooled(cache=cache, sites=sites, cut=fit_cut, strengths=[strength], tied=tied)
-    out: dict[str, ReplicaResiduals] = {}
+    out: dict[str, PooledReplica] = {}
     for site in sites:
         features = cache.sites[site.site]
-        keep = (
-            features.present
-            & ~features.switching_mask
-            & np.isfinite(features.y)
-            & np.isfinite(features.pv_unit_shape)
-            & np.isfinite(features.smoothed_temperature_c).all(axis=1)
-            & (cache.end_times > naive_utc(moment=fit_cut))
-            & (cache.end_times > naive_utc(moment=features.table.first_usable))
-            & (cache.end_times <= naive_utc(moment=cut))
-        )
-        index = np.flatnonzero(keep)
+        index = replica_rows(cache=cache, site=site.site, fit_cut=fit_cut, cut=cut)
         predicted = predict_gam(cache=cache, fit=joint.fits[site.site], index=index)
-        out[site.site] = ReplicaResiduals(
-            residuals=features.y[index] - predicted,
-            band=cache.calendar.band[index],
-            quarter=cache.calendar.quarter[index],
-            index=index,
-            fit_cut=fit_cut,
-            switching=features.switching_mask[index],
+        out[site.site] = PooledReplica(
+            residuals=ReplicaResiduals(
+                residuals=features.y[index] - predicted,
+                band=cache.calendar.band[index],
+                quarter=cache.calendar.quarter[index],
+                index=index,
+                fit_cut=fit_cut,
+                switching=features.switching_mask[index],
+            ),
+            n_training_rows=joint.fits[site.site].n_rows,
         )
     return out
 
@@ -580,15 +614,42 @@ def pooled_replica_residuals(
 class ShortHistoryReplica:
     """The replica residuals of one substation that was the short one in its replica fit.
 
+    Build one with `short_history_replica`, which takes the training rows from the replica fit
+    itself.
+
     Attributes:
         short_site: The substation that held only `weeks_of_history` weeks in the replica fit.
         weeks_of_history: How many weeks of history the short substation held.
         residuals: The short substation's own replica residuals.
+        n_training_rows: The short substation's training rows in the replica fit.
     """
 
     short_site: str
     weeks_of_history: int
     residuals: ReplicaResiduals
+    n_training_rows: int
+
+
+def short_history_replica(
+    *, replicas: Mapping[str, PooledReplica], short_site: str, weeks_of_history: int
+) -> ShortHistoryReplica:
+    """Return one substation's entry from a replica fit in which it held a short history.
+
+    Args:
+        replicas: The output of `pooled_replica_residuals` for a fit with `short_site` short.
+        short_site: The substation that held the short history.
+        weeks_of_history: The weeks of history it held (a month counts as 4.33 weeks, rounded).
+
+    Returns:
+        The entry, carrying the substation's training rows in that fit.
+    """
+    replica = replicas[short_site]
+    return ShortHistoryReplica(
+        short_site=short_site,
+        weeks_of_history=weeks_of_history,
+        residuals=replica.residuals,
+        n_training_rows=replica.n_training_rows,
+    )
 
 
 def short_history_spread(
@@ -610,9 +671,18 @@ def short_history_spread(
         The centred spread.
 
     Raises:
-        ValueError: If an entry is the held-out substation's, has other weeks of history, or no
+        ValueError: If a substation appears twice, the entries were fitted at different cuts, an
+            entry is the held-out substation's, has other weeks of history, trained
+            on more rows than that many weeks hold (so it was not a short-history fit), or no
             entry remains.
     """
+    sites = [replica.short_site for replica in replicas]
+    if len(set(sites)) != len(sites):
+        msg = "each substation may appear once among the short-history replicas"
+        raise ValueError(msg)
+    if len({replica.residuals.fit_cut for replica in replicas}) > 1:
+        msg = "the short-history replicas were fitted at different cuts"
+        raise ValueError(msg)
     for replica in replicas:
         if replica.short_site == held_out:
             msg = f"the replica of {held_out} cannot make {held_out}'s own spread"
@@ -621,6 +691,12 @@ def short_history_spread(
             msg = (
                 f"{replica.short_site}'s replica holds {replica.weeks_of_history} weeks of "
                 f"history, not {weeks_of_history}"
+            )
+            raise ValueError(msg)
+        if replica.n_training_rows > weeks_of_history * WEEK_ROWS:
+            msg = (
+                f"{replica.short_site}'s replica trained on {replica.n_training_rows} rows, more "
+                f"than {weeks_of_history} weeks hold: it was not a short-history fit"
             )
             raise ValueError(msg)
     if not replicas:
@@ -634,30 +710,80 @@ def short_history_spread(
     )
 
 
-def with_window(*, site: PooledSite, window: TrainingWindow) -> PooledSite:
-    """Return `site` with another window, as a short-history arm needs.
+EFFECTIVE_CAPACITY_QUANTILE: Final[float] = 0.99
+"""A series' effective capacity is this quantile of its absolute power."""
+
+
+def rebuilt_effective_capacity_mw(
+    *, cache: FeatureCache, site: str, cut: datetime, window: TrainingWindow
+) -> float:
+    """Return the effective capacity rebuilt from the rows a short window trains on.
+
+    The effective capacity of a series is the 99th percentile of its absolute power over its
+    history. A new substation has only its window, so its scale is rebuilt from the same rows the
+    fit sees, and never from rows it does not.
 
     Args:
-        site: The substation's inputs.
-        window: The new window.
+        cache: The cache, in the whole-history effective capacity.
+        site: The substation's label.
+        cut: The cut.
+        window: The substation's window.
 
     Returns:
-        A copy with `window`.
+        The rebuilt effective capacity in MW.
+
+    Raises:
+        ValueError: If the window holds no training row.
     """
-    return replace(site, window=window)
+    features = cache.sites[site]
+    rows = training_rows(features=features, cache=cache, cut=cut, window=window)
+    if len(rows) == 0:
+        msg = f"{site} has no training row in its window before {cut}"
+        raise ValueError(msg)
+    power_mw = np.abs(features.y[rows]) * features.table.effective_capacity_mw / 100.0
+    return float(np.quantile(power_mw, EFFECTIVE_CAPACITY_QUANTILE))
+
+
+def with_effective_capacity(*, cache: FeatureCache, site: str, capacity_mw: float) -> FeatureCache:
+    """Return the cache with one substation's points rebuilt on another effective capacity.
+
+    The target and the table's capacity move together, so the power in MW is unchanged and a
+    pinned capacity in MW converts to the new points.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        capacity_mw: The new effective capacity in MW.
+
+    Returns:
+        A cache whose `site` has `y` multiplied by the old capacity over `capacity_mw`, and
+        `table.effective_capacity_mw` set to `capacity_mw`.
+    """
+    features = cache.sites[site]
+    factor = features.table.effective_capacity_mw / capacity_mw
+    changed = replace(
+        features,
+        table=replace(features.table, effective_capacity_mw=capacity_mw),
+        y=features.y * factor,
+    )
+    return replace(cache, sites={**cache.sites, site: changed})
 
 
 __all__ = [
     "FLEET_MEAN_RIDGE",
     "HEATING_FAMILY",
     "POOLED_FAMILIES",
+    "PooledFamilyType",
     "PooledFit",
+    "PooledReplica",
     "PooledSite",
     "PoolingStrength",
     "ShortHistoryReplica",
     "centring_matrix",
     "fit_pooled",
     "pooled_replica_residuals",
+    "rebuilt_effective_capacity_mw",
+    "short_history_replica",
     "short_history_spread",
-    "with_window",
+    "with_effective_capacity",
 ]

@@ -174,6 +174,18 @@ def _is_bridge_day(*, day: date, bank: dict[date, str]) -> bool:
     )
 
 
+def band_of_hour(*, hour: np.ndarray) -> np.ndarray:
+    """Return the index into `BAND_NAMES` of each local hour.
+
+    Args:
+        hour: Local hours of the day, 0 to 23.
+
+    Returns:
+        The band of each hour, int8.
+    """
+    return (np.searchsorted(np.array(BAND_FIRST_HOURS), hour, side="right") - 1).astype(np.int8)
+
+
 def calendar_columns(*, end_times: pl.Series) -> CalendarColumns:
     """Return the calendar inputs of the half-hours that end at `end_times`.
 
@@ -187,11 +199,7 @@ def calendar_columns(*, end_times: pl.Series) -> CalendarColumns:
     hour = local.dt.hour().to_numpy().astype(np.int16)
     minute = local.dt.minute().to_numpy().astype(np.int16)
     half_hour = hour * 2 + minute // 30
-    band = (
-        (hour >= BAND_FIRST_HOURS[1]).astype(np.int8)
-        + (hour >= BAND_FIRST_HOURS[2]).astype(np.int8)
-        + (hour >= BAND_FIRST_HOURS[3]).astype(np.int8)
-    )
+    band = band_of_hour(hour=hour)
     dates = local.dt.date()
     unique_dates = dates.unique().sort()
     unique_list = unique_dates.to_list()
