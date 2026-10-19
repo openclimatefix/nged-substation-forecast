@@ -97,11 +97,15 @@ class FitCopy:
         capacity_prior: A prior centre for each substation's first capacity increment before the
             softplus, with `NaN` for none (see `PooledDemandModel.capacity_prior`), or `None`.
         fixed_scales: Population scales to hold fixed (not learned) in this copy, keyed by family
-            name, or `None`. A larger scale is a weaker prior.
+            name, or `None`. A larger scale is a weaker prior. The scale applies to every
+            substation, including those with no `capacity_prior` centre.
         capacity_init: Starting values of `capacity_raw`, shape (substations, season-years), or
-            `None` for the default start.
+            `None` for the default start. In the `decay` prior the start does not follow the
+            frozen population mean.
         capacity_override: Capacities in points held fixed in this copy, shape (substations,
-            season-years), with `NaN` where the capacity is learned; or `None`.
+            season-years), with `NaN` where the capacity is learned; or `None`. The override and
+            the weeks recorded by `onboard_site` live on the model object and are not saved with
+            its state dict.
     """
 
     name: str

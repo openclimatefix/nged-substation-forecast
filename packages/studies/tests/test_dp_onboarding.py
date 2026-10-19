@@ -231,6 +231,62 @@ def test_a_capacity_start_is_copied_into_the_model_before_fitting(batch: PooledB
     assert torch.allclose(models[0].capacity_raw, start, atol=0.2)
 
 
+def test_all_present_rows_still_keeps_only_dark_rows_of_an_mva_substation(cache: FeatureCache):
+    batch = build_pooled_batch(cache=cache, sites=("S2",), cut_end=CUT, all_present_rows=True)
+    mva = cache.sites["S2"]
+    assert bool(mva.dark[batch.row.numpy()].all())
+
+
+def test_a_fixed_scale_stays_fixed_and_is_not_learned(batch: PooledBatch):
+    models, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="f", fixed_scales={"capacity_first": 7.0})],
+        config=DpConfig(variational=True),
+        initial_level=_level(batch),
+        steps=STEPS,
+    )
+    scale = models[0].population_log_scale["capacity_first"]
+    assert not scale.requires_grad
+    assert float(scale.detach()) == pytest.approx(float(np.log(7.0)), rel=1e-5)
+
+
+def test_the_capacity_prior_centre_applies_only_to_the_first_increment(batch: PooledBatch):
+    model = PooledDemandModel(
+        config=DpConfig(population_scales=PopulationScales()),
+        n_sites=3,
+        n_season_years=batch.n_season_years,
+        initial_level=_level(batch),
+    )
+    model.mark_trained_years(batch=batch)
+    site = batch.site_labels.index("S1")
+    with torch.no_grad():
+        model.capacity_raw.fill_(2.0)
+        model.capacity_prior[site] = 2.0
+        near = float(model.site_prior_term())
+        model.capacity_prior[site] = 12.0
+        far = float(model.site_prior_term())
+        first, _ = model.capacity_masks()
+        scale = float(torch.exp(model.population_log_scale["capacity_first"]))
+        centre = float(model.population_mean["capacity_first"])
+    n_first = float(first[site].sum())
+    expected = n_first * ((2.0 - 12.0) ** 2 - (2.0 - 2.0) ** 2) / (2.0 * scale**2)
+    other = n_first * ((2.0 - centre) ** 2 - (2.0 - centre) ** 2)
+    assert far - near == pytest.approx(expected + other, rel=1e-4)
+
+
+def test_allow_seen_does_not_skip_the_weeks_of_history_check():
+    residuals = PooledResiduals(
+        site=np.array(["A"] * 400 + ["B"] * 400),
+        residual=np.linspace(-1, 1, 800),
+        band=np.zeros(800, dtype=np.int64),
+        quarter=np.zeros(800, dtype=np.int64),
+        fit_excluded=("A",),
+        weeks_of_history=4,
+    )
+    with pytest.raises(ValueError, match="weeks of history"):
+        cross_fitted_spread(residuals=residuals, held_out="B", weeks_of_history=8, allow_seen=True)
+
+
 def test_the_loss_is_the_negative_elbo_per_row(batch: PooledBatch):
     (model,), _ = _fit(batch, DpConfig(variational=True), [FitCopy(name="v")])
     model.eval()

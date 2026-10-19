@@ -80,9 +80,18 @@ def site_of_id() -> dict[int, str]:
     return dict(table.iter_rows())
 
 
+CENTRED_PART_2: Final[tuple[str, ...]] = ("g1", "g_all", "g_all_d1", "g_all_d1_steps")
+"""Part 2's convex arms are read from their corrected sets, whose spread is centred."""
+
+
+def stored_name(*, name: str, folder: Path) -> str:
+    """Return the folder name of an arm: Part 2's convex arms use their `_centred` sets."""
+    return f"{name}_centred" if folder == common.PART_2_DIR and name in CENTRED_PART_2 else name
+
+
 def load_arm(*, name: str, folder: Path, ids: dict[int, str]) -> pl.DataFrame | None:
     """Read an arm's predictions with its per-row score, site label, and error of the mean."""
-    path = folder / "predictions" / name / "predictions.parquet"
+    path = folder / "predictions" / stored_name(name=name, folder=folder) / "predictions.parquet"
     if not path.exists():
         return None
     frame = pl.read_parquet(path)
@@ -315,6 +324,24 @@ def main() -> None:
             reference=reference,
             sites=sites,
             level=BONFERRONI_LEVEL,
+            out=out,
+        )
+    print("\n== 2b. C2 and C3 on the five decision substations, and the full-history references ==")
+    for label, treatment, reference in (
+        ("C2 five sites", "p_onb4w", "s_4w"),
+        ("C3 five sites", "p_short3m", "s_3m"),
+        ("P-onb4w vs climatology (full history)", "p_onb4w", "climatology"),
+        ("P-onb4w vs manual heuristic", "p_onb4w", "manual_heuristic"),
+        ("P-short3m vs climatology (full history)", "p_short3m", "climatology"),
+        ("P-short3m vs manual heuristic", "p_short3m", "manual_heuristic"),
+    ):
+        print_contrast_block(
+            label=label,
+            arms=arms,
+            treatment=treatment,
+            reference=reference,
+            sites=five,
+            level=BONFERRONI_LEVEL if "five sites" in label else None,
             out=out,
         )
     print("\n== 3. C4 against lagless XGBoost and C5 against Part 2's convex models (95%) ==")

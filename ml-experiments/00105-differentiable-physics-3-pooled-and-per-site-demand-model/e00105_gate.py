@@ -21,6 +21,7 @@ Four tests, each fitted at the tuning cut (2024-07-01) so that nothing here sees
 
 import argparse
 import time
+from datetime import datetime
 from dataclasses import replace
 from typing import Any, Final
 
@@ -573,14 +574,18 @@ def placebo_draw(*, cache: FeatureCache, context: dict[str, Any], years: int) ->
     }
 
 
-def vintage_points(*, cache: FeatureCache) -> dict[str, float]:
-    """Return each scored site's `frozen` vintage at the tuning cut, in points of capacity."""
+def vintage_points(*, cache: FeatureCache, cut: datetime = common.TUNING_CUT) -> dict[str, float]:
+    """Return each scored site's `frozen` vintage at `cut`, in points of capacity.
+
+    The value is the last week of the latest origin on or before `cut`, so for a growing site it
+    sits above the season-year mean.
+    """
     series = pl.read_parquet(common.SERIES_TABLE).select("time_series_id", "site")
     vintages = (
         pl.read_parquet(common.VINTAGES)
         .filter(pl.col("variant") == "frozen")
-        .filter(pl.col("origin_monday") <= common.TUNING_CUT.date())
-        .filter(pl.col("week_start") <= common.TUNING_CUT.date())
+        .filter(pl.col("origin_monday") <= cut.date())
+        .filter(pl.col("week_start") <= cut.date())
         .join(series, on="time_series_id")
     )
     out = {}

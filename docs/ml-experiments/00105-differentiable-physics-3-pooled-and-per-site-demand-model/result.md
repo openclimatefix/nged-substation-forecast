@@ -38,17 +38,16 @@ date: 2026-10-19
 pr: 1355
 take_home_message: >-
   One neural-network demand model fitted across all the Primary substations forecasts a substation
-  with only 2 to 4 weeks of history far better than any model fitted to that substation alone (4
-  weeks: score 4.18 against 15.13, and against 11.30 for XGBoost), but it forecasts a substation
-  with 2 full years of history worse than a model fitted to that substation alone (score 3.42
-  against 3.04, worse at all 5 substations). One of the four known-answer checks failed, so the
-  verdict is inconclusive, and the pooled model's inferred solar capacities are not a measurement.
+  with only 4 weeks of history far better than a per-site copy of the same model (score 4.04
+  against 14.38 on the six scored substations) and better than XGBoost fitted to those 4 weeks
+  (11.15), but it forecasts a substation with 2 full years of history worse than a per-site copy
+  (3.42 against 3.04, worse at all 5 substations). By the plan's rule this refutes pooling at full
+  history, and a failed known-answer check caps the verdict at inconclusive.
 advice:
   - >-
     Use a pooled demand model to start a new substation from 2 to 4 weeks of its own readings, not
-    to forecast a substation that has years of history, since 4 weeks scored 4.18 against 15.13 for
-    a per-site model and 11.30 for XGBoost, while full history scored 3.42 against 3.04 for a
-    per-site model (C1, C2).
+    to forecast a substation that has years of history, since 4 weeks scored 4.04 against 14.38 for
+    a per-site model, while full history scored 3.42 against 3.04 for a per-site model (C1, C2).
   - >-
     Do not read the pooled model's PV capacity as a measurement: it differs by up to 20 points of
     capacity between starts and with the network off, a capacity prior cannot hold it, and fixing
@@ -59,13 +58,13 @@ advice:
     their mean, and expect the upper tail to be too narrow for substations that stay in the pooled
     fit (P covered 80% at the 95% quantile; the onboarding spread covered 94.6%) (tails table).
   - >-
-    Compare any per-site model on short history with lagless XGBoost on the same history, not only
-    with a per-site copy of the same model, since the per-site DP on 4 weeks scored 15.13 and is a
-    weak comparator (C2 against X-4w).
+    Compare a pooled model on short history with several per-site models, not only a per-site copy
+    of the same model, since the per-site DP on 4 weeks scored 14.38 against 12.79 mean absolute
+    error for a convex model and 13.97 for XGBoost, so it is a weak comparator (cheap baselines).
   - >-
-    Hold a known-answer test's threshold only if fit-to-fit noise is below it: refitting with
-    another seed moved the shared midday output by 0.3 to 1.9 points, so the 0.1-point leak limit
-    of gate test 2 cannot be passed or failed reliably (gate section).
+    Measure a known-answer test's own noise floor before fixing its limit: refitting with another
+    seed moved the network, harmonic, and lighting outputs by 0.3 to 1.9 points, so the 0.1-point
+    leak limit of gate test 2 may sit below the noise (gate section).
 code: ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/
 ---
 
@@ -82,9 +81,9 @@ well as a model fitted to that substation alone, and forecasts a new or short-hi
 clearly better. All models predict the demand minus the solar output of a substation from the
 calendar, the temperature, and the sun, and are fitted by gradient descent. We scored each arm on
 the 12 months from 1 July 2025 with one frozen fit and no refits, on the five Primary substations
-with 2 years of history (D5, D10, D11, D14, and D16), and on D9, which holds only 9 months of the
-window. A lower quantile score is better. Pooling is judged by the forecast scores, not by the
-inferred solar capacity.
+with 2 years of history (D5, D10, D11, D14, and D16), and on D9, which holds 21 months of the
+window (9 at the tuning cut). A lower quantile score is better. Pooling is judged by the forecast scores, not by the inferred
+solar capacity.
 
 ## Figures
 
@@ -109,42 +108,52 @@ inferred solar capacity.
 - **Arms and absolute scores** (five decision substations; six scored in brackets; tuning chose
   K = 2 shared shapes, see "Tuning"): P pooled, variational, network on 3.420 (3.272); P-map
   3.459 (3.317); P-nonet 3.395 (3.279); S per-site 3.035 (2.844); P-all 3.387 (3.233); S-all 2.928
-  (2.755); lagless XGBoost X-2y 3.056 (2.877); X-2yamq 3.048 (2.868); Part 2's convex G-all 2.726
-  (2.633), G-all+D1 2.922 (3.522), G1 3.125 (2.974); climatology 4.068 (3.890); manual heuristic
-  3.488 (3.387). Per-substation scores are in the second figure.
+  (2.755); lagless XGBoost X-2y 3.056 (2.877); X-2yamq 3.048 (2.868); Part 2's corrected (centred
+  spread) convex G-all 3.072 (2.917), G-all+D1 2.784 (2.701), G1 2.822 (2.703); climatology 4.068
+  (3.890); manual heuristic 3.488 (3.387). The arms of C2 and C3 are scored on the six substations:
+  P-onb4w 4.04, S-4w 14.38, X-4w 11.15, P-short3m 4.16, S-3m 6.03, X-3m 6.93. Per-substation scores are in the second figure.
 - **C1, pooling on all rows (non-inferiority, margin +0.10): refuted.** P minus S is +0.385 (98.33%
   interval +0.178 to +0.689); P is worse at 5 of 5 substations (D10 only +0.03), more in winter
   (+0.66) than in summer (+0.21). Leaving out any one substation leaves the estimate between +0.31
   and +0.48, with the interval above zero. The error of the mean forecast says the same (+0.61).
-- **C2, onboarding with 4 weeks: supported** (the pre-registered contrast, P-onb4w minus S-4w, is
-  the basis of the verdict; the XGBoost and convex comparisons below are descriptive, and S-4w, at
-  about 15, is a weak comparator). P-onb4w minus S-4w is −10.34 (−14.57 to −6.65), better
-  at 6 of 6 substations (P-onb4w 4.18, S-4w 15.13). The fairer comparison is lagless XGBoost on the
-  same 4 weeks (11.30): P-onb4w minus X-4w is −7.10 (95% interval −10.98 to −3.38), better at 6 of
-  6. The onboarding curve: 0 weeks 7.60, 2 weeks 4.14, 4 weeks 4.18, 8 weeks 4.27; full-history P
-  scores 3.42, so 4 weeks recovers all but +0.76 (P-onb4w minus P +0.76, 0.32 to 1.20).
-- **C3, short history of 3 months: supported.** P-short3m minus S-3m is −1.86 (−2.99 to −0.82),
-  better at 6 of 6 (P-short3m 4.38, S-3m 5.47). Against lagless XGBoost on 3 months (X-3m 7.50) it
-  is −2.77 (−4.56 to −1.16).
+- **C2, onboarding with 4 weeks: supported.** The pre-registered contrast P-onb4w minus S-4w, on the
+  six scored substations, is −10.34 (98.33% interval −14.57 to −6.65), better at 6 of 6 (4.04
+  against 14.38); on the five decision substations it is −10.95 (−15.12 to −7.28), better at 5 of
+  5. S-4w, at about 14, is a weak comparator. The comparisons below are descriptive: lagless
+  XGBoost on the same 4 weeks (X-4w, 11.15) is untuned and uses XGBoost's own quantiles, a
+  departure from the plan, and P-onb4w minus X-4w is −7.10 (95% interval −10.98 to −3.38), better
+  at 6 of 6. The onboarding curve (six substations): 0 weeks 7.97, 2 weeks 4.06, 4 weeks 4.04, 8
+  weeks 4.10. Full-history P scores 3.27 on the same six, so 4 weeks recovers all but +0.76 (P-onb4w
+  minus P +0.76, 0.32 to 1.20 on the five). **P-onb4w only ties climatology fitted on the
+  substation's full history** (+0.12, −0.33 to +0.57) and is worse than the manual heuristic
+  (+0.70, +0.23 to +1.19).
+- **C3, short history of 3 months: supported.** P-short3m minus S-3m is −1.86 (−2.99 to −0.82) on
+  the six, better at 6 of 6 (4.16 against 6.03); **D9 contributes −5.59 of it**, and on the five
+  decision substations it is −1.09 (−2.01 to −0.34), better at 5 of 5. Against lagless XGBoost on
+  3 months (X-3m 6.93) it is −2.77 (−4.56 to −1.16), descriptive. P-short3m ties climatology on
+  full history (+0.32, −0.46 to +1.21).
 - **C4, the pooled DP against lagless XGBoost** (labelled, outside the verdict): P minus X-2y is
-  +0.36 (+0.21 to +0.55), worse at 4 of 5 substations. The per-site DP ties XGBoost (S minus X-2yq
+  +0.36 (+0.21 to +0.55), worse at 4 of 5 substations. The tuning-year winner of the XGBoost arms
+  was not computed, so C4 is shown against each: +0.36 for X-2y and X-2yq, +0.37 for X-2yamq. The per-site DP ties XGBoost (S minus X-2yq
   −0.02, −0.13 to +0.08).
-- **C5, the pooled DP on all years against Part 2's convex models** (descriptive): P-all minus
-  G-all+D1 +0.47 (+0.04 to +0.97), minus G1 +0.26 (−0.05 to +0.63), minus G-all +0.66 (+0.38 to
-  +1.02). P-all minus S-all is +0.46 (+0.24 to +0.76), worse at 5 of 5. So the pooled DP does not
-  clear Part 2's bar, and Part 4 would start from a convex or per-site model.
+- **C5, the pooled DP on all years against Part 2's corrected convex models** (descriptive):
+  P-all minus G-all+D1 +0.60 (+0.22 to +1.06), minus G1 +0.57 (+0.31 to +0.89), minus G-all +0.32
+  (−0.02 to +0.72). P-all minus S-all is +0.46 (+0.24 to +0.76), worse at 5 of 5. So the pooled DP
+  does not clear Part 2's bar, and Part 4 would start from a convex or per-site model.
 - **Ablations.** P-map minus P +0.04 (+0.01 to +0.07); P-nonet minus P −0.03 (−0.14 to +0.07), so
   the interaction network adds nothing measurable. The solar offset again adds nothing (X-2yamq
   minus X-2yq −0.01).
 - **Tails** (coverage at q01, q05, q95, q99; nominal 0.01, 0.05, 0.95, 0.99; five substations): P
   0.015, 0.038, 0.798, 0.903; S 0.012, 0.035, 0.836, 0.927; P-onb4w 0.052, 0.104, 0.946, 0.982;
-  P-short3m 0.031, 0.074, 0.891, 0.958; X-2y 0.015, 0.071, 0.788, 0.979; G-all 0.015, 0.045,
-  0.884, 0.955. The pooled and per-site DP forecasts are too low in the upper tail (the 95%
+  P-short3m 0.031, 0.074, 0.891, 0.958; X-2y 0.015, 0.071, 0.788, 0.979; G1 0.014, 0.049,
+  0.884, 0.958; G-all+D1 0.025, 0.069, 0.895, 0.962. The pooled and per-site DP forecasts are too low in the upper tail (the 95%
   quantile covers 80% to 84%), which matters most for curtailment. The pinball losses at the four
   levels are in the report. The tail predictions are marked in the lists below.
 - **Not run, for lack of time on a shared GPU:** the cold block, the tuning-year replicate of the
   contrasts, the scarce-data rows (bank holidays, the Christmas run, days below 0 °C), the convex
-  G-2y arm, the sunny-hour residual against temperature, the held-out onboarding substations' cards,
+  G-2y arm, X-pool-onb4w (one XGBoost on the other substations plus 4 weeks), the lagged XGBoost
+  descriptive arms' report, the coastal split, the score by month since the cut, the usable-row
+  counts of each short history, the sunny-hour residual against temperature, the held-out onboarding substations' cards,
   and the curtailment-cost metric. The tuning year's mean scores point the same way for C1 (P 3.197
   against S 2.993 on 2024-25), without an interval.
 
@@ -154,7 +163,7 @@ inferred solar capacity.
   within ±0.05 (−0.01); P's q01 within 1 point of nominal (+0.5) and q05 within 2 points (−1.2);
   the signs of C2 and C3.
 - **Failed:** C1 within ±0.15 and spanning zero (+0.385); C2 of −0.5 to −2.0 (−10.34, larger); C3
-  of −0.2 to −1.0 (−1.86, larger); C4 of 0.0 to 0.4 better (0.36 worse); C5 within ±0.3 (+0.47);
+  of −0.2 to −1.0 (−1.86, larger); C4 of 0.0 to 0.4 better (0.36 worse); C5 within ±0.3 (+0.60 against G-all+D1) and P-all minus G1 of −0.3 to 0.0 (+0.57);
   onboarding within 0.5 of P (+0.76); P-all minus S-all within ±0.15 (+0.46); P's q95 and q99 within
   2 and 1 points (0.798, 0.903); the onboarding and short-history tails; P's capacities within ±20%
   of the vintages' season-year mean at D10, D11, and D16 (season-year 2024: 30.6, 15.5, and 27.0
@@ -165,52 +174,61 @@ inferred solar capacity.
 ## Known-answer gate
 
 **Gate: failed (test 2).** The plan made each test blocking and capped the verdict at
-`inconclusive` if one stayed failed. Every number on this page is labelled "gate failed".
+`inconclusive` if one stayed failed. Every number on this page is labelled "gate failed". All gate
+tests ran with K = 4 shared shapes, before tuning chose K = 2; test 1 runs P with the network off.
 
 - **Test 1, synthetic pooled recovery: passed**, after four post hoc changes to the test (the model
   and its fitting were not changed): 1200 optimiser steps at rate 0.15 (800 steps at rate 0.05
   recovered the threshold within 7 degrees only), the true capacity placed in each substation's
   first trained season-year (the first version put it where no rows existed), the daily profile
   compared as the shape mix plus the per-site deviation after subtracting the mean profile (the
-  plan said "loadings", which are not identified one by one), and D9 left out (its 9 months give a
-  profile correlation of 0.85, the others 0.91 to 0.99). The pass: threshold within 0.01 degrees,
-  slopes within 1%, capacities within 1.2%, the onboarded site's slope within 0.5% where a per-site
-  fit on the same 4 midsummer weeks missed it by 78%.
+  plan said "loadings", which are not identified one by one), and D9 left out (its rows cover 9
+  months of the tuning window, giving a profile correlation of 0.85 against 0.91 to 0.99 for the
+  others). The pass: threshold within 0.01 degrees, slopes within 0.3%, capacities within 1.2%,
+  profile correlation at least 0.91, and the onboarded substation's slope within 1.2% where a
+  per-site fit on the same 4 midsummer weeks missed it by 79%.
 - **Test 2, injected-farm recovery: failed, narrowly.** With the farm output added at the rows
   where the farm has a reading (about 30% of rows, night rows included), the median recovered
   capacity ratio is 0.78 (limit 0.75 to 1.25) and other substations' capacities move 2.0% to 5.2%
   (limit 5%; D10 breaches it), and the shared midday output moves 0.06, 0.07, 0.10, and 0.11 points
   at D10, D11, D14, and D16 (limit 0.1). The modules that move differ by substation (lighting at
-  D10, the holiday effects at D14, the network at D16). **The limit is below the fit-to-fit noise:**
-  refitting the same model with another seed moves the module outputs by 0.3 to 1.9 points, so the
-  test cannot separate a leak from a re-split between shared modules. The weaker capacity prior
-  planned for the retest was not needed once the prior was shown not to bind (below). The first
-  version, which filled missing farm rows with zeros, recovered 0.70 and moved the shared output
-  0.30 to 0.44 points.
+  D10, the holiday effects at D14, the network at D16). **A noise floor for this statistic was not
+  measured.** Refitting the base model with another seed changed the network, harmonic, and
+  lighting outputs by 0.3 to 1.9 points (the holiday and tent outputs by 0.07 and 0.02), which
+  suggests the 0.1 limit sits below the fit-to-fit noise, but that compares fits of different
+  seeds, not the paired same-seed fits the test compares. The first version of the test, which
+  filled missing farm rows with zeros, recovered 0.70 and moved the shared output 0.30 to 0.44
+  points. The weaker capacity prior planned for a retest was not run, because the prior does not
+  bind (below).
 - **Test 3, placebo twin: passed** for three draws (irradiance 1, 2, and 3 years earlier): the
   summer-midday error is worse with the placebo and the fitted capacity falls at all 6 substations.
-- **Test 4, shuffled capacity: passed**, rebuilt as the plan defines it: swapping the fitted
+- **Test 4, shuffled capacity: passed**, rebuilt as the series brief's Part 3 plan defines it (the
+  plan page defined the prior-swap refit below; both definitions existed): swapping the fitted
   capacity paths in MW among the six substations worsens the summer-midday error at 6 of 6
   (+0.8 to +11.4 points). The first version (swap the capacity prior and refit) was a different
   test and failed (2 of 4); it is kept as a diagnostic: the prior is a few nats against about
-  340,000 rows, so it cannot move the data-determined capacity.
-- **The free fit does not find the best capacity.** Season-year 2023 capacity in points, pooled
-  fit P, Part 2's convex model, the vintage mean: D5 50.1, 58.9, 66.0; D10 34.6, 49.2, 39.5; D11
-  13.5, 31.3, 28.8; D14 24.7, 30.6, none; D16 24.1, 25.5, 32.9; D9 12.1, 30.4, none. A second seed
-  moves a capacity by 0.2 to 2.7 points; starting at the convex capacities lands elsewhere (D5 29.7,
-  D16 18.7, D9 22.9); with the network off D11 is 20.6 and D9 17.6; a vintage-anchored prior with
-  scale 5 changes nothing. The capacity profile (the last figure) fixes every substation's capacity
-  at 0.5 to 1.3 times the convex capacity and refits the rest: the training loss is 774,009 nats at
-  0.5, 769,644 at 0.7, 767,187 at 0.85, 767,141 at 1.0, 771,197 at 1.15, and 776,076 at 1.3, a clear
-  minimum near the convex capacity. **The free fit's loss, 771,704 nats, is 4,563 nats above the
-  loss with the capacities pinned at the convex values (767,141), so the free fit has not found the
-  best capacities.** The data do carry information about capacity, and the optimiser, not the data,
-  is the weak point (a slow, badly conditioned valley between the capacity and the shared terms).
-  The loss is flat within 46 nats between 0.85 and 1.0 times the convex capacity, so the data pin
-  the capacity only to about ±15%.
+  340,000 rows, so it cannot move a capacity that the data determine.
+- **The free fit does not find the capacity that fits best.** Capacity in points, season-year 2023,
+  from the K = 4 diagnostic fit at the tuning cut (not the K = 2 decision arm), against Part 2's
+  convex model and the vintage mean: D5 50.1, 58.9, 66.0; D10 34.6, 49.2, 39.5; D11 13.5, 31.3,
+  28.8; D14 24.7, 30.6, none; D16 24.1, 25.5, 32.9; D9 12.1, 30.4, none. A second seed moves a
+  capacity by 0.2 to 2.7 points; starting at the convex capacities lands elsewhere (D5 29.7, D16
+  18.7, D9 22.9); with the network off D11 is 20.6 and D9 17.6; a vintage-anchored prior with scale
+  5 changes nothing. The capacity profile (the last figure) fixes every substation's capacity at
+  0.5 to 1.3 times the convex capacity and refits the rest: the training loss is 774,009 nats at
+  0.5, 769,644 at 0.7, 767,187 at 0.85, 767,141 at 1.0, 771,197 at 1.15, and 776,076 at 1.3, a
+  clear minimum near the convex capacity, flat within 46 nats between 0.85 and 1.0. **The free
+  fit's loss is FREE_LOSS nats, 4,5xx above the loss with the capacities pinned at the convex
+  values (767,141).** The data therefore carry information about capacity, between about −15% and +10% of the
+  convex value (the profile is flat on the low side), and the
+  free fit did not find the best capacity; the cause is only partly tested. The pinned and free
+  fits differ in their posterior sampling and in the Kullback-Leibler term, and variant (c), which
+  started at the convex capacities, moved away from them (loss VARIANT_C_LOSS nats).
 - **Labelled post hoc variants** (screening tier, tuning cut; the primary P is unchanged): (a)
-  temperature hidden from the network by day, (c) capacity started at the convex path, (a+c).
-  Their capacities and leak tests are in the diagnostics file. VARIANT_SENTENCE
+  temperature hidden from the network by day, (c) capacity started at the convex path, and (a+c).
+  Their capacities are in the diagnostics file (`work/diagnostics.json`) and their training losses
+  in `work/variant_losses.json`: VARIANT_LOSSES. **The leak tests of the variants were not run**
+  (they were queued behind the scored fits and had not finished).
 
 ## Cheap baselines on the same short history
 
@@ -229,10 +247,14 @@ inferred solar capacity.
 
 - **The per-site DP, configured like the convex model, does not reproduce its score.** With no
   network, no shared shapes, a weak penalty on the deviation, and the capacity pinned to the convex
-  path, the DP on all years scores 3.326 against G-all's 2.726 (+0.60, 0.48 to 0.73), worse at 4 of
-  5 substations (D10 +1.46, D16 +1.28). The setup left the 336-value daily profile nearly
-  unpenalised where G has a tuned ridge, so the gap is regularisation and optimisation, not a bug
-  we found. The DP with its shared shapes and network (S-all, 2.928) is better than this setup.
+  path, the DP on all years scores 3.326 against the corrected G-all's 3.072 (+0.25, 0.12 to 0.41),
+  worse at 5 of 5 substations, mostly D10 (+0.90; the others +0.05 to +0.12). The error of the mean
+  forecast, which the spread does not touch, gives +0.60 (+0.43 to +0.78). The setup left the
+  336-value daily profile nearly unpenalised where G has a tuned ridge, so the gap is
+  regularisation and optimisation, not a bug we found. The DP with its shared shapes and network
+  (S-all, 2.928) is better than this setup. The evidence on why P loses to S in C1 is therefore:
+  P-nonet minus P is −0.03, so the network is not the cause, and the per-site DP set up like G is
+  0.25 worse than G, mostly at D10.
 
 ## Tuning
 
@@ -253,15 +275,16 @@ inferred solar capacity.
   scored rows never reach any fit's training rows. The caveat on the spread stays: the replica fits
   contain the other held-out substations' own rows before 2024-07-01.
 - **Median forecast minus mean forecast, per site** (points; P): D5 0.01, D9 −0.38, D10 −1.70, D11
-  0.81, D14 0.24, D16 0.16, D18 0.95. The onboarding and short-history spreads are centred on the
-  mean, so P-onb4w shows −0.42 to +0.14. D10's gap (−1.7) is the unlabelled switching windows.
-- **Error of the mean forecast beside every contrast:** C1 +0.61 (same direction), C2 −13.18, C3
-  −2.48, C4 worse, C5 worse; no contrast points the other way (trigger 3 does not fire).
+  0.81, D14 0.24, D16 0.16, D18 0.95. Every DP arm's spread is centred on the mean, so the gaps are
+  skew, not shift (P-onb4w shows −0.42 to +0.14). D10's gap (−1.7) is the unlabelled switching windows.
+- **Error of the mean forecast beside every contrast:** C1 +0.61 (same direction), C2 −13.18 (six; −13.86 on
+  the five), C3 −2.48 (−1.74 on the five), C4 worse, C5 worse; no contrast points the other way (trigger 3 does not fire).
 - **Triggers that fired:** trigger 1 (gate test 2 failed), trigger 2 (C1 contradicts its prediction
   and the explanation, a shared network that cannot carry per-site responses, is partly tested by
   the equivalence check and P-nonet but not settled), and trigger 7 (Part 4 and the pooled convex
-  experiment depend on C1 and the capacity result). Trigger 4 fires for the descriptive C5 (P-all
-  minus G1 flips sign without D16). An audit is requested; its findings and their triage go here.
+  experiment depend on C1 and the capacity result). Trigger 4 does not fire: against the corrected
+  comparators, no contrast flips sign when one substation is left out (P-all minus G1 is +0.33
+  without D16). The numbers review and audit are triaged in "Audit triage" below.
 - **Leave-one-out and season splits** for every contrast, D10 with its 2025-11-17 to 2025-12-14 jump
   masked, and the error of the mean forecast are in the printed report; none flips C1, C2, or C3.
 
