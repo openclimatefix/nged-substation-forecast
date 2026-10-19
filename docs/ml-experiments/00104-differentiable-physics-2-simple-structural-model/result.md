@@ -32,22 +32,21 @@ adopted_in: none
 date: 2026-10-19
 pr: 1349
 take_home_message: >-
-  A simple model of demand minus solar, fitted as one convex optimisation per substation, scored
-  0.25 points better than lagless XGBoost with its default start when both trained on 12 months
-  (post hoc; a lower score is better; interval 0.53 better to 0.01 better), but that lead and the
-  0.55-point lead of the planned comparison C2 are mostly spread, because the error of the mean
-  forecast differs by only 0.08 points in each. More years of history did not clearly help: in the
-  scored year all years without a drift term scored 0.25 worse than 12 months and drift recovered
-  that (all years with drift 0.04 better, interval 0.30 better to 0.21 worse), but the tuning year
-  reversed both contrasts. A first version of this page had the opposite sign for two contrasts,
-  because its forecast spread carried the previous year's mean bias; see the Correction section.
+  A simple model of demand minus solar, trained on 12 months, scored 0.25 points better than lagless
+  XGBoost with its default start (post hoc; a lower score is better). Most of that lead is in the
+  forecast spread, because the error of the mean forecast differs by only 0.08 points, and four of
+  the five pre-registered positive controls failed, so the verdict is inconclusive. More years of
+  history did not clearly help: the scored year and the tuning year gave opposite signs for two
+  history-window contrasts, and a first version of this page had the wrong sign for both because
+  its spread carried the previous year's mean bias.
 advice:
   - >-
     Treat the benefit of drift and of more years as unreplicated: in the scored year all years
     without drift scored 0.25 points worse than 12 months (G-all minus G1; +0.03 without D16) and
-    drift lowered the score by 0.29 (G-all+D1 minus G-all), but the tuning year reversed both on the
-    error of the mean forecast (-0.25 and +0.06), and only C1 kept its sign (-0.04 in the scored
-    year, -0.20 in the tuning year). Score every history-window contrast on both years.
+    drift lowered the score by 0.29 (G-all+D1 minus G-all), both exploratory contrasts, but the
+    tuning year (a post hoc replicate) reversed both on the error of the mean forecast (-0.25 and
+    +0.06), and only C1 kept its sign (-0.04 in the scored year, -0.20 in the tuning year). Score
+    every history-window contrast on both years.
   - >-
     Start each XGBoost quantile from that level's own training quantile, not from a constant, since
     a zero start left the 95% and 99% quantiles covering only 66% and 73% and scored 0.30 points
@@ -75,34 +74,42 @@ code: ml-experiments/00104-differentiable-physics-2-simple-structural-model/
 **A simple model of demand minus solar forecasts better than lagless XGBoost on 12 months of
 history, but more years of history do not clearly help it.** This is part 2 of a six-part series on
 models built from physical terms (a daily profile, holidays, heating, and solar output) and fitted
-by gradient-based optimisation; part 3 pools the model across substations. Trained on 12 months, the
-model scored 0.25 points better than lagless XGBoost with its default start (post hoc; a lower score
-is better). Trained on all usable years with no drift it scored 0.25 points worse than on 12 months
-in the scored year (+0.03 without D16, and the reverse in the tuning year), and a drift term
-recovered that, so the planned comparison, all years with drift against 12 months, gave 0.04 points
-better with an interval from 0.30 better to 0.21 worse, and 2 of the 5 decision substations
-improved. The verdict is `inconclusive`: the planned comparison's interval spans zero, and four of
-the five pre-registered positive controls fail (the fifth, the framework tests, holds). The four are
-old years hurt, by size; the solar offset; the zero start; and baselines worse than every arm. On
-the comparison alone, the merged rule for the first scoring pass would give `partly supported`.
+by gradient-based optimisation; part 3 pools the model across substations. Trained on 12 months,
+the model scored 0.25 points better than lagless XGBoost with its default start (post hoc; a lower
+score is better). Only the contrasts C1 to C3 were pre-registered; the others below are
+exploratory. The arm names (G1, G-all, G-all+D1, X-12, and so on) are defined in the first
+Results bullet. Trained on all usable years with no drift, the model scored 0.25 points worse than on
+12 months in the scored year (exploratory; +0.03 without D16, and the reverse in the tuning year),
+and a drift term recovered that. The planned comparison C1, all years with drift against 12 months,
+gave 0.04 points better, with an interval from 0.30 better to 0.21 worse, and 2 of the 5 decision
+substations improved.
+
+**The verdict is `inconclusive`.** The interval of C1 spans zero, and four of the five
+pre-registered positive controls fail. The framework tests, which the plan names as the fifth
+control, pass. The four that fail are these: old years without drift hurt by less than predicted
+(+0.25 against +0.3 to +0.8); the solar offset gains nothing once irradiance is an input; the zero
+start scores worse than the default start; and the baselines are not worse than every arm. On C1
+alone, the merged rule for the first scoring pass would give `partly supported`.
 
 The result narrows the long-history question to "all years need a drift to be level with 12 months
-in the scored year, and the data cannot yet say whether they gain". By substation the planned
+in the scored year, and the data cannot yet say whether they gain". In this page, "history-window
+contrasts" means all years against 12 months, and drift against no drift. By substation the planned
 comparison is mixed: D14 (-0.51) and D11 (-0.22) improve, and D10 (+0.41), D5 (+0.11), and D16
 (+0.03) worsen.
 
-We fitted the model, one convex optimisation (a problem with a single best answer) per Primary
-substation, on data to 30 June 2025, held it fixed, and scored it on every half-hour from 1 July
-2025 to 30 June 2026. The score is twice the mean pinball loss (an error measure for quantile
-forecasts) over 11 quantile levels, in points of effective capacity (1% of the substation's
-effective capacity, the scale every experiment divides power by). The five decision substations
-are D5, D10, D11, D14, and D16; D9 has 9.0 months of history at 2024-07-01 and is reported beside
-them. ERA5 (a reanalysis) and CAMS (a satellite-based irradiance product) supply temperature and
-irradiance; both are estimates of past weather.
+**The model was fitted once per Primary substation on data to 30 June 2025 and scored on the next 12
+months.** We fitted the model, one convex optimisation (a problem with a single best answer) per
+Primary substation, on data to 30 June 2025, held the fit fixed, and scored the model on every
+half-hour from 1 July 2025 to 30 June 2026. The score is twice the mean pinball loss (an error
+measure for quantile forecasts) over 11 quantile levels, in points of effective capacity (1% of the
+substation's effective capacity, the scale every experiment divides power by). The five decision
+substations are D5, D10, D11, D14, and D16; D9 has 9.0 months of history at 2024-07-01 (experiment
+103's row table) and is reported beside them. ERA5 (a reanalysis) and CAMS (a satellite-based
+irradiance product) supply temperature and irradiance; both are estimates of past weather.
 
 ## Correction (2026-10-19)
 
-**The first version of this page reported the opposite sign for two of the years contrasts (all
+**The first version of this page reported the opposite sign for two history-window contrasts (all
 years against 12 months, and drift against no drift), because the forecast spread carried last
 year's mean bias into the scored year.** An audit found no bug in the fits. The fault was in the
 design of the spread: each quantile was the fitted mean plus the raw quantiles of the residuals of a
@@ -198,36 +205,47 @@ points at D10 and -10 points at D11 over the training years.
   error of the GAM mean and of the XGBoost median, five sites).** G1 4.93, G-all 5.24, G-all+D1
   4.85, steps 4.95; X-12 5.01. G-all minus G1 +0.31 (+0.01 to +0.56); C1 -0.08 (-0.46 to +0.28);
   G-all+D1 minus G-all -0.38 (-0.52 to -0.25); C3 -0.43 (-0.73 to -0.16). All four agree in sign
-  with the quantile score. C2, G1 minus X-12am, is -0.08 (-0.40 to +0.20) on this error against
-  -0.55 on the quantile score, so the lead over the zero-start arm lies mostly in the tails and the
-  spread, not the centre.
+  with the quantile score.
+- **C2's lead lies mostly in the tails and the spread, not the centre.** C2, G1 minus X-12am, is
+  -0.08 (-0.40 to +0.20) on the error of the mean forecast against -0.55 on the quantile score.
 - **Leaving one decision site out (report section 14).** C1 changes sign without D14: -0.04 with
   all five sites, +0.08 without D14 and +0.01 without D11, and between -0.16 and -0.06 without D5,
   D10, or D16. C2 and C3 stay between -0.65 and -0.24 whichever site is left out. G-all minus G1
   stays positive, between +0.03 (without D16) and +0.42 (without D14). G-all+D1 minus G-all stays
   negative, between -0.38 and -0.09.
-- **Which audit triggers fired.** Trigger 1 (a control fails): four positive controls fail. The
-  audit of the spread (private brief `e104_audit.md`) found no code bug in the zero-start, solar
-  offset, or tail results, and found that zero start overfits (better in training; the 99% quantile
-  covered 73% against 98% in the scored year, report section 5; the earlier -0.04 was from lagged,
-  weekly-retrained models) and that the solar offset adds nothing once CAMS irradiance is an input.
-  Trigger 2 (a result against its prediction or an earlier finding): the same two results, with the
-  explanations above, and the corrected years contrasts. Trigger 3 did not fire. Trigger 4 fired: C1
-  changes sign without D14, from D14's winter against D10's summer (see the section above; the
-  second audit found no data or switching fault at D14). Trigger 5 fired: G1, trained on less data,
-  beats G-all by 0.25 (the audit found no leak, and drift recovers the gap), and steps do not beat
-  D1 (+0.08, interval spanning zero). Trigger 6 did not fire: no sister experiment scores these
-  rows. Trigger 7 fired: later parts of the series use G-all+D1 as the reference and D1 plus steps
-  as the default drift.
+- **Audit triggers.** The seven triggers are those of the "Audit before merge" rule in the
+  `ml-experiment` skill, and each is defined below with whether it fired.
+    - **Trigger 1, a control fails: fired.** Four positive controls fail. The audit of the spread
+      (private brief `e104_audit.md`) found no code bug in the zero-start, solar-offset, or tail
+      results. It found that zero start overfits (better in training; the 99% quantile covered 73%
+      against 98% in the scored year, report section 5; experiment 80's -0.04 came from lagged,
+      weekly-retrained models) and that the solar offset adds nothing once CAMS irradiance is an
+      input.
+    - **Trigger 2, a result contradicts its prediction or an earlier finding without a tested
+      explanation: fired,** for the same two results, with the explanations above, and for the
+      corrected history-window contrasts.
+    - **Trigger 3, the quantile score and the error of the mean forecast point in different
+      directions: did not fire.**
+    - **Trigger 4, leaving one site out flips a planned contrast: fired.** C1 changes sign without
+      D14, from D14's winter against D10's summer (see the section below; the second audit found
+      no data or switching fault at D14).
+    - **Trigger 5, a nested arm beats the arm that contains it: fired.** G1, trained on less data,
+      beats G-all by 0.25 (the audit found no leak, and drift recovers the gap), and steps do not
+      beat D1 (+0.08, interval spanning zero).
+    - **Trigger 6, a headline interval twice as wide or half as wide as in a sister experiment: did
+      not fire.** No sister experiment scores these rows.
+    - **Trigger 7, a later experiment depends on the unreplicated headline: fired.** Later parts of
+      the series use G-all+D1 as the reference and D1 plus steps as the default drift.
 
 ## The tuning year as a replicate
 
-**The tuning year reverses two of the three years contrasts, so a one-year contrast between
-history windows is not yet a finding.** A second audit refitted the four convex arms at the
-2024-07-01 cut with the same penalties and scored them on the tuning year, 2024-07 to 2025-06, on
-the mean absolute error of the mean forecast (five sites), so the spread plays no part. No
-intervals were computed for the tuning-year column, and the steps row is in-sample because the
-step penalty was chosen on that year.
+**The tuning year reverses two of the three history-window contrasts, so a one-year contrast
+between history windows is not yet a finding.** The three are G-all minus G1, C1, and the drift
+contrast. This replicate is post hoc: a second audit added it after the first results. The audit
+refitted the four convex arms at the 2024-07-01 cut with the same penalties and scored them on the
+tuning year, 2024-07 to 2025-06, on the mean absolute error of the mean forecast (five sites), so
+the spread plays no part. No intervals were computed for the tuning-year column, and the steps row
+is in-sample because the step penalty was chosen on that year.
 
 | Contrast (error of the mean forecast, points) | Tuning year 2024-25 | Scored year 2025-26 |
 |---|---|---|
@@ -238,13 +256,14 @@ step penalty was chosen on that year.
 
 - **Two contrasts reverse between years and only C1 keeps its sign.** G-all minus G1 and the drift
   contrast reverse. C1 favours all years with drift in both years.
-- **C1's sign rests on one site's winter against another site's summer.** C1 is -0.40 in November
-  to March and +0.19 in April to October (-0.19 and +0.25 without D14), and all years with drift
-  beats G1 in winter at 4 of 5 sites in both years. D14's gain (-0.51) is all November to March
-  (-1.17, against -0.04 in other months): G1 under-forecasts the cold weeks of January and February
-  2026 by 8 to 11 points, and D14's scored winter was 6.8 points higher than its training winter.
-  D10's loss (+0.41) is a summer effect: all years with drift over-forecasts D10's falling summer
-  level by 5 to 8 points (+0.91 in April to October, -0.30 in winter).
+- **C1's sign rests on one site's winter against another site's summer.** On the quantile score (not
+  the error of the mean forecast), C1 is -0.40 in November to March and +0.19 in April to October
+  (-0.19 and +0.25 without D14), and all years with drift beats G1 in winter at 4 of 5 sites in both
+  years. D14's gain (-0.51) is all November to March (-1.17, against -0.04 in other months): G1
+  under-forecasts the cold weeks of January and February 2026 by 8 to 11 points, and D14's scored
+  winter was 6.8 points higher than its training winter. D10's loss (+0.41) is a summer effect: all
+  years with drift over-forecasts D10's falling summer level by 5 to 8 points (on the quantile
+  score, +0.91 in April to October and -0.30 in winter).
 - **G-all's scored-year loss to G1 is mostly D16.** G-all is biased +3.5 points at D16, whose
   demand rose every year from 2022, and -1.6 at D10, whose demand fell. Without D16 G-all minus G1
   is +0.03.
@@ -264,7 +283,7 @@ step penalty was chosen on that year.
   from the centred sets unless it says "first run".
 - **Absolute scores (points, five decision sites; figure 3 has every site).** G1 2.82, G-all 3.07,
   G-all+D1 2.78, G-all+D1+steps 2.86; X-12 3.07, X-all 3.15, X-12amq 3.06; climatology 4.07,
-  `manual_heuristic` 3.49. D9, which holds 21 months at the final cut, scores 2.31 (G-all+D1) and
+  `manual_heuristic` 3.49. D9 scores 2.31 (G-all+D1) and
   2.63 (steps); its former 6.39 and 15.67 were the uncentred spread's shift.
 - **C1 (the verdict contrast): G-all+D1 minus G1 is -0.04** (98.33% interval, which corrects for
   three planned contrasts by the Bonferroni method: -0.30 to +0.21; 2 of 5 better). Per site: D14
@@ -301,8 +320,8 @@ step penalty was chosen on that year.
   95% quantile is too low for every arm from November to February, and pooled coverage
   hides opposite errors between substations (figure 7). No curtailment-cost saving is reported:
   that metric needs a node with generators, and this experiment scores Primary demand only.
-- **Predictions that held:** the framework tests pass; steps within 0.1 points of D1 (+0.08); run
-  time (every arm under 10 minutes).
+- **Predictions that held:** the plan's framework unit tests (1 to 6) pass; steps within 0.1 points
+  of D1 (+0.08); run time (every arm under 10 minutes).
 - **Predictions that failed:** old years without drift hurt by +0.3 to +0.8 (+0.25: the direction
   and the interval above zero held, the size did not); solar offset with irradiance (no gain); zero
   start within -0.10 to +0.02 (+0.30); C1 in 0.0 to +0.4 (-0.04); C2 in 0.1 to 0.5 and C3 in 0.0 to
@@ -322,29 +341,30 @@ step penalty was chosen on that year.
 - **Scarce-data rows (no interval).** Bank holidays (1,728 rows): G-all+D1 2.65, G-all 2.97,
   `manual_heuristic` 6.05. Days below 0 °C (576 rows): G-all+D1 3.37, G-all 3.40. Christmas run
   (1,009 rows): X-allam 2.46, G-all+D1 2.68.
-- **GPU benchmark.** The pooled proxy ran 6.6 times faster on the GPU (221 s to 33.5 s); 20 stacked
-  bootstrap fits 3.1 times (50.8 s to 16.4 s); one fit on six sites 2.1 times (3.3 s to 1.6 s).
-  CPU and GPU predictions agree to 2e-9 points, and peak GPU memory was 0.87 GB. The two convex
-  workloads run in float64, because the normal equations are too badly conditioned for float32.
-  CPU timings ran while other jobs used the machine.
-- **Handed on.** Part 4's default drift by the plan's rule is D1 plus steps, because steps lowered
-  the tuning year's error by 0.22 points (over 0.1); in the scored year steps were 0.08 worse than
-  D1, and on the tuning year G-all with no drift (5.03) already beat every drift step (5.08 at
-  best). The spread model is the centred replica residual quantiles. The strongest XGBoost
+- **GPU benchmark (private file `work/benchmark.json`).** The pooled proxy ran 6.6 times faster on
+  the GPU (221 s to 33.5 s); 20 stacked bootstrap fits 3.1 times (50.8 s to 16.4 s); one fit on six
+  sites 2.1 times (3.3 s to 1.6 s). CPU and GPU predictions agree to 2e-9 points, and peak GPU
+  memory was 0.87 GB. The two convex workloads run in float64, because the normal equations are too
+  badly conditioned for float32. CPU timings ran while other jobs used the machine.
+- **Handed on.** The spread model is the centred replica residual quantiles. The strongest XGBoost
   benchmark is the default start (`X-12`, `X-all`), and `X-12amq` is the matching solar-offset arm.
-  Part 3's reference for pooling to beat is G-all+D1 (2.78), and a pooled model should be compared
-  with G1 (2.82) as well, since more years are not yet shown to help.
+  For Part 3, the references for pooling to beat are G-all+D1 (2.78), G1 (2.82), and G-all+D1+steps
+  (2.86), and the tuning year should be scored as a second frozen replicate. For Part 4, the plan's
+  rule gives D1 plus steps as the default drift, because steps lowered the tuning year's error by
+  0.22 points (over 0.1). That gain was measured on the year the step penalty was chosen on, and
+  steps lost to D1 in the scored year (+0.08, mostly at D10). Part 4 should instead run D1 and D1
+  plus steps as paired arms, with D1 as the default, and choose the step penalty out of sample.
 
 ## Substation cards
 
 **Provisional: fitted to past weather on a screening run.** Each card shows what the G-all+D1 fit
-says about one decision substation (and the steps arm for its steps panel), at the final cut
-2025-07-01: the unmetered PV capacity per season-year, the daily profile by day type, the drift
-held through the scored year, the heating response and its four smoothing-window slopes (the slope
-of the 6-hour window against the 168-hour window shows how quickly demand follows temperature), the
-holiday, Christmas, and lighting effects, and the cumulative steps. The capacity panels carry no
-interval, because the fit gives a point estimate only. Every axis is in points of effective
-capacity unless labelled.
+says about one decision substation at the final cut 2025-07-01, and the steps panel comes from the
+steps arm. A card has nine panels. They show the unmetered PV capacity per season-year, the daily
+profile by day type, the drift held through the scored year, the heating response, the four
+smoothing-window slopes, the holiday and Christmas effects, the lighting effect, and the cumulative
+steps. The slope of the 6-hour window against the 168-hour window shows how quickly demand follows
+temperature. The capacity panels carry no interval, because the fit gives a point estimate only.
+Every axis is in points of effective capacity unless labelled.
 
 ![Substation card D5](figure_13_card_d5.svg)
 
@@ -358,16 +378,16 @@ capacity unless labelled.
 
 ![Key fitted parameters side by side](figure_18_card_comparison.svg)
 
-- **What the cards show about the model's constraints.** Each heating response is zero above 15.5
-  °C and rises as the temperature falls, the unmetered PV capacity never falls from one season-year
-  to the next, and lighting is zero around midday. These hold by construction (non-negative heating
-  and capacity coefficients, and a lighting ramp that is zero at midday), so they check the
-  plotting and not the fit.
+- **What the cards show about the model's constraints.** Each heating response is zero above 15.5 °C
+  and rises as the temperature falls, the unmetered PV capacity never falls from one season-year to
+  the next, and lighting is zero around midday. All three properties hold by construction
+  (non-negative heating and capacity coefficients, and a lighting ramp that is zero at midday), so
+  they check the plotting and not the fit.
 - **What differs between substations (comparison figure).** D10 has the steepest heating response
   (a slope of about 19 points per 10 °C, against 6 to 10 elsewhere) and the lowest weekday profile
   peak (about 60 points, against 65 to 76). Fitted capacity runs from about 2.3 MW (D10) to 3.6 MW
   (D14), and the evening-to-midday ratio of the weekday profile from about 0.73 (D10) to 0.90 (D5).
-  These are fitted values from one frozen fit each, not measured properties.
+  These are fitted values from one frozen fit each.
 - **Not shown.** Capacity has no interval, the holiday panel averages the four hour bands, and the
   steps panel comes from a different fit (the steps arm).
 
@@ -398,6 +418,6 @@ Part 3 pools the model across substations on the GPU. A drift that re-estimates 
 recent data, for example by assimilating the latest observed demand, is one option for a later part.
 The corrected drift-by-month table says the existing drift helps in every scored month, but the
 tuning year reverses that, so the next question is whether drift and more years help in both years
-and in winter and summer alike. Part 3's pooling comparison should score the tuning year as a
-second frozen replicate and split every contrast into November to March and April to October.
-Whether all years with drift beat 12 months remains open.
+and in winter and summer alike. Part 3's pooling comparison should compare against G-all+D1, G1, and
+G-all+D1+steps, score the tuning year as a second frozen replicate, and split every contrast into
+November to March and April to October. Whether all years with drift beat 12 months remains open.
