@@ -96,12 +96,18 @@ class FitCopy:
         y: Replacement readings for every row of the batch, or `None` to keep the real ones.
         capacity_prior: A prior centre for each substation's first capacity increment before the
             softplus, with `NaN` for none (see `PooledDemandModel.capacity_prior`), or `None`.
+        fixed_scales: Population scales to hold fixed (not learned) in this copy, keyed by family
+            name, or `None`. A larger scale is a weaker prior.
+        capacity_init: Starting values of `capacity_raw`, shape (substations, season-years), or
+            `None` for the default start.
     """
 
     name: str
     keep: torch.Tensor | None = None
     y: torch.Tensor | None = None
     capacity_prior: torch.Tensor | None = None
+    fixed_scales: dict[str, float] | None = None
+    capacity_init: torch.Tensor | None = None
 
 
 def fit_many(
@@ -146,6 +152,11 @@ def fit_many(
         )
         if copy.capacity_prior is not None:
             model.capacity_prior.copy_(copy.capacity_prior)
+        if copy.capacity_init is not None:
+            model.capacity_raw.data.copy_(copy.capacity_init)
+        for family, scale in (copy.fixed_scales or {}).items():
+            model.population_log_scale[family].data.fill_(float(np.log(scale)))
+            model.population_log_scale[family].requires_grad_(False)
         results.append(
             fit_pooled(
                 model=model,

@@ -24,6 +24,7 @@ import time
 from dataclasses import replace
 from typing import Any, Final
 
+import e00105_arms as arms
 import e00105_common as common
 import numpy as np
 import polars as pl
@@ -307,8 +308,11 @@ def gate_1_synthetic(*, cache: FeatureCache) -> dict[str, Any]:
     return out
 
 
-def farm_series(*, farm: str, end_times: np.ndarray) -> np.ndarray:
-    """Return a farm's normalised output at the rows' end times, 0 where the farm has no reading."""
+def farm_series(*, farm: str, end_times: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return a farm's normalised output at the rows' end times, and where it has a reading.
+
+    A reading of zero at night counts as a reading; the output is 0 where the farm has none.
+    """
     table = (
         pl.read_parquet(common.FARMS_FILE)
         .filter(pl.col("farm") == farm)
@@ -321,7 +325,7 @@ def farm_series(*, farm: str, end_times: np.ndarray) -> np.ndarray:
     position = np.searchsorted(times, end_times)
     position = np.clip(position, 0, len(times) - 1)
     found = times[position] == end_times
-    return np.where(found, values[position], 0.0)
+    return np.where(found, values[position], 0.0), found
 
 
 def midday_summer(*, batch: PooledBatch, cache: FeatureCache) -> torch.Tensor:
@@ -344,6 +348,34 @@ def shared_midday_output(
     return float(centred[mask].mean())
 
 
+def module_midday_output(
+    *, model: PooledDemandModel, batch: PooledBatch, mask: torch.Tensor
+) -> dict[str, float]:
+    """Return the mean midday output of each shared module, centred per site-year, in points."""
+    model.eval()
+    n_slots = model.centre_means.numel()
+    counts = torch.bincount(batch.season_slot, minlength=n_slots).clamp(min=1)
+    with torch.no_grad():
+        holiday = model.holiday[batch.holiday, batch.band]
+        tent = (batch.tent * model.tent_coef[:, batch.band].T).sum(dim=1)
+        harmonics = (batch.harmonics * model.harmonic_coef[:, batch.band].T).sum(dim=1)
+        lighting = batch.lighting @ model.lighting_coef
+        total, _ = model.calendar_terms(batch=batch)
+        network = total - holiday - tent - harmonics - lighting
+        out = {}
+        for name, values in (
+            ("holiday", holiday),
+            ("tent", tent),
+            ("harmonics", harmonics),
+            ("lighting", lighting),
+            ("interaction_network", network),
+        ):
+            sums = torch.zeros(n_slots, dtype=values.dtype, device=values.device)
+            means = sums.index_add(0, batch.season_slot, values) / counts.to(values.dtype)
+            out[name] = float((values - means[batch.season_slot])[mask].mean())
+    return out
+
+
 def p99_unit_shape(*, batch: PooledBatch, site: int) -> float:
     """Return the 99th percentile of a site's daylight PV shape."""
     shape = batch.pv_shape[batch.site == site]
@@ -351,7 +383,15 @@ def p99_unit_shape(*, batch: PooledBatch, site: int) -> float:
     return float(torch.quantile(daylight.float().cpu(), 0.99))
 
 
-def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str, Any]:
+def gate_2_injected(
+    *,
+    cache: FeatureCache,
+    context: dict[str, Any],
+    capacity_scale: float | None = None,
+    config: DpConfig | None = None,
+    capacity_init: torch.Tensor | None = None,
+    prior: torch.Tensor | None = None,
+) -> dict[str, Any]:
     """Return the injected-farm recovery results.
 
     A farm reports for about 30% of the window, so a farm's output cannot be added at every row.
@@ -360,27 +400,28 @@ def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
     """
     batch = common.pooled_batch_for(cache=cache, sites=common.POOL, cut=common.TUNING_CUT)
     context["train_batch"] = batch
-    config = config_p()
-    copies = [FitCopy(name="base")]
+    config = config or config_p()
+    fixed = None if capacity_scale is None else {"capacity_first": capacity_scale}
+    common_copy = {"fixed_scales": fixed, "capacity_init": capacity_init, "capacity_prior": prior}
+    copies = [FitCopy(name="base", **common_copy)]
     coverage, keeps, farms = {}, {}, {}
     for site in INJECTED_SITES:
         index = batch.site_labels.index(site)
         site_rows = batch.site == index
         end = cache.end_times[batch.row.cpu().numpy()]
-        farm = torch.as_tensor(
-            farm_series(farm=FARM_OF_SITE[site], end_times=end),
-            dtype=batch.y.dtype,
-            device=batch.y.device,
-        )
-        has_farm = farm > 0
+        values, found = farm_series(farm=FARM_OF_SITE[site], end_times=end)
+        farm = torch.as_tensor(values, dtype=batch.y.dtype, device=batch.y.device)
+        has_farm = torch.as_tensor(found, device=batch.y.device)
         keep = ~site_rows | has_farm
         keeps[site] = keep
         farms[site] = INJECTED_POINTS * torch.where(
             site_rows & has_farm, farm, torch.zeros_like(farm)
         )
         coverage[site] = float(has_farm[site_rows].float().mean())
-        copies.append(FitCopy(name=f"base {site}", keep=keep))
-        copies.append(FitCopy(name=f"inject {site}", keep=keep, y=batch.y - farms[site]))
+        copies.append(FitCopy(name=f"base {site}", keep=keep, **common_copy))
+        copies.append(
+            FitCopy(name=f"inject {site}", keep=keep, y=batch.y - farms[site], **common_copy)
+        )
     models, results = fit_many(
         batch=batch,
         copies=copies,
@@ -392,7 +433,7 @@ def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
     )
     context["base_model"] = models[0]
     midday = midday_summer(batch=batch, cache=cache)
-    ratios, others, shared_moves = {}, {}, {}
+    ratios, others, shared_moves, by_module = {}, {}, {}, {}
     solar_sites = [s for s in common.MW_POOL if s in batch.site_labels]
     for position, site in enumerate(INJECTED_SITES):
         base, injected = models[1 + 2 * position], models[2 + 2 * position]
@@ -408,6 +449,9 @@ def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
                 if o != site
             )
         )
+        before = module_midday_output(model=base, batch=batch, mask=midday)
+        after = module_midday_output(model=injected, batch=batch, mask=midday)
+        by_module[site] = {name: after[name] - before[name] for name in before}
         shared_moves[site] = abs(
             shared_midday_output(model=injected, batch=batch, mask=midday)
             - shared_midday_output(model=base, batch=batch, mask=midday)
@@ -418,6 +462,11 @@ def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
         "median_ratio": median,
         "largest_other_capacity_change": others,
         "shared_midday_change_points": shared_moves,
+        "shared_midday_change_by_module_points": by_module,
+        "capacity_first_scale_fixed": capacity_scale,
+        "learned_capacity_first_scale": float(
+            torch.exp(models[0].population_log_scale["capacity_first"]).detach()
+        ),
         "farm_coverage_of_site_rows": coverage,
         "seconds": [r.seconds for r in results],
         "peak_gpu_gb": max(r.peak_memory_bytes for r in results) / 1e9,
@@ -429,8 +478,11 @@ def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
     }
 
 
-def placebo_cache(*, cache: FeatureCache) -> FeatureCache:
-    """Return a cache whose CAMS irradiance is the same site's from a year earlier (or later)."""
+def placebo_cache(*, cache: FeatureCache, shift_years: int = 1) -> FeatureCache:
+    """Return a cache whose CAMS irradiance is the same site's from `shift_years` earlier.
+
+    Where that year is missing, the same site's irradiance from `shift_years` later is used.
+    """
     paths = default_input_paths()
     cams = pl.read_parquet(paths.cams, columns=["site", "time", "ghi_w_m2"])
     grid = grid_end_times()
@@ -438,8 +490,8 @@ def placebo_cache(*, cache: FeatureCache) -> FeatureCache:
     for label in common.MW_POOL:
         features = cache.sites[label]
         own = cams.filter(pl.col("site") == label)
-        earlier = own.with_columns(time=pl.col("time").dt.offset_by("1y"))
-        later = own.with_columns(time=pl.col("time").dt.offset_by("-1y"))
+        earlier = own.with_columns(time=pl.col("time").dt.offset_by(f"{shift_years}y"))
+        later = own.with_columns(time=pl.col("time").dt.offset_by(f"-{shift_years}y"))
         shifted = (
             pl.concat([earlier, later.join(earlier.select("time"), on="time", how="anti")])
             .unique(subset=["site", "time"], keep="first")
@@ -457,16 +509,24 @@ def scored_rows(*, model: PooledDemandModel, batch: PooledBatch) -> np.ndarray:
 
 
 def gate_3_placebo(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str, Any]:
-    """Return the placebo-twin results."""
+    """Return the placebo-twin results for three draws (irradiance 1, 2, and 3 years earlier)."""
+    draws = {
+        f"shift_{years}y": placebo_draw(cache=cache, context=context, years=years)
+        for years in (1, 2, 3)
+    }
+    return {**draws, "passed": bool(all(draw["passed"] for draw in draws.values()))}
+
+
+def placebo_draw(*, cache: FeatureCache, context: dict[str, Any], years: int) -> dict[str, Any]:
+    """Return one placebo draw: the fit on shifted irradiance against the real fit."""
     cut, end = common.TUNING_CUT, common.TUNING_END
-    twin = placebo_cache(cache=cache)
+    twin = placebo_cache(cache=cache, shift_years=years)
     real_train = context["train_batch"]
     twin_train = common.pooled_batch_for(cache=twin, sites=common.POOL, cut=cut)
     twin_model, _ = _fit(batch=twin_train, config=config_p(), copy=FitCopy(name="placebo"))
     real_model = context["base_model"]
     real_score = common.scoring_batch_for(cache=cache, sites=SCORED, after=cut, through=end)
     twin_score = common.scoring_batch_for(cache=twin, sites=SCORED, after=cut, through=end)
-    common_rows = np.intersect1d(real_score.row.cpu().numpy(), twin_score.row.cpu().numpy())
     errors = {}
     for name, model, batch in (
         ("real", real_model, real_score),
@@ -489,7 +549,6 @@ def gate_3_placebo(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str,
     real_cap = real_model.capacities()[index, -1].detach().cpu().numpy()
     twin_cap = twin_model.capacities()[index, -1].detach().cpu().numpy()
     falls = int((twin_cap < real_cap).sum())
-    del common_rows
     return {
         "placebo_minus_real_summer_midday_mae": {"mean": mean, "low": low, "high": high},
         "capacity_falls_at_sites": falls,
@@ -524,7 +583,9 @@ def derangement(*, n: int) -> list[int]:
     return [(i + 1) % n for i in range(n)]
 
 
-def gate_4_shuffled(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str, Any]:
+def gate_4_prior_swap_diagnostic(
+    *, cache: FeatureCache, context: dict[str, Any], capacity_scale: float | None = None
+) -> dict[str, Any]:
     """Return the shuffled-capacity results."""
     batch = context["train_batch"]
     own = vintage_points(cache=cache)
@@ -535,8 +596,11 @@ def gate_4_shuffled(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
     for position, site in enumerate(sites):
         shuffled[site] = own[sites[moved[position]]]
         prior[batch.site_labels.index(site)] = float(inverse_softplus(shuffled[site]))
+    fixed = None if capacity_scale is None else {"capacity_first": capacity_scale}
     model, _ = _fit(
-        batch=batch, config=config_p(), copy=FitCopy(name="shuffled", capacity_prior=prior)
+        batch=batch,
+        config=config_p(),
+        copy=FitCopy(name="shuffled", capacity_prior=prior, fixed_scales=fixed),
     )
     capacity = model.capacities()[:, -1].detach().cpu().numpy()
     closer, separated, detail = 0, 0, {}
@@ -551,6 +615,10 @@ def gate_4_shuffled(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
         detail[site] = entry
     needed = int(np.ceil(2 * separated / 3))
     return {
+        "capacity_first_scale_fixed": capacity_scale,
+        "capacity_first_scale_used": float(
+            torch.exp(model.population_log_scale["capacity_first"]).detach()
+        ),
         "sites": detail,
         "closer_to_own_at": closer,
         "of_separated_sites": separated,
@@ -559,12 +627,97 @@ def gate_4_shuffled(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
     }
 
 
+def gate_4_shuffled(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str, Any]:
+    """Swap the fitted capacity paths among the six MW substations and rescore, without refitting.
+
+    The paths are swapped in MW (a derangement), converted to each substation's points, and
+    the tuning-year summer-midday error is compared with the unswapped fit's. The test passes if
+    the error worsens at 5 or more of the 6 substations, so the fitted capacities carry
+    substation-specific information.
+    """
+    batch = context["train_batch"]
+    model = context["base_model"]
+    capacity = model.capacities().detach()
+    index = [batch.site_labels.index(site) for site in SCORED]
+    effective = capacity.new_tensor(
+        [common.effective_capacity_mw(cache=cache, site=site) for site in SCORED]
+    )
+    megawatts = capacity[index] * effective[:, None] / 100.0
+    order = derangement(n=len(SCORED))
+    swapped = capacity.clone()
+    swapped[index] = megawatts[order] * 100.0 / effective[:, None]
+    score = arms.remap_sites(
+        batch=common.scoring_batch_for(
+            cache=cache, sites=SCORED, after=common.TUNING_CUT, through=common.TUNING_END
+        ),
+        model_sites=common.POOL,
+    )
+    sunny = midday_summer(batch=score, cache=cache).cpu().numpy()
+    truth = score.y.cpu().numpy()
+    base_error = np.abs(truth - predict_pooled(model=model, batch=score))
+    model.capacity_override = swapped
+    swapped_error = np.abs(truth - predict_pooled(model=model, batch=score))
+    model.capacity_override = None
+    site_of_row = score.site.cpu().numpy()
+    detail, worse = {}, 0
+    for site, position in zip(SCORED, index, strict=True):
+        rows = (site_of_row == position) & sunny
+        change = float(swapped_error[rows].mean() - base_error[rows].mean())
+        detail[site] = {
+            "base_summer_midday_mae": float(base_error[rows].mean()),
+            "swapped_minus_base": change,
+        }
+        worse += int(change > 0)
+    return {"sites": detail, "worse_at_sites": worse, "passed": bool(worse >= 5)}
+
+
+def run_weaker_prior(*, cache: FeatureCache, multiples: list[float], report_name: str) -> None:
+    """Rerun test 4, then test 2, with the capacity prior's scale fixed at larger multiples.
+
+    The multiples apply to the scale the primary fit learned. The primary prior stays the
+    pre-registered one, and the weaker priors are labelled variants.
+    """
+    context: dict[str, Any] = {}
+    report: dict[str, Any] = {}
+    context["train_batch"] = common.pooled_batch_for(
+        cache=cache, sites=common.POOL, cut=common.TUNING_CUT
+    )
+    primary = gate_4_prior_swap_diagnostic(cache=cache, context=context)
+    learned = primary["capacity_first_scale_used"]
+    report["test_4_primary"] = primary
+    print(f"primary test 4: passed={primary['passed']}, learned scale {learned:.3f}", flush=True)
+    passing: list[float] = []
+    for multiple in multiples:
+        result = gate_4_prior_swap_diagnostic(
+            cache=cache, context=context, capacity_scale=multiple * learned
+        )
+        report[f"test_4_x{multiple:g}"] = result
+        print(f"test 4 at x{multiple:g}: passed={result['passed']}", flush=True)
+        if result["passed"]:
+            passing.append(multiple)
+        common.write_json(name=report_name, payload=report)
+    chosen = passing[0] if passing else multiples[-1]
+    result = gate_2_injected(cache=cache, context=context, capacity_scale=chosen * learned)
+    report[f"test_2_x{chosen:g}"] = result
+    print(f"test 2 at x{chosen:g}: passed={result['passed']}", flush=True)
+    common.write_json(name=report_name, payload=report)
+
+
 def main() -> None:
     """Run the requested gate tests and write `work/gate.json`."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--tests", nargs="+", type=int, default=[1, 2, 3, 4])
     parser.add_argument("--steps", type=int, default=common.FIT_STEPS)
     parser.add_argument("--rate", type=float, default=common.FIT_RATE)
+    parser.add_argument(
+        "--weaker-prior",
+        nargs="*",
+        type=float,
+        default=None,
+        help="reruns tests 4 and 2 with the capacity prior's scale fixed at these multiples of "
+        "the scale the primary fit learned",
+    )
+    parser.add_argument("--report", default="gate.json")
     arguments = parser.parse_args()
     common.FIT_STEPS = arguments.steps
     common.FIT_RATE = arguments.rate
@@ -572,6 +725,11 @@ def main() -> None:
     cache = common.load_cache()
     context: dict[str, Any] = {}
     report: dict[str, Any] = {}
+    if arguments.weaker_prior is not None:
+        run_weaker_prior(
+            cache=cache, multiples=arguments.weaker_prior, report_name=arguments.report
+        )
+        return
     steps = {
         1: lambda: gate_1_synthetic(cache=cache),
         2: lambda: gate_2_injected(cache=cache, context=context),
@@ -591,7 +749,7 @@ def main() -> None:
             f"gate test {number}: passed={verdict} ({time.perf_counter() - started:.0f} s)",
             flush=True,
         )
-        common.write_json(name="gate.json", payload=report)
+        common.write_json(name=arguments.report, payload=report)
     print(report)
 
 

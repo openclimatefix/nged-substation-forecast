@@ -159,6 +159,9 @@ class DpConfig:
         drift: Drift form of the pooled model (only `none` is built).
         clip: The smooth export-limit clip of the solar term (not built).
         generator_node: The unmetered generator node (not built).
+        network_temperature_dark_only: The interaction network sees the mixed temperature only
+            when the sun is down. By day the network could otherwise use temperature as a proxy
+            for sunshine and trade off with the solar term.
     """
 
     shared_shapes: int = 4
@@ -168,6 +171,7 @@ class DpConfig:
     drift: DriftType = "none"
     clip: bool = False
     generator_node: bool = False
+    network_temperature_dark_only: bool = False
 
     @property
     def site_prior(self) -> SitePrior:
@@ -446,6 +450,7 @@ class PooledDemandModel(nn.Module):
         self.register_buffer("solar_sites", torch.ones(n_sites))
         self.register_buffer("fit_had_rows", torch.ones(n_sites))
         self.onboarding_weeks: dict[str, int] = {}
+        self.capacity_override: torch.Tensor | None = None
         self.register_buffer("capacity_prior", torch.full((n_sites,), float("nan")))
         self._build_site_prior(initial_level=initial_level)
 
@@ -556,6 +561,8 @@ class PooledDemandModel(nn.Module):
 
     def capacities(self) -> torch.Tensor:
         """Return the capacity of each substation and season-year, shape (sites, years)."""
+        if self.capacity_override is not None:
+            return self.capacity_override
         return torch.cumsum(
             nn.functional.softplus(self._site("capacity_raw")) * self.trained, dim=1
         )
@@ -682,9 +689,11 @@ class PooledDemandModel(nn.Module):
             self.centre_means.copy_(means.detach())
         return values - means[slot]
 
-    @staticmethod
-    def _interaction_inputs(*, batch: PooledBatch, mixed: torch.Tensor) -> torch.Tensor:
+    def _interaction_inputs(self, *, batch: PooledBatch, mixed: torch.Tensor) -> torch.Tensor:
         """Stack the calendar and weather inputs of the interaction network."""
+        temperature = (mixed - HEATING_THRESHOLD_C) / HEATING_SCALE_C
+        if self.config.network_temperature_dark_only:
+            temperature = temperature * (batch.elevation <= 0).to(temperature.dtype)
         angle = 2.0 * torch.pi * batch.half_hour.to(mixed.dtype) / HALF_HOURS_PER_DAY
         day_type = nn.functional.one_hot(batch.day_type, num_classes=len(DAY_TYPES)).to(mixed.dtype)
         return torch.cat(
@@ -694,7 +703,7 @@ class PooledDemandModel(nn.Module):
                 torch.sin(angle)[:, None],
                 torch.cos(angle)[:, None],
                 day_type,
-                ((mixed - HEATING_THRESHOLD_C) / HEATING_SCALE_C)[:, None],
+                temperature[:, None],
             ],
             dim=1,
         )
