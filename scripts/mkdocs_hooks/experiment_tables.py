@@ -31,10 +31,19 @@ EXPERIMENTS_DIR: Final[Path] = REPO_ROOT / "docs" / "ml-experiments"
 """Folder holding the experiment folders (`<id>-<slug>/result.md`) and `themes/`."""
 
 VERDICTS: Final[frozenset[str]] = frozenset(
-    {"inconclusive", "refuted", "supported", "partly supported", "small gain", "not supported"}
+    {
+        "inconclusive",
+        "refuted",
+        "supported",
+        "partly supported",
+        "small gain",
+        "not supported",
+        "invalid",
+        "failed",
+    }
 )
 PRODUCTION_STATUSES: Final[frozenset[str]] = frozenset(
-    {"candidate", "not-for-production", "adopted"}
+    {"candidate", "not-for-production", "adopted", "superseded"}
 )
 STATUSES: Final[frozenset[str]] = frozenset({"planned", "done", "finished"})
 FIRST_ID_NEEDING_TAKE_HOME_MESSAGE: Final[int] = 103

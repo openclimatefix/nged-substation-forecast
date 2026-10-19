@@ -28,8 +28,8 @@ best-estimate, not a guarantee.
   metrics (flexibility procurement and curtailment), the equal-risk method that avoids needing a
   price for a network breach, their limitations, and the open questions for NGED.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
-  weather datasets (ECMWF ENS, CAMS, ERA5, and the CEDA UKV archive that version 1 does not
-  ingest), with the dated list of upgrades to each weather model.
+  weather datasets (ECMWF ENS, CAMS, ERA5, and the CEDA UKV archive that version 1 does not ingest),
+  with the dated list of upgrades to each weather model.
 - [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference asset, the
   champion-model container, the costed AWS architecture options, production monitoring, and the
   handling of NWP model upgrades.
@@ -40,20 +40,20 @@ best-estimate, not a guarantee.
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort tiers,
   ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Extending the training history](training-history.md) — using estimates of past weather, CAMS for
-  irradiance and ERA5 for other variables, to train on the power data that predates the ECMWF
-  ENS archive: the era-confounding hazard that dictates the ingest's scope, the reconciliation and
-  pooling variants, how a weather product with a few months of history could enter the forecast,
-  the COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than
-  a promotion criterion.
+  irradiance and ERA5 for other variables, to train on the power data that predates the ECMWF ENS
+  archive: the era-confounding hazard that dictates the ingest's scope, the reconciliation and
+  pooling variants, how a weather product with a few months of history could enter the forecast, the
+  COVID covariate, and why scoring against estimates of past weather is a diagnostic rather than a
+  promotion criterion.
 - [A staged probabilistic forecast](staged-probabilistic-forecast.md) — 🔬 a design under test: a
   stage 1 that turns weather into power, a stage 2 that calibrates, uses lagged power, and blends
   weather products, and coupling that restores coherent ensemble members. The experiments that test
-  it are in the [research log](../ml-experiments/research-log.md).
-- [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent
-  searching for improvements to the XGBoost forecasting model in two phases: experiments run overnight
-  from a plan agreed the day before, then a careful search in which the agent runs as a separate
-  Unix user that never sees the leaderboard's validation window. The page also summarises what
-  published research agents found. A person re-implements every idea that survives either phase.
+  it are on the [ML experiments](../ml-experiments/README.md) pages.
+- [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent searching
+  for improvements to the XGBoost forecasting model in two phases: experiments run overnight from a
+  plan agreed the day before, then a careful search in which the agent runs as a separate Unix user
+  that never sees the leaderboard's validation window. The page also summarises what published
+  research agents found. A person re-implements every idea that survives either phase.
 - [Engineering health](engineering-health.md) — scientific-rigor tests and cleanup.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate estimators
   of the time-varying effective capacity of metered generators: a [convex

@@ -1,6 +1,8 @@
 # Solar disaggregation: research plan
 
-**This page lists the experiments in this theme that are planned or proposed.** The [Experiments](experiments.md) page holds the finished ones. A lower number in the "Priority" column runs sooner.
+**This page lists the experiments in this theme that are planned or proposed.** The
+[Experiments](experiments.md) page holds the finished ones. A lower number in the "Priority" column
+runs sooner.
 
 ## Priority
 
@@ -100,8 +102,8 @@ statistics need more substations or a continuous measure of capacity.
 
 ### PVDIS: separating embedded solar from Primary demand
 
-**The PVDIS line estimates how much unmetered solar capacity sits behind each Primary substation, how
-that capacity changes over time, and whether an explicit solar term improves or explains the net
+**The PVDIS line estimates how much unmetered solar capacity sits behind each Primary substation,
+how that capacity changes over time, and whether an explicit solar term improves or explains the net
 demand forecast.** The line serves three purposes, and the second matters about as much as the
 first:
 
@@ -115,10 +117,10 @@ first:
 
 **The capacity estimate runs offline, weekly or monthly, and the production forecast only reads the
 latest capacity table.** Nothing in this line adds a fitting step to the serving path. [Experiment
-73](../../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) (PVDIS-6) found that the mix of panel
-orientations behind each Primary, the quantity the `UniversalSolarFleetNode` sketched in
-[differentiable physics](../../../techniques/differentiable-physics.md) would fit, is not stable across
-season-years, so the explicit solar forecast keeps one south-facing shape.
+73](../../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) (PVDIS-6) found that the mix of
+panel orientations behind each Primary, the quantity the `UniversalSolarFleetNode` sketched in
+[differentiable physics](../../../techniques/differentiable-physics.md) would fit, is not stable
+across season-years, so the explicit solar forecast keeps one south-facing shape.
 
 **Experiments 00039 and 00040 are parts 1 and 2 of the series, and the parts below follow the
 exploratory protocol in the `ml-experiment` skill.** Opus plans each part after reading the result
@@ -126,11 +128,11 @@ of the part before, so the designs below are proposals that each part's plan may
 00039 fitted one capacity per Primary per season-year, from a calendar and temperature demand term
 minus one CAMS-driven solar shape. On real solar-farm output injected into the real demand, the
 half-hourly fit recovered a median 0.773 (0.740 to 0.818) of the injected capacity, and a fit on
-daily sums recovered 0.854 (0.815 to 0.866). Experiment 00040 compared six fits, which differ in
-how much cloud-driven demand each allows, and took the six-arm capacity C as its estimate. C
-recovered a median 0.992 (0.951 to 1.032) of the injected capacity. Experiment 00040 also attached
-a bound on the error that an undetected demand load would cause, of 0.18 to 0.23 at five Primaries.
-A demand load that rises with sunshine cannot be told apart from solar.
+daily sums recovered 0.854 (0.815 to 0.866). Experiment 00040 compared six fits, which differ in how
+much cloud-driven demand each allows, and took the six-arm capacity C as its estimate. C recovered a
+median 0.992 (0.951 to 1.032) of the injected capacity. Experiment 00040 also attached a bound on
+the error that an undetected demand load would cause, of 0.18 to 0.23 at five Primaries. A demand
+load that rises with sunshine cannot be told apart from solar.
 
 **The Opus review of experiment 00040 recommended stopping the series, publishing a season-year
 capacity table, and not using capacity as a forecast feature; the parts below continue because the
@@ -146,12 +148,12 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
 **Rules shared by every part:**
 
 - **Substations.** Only the 8 Primaries metered in MW, each carrying its status from the earlier
-  review into every result: Kirton is reported only as a range (1.2 to 4.4 MW), because its
-  daylight cloud load was flagged in 6 of 7 season-years; Wrangle T1 is excluded from any claim that
-  a Primary is free of a confound; Trusthorpe is marked low-power. The 8 Primaries metered only in
-  MVA fold solar into the magnitude of the flow, and experiment 00039 fitted a negative capacity at
-  Stickney in every year. [Experiment
-  00079](../../00079-pvdis-7-mw-at-mva-only-primaries/result.md) (PVDIS-7) treats them separately.
+  review into every result: Kirton is reported only as a range (1.2 to 4.4 MW), because its daylight
+  cloud load was flagged in 6 of 7 season-years; Wrangle T1 is excluded from any claim that a
+  Primary is free of a confound; Trusthorpe is marked low-power. The 8 Primaries metered only in MVA
+  fold solar into the magnitude of the flow, and experiment 00039 fitted a negative capacity at
+  Stickney in every year. [Experiment 00079](../../00079-pvdis-7-mw-at-mva-only-primaries/result.md)
+  (PVDIS-7) treats them separately.
 - **Service areas.** `TimeSeriesMetadata.area_wkt` holds one polygon per Primary. Wrangle T1 and
   Wrangle T2 are two transformers at one substation, feeding different circuits, and share one
   polygon. Each transformer keeps its own capacity fit, and any comparison against an outside count
@@ -159,9 +161,10 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
   check reports overlaps and gaps between neighbouring polygons, whether each Primary's location
   falls inside its own polygon, and how the union of the polygons compares with the two BSPs' area.
 - **Irradiance.** CAMS for past weather, because the [past-weather solar
-  study](../../../studies/past-weather/solar.md) found the CAMS solar estimate the most accurate of the
-  products it compared. ENS for forecasts. Where a capacity fitted on CAMS is applied to ENS, the ENS
-  irradiance is first calibrated against CAMS, by lead, on data from the fold's training window only.
+  study](../../../studies/past-weather/solar.md) found the CAMS solar estimate the most accurate of
+  the products it compared. ENS for forecasts. Where a capacity fitted on CAMS is applied to ENS,
+  the ENS irradiance is first calibrated against CAMS, by lead, on data from the fold's training
+  window only.
 - **Capacity used in a forecast is a real-time vintage.** A forecast experiment reads the capacity
   that a fit truncated at the fold's training end would give, never a path smoothed over the whole
   record. A path fitted once over all data passes information from later weeks back to earlier weeks
@@ -181,10 +184,9 @@ day-long load, so every part reports C as the capacity and keeps the daily fit a
 
 #### PVDIS-T: the capacity table, a study
 
-**Publish a season-year capacity table now, built from experiment 00040's outputs with no refit,
-and replace it with PVDIS-4's weekly series once that part has run.** NGED's need is to improve on
-almost no information, so the season-year table is useful before the weekly series exists. The
-study reports C as the capacity, keeps sampling uncertainty separate from the named systematic
-scenarios, and carries each Primary's status from the earlier review. The joint fit of
-[experiment 00063](../../00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) read the same
-capacities.
+**Publish a season-year capacity table now, built from experiment 00040's outputs with no refit, and
+replace it with PVDIS-4's weekly series once that part has run.** NGED's need is to improve on
+almost no information, so the season-year table is useful before the weekly series exists. The study
+reports C as the capacity, keeps sampling uncertainty separate from the named systematic scenarios,
+and carries each Primary's status from the earlier review. The joint fit of [experiment
+00063](../../00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) read the same capacities.

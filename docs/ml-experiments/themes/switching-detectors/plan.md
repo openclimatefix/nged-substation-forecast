@@ -1,6 +1,8 @@
 # Switching detectors: research plan
 
-**This page lists the experiments in this theme that are planned or proposed.** The [Experiments](experiments.md) page holds the finished ones. A lower number in the "Priority" column runs sooner.
+**This page lists the experiments in this theme that are planned or proposed.** The
+[Experiments](experiments.md) page holds the finished ones. A lower number in the "Priority" column
+runs sooner.
 
 ## Priority
 
@@ -47,9 +49,9 @@ scored on even months, with recall weighted by the MW moved as the headline from
 The order below is a proposal, by expected gain per hour of work, for the plan of each iteration to
 confirm:
 
-- **SW2-5 (done, [experiment 68](../../00068-sw2-5-train-detect-retrain-loop/result.md)):** three rounds
-  of refitting the lagless XGBoost model without the detected intervals changed the share of the
-  moved MW found by +0.011 and the forecast error by -0.175%, and a random mask did as well.
+- **SW2-5 (done, [experiment 68](../../00068-sw2-5-train-detect-retrain-loop/result.md)):** three
+  rounds of refitting the lagless XGBoost model without the detected intervals changed the share of
+  the moved MW found by +0.011 and the forecast error by -0.175%, and a random mask did as well.
 - **SW2-6 (done, [experiment 61](../../00061-sw2-6-paired-step-intervals/result.md)):** pairing the
   onset and return steps into one alarm score finds less than D0M at the same alarm rate, but taking
   the end of D0M's interval from the strongest opposite step in the next 14 days finds 0.19 more of
@@ -59,16 +61,16 @@ confirm:
   constant step on five injection shapes, so the step's shape does not limit the 24-hour detector.
   About a third of the transfers with a donor step of 6 noise units or more have the right onset and
   the wrong end, which SW2-6 (paired-step intervals) addresses.
-- **SW2-8 (done, [experiment 55](../../00055-sw2-8-neighbour-veto-single-series-detector/result.md)):** a
-  single-series detector first, with neighbour balance as a sense check, not a gate.
-  Every single-series alarm stands. A metered neighbour's opposite step raises the alarm's
-  confidence and names the receiver, a same-sign step on the neighbours vetoes the alarm as a
-  common-mode weather or calendar miss, and an alarm with no metered neighbour keeps its
-  single-series confidence. Experiment 00043 found the neighbour-balance detector D1, which uses
-  the neighbour test as a gate, finding almost none of the injected transfers without a metered
-  receiver. The sum of the neighbourhood's residuals and a subset-sum over neighbours for a split
-  feed the confidence score.
+- **SW2-8 (done, [experiment
+  55](../../00055-sw2-8-neighbour-veto-single-series-detector/result.md)):** a single-series
+  detector first, with neighbour balance as a sense check, not a gate. Every single-series alarm
+  stands. A metered neighbour's opposite step raises the alarm's confidence and names the receiver,
+  a same-sign step on the neighbours vetoes the alarm as a common-mode weather or calendar miss, and
+  an alarm with no metered neighbour keeps its single-series confidence. Experiment 00043 found the
+  neighbour-balance detector D1, which uses the neighbour test as a gate, finding almost none of the
+  injected transfers without a metered receiver. The sum of the neighbourhood's residuals and a
+  subset-sum over neighbours for a split feed the confidence score.
 - **SW2-9 (done, [experiment 62](../../00062-sw2-9-whitened-residual-step-detector/result.md)):**
-  whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and
-  hour of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at
-  24 hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
+  whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and hour
+  of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at 24
+  hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.

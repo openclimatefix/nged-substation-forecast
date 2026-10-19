@@ -1,6 +1,8 @@
 # Calibration and uncertainty: research plan
 
-**This page lists the experiments in this theme that are planned or proposed.** The [Experiments](experiments.md) page holds the finished ones. A lower number in the "Priority" column runs sooner.
+**This page lists the experiments in this theme that are planned or proposed.** The
+[Experiments](experiments.md) page holds the finished ones. A lower number in the "Priority" column
+runs sooner.
 
 ## Priority
 
@@ -18,5 +20,5 @@
 
 **The coupling step turns calibrated quantiles back into 51 coherent members.** The arms are ECC-Q
 with the interpolation, tail, and tie rules of the [staged forecast roadmap
-page](../../../roadmap/staged-probabilistic-forecast.md), and the Schaake shuffle, scored by the variogram
-score and the CRPS of summed solar farms in a weather cell, by lead band.
+page](../../../roadmap/staged-probabilistic-forecast.md), and the Schaake shuffle, scored by the
+variogram score and the CRPS of summed solar farms in a weather cell, by lead band.

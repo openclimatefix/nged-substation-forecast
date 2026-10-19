@@ -1,9 +1,8 @@
 # A staged probabilistic forecast
 
-> **Status: 🔬 Research.** The design on this page is a best guess under test. The
-> [research log](../ml-experiments/research-log.md) holds the experiments that test it, and the
-> [research plan](../ml-experiments/research-plan.md) lists the experiments to run next. No
-> production code implements it.
+> **Status: 🔬 Research.** The design on this page is a best guess under test. The [ML
+> experiments](../ml-experiments/README.md) pages hold the experiments that test it, and each
+> theme's Research plan page lists the experiments to run next. No production code implements it.
 
 **The page describes a probabilistic power forecast in three parts with fixed roles.** Stage 1 turns
 weather into power, stage 2 calibrates the result, uses lagged power, and blends weather products,
@@ -406,12 +405,12 @@ versioned stage 1 artefact, and a rule-based detector first.
 
 ## What the experiments show
 
-**Seven experiments and one closed study give the evidence so far.** The [research
-log](../ml-experiments/research-log.md) holds
-each experiment's question, verdict, and figures; the bullets give the headline of each. Pull
-request numbers for 00005 and 00006 are [PR #1195 (Experiment 5: where lagged power enters a
-two-stage demand forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195)
-and [PR #1202 (Experiment 6: which input features work best for the ERA5-trained demand
+**Seven experiments and one closed study give the evidence so far.** The [ML
+experiments](../ml-experiments/README.md) pages hold each experiment's question, verdict, and
+figures; the bullets give the headline of each. Pull request numbers for 00005 and 00006 are
+[PR #1195 (Experiment 5: where lagged power enters a two-stage demand
+forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195) and [PR #1202
+(Experiment 6: which input features work best for the ERA5-trained demand
 model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202).
 
 - **00001, solar and wind, ENS only:** stage 1 trained on ERA5 and applied to the 51 ENS members and
@@ -577,7 +576,7 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
   technique page.
 - **Reuse of stage 1:** the [capacity-estimation](capacity-estimation.md) and
   [data-cleaning](data-cleaning.md) roadmap pages.
-- **Evidence and process:** the [research log](../ml-experiments/research-log.md), which holds the
+- **Evidence and process:** the [ML experiments](../ml-experiments/README.md) pages, which hold the
   experiments' results, and the `release-model` skill, which describes how winners reach a numbered
   model release. Earlier evidence: the [lag-features study](../studies/forecasts/lag-features.md)
   and the [production feature faults study](../studies/forecasts/production-feature-faults.md).
@@ -586,10 +585,10 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
 
 ## Work still to do
 
-**The research plan lists the experiments to run next, and two pieces of infrastructure are tracked
-as GitHub issues because they change production-facing code.** The [research
-plan](../ml-experiments/research-plan.md) is a page next to the [research
-log](../ml-experiments/research-log.md). The two pieces of infrastructure are:
+**Each theme's Research plan page lists the experiments to run next, and two pieces of
+infrastructure are tracked as GitHub issues because they change production-facing code.** The
+Research plan pages are linked from the [ML experiments overview](../ml-experiments/README.md). The
+two pieces of infrastructure are:
 
 - **The conventions adapter.** The radiation and wind rules have shipped. Remaining: step widths for
   hourly-stepped NWPs, the same adapter for ERA5 and CAMS, the per-NWP convention table, and the
