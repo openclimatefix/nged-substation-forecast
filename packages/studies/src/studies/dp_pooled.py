@@ -458,6 +458,8 @@ class PooledDemandModel(nn.Module):
         self.register_buffer("solar_sites", torch.ones(n_sites))
         self.register_buffer("fit_had_rows", torch.ones(n_sites))
         self.register_buffer("weeks_of_history", torch.full((n_sites,), -1.0))
+        # Starts as `None`, so a strict `load_state_dict` fails between a model with an override and
+        # one without.
         self.register_buffer("capacity_override", None)
         self.register_buffer("capacity_prior", torch.full((n_sites,), float("nan")))
         self._build_site_prior(initial_level=initial_level)
