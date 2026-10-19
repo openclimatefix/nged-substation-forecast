@@ -136,7 +136,7 @@ def test_a_known_bias_is_recovered_by_the_calibration_within_fifteen_percent():
     truth_g = generator.uniform(50.0, 600.0, n)
     ens_g = truth_g / 0.8 * generator.normal(1.0, 0.02, n)
     calibration = weather.Calibration.fit(
-        valid_time=np.full(n, np.datetime64("2024-07-15T12:00", "us")),
+        origin_time=np.full(n, np.datetime64("2024-07-15T12:00", "us")),
         allowed_months={(2024, 7)},
         season=season,
         lead_band=lead,
@@ -156,7 +156,7 @@ def test_a_known_bias_is_recovered_by_the_calibration_within_fifteen_percent():
 
 def test_a_calibration_cell_with_few_rows_keeps_the_identity():
     calibration = weather.Calibration.fit(
-        valid_time=np.full(5, np.datetime64("2024-07-15T12:00", "us")),
+        origin_time=np.full(5, np.datetime64("2024-07-15T12:00", "us")),
         allowed_months={(2024, 7)},
         season=np.zeros(5, dtype=int),
         lead_band=np.zeros(5, dtype=int),

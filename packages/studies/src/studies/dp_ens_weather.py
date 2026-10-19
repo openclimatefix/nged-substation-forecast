@@ -357,7 +357,7 @@ class Calibration:
     @staticmethod
     def fit(
         *,
-        valid_time: np.ndarray,
+        origin_time: np.ndarray,
         allowed_months: Collection[tuple[int, int]],
         season: np.ndarray,
         lead_band: np.ndarray,
@@ -370,8 +370,9 @@ class Calibration:
         """Fit the shift and the ratio from the ensemble mean against the training weather.
 
         Args:
-            valid_time: The naive UTC valid time of each row.
-            allowed_months: The (year, month) pairs the fit may use: the tuning months.
+            origin_time: The naive UTC `power_fcst_init_time` of the run each row belongs to.
+            allowed_months: The (year, month) pairs of run origins the fit may use: the tuning
+                months.
             season: Season index of each row (`season_of_months`).
             lead_band: Lead band of each row.
             hour_band: Hour band of each row.
@@ -387,7 +388,7 @@ class Calibration:
         Raises:
             ValueError: If a row is in a month outside `allowed_months`.
         """
-        assert_months_allowed(valid_time=valid_time, allowed=allowed_months)
+        assert_months_allowed(valid_time=origin_time, allowed=allowed_months)
         calibration = Calibration.identity()
         shift = calibration.temperature_shift_c
         ratio = calibration.irradiance_ratio
