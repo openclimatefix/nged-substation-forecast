@@ -162,21 +162,20 @@ def month_intervals(
 class ClassCases:
     """The cases of one class, their scopes, and every arm's per-case scores.
 
-    Attributes:
-        cls: The class name.
-        keys: The cases' keys, `site`, `lead_hours`, and `actual`, sorted.
-        gap: Whether each case belongs to a run of `fold_a_daily_gap_v1`.
-        every5d: Whether each case belongs to a run of `fold_a_every5d_v1`.
-        month: Each case's origin-month index.
-        months: The origin-month labels in index order.
-        masks: Each scope's boolean mask over the cases (the gap runs only).
-        qs: Each arm's per-case quantile score in points of capacity, NaN where it has no case.
-        mae: Each arm's per-case absolute error of the median in points of capacity.
-        tails: Each arm's tail table (coverage with its interval, and pinball loss).
+    The instance holds the cases' keys (with `site`, `lead_hours`, and `actual`, sorted), boolean
+    masks of the cases in the 292 gap runs and in the 73 `fold_a_every5d_v1` runs, each case's
+    origin-month index and the month labels, the boolean mask of every scope (gap runs only), and,
+    for each arm added, its per-case quantile score and absolute error of the median in points of
+    capacity (NaN where the arm has no case), its tail table, and its per-site median-minus-mean
+    forecast.
     """
 
     def __init__(self, *, cls: str) -> None:
-        """Load the class's cases from the BG2 arm, which holds every series and run."""
+        """Load the class's cases from the BG2 arm, which holds every series and run.
+
+        Args:
+            cls: The class name (`Primary`, `BSP/GSP`, `solar`, or `wind`).
+        """
         self.cls = cls
         reference = (
             pl.read_parquet(
@@ -482,7 +481,9 @@ def arms_of_class(*, cls: str, contrasts: Sequence[Contrast]) -> list[str]:
 
 def score_class(
     *, cls: str
-) -> tuple[list[pl.DataFrame], list[pl.DataFrame], list[pl.DataFrame], list[str]]:
+) -> tuple[
+    list[pl.DataFrame], list[pl.DataFrame], list[pl.DataFrame], list[pl.DataFrame], list[str]
+]:
     """Score every arm and contrast of one class.
 
     Args:

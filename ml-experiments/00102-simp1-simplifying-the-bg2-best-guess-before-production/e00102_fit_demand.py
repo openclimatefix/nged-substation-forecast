@@ -170,6 +170,13 @@ def _training_rows_cached(*, row: dict, arrays: common.SeriesArrays) -> pl.DataF
 def prepared_run(*, run_rows: pl.DataFrame, row: dict) -> pl.DataFrame:
     """Return one run's member rows for one series with derived columns, sorted.
 
+    Args:
+        run_rows: The run's frame rows for the series, every valid time with every member.
+        row: The series' row of `common.series_table()`.
+
+    Returns:
+        The rows sorted by valid time and member, with the derived columns and `lead_hours`.
+
     Raises:
         ValueError: If a valid time lacks a member.
     """

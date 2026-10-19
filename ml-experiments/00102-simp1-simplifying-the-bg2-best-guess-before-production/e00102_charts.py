@@ -142,7 +142,7 @@ def contrast_figure(*, contrasts: pl.DataFrame, cls: str) -> alt.Chart:
         y=alt.Y("label:N", sort=None, title=None, axis=alt.Axis(labelLimit=330))
     )
     rule = (
-        alt.Chart(
+        alt.Chart(  # ty: ignore[unresolved-attribute]
             pl.DataFrame({"x": [0.0, threshold], "kind": ["same as BG2", "safe limit"]}).to_pandas()
         )
         .mark_rule(strokeDash=[4, 3])
@@ -158,8 +158,8 @@ def contrast_figure(*, contrasts: pl.DataFrame, cls: str) -> alt.Chart:
             ),
         )
     )
-    interval = base.mark_rule(color=ocf.DATA_BLUE).encode(x="lower:Q", x2="upper:Q")
-    dot = base.mark_point(filled=True, color=ocf.DATA_BLUE, size=60, aria=False).encode(
+    interval = base.mark_rule(color=ocf.DATA_BLUE).encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
+    dot = base.mark_point(filled=True, color=ocf.DATA_BLUE, size=60, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "mean:Q",
             title=wrapped(
@@ -181,7 +181,7 @@ def contrast_figure(*, contrasts: pl.DataFrame, cls: str) -> alt.Chart:
     )
 
 
-def lead_figure(*, absolute: pl.DataFrame) -> alt.Chart:
+def lead_figure(*, absolute: pl.DataFrame) -> alt.VConcatChart:
     """Return the score by forecast lead band for BG2 and the simplest candidate, per class."""
     arms = {
         "p_s6_bg2": "Primary",
@@ -206,7 +206,7 @@ def lead_figure(*, absolute: pl.DataFrame) -> alt.Chart:
             label=pl.col("arm").map_elements(lambda a: label_for(arm=a), return_dtype=pl.String),
         )
         panels.append(
-            alt.Chart(frame.to_pandas())
+            alt.Chart(frame.to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_line(point=True)
             .encode(
                 x=alt.X(
@@ -225,7 +225,7 @@ def lead_figure(*, absolute: pl.DataFrame) -> alt.Chart:
     )
 
 
-def midday_figure(*, absolute: pl.DataFrame, contrasts: pl.DataFrame) -> alt.Chart:
+def midday_figure(*, absolute: pl.DataFrame, contrasts: pl.DataFrame) -> alt.VConcatChart:
     """Return the Primary scores at midday in summer, at night, and in other hours."""
     scopes = ["midday_summer", "night", "other"]
     best = contrasts.filter(pl.col("contrast").str.starts_with("best"))["treatment"].unique()
@@ -246,7 +246,7 @@ def midday_figure(*, absolute: pl.DataFrame, contrasts: pl.DataFrame) -> alt.Cha
             hours=pl.col("scope").str.replace(r"\|offset5", "").str.replace("_", " "),
         )
         panels.append(
-            alt.Chart(frame.to_pandas())
+            alt.Chart(frame.to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=50, aria=False)
             .encode(
                 x=alt.X("mean:Q", title=SCORE_TITLE, scale=alt.Scale(zero=False)),
@@ -335,7 +335,7 @@ def week_figure(
     week_start: datetime.datetime,
     week: str,
     title_site: str,
-) -> alt.Chart:
+) -> alt.VConcatChart:
     """Return stacked panels, one per arm, with the actual and each arm's median and bands."""
     frames = []
     for arm in arms:
@@ -362,14 +362,14 @@ def week_figure(
                 axis=alt.Axis(values=[1, 2, 3, 4, 5, 6, 7, 8], title="Day of the week (1 to 7)"),
             )
         )
-        outer = base.mark_area(color=BAND_COLOUR, opacity=0.6, clip=True).encode(
+        outer = base.mark_area(color=BAND_COLOUR, opacity=0.6, clip=True).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title="% of capacity"), y2="q95:Q"
         )
-        inner = base.mark_area(color=ocf.DATA_BLUE, opacity=0.35, clip=True).encode(
+        inner = base.mark_area(color=ocf.DATA_BLUE, opacity=0.35, clip=True).encode(  # ty: ignore[unresolved-attribute]
             y="q25:Q", y2="q75:Q"
         )
-        median = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5, clip=True).encode(y="q50:Q")
-        actual = base.mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.5, clip=True).encode(
+        median = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5, clip=True).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
+        actual = base.mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.5, clip=True).encode(  # ty: ignore[unresolved-attribute]
             y="actual:Q"
         )
         panels.append(
@@ -404,7 +404,6 @@ def members_figure(
         "p_m_st": "Frozen with correction",
         "p_s6_bg2": "Blend (BG2)",
     }
-    actual = None
     for arm in arms:
         frame = read_arm_series(arm=arm, site=site).filter(
             (pl.col("valid_time") >= week_start)
@@ -416,10 +415,18 @@ def members_figure(
                 series=pl.lit(names[arm])
             )
         )
-        if actual is None:
-            actual = frame.select(
-                day.alias("day"), (pl.col("actual") * 100.0).alias("value")
-            ).with_columns(series=pl.lit("Actual"))
+    actual = (
+        read_arm_series(arm="p_s6_bg2", site=site)
+        .filter(
+            (pl.col("valid_time") >= week_start)
+            & (pl.col("valid_time") < week_start + datetime.timedelta(days=7))
+        )
+        .select(
+            ((pl.col("valid_time") - week_start).dt.total_minutes() / 1440.0 + 1.0).alias("day"),
+            (pl.col("actual") * 100.0).alias("value"),
+        )
+        .with_columns(series=pl.lit("Actual"))
+    )
     data = pl.concat([*frames, actual])
     order = ["Actual", *names.values()]
     colours = [
@@ -432,7 +439,7 @@ def members_figure(
         ocf.BRAND_ORANGE,
     ]
     return (
-        alt.Chart(data.to_pandas())
+        alt.Chart(data.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_line(clip=True, strokeWidth=1.5)
         .encode(
             x=alt.X(
@@ -488,7 +495,7 @@ def weights_figure(*, results_dir: Path) -> alt.Chart:
         )
     )
     return (
-        alt.Chart(long.to_pandas())
+        alt.Chart(long.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X("month:N", title="Month in which the runs start"),
@@ -548,7 +555,7 @@ def lag_by_series_figure(*, results_dir: Path) -> alt.Chart:
         .to_list()
     )
     return (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70, aria=False)
         .encode(
             x=alt.X(
