@@ -293,8 +293,9 @@ def build_pooled_batch(
             rows of a forecast year.
         device: Where the tensors live.
         dtype: The floating-point type of the real-valued tensors.
-        all_present_rows: Keep every row that has a reading, including those inside a switching
-            mask or the lockdown window, which scoring wants beside the default rows.
+        all_present_rows: Keep every row that has a reading, whatever the pool, the lockdown window,
+            and the switching masks say (the pool filter is dropped as well as the other two), which
+            scoring wants beside the default rows. MVA substations still keep only dark rows.
 
     Returns:
         The batch.
@@ -776,7 +777,8 @@ def fit_pooled(
 
     The levels start from the training rows' own means (`start_from_batch`), whatever
     `initial_level` the model was built with. Adam is not deterministic on the GPU, because
-    `index_add` adds in an unspecified order; the tests that need exact agreement run on the CPU.
+    `index_add` adds in an unspecified order. CPU runs agree closely, not exactly (two default CPU
+    runs differed by up to 0.015), so the tests that need agreement use a tolerance.
 
     Args:
         model: The model, already on the batch's device.
