@@ -292,15 +292,20 @@ def test_the_default_tolerance_loosens_in_float32_and_a_wellconditioned_problem_
 
 def test_a_batch_of_large_systems_solves_on_the_cpu_with_several_threads():
     # PyTorch's batched MKL LU solve fails above about 500 by 500 on several threads; the solver
-    # solves a CPU batch one system at a time.
+    # solves a CPU batch one system at a time. The failure needs an explicit thread count.
     generator = np.random.default_rng(16)
-    size = 600
+    size = 567
     factor = generator.normal(size=(3, size + 50, size))
     gram = torch.as_tensor(np.einsum("bnp,bnq->bpq", factor, factor) + np.eye(size))
     rhs = torch.as_tensor(generator.normal(size=(3, size)))
-    solved, violation = solve_bounded_quadratic(
-        matrix=gram, rhs=rhs, constrained=torch.zeros(size, dtype=torch.bool)
-    )
+    threads = torch.get_num_threads()
+    torch.set_num_threads(4)
+    try:
+        solved, violation = solve_bounded_quadratic(
+            matrix=gram, rhs=rhs, constrained=torch.zeros(size, dtype=torch.bool)
+        )
+    finally:
+        torch.set_num_threads(threads)
     assert violation.max() < 1e-7
     assert torch.allclose(torch.einsum("bpq,bq->bp", gram, solved), rhs, atol=1e-6)
 
