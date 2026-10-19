@@ -1,4 +1,4 @@
-"""Draw the substation cards of experiment 109 (provisional) from the pooled fit at the 2025-07-01 cut.
+"""Draw the substation cards of experiment 109 (provisional) from the pooled fit at the scored cut.
 
 The cards show, for each decision site under its D-label, the coefficients of the pooled model N
 beside the fleet mean and the per-site model G, and how far the deviation penalty pulled each
@@ -183,8 +183,10 @@ def figure_heating(*, joint: PooledFit, unpooled: PooledFit) -> alt.TopLevelMixi
         title=alt.TitleParams(
             text="Each substation's heating response sits close to the fleet mean",
             subtitle=[
-                "Pooled model N at the 2025-07-01 cut, 2 years of history per substation. Black: "
-                "fleet mean. Coloured: each",
+                (
+                    "Pooled model N at the 2025-07-01 cut, 2 years of history per substation. "
+                    "Black: fleet mean. Coloured: each"
+                ),
                 "substation under its D-label. Four hour bands; the four smoothing windows summed.",
             ],
             anchor="start",
@@ -236,10 +238,14 @@ def figure_capacity(*, rows: list) -> alt.TopLevelMixin:
             title=alt.TitleParams(
                 text="Capacity from a short window against the real-time vintage",
                 subtitle=[
-                    "Fits at the 2025-07-01 cut where the substation keeps only its last 4 weeks or "
-                    "3 months. Points of each",
-                    "substation's own rebuilt capacity for the fitted dots, and of its "
-                    "whole-history capacity for the vintage.",
+                    (
+                        "Fits at the 2025-07-01 cut where the substation keeps only its last 4 "
+                        "weeks or 3 months. Points of each"
+                    ),
+                    (
+                        "substation's own rebuilt capacity for the fitted dots, and of its "
+                        "whole-history capacity for the vintage."
+                    ),
                 ],
                 anchor="start",
                 fontSize=14,
