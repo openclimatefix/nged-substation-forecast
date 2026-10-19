@@ -1,7 +1,7 @@
 ---
 id: "00099"
 slug: crps1-crps-type-loss-over-ens-members-primary-demand-pilot
-status: planned
+status: done
 size: complex
 hypothesis: >-
   Training the Primary-substation quantile model on the continuous ranked probability score (CRPS) of
@@ -37,99 +37,123 @@ metric: >-
   Quantile score (twice the mass-weighted mean pinball loss) in points of capacity, over 11 levels
   (0.01, 0.05 to 0.95, 0.99). Reported and deciding nothing: mean absolute error of the median,
   coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99, and the threshold-weighted CRPS.
+verdict: small gain
+verdict_note: >-
+  Contrast C1 is -0.039 points (95% interval -0.057 to -0.018): the direction is established, and the
+  upper end is above the pre-registered -0.05.
+best_arm: >-
+  Arm c1 (CRPS loss on 6 members), 5.583 points of capacity on the quantile score (95% interval
+  5.243 to 5.946), against 5.622 for arm p3 (pinball loss, same rows and optimiser). Arm p1
+  (pinball, control member only) scores 5.547, so no 6-member arm beats the current recipe.
+headline: >-
+  The CRPS loss beats the pinball loss on the same 6 members per run by 0.039 points (-0.057 to
+  -0.018), but training on 6 members makes the pinball model 0.052 points worse (0.029 to 0.074), so
+  the CRPS arm only recovers that loss: it is 0.036 points (-0.022 to +0.111) worse than the
+  control-member recipe. Its 12 to 36 hour tails are not closer to nominal.
+lessons: >-
+  Extra ensemble members as separate training rows do not help the pinball loss, and the CRPS loss
+  of the pooled forecast only cancels that harm. The CRPS arm gains most at the median (mean
+  absolute error 0.109 points lower than p3) and not in the tails.
+production_status: not-for-production
+adopted_in: none
+arms: >-
+  Quantile score, points of capacity, 16 Primary substations, 292 runs: p1 5.547; p2 5.599; p3 5.622;
+  p3m 5.647; c1 5.583; with spread factor 1.15, p1 5.528, p2 5.584, p3 5.619, p3m 5.639, c1 5.567.
+  References: best guess (weekly refit, 500 rounds) 5.356; `manual_heuristic` 6.182.
+advice:
+  - >-
+    Do not run the CRPS loss on all 51 members for Primary substations on this evidence, because
+    c1 is 0.036 points (-0.022 to +0.111) worse than control-member pinball training and its
+    12 to 36 hour coverage at 0.95 is 0.924 against 0.945 for the best guess (C4, tail table).
+  - >-
+    Train a pinball model on the control member only, not on several members as separate rows,
+    because 6 members cost 0.052 points (0.029 to 0.074) (C2).
+  - >-
+    Judge a CRPS-type loss on the centre of the distribution first, because it lowered the mean
+    absolute error of the median by 0.109 points (0.066 to 0.149) and the tail pinball loss at 0.95
+    rose by 0.008 (0.002 to 0.014) (C1 table).
+  - >-
+    Write the pooled-forecast loss with atom masses that make each atom's CRPS optimum its own
+    quantile level (0.02, 0.06, 0.04, 0.26, 0.04, 0.16, 0.04, 0.26, 0.04, 0.06, 0.02 for the 11
+    levels), because pooling pinball-trained atoms with those masses scores 0.025 points worse (C5
+    against C1).
 code: ml-experiments/00099-crps1-crps-type-loss-over-ens-members-primary-demand-pilot/
 ---
 
 # Experiment 99: does training on the CRPS of the pooled ensemble forecast beat the pinball loss? (CRPS1 pilot)
 
-**Status: planned. No fit has run on the validation year.**
+**Take-home message: showing the model several ensemble members at once, with a loss that scores
+their pooled forecast, repairs the damage that several members do to the pinball loss and does not
+go further, so the 51-member run is not worth its cost for Primary substations.** The CRPS loss beat
+the pinball loss on the same rows by 0.039 points of capacity. Giving the pinball loss 6 members per
+run instead of the control member alone made it 0.052 points worse. The CRPS arm therefore ends
+0.036 points (95% interval -0.022 to +0.111) behind the control-member recipe, and its tails are no
+closer to nominal. What it narrows: the gain from a CRPS-type loss sits in the median, and the
+tails need another route. The verdict is `small gain`.
 
-We ask whether a substation forecast improves when its model learns from the ensemble's members
-jointly, instead of treating each member's row as a separate forecasting problem. The current
-recipe trains on the control member only, then predicts for all 51 members and pools their
-predicted quantiles. The pooled forecast is therefore trained on a different object than the one it
-is scored as. This experiment is a pilot on the 16 Primary substations: it trains on 6 members per
-run, with a loss that scores the pooled forecast, and compares it with the pinball loss on the same
-rows.
+We asked whether a substation forecast improves when the model learns from the ensemble's members
+jointly. Each daily run gave the control member and 5 drawn members as separate rows. The CRPS arm
+scores the mixture of the 6 rows' predicted quantiles, and the pinball arms score each row alone.
+All arms refit monthly on a rolling 12-month window (the cheap P-roll schedule, 150 rounds, learning
+rate 0.15) and forecast the 292 daily runs of July 2025 to June 2026 at 16 Primary substations,
+pooling all 51 members at prediction time. One point is 1% of a substation's capacity, and a lower
+score is better.
 
-## Design
+![Absolute quantile score of each arm](figure_1_absolute_score.svg)
 
-- **Rows and members:** each daily run contributes the control member and 5 members drawn from
-  members 1 to 50 with a seed fixed by the run's date. The same members are used by every arm and
-  every refit. Only every third daily run contributes training rows, to keep the CRPS gradient
-  affordable; the arms share this subsample, so a contrast between them does not depend on it.
-  Prediction uses all 51 members of every run.
-- **Schedule:** monthly refits from 2025-07-01 on a rolling 12-month window, 150 rounds, learning
-  rate 0.15, recency half-life 0.5 years (the P-roll recipe of experiment 85). Every arm starts each
-  quantile level at that quantile of the window's labels, so the arms share their starting values.
-  A cheap schedule is enough for a contrast between losses; the absolute scores are not the weekly
-  best guess's and are not quoted as such.
-- **Loss of arm c1:** each row predicts 11 atoms, one per quantile level. The pooled forecast of a
-  group of 6 rows is the mixture of their 66 atoms. The loss is the CRPS of that mixture. The atom
-  masses are 0.02, 0.06, 0.04, 0.26, 0.04, 0.16, 0.04, 0.26, 0.04, 0.06, and 0.02, which are the
-  masses for which the CRPS-optimal atom of each level is the quantile of that level (the quantile
-  score of the existing recipe uses different masses). Six members under-represent the spread of the
-  51 pooled at prediction time, so pairs of atoms from different members are weighted by
-  `(50/51) × 6/5` and pairs from the same member by `6/51` of their plug-in weight. The gradient, with atoms in any
-  order, is checked against a finite difference of a brute-force loss in `e00099_objective.py`.
-- **Arms:** p1 pinball on the control member only; p2 pinball on 6 members; p3 pinball on 6 members
-  as a custom objective with a constant Hessian; c1 CRPS on 6 members with the same constant Hessian.
-  Arm p3 exists so that C1 changes the loss and nothing else.
-- **Hessian:** arms p3 and c1 share one constant Hessian, chosen on four Primary substations and a
-  stretch of the training period (runs from 2025-01-02 to 2025-03-31, never the validation year).
-  The choice and its scores are in the tuning section below. The built-in optimiser of arms p1 and
-  p2 differs from the custom one (leaf refresh, Hessian scale, regularisation), so C3 is expected
-  to be non-zero and only p3 is the like-for-like control for c1.
-- **Level weights:** each level's gradient is divided by twice its atom mass, so every level takes
-  pinball-sized steps. Arm c1 is therefore a preconditioned CRPS gradient, and its fixed point is
-  the same.
-- **Pooling masses:** arm c1 pools the 51 members with the CRPS masses and arm p3 with the masses
-  of experiment 87. The set `p3m` is arm p3's model pooled with the CRPS masses, so that C5
-  separates the loss from the pooling.
-- **Budget:** at most 2 GPU hours of wall-clock time, 6 worker processes of one thread each (the
-  slot is 12 cores and up to 24 GB of GPU memory).
+![Paired differences between arms](figure_2_paired_differences.svg)
 
-## Planned contrasts
+![Quantile score by lead time](figure_3_lead_bands.svg)
 
-All contrasts are quantile-score differences in points of capacity, over the 292 runs, whole origin
-months resampled, 20,000 resamples. C1 decides the verdict. The others are read at 95% and decide
-nothing.
+![Tail coverage at 12 to 36 hours lead](figure_4_tail_coverage.svg)
 
-- **C1 (verdict):** c1 minus p3. The effect of the loss, with rows, optimiser, and schedule fixed.
-- **C2:** p2 minus p1. The effect of training on 6 members instead of the control member, with the
-  pinball loss.
-- **C5:** c1 minus p3m. The effect of the loss with the pooling masses also fixed.
-- **C3:** p3 minus p2. The effect of the custom optimiser against the built-in one, a check that
-  the pinball arms are comparable.
-- **C4:** c1 minus p1. The whole change from the current recipe, at the cheap schedule.
-- **Reference:** c1 and p1 against the stored weekly best guess, descriptive only, because its
-  schedule is weekly with 500 rounds.
+## Results
 
-## Not scored
+- **C1 (verdict), c1 minus p3:** -0.039 (95% interval -0.057 to -0.018), `small gain`. The
+  pre-registered threshold needed the interval's upper end below -0.05. With the spread factor 1.15
+  on both arms: -0.051 (-0.069 to -0.032).
+- **C5, c1 minus p3m:** -0.064 (-0.083 to -0.042), where p3m is arm p3's model pooled with the
+  CRPS masses. C5 is larger than C1 because pooling arm p3's pinball atoms with the CRPS masses
+  costs it 0.025 points.
+- **C2, p2 minus p1:** +0.052 (0.029 to 0.074). Six members as separate rows hurt the pinball loss.
+- **C3, p3 minus p2:** +0.023 (-0.046 to +0.111). The custom optimiser and the built-in one cannot
+  be told apart.
+- **C4, c1 minus p1:** +0.036 (-0.022 to +0.111). The whole change does not beat the current recipe.
+- **Reference:** c1 is 0.227 (0.148 to 0.317) and p1 is 0.190 (0.131 to 0.251) worse than the best
+  guess, which refits weekly with 500 rounds; the schedule explains this gap. c1 beats the
+  `manual_heuristic` by 0.598 (0.396 to 0.796).
+- **Absolute scores, all leads (95% interval):** p1 5.547 (5.216 to 5.890); p2 5.599 (5.278 to
+  5.932); p3 5.622 (5.280 to 5.987); c1 5.583 (5.243 to 5.946); best guess 5.356 (5.072 to 5.653);
+  `manual_heuristic` 6.182 (5.850 to 6.544).
+- **Other scores for C1:** the mean absolute error of the median falls by 0.109 (0.066 to 0.149);
+  the threshold-weighted score at the 95th percentile of history rises by 0.008 (0.002 to 0.014);
+  at the 99th and 5th percentiles the change is within noise.
 
-The curtailment-cost metric (`studies.node_curtailment`) scores bulk and grid supply points with
-generators behind them, and this pilot trains Primary substations only. The write-up says so and
-reports tail calibration and the threshold-weighted CRPS instead.
+| Tail check, 12 to 36 h | Quantile | c1 | p3 | p1 | Best guess |
+|---|---|---|---|---|---|
+| Share of actuals below the quantile | 0.01 | 0.012 | 0.010 | 0.009 | 0.004 |
+| | 0.05 | 0.061 | 0.051 | 0.058 | 0.036 |
+| | 0.95 | 0.924 | 0.938 | 0.919 | 0.945 |
+| | 0.99 | 0.987 | 0.989 | 0.986 | 0.992 |
+| Pinball loss (points of capacity) | 0.95 | 1.32 | 1.28 | 1.18 | 1.09 |
 
-## Past-weather caveat
+## Caveats and next steps
 
-The model's weather inputs are the ensemble's own forecast, so no past-weather product enters at
-lag times. The lag columns are the substation's own metered power, no younger than 3.5 hours at the
-forecast origin.
-
-## Tuning the constant Hessian (training period only)
-
-Each custom arm was fitted at a refit on 2025-01-01 at four Primary substations (D2 to D5) and scored
-on the 6-member rows of runs from 2025-01-02 to 2025-03-31 that the fit had not seen. The table gives
-the mean quantile score (points of capacity, pooled over 6 members) and the coverage of the 0.05 and
-0.95 quantiles. One Hessian is shared by arms p3 and c1: 10, the lowest score for both.
-
-| Hessian per row and level | p3 score | c1 score | p3 q05 / q95 | c1 q05 / q95 |
-|---|---|---|---|---|
-| 5 | 3.818 | 3.797 | 0.099 / 0.918 | 0.150 / 0.897 |
-| 10 | 3.767 | 3.748 | 0.069 / 0.930 | 0.089 / 0.917 |
-| 20 | 3.815 | 3.782 | 0.033 / 0.944 | 0.038 / 0.939 |
-| 40 | 4.085 | 4.050 | 0.014 / 0.952 | 0.014 / 0.950 |
-
-The built-in pinball arm p2 scored 3.640 on the same rows. These numbers are not results of the
-experiment: they use 6-member pooling and one refit.
+- **Schedule:** monthly P-roll with 150 rounds, not the weekly production recipe, so absolute scores
+  are not the best guess's. The contrasts C1, C2, C3, and C5 hold the schedule fixed; whether they
+  depend on it is untested.
+- **Pilot limits:** 6 members per run at training (51 at prediction), every third daily run, and
+  16 Primary substations. A run on all 51 members could behave differently, and the pilot cannot say
+  how.
+- **Tuning:** the constant Hessian (10) was chosen on four substations and January to March 2025,
+  inside the training period. Both custom arms share it; its best value for each loss may differ.
+  The level weights of the CRPS gradient are divided by twice the atom mass, so c1 is a
+  preconditioned CRPS gradient with the same fixed point.
+- **Not scored:** the curtailment-cost metric covers supply points with generators behind them, and
+  this pilot trains Primary substations only. Climatology is left out because its rows stop short of
+  the longest leads, so including it would drop 5% of the rows from every arm.
+- **Rows:** all arms and the stored best guess share 3,197,611 forecast rows.
+- **Compute:** 1.55 GPU hours of wall-clock time, 10 worker processes of one thread each.
+- **Options for later:** a tail-specific spread factor on the best guess, or pooled-member spread
+  statistics as input columns, because this pilot moved the centre of the distribution and left the
+  tails where they were.

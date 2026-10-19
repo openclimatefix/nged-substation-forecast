@@ -27,6 +27,12 @@ N_SERIES: Final[int] = 16
 def arm_frame(*, arm: str) -> pl.DataFrame:
     """Return one arm's predictions with `actual`, `lead_hours`, `site`, `group`, and `capacity_mw`.
 
+    Args:
+        arm: The arm's name, a folder of `work/preds`.
+
+    Returns:
+        The arm's rows for the 16 series and 292 runs with an observed value before the holdout.
+
     Raises:
         ValueError: If the arm lacks a refit file for a series or covers the wrong runs or series.
     """
@@ -56,7 +62,9 @@ def arm_frame(*, arm: str) -> pl.DataFrame:
                 capacity_mw=pl.lit(row["effective_capacity_mw"]).cast(pl.Float32),
             )
         )
-    table = pl.concat(pieces).filter(pl.col("actual").is_finite())
+    table = pl.concat(pieces).filter(
+        pl.col("actual").is_finite() & (pl.col("valid_time") < common.HOLDOUT)
+    )
     runs = table["power_fcst_init_time"].n_unique()
     sites = table["time_series_id"].n_unique()
     if runs != N_RUNS or sites != N_SERIES:

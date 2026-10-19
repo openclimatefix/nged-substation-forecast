@@ -174,6 +174,13 @@ def training_rows(*, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
 def known_rows(*, rows: pl.DataFrame, refit: datetime) -> pl.DataFrame:
     """Return the rows a refit may see, and check that none comes from its future.
 
+    Args:
+        rows: One series' training rows from `training_rows`.
+        refit: The refit time.
+
+    Returns:
+        The rows within the refit's window that were known at the refit.
+
     Raises:
         ValueError: If no row is usable, or a kept row breaks the valid-time or run-start rule.
     """
@@ -194,6 +201,13 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime) -> pl.DataFrame:
 
 def arm_rows(*, known: pl.DataFrame, arm: Arm) -> pl.DataFrame:
     """Return an arm's rows, with whole groups of `arm.members` consecutive rows.
+
+    Args:
+        known: `known_rows()` of the refit.
+        arm: The arm.
+
+    Returns:
+        The control member's rows for `p1`, else all the drawn members' rows.
 
     Raises:
         ValueError: If a group does not hold `arm.members` rows.
@@ -321,6 +335,14 @@ def mixture(*, atoms: np.ndarray, masses: np.ndarray) -> np.ndarray:
 def prepared_run(*, run_rows: pl.DataFrame, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
     """Return one run's 51-member rows for one series with derived columns and lags, sorted.
 
+    Args:
+        run_rows: The run's rows for one series, with the weather columns.
+        row: The series' row of `common.series_table()`.
+        arrays: The series' arrays on the dense grid.
+
+    Returns:
+        The rows sorted by valid time and member.
+
     Raises:
         ValueError: If a valid time lacks a member.
     """
@@ -413,7 +435,9 @@ def run_site(
             matrix = prepared.select(input_columns()).to_numpy().astype(np.float32)
             members = prepared["ensemble_member"].n_unique()
             for name in todo:
-                source, masses = POOLED_AGAIN.get(name, (name, ARMS[name].masses))
+                source, masses = (
+                    POOLED_AGAIN[name] if name in POOLED_AGAIN else (name, ARMS[name].masses)
+                )
                 booster, start = models[source]
                 atoms = predict_atoms(booster=booster, matrix=matrix, start=start)
                 pooled = mixture(

@@ -18,7 +18,6 @@ sooner.
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [00099](00099-crps1-crps-type-loss-over-ens-members-primary-demand-pilot/result.md) | Does training the Primary-substation quantile model on the CRPS of the pooled ensemble forecast, with 6 members per run as separate rows, beat the pinball loss on the same rows? (CRPS1 pilot) | 1 | Nothing | Planned; pilot on 16 Primary substations at the P-roll schedule, a run on all 51 members only if the pilot supports it |
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 
