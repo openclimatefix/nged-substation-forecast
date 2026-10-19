@@ -49,6 +49,13 @@ advice:
     C1 interval is 0.27 points wide up to 48 h.
 production_status: not-for-production
 adopted_in: none
+take_home_message: >-
+  Adding the minimum, mean, and maximum of the last 24 hours of power, and of the same weekday, to a
+  calibrator that already had raw power lags changed the quantile score by -0.02 points of capacity
+  up to 48 hours ahead (98.75% interval -0.14 to +0.13), which cannot be told from no change.
+  Replacing the raw lags with the summaries worsened the score by 0.29 (+0.11 to +0.51), so keep the
+  raw lags. Summaries alone, with no estimate-of-past-weather residual, beat no recent power by 1.18
+  (-1.83 to -0.58).
 code: ml-experiments/00008-lag-summaries-in-stage2-calibrator-demand/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1209
 ---
