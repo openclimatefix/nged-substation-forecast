@@ -38,9 +38,9 @@ Primary models uses the forecast output of the unmetered solar panels behind the
 **The best guess is the forecasting recipe assembled in [experiment
 33](00033-best-guess-architecture-vs-production/result.md).** For Primary substation demand it is N1
 with the 14-day correction and a spread factor of 1.15, which is the stack without its half-life
-(the `stack_minus_h` arm of experiment 33). For bulk and grid supply points it is N1 alone. For solar
-and wind farms it is a mixture, over the 51 ENS members, of XGBoost models trained on ERA5 weather,
-with a spread factor and, for wind, a power-curve base margin.
+(experiment 19's `stack_minus_h` arm, rebuilt in experiment 33 as `n1_cs`). For bulk and grid supply
+points it is N1 alone. For solar and wind farms it is a mixture, over the 51 ENS members, of XGBoost
+models trained on ERA5 weather, with a spread factor and, for wind, a power-curve base margin.
 
 ### BG2
 
