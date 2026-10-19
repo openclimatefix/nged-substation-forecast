@@ -353,6 +353,34 @@ def absolute_table() -> pl.DataFrame:
     return pl.DataFrame(rows, infer_schema_length=None).sort("year", "five sites QS")
 
 
+def season_by_site() -> pl.DataFrame:
+    """Return each planned contrast's November-to-March and April-to-October estimate per site."""
+    rows = []
+    for contrast in CONTRASTS:
+        if not contrast.planned:
+            continue
+        for site in DECISION:
+            winter = estimate(
+                label="scored", contrast=contrast, sites=(site,), months=WINTER_MONTHS
+            )[0]
+            summer = estimate(
+                label="scored",
+                contrast=contrast,
+                sites=(site,),
+                months=tuple(m for m in range(1, 13) if m not in WINTER_MONTHS),
+            )[0]
+            rows.append(
+                {
+                    "contrast": contrast.name,
+                    "site": site,
+                    "Nov-Mar": winter,
+                    "Apr-Oct": summer,
+                    "winter more negative": winter < summer,
+                }
+            )
+    return pl.DataFrame(rows)
+
+
 def median_minus_mean() -> pl.DataFrame:
     """Return the mean of (q50 - mean forecast) per site for the headline arms, in points."""
     rows = []
@@ -368,10 +396,14 @@ def tail_table() -> pl.DataFrame:
     """Return coverage and pinball loss at the four tail levels for the headline arms."""
     rows = []
     for label in ("scored", "replicate"):
-        for arm in ("a0", "a1", "w", "a2", "a3", "a4"):
+        for arm in ("a0", "a1", "w", "a2", "a3", "a4", "l_best_d1", "l_best_d6"):
             frame = load_arm(label=label, arm=arm).filter(pl.col("site_name").is_in(DECISION))
             actual = frame["actual"].to_numpy().astype(np.float64)
             row: dict[str, object] = {"year": label, "arm": arm}
+            winter = frame.filter(pl.col("valid_time").dt.month().is_in((11, 12, 1, 2)))
+            row["q95 coverage Nov-Feb"] = float(
+                (winter["actual"].to_numpy() <= winter["q95"].to_numpy()).mean()
+            )
             for column in TAIL_LEVELS:
                 level = QUANTILE_LEVELS[QUANTILE_COLUMNS.index(column)]
                 predicted = frame[column].to_numpy().astype(np.float64)
@@ -417,6 +449,8 @@ def main() -> None:
     print(contrast_table(planned=False).write_csv(float_precision=3))
     print("== Planned contrasts with each decision site left out (quantile score) ==")
     print(leave_one_site_out().write_csv(float_precision=3))
+    print("== Planned contrasts by season at each site, scored year ==")
+    print(season_by_site().write_csv(float_precision=3))
     print("== Median forecast minus mean forecast, points ==")
     print(median_minus_mean().write_csv(float_precision=3))
     print("== Tail calibration on the five decision sites ==")

@@ -839,7 +839,12 @@ def main() -> None:
         )
         + "\n"
     )
-    print(f"\n{len(checks) - len(failed)} of {len(checks)} blocking checks passed")
+    blocking = [c for c in checks if c["blocking"]]
+    reported_failed = [c for c in checks if not c["blocking"] and not c["passed"]]
+    print(
+        f"\n{len(blocking) - len(failed)} of {len(blocking)} blocking readings pass; "
+        f"{len(reported_failed)} of {len(checks) - len(blocking)} reported-only readings fail"
+    )
     sys.exit(1 if failed else 0)
 
 

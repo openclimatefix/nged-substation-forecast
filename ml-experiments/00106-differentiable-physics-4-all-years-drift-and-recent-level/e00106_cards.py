@@ -167,8 +167,10 @@ def site_tables(*, site: str, cache: object, vintages: pl.DataFrame, tuned: dict
             "site": site,
             "pinned capacity (points)": run.pinned.held_points,
             "heating slope, all bands (points per 10 C)": float(heating.sum()),
-            "drift range, midday (points)": float(np.ptp(drift[2])),
-            "level standard deviation (points)": float(np.std(daily["level"].to_numpy())),
+            "midday drift range over fitted history (points)": float(np.ptp(drift[2])),
+            "daily level standard deviation, scored year (points)": float(
+                np.std(daily["level"].to_numpy())
+            ),
         },
     }
 
@@ -344,9 +346,9 @@ def comparison(*, summaries: list[dict]) -> alt.TopLevelMixin:
             subtitle=(
                 "Provisional: fitted to past weather on a screening run. Left to right: the "
                 "pinned solar capacity held after 30 June 2025, the heating response summed over "
-                "hour bands and averaging windows, the range of the midday drift since 2019, and "
-                "the day-to-day spread of the Kalman filter's level in the scored year. All in "
-                "points of effective capacity."
+                "hour bands and averaging windows, the range of the midday drift over each "
+                "substation's fitted history, and the standard deviation of the Kalman "
+                "filter's daily level over the scored year. All in points of effective capacity."
             ),
         )
     )

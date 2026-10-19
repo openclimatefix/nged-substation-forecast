@@ -155,4 +155,4 @@ shape: (4, 6)
 │ D5    ┆ 2025          ┆ 15.458333 ┆ 26.210029      ┆ -13.83046         ┆ true                    │
 └───────┴───────────────┴───────────┴────────────────┴───────────────────┴─────────────────────────┘
 
-49 of 49 blocking checks passed
+40 of 40 blocking readings pass; 2 of 9 reported-only readings fail
