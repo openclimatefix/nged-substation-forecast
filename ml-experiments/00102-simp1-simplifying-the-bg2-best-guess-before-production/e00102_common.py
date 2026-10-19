@@ -1,10 +1,10 @@
 """Paths, series, grids, lags, and the 11-level quantile arithmetic of experiment 00102.
 
 Experiment 00102 (SIMP1) removes parts of the BG2 best guess one at a time and scores the result
-against BG2 (`docs/ml-experiments/00102-simp1-simplifying-the-bg2-best-guess-before-production/result.md`).
-The helpers are copied from experiment 00087's `e00087_common.py`, with a work folder of their own and a
-read-only path to experiment 00087's work folder. An experiment may not import another experiment, so
-the copies are the only link. The 14-day correction lives in `e00102_stack.py`.
+against BG2 (`docs/ml-experiments/00102-*/result.md`). The helpers are copied from experiment
+00087's `e00087_common.py`, with a work folder of their own and a read-only path to experiment
+00087's work folder. An experiment may not import another experiment, so the copies are the only
+link. The 14-day correction lives in `e00102_stack.py`.
 """
 
 import json

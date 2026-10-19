@@ -24,11 +24,12 @@ decision_rule: >-
   resampled, 20,000 resamples. C1 to C4 are the simplest candidate of each target class minus BG2 on
   the same runs. The simplest candidate is, for Primary, the single weekly-refitted N1 without lags,
   offset, correction, or blend and with BG2's spread factor of 1.15; for supply points, the weekly N1
-  without lags and with no spread factor (as in BG2's `b_weekly`, which is weekly); for solar and wind
-  farms, BG2's ENS-trained N1 without lags, refitted monthly and with no spread factor, like the
-  stored arm `g_ens_weekly`, which experiment 87 also refitted monthly. It is safe to take to production when the interval's
-  upper end lies below the threshold: +0.15 (Primary), +0.30 (supply points), +0.10 (solar farms),
-  +0.30 (wind farms). The Primary and supply point thresholds are about half of BG2's own gain over
+  without lags and with the spread factor of 1.15 (as in BG2's `b_weekly`, which is weekly); for
+  solar and wind farms, BG2's ENS-trained N1 without lags, refitted monthly and with no spread
+  factor, like the stored arm `g_ens_weekly`, which experiment 87 also refitted monthly. A simplification is safe to
+  take to production when the interval's upper end lies below the threshold: +0.15 (Primary), +0.30
+  (supply points), +0.10 (solar farms), +0.30 (wind farms). The Primary and supply point
+  thresholds are about half of BG2's own gain over
   the stack in experiment 87 (0.283 and 0.634), because a simplification that gives back half of a
   gain has not earned its place; the farm thresholds are experiment 87's non-inferiority margins. C5
   is BG2 minus BG2 without the offset (stored arms p_s6_bg2 and p_s5_blend_no_offset) on the 5 offset

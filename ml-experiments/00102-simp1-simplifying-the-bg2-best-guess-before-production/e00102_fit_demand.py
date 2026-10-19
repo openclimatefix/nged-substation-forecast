@@ -1,7 +1,7 @@
 """Fit the no-lag single N1 model of experiment 00102 for the demand series.
 
 Copied from experiment 00087's `e00087_fit_demand.py`, keeping only the `n1h` configuration (the
-weekly and monthly members W and M of the BG2 blend) with the three origin lags removed from the input
+weekly and monthly members of the BG2 blend) with the three origin lags removed from the input
 columns. The recipe is otherwise BG2's: the ENS control member's rows, a recency half-life of 0.5
 years anchored at the refit, 500 rounds, `eta` 0.05, Primary, BSP, and GSP, 51 ensemble members
 pooled into 11 mixture quantiles. No offset, so there is no base margin.
@@ -227,9 +227,7 @@ def run_job(
     for site in todo:
         started = time.monotonic()
         row = rows_of[site]
-        known = known_rows(
-            rows=_training_rows_cached(row=row, arrays=arrays[site]), refit=refit
-        )
+        known = known_rows(rows=_training_rows_cached(row=row, arrays=arrays[site]), refit=refit)
         age_days = (refit - known["valid_time"]).dt.total_seconds() / 86_400
         matrix = xgb.DMatrix(
             known.select(input_columns()).to_numpy().astype(np.float32),
