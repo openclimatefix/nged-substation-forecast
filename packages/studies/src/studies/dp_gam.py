@@ -24,6 +24,14 @@ parameters, and it has one global optimum:
   value.
 - **Steps D3:** a second, piecewise-constant level path per hour band whose monthly first
   differences carry an L1 penalty, written as non-negative positive and negative parts.
+- **Pinned capacity:** with `capacity="pinned"` the capacity is not fitted. The weekly capacity of
+  `studies.dp_pinned_capacity` times the derated unit PV shape moves to the target, so the fit
+  has no capacity columns and a forecast subtracts the held capacity times the shape.
+- **COVID flag:** with `covid_flag=True` the fit keeps the lockdown rows and gives each hour band
+  one indicator over the fixed lockdown window.
+- **The final drift knot:** `final_knot` is `free`, `shrunk` (a forecast holds the last knot
+  pulled towards the mean of the last 12 knots), or `pinned` (the fit ties the last knot to the one
+  before it).
 
 **The solver works on the Gram matrix.** `accumulate_gram` builds the design in chunks and sums
 `X^T W X` and `X^T W y`, with a leading batch dimension of weightings (a month-block bootstrap
@@ -45,6 +53,7 @@ from datetime import UTC, datetime
 from typing import Final, Literal
 
 import numpy as np
+import polars as pl
 import torch
 
 from studies.dp_calendar import (
@@ -57,6 +66,7 @@ from studies.dp_calendar import (
     lighting_ramps,
 )
 from studies.dp_features import FeatureCache, SiteFeatures
+from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity
 from studies.experiment_store import HOLDOUT_START
 
 
@@ -80,6 +90,12 @@ def naive_utc(*, moment: datetime) -> np.datetime64:
 
 DriftType = Literal["none", "d1", "d1_steps"]
 """The drift form: no drift, the smooth level path, or the smooth path plus sparse steps."""
+
+CapacityType = Literal["fitted", "pinned"]
+"""Whether the PV capacity is fitted, or taken from the pinned real-time vintage."""
+
+FinalKnotType = Literal["free", "shrunk", "pinned"]
+"""How the drift's last knot is treated: free, shrunk at forecast time, or tied in the fit."""
 
 QUANTILE_LEVELS: Final[tuple[float, ...]] = (
     0.01,
@@ -131,6 +147,14 @@ REPLICA_MONTHS: Final[int] = 12
 """The scored forecast is frozen for this many months, and so is its replica."""
 LAST_TRAINED_MIN_SHAPE: Final[float] = 1e-3
 """A training row carries solar signal when its derated unit shape is above this."""
+FINAL_KNOT_TIE_WEIGHT: Final[float] = 1e6
+"""The weight of the penalty that ties the last drift knot to the one before it.
+
+The weight is absolute, not scaled by the number of rows, so a fit with `final_knot="pinned"` needs
+float64 (the default).
+"""
+SHRINK_KNOTS: Final[int] = 12
+"""A shrunk final knot is pulled towards the mean of this many last knots."""
 
 
 @dataclass(frozen=True)
@@ -146,6 +170,11 @@ class GamSpec:
         drift_ridge: A small ridge on the drift levels, which settles the level shared with the
             profile.
         step_penalty: The weight of the L1 penalty on the steps, per training site-year.
+        capacity: Whether the PV capacity is fitted or pinned.
+        covid_flag: True to keep the lockdown rows and fit one indicator per hour band over them.
+        final_knot: How the drift's last knot is treated.
+        final_knot_shrink: For `final_knot="shrunk"`, the share of the way a forecast moves the
+            last knot towards the mean of the last 12 knots, between 0 and 1.
     """
 
     drift: DriftType = "none"
@@ -154,6 +183,24 @@ class GamSpec:
     drift_step: float = 3e4
     drift_ridge: float = 1e-2
     step_penalty: float = 300.0
+    capacity: CapacityType = "fitted"
+    covid_flag: bool = False
+    final_knot: FinalKnotType = "free"
+    final_knot_shrink: float = 0.5
+
+    def __post_init__(self) -> None:
+        """Refuse a shrink outside 0 to 1, and a final-knot option on a spec with no drift.
+
+        Raises:
+            ValueError: If `final_knot_shrink` is outside 0 to 1, or `final_knot` is not `free`
+                while `drift` is `none`.
+        """
+        if not 0.0 <= self.final_knot_shrink <= 1.0:
+            msg = f"final_knot_shrink must be between 0 and 1, not {self.final_knot_shrink}"
+            raise ValueError(msg)
+        if self.final_knot != "free" and self.drift == "none":
+            msg = f"final_knot={self.final_knot!r} needs a drift term, but drift is 'none'"
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True)
@@ -215,8 +262,10 @@ def make_layout(
         "harmonics": 4 * n_bands,
         "heating": len(SMOOTHING_HOURS) * n_bands,
         "lighting": 4,
-        "capacity": len(season_years),
+        "capacity": len(season_years) if spec.capacity == "fitted" else 0,
     }
+    if spec.covid_flag:
+        sizes["covid"] = n_bands
     cut_day = naive_utc(moment=cut).astype("datetime64[s]").astype(np.int64) / 86400.0
     first_day = earliest.astype("datetime64[s]").astype(np.int64) / 86400.0
     n_knots = int(np.ceil((cut_day - first_day) / KNOT_SPACING_DAYS)) + 1
@@ -236,7 +285,7 @@ def make_layout(
             constrained[slices[name]] = True
     return GamLayout(
         spec=spec,
-        season_years=tuple(int(s) for s in season_years),
+        season_years=tuple(int(s) for s in season_years) if spec.capacity == "fitted" else (),
         knot_days=knot_days,
         slices=slices,
         n_columns=start,
@@ -292,7 +341,8 @@ def design_matrix(
 
     Returns:
         A float64 array of shape (len(index), layout.n_columns). The capacity columns carry a
-        minus sign, so a non-negative coefficient lowers net power.
+        minus sign, so a non-negative coefficient lowers net power. A pinned-capacity layout has
+        no capacity columns.
     """
     calendar = cache.calendar
     n = len(index)
@@ -324,6 +374,8 @@ def design_matrix(
     season = calendar.season_year[index]
     years = np.array(layout.season_years)
     x[:, layout.slices["capacity"]] = -shape[:, None] * (season[:, None] >= years[None, :])
+    if "covid" in layout.slices:
+        x[:, layout.slices["covid"]] = features.lockdown[index][:, None] * band_hot
     if "drift" in layout.slices:
         days = _days_since_epoch(cache=cache, index=index)
         hats = _hat_functions(days=days, knot_days=layout.knot_days)
@@ -363,7 +415,9 @@ def penalty_matrix(*, layout: GamLayout, n_rows: int) -> tuple[np.ndarray, np.nd
     matrix[layout.slices["profile"], layout.slices["profile"]] = spec.profile_ridge * np.eye(
         layout.slices["profile"].stop - layout.slices["profile"].start
     )
-    for name in ("holiday", "tent", "harmonics", "heating", "lighting"):
+    for name in ("holiday", "tent", "harmonics", "heating", "lighting", "covid"):
+        if name not in layout.slices:
+            continue
         block = layout.slices[name]
         matrix[block, block] = spec.ridge * np.eye(block.stop - block.start)
     capacity = layout.slices["capacity"]
@@ -378,6 +432,10 @@ def penalty_matrix(*, layout: GamLayout, n_rows: int) -> tuple[np.ndarray, np.nd
         for band in range(N_BANDS):
             block = slice(start + band * n_knots, start + (band + 1) * n_knots)
             matrix[block, block] = smooth
+            if spec.final_knot == "pinned":
+                tie = np.zeros(n_knots)
+                tie[-2:] = (-1.0, 1.0)
+                matrix[block, block] += FINAL_KNOT_TIE_WEIGHT * np.outer(tie, tie)
     if "steps" in layout.slices:
         block = layout.slices["steps"]
         matrix[block, block] = 1e-6 * np.eye(block.stop - block.start)
@@ -391,18 +449,21 @@ def training_rows(
     cache: FeatureCache,
     cut: datetime,
     window: TrainingWindow,
+    keep_lockdown: bool = False,
 ) -> np.ndarray:
     """Return the grid rows a fit may train on.
 
     A row trains when it is in `default_rows` (after the early-calibration cut, outside the
     lockdown window and the switching masks), has a reading and a finite solar shape, ends no later
-    than `cut`, and lies inside the window.
+    than `cut`, and lies inside the window. With `keep_lockdown`, a lockdown row that is in the
+    pool and outside the switching masks trains too.
 
     Args:
         features: The substation's arrays.
         cache: The cache.
         cut: The fit's cut; no row ends after it.
         window: The window rule.
+        keep_lockdown: True to keep the lockdown rows, for a fit with the COVID flag.
 
     Returns:
         Sorted grid positions.
@@ -415,8 +476,11 @@ def training_rows(
         start64 = naive_utc(moment=window.start)
     else:
         start64 = naive_utc(moment=features.table.first_usable)
+    allowed = features.default_rows
+    if keep_lockdown:
+        allowed = allowed | (features.lockdown & features.in_pool & ~features.switching_mask)
     keep = (
-        features.default_rows
+        allowed
         & features.present
         & np.isfinite(features.y)
         & np.isfinite(features.pv_unit_shape)
@@ -474,6 +538,25 @@ def _chunks(*, index: np.ndarray) -> Iterator[slice]:
         yield slice(start, min(start + CHUNK_ROWS, len(index)))
 
 
+def pinned_solar_points(
+    *, cache: FeatureCache, features: SiteFeatures, pinned: PinnedCapacity, index: np.ndarray
+) -> np.ndarray:
+    """Return the pinned capacity times the derated unit PV shape at the rows `index`, in points.
+
+    Args:
+        cache: The cache, for the rows' times.
+        features: The substation's arrays.
+        pinned: The pinned capacity.
+        index: Grid rows.
+
+    Returns:
+        The solar output the model subtracts from demand, never negative.
+    """
+    return pinned.at_rows(cache=cache, index=index) * derated_unit_shape(
+        features=features, index=index
+    )
+
+
 def accumulate_gram(
     *,
     cache: FeatureCache,
@@ -483,6 +566,7 @@ def accumulate_gram(
     weights: np.ndarray | None = None,
     device: torch.device | str = "cpu",
     dtype: torch.dtype = torch.float64,
+    pinned: PinnedCapacity | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Sum `X^T W X` and `X^T W y` over the rows `index`, one Gram matrix per weighting.
 
@@ -494,10 +578,18 @@ def accumulate_gram(
         weights: Row weights of shape (batch, len(index)), or `None` for one weighting of ones.
         device: Where the sums are accumulated.
         dtype: The floating-point type of the sums.
+        pinned: The pinned capacity, whose solar output is added to the target; required exactly
+            when the layout's capacity is pinned.
 
     Returns:
         `(gram, rhs)` of shapes (batch, p, p) and (batch, p).
+
+    Raises:
+        ValueError: If `pinned` is missing for a pinned layout, or given for a fitted one.
     """
+    if (pinned is not None) != (layout.spec.capacity == "pinned"):
+        msg = "a pinned capacity is required exactly when the layout's capacity is pinned"
+        raise ValueError(msg)
     n = len(index)
     if weights is None:
         weights = np.ones((1, n))
@@ -513,7 +605,12 @@ def accumulate_gram(
             dtype=dtype,
             device=device,
         )
-        y = torch.as_tensor(features.y[rows], dtype=dtype, device=device)
+        target = features.y[rows]
+        if pinned is not None:
+            target = target + pinned_solar_points(
+                cache=cache, features=features, pinned=pinned, index=rows
+            )
+        y = torch.as_tensor(target, dtype=dtype, device=device)
         w = weight_tensor[:, chunk]
         weighted = w[:, :, None] * x[None, :, :]
         gram += torch.einsum("bnp,nq->bpq", weighted, x)
@@ -675,6 +772,7 @@ class GamFit:
         last_season_year: The latest season-year with a training row that carries solar signal.
             A later season-year takes this one's capacity.
         violation: Each fit's optimality violation.
+        pinned: The pinned capacity of a fit with `capacity="pinned"`, else `None`.
     """
 
     layout: GamLayout
@@ -684,6 +782,7 @@ class GamFit:
     site: str
     last_season_year: int
     violation: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    pinned: PinnedCapacity | None = None
 
     def capacity_points(self, *, member: int = 0) -> dict[int, float]:
         """Return the fitted capacity of each season-year, in points of effective capacity.
@@ -692,7 +791,7 @@ class GamFit:
             member: Which fit of the batch.
 
         Returns:
-            A map from season-year to the sum of increments up to it.
+            A map from season-year to the sum of increments up to it; empty for a pinned fit.
         """
         increments = self.theta[member, self.layout.slices["capacity"]]
         return dict(zip(self.layout.season_years, np.cumsum(increments).tolist(), strict=True))
@@ -723,7 +822,13 @@ def prepare_fit(
     Raises:
         ValueError: If no row can train, or a training row ends after the cut.
     """
-    index = training_rows(features=cache.sites[site], cache=cache, cut=cut, window=window)
+    index = training_rows(
+        features=cache.sites[site],
+        cache=cache,
+        cut=cut,
+        window=window,
+        keep_lockdown=spec.covid_flag,
+    )
     if len(index) == 0:
         msg = f"{site} has no training rows before {cut}"
         raise ValueError(msg)
@@ -744,12 +849,14 @@ def fit_gam(
     weights: np.ndarray | None = None,
     device: torch.device | str = "cpu",
     dtype: torch.dtype = torch.float64,
+    pinned: PinnedCapacity | None = None,
 ) -> GamFit:
     """Fit the convex model of one substation, for one or more penalty sets or weightings.
 
-    All `specs` must share a drift form. The Gram matrix is built once and each batch member adds
-    its own penalty, so a grid of penalties costs one pass over the rows. Give either several
-    `specs` and no `weights`, or one spec and `weights`.
+    All `specs` must share a drift form, a capacity mode, a COVID flag, and a final-knot mode. The
+    Gram matrix is built once and each batch member adds its own penalty, so a grid of penalties
+    costs one pass over the rows. Give either several `specs` and no `weights`, or one spec and
+    `weights`.
 
     Args:
         cache: The cache.
@@ -761,17 +868,29 @@ def fit_gam(
         weights: Optional row weights of shape (batch, n_training_rows).
         device: Where the arithmetic runs.
         dtype: The floating-point type.
+        pinned: The pinned capacity built for `cut`; required exactly when the specs pin the
+            capacity.
 
     Returns:
         The fitted batch.
 
     Raises:
-        ValueError: If the specs differ in drift form, the batch sizes do not match, or no row
-            can train.
+        ValueError: If the specs differ in drift form, capacity mode, COVID flag, or final knot,
+            the batch sizes do not match, the pinned capacity is missing, unexpected or built for
+            another cut, or no row can train.
     """
     features = cache.sites[site]
-    if len({spec.drift for spec in specs}) != 1:
-        msg = "all specs of one call must share a drift form"
+    structure = {(spec.drift, spec.capacity, spec.covid_flag, spec.final_knot) for spec in specs}
+    if len(structure) != 1:
+        msg = "all specs of one call must share a drift form, capacity mode, COVID flag, and knot"
+        raise ValueError(msg)
+    if (pinned is not None) != (specs[0].capacity == "pinned"):
+        msg = "a pinned capacity is required exactly when the specs pin the capacity"
+        raise ValueError(msg)
+    if pinned is not None and (pinned.cut != cut or pinned.site != features.table.site):
+        msg = (
+            f"the pinned capacity was built for {pinned.site} at {pinned.cut}, not {site} at {cut}"
+        )
         raise ValueError(msg)
     layout, index = prepare_fit(
         cache=cache,
@@ -793,6 +912,7 @@ def fit_gam(
         weights=weights,
         device=device,
         dtype=dtype,
+        pinned=pinned,
     )
     penalties = []
     costs = []
@@ -814,7 +934,7 @@ def fit_gam(
         constrained=torch.as_tensor(layout.constrained),
     )
     signal = derated_unit_shape(features=features, index=index) > LAST_TRAINED_MIN_SHAPE
-    if not signal.any():
+    if not signal.any() and pinned is None:
         msg = f"{site} has no training row that carries solar signal before {cut}"
         raise ValueError(msg)
     return GamFit(
@@ -823,8 +943,11 @@ def fit_gam(
         cut=cut,
         n_rows=len(index),
         site=site,
-        last_season_year=int(cache.calendar.season_year[index[signal]].max()),
+        last_season_year=int(cache.calendar.season_year[index[signal]].max())
+        if signal.any()
+        else -1,
         violation=violation.cpu().numpy(),
+        pinned=pinned,
     )
 
 
@@ -834,8 +957,11 @@ def predict_gam(
     """Predict net power in points at the grid rows `index`.
 
     The drift is held at its last knot, because the layout's knots end at the cut and the hat
-    functions are clipped there. The capacity of a season-year after `fit.last_season_year` is set
-    explicitly to that season-year's capacity.
+    functions are clipped there. With `final_knot="shrunk"` the held value is the last knot pulled
+    towards the mean of the last 12 knots, for rows that end after the fit's cut only; a row at or
+    before the cut uses the fitted knot. The capacity of a season-year after
+    `fit.last_season_year` is set explicitly to that season-year's capacity, and a pinned fit
+    subtracts the pinned capacity times the derated unit shape.
 
     Args:
         cache: The cache.
@@ -853,7 +979,9 @@ def predict_gam(
     features = cache.sites[fit.site]
     layout = fit.layout
     out = np.empty(len(index))
-    theta = fit.theta[member]
+    theta = _forecast_theta(fit=fit, member=member)
+    free_theta = fit.theta[member]
+    after_cut = cache.end_times > naive_utc(moment=fit.cut)
     for chunk in _chunks(index=index):
         rows = index[chunk]
         x = design_matrix(cache=cache, features=features, layout=layout, index=rows)
@@ -864,8 +992,36 @@ def predict_gam(
         if not np.isfinite(x).all():
             msg = f"{fit.site} has a non-finite input among the rows to predict"
             raise ValueError(msg)
-        out[chunk] = x @ theta
+        out[chunk] = np.where(after_cut[rows], x @ theta, x @ free_theta)
+        if fit.pinned is not None:
+            out[chunk] -= pinned_solar_points(
+                cache=cache, features=features, pinned=fit.pinned, index=rows
+            )
     return out
+
+
+def _forecast_theta(*, fit: GamFit, member: int) -> np.ndarray:
+    """Return the coefficients a forecast uses: the fit's, with a shrunk final drift knot.
+
+    Args:
+        fit: The fitted batch.
+        member: Which fit of the batch.
+
+    Returns:
+        A copy of the member's coefficients in which, for `final_knot="shrunk"`, each band's last
+        knot has moved `final_knot_shrink` of the way towards the mean of that band's last
+        `SHRINK_KNOTS` knots.
+    """
+    theta = fit.theta[member].copy()
+    spec = fit.layout.spec
+    if "drift" not in fit.layout.slices or spec.final_knot != "shrunk":
+        return theta
+    n_knots = len(fit.layout.knot_days)
+    start = fit.layout.slices["drift"].start
+    for band in range(N_BANDS):
+        block = theta[start + band * n_knots : start + (band + 1) * n_knots]
+        block[-1] += spec.final_knot_shrink * (block[-SHRINK_KNOTS:].mean() - block[-1])
+    return theta
 
 
 @dataclass(frozen=True)
@@ -960,6 +1116,8 @@ class ReplicaResiduals:
         index: The grid rows of the residuals.
         fit_cut: The replica fit's cut, 12 months before the final cut; every residual row ends
             after it, and none ends after the final cut.
+        switching: True where a residual row sits inside the hand-filtered switching masks; all
+            false unless the replica kept those rows.
     """
 
     residuals: np.ndarray
@@ -967,6 +1125,7 @@ class ReplicaResiduals:
     quarter: np.ndarray
     index: np.ndarray
     fit_cut: datetime
+    switching: np.ndarray
 
 
 def replica_cut(*, cut: datetime) -> datetime:
@@ -982,6 +1141,8 @@ def replica_residuals(
     cut: datetime,
     window: TrainingWindow,
     season_years: Sequence[int],
+    capacity_vintages: pl.DataFrame | None = None,
+    drop_switching: bool = True,
 ) -> ReplicaResiduals:
     """Return the residuals of a replica of the scored forecast.
 
@@ -999,13 +1160,27 @@ def replica_residuals(
         cut: The cut of the final fit.
         window: The arm's window rule.
         season_years: The season-years with a capacity increment.
+        capacity_vintages: The real-time capacity vintages, from which the replica's pinned
+            capacity at its own cut is built; required when the spec pins the capacity.
+        drop_switching: True to leave out the rows inside the switching masks, as a spread does;
+            False to keep them and flag them, as the recent-level filter needs, since the filter
+            has no mask.
 
     Returns:
-        The residuals over the rows that have a reading, sit outside the switching masks, and end
-        after the substation's first usable instant.
+        The residuals over the rows that have a reading and end after the substation's first usable
+        instant, outside the switching masks unless `drop_switching` is False.
+
+    Raises:
+        ValueError: If the spec pins the capacity and no vintages are given.
     """
     features = cache.sites[site]
     fit_cut = replica_cut(cut=cut)
+    pinned = None
+    if spec.capacity == "pinned":
+        if capacity_vintages is None:
+            msg = "a replica of a pinned-capacity arm needs the capacity vintages"
+            raise ValueError(msg)
+        pinned = pinned_capacity(vintages=capacity_vintages, table=features.table, cut=fit_cut)
     fit = fit_gam(
         cache=cache,
         site=site,
@@ -1013,10 +1188,11 @@ def replica_residuals(
         cut=fit_cut,
         window=window,
         season_years=season_years,
+        pinned=pinned,
     )
     keep = (
         features.present
-        & ~features.switching_mask
+        & (~features.switching_mask | (not drop_switching))
         & np.isfinite(features.y)
         & np.isfinite(features.pv_unit_shape)
         & np.isfinite(features.smoothed_temperature_c).all(axis=1)
@@ -1032,6 +1208,7 @@ def replica_residuals(
         quarter=cache.calendar.quarter[index],
         index=index,
         fit_cut=fit_cut,
+        switching=features.switching_mask[index],
     )
 
 
