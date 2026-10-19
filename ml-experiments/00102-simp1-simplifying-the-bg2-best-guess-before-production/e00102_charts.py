@@ -40,7 +40,10 @@ CHARTS_DIR: Final[Path] = common.WORK_DIR / "charts"
 PLOT_WIDTH: Final[int] = 540
 SCORE_TITLE: Final[str] = "Quantile score (points of capacity; smaller is better)"
 SCOPE: Final[str] = "292 daily forecast runs, July 2025 to June 2026."
-INTERVAL_NOTE: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
+INTERVAL_NOTE: Final[str] = (
+    "Dot: estimate. Line: 95% interval from resampling whole months (99% where the label says so)."
+)
+LEVEL_95: Final[float] = 95.0
 CLASS_TITLES: Final[dict[str, str]] = {
     "Primary": "16 Primary substations",
     "BSP/GSP": "2 bulk and 2 grid supply points",
@@ -101,8 +104,8 @@ MIDDAY_ARMS: Final[tuple[str, ...]] = (
 )
 WEEKS: Final[tuple[str, ...]] = ("summer", "winter", "large_error")
 WEEK_TITLES: Final[dict[str, str]] = {
-    "summer": "a sunny summer week",
-    "winter": "a cold winter week",
+    "summer": "the summer week with the highest mean power",
+    "winter": "the winter week with the highest mean power",
     "large_error": "a week with large errors",
 }
 
@@ -126,10 +129,11 @@ def contrast_figure(*, contrasts: pl.DataFrame, cls: str) -> alt.Chart:
             & ~pl.col("contrast").str.starts_with("C5")
             & ~pl.col("contrast").str.starts_with("blend ")
             & ~pl.col("contrast").str.contains("reproduction")
+            & pl.col("contrast").str.ends_with("- BG2")
         )
         .with_columns(
-            label=pl.col("contrast").replace(MEMBER_PHRASES),
-            safe=pl.col("upper") < score.THRESHOLDS[cls],
+            label=pl.col("contrast").replace(MEMBER_PHRASES)
+            + pl.when(pl.col("level") > LEVEL_95).then(pl.lit(" (99%)")).otherwise(pl.lit(""))
         )
         .to_pandas()
     )
@@ -287,9 +291,7 @@ def read_arm_series(*, arm: str, site: str) -> pl.DataFrame:
     )
 
 
-def choose_weeks(
-    *, bg2: pl.DataFrame, no_offset: pl.DataFrame | None
-) -> dict[str, datetime.datetime]:
+def choose_weeks(*, bg2: pl.DataFrame) -> dict[str, datetime.datetime]:
     """Choose the first day of the example weeks from BG2's rows of one series.
 
     A summer week is the week in June to August with the largest mean daytime actual-minus-median
@@ -570,7 +572,7 @@ def example_figures() -> dict[str, Callable[[], alt.TopLevelMixin]]:
     out: dict[str, Callable[[], alt.TopLevelMixin]] = {}
     for key, (cls, site, arms) in EXAMPLES.items():
         reference = read_arm_series(arm=arms[0], site=site)
-        weeks = choose_weeks(bg2=reference, no_offset=None)
+        weeks = choose_weeks(bg2=reference)
         title_site = anonymous_label(site=site, cls=cls, primaries=primaries)
         for week, start in weeks.items():
             out[f"figure_4_{key}_{week}"] = (
@@ -580,7 +582,7 @@ def example_figures() -> dict[str, Callable[[], alt.TopLevelMixin]]:
             )
     for site in MEMBER_SITES:
         reference = read_arm_series(arm="p_s6_bg2", site=site)
-        weeks = choose_weeks(bg2=reference, no_offset=None)
+        weeks = choose_weeks(bg2=reference)
         title_site = anonymous_label(site=site, cls="Primary", primaries=primaries)
         for week, start in weeks.items():
             letter = title_site[-1].lower()

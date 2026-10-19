@@ -11,8 +11,9 @@ A contrast uses the cases that both arms hold. The 73 runs of `fold_a_every5d_v1
 pair and triple of blend members (the pair or triple with the lowest mean quantile score there) and
 are never scored for a result.
 
-**Scopes.** `all` is every case. `midday_summer` is valid times from 10:00 to 14:00 UK time in
-April to September. `night` is valid times from 23:00 to 03:59 UK time all year. `other` is every
+**Scopes.** `all` is every case. `midday_summer` is the half-hours that start from 10:00 to 13:30 UK
+time in April to September (a valid time is the end of its half-hour, as in experiment 00087's
+scorer). `night` is the half-hours that start from 23:00 to 03:30 UK time all year. `other` is every
 case in neither. Each scope is also taken for the 5 Primary series that have a solar offset
 (`|offset5`). The lead bands of `e00102_common.LEAD_BANDS` are scopes too.
 
@@ -25,6 +26,7 @@ contrasts are read at 99% (5% divided by five, Bonferroni); every other contrast
 import functools
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
@@ -189,7 +191,9 @@ class ClassCases:
             .sort(*assemble.KEY_COLUMNS)
         )
         self.keys = reference
-        local = reference["valid_time"].dt.convert_time_zone("Europe/London")
+        local = (reference["valid_time"] - timedelta(minutes=30)).dt.convert_time_zone(
+            "Europe/London"
+        )
         runs_gap = set(common.origins_of_subset(subset="gap"))
         runs_5d = set(common.origins_of_subset(subset="every5d"))
         origin = reference["power_fcst_init_time"]
@@ -554,16 +558,26 @@ def report_lines(
     lines = ["== Verdict contrasts (qs, 99%, in the verdict scope) =="]
     verdicts = contrasts.filter(pl.col("verdict") & (pl.col("scope") == pl.col("verdict_scope")))
     lines.append(str(verdicts.select("cls", "contrast", "scope", "n", "mean", "lower", "upper")))
+    passed = 0
     for row in verdicts.iter_rows(named=True):
         if row["contrast"].startswith("C5"):
-            lines.append(f"C5: the offset helps if the upper end is below 0: {row['upper']:.3f}")
+            helps = row["upper"] < 0.0
+            passed += helps
+            lines.append(
+                f"C5: the offset helps if the upper end is below 0: {row['upper']:.3f}: {helps}"
+            )
             continue
         threshold = THRESHOLDS[row["cls"]]
-        verdict = "safe" if row["upper"] < threshold else "not shown safe"
+        safe = row["upper"] < threshold
+        passed += safe
         lines.append(
             f"{row['contrast']} ({row['cls']}): upper {row['upper']:.3f} against threshold "
-            f"{threshold:.2f}: {verdict}"
+            f"{threshold:.2f}: {'safe' if safe else 'not shown safe'}"
         )
+    overall = (
+        "supported" if passed == VERDICT_COUNT else "partly supported" if passed else "refuted"
+    )
+    lines.append(f"Overall verdict: {overall} ({passed} of {VERDICT_COUNT} verdict contrasts hold)")
     lines.append("== Absolute qs, all rows ==")
     lines.append(
         str(
@@ -612,7 +626,9 @@ def analyse(*, results_dir: Path) -> None:
         tail_rows += tails
         notes += class_notes
     absolute_table = pl.concat(absolute_rows)
-    contrast_table = pl.concat(contrast_rows)
+    contrast_table = pl.concat(contrast_rows).with_columns(
+        safe=pl.col("upper") < pl.col("cls").replace_strict(THRESHOLDS, return_dtype=pl.Float64)
+    )
     tail_table = pl.concat(tail_rows)
     absolute_table.write_parquet(results_dir / "absolute.parquet")
     contrast_table.write_parquet(results_dir / "contrasts.parquet")

@@ -10,7 +10,9 @@ One job is one refit for a chunk of series. A refit at time `t` trains each seri
 control member's rows whose valid time is at least 3.5 hours before `t` and whose run began at or
 before `t`, and forecasts the daily runs that the regime assigns to it. Files go to
 `work/anchor_preds/n1h_nolag/<site>_s<seed>_<refit>.parquet`; existing files stay, so a stopped run
-resumes. Every job appends its wall-clock seconds to `work/gpu_hours.jsonl`.
+resumes. Run the monthly regime first: its file for the shared refit of 2025-07-01 holds every run
+of July, a superset of the weekly regime's runs for that refit. Every job appends its wall-clock
+seconds to `work/gpu_hours.jsonl`.
 
 Leakage check, raising `ValueError`: a refit's training rows have a valid time at most 3.5 hours
 before the refit and a run that began at or before the refit (`known_rows`).
