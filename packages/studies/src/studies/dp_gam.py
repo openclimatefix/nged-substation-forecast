@@ -876,8 +876,10 @@ class ResidualSpread:
     mean bias. Added raw to the scored year's mean forecast, they shift every quantile by last
     year's bias. A centred spread subtracts each (band, quarter) group's median from its quantiles,
     so the median of the spread is zero and only the shape of the error around the forecast is
-    kept. The uncentred spread stays available (`centre=False`) so that the bias can be reported as
-    its own result.
+    kept. Centring on the median keeps the forecast's mean-to-median skew out of the spread, whereas
+    the onboarding spread (`studies.dp_onboarding`) centres its residuals on the mean before calling
+    `fit` with `centre=False`. The uncentred spread stays available (`centre=False`) so that the
+    bias can be reported as its own result.
 
     Attributes:
         table: Shape (4 bands, 4 quarters, 11 levels).
