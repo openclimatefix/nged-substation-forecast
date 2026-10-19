@@ -74,15 +74,15 @@ code: ml-experiments/00104-differentiable-physics-2-simple-structural-model/
 **A simple model of demand minus solar forecasts better than lagless XGBoost on 12 months of
 history, but more years of history do not clearly help it.** This is part 2 of a six-part series on
 models built from physical terms (a daily profile, holidays, heating, and solar output) and fitted
-by gradient-based optimisation; part 3 pools the model across substations. Trained on 12 months,
-the model scored 0.25 points better than lagless XGBoost with its default start (post hoc; a lower
-score is better). Only the contrasts C1 to C3 were pre-registered; the others below are
-exploratory. The arm names (G1, G-all, G-all+D1, X-12, and so on) are defined in the first
-Results bullet. Trained on all usable years with no drift, the model scored 0.25 points worse than on
-12 months in the scored year (exploratory; +0.03 without D16, and the reverse in the tuning year),
-and a drift term recovered that. The planned comparison C1, all years with drift against 12 months,
-gave 0.04 points better, with an interval from 0.30 better to 0.21 worse, and 2 of the 5 decision
-substations improved.
+by gradient-based optimisation; part 3 pools the model across substations. Trained on 12 months, the
+model scored 0.25 points better than lagless XGBoost with its default start (post hoc; a lower score
+is better). Only the contrasts C1 to C3 were pre-registered; the others below are exploratory. The
+arm names (G1, G-all, G-all+D1, X-12, and so on) are defined in the first Results bullet. Trained on
+all usable years with no drift, the model scored 0.25 points worse than on 12 months in the scored
+year (exploratory; +0.03 without D16, and the reverse in the tuning year), and a drift term
+recovered that. The planned comparison C1, all years with drift against 12 months, gave 0.04 points
+better, with an interval from 0.30 better to 0.21 worse, and 2 of the 5 decision substations
+improved.
 
 **The verdict is `inconclusive`.** The interval of C1 spans zero, and four of the five
 pre-registered positive controls fail. The framework tests, which the plan names as the fifth
@@ -218,7 +218,8 @@ points at D10 and -10 points at D11 over the training years.
     - **Trigger 1, a control fails: fired.** Four positive controls fail. The audit of the spread
       (private brief `e104_audit.md`) found no code bug in the zero-start, solar-offset, or tail
       results. It found that zero start overfits (better in training; the 99% quantile covered 73%
-      against 98% in the scored year, report section 5; experiment 80's -0.04 came from lagged,
+      against 98% in the scored year, report section 5; [experiment
+      80](../00080-bm0-zero-base-margin-xgboost-quantile-models/result.md)'s -0.04 came from lagged,
       weekly-retrained models) and that the solar offset adds nothing once CAMS irradiance is an
       input.
     - **Trigger 2, a result contradicts its prediction or an earlier finding without a tested

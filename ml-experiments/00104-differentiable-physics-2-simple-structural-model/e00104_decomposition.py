@@ -129,6 +129,9 @@ def build_tables(  # noqa: PLR0912, PLR0915 (one pass per site)
 ) -> dict[str, pl.DataFrame]:
     """Fit the arms at the three sites and return every table the figures draw.
 
+    Args:
+        sites: The substations to fit.
+
     Returns:
         Tables named `profile`, `holiday`, `tent`, `harmonics`, `heating_curve`, `heating_series`,
         `lighting`, `capacity`, `solar_week`, `drift`, `steps`, and `weeks`.
