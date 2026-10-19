@@ -335,6 +335,42 @@ step penalty was chosen on that year.
   Part 3's reference for pooling to beat is G-all+D1 (2.78), and a pooled model should be compared
   with G1 (2.82) as well, since more years are not yet shown to help.
 
+## Substation cards
+
+**Provisional: fitted to past weather on a screening run.** Each card shows what the G-all+D1 fit
+says about one decision substation (and the steps arm for its steps panel), at the final cut
+2025-07-01: the unmetered PV capacity per season-year, the daily profile by day type, the drift
+held through the scored year, the heating response and its four smoothing-window slopes (the slope
+of the 6-hour window against the 168-hour window shows how quickly demand follows temperature), the
+holiday, Christmas, and lighting effects, and the cumulative steps. The capacity panels carry no
+interval, because the fit gives a point estimate only. Every axis is in points of effective
+capacity unless labelled.
+
+![Substation card D5](figure_13_card_d5.svg)
+
+![Substation card D10](figure_14_card_d10.svg)
+
+![Substation card D11](figure_15_card_d11.svg)
+
+![Substation card D14](figure_16_card_d14.svg)
+
+![Substation card D16](figure_17_card_d16.svg)
+
+![Key fitted parameters side by side](figure_18_card_comparison.svg)
+
+- **What the cards show about the model's constraints.** Each heating response is zero above 15.5
+  °C and rises as the temperature falls, the unmetered PV capacity never falls from one season-year
+  to the next, and lighting is zero around midday. These hold by construction (non-negative heating
+  and capacity coefficients, and a lighting ramp that is zero at midday), so they check the
+  plotting and not the fit.
+- **What differs between substations (comparison figure).** D10 has the steepest heating response
+  (a slope of about 19 points per 10 °C, against 6 to 10 elsewhere) and the lowest weekday profile
+  peak (about 60 points, against 65 to 76). Fitted capacity runs from about 2.3 MW (D10) to 3.6 MW
+  (D14), and the evening-to-midday ratio of the weekday profile from about 0.73 (D10) to 0.90 (D5).
+  These are fitted values from one frozen fit each, not measured properties.
+- **Not shown.** Capacity has no interval, the holiday panel averages the four hour bands, and the
+  steps panel comes from a different fit (the steps arm).
+
 ## Caveats
 
 - ERA5 and CAMS are estimates of past weather and flatter the solar term; a production forecast

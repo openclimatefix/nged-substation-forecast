@@ -124,7 +124,9 @@ def piece_contributions(
     }
 
 
-def build_tables() -> dict[str, pl.DataFrame]:  # noqa: PLR0912, PLR0915 (one pass per site)
+def build_tables(  # noqa: PLR0912, PLR0915 (one pass per site)
+    *, sites: tuple[str, ...] = SITES
+) -> dict[str, pl.DataFrame]:
     """Fit the arms at the three sites and return every table the figures draw.
 
     Returns:
@@ -142,6 +144,7 @@ def build_tables() -> dict[str, pl.DataFrame]:  # noqa: PLR0912, PLR0915 (one pa
             "tent",
             "harmonics",
             "heating_curve",
+            "heating_windows",
             "heating_series",
             "lighting",
             "capacity",
@@ -152,7 +155,7 @@ def build_tables() -> dict[str, pl.DataFrame]:  # noqa: PLR0912, PLR0915 (one pa
         )
     }
     temperatures = np.linspace(-4.0, 20.0, 49)
-    for site in SITES:
+    for site in sites:
         fit = _fit(site=site, arm=arm_d1, cache=cache)
         layout = fit.layout
         theta = fit.theta[0]
@@ -221,6 +224,16 @@ def build_tables() -> dict[str, pl.DataFrame]:  # noqa: PLR0912, PLR0915 (one pa
                 )
         # 4. Heating: steady temperature, so every smoothed temperature equals it.
         heating_coef = theta[layout.slices["heating"]].reshape(len(SMOOTHING_HOURS), N_BANDS)
+        out["heating_windows"] += [
+            {
+                "site": site,
+                "window (hours)": SMOOTHING_HOURS[k],
+                "band": BAND_NAMES[b],
+                "points per 10 °C": float(heating_coef[k, b]),
+            }
+            for k in range(len(SMOOTHING_HOURS))
+            for b in range(N_BANDS)
+        ]
         for temperature in temperatures:
             hinge = max(HEATING_THRESHOLD_C - temperature, 0.0) / 10.0
             for band, band_name in enumerate(BAND_NAMES):
