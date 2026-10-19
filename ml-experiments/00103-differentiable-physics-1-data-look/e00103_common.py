@@ -32,7 +32,6 @@ LABELLED_PATH: Final[Path] = (
 )
 NGED_DIR: Final[Path] = STUDIES_DATA_DIR.parent / "NGED"
 CLEANED_POWER_PATH: Final[Path] = NGED_DIR / "cleaned_power_time_series.delta"
-RAW_POWER_PATH: Final[Path] = NGED_DIR / "power_time_series.delta"
 METADATA_PATH: Final[Path] = NGED_DIR / "metadata.parquet"
 PANEL_PATH: Final[Path] = WORK_DIR / "panel.parquet"
 SERIES_TABLE_PATH: Final[Path] = WORK_DIR / "series_table.parquet"
