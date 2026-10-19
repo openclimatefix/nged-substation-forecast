@@ -799,6 +799,14 @@ def test_a_tied_fit_and_a_replica_hold_a_pinned_site_beside_a_fitted_one(
     )
     assert replicas["D2"].residuals.fit_cut == fit_cut
     assert np.isfinite(replicas["D2"].residuals.residuals).all()
+    tied_replicas = pooled_replica_residuals(
+        cache=pooled_cache,
+        sites=replica_sites,
+        cut=CUT,
+        strength=PoolingStrength.uniform(value=0.0),
+        tied=True,
+    )
+    assert tied_replicas["D2"].n_training_rows == replicas["D2"].n_training_rows
     with pytest.raises(ValueError, match="was built for"):
         pooled_replica_residuals(
             cache=pooled_cache,
