@@ -49,6 +49,12 @@ headline: >-
   points of capacity without the 14-day correction (95% interval -0.150 to -0.048), and `am0`, which
   has no solar term at all, shows a gap of 0.102 (-0.158 to -0.047). The offset in training adds
   +0.004 (-0.012 to +0.021), so the gap matches a start-at-zero effect.
+take_home_message: >-
+  No route for a leak was found, and a refit with no solar term at all reproduces the gain of
+  experiment 64's arm `am` at 10 days and beyond (0.102 below `d1l` without the 14-day correction,
+  against 0.098 for `am`). The gain matches XGBoost starting from zero when a base margin is
+  supplied, and not the solar offset, with the caveat that the reference `d1l` came from another
+  pipeline.
 lessons: >-
   The audit found a margin of exactly zero at every row from 10 days in training and at prediction,
   and no validation value in the weights. The gain of `am` beyond 10 days is reproduced by a refit

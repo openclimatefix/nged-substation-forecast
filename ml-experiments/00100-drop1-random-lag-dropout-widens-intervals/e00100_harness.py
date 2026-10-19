@@ -130,10 +130,10 @@ def seeded_batches(*, events: list[Event]) -> list[tuple[int, list[Event]]]:
 
 
 def make_state() -> dict:
-    """Return the panels, noise scales, fitted shares, fitted score, and threshold of XL.
+    """Return the panels, noise scales, fitted shares, fitted score, and threshold of RO-NC.
 
-    The XL logistic score and threshold are experiment 82's, fitted on odd-month injections; nothing
-    is refitted here.
+    The RO-NC logistic score and threshold are experiment 82's, fitted on odd-month injections;
+    nothing is refitted here.
     """
     panel, offset_panel = load_both()
     scales = {

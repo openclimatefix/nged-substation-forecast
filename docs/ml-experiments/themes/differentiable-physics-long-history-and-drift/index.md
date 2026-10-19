@@ -1,14 +1,18 @@
 # Differentiable physics: long history and drift
 
-**The first experiment of this theme shows that the data lets the series go ahead, with three
-changes: start most Primary substation series later than their first record, fix the lockdown window
-in advance, and count eligible long-history sites at each tuning year's first day. The second shows
-that a simple model of demand minus solar forecasts better when trained on every usable year than on
-the last 12 months, but that a drift term fitted to the end of the training data gives half of the
-gain back.** This theme covers whether a differentiable-physics model of Primary substation demand
-can use old years of history and cope with drift in the demand level over the years. The
-[Experiments](experiments.md) page lists every experiment tried, with its verdict and a take-home
-message, and the [Research plan](plan.md) lists what is planned next.
+**A Kalman filter on recent residuals lowered the quantile score by 0.61 points, using estimates of
+past weather, but whether old years of history help is still not settled.**
+
+The first experiment of this theme shows that the data lets the series go ahead, with three changes:
+start most Primary substation series later than their first record, fix the lockdown window in
+advance, and count eligible long-history sites at each tuning year's first day. The second shows
+that a simple model of demand minus solar does not clearly gain from every usable year: without a
+drift term it scored worse than on the last 12 months, and with a drift term the model was level
+with 12 months. The third shows that the filter lowers the score, and that the benefit of old years
+changed sign between two scored years. This theme covers whether a differentiable-physics model of
+Primary substation demand can use old years of history and cope with drift in the demand level over
+the years. The [Experiments](experiments.md) page lists every experiment tried, with its verdict and
+a take-home message, and the [Research plan](plan.md) lists what is planned next.
 
 ## What the experiments found
 
@@ -19,9 +23,29 @@ message, and the [Research plan](plan.md) lists what is planned next.
   2026-03-26.
 - **[00104 - Differentiable physics, part
   2](../../00104-differentiable-physics-2-simple-structural-model/result.md):** A simple model of
-  demand minus solar, fitted as one convex optimisation per substation, scored 0.40 points lower
-  (better) when trained on every usable year than on the last 12 months (4 of 5 substations better).
-  Adding a drift term halved that gain, and the planned comparison is inconclusive (0.20 points
-  better, 98.33% interval from 0.68 better to 0.22 worse), because it rests on one substation, D14.
-  The experiment belongs mainly to the [demand: calendar and weather
+  demand minus solar, fitted as one convex optimisation per substation, scored 0.25 points higher
+  (worse) when trained on every usable year without a drift term than on the last 12 months. Adding
+  a drift term lowered the score by 0.29, so all years with drift was level with 12 months (0.04
+  points better, 98.33% interval from 0.30 better to 0.21 worse, 2 of 5 substations better), and the
+  planned comparison is inconclusive. A first version of the page had the opposite sign for two
+  contrasts, because its forecast spread carried the previous year's mean bias; the page now carries
+  a Correction section. The experiment belongs mainly to the [demand: calendar and weather
   theme](../differentiable-physics-demand-calendar-and-weather/index.md).
+- **[00106 - Differentiable physics, part
+  4](../../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md):** A Kalman
+  filter that corrects each day-ahead forecast with the errors observed up to 3.5 hours earlier
+  lowered the quantile score by 0.61 points in the scored year and 1.02 in the year before, at all
+  five long-history substations. More years of history gave -0.22 points in the scored year and
+  +0.32 in the year before, so the verdict is partly supported. With the filter running, a drift
+  term added nothing measurable and refitting made the score slightly worse. Against lagged XGBoost
+  at the same lead, the filtered model was 0.138 points better, which is not significant. The
+  filter's residuals use estimates of past weather.
+- **[00107 - Differentiable physics, rolling-origin history and
+  tails](../../00107-differentiable-physics-rolling-origin-history-and-tails/result.md):** Refitting
+  the convex model every quarter, 12 times from 2023 to 2026, adding a drift term to the model
+  trained on all years lowered the score at 10 of 12 refits (0.45 points, 99% interval 0.23 to 0.68
+  better). In a post hoc split, about three-fifths of that size is one substation (D10) at the
+  2023-24 refits, and the 2025-26 refits give 0.30, as in experiment 104. All years without drift
+  scored worse than 12 months at 8 of 12 refits, and all years with drift against 12 months has no
+  stable answer, with winter-quarter refits favouring more years. A spread that depends on the
+  forecast level made the 95% and 99% quantile coverage worse. The verdict is partly supported.

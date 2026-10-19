@@ -268,8 +268,17 @@ def _site_table(*, row: Mapping[str, Any], sites_row: Mapping[str, Any]) -> Site
     )
 
 
-def _unit_pv_shape(*, cams: pl.DataFrame, table: SiteTable, grid: pl.Series) -> np.ndarray:
-    """Return the unit PV shape of the site's CAMS irradiance on the grid, `NaN` if missing."""
+def unit_pv_shape(*, cams: pl.DataFrame, table: SiteTable, grid: pl.Series) -> np.ndarray:
+    """Return the unit PV shape of the site's CAMS irradiance on the grid, `NaN` if missing.
+
+    Args:
+        cams: Columns `site`, `time` (the end of the hour), and `ghi_w_m2`.
+        table: The substation's table, which gives the site label and the coordinates.
+        grid: The half-hour end stamps of the feature cache's time grid.
+
+    Returns:
+        The unit PV shape on the grid.
+    """
     hourly = (
         cams.filter(pl.col("site") == table.site)
         .select("time", "ghi_w_m2")
@@ -355,7 +364,7 @@ def _site_features(
         smoothed_temperature_c=smoothed,
         ghi_w_m2=half_hour_cams["ghi_w_m2"].to_numpy().astype(np.float64),
         elevation_deg=90.0 - zenith,
-        pv_unit_shape=_unit_pv_shape(cams=cams, table=table, grid=grid),
+        pv_unit_shape=unit_pv_shape(cams=cams, table=table, grid=grid),
     )
 
 

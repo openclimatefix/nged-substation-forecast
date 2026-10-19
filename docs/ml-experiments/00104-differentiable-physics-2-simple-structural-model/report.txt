@@ -3,10 +3,10 @@ tuned: ridge 0.1 drift step 3000.0 step penalty 300.0 steps gain over D1 on the 
 
 == 1. Absolute quantile score, points of capacity (rows outside the switching masks) ==
 arm                     D5     D10     D11     D14     D16      D9    five     six
-g1                   3.341   3.341   2.721   3.801   2.429   2.247   3.125   2.974
-g_all                3.099   2.995   2.355   2.734   2.485   2.190   2.726   2.633
-g_all_d1             3.197   3.882   2.679   2.277   2.589   6.392   2.922   3.522
-g_all_d1_steps       3.043   4.435   2.620   2.310   2.498  15.674   2.986   5.177
+g1                   3.236   3.192   2.427   2.743   2.555   2.129   2.822   2.703
+g_all                3.499   3.560   2.351   2.337   3.690   2.174   3.072   2.917
+g_all_d1             3.348   3.604   2.204   2.230   2.590   2.307   2.784   2.701
+g_all_d1_steps       3.175   4.138   2.195   2.260   2.559   2.630   2.861   2.821
 x_12                 2.969   3.637   2.862   2.984   2.863   2.119   3.068   2.904
 x_12z                3.317   3.878   3.053   3.399   3.155   2.274   3.363   3.175
 x_12am               3.310   3.900   3.061   3.411   3.150   2.257   3.369   3.177
@@ -23,20 +23,20 @@ manual_heuristic     3.886   4.129   3.381   2.931   3.142   2.899   3.488   3.3
 (five = D5, D10, D11, D14, D16 pooled; six adds D9)
 
 == 2. Planned contrasts (Bonferroni, 3 contrasts), decision set of five ==
-C1 years: g_all_d1 - g1: -0.203 (-0.683 to +0.216, 98.33%); 3 sites better, 2 worse
-   per site: {'D14': -1.523, 'D5': -0.144, 'D10': 0.541, 'D16': 0.16, 'D11': -0.042}
-   with D9 (six sites): +0.548 (+0.178 to +0.896, 98.33%); 3 sites better, 3 worse
-C2 GAM vs XGBoost, 12 months: g1 - x_12am: -0.244 (-0.802 to +0.238, 98.33%); 3 sites better, 2 worse
-   per site: {'D14': 0.39, 'D16': -0.72, 'D5': 0.031, 'D10': -0.559, 'D11': -0.34}
-   with D9 (six sites): -0.203 (-0.687 to +0.217, 98.33%); 4 sites better, 2 worse
-C3 GAM vs XGBoost, all years: g_all_d1 - x_allam: -0.293 (-0.668 to +0.033, 98.33%); 4 sites better, 1 worse
-   per site: {'D10': 0.129, 'D14': -0.343, 'D11': -0.033, 'D16': -1.212, 'D5': -0.017}
-   with D9 (six sites): +0.497 (+0.172 to +0.894, 98.33%); 4 sites better, 2 worse
+C1 years: g_all_d1 - g1: -0.039 (-0.303 to +0.206, 98.33%); 2 sites better, 3 worse
+   per site: {'D14': -0.513, 'D10': 0.412, 'D5': 0.112, 'D11': -0.223, 'D16': 0.034}
+   with D9 (six sites): -0.001 (-0.213 to +0.205, 98.33%); 2 sites better, 4 worse
+C2 GAM vs XGBoost, 12 months: g1 - x_12am: -0.547 (-1.127 to -0.113, 98.33%); 5 sites better, 0 worse
+   per site: {'D5': -0.074, 'D14': -0.668, 'D16': -0.594, 'D10': -0.708, 'D11': -0.634}
+   with D9 (six sites): -0.475 (-0.970 to -0.094, 98.33%); 6 sites better, 0 worse
+C3 GAM vs XGBoost, all years: g_all_d1 - x_allam: -0.432 (-0.753 to -0.148, 98.33%); 4 sites better, 1 worse
+   per site: {'D11': -0.508, 'D16': -1.211, 'D10': -0.148, 'D5': 0.134, 'D14': -0.39}
+   with D9 (six sites): -0.323 (-0.615 to -0.062, 98.33%); 4 sites better, 2 worse
 
 == 3. Exploratory contrasts (95%), decision set of five ==
-g_all - g1: -0.399 (-0.658 to -0.148, 95.00%); 4 sites better, 1 worse
-g_all_d1_steps - g_all_d1: +0.063 (+0.023 to +0.105, 95.00%); 3 sites better, 2 worse
-g_all_d1 - g_all: +0.196 (-0.050 to +0.430, 95.00%); 1 sites better, 4 worse
+g_all - g1: +0.249 (+0.081 to +0.398, 95.00%); 2 sites better, 3 worse
+g_all_d1_steps - g_all_d1: +0.077 (-0.006 to +0.165, 95.00%); 3 sites better, 2 worse
+g_all_d1 - g_all: -0.288 (-0.371 to -0.207, 95.00%); 4 sites better, 1 worse
 x_12z - x_12: +0.295 (+0.155 to +0.472, 95.00%); 0 sites better, 5 worse
 x_allz - x_all: +0.090 (+0.019 to +0.174, 95.00%); 1 sites better, 4 worse
 x_12am - x_12z: +0.006 (-0.010 to +0.023, 95.00%); 2 sites better, 3 worse
@@ -46,40 +46,40 @@ x_allamq - x_all: -0.023 (-0.045 to -0.002, 95.00%); 4 sites better, 1 worse
 x_12am_ng - x_12z_ng: -0.282 (-0.481 to -0.078, 95.00%); 5 sites better, 0 worse
 x_all - x_12: +0.083 (-0.238 to +0.343, 95.00%); 2 sites better, 3 worse
 x_allam - x_12am: -0.154 (-0.585 to +0.193, 95.00%); 4 sites better, 1 worse
-g_all - x_allam: -0.489 (-0.647 to -0.327, 95.00%); 4 sites better, 1 worse
-g1 - x_12: +0.058 (-0.251 to +0.374, 95.00%); 3 sites better, 2 worse
-g1 - x_12amq: +0.063 (-0.246 to +0.371, 95.00%); 3 sites better, 2 worse
-g_all - x_all: -0.425 (-0.561 to -0.288, 95.00%); 3 sites better, 2 worse
-g_all - x_12: -0.342 (-0.664 to -0.070, 95.00%); 4 sites better, 1 worse
-g_all_d1 - x_12: -0.145 (-0.670 to +0.295, 95.00%); 3 sites better, 2 worse
-g_all - x_allamq: -0.401 (-0.542 to -0.263, 95.00%); 3 sites better, 2 worse
-g_all_d1 - x_all: -0.228 (-0.452 to -0.009, 95.00%); 3 sites better, 2 worse
-g_all_d1 - x_allamq: -0.205 (-0.436 to +0.019, 95.00%); 2 sites better, 3 worse
+g_all - x_allam: -0.144 (-0.349 to +0.045, 95.00%); 4 sites better, 1 worse
+g1 - x_12: -0.245 (-0.526 to -0.010, 95.00%); 4 sites better, 1 worse
+g1 - x_12amq: -0.240 (-0.527 to -0.003, 95.00%); 4 sites better, 1 worse
+g_all - x_all: -0.079 (-0.214 to +0.059, 95.00%); 3 sites better, 2 worse
+g_all - x_12: +0.004 (-0.396 to +0.339, 95.00%); 3 sites better, 2 worse
+g_all_d1 - x_12: -0.284 (-0.740 to +0.091, 95.00%); 4 sites better, 1 worse
+g_all - x_allamq: -0.056 (-0.201 to +0.088, 95.00%); 3 sites better, 2 worse
+g_all_d1 - x_all: -0.367 (-0.537 to -0.203, 95.00%); 4 sites better, 1 worse
+g_all_d1 - x_allamq: -0.344 (-0.527 to -0.166, 95.00%); 4 sites better, 1 worse
 
 == 3b. The coastal substations (D5 and D9) ==
-g_all_d1 - g1: +2.151 (+1.154 to +3.208, 95.00%); 1 sites better, 1 worse; per site {'D9': 4.14430372884126, 'D5': -0.14401865212168785}
-g1 - x_12am: +0.010 (-0.392 to +0.354, 95.00%); 1 sites better, 1 worse; per site {'D5': 0.0313395735489553, 'D9': -0.00938514183067441}
-g_all_d1 - x_allam: +2.284 (+1.457 to +3.266, 95.00%); 1 sites better, 1 worse; per site {'D5': -0.016627195952153596, 'D9': 4.282411164268942}
+g_all_d1 - g1: +0.148 (+0.034 to +0.260, 95.00%); 0 sites better, 2 worse; per site {'D9': 0.17845073985797472, 'D5': 0.11192786882928081}
+g1 - x_12am: -0.103 (-0.441 to +0.146, 95.00%); 2 sites better, 0 worse; per site {'D5': -0.07445428955441889, 'D9': -0.12792981953387408}
+g_all_d1 - x_allam: +0.168 (-0.026 to +0.350, 95.00%); 0 sites better, 2 worse; per site {'D9': 0.19801349758245862, 'D5': 0.13352546189544076}
 
 == 4. Prediction checks ==
-FAILED old years without drift hurt (G-all - G1 +0.3 to +0.8, interval above zero): -0.399 (-0.658 to -0.148, 95.00%); 4 sites better, 1 worse
+FAILED old years without drift hurt (G-all - G1 +0.3 to +0.8, interval above zero): +0.249 (+0.081 to +0.398, 95.00%); 2 sites better, 3 worse
 FAILED solar offset (X-12am - X-12z -0.40 to -0.10, interval below zero): +0.006 (-0.010 to +0.023, 95.00%); 2 sites better, 3 worse
 HELD   solar offset without the irradiance input (X-12am-ng - X-12z-ng -0.40 to -0.10): -0.282 (-0.481 to -0.078, 95.00%); 5 sites better, 0 worse
 FAILED zero start (X-12z - X-12 between -0.10 and +0.02): +0.295 (+0.155 to +0.472, 95.00%); 0 sites better, 5 worse
-FAILED C1 +0.0 to +0.4, interval spanning zero: -0.203 (-0.683 to +0.216, 98.33%); 3 sites better, 2 worse
-FAILED C2 +0.1 to +0.5: -0.244 (-0.802 to +0.238, 98.33%); 3 sites better, 2 worse
-FAILED C3 +0.0 to +0.5: -0.293 (-0.668 to +0.033, 98.33%); 4 sites better, 1 worse
-HELD   steps within +-0.1 of D1: +0.063 (+0.023 to +0.105, 95.00%); 3 sites better, 2 worse
-FAILED baselines worse than every model arm at every site: g1 vs climatology at D14 (3.80 vs 3.21); g1 vs manual_heuristic at D14 (3.80 vs 2.93); g_all_d1 vs climatology at D9 (6.39 vs 3.04); g_all_d1 vs manual_heuristic at D9 (6.39 vs 2.90); g_all_d1_steps vs climatology at D9 (15.67 vs 3.04); g_all_d1_steps vs manual_heuristic at D9 (15.67 vs 2.90); g_all_d1_steps vs manual_heuristic at D10 (4.43 vs 4.13); x_12 vs manual_heuristic at D14 (2.98 vs 2.93); x_12z vs manual_heuristic at D16 (3.15 vs 3.14); x_12z vs climatology at D14 (3.40 vs 3.21); x_12z vs manual_heuristic at D14 (3.40 vs 2.93); x_12am vs climatology at D14 (3.41 vs 3.21); x_12am vs manual_heuristic at D14 (3.41 vs 2.93); x_12am vs manual_heuristic at D16 (3.15 vs 3.14); x_12amq vs manual_heuristic at D14 (2.98 vs 2.93); x_all vs manual_heuristic at D16 (3.64 vs 3.14); x_allz vs manual_heuristic at D16 (3.85 vs 3.14); x_allam vs manual_heuristic at D16 (3.80 vs 3.14); x_allamq vs manual_heuristic at D16 (3.59 vs 3.14)
+FAILED C1 +0.0 to +0.4, interval spanning zero: -0.039 (-0.303 to +0.206, 98.33%); 2 sites better, 3 worse
+FAILED C2 +0.1 to +0.5: -0.547 (-1.127 to -0.113, 98.33%); 5 sites better, 0 worse
+FAILED C3 +0.0 to +0.5: -0.432 (-0.753 to -0.148, 98.33%); 4 sites better, 1 worse
+HELD   steps within +-0.1 of D1: +0.077 (-0.006 to +0.165, 95.00%); 3 sites better, 2 worse
+FAILED baselines worse than every model arm at every site: g_all vs manual_heuristic at D16 (3.69 vs 3.14); g_all_d1_steps vs manual_heuristic at D10 (4.14 vs 4.13); x_12 vs manual_heuristic at D14 (2.98 vs 2.93); x_12z vs climatology at D14 (3.40 vs 3.21); x_12z vs manual_heuristic at D14 (3.40 vs 2.93); x_12z vs manual_heuristic at D16 (3.15 vs 3.14); x_12am vs manual_heuristic at D16 (3.15 vs 3.14); x_12am vs climatology at D14 (3.41 vs 3.21); x_12am vs manual_heuristic at D14 (3.41 vs 2.93); x_12amq vs manual_heuristic at D14 (2.98 vs 2.93); x_all vs manual_heuristic at D16 (3.64 vs 3.14); x_allz vs manual_heuristic at D16 (3.85 vs 3.14); x_allam vs manual_heuristic at D16 (3.80 vs 3.14); x_allamq vs manual_heuristic at D16 (3.59 vs 3.14)
 
 C1 alone under the merged Phase A rule: partly supported. The plan overrides this with `inconclusive` when a positive control fails.
 
 == 5. Tails: coverage (nominal 1%, 5%, 95%, 99%) and pinball loss at each level ==
 arm                     q01      q05      q95      q99   |   pinball
-g1                    0.027    0.092    0.895    0.950   |   0.190 0.697 0.994 0.348
-g_all                 0.015    0.045    0.884    0.955   |   0.176 0.624 0.795 0.259
-g_all_d1              0.042    0.120    0.936    0.978   |   0.212 0.702 0.783 0.221
-g_all_d1_steps        0.050    0.136    0.940    0.979   |   0.236 0.757 0.779 0.219
+g1                    0.014    0.049    0.884    0.958   |   0.177 0.642 0.819 0.256
+g_all                 0.029    0.067    0.834    0.928   |   0.213 0.711 0.951 0.337
+g_all_d1              0.025    0.069    0.895    0.962   |   0.195 0.669 0.772 0.235
+g_all_d1_steps        0.039    0.093    0.906    0.966   |   0.234 0.735 0.772 0.232
 x_12                  0.014    0.097    0.793    0.977   |   0.261 0.716 1.078 0.338
 x_12z                 0.002    0.076    0.662    0.731   |   0.365 0.688 1.537 1.095
 x_12am                0.002    0.076    0.661    0.729   |   0.364 0.685 1.547 1.116
@@ -96,18 +96,18 @@ manual_heuristic      0.042    0.061    0.906    0.933   |   0.248 0.762 0.916 0
 == 6. Staleness: score and tail coverage by month of the scored year ==
 score | q05 coverage | q95 coverage
  month                    g1                 g_all              g_all_d1                x_12am               x_allam
-     0    2.18 0.079 0.951    2.36 0.054 0.900    2.54 0.133 0.956    2.17 0.061 0.767    2.39 0.066 0.876
-     1    2.23 0.092 0.945    2.25 0.085 0.930    2.93 0.205 0.970    2.46 0.109 0.783    3.16 0.156 0.864
-     2    2.18 0.105 0.974    2.05 0.074 0.963    2.71 0.183 0.983    2.16 0.103 0.824    2.54 0.096 0.908
-     3    3.32 0.149 0.945    2.25 0.049 0.963    3.19 0.188 0.991    2.22 0.040 0.767    2.68 0.029 0.812
-     4    3.46 0.147 0.934    2.65 0.018 0.909    2.71 0.073 0.973    3.57 0.093 0.653    3.42 0.029 0.715
-     5    3.73 0.074 0.838    3.23 0.011 0.868    2.94 0.069 0.977    5.85 0.076 0.385    4.28 0.030 0.612
-     6    5.10 0.123 0.726    3.77 0.010 0.729    3.47 0.073 0.801    4.82 0.044 0.474    4.21 0.027 0.614
-     7    3.95 0.018 0.752    3.25 0.004 0.770    2.75 0.029 0.856    5.65 0.007 0.344    3.98 0.005 0.602
-     8    3.19 0.046 0.832    2.54 0.027 0.881    2.75 0.112 0.945    2.99 0.068 0.719    3.03 0.070 0.827
-     9    2.61 0.086 0.961    2.53 0.075 0.945    2.86 0.140 0.966    2.86 0.083 0.703    2.81 0.085 0.805
-    10    3.07 0.091 0.925    2.97 0.050 0.873    3.11 0.103 0.910    3.44 0.113 0.713    3.28 0.086 0.791
-    11    3.03 0.095 0.899    3.18 0.063 0.834    3.18 0.106 0.881    3.18 0.106 0.685    3.23 0.078 0.744
+     0    2.31 0.080 0.920    2.66 0.117 0.881    2.52 0.116 0.933    2.17 0.061 0.767    2.39 0.066 0.876
+     1    2.32 0.090 0.917    2.95 0.187 0.923    2.86 0.179 0.951    2.46 0.109 0.783    3.16 0.156 0.864
+     2    2.07 0.079 0.963    2.62 0.175 0.955    2.55 0.155 0.968    2.16 0.103 0.824    2.54 0.096 0.908
+     3    2.39 0.029 0.937    2.81 0.069 0.864    2.41 0.067 0.950    2.22 0.040 0.767    2.68 0.029 0.812
+     4    2.65 0.026 0.931    3.12 0.007 0.807    2.66 0.008 0.888    3.57 0.093 0.653    3.42 0.029 0.715
+     5    3.45 0.023 0.860    3.43 0.005 0.805    2.92 0.009 0.888    5.85 0.076 0.385    4.28 0.030 0.612
+     6    3.61 0.028 0.757    3.49 0.016 0.743    3.21 0.013 0.784    4.82 0.044 0.474    4.21 0.027 0.614
+     7    3.67 0.001 0.751    3.32 0.003 0.736    2.88 0.003 0.803    5.65 0.007 0.344    3.98 0.005 0.602
+     8    2.76 0.007 0.854    2.76 0.032 0.845    2.41 0.028 0.908    2.99 0.068 0.719    3.03 0.070 0.827
+     9    2.71 0.068 0.929    2.87 0.068 0.868    2.74 0.093 0.935    2.86 0.083 0.703    2.81 0.085 0.805
+    10    3.19 0.078 0.885    3.49 0.052 0.790    3.16 0.066 0.865    3.44 0.113 0.713    3.28 0.086 0.791
+    11    3.10 0.063 0.864    3.52 0.047 0.761    3.20 0.062 0.833    3.18 0.106 0.685    3.23 0.078 0.744
 
 == 7. Capacity per season-year, MW (fitted by the convex model, and experiment 45) ==
 D5: vintage 'frozen' over hindsight season-year constant, 299 weeks: min 0.9011, max 1.1068, share within 0.1%: 0.000
@@ -154,10 +154,10 @@ shape: (30, 9)
 
 == 9. Scarce-data rows (descriptive, no interval): mean score by kind ==
 kind              rows               g1            g_all         g_all_d1           x_12am          x_allam manual_heuristic
-bank_holiday      1728            3.484            2.620            2.499            3.417            3.039            6.049
-christmas_run     1009            3.715            2.718            2.750            3.400            2.455            5.300
-cold_day           576            4.513            4.340            2.965            4.239            3.613            7.508
-other            80552            3.100            2.717            2.933            3.362            3.226            3.382
+bank_holiday      1728            3.338            2.973            2.649            3.417            3.039            6.049
+christmas_run     1009            3.458            3.023            2.675            3.400            2.455            5.300
+cold_day           576            3.205            3.396            3.373            4.239            3.613            7.508
+other            80552            2.801            3.072            2.784            3.362            3.226            3.382
 
 == 10. Cold block, November 2022 to February 2023 (descriptive) ==
 Mean absolute error of the central forecast (GAM mean; XGBoost median), points:
@@ -173,11 +173,71 @@ pooled: {'cold_g1': 7.664, 'cold_g_all': 6.412, 'cold_g_all_d1': 4.148, 'cold_x_
 leads 24.5 to 48 h: -0.580 (-0.973 to -0.284, 95.00%); 5 sites better, 0 worse; absolute {'x_12_d1': 3.068, 'l_12_d1': 2.487}
 leads 144.5 to 168 h: -0.320 (-0.563 to -0.145, 95.00%); 5 sites better, 0 worse; absolute {'x_12_d6': 3.068, 'l_12_d6': 2.747}
 
+== 12. The replica's mean bias as its own arm: uncentred minus centred spread ==
+(scores: five sites, rows outside the switching masks; q50 shifts: all rows)
+g1               five-site score: uncentred 3.125, centred 2.822; uncentred minus centred +0.303
+   per site (uncentred minus centred): D10 +0.15, D11 +0.29, D14 +1.06, D16 -0.13, D5 +0.11, D9 +0.12
+   mean shift of q50 (points): D10 +1.81, D11 +3.08, D14 -1.73, D16 +2.30, D5 +2.15, D9 +1.23
+g_all            five-site score: uncentred 2.726, centred 3.072; uncentred minus centred -0.346
+   per site (uncentred minus centred): D10 -0.56, D11 +0.00, D14 +0.40, D16 -1.21, D5 -0.40, D9 +0.02
+   mean shift of q50 (points): D10 -3.17, D11 +0.90, D14 -1.29, D16 +3.37, D5 +1.69, D9 +1.23
+g_all_d1         five-site score: uncentred 2.922, centred 2.784; uncentred minus centred +0.139
+   per site (uncentred minus centred): D10 +0.28, D11 +0.47, D14 +0.05, D16 -0.00, D5 -0.15, D9 +4.08
+   mean shift of q50 (points): D10 +1.79, D11 +3.60, D14 +0.98, D16 +3.24, D5 +1.36, D9 -7.51
+g_all_d1_steps   five-site score: uncentred 2.986, centred 2.861; uncentred minus centred +0.125
+   per site (uncentred minus centred): D10 +0.30, D11 +0.43, D14 +0.05, D16 -0.06, D5 -0.13, D9 +13.04
+   mean shift of q50 (points): D10 +1.40, D11 +2.78, D14 +1.10, D16 +2.31, D5 +1.67, D9 -21.31
+
+== 13. D10 without its 2025-11-17 to 2025-12-14 window (rows dropped at D10 only) ==
+rows dropped: 1344 of 17401
+arm                 D10 with  D10 without  five with  five without
+g1                     3.192        3.036      2.822         2.786
+g_all                  3.560        3.371      3.072         3.027
+g_all_d1               3.604        3.435      2.784         2.737
+g_all_d1_steps         4.138        4.052      2.861         2.824
+x_12                   3.637        3.228      3.068         2.979
+x_12am                 3.900        3.366      3.369         3.257
+x_allam                3.752        3.460      3.215         3.150
+contrasts, five sites, 95% interval, window dropped:
+  g_all_d1 - g1: -0.049 (-0.276 to +0.156, 95.00%); 2 sites better, 3 worse
+  g_all - g1: +0.241 (+0.067 to +0.395, 95.00%); 2 sites better, 3 worse
+  g_all_d1 - g_all: -0.290 (-0.377 to -0.207, 95.00%); 4 sites better, 1 worse
+  g1 - x_12am: -0.471 (-0.883 to -0.164, 95.00%); 5 sites better, 0 worse
+  g_all_d1 - x_allam: -0.412 (-0.662 to -0.188, 95.00%); 4 sites better, 1 worse
+  g_all - x_12: +0.048 (-0.333 to +0.347, 95.00%); 2 sites better, 3 worse
+
+== 14. Checks: error of the central forecast, and leaving one site out ==
+median forecast minus mean forecast, headline rows, mean per site (points):
+  g1              D10 +0.00, D11 +0.00, D14 +0.00, D16 +0.00, D5 +0.00, D9 +0.00
+  g_all           D10 +0.00, D11 +0.00, D14 +0.00, D16 +0.00, D5 +0.00, D9 +0.00
+  g_all_d1        D10 +0.00, D11 +0.00, D14 +0.00, D16 +0.00, D5 +0.00, D9 +0.00
+  g_all_d1_steps  D10 +0.00, D11 +0.00, D14 +0.00, D16 +0.00, D5 +0.00, D9 +0.00
+mean absolute error of the central forecast, five sites (GAM mean, XGBoost median):
+  g1                 4.930
+  g_all              5.236
+  g_all_d1           4.854
+  g_all_d1_steps     4.949
+  x_12               5.012
+  x_all              5.370
+  x_12amq            5.009
+contrasts on the error of the central forecast (95% interval), five sites:
+  g_all_d1 - g1: error -0.077 (-0.462 to +0.277); quantile score -0.039
+  g1 - x_12am: error -0.084 (-0.398 to +0.197); quantile score -0.547
+  g_all_d1 - x_allam: error -0.433 (-0.730 to -0.157); quantile score -0.432
+  g_all - g1: error +0.306 (+0.009 to +0.564); quantile score +0.249
+  g_all_d1 - g_all: error -0.382 (-0.524 to -0.245); quantile score -0.288
+leaving one decision site out, quantile score, point estimate and sites better:
+  g_all_d1 - g1: without D5 -0.072; without D10 -0.157; without D11 +0.010; without D14 +0.083; without D16 -0.057
+  g1 - x_12am: without D5 -0.652; without D10 -0.505; without D11 -0.524; without D14 -0.516; without D16 -0.535
+  g_all_d1 - x_allam: without D5 -0.557; without D10 -0.506; without D11 -0.412; without D14 -0.442; without D16 -0.240
+  g_all - g1: without D5 +0.246; without D10 +0.218; without D11 +0.335; without D14 +0.418; without D16 +0.031
+  g_all_d1 - g_all: without D5 -0.318; without D10 -0.375; without D11 -0.326; without D14 -0.335; without D16 -0.088
+
 All-rows scores (including rows inside the switching masks), decision set of five:
-  g1                   3.315
-  g_all                2.977
-  g_all_d1             3.139
-  g_all_d1_steps       3.201
+  g1                   3.089
+  g_all                3.389
+  g_all_d1             3.081
+  g_all_d1_steps       3.144
   x_12                 3.369
   x_12z                3.679
   x_12am               3.686

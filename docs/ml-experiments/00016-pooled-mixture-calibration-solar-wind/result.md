@@ -5,6 +5,11 @@ theme: calibration-and-uncertainty
 also_relevant_to: []
 status: done
 size: complex
+take_home_message: >-
+  For solar, one spread factor brought the 5% to 95% band from covering 94.3% to 95.3% of cases down
+  to 89.5% to 91.8%, with no detectable change in accuracy. For wind, no planned correction fixed
+  the first two days, and a spread factor on two lead groups, added after seeing the results,
+  brought every lead band to 90.7% to 92.5% coverage and has not been tested on another year.
 hypothesis: >-
   For the 6 solar farms and 3 wind farms, a correction fitted on earlier validation months (a scalar
   spread factor, a spread factor per lead band, a location-and-scale calibrator, or a free quantile

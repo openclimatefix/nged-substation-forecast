@@ -6,10 +6,10 @@ Steps:
    00033's spread factor of 1.15, attach the observed power, and write per-case scores plus the
    flags `nra` (the valid time is outside every oracle event and every logged closure of the
    series), `lag_oracle` (one of the three lag times is inside an oracle event), and `lag_xl` (one
-   is inside an XL event) to `work/metrics/<arm>.parquet`.
+   is inside an RO-NC event) to `work/metrics/<arm>.parquet`.
 2. `results`: the planned contrasts C1 to C3 and the no-harm check at the Bonferroni level, the
    descriptive contrasts, the absolute scores and tail table, the label coverage counts, and the
-   agreement of the XL and oracle signed MW, in `work/results/*.parquet`.
+   agreement of the RO-NC and oracle signed MW, in `work/results/*.parquet`.
 
     uv run python ml-experiments/00086-*/e00086_stats.py [--smoke]
 """
@@ -55,7 +55,8 @@ class Contrast:
         treatment: The arm whose score is differenced.
         reference: The arm it is differenced against.
         subset: `all`, `nra`, `lag_oracle` (NRA rows with a lag in an oracle event), `lag_xl`
-            (NRA rows with a lag in an XL event), or `lag_xl_only` (`lag_xl` and not `lag_oracle`).
+            (NRA rows with a lag in an RO-NC event), or `lag_xl_only` (`lag_xl` and not
+            `lag_oracle`).
     """
 
     treatment: str
@@ -343,10 +344,10 @@ def label_counts(*, smoke: bool) -> pl.DataFrame:
 
 
 def label_agreement() -> pl.DataFrame:
-    """Return, per series, how the XL labels cover the oracle's and how their signed MW compare.
+    """Return, per series, how the RO-NC labels cover the oracle's and how their signed MW compare.
 
     For each Primary series, over the scored year's half-hours: those inside an oracle event,
-    those inside an XL event, those inside both, and the correlation and the median ratio of the
+    those inside an RO-NC event, those inside both, and the correlation and the median ratio of the
     two signed-MW fractions of capacity on the half-hours inside both. A negative correlation
     would mean a sign mismatch.
     """

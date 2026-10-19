@@ -15,6 +15,7 @@ at the scored substation. The decision set is D5, D10, D11, D14, and D16; D9 hol
 """
 
 import json
+from datetime import UTC, datetime
 from typing import Final
 
 import e00104_common as common
@@ -29,7 +30,7 @@ from studies.dp_gam import QUANTILE_COLUMNS
 from studies.experiment_store import losses_for_bootstrap
 
 SITE_OF_ID: Final[dict[int, str]] = {7: "D9", 8: "D11", 10: "D10", 16: "D14", 17: "D5", 18: "D16"}
-GAM_ARMS: Final[tuple[str, ...]] = ("g1", "g_all", "g_all_d1", "g_all_d1_steps")
+GAM_ARMS: Final[tuple[str, ...]] = common.GAM_ARMS
 XGB_ARMS: Final[tuple[str, ...]] = (
     "x_12",
     "x_12z",
@@ -52,17 +53,20 @@ TAIL_COLUMNS: Final[tuple[str, ...]] = ("q01", "q05", "q95", "q99")
 ID_OF_SITE: Final[dict[str, int]] = {site: ident for ident, site in SITE_OF_ID.items()}
 
 
-def load_arm(*, name: str, headline: bool = True) -> pl.DataFrame:
+def load_arm(*, name: str, headline: bool = True, uncentred: bool = False) -> pl.DataFrame:
     """Read an arm's predictions with its per-row score and site label.
 
     Args:
         name: The prediction set's name.
         headline: True to drop rows inside the switching masks.
+        uncentred: True to read a convex-model arm's first-run set, whose spread carries the
+            replica year's mean bias, whatever `common.SPREAD` says.
 
     Returns:
         The predictions with `score` and `site` columns.
     """
-    frame = pl.read_parquet(common.DATA_DIR / "predictions" / name / "predictions.parquet")
+    stored = name if uncentred else common.stored_name(name=name)
+    frame = pl.read_parquet(common.DATA_DIR / "predictions" / stored / "predictions.parquet")
     if headline:
         frame = frame.filter(~pl.col("switching_mask"))
     quantiles = frame.select(QUANTILE_COLUMNS).to_numpy().astype(np.float64)
@@ -488,6 +492,185 @@ def print_lagged(*, arms: dict[str, pl.DataFrame]) -> None:
     del arms
 
 
+D10_JUMP_START: Final[datetime] = datetime(2025, 11, 17, tzinfo=UTC)
+D10_JUMP_END: Final[datetime] = datetime(2025, 12, 15, tzinfo=UTC)
+"""D10's scored-year window with a 15 to 20 point rise in residuals and in the night-time floor
+(from 17 November to 14 December 2025), probably unlabelled switching. An earlier window of the
+same kind starts on 8 November 2024, inside the training data, and is not removed from any fit."""
+
+MEAN_FORECAST_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("g_all_d1", "g1"),
+    ("g_all", "g1"),
+    ("g_all_d1", "g_all"),
+    ("g1", "x_12am"),
+    ("g_all_d1", "x_allam"),
+    ("g_all", "x_12"),
+)
+
+
+def print_spread_bias() -> None:
+    """Print the score of the uncentred spread against the centred spread, per convex arm.
+
+    The uncentred sets (the first run's) add the replica year's mean bias to every quantile.
+    """
+    print(
+        "\n== 12. The replica's mean bias as its own arm: uncentred minus centred spread =="
+        "\n(scores: five sites, rows outside the switching masks; q50 shifts: all rows)"
+    )
+    sites = common.ELIGIBLE_SITES
+    for name in common.GAM_ARMS:
+        centred = pl.read_parquet(
+            common.DATA_DIR / "predictions" / f"{name}_centred" / "predictions.parquet"
+        )
+        raw = pl.read_parquet(common.DATA_DIR / "predictions" / name / "predictions.parquet")
+        scored = {}
+        for label, unmasked in (("centred", centred), ("uncentred", raw)):
+            headline = unmasked.filter(~pl.col("switching_mask"))
+            score = common.quantile_score(
+                actual=headline["actual"].to_numpy().astype(np.float64),
+                quantiles=headline.select(QUANTILE_COLUMNS).to_numpy().astype(np.float64),
+            )
+            scored[label] = headline.with_columns(
+                score=pl.Series(score),
+                site=pl.col("time_series_id").replace_strict(SITE_OF_ID, return_dtype=pl.String),
+            )
+        five = {
+            k: float(v.filter(pl.col("site").is_in(sites))["score"].mean())  # ty: ignore[invalid-argument-type]
+            for k, v in scored.items()
+        }
+        by_site = {
+            label: dict(frame.group_by("site").agg(pl.col("score").mean()).sort("site").iter_rows())
+            for label, frame in scored.items()
+        }
+        shift = (
+            raw.join(centred, on=["time_series_id", "valid_time"], suffix="_c", validate="1:1")
+            .group_by("time_series_id")
+            .agg((pl.col("q50") - pl.col("q50_c")).mean().alias("shift"))
+            .with_columns(site=pl.col("time_series_id").replace_strict(SITE_OF_ID))
+        )
+        print(
+            f"{name:16} five-site score: uncentred {five['uncentred']:.3f}, centred "
+            f"{five['centred']:.3f}; uncentred minus centred "
+            f"{five['uncentred'] - five['centred']:+.3f}"
+        )
+        print(
+            "   per site (uncentred minus centred): "
+            + ", ".join(
+                f"{site} {by_site['uncentred'][site] - by_site['centred'][site]:+.2f}"
+                for site in sorted(by_site["centred"])
+            )
+        )
+        print(
+            "   mean shift of q50 (points): "
+            + ", ".join(
+                f"{s} {v:+.2f}" for s, v in sorted(shift.select("site", "shift").iter_rows())
+            )
+        )
+
+
+def print_d10_window(*, arms: dict[str, pl.DataFrame]) -> None:
+    """Print the headline contrasts and D10's scores with and without D10's 2025 jump window."""
+    print("\n== 13. D10 without its 2025-11-17 to 2025-12-14 window (rows dropped at D10 only) ==")
+    inside = (
+        (pl.col("site") == "D10")
+        & (pl.col("valid_time") >= D10_JUMP_START)
+        & (pl.col("valid_time") < D10_JUMP_END)
+    )
+    trimmed = {name: frame.filter(~inside) for name, frame in arms.items()}
+    n_dropped = arms["g1"].filter(inside).height
+    print(f"rows dropped: {n_dropped} of {arms['g1'].filter(pl.col('site') == 'D10').height}")
+    print(f"{'arm':18}{'D10 with':>10}{'D10 without':>13}{'five with':>11}{'five without':>14}")
+    for name in ("g1", "g_all", "g_all_d1", "g_all_d1_steps", "x_12", "x_12am", "x_allam"):
+        frame, cut = arms[name], trimmed[name]
+        print(
+            f"{name:18}"
+            f"{frame.filter(pl.col('site') == 'D10')['score'].mean():10.3f}"
+            f"{cut.filter(pl.col('site') == 'D10')['score'].mean():13.3f}"
+            f"{frame.filter(pl.col('site').is_in(common.ELIGIBLE_SITES))['score'].mean():11.3f}"
+            f"{cut.filter(pl.col('site').is_in(common.ELIGIBLE_SITES))['score'].mean():14.3f}"
+        )
+    print("contrasts, five sites, 95% interval, window dropped:")
+    for treatment, reference in MEAN_FORECAST_CONTRASTS:
+        result = contrast(
+            arms=trimmed,
+            treatment=treatment,
+            reference=reference,
+            sites=common.ELIGIBLE_SITES,
+            level=None,
+        )
+        print(f"  {treatment} - {reference}: {fmt(result)}")
+
+
+LEAVE_ONE_OUT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("g_all_d1", "g1"),
+    ("g1", "x_12am"),
+    ("g_all_d1", "x_allam"),
+    ("g_all", "g1"),
+    ("g_all_d1", "g_all"),
+)
+
+
+def print_checks_for_audit(*, arms: dict[str, pl.DataFrame]) -> None:
+    """Print the spread-free and leave-one-out checks of the `ml-experiment` skill's audit rule.
+
+    The error of the central forecast is the absolute error of the convex model's mean and of
+    XGBoost's median, so it does not depend on the spread. Each contrast is also repeated with one
+    decision site left out.
+    """
+    print("\n== 14. Checks: error of the central forecast, and leaving one site out ==")
+    print("median forecast minus mean forecast, headline rows, mean per site (points):")
+    for name in common.GAM_ARMS:
+        frame = arms[name].filter(pl.col("site").is_in(common.SCORED_SITES))
+        shift = dict(
+            frame.group_by("site")
+            .agg((pl.col("q50") - pl.col("mean")).mean())
+            .sort("site")
+            .iter_rows()
+        )
+        print(f"  {name:16}" + ", ".join(f"{k} {v:+.2f}" for k, v in shift.items()))
+    central = {}
+    for name, frame in arms.items():
+        column = "mean" if name in common.GAM_ARMS else "q50"
+        central[name] = frame.with_columns(
+            score=(pl.col("actual") - pl.col(column)).abs().cast(pl.Float64)
+        )
+    print("mean absolute error of the central forecast, five sites (GAM mean, XGBoost median):")
+    for name in ("g1", "g_all", "g_all_d1", "g_all_d1_steps", "x_12", "x_all", "x_12amq"):
+        mae = central[name].filter(pl.col("site").is_in(common.ELIGIBLE_SITES))["score"].mean()
+        print(f"  {name:16}{mae:8.3f}")
+    print("contrasts on the error of the central forecast (95% interval), five sites:")
+    for treatment, reference in LEAVE_ONE_OUT_CONTRASTS:
+        error = contrast(
+            arms=central,
+            treatment=treatment,
+            reference=reference,
+            sites=common.ELIGIBLE_SITES,
+            level=None,
+        )
+        quantile = contrast(
+            arms=arms,
+            treatment=treatment,
+            reference=reference,
+            sites=common.ELIGIBLE_SITES,
+            level=None,
+        )
+        print(
+            f"  {treatment} - {reference}: error {error['estimate']:+.3f} "
+            f"({error['low']:+.3f} to {error['high']:+.3f}); quantile score "
+            f"{quantile['estimate']:+.3f}"
+        )
+    print("leaving one decision site out, quantile score, point estimate and sites better:")
+    for treatment, reference in LEAVE_ONE_OUT_CONTRASTS:
+        cells = []
+        for left_out in common.ELIGIBLE_SITES:
+            kept = tuple(site for site in common.ELIGIBLE_SITES if site != left_out)
+            result = contrast(
+                arms=arms, treatment=treatment, reference=reference, sites=kept, level=None
+            )
+            cells.append(f"without {left_out} {result['estimate']:+.3f}")
+        print(f"  {treatment} - {reference}: " + "; ".join(cells))
+
+
 def main() -> None:
     """Print the whole report."""
     arms = {name: load_arm(name=name) for name in MAIN_ARMS}
@@ -513,6 +696,9 @@ def main() -> None:
     print_scarce(arms=arms)
     print_cold()
     print_lagged(arms=arms)
+    print_spread_bias()
+    print_d10_window(arms=arms)
+    print_checks_for_audit(arms=arms)
     print("\nAll-rows scores (including rows inside the switching masks), decision set of five:")
     for name in MAIN_ARMS:
         frame = load_arm(name=name, headline=False)

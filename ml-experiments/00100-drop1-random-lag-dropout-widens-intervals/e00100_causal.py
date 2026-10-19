@@ -1,4 +1,4 @@
-"""The XL detector run causally: only residual values before a cut stamp are visible.
+"""The RO-NC detector run causally: only residual values before a cut stamp are visible.
 
 Experiment 00082 built `xl_intervals.parquet` from the whole record. This module repeats that
 construction on residuals whose values at or after the cut are missing and whose values more than
@@ -68,7 +68,7 @@ def visible(*, values: Arrays, cut: int) -> Arrays:
 def causal_intervals(
     *, state: dict, residual: Arrays, offset: Arrays, cut: int
 ) -> list[CausalInterval]:
-    """Return the intervals that XL reports at a cut, from residuals up to the cut only.
+    """Return the intervals that RO-NC reports at a cut, from residuals up to the cut only.
 
     Args:
         state: `e00100_harness.make_state()`.

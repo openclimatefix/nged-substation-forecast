@@ -94,11 +94,26 @@ class FitCopy:
         name: A label for the copy.
         keep: A boolean tensor over the batch's rows, or `None` to keep every row.
         y: Replacement readings for every row of the batch, or `None` to keep the real ones.
+        capacity_prior: A prior centre for each substation's first capacity increment before the
+            softplus, with `NaN` for none (see `PooledDemandModel.capacity_prior`), or `None`.
+            `onboard_site` does not use it: an onboarded substation starts at the population mean.
+        fixed_scales: Population scales to hold fixed (not learned) in this copy, keyed by family
+            name, or `None`. A larger scale is a weaker prior. The scale applies to every
+            substation, including those with no `capacity_prior` centre.
+        capacity_init: Starting values of `capacity_raw`, shape (substations, season-years), or
+            `None` for the default start. It moves only the site-level values: the population
+            means of the `map` and `variational` priors keep their default start.
+        capacity_override: Capacities in points held fixed in this copy, shape (substations,
+            season-years), with `NaN` where the capacity is learned; or `None`.
     """
 
     name: str
     keep: torch.Tensor | None = None
     y: torch.Tensor | None = None
+    capacity_prior: torch.Tensor | None = None
+    fixed_scales: dict[str, float] | None = None
+    capacity_init: torch.Tensor | None = None
+    capacity_override: torch.Tensor | None = None
 
 
 def fit_many(
@@ -141,6 +156,15 @@ def fit_many(
             n_season_years=batch.n_season_years,
             initial_level=initial_level,
         )
+        if copy.capacity_prior is not None:
+            model.capacity_prior.copy_(copy.capacity_prior)
+        if copy.capacity_override is not None:
+            model.capacity_override = copy.capacity_override.clone()
+        if copy.capacity_init is not None:
+            model.capacity_raw.data.copy_(copy.capacity_init)
+        for family, scale in (copy.fixed_scales or {}).items():
+            model.population_log_scale[family].data.fill_(float(np.log(scale)))
+            model.population_log_scale[family].requires_grad_(False)
         results.append(
             fit_pooled(
                 model=model,
@@ -215,6 +239,7 @@ def onboard_site(
     history_end: np.datetime64,
     forecast_season_year: int,
     steps: int,
+    weeks_of_history: int | None = None,
     learning_rate: float = 0.05,
     seed: int = 0,
 ) -> dict[str, float]:
@@ -235,6 +260,8 @@ def onboard_site(
         history_end: The substation's history ends here; no row may end after it.
         forecast_season_year: The season-year of the forecast.
         steps: Optimiser steps.
+        weeks_of_history: The weeks of history this arm gives the substation, recorded on the
+            model so the pooled residuals can be checked against the arm they are used for.
         learning_rate: Adam's learning rate.
         seed: Seeds the posterior draws.
 
@@ -255,6 +282,8 @@ def onboard_site(
         forecast_season_year=forecast_season_year,
     )
     n_years = model.n_season_years
+    if weeks_of_history is not None:
+        model.weeks_of_history[site] = float(weeks_of_history)
     saved_trained = model.trained.clone()
     saved_centres = model.centre_means.clone()
     saved_flags = {name: p.requires_grad for name, p in model.named_parameters()}
@@ -377,7 +406,8 @@ class PooledResiduals:
         quarter: The calendar quarter of each residual.
         fit_excluded: The substations that had no rows in the fit that made the residuals.
         weeks_of_history: The weeks of history the held-out substation had in that fit's
-            onboarding, or `None` when the fit is not an onboarding arm.
+            onboarding, or `None` when the fit is not an onboarding arm. It must equal the weeks
+            recorded on an onboarded model; `None` fails for one.
     """
 
     site: np.ndarray
@@ -396,16 +426,23 @@ def pooled_residuals(
     Args:
         model: The replica fit.
         batch: The replica year's rows.
-        weeks_of_history: The weeks of history of the onboarding arm, if the model was onboarded.
+        weeks_of_history: The weeks of history of the onboarding arm. If the model was onboarded,
+            this must equal the weeks recorded then (so `None` fails for an onboarded model).
 
     Returns:
         The residuals, tagged with the substations the fit excluded and the weeks of history.
     """
+    # A model that was never onboarded records no weeks, so a weeks value given for it is not
+    # checked.
+    recorded = model.weeks_of_history[model.weeks_of_history >= 0].tolist()
+    if any(weeks != weeks_of_history for weeks in recorded):
+        msg = f"the model was onboarded with {recorded} weeks, not {weeks_of_history}"
+        raise ValueError(msg)
     predicted = predict_pooled(model=model, batch=batch)
     labels = np.array(batch.site_labels)[batch.site.cpu().numpy()]
     excluded = tuple(
         label
-        for label, active in zip(batch.site_labels, model.site_active.tolist(), strict=True)
+        for label, active in zip(batch.site_labels, model.fit_had_rows.tolist(), strict=True)
         if active == 0
     )
     return PooledResiduals(
@@ -419,7 +456,11 @@ def pooled_residuals(
 
 
 def cross_fitted_spread(
-    *, residuals: PooledResiduals, held_out: str, weeks_of_history: int | None = None
+    *,
+    residuals: PooledResiduals,
+    held_out: str,
+    weeks_of_history: int | None = None,
+    allow_seen: bool = False,
 ) -> ResidualSpread:
     """Fit a spread on the other substations' residuals from a fit that never saw `held_out`.
 
@@ -433,6 +474,8 @@ def cross_fitted_spread(
         residuals: The replica residuals of all substations.
         held_out: The label of the substation whose forecast the spread is for.
         weeks_of_history: The weeks of history of the arm the spread is for.
+        allow_seen: Accept residuals from fits that trained on `held_out`'s rows before the
+            replica cut. The caller then states that caveat in the write-up.
 
     Returns:
         The spread, with the quantile levels of `studies.dp_gam.QUANTILE_LEVELS`.
@@ -441,7 +484,7 @@ def cross_fitted_spread(
         ValueError: If the replica fit saw `held_out`, the weeks of history differ, or no other
             substation has residuals.
     """
-    if held_out not in residuals.fit_excluded:
+    if held_out not in residuals.fit_excluded and not allow_seen:
         msg = f"the replica fit saw {held_out}: its residuals cannot make {held_out}'s spread"
         raise ValueError(msg)
     if residuals.weeks_of_history != weeks_of_history:
@@ -455,8 +498,24 @@ def cross_fitted_spread(
         msg = f"no residuals from a substation other than {held_out}"
         raise ValueError(msg)
     band, quarter = residuals.band[others], residuals.quarter[others]
-    centred = _centre_by_group(residual=residuals.residual[others], band=band, quarter=quarter)
-    return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter)
+    return fit_centred_spread(residual=residuals.residual[others], band=band, quarter=quarter)
+
+
+def fit_centred_spread(
+    *, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray
+) -> ResidualSpread:
+    """Fit a spread on residuals centred per (band, quarter) group.
+
+    Args:
+        residual: Actual minus predicted mean, in points.
+        band: The hour band of each residual.
+        quarter: The calendar quarter of each residual.
+
+    Returns:
+        The spread around the mean forecast, with mean zero in each group.
+    """
+    centred = _centre_by_group(residual=residual, band=band, quarter=quarter)
+    return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter, centre=False)
 
 
 def _centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:
@@ -487,6 +546,7 @@ __all__ = [
     "PooledResiduals",
     "after_mask",
     "cross_fitted_spread",
+    "fit_centred_spread",
     "fit_many",
     "onboard_site",
     "pooled_residuals",
