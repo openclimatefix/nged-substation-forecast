@@ -35,6 +35,7 @@ from studies.dp_gam import (  # noqa: E402
 )
 from studies.dp_gam_pooled import (  # noqa: E402
     POOLED_FAMILIES,
+    PooledFamilyType,
     PooledSite,
     PoolingStrength,
     ShortHistoryReplica,
@@ -295,8 +296,8 @@ def _active_set_solution(
 def _tied_mapping(
     *,
     layout: GamLayout,
-    sizes: Mapping[str, int],
-    shared_start: Mapping[str, int],
+    sizes: Mapping[PooledFamilyType, int],
+    shared_start: Mapping[PooledFamilyType, int],
     n_shared: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the matrix from a site's free columns to its theta, and its non-pooled columns.
