@@ -8,8 +8,9 @@ size: complex
 take_home_message: >-
   For wind, a starting guess from the turbine power curve lowered the error by 0.055 points of
   capacity (99.58% interval -0.110 to -0.007), and adding a spread factor made the total 0.071
-  (-0.133 to -0.014). For solar, no change helped detectably, and the full stack was 0.035 points
-  worse with an interval that includes zero (-0.075 to +0.116).
+  (-0.133 to -0.014); the spread factor's extra -0.016 (-0.036 to +0.004) is not detectable. For
+  solar, no change helped detectably, and the full stack was 0.035 points higher with an interval
+  that includes zero (-0.075 to +0.116).
 hypothesis: >-
   For the 6 solar farms and 3 wind farms, stacking the candidate changes of experiments 00012, 00014,
   and 00016 (a CAMS-trained stage 1a and a stage 0 quantile mapping for solar, a power-curve base
