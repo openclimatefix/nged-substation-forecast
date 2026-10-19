@@ -168,6 +168,10 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/plan.md
+          - Long history and drift:
+              - Summary: ml-experiments/themes/differentiable-physics-long-history-and-drift/index.md
+              - Experiments: ml-experiments/themes/differentiable-physics-long-history-and-drift/experiments.md
+              - Research plan: ml-experiments/themes/differentiable-physics-long-history-and-drift/plan.md
       - Generator forecasting:
           - Summary: ml-experiments/themes/generator-forecasting/index.md
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
