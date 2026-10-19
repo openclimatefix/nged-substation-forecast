@@ -128,6 +128,9 @@ which prints a whole list however long it is, and say in the plan which items th
 which it departs from. The overview's "What the experiments taught us so far" section is the
 curated roll-up of the `advice` lists.
 
+A plan also begins by reading `docs/ml-experiments/data-processing.md`, which lists the processing
+that the data needs before a model trains or scores on it.
+
 ## How to score
 
 **Pre-register the planned contrasts, and score them with the existing machinery.**

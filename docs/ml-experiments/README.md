@@ -48,6 +48,11 @@ block, and the documentation build runs the same check. `uv run python
 scripts/mkdocs_hooks/experiment_tables.py --theme <theme>` prints a theme's Experiments table as
 markdown.
 
+## Data processing
+
+**The [data-processing page](data-processing.md) lists the processing that the experiments showed
+the data needs.** Each entry says whether it applies to experiments, to production, or to both.
+
 ## Planned experiments and their order
 
 **Each theme's Research plan page holds its own priority table and the detailed proposals for that

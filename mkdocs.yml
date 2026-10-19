@@ -150,6 +150,7 @@ nav:
       - Cross-validation folds: cross-validation/cross-validation-folds.md
   - ML experiments:
       - Overview: ml-experiments/README.md
+      - Data processing: ml-experiments/data-processing.md
       - Calibration and uncertainty:
           - Summary: ml-experiments/themes/calibration-and-uncertainty/index.md
           - Experiments: ml-experiments/themes/calibration-and-uncertainty/experiments.md
