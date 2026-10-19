@@ -1,6 +1,8 @@
 ---
 id: "00077"
 slug: pvdis-6b-fitted-solar-shape-in-arm-am
+theme: solar-disaggregation
+also_relevant_to: []
 status: finished
 size: medium
 hypothesis: >-

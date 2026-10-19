@@ -1,6 +1,8 @@
 ---
 id: "00089"
 slug: sw2-22-longest-history-nra-forecast-with-ara-lags-masked
+theme: switching-labels-in-the-forecast
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

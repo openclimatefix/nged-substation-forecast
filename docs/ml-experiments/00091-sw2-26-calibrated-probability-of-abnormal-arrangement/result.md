@@ -1,6 +1,8 @@
 ---
 id: "00091"
 slug: sw2-26-calibrated-probability-of-abnormal-arrangement
+theme: switching-labels-in-the-forecast
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

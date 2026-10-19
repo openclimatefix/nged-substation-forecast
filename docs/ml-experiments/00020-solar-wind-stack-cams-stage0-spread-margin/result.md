@@ -1,6 +1,8 @@
 ---
 id: "00020"
 slug: solar-wind-stack-cams-stage0-spread-margin
+theme: calibration-and-uncertainty
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

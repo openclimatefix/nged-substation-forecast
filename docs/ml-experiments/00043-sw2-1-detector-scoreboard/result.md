@@ -1,6 +1,8 @@
 ---
 id: "00043"
 slug: sw2-1-detector-scoreboard
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

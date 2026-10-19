@@ -1,6 +1,8 @@
 ---
 id: "00028"
 slug: pvlive-forecast-in-stage2-gsp-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

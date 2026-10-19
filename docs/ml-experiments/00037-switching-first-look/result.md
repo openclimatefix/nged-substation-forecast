@@ -1,6 +1,8 @@
 ---
 id: "00037"
 slug: switching-first-look
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

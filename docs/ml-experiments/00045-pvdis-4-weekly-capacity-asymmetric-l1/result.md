@@ -1,7 +1,11 @@
 ---
 id: "00045"
 slug: pvdis-4-weekly-capacity-asymmetric-l1
+theme: solar-disaggregation
+also_relevant_to: []
 status: finished
+verdict: refuted
+production_status: not-for-production
 size: complex
 hypothesis: >-
   On the 8 Primary substations (substations that feed 11 kV circuits from the 33 kV network)

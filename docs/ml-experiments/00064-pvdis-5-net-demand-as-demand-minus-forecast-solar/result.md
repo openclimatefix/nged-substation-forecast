@@ -1,6 +1,8 @@
 ---
 id: "00064"
 slug: pvdis-5-net-demand-as-demand-minus-forecast-solar
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

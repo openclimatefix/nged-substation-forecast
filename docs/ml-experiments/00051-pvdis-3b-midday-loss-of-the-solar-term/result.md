@@ -1,6 +1,8 @@
 ---
 id: "00051"
 slug: pvdis-3b-midday-loss-of-the-solar-term
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

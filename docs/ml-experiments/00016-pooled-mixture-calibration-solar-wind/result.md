@@ -1,6 +1,8 @@
 ---
 id: "00016"
 slug: pooled-mixture-calibration-solar-wind
+theme: calibration-and-uncertainty
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

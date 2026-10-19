@@ -1,6 +1,8 @@
 ---
 id: "00062"
 slug: sw2-9-whitened-residual-step-detector
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

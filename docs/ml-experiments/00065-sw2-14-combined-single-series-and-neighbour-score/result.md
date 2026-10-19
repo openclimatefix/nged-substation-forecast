@@ -1,6 +1,8 @@
 ---
 id: "00065"
 slug: sw2-14-combined-single-series-and-neighbour-score
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

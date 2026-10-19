@@ -1,6 +1,8 @@
 ---
 id: "00023"
 slug: lagged-power-and-error-correction-solar-wind
+theme: generator-forecasting
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

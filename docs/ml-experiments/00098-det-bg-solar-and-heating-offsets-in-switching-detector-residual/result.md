@@ -1,6 +1,8 @@
 ---
 id: "00098"
 slug: det-bg-solar-and-heating-offsets-in-switching-detector-residual
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

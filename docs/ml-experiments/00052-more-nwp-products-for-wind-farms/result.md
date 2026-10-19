@@ -1,6 +1,8 @@
 ---
 id: "00052"
 slug: more-nwp-products-for-wind-farms
+theme: generator-forecasting
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

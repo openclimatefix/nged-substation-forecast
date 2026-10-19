@@ -1,6 +1,8 @@
 ---
 id: "00006"
 slug: stage1a-demand-input-feature-sweep
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

@@ -1,6 +1,8 @@
 ---
 id: "00029"
 slug: physics-stage1-solar-pytorch
+theme: generator-forecasting
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

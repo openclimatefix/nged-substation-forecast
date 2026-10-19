@@ -1,6 +1,8 @@
 ---
 id: "00054"
 slug: product-trained-xgboost-wind-farms
+theme: generator-forecasting
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

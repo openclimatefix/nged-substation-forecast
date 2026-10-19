@@ -1,6 +1,8 @@
 ---
 id: "00021"
 slug: error-correction-variants-bsp-gsp-demand
+theme: lagged-power-and-error-correction
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

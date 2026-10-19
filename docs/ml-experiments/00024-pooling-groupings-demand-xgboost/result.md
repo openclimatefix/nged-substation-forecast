@@ -1,6 +1,8 @@
 ---
 id: "00024"
 slug: pooling-groupings-demand-xgboost
+theme: hierarchy-and-pooling
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

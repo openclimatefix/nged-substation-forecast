@@ -1,6 +1,8 @@
 ---
 id: "00019"
 slug: primary-demand-stack-vs-manual-heuristic
+theme: production-reference-and-best-guess
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

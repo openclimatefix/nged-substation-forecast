@@ -1,6 +1,8 @@
 ---
 id: "00059"
 slug: sw2-13-several-windows-in-one-detector
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

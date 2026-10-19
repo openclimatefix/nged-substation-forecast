@@ -1,6 +1,8 @@
 ---
 id: "00070"
 slug: sw2-19-same-sign-neighbour-count
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

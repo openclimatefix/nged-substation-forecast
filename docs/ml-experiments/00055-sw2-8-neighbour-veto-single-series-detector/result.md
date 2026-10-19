@@ -1,6 +1,8 @@
 ---
 id: "00055"
 slug: sw2-8-neighbour-veto-single-series-detector
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

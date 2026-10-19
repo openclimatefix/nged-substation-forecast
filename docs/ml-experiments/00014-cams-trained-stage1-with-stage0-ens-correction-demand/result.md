@@ -1,6 +1,8 @@
 ---
 id: "00014"
 slug: cams-trained-stage1-with-stage0-ens-correction-demand
+theme: weather-products-and-blending
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

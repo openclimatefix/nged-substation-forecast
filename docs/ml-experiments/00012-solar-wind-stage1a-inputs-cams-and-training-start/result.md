@@ -1,6 +1,8 @@
 ---
 id: "00012"
 slug: solar-wind-stage1a-inputs-cams-and-training-start
+theme: generator-forecasting
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

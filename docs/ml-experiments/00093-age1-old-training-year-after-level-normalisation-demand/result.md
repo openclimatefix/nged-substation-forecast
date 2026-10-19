@@ -1,6 +1,8 @@
 ---
 id: "00093"
 slug: age1-old-training-year-after-level-normalisation-demand
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

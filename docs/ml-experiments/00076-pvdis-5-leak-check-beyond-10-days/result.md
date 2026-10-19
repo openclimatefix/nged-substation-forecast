@@ -1,6 +1,8 @@
 ---
 id: "00076"
 slug: pvdis-5-leak-check-beyond-10-days
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

@@ -1,6 +1,8 @@
 ---
 id: "00101"
 slug: ro-nc-detector-on-real-hand-filtered-switching-events
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

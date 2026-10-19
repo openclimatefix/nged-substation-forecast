@@ -1,6 +1,8 @@
 ---
 id: "00035"
 slug: lead-weighted-quantile-blend-of-stored-models
+theme: calibration-and-uncertainty
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-
