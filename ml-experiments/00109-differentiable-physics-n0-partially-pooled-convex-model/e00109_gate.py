@@ -264,6 +264,39 @@ def build_variant(
     return arms.Source(cache_path=cache_path, vintages_path=vintages_path), truth
 
 
+def heating_design(*, cache: FeatureCache, layout: GamLayout, label: str) -> np.ndarray:
+    """Return the heating columns of the design over the substation's two-year window at the cut.
+
+    The gate measures shrinkage on the heating contribution to the prediction over these rows,
+    because the four smoothing windows of a band are nearly collinear: their coefficients can be
+    shrunk hard while the predictions barely move.
+    """
+    features = cache.sites[label]
+    index = training_rows(features=features, cache=cache, cut=FLEET_CUT, window=common.FULL_WINDOW)
+    x = design_matrix(cache=cache, features=features, layout=layout, index=index)
+    return x[:, layout.slices["heating"]]
+
+
+def contribution_slope(
+    *, estimated: dict[str, np.ndarray], truth: dict[str, np.ndarray], design: dict[str, np.ndarray]
+) -> float:
+    """Return the slope of the estimated heating contribution on the true one, through the origin.
+
+    Args:
+        estimated: The estimated deviation of each substation's heating coefficients.
+        truth: The true deviation of each substation's heating coefficients.
+        design: Each substation's heating design columns over its two-year window.
+
+    Returns:
+        The pooled slope over every substation's rows.
+    """
+    numerator = sum(
+        float(((design[s] @ truth[s]) * (design[s] @ estimated[s])).sum()) for s in truth
+    )
+    denominator = sum(float(((design[s] @ truth[s]) ** 2).sum()) for s in truth)
+    return numerator / denominator
+
+
 def band_totals(*, heating: np.ndarray) -> np.ndarray:
     """Return the heating slopes summed over the smoothing windows, one per hour band."""
     return heating.reshape(len(SMOOTHING_HOURS), N_BANDS).sum(axis=0)
@@ -286,8 +319,8 @@ def posterior_factor_and_oracle(
     window: TrainingWindow,
     cut: datetime,
     pinned_points: float,
-) -> tuple[float, np.ndarray]:
-    """Return the closed-form shrinkage factor and the oracle posterior-mean heating slopes.
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the closed-form shrinkage matrix and the oracle posterior-mean heating slopes.
 
     The oracle knows every other coefficient, the fleet mean of the heating slopes, `tau`, and the
     noise variance.
@@ -305,7 +338,8 @@ def posterior_factor_and_oracle(
         pinned_points: The synthetic capacity in points.
 
     Returns:
-        The mean over columns of the diagonal of the shrinkage matrix, and the posterior mean.
+        The shrinkage matrix `S` (so the posterior mean is `S theta_ols + (I - S) mean`), and the
+        posterior mean.
     """
     features = cache.sites[label]
     index = training_rows(features=features, cache=cache, cut=cut, window=window)
@@ -325,7 +359,7 @@ def posterior_factor_and_oracle(
         precision + prior, x_h.T @ residual / noise_variance + prior @ mean_heating
     )
     shrink = np.linalg.solve(precision + prior, precision)
-    return float(np.trace(shrink) / len(posterior)), posterior
+    return shrink, posterior
 
 
 def run_checks(*, workers: int) -> dict[str, Any]:
@@ -443,11 +477,22 @@ def shrinkage_checks(
         }
     }
     mu_heating = fleet_family(joint=full, layout=layout, family="heating")
-    full_delta = np.stack([full.fits[s].theta[0, heating] - mu_heating for s in SYNTHETIC_LABELS])
-    slope_full = slope_through_origin(estimated=full_delta, truth=true_delta)
-    checks["c_full_history_keeps_own"] = {"passed": slope_full >= 0.85, "slope": slope_full}
+    designs = {
+        label: heating_design(cache=cache, layout=layout, label=label) for label in SYNTHETIC_LABELS
+    }
+    true_by_site = dict(zip(SYNTHETIC_LABELS, true_delta, strict=True))
+    full_delta = {s: full.fits[s].theta[0, heating] - mu_heating for s in SYNTHETIC_LABELS}
+    slope_full = contribution_slope(estimated=full_delta, truth=true_by_site, design=designs)
+    slope_full_coefficients = slope_through_origin(
+        estimated=np.stack([full_delta[s] for s in SYNTHETIC_LABELS]), truth=true_delta
+    )
+    checks["c_full_history_keeps_own"] = {
+        "passed": slope_full >= 0.85,
+        "slope_on_heating_contribution": slope_full,
+        "slope_on_coefficients_reported": slope_full_coefficients,
+    }
 
-    deltas, errors, oracle_errors, factors = [], [], [], []
+    deltas, errors, oracle_errors, shrinks = {}, [], [], {}
     ratios: dict[str, list[float]] = {"4w": [], "3m": [], "g_4w": [], "g_3m": []}
     for number, label in enumerate(SYNTHETIC_LABELS):
         joint, built = _fleet_fit(
@@ -459,9 +504,9 @@ def shrinkage_checks(
             rebuild_scale=False,
         )
         fitted = joint.fits[label].theta[0, heating]
-        deltas.append(fitted - fleet_family(joint=joint, layout=layout, family="heating"))
+        deltas[label] = fitted - fleet_family(joint=joint, layout=layout, family="heating")
         errors.append(fitted - true_heating[number])
-        factor, posterior = posterior_factor_and_oracle(
+        shrink, posterior = posterior_factor_and_oracle(
             cache=built.cache,
             layout=layout,
             label=label,
@@ -473,16 +518,17 @@ def shrinkage_checks(
             cut=FLEET_CUT,
             pinned_points=truth["capacity_points"][label],
         )
-        factors.append(factor)
+        shrinks[label] = shrink
         oracle_errors.append(posterior - true_heating[number])
-    slope_short = slope_through_origin(estimated=np.stack(deltas), truth=true_delta)
-    closed_form = float(np.mean(factors))
+    slope_short = contribution_slope(estimated=deltas, truth=true_by_site, design=designs)
+    expected = {s: shrinks[s] @ true_by_site[s] for s in SYNTHETIC_LABELS}
+    closed_form = contribution_slope(estimated=expected, truth=true_by_site, design=designs)
     rmse = float(np.sqrt((np.stack(errors) ** 2).mean()))
     oracle_rmse = float(np.sqrt((np.stack(oracle_errors) ** 2).mean()))
     checks["b_shrinkage_on_4_weeks"] = {
         "passed": bool(abs(slope_short - closed_form) <= 0.15 and rmse <= 1.2 * oracle_rmse),
-        "slope": slope_short,
-        "closed_form_factor": closed_form,
+        "slope_on_heating_contribution": slope_short,
+        "closed_form_slope": closed_form,
         "rmse": rmse,
         "oracle_rmse": oracle_rmse,
         "note": "scale not rebuilt, to isolate shrinkage",
