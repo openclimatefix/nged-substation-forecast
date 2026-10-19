@@ -193,6 +193,29 @@ def test_the_kl_term_matches_numpy_on_random_inputs():
         assert float(term) == pytest.approx(float(expected.sum()), rel=1e-3, abs=1e-4)
 
 
+def test_a_capacity_override_replaces_the_capacity_in_the_forecast(batch: PooledBatch):
+    (model,), _ = _fit(batch, DpConfig(population_scales=PopulationScales()), [FitCopy(name="m")])
+    base = predict_pooled(model=model, batch=batch)
+    model.capacity_override = model.capacities().detach() * 0.0
+    nothing = predict_pooled(model=model, batch=batch)
+    model.capacity_override = None
+    assert np.array_equal(base, predict_pooled(model=model, batch=batch))
+    daylight = (batch.pv_shape > 0.05).numpy() & batch.solar_gate.numpy()
+    assert float(np.abs(nothing - base)[daylight].mean()) > 0.0
+
+
+def test_a_capacity_start_is_copied_into_the_model_before_fitting(batch: PooledBatch):
+    start = torch.full((len(batch.site_labels), batch.n_season_years), 1.25)
+    models, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="s", capacity_init=start)],
+        config=DpConfig(population_scales=PopulationScales()),
+        initial_level=_level(batch),
+        steps=1,
+    )
+    assert torch.allclose(models[0].capacity_raw, start, atol=0.2)
+
+
 def test_the_loss_is_the_negative_elbo_per_row(batch: PooledBatch):
     (model,), _ = _fit(batch, DpConfig(variational=True), [FitCopy(name="v")])
     model.eval()
