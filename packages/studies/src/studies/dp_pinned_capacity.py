@@ -12,11 +12,14 @@ of experiment 45 instead, so the model fits everything else around a fixed solar
 - **A cut before the first vintage.** The first origin is 2023-08-07 (2025-04-14 at D9, 2026-08-03
   at D18). When the earliest vintage's origin is at most `EARLY_VINTAGE_MAX_GAP_DAYS` after `c`,
   that vintage is used as it is, and the write-up discloses the leak of those weeks. When the gap is
-  longer, the vintage's weekly shape is hindsight too far past the cut to use, so only its level at
-  the cut is kept (the median of its last `HOLD_WEEKS` weeks up to `c`) and earlier weeks are the
-  level scaled back at `CAPACITY_GROWTH_PER_YEAR` per year.
+  longer, the vintage's weekly shape is not used. The capacity is the median of the vintage's last
+  `HOLD_WEEKS` weeks (its level at its own origin), scaled back at `CAPACITY_GROWTH_PER_YEAR` per
+  year over the time between the origin and each week. **That level is hindsight:** the vintage
+  was fitted with every reading up to its origin, which is months after the cut. The cases are D9
+  at the 2024-07-01 cut (9.5 months), D18 at every cut (up to the whole scored year), and every
+  site at the 2022-07-01 cut of the tuning year's replica (13 months).
 - **Unobserved weeks** hold the last observed value, and leading unobserved weeks take the first
-  observed value. A zero is never read as capacity.
+  observed value.
 - **After the cut,** and for any week beyond the last week of the vintage (the vintage of D14 stops
   at 2023-04-17), the capacity is the median of the last `HOLD_WEEKS` weeks up to `c`, not the last
   week alone: the latest week of a real-time capacity has 3.63 times the path error of the same
@@ -58,10 +61,11 @@ EARLY_VINTAGE_MAX_GAP_DAYS: Final[int] = 42
 """A vintage whose origin is at most this long after the cut is used as it is (6 weeks)."""
 
 DAYS_PER_YEAR: Final[float] = 365.25
+"""Days in a year, for the growth prior's exponent."""
 
 CapacitySourceType = Literal["vintage", "early_vintage", "growth_prior"]
 """Where the pinned capacity came from: a vintage at or before the cut, a vintage up to 6 weeks
-after the cut, or the level at the cut scaled back at the growth prior."""
+after the cut, or a later vintage's level at its own origin scaled back at the growth prior."""
 
 
 @dataclass(frozen=True)
@@ -146,8 +150,8 @@ def pinned_capacity(*, vintages: pl.DataFrame, table: SiteTable, cut: datetime) 
         The pinned capacity.
 
     Raises:
-        ValueError: If the substation has no vintage, or its vintage has no week on or before
-            the cut.
+        ValueError: If the substation has no vintage, or (unless the growth prior is used) its
+            vintage has no week on or before the cut.
     """
     site_rows = vintages.filter(
         pl.col("variant") == VINTAGE_VARIANT, pl.col("time_series_id") == table.time_series_id
@@ -179,16 +183,18 @@ def pinned_capacity(*, vintages: pl.DataFrame, table: SiteTable, cut: datetime) 
         unobserved=unobserved,
     )
     cut_day = np.datetime64(cut_date.isoformat(), "D")
-    up_to_cut = np.flatnonzero(weeks <= cut_day)
-    if len(up_to_cut) == 0:
-        msg = f"{table.site}'s capacity vintage has no week on or before {cut_date}"
-        raise ValueError(msg)
-    held = float(np.median(points[up_to_cut][-HOLD_WEEKS:]))
     if source == "growth_prior":
-        years_before = (cut_day - weeks).astype(np.float64) / DAYS_PER_YEAR
-        points = np.where(
-            weeks <= cut_day, held / (1.0 + CAPACITY_GROWTH_PER_YEAR) ** years_before, held
-        )
+        origin_day = np.datetime64(origin.isoformat(), "D")
+        level = float(np.median(points[-HOLD_WEEKS:]))
+        growth = 1.0 + CAPACITY_GROWTH_PER_YEAR
+        points = level / growth ** ((origin_day - weeks).astype(np.float64) / DAYS_PER_YEAR)
+        held = level / growth ** ((origin_day - cut_day).astype(np.float64) / DAYS_PER_YEAR)
+    else:
+        up_to_cut = np.flatnonzero(weeks <= cut_day)
+        if len(up_to_cut) == 0:
+            msg = f"{table.site}'s capacity vintage has no week on or before {cut_date}"
+            raise ValueError(msg)
+        held = float(np.median(points[up_to_cut][-HOLD_WEEKS:]))
     return PinnedCapacity(
         site=table.site,
         cut=cut,

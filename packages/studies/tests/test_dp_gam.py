@@ -326,6 +326,17 @@ def test_no_training_row_ends_after_the_cut(dp_synthetic_cache: FeatureCache):
         assert_no_lookahead(cache=dp_synthetic_cache, index=late, cut=CUT)
 
 
+def test_the_last_drift_knot_is_at_the_cut_and_none_lies_after_it(
+    dp_synthetic_cache: FeatureCache,
+):
+    layout, _ = _layout_for(cache=dp_synthetic_cache, spec=GamSpec(drift="d1"))
+    cut_day = (np.datetime64("2024-07-01T00:00", "us") - np.datetime64("1970-01-01", "us")) / (
+        np.timedelta64(1, "D")
+    )
+    assert layout.knot_days[-1] == cut_day
+    assert layout.knot_days.max() <= cut_day
+
+
 def test_a_twelve_month_window_starts_twelve_months_before_the_cut(
     dp_synthetic_cache: FeatureCache,
 ):
@@ -911,6 +922,77 @@ def test_a_shrunk_final_knot_moves_the_forecast_towards_the_recent_mean_and_zero
     full = predict_gam(cache=cache, fit=fits[1.0], index=index)
     assert np.abs(full - free_prediction).max() > 0.1
     assert np.allclose(free.theta[0], fits[1.0].theta[0])
+    # With a full shrink, the held knot of each band is the mean of its last 12 fitted knots.
+    n_knots = len(free.layout.knot_days)
+    start = free.layout.slices["drift"].start
+    shrunk = dp_gam._forecast_theta(fit=fits[1.0], member=0)
+    for band in range(N_BANDS):
+        knots = free.theta[0][start + band * n_knots : start + (band + 1) * n_knots]
+        assert shrunk[start + (band + 1) * n_knots - 1] == pytest.approx(knots[-12:].mean())
+        assert shrunk[start + band * n_knots + 3] == knots[3]
+
+
+def test_a_shrunk_final_knot_leaves_the_rows_before_the_cut_alone(
+    dp_synthetic_cache: FeatureCache,
+):
+    window = TrainingWindow(months=24)
+    spec = GamSpec(drift="d1", final_knot="shrunk", final_knot_shrink=1.0)
+    free_spec = GamSpec(drift="d1")
+    fits = [
+        fit_gam(
+            cache=dp_synthetic_cache,
+            site="S1",
+            specs=[s],
+            cut=CUT,
+            window=window,
+            season_years=SEASON_YEARS,
+        )
+        for s in (spec, free_spec)
+    ]
+    inside = np.flatnonzero(
+        (dp_synthetic_cache.end_times > np.datetime64("2024-06-15T00:00", "us"))
+        & (dp_synthetic_cache.end_times <= np.datetime64("2024-07-01T00:00", "us"))
+    )
+    assert np.allclose(
+        predict_gam(cache=dp_synthetic_cache, fit=fits[0], index=inside),
+        predict_gam(cache=dp_synthetic_cache, fit=fits[1], index=inside),
+    )
+
+
+def test_a_gam_spec_refuses_a_shrink_outside_zero_to_one_and_a_knot_option_without_drift():
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        GamSpec(drift="d1", final_knot="shrunk", final_knot_shrink=1.5)
+    with pytest.raises(ValueError, match="needs a drift term"):
+        GamSpec(drift="none", final_knot="pinned")
+
+
+def test_a_pinned_replica_is_built_at_its_own_cut(dp_synthetic_cache: FeatureCache):
+    cut = replica_cut(cut=CUT)
+    pinned = _pinned_capacity(cache=dp_synthetic_cache, cut=cut)
+    table = dp_synthetic_cache.sites["S1"].table
+    weeks = [date(2019, 9, 2) + timedelta(days=7 * i) for i in range(300)]
+    vintages = pl.DataFrame(
+        {
+            "time_series_id": table.time_series_id,
+            "variant": "frozen",
+            "origin_monday": cut.date(),
+            "week_start": [w for w in weeks if w <= cut.date()],
+            "capacity_mw": 1.0,
+            "unobserved": False,
+        }
+    )
+    replica = replica_residuals(
+        cache=dp_synthetic_cache,
+        site="S1",
+        spec=GamSpec(capacity="pinned"),
+        cut=CUT,
+        window=TrainingWindow(months=12),
+        season_years=SEASON_YEARS,
+        capacity_vintages=vintages,
+    )
+    assert replica.fit_cut == cut
+    assert pinned.cut == cut
+    assert np.isfinite(replica.residuals).all()
 
 
 def test_the_replica_of_a_pinned_arm_needs_the_vintages(dp_synthetic_cache: FeatureCache):

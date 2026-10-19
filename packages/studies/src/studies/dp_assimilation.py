@@ -25,7 +25,15 @@ the newest usable reading. No switching mask enters the filter, because the hand
 are hindsight; the masks apply to fitting the DP and to scoring.
 
 **The simple fix.** `run_ewma` keeps an exponentially weighted mean of the raw residuals per band,
-held flat over every lead, under the same cut.
+held flat over every lead, under the same cut. It is a normalised weighted mean with decay by
+wall-clock gap, so it equals a local-level Kalman filter only asymptotically on a regular grid, and
+not exactly.
+
+**Across a refit,** `stitch_out_of_sample_residuals` joins each fit's residuals after its own cut
+into one stream, so the filter's state carries forward and never re-runs on a fit's in-sample
+residuals, which would pull the level towards zero at the cut. The replica's filter
+(`post_filter_lead_spread`) starts cold on its year and leaves out the first `REPLICA_BURN_IN_DAYS`
+days, whereas the scored filter is warm.
 
 **The hyperparameters** (log `q`, logit `phi`, log `sigma_z`, log `sigma_eps`) are fitted per site
 by marginal likelihood under a normal prior shared across sites, whose mean and spread are updated
@@ -35,10 +43,11 @@ from the sites' own fits (empirical Bayes).
 calendar quarter, and lead band, centred on their median (`LeadSpread`).
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from math import exp, log, pi
-from typing import Final, Literal
+from typing import Final, Literal, Protocol
 
 import numpy as np
 from scipy.optimize import minimize
@@ -68,6 +77,7 @@ LEAD_BAND_UPPER_DAYS: Final[tuple[int, ...]] = (1, 3, 7)
 """The last day ahead of each lead band: day 1, days 2 to 3, and days 4 to 7."""
 
 N_LEAD_BANDS: Final[int] = len(LEAD_BAND_UPPER_DAYS)
+"""The number of lead bands."""
 
 PRIOR_START: Final[tuple[float, float, float, float]] = (log(0.05), 4.2, log(0.35), log(1.0))
 """The start of the shared prior mean: a level step of 0.22 points a day, a transient with a
@@ -80,11 +90,24 @@ PRIOR_SPREAD: Final[tuple[float, float, float, float]] = (1.5, 1.0, 1.0, 1.0)
 MIN_PRIOR_SPREAD: Final[float] = 0.25
 """The shared prior's spread never shrinks below this, so the prior stays a prior with few sites."""
 
-LOGIT_PHI_BOUNDS: Final[tuple[float, float]] = (-2.0, 8.0)
-LOG_BOUNDS: Final[tuple[float, float]] = (-12.0, 6.0)
-"""Bounds on the unconstrained hyperparameters, which keep the optimiser off degenerate corners."""
+MIN_SIGMA_EPS: Final[float] = 0.05
+"""The smallest observation noise standard deviation in points, which keeps the update stable."""
+
+BOUNDS: Final[tuple[tuple[float, float], ...]] = (
+    (-12.0, 6.0),
+    (-2.0, 8.0),
+    (-12.0, 6.0),
+    (log(MIN_SIGMA_EPS), 6.0),
+)
+"""Bounds on the four unconstrained hyperparameters, which keep the optimiser off degenerate
+corners: log `q`, logit `phi`, log `sigma_z`, and log `sigma_eps`."""
+
+VARIANCE_FLOOR: Final[float] = 1e-12
+"""A state variance is never allowed below this after an update, so rounding cannot make it
+negative."""
 
 N_EMPIRICAL_BAYES_ROUNDS: Final[int] = 3
+"""How many times the shared prior is refitted from the sites' own fits."""
 
 CorrectionKindType = Literal["kalman", "ewma"]
 """Which correction a trace holds."""
@@ -133,7 +156,12 @@ class FilterHyperparameters:
     @staticmethod
     def from_array(*, values: np.ndarray) -> FilterHyperparameters:
         """Build the hyperparameters from four unconstrained values."""
-        return FilterHyperparameters(*(float(v) for v in values))
+        return FilterHyperparameters(
+            log_q=float(values[0]),
+            logit_phi=float(values[1]),
+            log_sigma_z=float(values[2]),
+            log_sigma_eps=float(values[3]),
+        )
 
 
 @dataclass(frozen=True)
@@ -155,6 +183,25 @@ class CorrectionTrace:
     anomaly: tuple[np.ndarray, ...]
     phi: float
     log_likelihood: float
+
+
+class TraceBuilder(Protocol):
+    """A function that builds a correction trace from a residual stream.
+
+    `run_ewma` and `functools.partial(run_kalman, hyper=hyper)` both satisfy it.
+    """
+
+    def __call__(self, *, residual: np.ndarray, band: np.ndarray) -> CorrectionTrace:
+        """Build the trace.
+
+        Args:
+            residual: Observed minus forecast on the grid, in points, `NaN` where there is none.
+            band: The hour band of each grid row.
+
+        Returns:
+            The trace.
+        """
+        ...
 
 
 @dataclass(frozen=True)
@@ -226,9 +273,9 @@ def _kalman_band(
         level += gain_l * innovation
         anomaly += gain_z * innovation
         p_ll, p_lz, p_zz = (
-            p_ll - gain_l * gain_l * innovation_variance,
+            max(p_ll - gain_l * gain_l * innovation_variance, VARIANCE_FLOOR),
             p_lz - gain_l * gain_z * innovation_variance,
-            p_zz - gain_z * gain_z * innovation_variance,
+            max(p_zz - gain_z * gain_z * innovation_variance, VARIANCE_FLOOR),
         )
         levels[k] = level
         anomalies[k] = anomaly
@@ -408,16 +455,7 @@ def site_log_likelihood(
     *, residual: np.ndarray, band: np.ndarray, hyper: FilterHyperparameters
 ) -> float:
     """Return the marginal log likelihood of a site's residual stream."""
-    total = 0.0
-    for band_index in range(N_BANDS):
-        positions, values = _band_readings(residual=residual, band=band, band_index=band_index)
-        total += _kalman_band(positions=positions, values=values, hyper=hyper)[2]
-    return total
-
-
-def _bounds() -> list[tuple[float, float]]:
-    """Return the bounds of the four unconstrained hyperparameters."""
-    return [LOG_BOUNDS, LOGIT_PHI_BOUNDS, LOG_BOUNDS, LOG_BOUNDS]
+    return run_kalman(residual=residual, band=band, hyper=hyper).log_likelihood
 
 
 def fit_site_hyperparameters(
@@ -439,6 +477,10 @@ def fit_site_hyperparameters(
 
     Returns:
         The hyperparameters that maximise the marginal likelihood plus the log prior.
+
+    Raises:
+        ValueError: If the optimiser does not report success, since a poor fit would pull the
+            shared prior of every site.
     """
 
     def negative_posterior(values: np.ndarray) -> float:
@@ -447,12 +489,19 @@ def fit_site_hyperparameters(
         prior = -0.5 * float((((values - prior_mean) / prior_spread) ** 2).sum())
         return -(likelihood + prior)
 
-    result = minimize(negative_posterior, x0=start, method="L-BFGS-B", bounds=_bounds())
+    result = minimize(negative_posterior, x0=start, method="L-BFGS-B", bounds=BOUNDS)
+    if not result.success:
+        msg = f"the hyperparameter fit did not converge: {result.message}"
+        raise ValueError(msg)
     return FilterHyperparameters.from_array(values=result.x)
 
 
 def fit_filter_hyperparameters(
-    *, residuals: Mapping[str, np.ndarray], band: np.ndarray
+    *,
+    residuals: Mapping[str, np.ndarray],
+    band: np.ndarray,
+    end_times: np.ndarray | None = None,
+    window: tuple[np.datetime64, np.datetime64] | None = None,
 ) -> dict[str, FilterHyperparameters]:
     """Fit every site's hyperparameters under a prior shared across sites.
 
@@ -464,16 +513,25 @@ def fit_filter_hyperparameters(
         residuals: Each site's residual stream on the grid, in points, `NaN` where there is no
             reading; the tuning year's out-of-sample residuals.
         band: The hour band of each grid row.
+        end_times: The grid's half-hour ends as `datetime64[us]`, needed with `window`.
+        window: If given, the half-open interval (start, end] that every finite residual must lie
+            in, which makes "fitted on the tuning year only" a guarantee of this function.
 
     Returns:
         Each site's fitted hyperparameters.
 
     Raises:
-        ValueError: If there are no sites.
+        ValueError: If there are no sites, or a residual lies outside `window`.
     """
     if not residuals:
         msg = "no residual streams to fit the filter on"
         raise ValueError(msg)
+    if window is not None and end_times is not None:
+        for site, stream in residuals.items():
+            outside = np.isfinite(stream) & ~((end_times > window[0]) & (end_times <= window[1]))
+            if outside.any():
+                msg = f"{site} has {int(outside.sum())} residuals outside the fitting window"
+                raise ValueError(msg)
     prior_mean = np.array(PRIOR_START)
     prior_spread = np.array(PRIOR_SPREAD)
     fitted: dict[str, FilterHyperparameters] = {}
@@ -552,11 +610,49 @@ class LeadSpread:
         return self.by_lead_band[lead_band].quantiles(mean=mean, band=band, quarter=quarter)
 
 
+def stitch_out_of_sample_residuals(
+    *, cut_positions: Sequence[int], residuals: Sequence[np.ndarray]
+) -> np.ndarray:
+    """Join each fit's out-of-sample residuals into one stream across refits.
+
+    Fit `i` supplies the grid positions after its own cut and up to the next fit's cut (the last
+    fit supplies every position after its cut). A fit's in-sample residuals, at or before its own
+    cut, never enter the stream, so the filter's state carries forward across a refit and switches
+    to the new fit's residuals at the cut. Positions at or before the first cut stay `NaN`.
+
+    Args:
+        cut_positions: Each fit's cut as a grid position, strictly ascending.
+        residuals: Each fit's observed-minus-forecast residuals on the grid, in points; only the
+            positions after its cut need be meaningful.
+
+    Returns:
+        One stream on the grid, with `NaN` where no fit supplies a residual.
+
+    Raises:
+        ValueError: If there are no fits, the arrays and cuts differ in number or length, or the
+            cuts are not strictly ascending.
+    """
+    if not cut_positions or len(cut_positions) != len(residuals):
+        msg = "stitching needs one residual array per cut, and at least one"
+        raise ValueError(msg)
+    if any(later <= earlier for earlier, later in pairwise(cut_positions)):
+        msg = "the cuts must be strictly ascending"
+        raise ValueError(msg)
+    if len({len(r) for r in residuals}) != 1:
+        msg = "every fit's residuals must cover the same grid"
+        raise ValueError(msg)
+    stream = np.full(len(residuals[0]), np.nan)
+    ends = [*cut_positions[1:], len(stream) - 1]
+    for cut, end, fit_residuals in zip(cut_positions, ends, residuals, strict=True):
+        stream[cut + 1 : end + 1] = fit_residuals[cut + 1 : end + 1]
+    return stream
+
+
 def post_filter_lead_spread(
     *,
     end_times: np.ndarray,
     replica: ReplicaResiduals,
-    run: Callable[[np.ndarray, np.ndarray], CorrectionTrace],
+    run: TraceBuilder,
     delay_hours: float = DEFAULT_DELAY_HOURS,
     burn_in_days: int = REPLICA_BURN_IN_DAYS,
 ) -> LeadSpread:
@@ -573,7 +669,7 @@ def post_filter_lead_spread(
         replica: The replica's residuals, fitted with `drop_switching=False` so the stream holds
             the switching rows, as a live filter would see them.
         run: Builds the correction's trace from the residual stream and the hour band of each
-            grid row, for example `run_kalman` or `run_ewma` with the arm's hyperparameters.
+            grid row, for example `run_ewma` or `functools.partial(run_kalman, hyper=hyper)`.
         delay_hours: The telemetry delay.
         burn_in_days: How many days at the start of the replica year to leave out.
 
@@ -584,7 +680,7 @@ def post_filter_lead_spread(
     stream[replica.index] = replica.residuals
     grid_band = np.zeros(len(end_times), dtype=np.int64)
     grid_band[replica.index] = replica.band
-    trace = run(stream, grid_band)
+    trace = run(residual=stream, band=grid_band)
     valid_times = end_times[replica.index]
     settled = valid_times > valid_times.min() + np.timedelta64(burn_in_days, "D")
     kept = settled & ~replica.switching

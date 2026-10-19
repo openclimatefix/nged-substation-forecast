@@ -5,7 +5,9 @@ information cut by changing every residual after the cut, and the hyperparameter
 likelihood at the truth of a simulated stream.
 """
 
+from dataclasses import replace
 from datetime import UTC, datetime
+from functools import partial
 from typing import Final
 
 import numpy as np
@@ -28,6 +30,7 @@ from studies.dp_assimilation import (  # noqa: E402
     run_ewma,
     run_kalman,
     site_log_likelihood,
+    stitch_out_of_sample_residuals,
     usable_cutoff_positions,
 )
 from studies.dp_gam import ReplicaResiduals, ResidualSpread  # noqa: E402
@@ -142,7 +145,9 @@ def test_the_level_follows_a_permanent_step_and_the_transient_releases_a_pulse()
     band = _bands(n=n)
     step_at = 48 * 20
     stream = np.where(np.arange(n) >= step_at, 3.0, 0.0)
-    hyper = FilterHyperparameters(np.log(0.5), 3.5, np.log(0.3), np.log(0.3))
+    hyper = FilterHyperparameters(
+        log_q=np.log(0.5), logit_phi=3.5, log_sigma_z=np.log(0.3), log_sigma_eps=np.log(0.3)
+    )
     trace = run_kalman(residual=stream, band=band, hyper=hyper)
     late = trace.level[1][-1]
     assert late == pytest.approx(3.0, abs=0.3)
@@ -150,6 +155,8 @@ def test_the_level_follows_a_permanent_step_and_the_transient_releases_a_pulse()
     pulse = np.zeros(n)
     pulse[(np.arange(n) >= 48 * 20) & (np.arange(n) < 48 * 20 + 6)] = 4.0
     trace = run_kalman(residual=pulse, band=band, hyper=hyper)
+    during = trace.anomaly[0][(trace.positions[0] >= 48 * 20) & (trace.positions[0] < 48 * 20 + 6)]
+    assert np.abs(during).max() > 1.0  # the filter reacts to the pulse
     assert abs(trace.level[1][-1]) < 0.3
     assert abs(trace.anomaly[1][-1]) < 0.3
 
@@ -227,15 +234,9 @@ def test_the_true_hyperparameters_beat_wrong_ones_and_the_fit_finds_them_roughly
     band = _bands(n=n)
     truth = site_log_likelihood(residual=residual, band=band, hyper=HYPER)
     for wrong in (
-        FilterHyperparameters(
-            HYPER.log_q + 3.0, HYPER.logit_phi, HYPER.log_sigma_z, HYPER.log_sigma_eps
-        ),
-        FilterHyperparameters(
-            HYPER.log_q, HYPER.logit_phi - 3.0, HYPER.log_sigma_z, HYPER.log_sigma_eps
-        ),
-        FilterHyperparameters(
-            HYPER.log_q, HYPER.logit_phi, HYPER.log_sigma_z, HYPER.log_sigma_eps + 2.0
-        ),
+        replace(HYPER, log_q=HYPER.log_q + 3.0),
+        replace(HYPER, logit_phi=HYPER.logit_phi - 3.0),
+        replace(HYPER, log_sigma_eps=HYPER.log_sigma_eps + 2.0),
     ):
         assert site_log_likelihood(residual=residual, band=band, hyper=wrong) < truth - 10.0
     flat = np.array([0.0, 0.0, 0.0, 0.0])
@@ -305,17 +306,17 @@ def test_a_drifting_level_widens_the_raw_spread_but_not_the_post_filter_spread()
         fit_cut=datetime(2024, 1, 1, tzinfo=UTC),
         switching=np.zeros(n, dtype=bool),
     )
-    hyper = FilterHyperparameters(np.log(0.5), 3.5, np.log(0.3), np.log(0.5))
+    hyper = FilterHyperparameters(
+        log_q=np.log(0.5), logit_phi=3.5, log_sigma_z=np.log(0.3), log_sigma_eps=np.log(0.5)
+    )
     spread = post_filter_lead_spread(
-        end_times=end_times,
-        replica=replica,
-        run=lambda stream, bands: run_kalman(residual=stream, band=bands, hyper=hyper),
+        end_times=end_times, replica=replica, run=partial(run_kalman, hyper=hyper)
     )
     raw = ResidualSpread.fit(residuals=residual, band=band, quarter=quarter, centre=True)
     post = spread.by_lead_band[0].table[0, 0]
     assert post[-1] - post[0] < 0.4 * (raw.table[0, 0, -1] - raw.table[0, 0, 0])
     far = spread.by_lead_band[2].table[0, 0]
-    assert far[-1] - far[0] >= post[-1] - post[0]
+    assert far[-1] - far[0] > post[-1] - post[0]
 
 
 def test_a_flagged_switching_row_stays_in_the_stream_but_leaves_the_spread():
@@ -339,10 +340,112 @@ def test_a_flagged_switching_row_stays_in_the_stream_but_leaves_the_spread():
     )
     streams: list[np.ndarray] = []
 
-    def run(stream: np.ndarray, bands: np.ndarray) -> CorrectionTrace:
-        streams.append(stream.copy())
-        return run_ewma(residual=stream, band=bands)
+    def run(*, residual: np.ndarray, band: np.ndarray) -> CorrectionTrace:
+        streams.append(residual.copy())
+        return run_ewma(residual=residual, band=band)
 
     spread = post_filter_lead_spread(end_times=end_times, replica=replica, run=run)
     assert streams[0][switching].min() == 50.0
-    assert spread.by_lead_band[0].table.max() < 60.0
+    assert spread.by_lead_band[0].table.max() < 5.0
+
+
+def test_a_leak_of_the_target_reading_into_the_spread_would_be_caught():
+    # White noise has nothing in its past that predicts the next reading, so no causal correction
+    # can shrink the spread below the noise. A filter that saw the target would track it.
+    end_times = np.arange(
+        np.datetime64("2024-01-01T00:30", "us"),
+        np.datetime64("2024-07-01T00:30", "us"),
+        np.timedelta64(30, "m"),
+    )
+    n = len(end_times)
+    residual = np.random.default_rng(10).normal(0.0, 1.0, size=n)
+    replica = ReplicaResiduals(
+        residuals=residual,
+        band=_bands(n=n),
+        quarter=np.zeros(n, dtype=int),
+        index=np.arange(n),
+        fit_cut=datetime(2024, 1, 1, tzinfo=UTC),
+        switching=np.zeros(n, dtype=bool),
+    )
+    tight = FilterHyperparameters(
+        log_q=np.log(5.0), logit_phi=3.5, log_sigma_z=np.log(1.0), log_sigma_eps=np.log(0.06)
+    )
+    spread = post_filter_lead_spread(
+        end_times=end_times, replica=replica, run=partial(run_kalman, hyper=tight)
+    )
+    for lead_band in range(N_LEAD_BANDS):
+        table = spread.by_lead_band[lead_band].table[0, 0]
+        assert table[-1] - table[0] > 0.9 * (4.65 * 1.0) * 0.8
+
+
+def test_the_stitched_stream_takes_each_fits_residuals_only_after_its_own_cut():
+    n = 100
+    first = np.full(n, 1.0)
+    second = np.full(n, 2.0)
+    third = np.full(n, 3.0)
+    stream = stitch_out_of_sample_residuals(
+        cut_positions=[20, 50, 80], residuals=[first, second, third]
+    )
+    assert np.isnan(stream[:21]).all()
+    assert (stream[21:51] == 1.0).all()
+    assert (stream[51:81] == 2.0).all()
+    assert (stream[81:] == 3.0).all()
+    # Changing a fit's in-sample residuals, at or before its own cut, changes nothing.
+    in_sample = second.copy()
+    in_sample[:51] = -99.0
+    again = stitch_out_of_sample_residuals(
+        cut_positions=[20, 50, 80], residuals=[first, in_sample, third]
+    )
+    assert np.array_equal(stream, again, equal_nan=True)
+
+
+def test_stitching_refuses_unordered_cuts_missing_fits_and_mismatched_grids():
+    with pytest.raises(ValueError, match="strictly ascending"):
+        stitch_out_of_sample_residuals(cut_positions=[50, 20], residuals=[np.zeros(9), np.zeros(9)])
+    with pytest.raises(ValueError, match="one residual array per cut"):
+        stitch_out_of_sample_residuals(cut_positions=[5], residuals=[])
+    with pytest.raises(ValueError, match="same grid"):
+        stitch_out_of_sample_residuals(cut_positions=[2, 4], residuals=[np.zeros(9), np.zeros(8)])
+
+
+def test_a_hyperparameter_fit_that_does_not_converge_raises(monkeypatch: pytest.MonkeyPatch):
+    class Failed:
+        success = False
+        message = "ABNORMAL_TERMINATION_IN_LNSRCH"
+        x = np.zeros(4)
+
+    monkeypatch.setattr("studies.dp_assimilation.minimize", lambda *args, **kwargs: Failed())
+    with pytest.raises(ValueError, match="did not converge"):
+        fit_site_hyperparameters(
+            residual=np.zeros(48),
+            band=np.zeros(48, dtype=int),
+            prior_mean=np.zeros(4),
+            prior_spread=np.ones(4),
+            start=np.zeros(4),
+        )
+
+
+def test_a_residual_outside_the_fitting_window_is_refused():
+    n = 48 * 10
+    end_times = np.arange(
+        np.datetime64("2024-01-01T00:30", "us"),
+        np.datetime64("2024-01-11T00:30", "us"),
+        np.timedelta64(30, "m"),
+    )
+    stream = np.full(n, np.nan)
+    stream[:48] = 0.1
+    stream[-1] = 0.2
+    with pytest.raises(ValueError, match="outside the fitting window"):
+        fit_filter_hyperparameters(
+            residuals={"S1": stream},
+            band=_bands(n=n),
+            end_times=end_times,
+            window=(np.datetime64("2024-01-01", "us"), np.datetime64("2024-01-05", "us")),
+        )
+
+
+def test_a_tiny_observation_noise_keeps_the_variances_positive():
+    stream = _simulate(hyper=HYPER, n=48 * 20, seed=12)
+    tiny = replace(HYPER, log_sigma_eps=np.log(1e-6))
+    trace = run_kalman(residual=stream, band=_bands(n=len(stream)), hyper=tiny)
+    assert np.isfinite(trace.log_likelihood)

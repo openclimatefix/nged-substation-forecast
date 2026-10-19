@@ -148,7 +148,11 @@ REPLICA_MONTHS: Final[int] = 12
 LAST_TRAINED_MIN_SHAPE: Final[float] = 1e-3
 """A training row carries solar signal when its derated unit shape is above this."""
 FINAL_KNOT_TIE_WEIGHT: Final[float] = 1e6
-"""The weight of the penalty that ties the last drift knot to the one before it."""
+"""The weight of the penalty that ties the last drift knot to the one before it.
+
+The weight is absolute, not scaled by the number of rows, so a fit with `final_knot="pinned"` needs
+float64 (the default).
+"""
 SHRINK_KNOTS: Final[int] = 12
 """A shrunk final knot is pulled towards the mean of this many last knots."""
 
@@ -183,6 +187,20 @@ class GamSpec:
     covid_flag: bool = False
     final_knot: FinalKnotType = "free"
     final_knot_shrink: float = 0.5
+
+    def __post_init__(self) -> None:
+        """Refuse a shrink outside 0 to 1, and a final-knot option on a spec with no drift.
+
+        Raises:
+            ValueError: If `final_knot_shrink` is outside 0 to 1, or `final_knot` is not `free`
+                while `drift` is `none`.
+        """
+        if not 0.0 <= self.final_knot_shrink <= 1.0:
+            msg = f"final_knot_shrink must be between 0 and 1, not {self.final_knot_shrink}"
+            raise ValueError(msg)
+        if self.final_knot != "free" and self.drift == "none":
+            msg = f"final_knot={self.final_knot!r} needs a drift term, but drift is 'none'"
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True)
@@ -940,7 +958,8 @@ def predict_gam(
 
     The drift is held at its last knot, because the layout's knots end at the cut and the hat
     functions are clipped there. With `final_knot="shrunk"` the held value is the last knot pulled
-    towards the mean of the last 12 knots. The capacity of a season-year after
+    towards the mean of the last 12 knots, for rows that end after the fit's cut only; a row at or
+    before the cut uses the fitted knot. The capacity of a season-year after
     `fit.last_season_year` is set explicitly to that season-year's capacity, and a pinned fit
     subtracts the pinned capacity times the derated unit shape.
 
@@ -961,6 +980,8 @@ def predict_gam(
     layout = fit.layout
     out = np.empty(len(index))
     theta = _forecast_theta(fit=fit, member=member)
+    free_theta = fit.theta[member]
+    after_cut = cache.end_times > naive_utc(moment=fit.cut)
     for chunk in _chunks(index=index):
         rows = index[chunk]
         x = design_matrix(cache=cache, features=features, layout=layout, index=rows)
@@ -971,7 +992,7 @@ def predict_gam(
         if not np.isfinite(x).all():
             msg = f"{fit.site} has a non-finite input among the rows to predict"
             raise ValueError(msg)
-        out[chunk] = x @ theta
+        out[chunk] = np.where(after_cut[rows], x @ theta, x @ free_theta)
         if fit.pinned is not None:
             out[chunk] -= pinned_solar_points(
                 cache=cache, features=features, pinned=fit.pinned, index=rows

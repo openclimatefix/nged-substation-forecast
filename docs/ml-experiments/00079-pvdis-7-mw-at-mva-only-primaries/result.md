@@ -81,12 +81,17 @@ headline: >-
   -0.068); C1b (level 1.5) is -0.887 (-0.920 to -0.754). C2a (balanced accuracy minus 0.5) is
   +0.279 (+0.157 to +0.337); C2b is +0.311 (+0.184 to +0.372). Without Wrangle T1 the balanced
   accuracy is 0.819 (0.791 to 0.843) at level 1.0 and 0.856 (0.831 to 0.874) at level 1.5.
+take_home_message: >-
+  Hiding the sign of the MW series and recovering it works for the solar capacity (median error
+  0.09 to 0.11 of the signed fit's, against 0.29 to 1.00 for the naive fit) but not to the pre-
+  registered level for the direction of flow (balanced accuracy 0.78 to 0.81, rule 0.80), so the
+  verdict is partly supported. At 7 of the 8 Primaries metered only in MVA, the fit found no
+  reverse flow.
 lessons: >-
   A fit of the magnitude of demand minus solar recovers the solar capacity through zero flow, and
-  finds the direction of flow with a balanced accuracy of 0.78 to 0.86, except where reverse flow is
-  the
-  usual state, as at Wrangle T1. A reactive-power floor of 20% of midday power already lowers the
-  capacity recovery to a median error of 0.31 and the balanced accuracy to 0.67. On the real
+  finds the direction of flow with a balanced accuracy of 0.78 to 0.81 (0.82 to 0.86 without Wrangle
+  T1, where reverse flow is the usual state). A reactive-power floor of 20% of midday power already
+  lowers the capacity recovery to a median error of 0.31 and the balanced accuracy to 0.67. On the real
   series the fit finds no reverse flow at 7 of the 8 MVA-only Primaries, and finds a flow that is
   negative on 75% to 87% of daylight half-hours at Stickney from 2021, which cannot be checked.
 production_status: not-for-production

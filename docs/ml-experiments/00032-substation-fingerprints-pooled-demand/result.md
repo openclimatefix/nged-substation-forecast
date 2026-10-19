@@ -58,6 +58,10 @@ headline: >-
   C4, identifier plus both fingerprints minus identifier alone, Primary quantile score over all
   leads: +0.02 points of capacity (99.375% interval -0.05 to +0.10). C7, held-out substation with
   training-window statistics minus none: +1.39 (+0.99 to +1.91), worse.
+take_home_message: >-
+  Adding numeric substation fingerprints to the pooled model changed the Primary score by at most
+  0.02 points of capacity, and training-window statistics made a held-out substation worse by 1.39
+  (inconclusive overall; recent power statistics alone helped it by 0.23, post hoc).
 lessons: >-
   The identifier already carries everything the fingerprints describe, so adding them changes
   nothing in the warm arms (C1 to C4 within 0.1 points). A likely cause of the cold-start failure,
