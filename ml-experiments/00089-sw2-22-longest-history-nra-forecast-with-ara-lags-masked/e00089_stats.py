@@ -4,7 +4,7 @@ Steps:
 
 1. `metrics`: for each arm, read the monthly refits' quantiles (`e00089_fit.py`), apply experiment
    00033's spread factor of 1.15, attach the observed power, and write per-case scores plus the
-   flags `nra` (the valid time is outside every ARA: an XL event, a logged event, or a logged
+   flags `nra` (the valid time is outside every ARA: an RO-NC event, a logged event, or a logged
    closure), `lag_ara` (one of the three lag times is inside an ARA), and `lag_oracle` (one is
    inside a logged event) to `work/metrics/<arm>.parquet`.
 2. `results`: the planned contrasts C1 to C3 and the no-harm check at the Bonferroni level, the
@@ -352,7 +352,7 @@ def label_counts(*, smoke: bool) -> pl.DataFrame:
 def events_per_year() -> pl.DataFrame:
     """Return, per calendar year and label source, the events and labelled half-hours.
 
-    The XL source counts detector intervals by onset; the oracle source counts logged events and
+    The RO-NC source counts detector intervals by onset; the oracle source counts logged events and
     closures by their onset or logged close. Half-hours are those of the 16 series summed.
     """
     series = common.series_table().filter(pl.col("substation_type").is_in(common.GROUPS))

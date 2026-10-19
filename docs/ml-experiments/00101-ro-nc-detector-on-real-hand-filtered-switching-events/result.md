@@ -11,11 +11,10 @@ take_home_message: >-
   the 35, 6 sit where the detector's residual panel holds no readings and 12 have a step under 4
   noise units.
 hypothesis: >-
-  Post hoc, and descriptive: the refit-offset neighbour-count detector (RO-NC, called XL in
-  experiments 70 to 82) finds less of the moved power on the 66 real, hand-filtered switching
-  transfers than on injected transfers (0.770 of the moved MW) because most real transfers are
-  small, short, or have no metered receiver, and not because the detector fails on a real transfer
-  of the size the injected ones have.
+  Post hoc, and descriptive: the refit-offset neighbour-count detector (RO-NC) finds less of the
+  moved power on the 66 real, hand-filtered switching transfers than on injected transfers (0.770 of
+  the moved MW) because most real transfers are small, short, or have no metered receiver, and not
+  because the detector fails on a real transfer of the size the injected ones have.
 prediction: >-
   Written after the numbers were read, so not a prediction. On the 14 real transfers of 25% or more
   of the receiving load lasting over 1 day, the interval of RO-NC's MW-weighted recall includes

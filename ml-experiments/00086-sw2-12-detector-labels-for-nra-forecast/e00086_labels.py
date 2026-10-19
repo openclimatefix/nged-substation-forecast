@@ -12,7 +12,7 @@ For each Primary series the module builds three arrays aligned with `common.grid
 
 The labelled set holds events from January 2022 only, so earlier half-hours are never marked.
 
-`load_xl_labels` builds the same arrays from the XL detector's intervals (experiment 00082's
+`load_xl_labels` builds the same arrays from the RO-NC detector's intervals (experiment 00082's
 `xl_intervals.parquet`) instead of NGED's logs. Its `closed` array is the oracle's, because the
 scored rows are defined by NGED's logged closures whichever labels the model sees.
 """
@@ -138,7 +138,7 @@ def load_labels(*, series: pl.DataFrame) -> dict[str, SeriesLabels]:
 def load_xl_labels(
     *, series: pl.DataFrame, oracle: dict[str, SeriesLabels]
 ) -> dict[str, SeriesLabels]:
-    """Return each series' label arrays from the XL detector's intervals.
+    """Return each series' label arrays from the RO-NC detector's intervals.
 
     An interval `[onset, end)` of experiment 00082's stamps marks `in_event` on the half-hours
     from `onset` to `end - 1`. Its signed MW (the series' own 24-hour residual step, negative on a
@@ -164,7 +164,7 @@ def load_xl_labels(
     }
     offset = (XL_GRID_START - common.GRID_START) / common.STEP
     if offset != int(offset):
-        msg = "the XL grid must lie on a whole number of half-hours from the grid start"
+        msg = "the RO-NC grid must lie on a whole number of half-hours from the grid start"
         raise ValueError(msg)
     for interval in pl.read_parquet(XL_INTERVALS_PATH).iter_rows(named=True):
         row = by_id.get(int(interval["series"]))
