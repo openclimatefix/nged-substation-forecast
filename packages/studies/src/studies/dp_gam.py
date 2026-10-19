@@ -578,7 +578,7 @@ def solve_bounded_quadratic(
         tolerance = default_tolerance(dtype=matrix.dtype)
     batch, p = rhs.shape
     scale = rhs.abs().amax(dim=1).clamp(min=1.0)
-    unconstrained = torch.linalg.solve(matrix, rhs[:, :, None])[:, :, 0]
+    unconstrained = _solve(matrix=matrix, rhs=rhs)
     free = ~constrained[None, :] | (unconstrained > 0.0)
     best_broken = torch.full((batch,), p + 1, dtype=torch.long, device=matrix.device)
     patience = torch.zeros(batch, dtype=torch.long, device=matrix.device)
@@ -615,6 +615,28 @@ def solve_bounded_quadratic(
     return theta, violation
 
 
+def _solve(*, matrix: torch.Tensor, rhs: torch.Tensor) -> torch.Tensor:
+    """Solve `A x = b` for each problem of the batch.
+
+    On the CPU a batch of more than one system is solved one system at a time. PyTorch's batched
+    LU solve with the MKL backend fails ("Pivots given to lu_solve must all be greater or equal to
+    1") from about 200 by 200 upwards when it runs on four or more threads, and it can return wrong
+    answers without raising; a single system is unaffected. The GPU solves the batch in one call.
+
+    Args:
+        matrix: Shape (batch, p, p).
+        rhs: Shape (batch, p).
+
+    Returns:
+        The solutions, shape (batch, p).
+    """
+    if matrix.device.type == "cpu" and matrix.shape[0] > 1:
+        return torch.stack(
+            [torch.linalg.solve(m, r[:, None])[:, 0] for m, r in zip(matrix, rhs, strict=True)]
+        )
+    return torch.linalg.solve(matrix, rhs[:, :, None])[:, :, 0]
+
+
 def _solve_on_free_set(
     *, matrix: torch.Tensor, rhs: torch.Tensor, free: torch.Tensor
 ) -> torch.Tensor:
@@ -626,9 +648,7 @@ def _solve_on_free_set(
     reduced[:, diagonal, diagonal] = torch.where(
         outside, torch.ones_like(rhs), reduced[:, diagonal, diagonal]
     )
-    return torch.linalg.solve(
-        reduced, torch.where(outside, torch.zeros_like(rhs), rhs)[:, :, None]
-    )[:, :, 0]
+    return _solve(matrix=reduced, rhs=torch.where(outside, torch.zeros_like(rhs), rhs))
 
 
 def _kkt_violation(
