@@ -31,7 +31,7 @@ the batching of several fits in one solve.
 """
 
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, fields, replace
 from typing import Final, Literal
@@ -287,7 +287,7 @@ def phi_parameters(*, model: PooledDemandModel) -> list[nn.Parameter]:
 
 
 @contextmanager
-def trainable_only(*, model: PooledDemandModel, parameters: list[nn.Parameter]) -> Iterator[None]:
+def trainable_only(*, model: PooledDemandModel, parameters: list[nn.Parameter]) -> Generator[None]:
     """Let only `parameters` train inside the block, and restore every flag afterwards."""
     saved = {name: p.requires_grad for name, p in model.named_parameters()}
     try:
