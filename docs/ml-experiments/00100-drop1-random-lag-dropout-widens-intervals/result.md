@@ -90,11 +90,12 @@ production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   Training the demand forecast with lags hidden at random did not make its band wider on half-hours
-  where a lag is missing: on real rows the band covered 0.799 of actuals for the plain model and
-  0.802 with lags hidden in 10% of training rows, against a nominal 0.90. Hiding lags in 30% of
-  training rows removed the accuracy loss that masking alone causes on injected transfers, so an
-  XGBoost model can be trained to run with missing lags. An input that tells the model a lag is
-  missing, or a separate XGBoost model of the quantile spread, are untested routes to a wider band.
+  where a lag is missing: on real rows the band covered 0.80 (hidden in 10% of training rows) to 0.84
+  (30%) of actuals, against a nominal 0.90. Hiding lags in 30% of rows did remove the accuracy loss
+  that masking alone causes on injected transfers (-0.02 points, 95% interval -0.35 to +0.38 against
+  the plain model). Hiding lags in 10% of rows left +0.26 (98.75% interval -0.15 to +0.85), not
+  separable from zero or from the loss. An input that tells the XGBoost model a lag is missing, or a
+  separate XGBoost model of the quantile spread, are untested routes to a wider band.
 boosters: data/ml-experiments/00100-drop1-random-lag-dropout-widens-intervals/work/boosters/
 ---
 
