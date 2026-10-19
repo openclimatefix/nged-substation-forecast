@@ -275,6 +275,14 @@ def known_rows(*, rows: pl.DataFrame, refit: datetime, config: Config) -> pl.Dat
     began at or before the refit. The frozen model, anchored at 2025-06-30 23:30, sees the pilot's
     training rows up to that valid time (experiment 00033's recipe has no 3.5-hour gap).
 
+    Args:
+        rows: One series' training rows with `valid_time` and `power_fcst_init_time`.
+        refit: The refit time.
+        config: The configuration, which says whether the model is frozen.
+
+    Returns:
+        The rows the refit may see.
+
     Raises:
         ValueError: If no row is usable, or a kept row is newer than the refit allows.
     """
@@ -411,6 +419,15 @@ def prepared_run(
     *, run_rows: pl.DataFrame, row: dict, arrays: common.SeriesArrays, a7: bool
 ) -> pl.DataFrame:
     """Return one run's member rows for one series with derived columns and lags, sorted.
+
+    Args:
+        run_rows: The run's frame rows for the series, every valid time with every member.
+        row: The series' row of `common.series_table()`.
+        arrays: The series' arrays on the dense grid.
+        a7: Whether to add experiment 00030's weekly-analogue summaries.
+
+    Returns:
+        The rows sorted by valid time and member, with the derived columns and lags.
 
     Raises:
         ValueError: If a valid time lacks a member.

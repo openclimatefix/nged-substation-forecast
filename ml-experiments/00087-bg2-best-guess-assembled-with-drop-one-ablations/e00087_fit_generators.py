@@ -292,6 +292,15 @@ def fit_job(
 ) -> tuple[gen.FittedQuantiles, int, float]:
     """Fit one job's model for one series and log its seconds.
 
+    Args:
+        arm: The arm being fitted.
+        job: The refit and the runs it serves.
+        row: The series' row of the site table.
+        rounds: Boosting rounds.
+        nthread: Threads for the fit.
+        workers: Worker processes sharing the GPU, logged with the seconds.
+        log_hours: Whether to append the job's seconds to the GPU-hour log.
+
     Returns:
         The model, the number of training rows, and the fit's wall-clock seconds.
     """
