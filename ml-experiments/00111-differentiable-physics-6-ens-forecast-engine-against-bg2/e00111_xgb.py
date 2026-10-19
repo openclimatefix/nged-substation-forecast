@@ -16,8 +16,8 @@ daily run pooled into 11 mixture quantiles. They differ in the inputs and the st
 
 The margin arms refit monthly, not weekly as the plan said, because the plan's compute estimate was
 20 times too low. They train on leads to 168 hours because the DP's forecast covers 168 hours; the
-lagless arms keep SIMP1's rows. A refit at time `t` trains on the control member's rows with a valid time
-at least 3.5 hours before `t` and a run that began at or before `t`, from each site's
+lagless arms keep SIMP1's rows. A refit at time `t` trains on the control member's rows with a
+valid time at least 3.5 hours before `t` and a run that began at or before `t`, from each site's
 `first_usable` instant (experiment 103's start cut). It forecasts the runs of the tuning,
 replicate, and scored periods whose origin lies from `t` to the next refit.
 
