@@ -118,36 +118,45 @@ Pipeline: Opus plan review; Opus writes the module changes and the scripts; Opus
 module PR; light review of the experiment scripts (configuration only); Sonnet mechanical fixes;
 Opus numbers review against the printed report; Sonnet prose sweep.
 
-## Module changes (`studies.dp_pooled`, tests under 5 minutes each)
+## Module changes (`studies.dp_pooled` and `studies.dp_onboarding`, reviewed in PR 1356)
 
-- **Variational posterior (the `variational` switch).** A mean-field Gaussian posterior over the
-  site-level parameters named in the series brief: the style loadings, the per-site deviation, the
-  heating slope and threshold, the holiday loadings, the level, and the capacity increments per
-  season-year. Each parameter family has a population mean and a population scale, learned through
-  the evidence lower bound; shared network weights stay point estimates with weight decay. The
-  forecast uses the posterior mean. The heating-threshold prior is 15.5 ± 2 °C.
+- **Variational posterior (the `variational` switch).** A mean-field Gaussian posterior over six
+  families of site-level parameters: the style loadings, the per-site deviation, the heating slope
+  and threshold, the level, and the capacity increments. The holiday loadings stay shared point
+  estimates, because the model holds them per holiday period and hour band, not per substation. Each
+  family has a population mean (zero for the loadings and the deviation) and a population scale,
+  learned through the evidence lower bound; shared network weights stay point estimates with weight
+  decay. The first trained season-year's capacity increment is a substation's whole capacity, so it
+  is its own family (`capacity_first`), and the later growth increments are another. Only
+  substations with solar rows enter the capacity prior. The forecast uses the posterior mean. The
+  heating threshold's population mean carries a normal prior of 15.5 ± 2 °C. Levels start from the
+  training rows only.
 - **MAP ablation.** The same model with the population scales fixed by tuning on 2024-07 to
   2025-06 (the brief's ablation arm).
-- **Batched fits over row weights and targets.** `fit_pooled` accepts a leading dimension of B
-  row-weight vectors and B target vectors and fits B independent copies of the model in one call.
-  A leave-one-site-out fit is a weight vector that zeroes one site; a short-history fit zeroes one
-  site's rows before a date; an injected-farm fit changes one site's target. Peak GPU memory is
-  recorded for B = 1, 6, and 12.
-- **Onboarding.** `onboard_site` takes a fitted pooled model, freezes the shared modules and the
-  population priors, and fits only the new site's site-level parameters on its rows, starting from
-  the population mean.
+- **Many fits from one batch.** `fit_many` fits one independent model per copy, where a copy is a
+  row subset (a leave-one-site-out fit drops one site's rows; a short-history fit drops one site's
+  early rows) and optionally replaced targets (an injected-farm fit). The copies run one after
+  another, because one fit already fills the GPU; stacking copies would add memory and no speed. The
+  peak GPU memory of one copy is recorded.
+- **Onboarding.** `onboard_site` takes a fitted pooled model in which the site had no rows, freezes
+  the shared modules and the population distributions, and fits only the new site's site-level
+  parameters on its rows, starting from the population mean. The site's capacity has an increment
+  in every season-year its rows touch and in the forecast season-year.
 - **Spread.** The replica spread of `studies.dp_gam` (the arm refitted 12 months before the cut
   with its own window rule, residual quantiles per hour band and quarter), applied to the pooled
-  model. For onboarding and short-history arms the replica repeats the whole procedure at the
-  replica cut, and the residual quantiles come from the other held-out sites' replica residuals
-  (cross-fitted across sites), stratified by weeks of site history.
-- **Tests.** (1) A pooled fit on one site equals the per-site fit on the same rows. (2) A row
-  weight of zero is exact: changing a held-out site's targets leaves its leave-one-site-out fit
-  unchanged to 1e-6. (3) The batched fit of B copies matches B separate fits to 0.01 points. (4)
-  MVA rows enter through the `apparent` operator with Q = 0 and the solar gate off, so they train
-  demand only; their PV gradient is exactly zero. (5) Leakage asserts as in Part 2: no target,
-  feature, capacity, or residual at or after the training cut; nothing scores a valid time on or
-  after 2026-07-01; an onboarded site's rows all lie inside its own history window.
+  model. The residuals are centred per group, so the spread carries no bias from the replica year;
+  Part 2's audit found that adding raw residual quantiles to a mean forecast shifts it by the
+  replica year's bias. For an onboarding arm, the spread for site s comes from the replica of the
+  same arm with s held out, scored on the other sites, so s's history never reaches s's spread; the
+  residuals carry the weeks of history of the arm.
+- **Tests.** (1) A pooled fit on one site equals the per-site fit on the same rows. (2) Changing a
+  held-out site's targets or starting values leaves the other sites' fit unchanged. (3) A copy of
+  `fit_many` equals the same fit alone. (4) MVA rows train demand only; their solar gradient is
+  exactly zero. (5) Leakage asserts: an onboarded site's rows all end by its history end, the
+  onboarded site is one that was held out, and onboarding leaves every other site's predictions,
+  parameters, and centring means bit-identical. (6) The Kullback-Leibler term and the loss match their
+  closed forms; the site prior ignores a site with no rows; onboarding fits the capacity of the
+  season-year its rows fall in; the spread is centred.
 
 ## Sites and rows
 
@@ -165,7 +174,9 @@ Opus numbers review against the printed report; Sonnet prose sweep.
   filtered as experiment 101 does, padded 24 hours each side at the donor and every receiver,
   already applied in Part 1's `rows.parquet`. The 2-year window lies wholly after 2022-03, so every
   training year has masks. The masks are hindsight labels, a mild leak shared by every arm.
-- **Scored sites:** the MW Primaries. The decision count uses D5, D10, D11, D14, and D16 (history
+- **Scored sites:** the MW Primaries. D10 has two unmasked jumps of 15 to 20 points (from about
+  2024-11-08 and 2025-11-01, probably unlabelled switching), so every D10 number is reported with
+  and without those windows. The decision count uses D5, D10, D11, D14, and D16 (history
   counted at the tuning year's first day, 2024-07-01, as in Part 2), so Phase A needs 4 of 5. D9
   (9.0 months at 2024-07-01) is scored and reported beside the count. D18 (4 months at the cut) is
   the one real short-history site and is reported descriptively beside C3.
