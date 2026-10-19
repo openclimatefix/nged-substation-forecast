@@ -1,6 +1,11 @@
 ---
 id: "00102"
 slug: simp1-simplifying-the-bg2-best-guess-before-production
+theme: production-reference-and-best-guess
+also_relevant_to:
+  - lagged-power-and-error-correction
+  - generator-forecasting
+  - solar-disaggregation
 status: planned
 size: complex
 hypothesis: >-
@@ -47,6 +52,10 @@ metric: >-
   Quantile score (twice the mass-weighted mean pinball loss) in points of capacity over 11 levels
   (0.01, 0.05 to 0.95, 0.99). Reported and deciding nothing: mean absolute error of the median, and
   coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99.
+take_home_message: >-
+  Planned. The experiment removes one part at a time from the best-guess forecast (the blend of five
+  models, the three recent-power inputs, the solar offset, the 14-day correction) and measures what
+  each part is worth, so that production can take the simpler forecast where it loses little.
 code: ml-experiments/00102-simp1-simplifying-the-bg2-best-guess-before-production/
 ---
 

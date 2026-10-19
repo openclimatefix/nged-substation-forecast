@@ -56,6 +56,7 @@ ARM_LABELS: Final[dict[str, str]] = {
     "p_a5_spread_off": "BG2 without the spread factor",
     "p_b_bg2_st_uncorrected": "BG2 without the 14-day correction",
     "ref_manual_heuristic": "NGED manual heuristic",
+    "ref_climatology": "Climatology",
     "p_s2_stack": "Stack (frozen model, 14-day correction)",
     "b_weekly": "BG2 (weekly model with lags)",
     "b_nl_weekly": "Simplest: weekly model, no lags",
@@ -74,6 +75,30 @@ for _member, _name in (
 ):
     ARM_LABELS[f"p_m_{_member}"] = f"Member alone: {_name}"
 BAND_COLOUR: Final[str] = ocf.DATA_BLUE_LIGHT
+MEMBER_PHRASES: Final[dict[str, str]] = {
+    "member W alone - BG2": "Weekly model alone - BG2",
+    "member M alone - BG2": "Monthly model alone - BG2",
+    "member AN alone - BG2": "Analogue model alone - BG2",
+    "member PT alone - BG2": "Model pooled by type alone - BG2",
+    "member ST alone - BG2": "Frozen model with correction alone - BG2",
+    "BG2 with ST uncorrected - BG2": "BG2 without the 14-day correction - BG2",
+}
+MIDDAY_ARMS: Final[tuple[str, ...]] = (
+    "p_s6_bg2",
+    "p_s5_blend_no_offset",
+    "p_b_bg2_st_uncorrected",
+    "p_m_w",
+    "p_m_m",
+    "p_m_an",
+    "p_m_pt",
+    "p_m_st",
+    "p_s4_weekly",
+    "p_nl_weekly",
+    "p_nl_monthly",
+    "p_s2_stack",
+    "ref_manual_heuristic",
+    "ref_climatology",
+)
 WEEKS: Final[tuple[str, ...]] = ("summer", "winter", "large_error")
 WEEK_TITLES: Final[dict[str, str]] = {
     "summer": "a sunny summer week",
@@ -84,7 +109,11 @@ WEEK_TITLES: Final[dict[str, str]] = {
 
 def label_for(*, arm: str) -> str:
     """Return a plain-words label for an arm."""
-    return ARM_LABELS.get(arm, arm)
+    if arm in ARM_LABELS:
+        return ARM_LABELS[arm]
+    if arm.startswith("p_b_"):
+        return f"Blend of {score.plain_blend(arm=arm)}"
+    return arm
 
 
 def contrast_figure(*, contrasts: pl.DataFrame, cls: str) -> alt.Chart:
@@ -95,9 +124,11 @@ def contrast_figure(*, contrasts: pl.DataFrame, cls: str) -> alt.Chart:
             & (pl.col("metric") == "qs")
             & (pl.col("scope") == "all")
             & ~pl.col("contrast").str.starts_with("C5")
+            & ~pl.col("contrast").str.starts_with("blend ")
+            & ~pl.col("contrast").str.contains("reproduction")
         )
         .with_columns(
-            label=pl.col("contrast"),
+            label=pl.col("contrast").replace(MEMBER_PHRASES),
             safe=pl.col("upper") < score.THRESHOLDS[cls],
         )
         .to_pandas()
@@ -116,7 +147,8 @@ def contrast_figure(*, contrasts: pl.DataFrame, cls: str) -> alt.Chart:
             color=alt.Color(
                 "kind:N",
                 scale=alt.Scale(
-                    domain=["same as BG2", "safe limit"], range=[ocf.GREY_5, ocf.BRAND_ORANGE]
+                    domain=["same as BG2", "safe limit"],
+                    range=[ocf.ENSEMBLE_LINE, ocf.BRAND_ORANGE],
                 ),
                 legend=alt.Legend(orient="top", title=None),
             ),
@@ -192,6 +224,9 @@ def lead_figure(*, absolute: pl.DataFrame) -> alt.Chart:
 def midday_figure(*, absolute: pl.DataFrame, contrasts: pl.DataFrame) -> alt.Chart:
     """Return the Primary scores at midday in summer, at night, and in other hours."""
     scopes = ["midday_summer", "night", "other"]
+    best = contrasts.filter(pl.col("contrast").str.starts_with("best"))["treatment"].unique()
+    shown = [*MIDDAY_ARMS, *best.to_list()]
+    absolute = absolute.filter(pl.col("arm").is_in(shown))
     panels = []
     for suffix, title in (
         ("|offset5", "5 Primary substations with a solar offset"),
@@ -386,7 +421,7 @@ def members_figure(
     data = pl.concat([*frames, actual])
     order = ["Actual", *names.values()]
     colours = [
-        ocf.GREY_5,
+        ocf.ENSEMBLE_LINE,
         ocf.DATA_SKY,
         ocf.DATA_BLUE,
         ocf.DATA_PURPLE,

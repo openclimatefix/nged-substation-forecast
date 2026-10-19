@@ -344,6 +344,20 @@ def choose_best(*, cases: ClassCases, size: int) -> str:
     return best
 
 
+MEMBER_WORDS: Final[dict[str, str]] = {
+    "w": "weekly",
+    "m": "monthly",
+    "an": "analogue",
+    "pt": "pooled",
+    "st": "frozen",
+}
+
+
+def plain_blend(*, arm: str) -> str:
+    """Return a blend arm's members in words, such as `weekly + analogue + frozen`."""
+    return " + ".join(MEMBER_WORDS[m] for m in arm.removeprefix("p_b_").split("_"))
+
+
 def primary_contrasts(*, best_pair: str, best_triple: str) -> list[Contrast]:
     """Return the contrasts of the Primary class, the first being the verdict contrast C1."""
     bg2 = "p_s6_bg2"
@@ -375,8 +389,10 @@ def primary_contrasts(*, best_pair: str, best_triple: str) -> list[Contrast]:
         Contrast("BG2 without spread factor - BG2", "Primary", "p_a5_spread_off", bg2),
         Contrast("BG2 with ST uncorrected - BG2", "Primary", "p_b_bg2_st_uncorrected", bg2),
         Contrast("BG2 rebuilt - BG2 (reproduction)", "Primary", "p_b_bg2_rebuilt", bg2),
-        Contrast("best pair - BG2", "Primary", best_pair, bg2),
-        Contrast("best triple - BG2", "Primary", best_triple, bg2),
+        Contrast(f"best pair ({plain_blend(arm=best_pair)}) - BG2", "Primary", best_pair, bg2),
+        Contrast(
+            f"best triple ({plain_blend(arm=best_triple)}) - BG2", "Primary", best_triple, bg2
+        ),
         Contrast("stack - BG2", "Primary", "p_s2_stack", bg2),
         Contrast("manual heuristic - BG2", "Primary", "ref_manual_heuristic", bg2),
         Contrast("simplest candidate - stack", "Primary", "p_nl_weekly", "p_s2_stack"),
