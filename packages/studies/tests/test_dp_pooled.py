@@ -198,11 +198,27 @@ def test_the_interaction_network_does_not_see_the_suns_elevation(dp_synthetic_ca
     batch = build_pooled_batch(
         cache=_two_site_cache(dp_synthetic_cache), sites=("S1", "S2"), cut_end=CUT
     )
+    model = _model(batch=batch, config=DpConfig(interaction_hidden=(4,)))
     mixed = torch.zeros(batch.n_rows)
-    inputs = PooledDemandModel._interaction_inputs(batch=batch, mixed=mixed)
+    inputs = model._interaction_inputs(batch=batch, mixed=mixed)
     assert inputs.shape[1] == INTERACTION_INPUTS
     changed = replace(batch, elevation=batch.elevation + 30.0)
-    assert torch.equal(PooledDemandModel._interaction_inputs(batch=changed, mixed=mixed), inputs)
+    assert torch.equal(model._interaction_inputs(batch=changed, mixed=mixed), inputs)
+
+
+def test_the_dark_only_option_hides_temperature_from_the_network_by_day(
+    dp_synthetic_cache: FeatureCache,
+):
+    batch = build_pooled_batch(
+        cache=_two_site_cache(dp_synthetic_cache), sites=("S1", "S2"), cut_end=CUT
+    )
+    config = DpConfig(interaction_hidden=(4,), network_temperature_dark_only=True)
+    model = _model(batch=batch, config=config)
+    mixed = torch.full((batch.n_rows,), 5.0)
+    temperature = model._interaction_inputs(batch=batch, mixed=mixed)[:, -1]
+    day = batch.elevation > 0
+    assert bool((temperature[day] == 0).all())
+    assert bool((temperature[~day] != 0).all())
 
 
 def test_a_season_year_without_training_rows_adds_no_capacity(dp_synthetic_cache: FeatureCache):
