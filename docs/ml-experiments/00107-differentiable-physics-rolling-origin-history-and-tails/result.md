@@ -47,7 +47,7 @@ take_home_message: >-
   years, summer ones are level). The level-dependent and conformal spreads made the 95% and 99%
   quantiles worse, not better, so the tails still need another idea.
 date: 2026-10-19
-pr: 0
+pr: 1385
 advice:
   - >-
     Give a convex demand model a drift term when it trains on all years and refits quarterly: G-all+D1
