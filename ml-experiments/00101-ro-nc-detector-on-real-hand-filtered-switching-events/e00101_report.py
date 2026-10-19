@@ -364,7 +364,7 @@ EXPERIMENT_82_DIR: Final = (
 )
 
 
-def injected_recall_by_cell() -> dict[tuple[bool, int], float]:
+def injected_recall_by_cell(*, base_only: bool = False) -> dict[tuple[bool, int], float]:
     """RO-NC recall on experiment 82's injected transfers, by metered receiver and step band.
 
     Even months, shapes S2 to S4, headline-band and long transfers together. The key is
@@ -375,6 +375,8 @@ def injected_recall_by_cell() -> dict[tuple[bool, int], float]:
         pl.col("setting") == "XL", pl.col("shape").is_in(["S2", "S3", "S4"])
     )
     frame = results.join(events, on="event_id")
+    if base_only:
+        frame = frame.filter(pl.col("population") == "base")
     frame = frame.filter(pl.Series(stamp_months()[frame["onset"].to_numpy()] % 2 == 0))
     out = {}
     for flag in (True, False):
@@ -390,11 +392,12 @@ def injected_recall_by_cell() -> dict[tuple[bool, int], float]:
 def section_expected(*, table: pl.DataFrame) -> None:
     """How many real events RO-NC would find if each behaved like an injected one of its step."""
     cells = injected_recall_by_cell()
+    base_cells = injected_recall_by_cell(base_only=True)
     print("\n== injected RO-NC recall by (metered receiver, step band), experiment 82 data")
     for (flag, i), value in cells.items():
         print(f"  metered={flag} step [{STEP_EDGES[i]:g}, {STEP_EDGES[i + 1]:g}): {value:.3f}")
 
-    def probabilities(frame: pl.DataFrame) -> list[float]:
+    def probabilities(frame: pl.DataFrame, table: dict | None = None) -> list[float]:
         out = []
         for row in frame.iter_rows(named=True):
             step = row["peak_step_z"]
@@ -402,7 +405,7 @@ def section_expected(*, table: pl.DataFrame) -> None:
                 out.append(0.0)
                 continue
             i = max(j for j in range(5) if abs(step) >= STEP_EDGES[j])
-            out.append(cells[row["share"] is not None, i])
+            out.append((table or cells)[row["share"] is not None, i])
         return out
 
     def expected(frame: pl.DataFrame) -> float:
@@ -419,6 +422,24 @@ def section_expected(*, table: pl.DataFrame) -> None:
             f"{name}: expected found {expected(frame):.1f}, "
             f"actual {int(frame['found|RO-NC'].sum())} of {frame.height}"
         )
+    base_probs = [p for p in probabilities(long, base_cells) if np.isfinite(p)]
+    print(
+        "base-only injected recall cells (metered [2,4), unmetered [2,4)): "
+        f"{base_cells[True, 1]:.3f}, {base_cells[False, 1]:.3f}; "
+        f"expected found over the 35 from base-only cells: {sum(base_probs):.1f}"
+    )
+    print("found by PF14:", long.filter(pl.col("found|PF14"))["event"].to_list())
+    print("found by RO-NC:", long.filter(pl.col("found|RO-NC"))["event"].to_list())
+    print(
+        "onset found, RO-NC, missed events with step 4 or more:",
+        long.filter(
+            pl.col("peak_step_z").is_finite()
+            & (pl.col("peak_step_z") >= 4)
+            & ~pl.col("found|RO-NC")
+        )
+        .select("event", "onset_found|RO-NC")
+        .rows(),
+    )
     probs = np.array([p for p in probabilities(long) if np.isfinite(p)])
     print(
         "standard error of the expected count over the 35: "
@@ -441,7 +462,7 @@ def section_expected(*, table: pl.DataFrame) -> None:
     )
     print(
         "real events with step 4 or more:",
-        int((long["peak_step_z"] >= 4).sum()),
+        int((long["peak_step_z"].is_finite() & (long["peak_step_z"] >= 4)).sum()),
         "of",
         long.height,
     )

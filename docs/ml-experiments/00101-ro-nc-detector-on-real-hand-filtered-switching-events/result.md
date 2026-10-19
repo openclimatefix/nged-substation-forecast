@@ -120,10 +120,10 @@ so every interval below is wide.
   24 hours. RO-NC finds 4 of 17 events of 1 to 3 days (0.24; 0.10 to 0.47) and 8 of 18 over 3 days
   (0.44; 0.25 to 0.66). Every detector needs the 24 hours after a step, so events under 1 day are
   outside what any of these detectors can find.
-- **Time to detection.** Every alarm that starts an event does so at the labelled start (median
-  error 0.0 hours), and every detector needs the following 24 hours to confirm the step, so the
-  detection lag is 24 hours by construction. The end of an interval is known only after the first
-  opposite step.
+- **Time to detection.** Among the events with an alarm at the start, the median error of the
+  alarm's start is 0.0 hours, and every detector needs the following 24 hours to confirm the step,
+  so the detection lag is 24 hours by construction. The end of an interval is known only after the
+  first opposite step.
 - **Half-hours flagged.** Of the 9,332 half-hours of the 35 events, RO-NC flags 5,042 (0.54), PF14
   3,497 (0.37), and D0 3,832 (0.41). Within the events a detector finds, it flags 0.99 or more. A
   half-hour counts as flagged if any alarm interval on the event's series covers it.
@@ -188,6 +188,13 @@ supported only for closures of 2 hours to 60 days.
   in the six events above. Why the labeller saw a transfer there is not checked here.
 - **The share of the receiving load is blank for 21 events** with no metered receiver, 10 of them
   over 1 day, and the labelled MW comes from the labeller's median estimate.
+- **The step sizes are two different quantities.** The real step is the largest measured 24-hour
+  step within 2 hours of the labelled start, over all series of the event, so noise can inflate it.
+  The injected step is the exact size of the added transfer. Real events may therefore sit in a
+  higher step band than injected events of the same true size, which raises the expected count.
+- **The expected counts pool two injected sets.** The rates are from experiment 82's headline-band
+  and long transfers together (metered, 2 to 4 noise units: 0.651). Its headline-band transfers
+  alone give 0.722, and an expected 20.2 of 35 found, a slightly larger gap.
 - **Lab shortcuts.** The residual uses ERA5 weather and hindsight ends of up to 14 days, so the
   numbers describe the detector as a training-time tool, as in experiment 82.
 
