@@ -5,9 +5,9 @@ experiment's no-lag refits, and writes each arm to `work/arms/<name>.parquet` (r
 `lead_hours`, `actual`, the 11 quantiles `q01` to `q99` as fractions of capacity, and `site`,
 `group`, `capacity_mw`) and, for the 292 runs of `fold_a_daily_gap_v1`, to the prediction store.
 Helpers (`regime_rows`, the monthly-weight blend, `finalise`, `write_arm`) are copied from
-experiment 00087's `e00087_assemble.py`. The arms cover all 365 daily runs, because the monthly blend weights
-read the cases of earlier months and the 73 runs of `fold_a_every5d_v1` choose the best pair and
-triple.
+experiment 00087's `e00087_assemble.py`. The arms cover all 365 daily runs, because the monthly
+blend weights read the cases of earlier months and the 73 runs of `fold_a_every5d_v1` choose the
+best pair and triple.
 
 **Primary arms.**
 
