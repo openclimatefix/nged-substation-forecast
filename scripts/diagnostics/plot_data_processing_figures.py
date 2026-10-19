@@ -67,8 +67,8 @@ NIGHT_HOURS_UTC: Final[tuple[int, int]] = (0, 6)
 PANEL_HEIGHT_PX: Final[int] = 95
 PLOT_WIDTH_PX: Final[int] = CONTENT_WIDTH_PX - 70
 GREY_TEXT: Final[str] = "#6b6560"
-NARROW_SHADE_DAYS: Final[int] = 120
-"""A shaded band shorter than this holds no room for its label, which goes beside it."""
+NARROW_SHADE_DAYS: Final[int] = 150
+"""A shaded band shorter than this holds no room for its label, which goes right of the cut."""
 
 
 def _wrapped(*, text: str, width: int) -> list[str]:
@@ -160,11 +160,11 @@ def trim_figure(*, ids: pl.DataFrame, cuts: pl.DataFrame) -> alt.VConcatChart:
         )
         narrow = (cut - first).days < NARROW_SHADE_DAYS
         label_text = (
-            alt.Chart(pl.DataFrame({"x": [first], "text": ["dropped"]}))  # ty: ignore[unresolved-attribute]
+            alt.Chart(pl.DataFrame({"x": [cut if narrow else first], "text": ["dropped"]}))  # ty: ignore[unresolved-attribute]
             .mark_text(
-                align="right" if narrow else "left",
+                align="left",
                 baseline="top",
-                dx=-3 if narrow else 4,
+                dx=4,
                 dy=3,
                 color=GREY_TEXT,
                 fontSize=10,

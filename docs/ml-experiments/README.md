@@ -1,11 +1,11 @@
 # ML experiments
 
 **Each folder here is one small experiment that tests one hypothesis about improving the production
-forecast, and the experiments are grouped into themes.** A theme has three pages: a Summary that
-states the answer so far, an Experiments page that lists every experiment tried, and a Research plan
-that lists what is planned next. The folders are named `<id>-<slug>`, where the id is a five-digit
-integer that orders the experiments by the order in which they were started. A folder holds
-`result.md` and its figures.
+forecast, and the experiments are grouped into themes.** A theme has three pages: a Summary (where
+one has been written) that states the answer so far, an Experiments page that lists every experiment
+tried, and a Research plan that lists what is planned next. The folders are named `<id>-<slug>`,
+where the id is a five-digit integer that orders the experiments by the order in which they were
+started. A folder holds `result.md` and its figures.
 
 ## Themes
 
@@ -60,18 +60,20 @@ theme.** A planned experiment has a `result.md` with status `planned`, committed
 runs. An idea that has no folder yet is marked "proposed" in the priority table and carries a
 tentative id, P1, P2, and so on, which the proposal sections use as headings. A proposal receives
 its numeric id when its plan is committed, and the tentative id then disappears. The design under
-test is on the [staged probabilistic forecast](../roadmap/staged-probabilistic-forecast.md) page.
+test is the [staged probabilistic forecast](../roadmap/staged-probabilistic-forecast.md), in which
+stage 1 turns weather into power, stage 2 calibrates the result, uses lagged power, and blends
+weather products, and a coupling step restores coherent ensemble members.
 
-**Resolution limits.** The Research plan pages flag the experiments whose planned contrasts the
-available sample cannot resolve. The sample is 16 Primary substations, 9 generator series, and one
-validation year with 12 months, and it resolves gains of roughly 0.3 points of capacity or more.
+**The sample resolves gains of roughly 0.3 points of capacity or more, and no smaller gains.** A
+point of capacity is 1% of a series' capacity. The sample is 16 Primary substations, 9 generator
+series, and one validation year with 12 months. The Research plan pages flag the experiments whose
+planned contrasts the sample cannot resolve.
 
 ## Candidates for the next release
 
 **These experiments are flagged `candidate` and are not yet adopted.** The flags are proposals for
-the maintainer to confirm. The maintainer reviews the
-candidates every one to two weeks and ports the best into a new model release. The [release
-log](../live_service/model-releases.md) records which experiments each release adopted.
+the maintainer to confirm. The maintainer decides which candidates to port into a new model release.
+The [release log](../live_service/model-releases.md) records which experiments each release adopted.
 
 <!-- candidates-table -->
 

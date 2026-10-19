@@ -23,9 +23,8 @@ experiment is running.
 **Git holds each theme's queue and the finished results, and a private folder holds the order across
 themes and everything else.** The `plan.md` page of each theme under `docs/ml-experiments/themes/`
 holds that theme's queue, and the Experiments table of each theme, generated from the `result.md`
-front matter, is the finished work. The manager's brief in the private folder holds the order across
-themes. Under `data/ml-experiments/`, which is
-never committed:
+front matter, is the finished work. The manager merges the themes' orders into one order in its
+private brief. Under `data/ml-experiments/`, which is never committed:
 
 - `SLOTS.md` is the slot ledger.
 - `MANAGER_STATE.md` is an append-only log, one timestamped line per event: a session started, a
@@ -65,13 +64,12 @@ slot, the holder's session id, the GPU share, the cores, and the start date.
 
 ## Ordering the queue
 
-**Start experiments in the priority order of the themes' Research plan pages, merged into one order
-in the manager's private brief, and start one as soon as a slot frees.** An experiment that waits
-for another's result stays in the queue until that result merges. A hold from the maintainer, such
-as "start nothing new until PR N merges", overrides the order. Ideas that the maintainer has not
-agreed to run go to the maintainer as a ranked list, and nothing is committed to the plan until the
-maintainer has seen the ranking. Exploratory questions run as a series, as the `ml-experiment`
-skill's "Exploratory series" section describes.
+**Start experiments in the priority order of the manager's private brief, and start one as soon as a
+slot frees.** An experiment that waits for another's result stays in the queue until that result
+merges. A hold from the maintainer, such as "start nothing new until PR N merges", overrides the
+order. Ideas that the maintainer has not agreed to run go to the maintainer as a ranked list, and
+nothing is committed to the plan until the maintainer has seen the ranking. Exploratory questions
+run as a series, as the `ml-experiment` skill's "Exploratory series" section describes.
 
 ## Starting a session
 

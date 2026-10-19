@@ -91,10 +91,10 @@ review as `implement-issue` does.
 
 **`result.md` is the plan first and the write-up second.** Commit it with status `planned` before
 the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
-`id`, the `slug`, the `theme`, `also_relevant_to`, the hypothesis, the prediction, the decision
-rule, the status, the size, the benchmark, the row set id, the metric, and, when finished, the
-verdict (`supported`, `partly supported`, `small gain`, `not supported`, `refuted`, `inconclusive`,
-`invalid`, or `failed`), the best arm with its headline number, the lessons learned,
+`id`, `slug`, `theme`, `also_relevant_to`, `status`, `size`, `hypothesis`, `prediction`,
+`decision_rule`, `benchmark`, `row_set_id`, and `metric`, and, when finished, the `verdict`
+(`supported`, `partly supported`, `small gain`, `not supported`, `refuted`, `inconclusive`,
+`invalid`, or `failed`), `best_arm` with its headline number, `headline`, `lessons`,
 `take_home_message`, and `advice` (below). A finished experiment also has `production_status`
 (`candidate`, `adopted`, `superseded`, or `not-for-production`) and `adopted_in` (the model release
 number, or `none`). Every result has the same front matter, so a later session finds results with
@@ -102,13 +102,13 @@ number, or `none`). Every result has the same front matter, so a later session f
 
 **`theme` names exactly one theme folder under `docs/ml-experiments/themes/`, and `also_relevant_to`
 lists the other themes the result bears on (an empty list if none).** The experiment appears in the
-Experiments table of its own theme as "primary" and of each listed theme as "also relevant". A new theme
-should cover several related experiments, so an experiment that fits no existing theme takes the
-closest one rather than starting a theme of its own. A new theme is a folder under `themes/` with
-`index.md`, `experiments.md`, and `plan.md`, and an entry in the `mkdocs.yml` navigation.
+Experiments table of its own theme as "primary" and of each listed theme as "also relevant". An
+experiment that fits no existing theme takes the closest theme. A new theme should cover several
+related experiments, and is a folder under `themes/` with `index.md`, `experiments.md`, and
+`plan.md`, plus an entry in the `mkdocs.yml` navigation.
 
 **`take_home_message` is two or three plain sentences saying what the result means for the forecast,
-and it is required for every experiment with an id above 102.** Write it for a reader who has not
+and it is required for every experiment with an id of 103 or more.** Write it for a reader who has not
 opened the page, with no jargon, and put the effect on the forecast first. It is shown in the
 Experiments table of each theme. `uv run python scripts/mkdocs_hooks/experiment_tables.py --check`
 validates the whole front matter, and `... --theme <theme>` prints a theme's Experiments table.

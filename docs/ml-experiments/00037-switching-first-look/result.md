@@ -7,9 +7,9 @@ status: done
 size: medium
 take_home_message: >-
   A detector that compares each substation with its neighbours found 0.33 of the switched power in
-  the 18 visible validation transfers, and beat a single-series detector by about 0.14 at equal
-  alarm rates. The 18 transfers are too few to show whether it meets the 0.35 bar, so the result is
-  inconclusive.
+  the 18 visible validation transfers, and beat a single-series detector by about 0.14 in a rough
+  post hoc comparison at equal alarm rates, which has no interval. The 18 transfers are too few to
+  show whether the detector meets the 0.35 bar, so the result is inconclusive.
 hypothesis: >-
   For the 16 Primary substation demand series, logged network switching (normal open points closed
   for hours or days) moves load that appears in the telemetry as a pair of opposite steps whose
