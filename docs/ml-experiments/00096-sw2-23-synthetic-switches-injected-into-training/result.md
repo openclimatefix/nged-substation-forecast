@@ -73,7 +73,7 @@ code: ml-experiments/00096-*/
   reviewers only, as the brief says.
 - **Training injection.** Experiment 88's harness (`draw_events`, `inject_shaped`) draws synthetic
   transfers in the odd calendar months from 2024-07 to 2026-05, quiet on every series they touch
-  (no logged closure within 7 days, no alarm within 2 days). The shapes S2, S3, S4, and S6 are
+  (no logged closure within 1 day, no alarm within 2 days; see "Changes made before any fit"). The shapes S2, S3, S4, and S6 are
   assigned in turn. The number of series-intervals injected is 3 times the number of real labelled
   transfer intervals (experiment 41's labels) that start in the 365-day windows of the refits,
   counted per series; the script prints both counts. Test transfers (experiment 88's 839) start in
@@ -112,6 +112,15 @@ code: ml-experiments/00096-*/
   test with the true MW first (arm 2); do not expect target masking to add (arm 1 is masked
   already). Experiment 89: lag masking is worse and the longest history no better, so the window is
   365 days. Departures: none.
+
+## Changes made before any fit
+
+- **Quiet rule for training transfers.** With experiment 88's rule (no logged closure within 7
+  days), only 33% of the odd-month half-hours are quiet and the draw yielded 74 series-intervals,
+  1.3 times the 56 real ones. The training transfers therefore keep only 1 day clear of a logged or
+  labelled closure and 2 days clear of a detector alarm, which yields 94 transfers and 169
+  series-intervals (3.0 times the real count). A nearby real transfer does no harm in training
+  because it is corrected with its labelled MW. The test transfers keep experiment 88's 7-day rule.
 
 ## Status
 
