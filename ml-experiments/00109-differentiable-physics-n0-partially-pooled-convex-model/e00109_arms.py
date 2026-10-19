@@ -273,6 +273,7 @@ def build_arm(
                 window=window,
                 season_years=common.SEASON_YEARS,
                 pinned=pinned if use_pinned else None,
+                allow_late_vintage=short and config.oracle_pin,
             )
         )
     return Built(sites=sites, cache=used, transform=transform, capacity_sources=sources)

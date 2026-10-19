@@ -10,6 +10,7 @@ written once, against a day-ahead initialisation at 09:00 UTC on the previous da
 39 hours).
 """
 
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -101,8 +102,10 @@ class History:
 
     @property
     def weeks_of_history(self) -> int:
-        """The history in weeks (a month counts as 52/12 weeks, rounded)."""
-        return self.weeks if self.weeks is not None else round(52 * (self.months or 0) / 12)
+        """The history in weeks, rounding a month up (3 months is 14 weeks, a window of 91 days)."""
+        if self.weeks is not None:
+            return self.weeks
+        return math.ceil((self.months or 0) * 365.25 / 12 / WEEK_DAYS)
 
 
 FOUR_WEEKS: Final[History] = History(label="4w", weeks=4)
