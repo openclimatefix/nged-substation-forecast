@@ -155,14 +155,14 @@ measurable difference: -0.059 points at wind farms and +0.010 at solar farms.
 
 **Example forecasts.** Each figure shows BG2, the simplifications, and `manual_heuristic` for one
 series in the week with the highest mean power in summer, the week with the highest mean power in
-winter, and the week with the largest error. The series are Primary A, Solar farm A, Wind farm A,
+winter, and the week with the largest error. The series are Primary G, Solar farm A, Wind farm A,
 and one supply point.
 
-![Primary A, summer](figure_4_primary_summer.svg)
+![Primary G, summer](figure_4_primary_summer.svg)
 
-![Primary A, winter](figure_4_primary_winter.svg)
+![Primary G, winter](figure_4_primary_winter.svg)
 
-![Primary A, large error](figure_4_primary_large_error.svg)
+![Primary G, large error](figure_4_primary_large_error.svg)
 
 ![Supply point, summer](figure_4_supply_summer.svg)
 
@@ -184,7 +184,7 @@ and one supply point.
 
 **The five blend members.** Each figure shows the median forecast of the weekly, monthly, analogue,
 pooled-by-type, and frozen-with-correction members, with the blend and the actual, at one Primary
-substation. The same three weeks are drawn for two other Primaries in this folder
+substation. The same three weeks are drawn for Primary G and Primary K in this folder
 (`figure_5_members_g_*` and `figure_5_members_k_*`).
 
 ![Blend members at Primary A, summer](figure_5_members_a_summer.svg)
