@@ -6,7 +6,7 @@
 
 ## Solution in brief
 
-**Group every experiment under one theme, list only the themes in the nav, and generate each theme's table of experiments from the `result.md` front matter.** A theme is three pages: Summary (the answer, headline plots, best design so far, what to implement in production), Experiments (a generated table of experiments tried), and Research plan (planned experiments). The experiment folders stay flat, named by id, so a reclassified experiment breaks no link. The global research log and research plan are deleted.
+**Group every experiment under one theme, list only the themes in the nav, and build each theme's table of experiments from the `result.md` front matter at MkDocs build time.** A theme is three pages: Summary (the answer, headline plots, best design so far, what to implement in production), Experiments (a generated table of experiments tried), and Research plan (planned experiments). The experiment folders stay flat, named by id, so a reclassified experiment breaks no link. The global research log and research plan are deleted.
 
 ## Verdict, size and departures
 
@@ -33,32 +33,35 @@ Departures from the schema agreed in chat (issue #1346 lists the agreed version)
 
 ### The happy path
 
-To add a finished experiment, the author writes `docs/ml-experiments/<id>-<slug>/result.md` with the front matter fields `id`, `slug`, `theme`, `also_relevant_to`, `hypothesis`, `verdict`, `production_status`, `take_home_message`, and the rest of today's fields. The author runs `uv run python scripts/lint/generate_experiment_tables.py --write`. The script reads every `result.md` front matter, groups by `theme`, and rewrites the block between `<!-- experiments-table:start -->` and `<!-- experiments-table:end -->` in `docs/ml-experiments/themes/<theme>/experiments.md`, and the planned-experiments block in `plan.md`. A row links to the experiment's `result.md` with the id and slug as link text, then shows the hypothesis, the verdict, `production_status`, and `take_home_message`. Rows are sorted by id descending. A second block lists the experiments in `also_relevant_to` for that theme, so the cross-links are generated too.
+To add a finished experiment, the author writes `docs/ml-experiments/<id>-<slug>/result.md` with the front matter fields `id`, `slug`, `theme`, `also_relevant_to`, `hypothesis`, `verdict`, `production_status`, `take_home_message`, and the rest of today's fields. Nothing else is edited. At build time the MkDocs hook `docs/hooks/experiment_tables.py` reads every `result.md` front matter. In `on_page_markdown` it replaces the line `<!-- experiments-table -->` in `themes/<theme>/experiments.md` with a table of every experiment whose `theme` is that theme or whose `also_relevant_to` includes it, one row each, sorted by id descending. A row links to the experiment's `result.md` with the id and slug as link text, then shows the hypothesis, the verdict, `production_status`, `take_home_message`, and a column that says "primary" or "also relevant". The line `<!-- planned-table -->` in `plan.md` is replaced the same way with the experiments whose `status` is `planned`. The line `<!-- candidates-table -->` in the Overview is replaced with every experiment whose `production_status` is `candidate`.
 
-The pre-commit hook `check-experiment-front-matter` runs `generate_experiment_tables.py --check`. It fails when a `result.md` lacks a `theme`, names a theme with no folder, uses an unknown `verdict` or `production_status`, or when a generated block differs from what `--write` would produce. The check runs at commit time rather than build time, so the tables are in the committed files that Claude reads without running MkDocs.
+Because the tables are not committed, concurrent experiment PRs never conflict on a table. Claude reads a theme's experiments with `uv run python docs/hooks/experiment_tables.py --theme <theme>`, which prints the same table as markdown, and finds experiments by any front matter field with `grep`.
+
+The same module has a `--check` mode that validates every front matter block and exits non-zero on a missing `theme`, a `theme` with no folder, an unknown `verdict` or `production_status`, or a missing `take_home_message` on an experiment above id 102. `mkdocs build --strict` calls the same validation and fails the build, and a validate-only pre-commit hook `check-experiment-front-matter` runs `--check` on any change under `docs/ml-experiments/`.
 
 ### The main branches
 
-- **A planned experiment** (`status: planned`) is listed in the theme's `plan.md` generated block, not in the Experiments table. An idea with no `result.md` yet is a hand-written row in `plan.md` outside the generated block.
-- **A new theme** needs a folder under `docs/ml-experiments/themes/` with `index.md`, `experiments.md`, and `plan.md`, plus a nav entry. `Unsorted` is the inbox for an experiment that fits no theme. A theme needs at least three related experiments.
-- **A two-level theme** (differentiable physics) is a folder `themes/differentiable-physics/<subtheme>/`. The `theme` field then holds `differentiable-physics/<subtheme>`, and the script resolves the path.
-- **Cross-links:** `also_relevant_to` lists other themes. The generated "Also relevant" block in each theme's `experiments.md` lists those experiments.
+- **A planned experiment** (`status: planned`) appears in the theme's planned table and not in the Experiments table. An idea with no `result.md` yet is a hand-written row in `plan.md` outside the placeholder line.
+- **A new theme** needs a folder under `docs/ml-experiments/themes/` with `index.md`, `experiments.md`, and `plan.md`, plus a nav entry. A theme needs at least three related experiments.
+- **A group of themes in the nav** (differentiable physics) is a nav grouping in `mkdocs.yml` only. Each sub-theme is a flat folder and slug such as `differentiable-physics-network`, created with its first experiment.
+- **Cross-links:** an experiment with `also_relevant_to: [b]` appears in theme b's table with the "also relevant" marker.
 
 ### The main error-handling paths
 
-All of this is docs tooling that runs on a developer machine and in CI. It raises (fail fast) because a wrong table misleads the reader, and no production data path imports it. A malformed front matter block names the file and the field in the error. The script never rewrites text outside its marker blocks, and it fails if a marker is missing.
+All of this is docs tooling that runs on a developer machine and in CI. It raises (fail fast) because a wrong table misleads the reader, and no production data path imports it. A malformed front matter block names the file and the field in the error. A placeholder line the hook cannot find in a theme page is an error, so a theme page cannot silently show no table.
 
 ## What changes, file by file
 
-- **`scripts/lint/generate_experiment_tables.py`** (new): front matter reader (PyYAML, already a dependency through MkDocs), table generator, `--write` and `--check`. About 150 lines.
-- **`tests/test_generate_experiment_tables.py`** (new): see Tests.
-- **`.pre-commit-config.yaml`**: one local hook, `check-experiment-front-matter`, triggered by changes under `docs/ml-experiments/`.
-- **`docs/ml-experiments/*/result.md`** (98 files): add `theme`, `also_relevant_to`, and `take_home_message`. A Sonnet sub-agent per theme writes these from the existing `headline`, `lessons`, and body. The assignment follows the theme list below.
-- **`docs/ml-experiments/themes/<theme>/{index,experiments,plan}.md`** (new, about 12 themes): the Summary page is the converted series report where one exists (four themes) and a short stub saying "Summary in progress" with the generated table otherwise. The solar disaggregation theme is finished end to end in this PR as the template. The other three series reports are converted in follow-up PRs, one per theme, so they can run in parallel.
+- **`docs/hooks/experiment_tables.py`** (new): front matter reader (PyYAML, already installed with MkDocs), table builder, `on_page_markdown` hook, and a `--theme` print mode and a `--check` mode. About 100 lines.
+- **`tests/test_experiment_tables.py`** (new): see Tests.
+- **`mkdocs.yml`**: `hooks: [docs/hooks/experiment_tables.py]`.
+- **`.pre-commit-config.yaml`**: one local hook, `check-experiment-front-matter`, running `--check`, triggered by changes under `docs/ml-experiments/`.
+- **`docs/ml-experiments/*/result.md`** (98 files): add `theme` and `also_relevant_to`, mechanically from the theme list below, which a Sonnet pass checks against each body. No `take_home_message` is backfilled in this PR.
+- **`docs/ml-experiments/themes/<theme>/{index,experiments,plan}.md`** (new, 12 themes): the Summary page is the converted series report where one exists (four themes) and a short stub saying "Summary in progress" with the generated table otherwise. The solar disaggregation theme is finished end to end in this PR as the template. The other three series reports are converted in follow-up PRs, one per theme, so they can run in parallel.
 - **`docs/ml-experiments/series/`**: moved to `themes/` (the four reports become the Summary pages).
 - **`docs/ml-experiments/research-log.md`, `research-plan.md`**: deleted. Their "candidates for the next release" table moves to `docs/ml-experiments/README.md` as a generated table of every experiment with `production_status: candidate`. The "what would change in production" text moves into each theme's Summary.
 - **`docs/ml-experiments/README.md`**: rewritten as the Overview: how themes work, the front matter fields, the list of themes, and the candidates table.
-- **`mkdocs.yml`**: the nav lists the Overview and each theme (three pages each), alphabetical, with `not_in_nav` for the 98 experiment pages (MkDocs 1.5 and later), and new `redirect_maps` entries for the moved series pages and the deleted log and plan pages.
+- **`mkdocs.yml`** (nav): the nav lists the Overview and each theme (three pages each), alphabetical, with the 98 experiment pages removed from it, and new `redirect_maps` entries for the moved series pages and the deleted log and plan pages.
 - **`.claude/skills/ml-experiment/SKILL.md`, `ml-experiment-manager/SKILL.md`, `study/SKILL.md`, `release-model/SKILL.md`**: replace every instruction to update the research log or plan with the front matter and generator workflow. The `ml-experiment` skill states the new front matter fields and the take-home message rule.
 - **`data/ml-experiments/briefs/common.md`** (private, not in git): updated by the ML manager after merge.
 - **Inbound links:** a grep of `docs/`, READMEs, skills, and `ml-experiments/` scripts for `research-log`, `research-plan`, and `series/` finds every reference. Links to experiment pages are unchanged because the folders do not move.
@@ -70,7 +73,7 @@ Alphabetical in the nav. Experiment numbers are first-pass.
 - **Calibration and uncertainty:** 2, 16, 20, 35, 80, 97, 99, 100
 - **Curtailment cost:** 83, 84
 - **Demand inputs:** 6, 10, 11, 15, 25, 27, 28, 30, 31, 74, 94
-- **Differentiable physics** (two-level, sub-themes agreed with the differentiable-physics session): Demand: calendar and weather; Pooling and long history; Embedded generation; Forecast engine; Network (reserved). No experiments yet.
+- **Differentiable physics:** a nav group only. Sub-themes (demand: calendar and weather; pooling and long history; embedded generation; forecast engine; network) get a flat folder and slug when each has its first experiment.
 - **Generator forecasting (solar and wind farms):** 12, 23, 26, 29, 52, 54, 57, 72
 - **Hierarchy and pooling:** 24, 32, 36
 - **Lagged power and error correction:** 5, 8, 18, 21
@@ -80,7 +83,6 @@ Alphabetical in the nav. Experiment numbers are first-pass.
 - **Switching detectors:** 37, 38, 41, 43, 44, 47, 55, 58 to 71, 82, 86, 98, 101
 - **Switching labels in the forecast:** 44, 75, 88 to 91, 96
 - **Weather products and blending:** 1, 3, 7, 9, 14, 50, 53
-- **Unsorted:** any experiment that fits none.
 
 ## Design-philosophy check
 
@@ -88,13 +90,11 @@ This is R&D and docs tooling, outside the production path, so the fail-fast rule
 
 ## Tests
 
-- `test_generated_table_matches_front_matter`: build three fixture `result.md` files in a temp directory, run `--write`, and assert the table rows, their order (id descending), the verdict column, and the link targets. On `main` the script does not exist, so the test fails.
-- `test_check_fails_on_stale_table`: edit a fixture's `verdict` after `--write` and assert `--check` exits non-zero and names the file.
-- `test_check_fails_on_missing_or_unknown_theme`: a fixture without `theme`, and one naming a theme with no folder, each exit non-zero.
-- `test_also_relevant_to_lists_experiment_under_second_theme`: a fixture with `also_relevant_to: [b]` appears in theme b's "Also relevant" block and not in its main table.
-- `test_two_level_theme_path_resolves`: `theme: differentiable-physics/network` writes to the nested folder.
-- `test_text_outside_markers_is_untouched`: hand-written prose around the markers is byte-identical after `--write`.
-- A repository-level test runs `--check` over the real `docs/ml-experiments/` tree, so CI catches an experiment merged without a theme.
+- `test_table_rows_and_order`: three fixture `result.md` files; assert the rows, order (id descending), verdict column, link targets, and the primary or also-relevant marker. On `main` the hook does not exist, so the test fails.
+- `test_older_experiment_without_take_home_message_uses_headline`: a fixture id 50 with `headline` and no `take_home_message` shows the first sentence of `headline`.
+- `test_check_fails_on_bad_front_matter`: one fixture each for a missing `theme`, a `theme` with no folder, an unknown `verdict`, and a missing `take_home_message` at id 103; each exits non-zero and names the file.
+- `test_missing_placeholder_is_an_error`: a theme page without its placeholder line raises.
+- The strict MkDocs build in CI runs the validation over the real tree.
 
 ## Docs to update
 
@@ -103,8 +103,8 @@ Every page that names the research log, the research plan, or the series reports
 ## Verification commands
 
 ```bash
-uv run pytest scripts/lint tests/test_generate_experiment_tables.py
-uv run python scripts/lint/generate_experiment_tables.py --check
+uv run pytest tests/test_experiment_tables.py
+uv run python docs/hooks/experiment_tables.py --check
 uv run ruff check . && uv run ruff format --check . && uv run ty check
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run python scripts/lint/check_docs_links.py
@@ -117,13 +117,28 @@ Read the rendered nav in `site/` to confirm that the themes appear, that the exp
 
 The docs freeze stays on until this PR merges. Plan PRs #1343 and #1345 each add their finished `result.md` afterwards, with the new front matter. The differentiable-physics session writes its parts with the final schema after merge.
 
-1. This PR: script, tests, hook, front matter backfill, nav, redirects, the solar disaggregation theme finished, the other three series reports moved as Summary pages unchanged, stubs for the remaining themes, skills.
+1. This PR: hook, tests, pre-commit check, front matter backfill, nav, redirects, the solar disaggregation theme finished, the other three series reports moved as Summary pages unchanged, stubs for the remaining themes, skills.
 2. Follow-up PRs, in parallel, one per theme: convert the Summary to the "Does it work? / Best design so far" structure, with a prose review each.
 
 ## Risks and open questions
 
 1. **Verdict words.** Keep the existing six words (recommended), or migrate to the four agreed words? Migration rewrites 98 verdicts and the decision rules that cite them.
-2. **Rewriting 98 take-home messages is the main cost.** Sonnet drafts them from the existing `headline` and `lessons`, and a sampled review checks about 10 of them against the bodies. The rest are spot-checked in the follow-up PRs.
-3. **The `not_in_nav` option** needs MkDocs 1.5 or later. The first step checks `uv run mkdocs --version`. If the installed version is older, the fallback is to leave the pages out of the nav and accept the "not included in nav" log lines at INFO level.
+2. **Older take-home messages** are blank or taken from `headline` until each theme's follow-up PR writes them.
+3. **Pages outside the nav** produce only INFO log lines in MkDocs. If `mkdocs build --strict` objects, the `not_in_nav` option (MkDocs 1.5 and later) is the fix.
 4. **Edit collisions.** Any experiment PR that edits `docs/ml-experiments/` conflicts with the backfill. The freeze covers that, and the follow-up PRs rebase on `main` first.
 5. **A separate git repository** was deferred (see the ML manager's reasons in #1346). This structure makes a later split cheaper, because a theme is already a self-contained folder.
+
+## Review 1 (simplicity) triage
+
+Accepted:
+
+- Build the tables at MkDocs build time with a hook instead of committing generated tables. Committed tables would make every concurrent experiment PR conflict on the same file, and the `--theme` print mode keeps the tables readable to Claude.
+- Require `take_home_message` only above id 102, with a `headline` fallback, so the backfill stops blocking this PR.
+- Flat theme slugs and a nav-only group for differentiable physics, and no `Unsorted` theme.
+- One table per theme with a primary or also-relevant column, replacing the second generated block.
+- Drop the repository-level test, because the strict build covers it.
+- `not_in_nav` only if the strict build objects.
+
+Rejected:
+
+- One page per stub theme instead of three. The maintainer asked for the same pages in every theme, and the three files per stub theme are generated by copy and hold one placeholder line each.
