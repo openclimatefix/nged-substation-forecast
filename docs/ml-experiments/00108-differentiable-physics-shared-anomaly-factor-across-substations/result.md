@@ -1,23 +1,38 @@
---- id: "00108" slug: differentiable-physics-shared-anomaly-factor-across-substations title:
-"Differentiable physics: a shared anomaly factor across substations" theme:
-lagged-power-and-error-correction also_relevant_to: [differentiable-physics-long-history-and-drift]
-status: planned size: >- medium: a small module PR (a spread over a correction summed from several
-traces, with its leakage test) plus experiment scripts hypothesis: >- The residuals of the frozen
-convex demand model carry a component shared across Primaries, and a shared state estimated from the
-other substations' residuals, available at the forecast origin, lowers the day-ahead quantile score
-by more than the per-site Kalman filter of Part 4 already does. prediction: see "Predictions"
-decision_rule: see "Decision rule" benchmark: >- Part 4's A2 (convex model on all years, no drift,
-pinned capacity, per-site Kalman filter), rebuilt from its stored configuration; Part 4's A0 (the
-same model uncorrected); a placebo factor from the contributor panel shifted by whole weeks,
-refitted per draw; climatology and manual_heuristic as stored by Part 4 row_set_id: dp_mw_v1
-(experiment 103); scored 2025-07-01 to 2026-06-30, replicate 2024-07-01 to 2025-06-30, tuning
-2023-07-01 to 2024-06-30 metric: >- Quantile score (twice the mean pinball loss over experiment 87's
-11 quantiles) in points of effective capacity, on rows outside the hand-filtered switching events at
-the scored site, at day D+1 from a 09:00 UTC initialisation on day D (leads of 15.5 to 39 hours)
-verdict: <supported, partly supported, refuted, or inconclusive> production_status:
-not-for-production take_home_message: <written after the results> date: <date> pr: <pr> advice:
-<written after the results> code:
-ml-experiments/00108-differentiable-physics-shared-anomaly-factor-across-substations/ ---
+---
+id: "00108"
+slug: differentiable-physics-shared-anomaly-factor-across-substations
+theme: lagged-power-and-error-correction
+also_relevant_to: [differentiable-physics-long-history-and-drift]
+status: planned
+size: >-
+  medium: a small module PR (a spread over a correction summed from several traces, with its leakage
+  test) plus experiment scripts
+hypothesis: >-
+  The residuals of the frozen convex demand model carry a component shared across Primaries, and a
+  shared state estimated from the other substations' residuals, available at the forecast origin,
+  lowers the day-ahead quantile score by more than the per-site Kalman filter of Part 4 already does.
+prediction: see "Predictions"
+decision_rule: see "Decision rule"
+benchmark: >-
+  Part 4's A2 (convex model on all years, no drift, pinned capacity, per-site Kalman filter), rebuilt
+  from its stored configuration; Part 4's A0 (the same model uncorrected); a placebo factor from the
+  contributor panel shifted by whole weeks, refitted per draw; climatology and manual_heuristic as
+  stored by Part 4
+row_set_id: >-
+  dp_mw_v1 (experiment 103); scored 2025-07-01 to 2026-06-30, replicate 2024-07-01 to 2025-06-30,
+  tuning 2023-07-01 to 2024-06-30
+metric: >-
+  Quantile score (twice the mean pinball loss over experiment 87's 11 quantiles) in points of
+  effective capacity, on rows outside the hand-filtered switching events at the scored site, at day
+  D+1 from a 09:00 UTC initialisation on day D (leads of 15.5 to 39 hours)
+verdict: <supported, partly supported, refuted, or inconclusive>
+production_status: not-for-production
+take_home_message: <written after the results>
+date: <date>
+pr: <pr>
+advice: <written after the results>
+code: ml-experiments/00108-differentiable-physics-shared-anomaly-factor-across-substations/
+---
 
 # Differentiable physics: a shared anomaly factor across substations
 
@@ -40,18 +55,19 @@ review (leakage first), before any real score.
 
 - **Base:** Part 4's A0 (`studies.dp_gam`, all years, lockdown out, no drift, pinned capacity). The
   bar is A2, A0 plus the per-site Kalman filter with Part 4's `a0` hyperparameters. No arm carries
-  drift: the Part 4 audit ruled it adds nothing once the filter runs. - **Scored sites:** D5, D10,
-  D11, D14, and D16 decide; D9 is reported beside them. - **Contributors (decision arm):** the six
-  MW sites, so the composition is fixed across bands and seasons. A site contributes once it has a
-  fit with at least 6 months of training rows: each leave-one-out factor has 4 contributors in the
-  tuning year (D9 has no fit at 2023-07-01) and 5 later, and is missing where fewer than 3 have a
-  reading. - **Contributors (exploratory KF-mva):** the MW sites plus the MVA Primaries D2, D3, D4,
-  D8, D12, D19, D21, and D22 on dark rows, fitted with a zero-point `PinnedCapacity` built in the
-  script. Its factor is a median of up to 13 at night and 4 or 5 at midday, with a seasonal mix at
-  dusk. - **Fits:** every contributor at each 1 July from 2021 to 2025, CPU, float64. The 2024 and
-  2025 MW fits must reproduce Part 4's stored A0 and A2 to 1e-4 points, and `a0` refitted from this
-  experiment's 2023 residuals must match `tuned.json` to 1e-3, or the experiment stops. -
-  **Streams:** r_s(t) = observed − A0 mean, stitched with `stitch_out_of_sample_residuals`, so none
+  drift: the Part 4 audit ruled it adds nothing once the filter runs.
+- **Scored sites:** D5, D10, D11, D14, and D16 decide; D9 is reported beside them.
+- **Contributors (decision arm):** the six MW sites, so the composition is fixed across bands and
+  seasons. A site contributes once it has a fit with at least 6 months of training rows: each
+  leave-one-out factor has 4 contributors in the tuning year (D9 has no fit at 2023-07-01) and 5
+  later, and is missing where fewer than 3 have a reading.
+- **Contributors (exploratory KF-mva):** the MW sites plus the MVA Primaries D2, D3, D4, D8, D12,
+  D19, D21, and D22 on dark rows, fitted with a zero-point `PinnedCapacity` built in the script. Its
+  factor is a median of up to 13 at night and 4 or 5 at midday, with a seasonal mix at dusk.
+- **Fits:** every contributor at each 1 July from 2021 to 2025, CPU, float64. The 2024 and 2025 MW
+  fits must reproduce Part 4's stored A0 and A2 to 1e-4 points, and `a0` refitted from this
+  experiment's 2023 residuals must match `tuned.json` to 1e-3, or the experiment stops.
+- **Streams:** r_s(t) = observed − A0 mean, stitched with `stitch_out_of_sample_residuals`, so none
   is in-sample. No switching mask enters a stream, σ, or β; masks apply to fitting and scoring.
 
 ## The factor and the decision arm
@@ -144,10 +160,10 @@ The factor and A2 on the 66 real hand-filtered transfers are reported, not block
 corrections on one base) is −0.20 [−0.42, −0.06] scored and −0.20 [−0.35, −0.09] replicate at
 98.33%, a half-width of 0.13 to 0.18; KF − A2 should be narrower by an unknown amount. Before
 scoring, the script measures on the tuning year the half-width of C1's 98.33% interval (in-sample
-for this experiment's tuning, so it measures noise only) and 2.4 × the standard deviation of the 13
-placebo draws' KF-plc − A2. **The minimum detectable effect (MDE) is the larger.** If it is at most
-0.08 points the scored-year C1 decides; otherwise the pooled 24-month C1 (replicate and scored
-years, months resampled across both) decides. **A pooled C1 has no independent replicate, so its
+for the tuning year here, so it measures noise only) and 2.4 × the standard deviation of the 13
+placebo draws' KF-plc − A2. **The minimum detectable effect (MDE) is the larger.** If it is at most 0.08
+points the scored-year C1 decides; otherwise the pooled 24-month C1 (replicate and scored years,
+months resampled across both) decides. **A pooled C1 has no independent replicate, so its
 verdict is capped at `inconclusive` unless its interval lies wholly below zero.** The MDE and the
 choice go in `decisions.json`, and to the manager, before the first replicate-year score.
 
@@ -193,18 +209,18 @@ Written before any fit; each line can fail, and none overrides the decision rule
 says so; "the replicate" is the replicate-year C1, unused when the pooled C1 decides.** The placebo
 control passes when KF − A2 is below every refitted draw's KF-plc − A2 and C3's interval lies wholly
 below zero. The margin, 0.03 points, is about 1.3% of a day-ahead score of about 2.29 (Part 4's A3,
-the arm with drift, unreviewed); below it a gain does not justify a cross-site dependency in
-production.
+unreviewed); below it a gain does not justify a cross-site dependency in production.
 
 - **`supported`:** the estimate is at or below −0.03, the interval lies wholly below zero, at least
   4 of the 5 decision sites improve, the replicate (if used) has the same sign, and both the gate
-  and the placebo control passed. - **`partly supported`:** not `supported`, the gate and the
-  placebo control passed, and either the interval lies wholly below zero, or the estimate is at or
-  below −0.03 with the replicate (or, when the pooled C1 decides, each year) the same sign. -
-  **`refuted`:** the interval lies wholly above zero. - **`inconclusive`:** everything else,
-  including any estimate between −0.03 and zero with an interval spanning zero, a failed placebo
-  control, or a gate test that cannot be fixed. When several conditions fail, the lowest label any
-  of them allows applies.
+  and the placebo control passed.
+- **`partly supported`:** not `supported`, the gate and the placebo control passed, and either the
+  interval lies wholly below zero, or the estimate is at or below −0.03 with the replicate (or, when
+  the pooled C1 decides, each year) the same sign.
+- **`refuted`:** the interval lies wholly above zero.
+- **`inconclusive`:** everything else, including any estimate between −0.03 and zero with an interval
+  spanning zero, a failed placebo control, or a gate test that cannot be fixed. When several
+  conditions fail, the lowest label any of them allows applies.
 
 **C2 and C3 are labelled in the bullets and take-home.** If C2 holds and C1 does not, the take-home
 says a shared component exists and the per-site filter already carries it. A `supported` C1 goes to
@@ -223,12 +239,12 @@ national news reports, each with a source URL.
 
 ## Run order, compute, and time
 
-**Order:** module PR; scripts; fits and checks; tuning; gate; power check; arms; contrasts;
-write-up. **Compute, CPU only, at most 6 cores, no GPU, about 50 minutes of wall clock plus 20 to 40
-for the placebo refits:** 70 fits (14 sites × 5 cuts) about 5 minutes on 6 workers; tuning 10; the
-13 refitted placebo draws about 20 to 40 as parallel workers; gate 5; arms 10; power check,
-bootstrap, and report 15. Agent time: about 2 hours for the module PR, 3 for the scripts, and 2 for
-the write-up, plus reviews.
+**Order:** module PR; scripts; fits and checks; tuning; gate; power check; arms; contrasts; write-up.
+**Compute, CPU only, at most 6 cores, no GPU, about 50 minutes of wall clock, plus 20 to 40 for
+the placebo refits:** 70 fits (14 sites × 5 cuts) about 5 minutes on 6 workers; tuning 10; the 13
+refitted placebo draws about 20 to 40 as parallel workers; gate 5; arms 10; power check, bootstrap,
+and report 15. Agent time: about 2 hours for the module PR, 3 for the scripts, and 2 for the
+write-up, plus reviews.
 
 ## What the write-up must contain (beyond the series brief's standing rules)
 
