@@ -1,11 +1,11 @@
 # Production reference and best guess
 
 **On one validation year, the best recipe tested so far beats the stored production-style forecast
-at Primary substations, supply points, solar farms, and wind farms.** Most of the gain at [Primary
-substations](../../glossary.md#primary-substation) comes from correcting each forecast by its mean
-error over the previous 14 days, and refitting weekly adds a little more. The experiments scored one
-validation year (July 2025 to June 2026), and several settings were chosen on that year, so the
-gains are probably optimistic. Nothing from this theme is adopted in production, and the best
+at Primary substations, supply points, 6 solar farms, and 3 wind farms.** Most of the gain at
+[Primary substations](../../glossary.md#primary-substation) comes from correcting each forecast by
+its mean error over the previous 14 days, and refitting weekly adds a little more. The experiments
+scored one validation year (July 2025 to June 2026), and several settings were chosen on that year,
+so the gains are probably optimistic. Nothing from this theme is adopted in production, and the best
 training source for solar and wind farms is unsettled.
 
 ![Mean absolute error of the median by forecast day, for each target class](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/figure_1_headline.svg)
@@ -38,8 +38,9 @@ that BG2 gains, and weekly refitting lowers it by a further 0.12 (95% interval 0
 forecast by 3.8 to 6.3 points.** The [experiment
 33](../../00033-best-guess-architecture-vs-production/result.md) contrasts are 4.89 for Primary
 demand (98.33% interval -5.66 to -4.06), 3.81 for solar farms (-5.07 to -2.64), and 6.27 for wind
-farms (-7.65 to -5.28). The farm contrasts use 53 Tuesday runs and the Primary contrast 73 runs. The
-correction explains 1.38 of the 4.89 Primary points, and no arm tested what explains the rest. The
+farms (-7.65 to -5.28), all at the 98.33% level. The farm contrasts use 53 Tuesday runs and the
+Primary contrast 73 runs. The correction applied to production explains 1.38 of the 4.89 Primary
+points. No arm widened production's band, so the share due to calibration is untested. The
 production-style 0.95 quantile was exceeded in 49% of Primary cases, against 7% for the best guess.
 
 **BG2 beats the previous best forecast at Primaries and supply points.** BG2 lowered the score by
@@ -56,21 +57,23 @@ small steps (experiment 87).**
 **The solar and wind farm models cannot yet be ranked.** The ensemble-trained model scored 0.050
 points worse than the ERA5-trained mixture at 6 solar farms (98.75% interval -0.125 to +0.168) and
 0.228 worse at 3 wind farms (-0.178 to +0.653). Neither interval rules out a loss above the margin
-we would accept (0.10 and 0.30), so experiment 87 is partly supported.
+we would accept (0.10 and 0.30), which is why the verdict of experiment 87 is partly supported.
 
 **Better weather would add little for Primary demand.** In [experiment
 22](../../00022-era5-weather-ceiling-primary-demand/result.md),
 [ERA5](../../glossary.md#ens-era5-and-cams) weather in place of ENS weather lowered the score by
 0.10 points (99.38% interval -0.16 to -0.04), and not at all within 2 days. A demand model retrained
-on ERA5 gained 0.27 against an ENS-trained N1 with the correction (experiment 33). Both are
-ceilings, because ERA5 arrives about 5 days late.
+on ERA5 lowered the score by 0.27 against an ENS-trained N1 with the correction (experiment 33).
+Both are ceilings, because ERA5 arrives about 5 days late.
 
-**Whether [MVA-only](../../glossary.md#mw-and-mva) metering lowers skill is unsettled.** In
-[experiment 56](../../00056-mva-only-primaries-skill-against-mw-primaries/result.md),
-[skill](../../glossary.md#skill) at sunny middays (April to September, 10:00 to 13:30 UTC) was 5.6
-percentage points lower at the 8 MVA
-series than at the 8 MW series (95% interval -5.0 to 14.6), so the experiment found no evidence of a
-need for special handling and cannot rule out a loss of about 15 points.
+**Whether the metering unit causes the MVA-only skill gap is unsettled.** In [experiment
+56](../../00056-mva-only-primaries-skill-against-mw-primaries/result.md),
+[skill](../../glossary.md#skill) was 10.5 percentage points lower at the 8 MVA series than at the 8
+MW series over all hours (95% interval 2.1 to 17.5, resampling months), and the gap was smaller at
+sunny middays (April to September, 10:00 to 13:30 UTC: 5.6, -5.0 to 14.6). Resampling series instead
+of months gives -2.0 to 20.2 over all hours, so the data cannot separate the metering from which
+series were chosen. The experiment found no evidence of a need for special handling and cannot rule
+out a loss of about 15 points at sunny middays.
 
 ## Best design so far
 
@@ -91,15 +94,17 @@ ranked for farms.**
 
 - **Primary demand:** add the 14-day correction and the spread factor of 1.15 to N1 ([experiment
   19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md), [experiment
-  33](../../00033-best-guess-architecture-vs-production/result.md)). The correction raised
-  production's upper-tail score from 0.067 to 0.107, so check the tail when porting it.
+  33](../../00033-best-guess-architecture-vs-production/result.md)). Applied to the production
+  forecast, the correction raised the threshold-weighted CRPS above the 99th percentile of history
+  from 0.067 to 0.107 (higher is worse), and on N1 from 0.058 to 0.064, so check the tail when
+  porting it.
 - **Primaries and supply points:** refit weekly, and blend five models at Primaries ([experiment
   87](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)). Serve supply points
   without the correction.
 - **Solar and wind farms:** either the ERA5-trained mixture or the ensemble-trained model beats the
   production-style forecast, and which to serve is unresolved. Adding the power-curve [base
-  margin](../../glossary.md#base-margin) lowered the wind score by 0.057 (0.024 to 0.098), and the
-  solar bands need recalibration (experiment 87).
+  margin](../../glossary.md#base-margin) lowered the wind score by 0.057 (95% interval 0.024 to
+  0.098), and the solar bands need recalibration (experiment 87).
 
 Experiments 13, 22, and 56 are `not-for-production`.
 
@@ -110,9 +115,10 @@ Experiments 13, 22, and 56 are `not-for-production`.
   `manual_heuristic` lacked 195 ([experiment
   33](../../00033-best-guess-architecture-vs-production/result.md)). Look for arms with different
   run sets or ensemble members.
-- **Compare with `manual_heuristic` as well as production.** Production scored 9.52 and
-  `manual_heuristic` 5.89, so a gain over production alone overstates a new XGBoost model
-  ([experiment 13](../../00013-primary-demand-against-stored-baselines/result.md), [experiment
+- **Compare with `manual_heuristic` as well as production.** The quantile score at the 16 Primaries
+  over 73 runs was 9.52 for production and 5.89 for `manual_heuristic`, so a gain over production
+  alone overstates a new XGBoost model ([experiment
+  13](../../00013-primary-demand-against-stored-baselines/result.md), [experiment
   33](../../00033-best-guess-architecture-vs-production/result.md)). Look for a changed production
   recipe.
 - **Do not add the correction to supply points without a new test.** It raised the supply-point
@@ -122,8 +128,9 @@ Experiments 13, 22, and 56 are `not-for-production`.
   validation year or more than 4 supply points.
 - **Build the correction history from daily forecasts.** [Experiment
   19](../../00019-primary-demand-stack-vs-manual-heuristic/result.md) used runs 5 days apart, so
-  past errors were probably larger than a daily service would see, whereas experiment 87 corrects
-  each run from the earlier daily runs. Look for a service that runs less often than daily.
+  past errors were probably larger than a daily service would see, whereas experiment 87 scored 292
+  daily runs and its assembly script builds each correction from earlier runs. Look for a forecast
+  service that runs less often than daily, which would make the history sparser.
 - **Treat settings tuned on the scored year as optimistic.** The spread factor, the blend scheme,
   the choice of which Primaries get the solar offset, and the half-life were chosen on the
   validation year ([experiment
@@ -150,6 +157,9 @@ Experiments 13, 22, and 56 are `not-for-production`.
 - Whether the correction and the weekly refit hold their gains on a second validation year.
 - Which training source suits solar and wind farms, which needs more than 6 solar and 3 wind farms.
 - Whether the solar offset helps on daylight rows from April to September.
-- Whether MVA-only metering lowers skill, which needs more than 8 MVA series.
+- Whether the 10.5-point all-hours skill gap of MVA-only Primaries (2.1 to 17.5 over months, -2.0 to
+  20.2 over series) is caused by the metering, which needs more than 8 MVA series.
+- Whether monthly retraining without the correction beats the best guess of experiment 33: it scored
+  5.12 on one seed against 5.32, and needs a test on three seeds and more than one validation year.
 
 The [Research plan](plan.md) lists what is planned next.
