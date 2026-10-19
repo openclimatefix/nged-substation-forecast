@@ -23,7 +23,7 @@ import numpy as np
 import torch
 
 from studies.dp_features import FeatureCache
-from studies.dp_gam import ResidualSpread
+from studies.dp_gam import MIN_SPREAD_GROUP_ROWS, ResidualSpread
 from studies.dp_pooled import (
     SITE_FAMILIES,
     DpConfig,
@@ -172,11 +172,47 @@ def _site_parameters(*, model: PooledDemandModel) -> list[torch.nn.Parameter]:
     return named
 
 
+def _check_onboarding_inputs(
+    *,
+    model: PooledDemandModel,
+    batch: PooledBatch,
+    label: str,
+    cache: FeatureCache,
+    history_end: np.datetime64,
+    forecast_season_year: int,
+) -> tuple[int, int]:
+    """Raise unless the model, the rows, and the dates can be onboarded; return site and year."""
+    if model.config.site_prior == "decay":
+        msg = "onboarding needs a population prior: fit with the map or variational site prior"
+        raise ValueError(msg)
+    site = batch.site_labels.index(label)
+    if bool(model.site_active[site] > 0):
+        msg = f"{label} had rows in the fit: onboard a substation that was held out of it"
+        raise ValueError(msg)
+    if batch.n_season_years != model.n_season_years or len(batch.site_labels) != model.n_sites:
+        msg = "the batch's sites and season-years differ from the model's"
+        raise ValueError(msg)
+    if batch.n_rows and not bool((batch.site == site).all()):
+        msg = f"the onboarding rows must all belong to {label}"
+        raise ValueError(msg)
+    if batch.n_rows and cache.end_times[batch.row.cpu().numpy()].max() > history_end:
+        msg = f"an onboarding row of {label} ends after its history end {history_end}"
+        raise ValueError(msg)
+    n_years = model.n_season_years
+    year_index = forecast_season_year - batch.first_season_year
+    if not 0 <= year_index < n_years:
+        msg = f"season-year {forecast_season_year} is outside the capacity table"
+        raise ValueError(msg)
+    return site, year_index
+
+
 def onboard_site(
     *,
     model: PooledDemandModel,
     batch: PooledBatch,
     label: str,
+    cache: FeatureCache,
+    history_end: np.datetime64,
     forecast_season_year: int,
     steps: int,
     learning_rate: float = 0.05,
@@ -187,14 +223,17 @@ def onboard_site(
     The shared modules, the population means and scales, and every other substation's parameters
     stay as they are. The new substation starts at the population mean and fits only its own
     site-level parameters on `batch`, its rows, which may be empty (zero weeks of history). Its
-    capacity has one increment, in the season-year `forecast_season_year`, so a site with no
-    history of its own holds the population's capacity increment.
+    capacity has an increment in every season-year its rows touch and in `forecast_season_year`:
+    the first is drawn around the population's first-year increment, the rest around the growth
+    increment. A site with no history of its own therefore holds the population's capacity.
 
     Args:
         model: A fitted `map` or `variational` pooled model, in which `label` held no rows.
         batch: The new substation's rows only, with the full model's site and year layout.
         label: The new substation's label.
-        forecast_season_year: The season-year of the forecast, which carries the capacity.
+        cache: The feature cache the batch was built from, which dates the rows.
+        history_end: The substation's history ends here; no row may end after it.
+        forecast_season_year: The season-year of the forecast.
         steps: Optimiser steps.
         learning_rate: Adam's learning rate.
         seed: Seeds the posterior draws.
@@ -203,30 +242,32 @@ def onboard_site(
         The rows used and the final loss, for the report.
 
     Raises:
-        ValueError: If the model's site prior is `decay`, or `batch` holds another substation.
+        ValueError: If the model's site prior is `decay`, the substation was not held out of the
+            fit, the batch's layout differs from the model's, `batch` holds another substation,
+            or a row ends after `history_end`.
     """
-    if model.config.site_prior == "decay":
-        msg = "onboarding needs a population prior: fit with the map or variational site prior"
-        raise ValueError(msg)
-    site = batch.site_labels.index(label)
-    if batch.n_rows and not bool((batch.site == site).all()):
-        msg = f"the onboarding rows must all belong to {label}"
-        raise ValueError(msg)
+    site, year_index = _check_onboarding_inputs(
+        model=model,
+        batch=batch,
+        label=label,
+        cache=cache,
+        history_end=history_end,
+        forecast_season_year=forecast_season_year,
+    )
     n_years = model.n_season_years
-    year_index = forecast_season_year - batch.first_season_year
-    if not 0 <= year_index < n_years:
-        msg = f"season-year {forecast_season_year} is outside the capacity table"
-        raise ValueError(msg)
     saved_trained = model.trained.clone()
     saved_centres = model.centre_means.clone()
     saved_flags = {name: p.requires_grad for name, p in model.named_parameters()}
     device = batch.y.device
     model.to(device=device, dtype=batch.y.dtype)
-    _reset_to_population(model=model, site=site)
+    touched = torch.bincount(batch.season_slot, minlength=model.n_sites * n_years)
+    touched = touched.reshape(model.n_sites, n_years)[site] > 0
     with torch.no_grad():
-        model.trained[site] = 0.0
+        model.trained[site] = touched.to(model.trained.dtype)
         model.trained[site, year_index] = 1.0
         model.site_active[site] = 1.0
+        model.solar_sites[site] = 1.0
+    _reset_to_population(model=model, site=site)
     for parameter in model.parameters():
         parameter.requires_grad_(False)
     mask = torch.zeros(model.n_sites, device=device, dtype=batch.y.dtype)
@@ -264,16 +305,27 @@ def onboard_site(
 
 
 def _reset_to_population(*, model: PooledDemandModel, site: int) -> None:
-    """Set one substation's site-level parameters to the population mean (and prior spread)."""
+    """Set one substation's site-level parameters to the population mean (and prior spread).
+
+    The capacity row takes the population's first-year increment at the substation's first
+    trained season-year and the growth increment at its other trained season-years.
+    """
     with torch.no_grad():
+        first, _ = model.capacity_masks()
         for name in SITE_FAMILIES:
             values: torch.Tensor = getattr(model, name)
-            if name in model.population_mean:
+            if name == "capacity_raw":
+                values[site] = model.population_mean["capacity_raw"]
+                values[site] = torch.where(
+                    first[site] > 0, model.population_mean["capacity_first"], values[site]
+                )
+            elif name in model.population_mean:
                 values[site] = model.population_mean[name]
             else:
                 values[site] = 0.0
             if model.config.variational:
-                model.posterior_log_sd[name][site] = model.population_log_scale[name]
+                scale_name = "capacity_raw" if name == "capacity_raw" else name
+                model.posterior_log_sd[name][site] = model.population_log_scale[scale_name]
 
 
 def _restore_other_sites(
@@ -323,50 +375,111 @@ class PooledResiduals:
         residual: Actual minus predicted mean, in points.
         band: The hour band of each residual.
         quarter: The calendar quarter of each residual.
+        fit_excluded: The substations that had no rows in the fit that made the residuals.
+        weeks_of_history: The weeks of history the held-out substation had in that fit's
+            onboarding, or `None` when the fit is not an onboarding arm.
     """
 
     site: np.ndarray
     residual: np.ndarray
     band: np.ndarray
     quarter: np.ndarray
+    fit_excluded: tuple[str, ...] = ()
+    weeks_of_history: int | None = None
 
 
-def pooled_residuals(*, model: PooledDemandModel, batch: PooledBatch) -> PooledResiduals:
-    """Return the residuals of `model` on `batch`, the rows of a replica year."""
+def pooled_residuals(
+    *, model: PooledDemandModel, batch: PooledBatch, weeks_of_history: int | None = None
+) -> PooledResiduals:
+    """Return the residuals of `model` on `batch`, the rows of a replica year.
+
+    Args:
+        model: The replica fit.
+        batch: The replica year's rows.
+        weeks_of_history: The weeks of history of the onboarding arm, if the model was onboarded.
+
+    Returns:
+        The residuals, tagged with the substations the fit excluded and the weeks of history.
+    """
     predicted = predict_pooled(model=model, batch=batch)
     labels = np.array(batch.site_labels)[batch.site.cpu().numpy()]
+    excluded = tuple(
+        label
+        for label, active in zip(batch.site_labels, model.site_active.tolist(), strict=True)
+        if active == 0
+    )
     return PooledResiduals(
         site=labels,
         residual=batch.y.detach().cpu().numpy() - predicted,
         band=batch.band.cpu().numpy(),
         quarter=batch.quarter.cpu().numpy(),
+        fit_excluded=excluded,
+        weeks_of_history=weeks_of_history,
     )
 
 
-def cross_fitted_spread(*, residuals: PooledResiduals, held_out: str) -> ResidualSpread:
-    """Fit a spread on every substation's replica residuals except the held-out one's.
+def cross_fitted_spread(
+    *, residuals: PooledResiduals, held_out: str, weeks_of_history: int | None = None
+) -> ResidualSpread:
+    """Fit a spread on the other substations' residuals from a fit that never saw `held_out`.
 
-    A forecast for a new substation then never uses residuals that the substation produced.
+    The residuals must come from a replica fit in which `held_out` had no rows, and from the
+    onboarding arm with the same weeks of history, so the spread for a new substation carries
+    neither its own history nor another arm's staleness. The residuals are centred per group
+    first (see `_centre_by_group`), so the spread is a spread around the mean forecast and carries
+    no shift.
 
     Args:
         residuals: The replica residuals of all substations.
         held_out: The label of the substation whose forecast the spread is for.
+        weeks_of_history: The weeks of history of the arm the spread is for.
 
     Returns:
         The spread, with the quantile levels of `studies.dp_gam.QUANTILE_LEVELS`.
 
     Raises:
-        ValueError: If no other substation has residuals.
+        ValueError: If the replica fit saw `held_out`, the weeks of history differ, or no other
+            substation has residuals.
     """
+    if held_out not in residuals.fit_excluded:
+        msg = f"the replica fit saw {held_out}: its residuals cannot make {held_out}'s spread"
+        raise ValueError(msg)
+    if residuals.weeks_of_history != weeks_of_history:
+        msg = (
+            f"the residuals are for {residuals.weeks_of_history} weeks of history, "
+            f"not {weeks_of_history}"
+        )
+        raise ValueError(msg)
     others = residuals.site != held_out
     if not others.any():
         msg = f"no residuals from a substation other than {held_out}"
         raise ValueError(msg)
-    return ResidualSpread.fit(
-        residuals=residuals.residual[others],
-        band=residuals.band[others],
-        quarter=residuals.quarter[others],
-    )
+    band, quarter = residuals.band[others], residuals.quarter[others]
+    centred = _centre_by_group(residual=residuals.residual[others], band=band, quarter=quarter)
+    return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter)
+
+
+def _centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:
+    """Subtract the mean residual of each (band, quarter) group, so the spread has mean zero.
+
+    The forecast is a mean forecast, so a group's mean residual in the replica year is the replica
+    year's bias, not a spread. Adding raw residual quantiles to the scored year's forecast would
+    carry that bias into the scored year as a shift. A group with fewer than
+    `MIN_SPREAD_GROUP_ROWS` residuals uses its band's mean, and a band with fewer uses the mean of
+    all residuals.
+    """
+    centred = residual - residual.mean()
+    for b in np.unique(band):
+        in_band = band == b
+        band_mean = (
+            residual[in_band].mean() if in_band.sum() >= MIN_SPREAD_GROUP_ROWS else residual.mean()
+        )
+        centred[in_band] = residual[in_band] - band_mean
+        for q in np.unique(quarter):
+            group = in_band & (quarter == q)
+            if group.sum() >= MIN_SPREAD_GROUP_ROWS:
+                centred[group] = residual[group] - residual[group].mean()
+    return centred
 
 
 __all__ = [
