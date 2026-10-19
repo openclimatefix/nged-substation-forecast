@@ -7,10 +7,11 @@ and the power factor shows the Gauss-Newton fit climbed out of the mirror basin.
 """
 
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Final
 
 import numpy as np
+import polars as pl
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -34,7 +35,7 @@ from studies.dp_meter import (  # noqa: E402
     predict_meter,
 )
 from studies.dp_operator import DEFAULT_EPSILON, tan_phi_from_power_factor  # noqa: E402
-from studies.dp_pinned_capacity import no_solar_capacity  # noqa: E402
+from studies.dp_pinned_capacity import pinned_capacity  # noqa: E402
 
 CUT: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 SEASON_YEARS: Final[range] = range(2019, 2026)
@@ -282,7 +283,18 @@ def test_a_dark_only_window_trains_on_dark_rows_and_a_zero_capacity_removes_the_
     )
     assert 0 < len(dark_rows) < len(all_rows)
     assert cache.sites["S1"].dark[dark_rows].all()
-    zero = no_solar_capacity(table=cache.sites["S1"].table, cut=CUT)
+    weeks = [date(2019, 8, 26) + timedelta(days=7 * i) for i in range(370)]
+    zero_vintages = pl.DataFrame(
+        {
+            "time_series_id": features.table.time_series_id,
+            "variant": "frozen",
+            "origin_monday": date(2019, 9, 2),
+            "week_start": weeks,
+            "capacity_mw": 0.0,
+            "unobserved": False,
+        }
+    )
+    zero = pinned_capacity(vintages=zero_vintages, table=features.table, cut=CUT)
     assert zero.held_points == 0.0
     assert zero.at_rows(cache=cache, index=dark_rows[:10]) == pytest.approx(0.0)
     fit = fit_gam(
