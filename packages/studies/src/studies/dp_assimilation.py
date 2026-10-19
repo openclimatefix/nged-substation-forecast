@@ -657,17 +657,59 @@ class SharedTerm:
     """A correction summed onto the site's own, from a stream the site shares with others.
 
     Attributes:
-        residual: The stream the correction reads, on the grid, in points; `NaN` where there is no
-            reading.
-        band: The hour band of each grid row of the stream.
-        run: Builds the correction's trace from the stream and its bands.
-        weight_by_band: What multiplies the correction of a case whose target is in each hour band.
+        residual: The stream the correction reads, on the whole grid, in the stream's own units;
+            `NaN` where there is no reading.
+        run: Builds the correction's trace from the stream and the grid's hour bands.
+        weight_by_band: What multiplies the correction of a case whose target is in each hour band,
+            in points per unit of the stream: for a factor in units of the site's residual scale,
+            the site's loading times its scale in that band (beta times sigma).
     """
 
     residual: np.ndarray
-    band: np.ndarray
     run: TraceBuilder
     weight_by_band: np.ndarray
+
+    def __post_init__(self) -> None:
+        """Check the weights have one entry per hour band.
+
+        Raises:
+            ValueError: If `weight_by_band` does not hold exactly one weight per hour band.
+        """
+        if np.shape(self.weight_by_band) != (N_BANDS,):
+            msg = f"weight_by_band needs {N_BANDS} entries, one per hour band"
+            raise ValueError(msg)
+
+
+def summed_correction_at(
+    *,
+    local_trace: CorrectionTrace,
+    shared_traces: Sequence[tuple[CorrectionTrace, np.ndarray]],
+    cutoff: np.ndarray,
+    target: np.ndarray,
+    band: np.ndarray,
+) -> Correction:
+    """Look up the local correction plus each shared correction weighted by the target's band.
+
+    A forecast and its spread both sum through this function, so they cannot drift apart.
+
+    Args:
+        local_trace: The site's own correction trace.
+        shared_traces: Each shared trace with its weight per hour band, in points per unit of the
+            shared stream.
+        cutoff: Each case's newest usable grid position.
+        target: Each case's grid position of the valid time.
+        band: Each case's hour band (the target's).
+
+    Returns:
+        The summed correction. Its `level` and `anomaly` are the sums of the weighted parts.
+    """
+    summed = correction_at(trace=local_trace, cutoff=cutoff, target=target, band=band)
+    level, anomaly = summed.level, summed.anomaly
+    for trace, weight_by_band in shared_traces:
+        part = correction_at(trace=trace, cutoff=cutoff, target=target, band=band)
+        level = level + weight_by_band[band] * part.level
+        anomaly = anomaly + weight_by_band[band] * part.anomaly
+    return Correction(total=level + anomaly, level=level, anomaly=anomaly)
 
 
 def replica_corrections(
@@ -675,6 +717,7 @@ def replica_corrections(
     end_times: np.ndarray,
     replica: ReplicaResiduals,
     run: TraceBuilder,
+    grid_band: np.ndarray | None = None,
     local_residual: np.ndarray | None = None,
     shared: Sequence[SharedTerm] = (),
     delay_hours: float = DEFAULT_DELAY_HOURS,
@@ -689,22 +732,41 @@ def replica_corrections(
         replica: The replica's residuals; its residual stream feeds the local term unless
             `local_residual` replaces it.
         run: Builds the local term's trace.
-        local_residual: A stream on the grid for the local term, such as the replica's residuals
-            with the shared part taken out. `None` uses the replica's own residual stream.
+        grid_band: The hour band of every grid row, used by the local and every shared trace.
+            Required with `local_residual` or `shared`. Without them, the bands of the replica's
+            rows are used and the rest of the grid is empty.
+        local_residual: A stream on the whole grid for the local term, such as the replica's
+            residuals with the shared part taken out. `None` uses the replica's own residual
+            stream.
         shared: Terms summed onto the local one.
         delay_hours: The telemetry delay.
 
     Returns:
         One array per number of days ahead from 1 to 7, each as long as the replica's rows.
+
+    Raises:
+        ValueError: If `local_residual` or `shared` is given without `grid_band`, or a stream or
+            the bands do not cover the whole grid.
     """
-    grid_band = np.zeros(len(end_times), dtype=np.int64)
-    grid_band[replica.index] = replica.band
+    n_grid = len(end_times)
+    if grid_band is None:
+        if local_residual is not None or shared:
+            msg = "a local stream or a shared term needs grid_band, the hour band of every grid row"
+            raise ValueError(msg)
+        grid_band = np.zeros(n_grid, dtype=np.int64)
+        grid_band[replica.index] = replica.band
+    streams = [local_residual, *(term.residual for term in shared), grid_band]
+    if any(stream is not None and len(stream) != n_grid for stream in streams):
+        msg = "every stream and grid_band must have one entry per grid row"
+        raise ValueError(msg)
     stream = local_residual
     if stream is None:
-        stream = np.full(len(end_times), np.nan)
+        stream = np.full(n_grid, np.nan)
         stream[replica.index] = replica.residuals
     local_trace = run(residual=stream, band=grid_band)
-    shared_traces = [term.run(residual=term.residual, band=term.band) for term in shared]
+    shared_traces = [
+        (term.run(residual=term.residual, band=grid_band), term.weight_by_band) for term in shared
+    ]
     valid_times = end_times[replica.index]
     corrections = []
     for days_ahead in range(1, LEAD_BAND_UPPER_DAYS[-1] + 1):
@@ -713,18 +775,15 @@ def replica_corrections(
             initialisation=day_ahead_initialisation(end_times=valid_times, days_ahead=days_ahead),
             delay_hours=delay_hours,
         )
-        total = correction_at(
-            trace=local_trace, cutoff=cutoff, target=replica.index, band=replica.band
-        ).total
-        for term, trace in zip(shared, shared_traces, strict=True):
-            total = (
-                total
-                + term.weight_by_band[replica.band]
-                * correction_at(
-                    trace=trace, cutoff=cutoff, target=replica.index, band=replica.band
-                ).total
-            )
-        corrections.append(total)
+        corrections.append(
+            summed_correction_at(
+                local_trace=local_trace,
+                shared_traces=shared_traces,
+                cutoff=cutoff,
+                target=replica.index,
+                band=replica.band,
+            ).total
+        )
     return tuple(corrections)
 
 
@@ -733,6 +792,7 @@ def post_filter_lead_spread(
     end_times: np.ndarray,
     replica: ReplicaResiduals,
     run: TraceBuilder,
+    grid_band: np.ndarray | None = None,
     local_residual: np.ndarray | None = None,
     shared: Sequence[SharedTerm] = (),
     delay_hours: float = DEFAULT_DELAY_HOURS,
@@ -752,8 +812,9 @@ def post_filter_lead_spread(
             the switching rows, as a live filter would see them.
         run: Builds the local correction's trace from the residual stream and the hour band of each
             grid row, for example `run_ewma` or `functools.partial(run_kalman, hyper=hyper)`.
-        local_residual: A stream on the grid for the local correction, when it differs from the
-            replica's residuals; `None` uses the replica's residuals.
+        grid_band: The hour band of every grid row; required with `local_residual` or `shared`.
+        local_residual: A stream on the whole grid for the local correction, when it differs from
+            the replica's residuals; `None` uses the replica's residuals.
         shared: Corrections from other streams, summed onto the local one with a weight per hour
             band. The corrected residual is still the replica's residual minus the sum.
         delay_hours: The telemetry delay.
@@ -772,6 +833,7 @@ def post_filter_lead_spread(
         end_times=end_times,
         replica=replica,
         run=run,
+        grid_band=grid_band,
         local_residual=local_residual,
         shared=shared,
         delay_hours=delay_hours,
