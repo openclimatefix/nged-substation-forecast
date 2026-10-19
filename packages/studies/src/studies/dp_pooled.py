@@ -451,6 +451,7 @@ class PooledDemandModel(nn.Module):
         self.register_buffer("fit_had_rows", torch.ones(n_sites))
         self.onboarding_weeks: dict[str, int] = {}
         self.capacity_override: torch.Tensor | None = None
+        """Capacities in points that replace the learned ones where not `NaN`; `None` for none."""
         self.register_buffer("capacity_prior", torch.full((n_sites,), float("nan")))
         self._build_site_prior(initial_level=initial_level)
 
@@ -561,11 +562,12 @@ class PooledDemandModel(nn.Module):
 
     def capacities(self) -> torch.Tensor:
         """Return the capacity of each substation and season-year, shape (sites, years)."""
-        if self.capacity_override is not None:
-            return self.capacity_override
-        return torch.cumsum(
+        learned = torch.cumsum(
             nn.functional.softplus(self._site("capacity_raw")) * self.trained, dim=1
         )
+        if self.capacity_override is None:
+            return learned
+        return torch.where(torch.isnan(self.capacity_override), learned, self.capacity_override)
 
     def finalise_centres(self, *, batch: PooledBatch) -> None:
         """Store the final centring means of the training rows, and carry them to later years.

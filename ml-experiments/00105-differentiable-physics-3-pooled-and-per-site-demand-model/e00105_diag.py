@@ -200,11 +200,68 @@ def run_variant(
     return capacity_rows(model=model, batch=batch, cache=cache, name=name)
 
 
+MULTIPLIERS: Final[tuple[float, ...]] = (0.5, 0.7, 0.85, 1.0, 1.15, 1.3)
+
+
+def capacity_profile(*, cache: FeatureCache, convex: dict[str, dict[int, float]]) -> dict[str, Any]:
+    """Fit P with every scored substation's capacity fixed at a multiple of the convex capacity.
+
+    For each multiplier the capacity paths are Part 2's convex capacities (all years, no drift,
+    fitted before the tuning cut) times the multiplier, and everything else is refitted. The
+    result records the training loss in nats (the loss per row times the rows) and each
+    substation's summer-midday mean absolute error on the tuning year. A flat loss within a few
+    nats means the pooled model does not identify the capacity; a clear minimum means a fit of
+    the capacity itself is slow to converge.
+    """
+    batch = common.pooled_batch_for(cache=cache, sites=common.POOL, cut=common.TUNING_CUT)
+    score = gate.arms.remap_sites(
+        batch=common.scoring_batch_for(
+            cache=cache, sites=gate.SCORED, after=common.TUNING_CUT, through=common.TUNING_END
+        ),
+        model_sites=common.POOL,
+    )
+    sunny = gate.midday_summer(batch=score, cache=cache).cpu().numpy()
+    truth = score.y.cpu().numpy()
+    site_of_row = score.site.cpu().numpy()
+    base_path = np.full((len(batch.site_labels), batch.n_season_years), np.nan)
+    for site, by_year in convex.items():
+        row = batch.site_labels.index(site)
+        previous = 0.0
+        for offset in range(batch.n_season_years):
+            previous = by_year.get(batch.first_season_year + offset, previous)
+            base_path[row, offset] = previous
+    out: dict[str, Any] = {}
+    for multiplier in MULTIPLIERS:
+        override = torch.as_tensor(base_path * multiplier, dtype=torch.float32)
+        models, results = fit_many(
+            batch=batch,
+            copies=[FitCopy(name=f"x{multiplier}", capacity_override=override)],
+            config=gate.config_p(),
+            initial_level=torch.full((len(batch.site_labels),), 50.0),
+            steps=common.FIT_STEPS,
+            learning_rate=common.FIT_RATE,
+            final_rate_fraction=common.FINAL_RATE_FRACTION,
+        )
+        model = models[0]
+        predicted = gate.predict_pooled(model=model, batch=score)
+        error = np.abs(truth - predicted)
+        out[str(multiplier)] = {
+            "loss_nats": float(np.mean(results[0].losses[-20:])) * batch.n_rows,
+            "summer_midday_mae": {
+                site: float(error[(site_of_row == batch.site_labels.index(site)) & sunny].mean())
+                for site in gate.SCORED
+            },
+        }
+        print(f"profile x{multiplier}: {out[str(multiplier)]['loss_nats']:.0f} nats", flush=True)
+    return out
+
+
 def main() -> None:
     """Run the requested variants and write `work/diagnostics.json` and the capacity table."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--variants", nargs="+", default=list(VARIANTS))
     parser.add_argument("--leak-test", nargs="*", default=[])
+    parser.add_argument("--profile", action="store_true")
     arguments = parser.parse_args()
     torch.set_num_threads(4)
     cache = common.load_cache()
@@ -216,6 +273,11 @@ def main() -> None:
         "cut": date.isoformat(common.TUNING_CUT.date()),
     }
     table: list[dict[str, Any]] = []
+    if arguments.profile:
+        common.write_json(
+            name="capacity_profile.json", payload=capacity_profile(cache=cache, convex=convex)
+        )
+        return
     for name in arguments.variants:
         table += run_variant(
             name=name,

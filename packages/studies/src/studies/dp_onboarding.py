@@ -100,6 +100,8 @@ class FitCopy:
             name, or `None`. A larger scale is a weaker prior.
         capacity_init: Starting values of `capacity_raw`, shape (substations, season-years), or
             `None` for the default start.
+        capacity_override: Capacities in points held fixed in this copy, shape (substations,
+            season-years), with `NaN` where the capacity is learned; or `None`.
     """
 
     name: str
@@ -108,6 +110,7 @@ class FitCopy:
     capacity_prior: torch.Tensor | None = None
     fixed_scales: dict[str, float] | None = None
     capacity_init: torch.Tensor | None = None
+    capacity_override: torch.Tensor | None = None
 
 
 def fit_many(
@@ -152,6 +155,8 @@ def fit_many(
         )
         if copy.capacity_prior is not None:
             model.capacity_prior.copy_(copy.capacity_prior)
+        if copy.capacity_override is not None:
+            model.capacity_override = copy.capacity_override.clone()
         if copy.capacity_init is not None:
             model.capacity_raw.data.copy_(copy.capacity_init)
         for family, scale in (copy.fixed_scales or {}).items():
