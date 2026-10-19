@@ -73,9 +73,12 @@ TUNING_DECISION: Final[tuple[str, ...]] = SYNTHETIC_LABELS[:5]
 VARIANTS: Final[dict[str, float]] = {"base": 1.0, "tau_x10": 10.0, "tau_x0.1": 0.1}
 WEEK_ROWS: Final[int] = 7 * HALF_HOURS_PER_DAY
 FLEET_CUT: Final[datetime] = common.SCORED_CUT
-SEED: Final[int] = 20261020
-"""The seed of the synthetic fleets. The first gate run used 20261019, with shrinkage measured on
-raw heating coefficients; its result is kept in `work/gate/gate_run1.json`."""
+SEED: Final[int] = 20261021
+"""The seed of the synthetic fleets. Run 1 used 20261019 with shrinkage measured on raw heating
+coefficients. Run 2 used 20261020 with shrinkage measured on the heating contribution to the
+prediction and an independent-noise closed form. This run, 20261021, keeps the contribution and
+uses a closed form that accounts for the noise's persistence. The earlier results are kept in
+`work/gate/gate_run1.json` and `gate_run2.json`."""
 
 
 def _g_fits(*, cache: FeatureCache, vintages: pl.DataFrame) -> tuple[Any, dict[str, np.ndarray]]:
@@ -309,6 +312,32 @@ def slope_through_origin(*, estimated: np.ndarray, truth: np.ndarray) -> float:
     return float((estimated * truth).sum() / (truth * truth).sum())
 
 
+def heating_ols_covariance(*, x_heating: np.ndarray, noise: np.ndarray, max_lag: int) -> np.ndarray:
+    """Return the covariance of the least-squares heating slopes under serially correlated noise.
+
+    The sandwich estimator with Bartlett weights over `max_lag` half-hours, built from the
+    realised noise of the synthetic substation. The plan puts multi-day persistence in the noise,
+    and a covariance that assumes independent rows (`sigma^2 (X'X)^-1`) understates how little
+    four weeks of heating evidence is worth.
+
+    Args:
+        x_heating: The heating columns of the design over the window, shape (rows, columns).
+        noise: The realised noise on those rows.
+        max_lag: The longest lag, in rows, that counts.
+
+    Returns:
+        The covariance of the estimated slopes, shape (columns, columns).
+    """
+    scores = x_heating * noise[:, None]
+    meat = scores.T @ scores
+    for lag in range(1, max_lag + 1):
+        weight = 1.0 - lag / (max_lag + 1)
+        cross = scores[lag:].T @ scores[:-lag]
+        meat += weight * (cross + cross.T)
+    bread = np.linalg.inv(x_heating.T @ x_heating + 1e-6 * np.eye(x_heating.shape[1]))
+    return bread @ meat @ bread
+
+
 def posterior_factor_and_oracle(
     *,
     cache: FeatureCache,
@@ -317,7 +346,6 @@ def posterior_factor_and_oracle(
     truth_theta: np.ndarray,
     mean_heating: np.ndarray,
     tau_heating: float,
-    noise_variance: float,
     window: TrainingWindow,
     cut: datetime,
     pinned_points: float,
@@ -325,7 +353,7 @@ def posterior_factor_and_oracle(
     """Return the closed-form shrinkage matrix and the oracle posterior-mean heating slopes.
 
     The oracle knows every other coefficient, the fleet mean of the heating slopes, `tau`, and the
-    noise variance.
+    covariance of the least-squares slopes under the realised, serially correlated noise.
 
     Args:
         cache: The synthetic cache.
@@ -334,13 +362,12 @@ def posterior_factor_and_oracle(
         truth_theta: The substation's true coefficients.
         mean_heating: The fleet mean of the heating slopes the oracle shrinks towards.
         tau_heating: The true family scale of the heating slopes.
-        noise_variance: The noise variance.
         window: The substation's window.
         cut: The cut.
         pinned_points: The synthetic capacity in points.
 
     Returns:
-        The shrinkage matrix `S` (so the posterior mean is `S theta_ols + (I - S) mean`), and the
+        The shrinkage matrix `S` (so the posterior mean is `mean + S (theta_ols - mean)`), and the
         posterior mean.
     """
     features = cache.sites[label]
@@ -355,13 +382,12 @@ def posterior_factor_and_oracle(
         - x[:, rest] @ truth_theta[rest]
     )
     x_h = x[:, heating]
-    precision = x_h.T @ x_h / noise_variance
-    prior = np.eye(heating.stop - heating.start) / tau_heating**2
-    posterior = np.linalg.solve(
-        precision + prior, x_h.T @ residual / noise_variance + prior @ mean_heating
-    )
-    shrink = np.linalg.solve(precision + prior, precision)
-    return shrink, posterior
+    noise = residual - x_h @ truth_theta[heating]
+    covariance = heating_ols_covariance(x_heating=x_h, noise=noise, max_lag=WEEK_ROWS)
+    prior_variance = tau_heating**2
+    shrink = prior_variance * np.linalg.inv(prior_variance * np.eye(len(covariance)) + covariance)
+    ols = np.linalg.solve(x_h.T @ x_h + 1e-6 * np.eye(x_h.shape[1]), x_h.T @ residual)
+    return shrink, mean_heating + shrink @ (ols - mean_heating)
 
 
 def run_checks(*, workers: int) -> dict[str, Any]:
@@ -516,7 +542,6 @@ def shrinkage_checks(
             truth_theta=truth["thetas"][number],
             mean_heating=true_mean,
             tau_heating=truth["scale"]["heating"],
-            noise_variance=truth["noise_variance"],
             window=common.FOUR_WEEKS.window(cut=FLEET_CUT),
             cut=FLEET_CUT,
             pinned_points=truth["capacity_points"][label],
