@@ -163,6 +163,11 @@ nav:
           - Summary: ml-experiments/themes/demand-inputs/index.md
           - Experiments: ml-experiments/themes/demand-inputs/experiments.md
           - Research plan: ml-experiments/themes/demand-inputs/plan.md
+      - Differentiable physics:
+          - Demand, calendar, and weather:
+              - Summary: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/index.md
+              - Experiments: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/experiments.md
+              - Research plan: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/plan.md
       - Generator forecasting:
           - Summary: ml-experiments/themes/generator-forecasting/index.md
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
