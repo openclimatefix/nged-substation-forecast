@@ -22,6 +22,7 @@ from studies.dp_assimilation import (  # noqa: E402
     FilterHyperparameters,
     LeadSpread,
     SharedTerm,
+    WeightedTrace,
     correction_at,
     day_ahead_initialisation,
     fit_filter_hyperparameters,
@@ -503,28 +504,75 @@ def _shared_term(*, stream: np.ndarray, weights: tuple[float, ...]) -> SharedTer
     )
 
 
+def _day_ahead_cutoff(*, end_times: np.ndarray, delay_hours: float, days_ahead: int) -> np.ndarray:
+    return usable_cutoff_positions(
+        end_times=end_times,
+        initialisation=day_ahead_initialisation(end_times=end_times, days_ahead=days_ahead),
+        delay_hours=delay_hours,
+    )
+
+
 def test_a_summed_correction_is_the_local_plus_the_weighted_shared_correction():
     end_times, replica, local, shared = _summed_replica()
-    run = partial(run_kalman, hyper=HYPER)
     grid_band = _bands(n=len(end_times))
-    weights = (0.5, 1.0, 1.5, 0.0)
+    weights = np.array([0.5, 1.0, 1.5, 0.0])
     summed = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=partial(run_kalman, hyper=HYPER),
+        grid_band=grid_band,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=tuple(weights))],
+    )
+    local_trace = run_kalman(residual=local, band=grid_band, hyper=HYPER)
+    shared_trace = run_kalman(residual=shared, band=grid_band, hyper=HYPER)
+    for days_ahead, total in enumerate(summed, start=1):
+        cutoff = _day_ahead_cutoff(end_times=end_times, delay_hours=3.5, days_ahead=days_ahead)
+        local_part = correction_at(
+            trace=local_trace, cutoff=cutoff, target=replica.index, band=replica.band
+        )
+        shared_part = correction_at(
+            trace=shared_trace, cutoff=cutoff, target=replica.index, band=replica.band
+        )
+        assert np.allclose(total, local_part.total + weights[replica.band] * shared_part.total)
+
+
+def test_a_shared_term_with_its_own_delay_reads_only_what_was_usable_that_much_earlier():
+    end_times, replica, local, shared = _summed_replica()
+    grid_band = _bands(n=len(end_times))
+    weights = np.array([0.6, 0.6, 0.6, 0.6])
+    run = partial(run_kalman, hyper=HYPER)
+    late = replica_corrections(
         end_times=end_times,
         replica=replica,
         run=run,
         grid_band=grid_band,
         local_residual=local,
-        shared=[_shared_term(stream=shared, weights=weights)],
+        shared=[replace(_shared_term(stream=shared, weights=tuple(weights)), delay_hours=9.0)],
     )
-    local_only = replica_corrections(
-        end_times=end_times, replica=replica, run=run, grid_band=grid_band, local_residual=local
+    common_delay = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=run,
+        grid_band=grid_band,
+        local_residual=local,
+        shared=[_shared_term(stream=shared, weights=tuple(weights))],
     )
-    shared_only = replica_corrections(
-        end_times=end_times, replica=replica, run=run, grid_band=grid_band, local_residual=shared
+    local_trace = run(residual=local, band=grid_band)
+    shared_trace = run(residual=shared, band=grid_band)
+    cutoff = _day_ahead_cutoff(end_times=end_times, delay_hours=3.5, days_ahead=1)
+    shared_cutoff = _day_ahead_cutoff(end_times=end_times, delay_hours=9.0, days_ahead=1)
+    expected = (
+        correction_at(
+            trace=local_trace, cutoff=cutoff, target=replica.index, band=replica.band
+        ).total
+        + weights[replica.band]
+        * correction_at(
+            trace=shared_trace, cutoff=shared_cutoff, target=replica.index, band=replica.band
+        ).total
     )
-    for total, local_part, shared_part in zip(summed, local_only, shared_only, strict=True):
-        expected = local_part + np.array(weights)[replica.band] * shared_part
-        assert np.allclose(total, expected, atol=1e-12)
+    assert np.allclose(late[0], expected)
+    assert not np.allclose(late[0], common_delay[0])
 
 
 def test_the_helper_that_sums_a_forecast_correction_matches_the_replica_sum():
@@ -547,7 +595,9 @@ def test_the_helper_that_sums_a_forecast_correction_matches_the_replica_sum():
     )
     helper = summed_correction_at(
         local_trace=run(residual=local, band=grid_band),
-        shared_traces=[(run(residual=shared, band=grid_band), weights)],
+        shared_traces=[
+            WeightedTrace(trace=run(residual=shared, band=grid_band), weight_by_band=weights)
+        ],
         cutoff=cutoff,
         target=replica.index,
         band=replica.band,

@@ -32,8 +32,9 @@ not exactly.
 **Across a refit,** `stitch_out_of_sample_residuals` joins each fit's residuals after its own cut
 into one stream, so the filter's state carries forward and never re-runs on a fit's in-sample
 residuals, which would pull the level towards zero at the cut. The replica's filter
-(`post_filter_lead_spread`) starts cold on its year and leaves out the first `REPLICA_BURN_IN_DAYS`
-days, whereas the scored filter is warm.
+(`post_filter_lead_spread`) starts cold on the stream it is given and leaves out the first
+`REPLICA_BURN_IN_DAYS` days of the replica year, whereas the scored filter is warm. A stream that
+holds readings before the replica year makes the replica's filter warm too.
 
 **The hyperparameters** (log `q`, logit `phi`, log `sigma_z`, log `sigma_eps`) are fitted per site
 by marginal likelihood under a normal prior shared across sites, whose mean and spread are updated
@@ -663,11 +664,15 @@ class SharedTerm:
         weight_by_band: What multiplies the correction of a case whose target is in each hour band,
             in points per unit of the stream: for a factor in units of the site's residual scale,
             the site's loading times its scale in that band (beta times sigma).
+        delay_hours: How long after a reading the term may see it, when that differs from the
+            telemetry delay of the local term (for example, contributors whose telemetry is later);
+            `None` uses the same delay as the local term.
     """
 
     residual: np.ndarray
     run: TraceBuilder
     weight_by_band: np.ndarray
+    delay_hours: float | None = None
 
     def __post_init__(self) -> None:
         """Check the weights have one entry per hour band.
@@ -680,10 +685,26 @@ class SharedTerm:
             raise ValueError(msg)
 
 
+@dataclass(frozen=True)
+class WeightedTrace:
+    """A shared correction trace with its weight per hour band.
+
+    Attributes:
+        trace: The shared correction's trace.
+        weight_by_band: What multiplies the correction of a case whose target is in each hour band.
+        cutoff: Each case's newest usable grid position for this trace, when it differs from the
+            local term's; `None` uses the local term's.
+    """
+
+    trace: CorrectionTrace
+    weight_by_band: np.ndarray
+    cutoff: np.ndarray | None = None
+
+
 def summed_correction_at(
     *,
     local_trace: CorrectionTrace,
-    shared_traces: Sequence[tuple[CorrectionTrace, np.ndarray]],
+    shared_traces: Sequence[WeightedTrace],
     cutoff: np.ndarray,
     target: np.ndarray,
     band: np.ndarray,
@@ -695,7 +716,7 @@ def summed_correction_at(
     Args:
         local_trace: The site's own correction trace.
         shared_traces: Each shared trace with its weight per hour band, in points per unit of the
-            shared stream.
+            shared stream, and optionally its own cutoff.
         cutoff: Each case's newest usable grid position.
         target: Each case's grid position of the valid time.
         band: Each case's hour band (the target's).
@@ -705,10 +726,15 @@ def summed_correction_at(
     """
     summed = correction_at(trace=local_trace, cutoff=cutoff, target=target, band=band)
     level, anomaly = summed.level, summed.anomaly
-    for trace, weight_by_band in shared_traces:
-        part = correction_at(trace=trace, cutoff=cutoff, target=target, band=band)
-        level = level + weight_by_band[band] * part.level
-        anomaly = anomaly + weight_by_band[band] * part.anomaly
+    for shared in shared_traces:
+        part = correction_at(
+            trace=shared.trace,
+            cutoff=cutoff if shared.cutoff is None else shared.cutoff,
+            target=target,
+            band=band,
+        )
+        level = level + shared.weight_by_band[band] * part.level
+        anomaly = anomaly + shared.weight_by_band[band] * part.anomaly
     return Correction(total=level + anomaly, level=level, anomaly=anomaly)
 
 
@@ -764,21 +790,34 @@ def replica_corrections(
         stream = np.full(n_grid, np.nan)
         stream[replica.index] = replica.residuals
     local_trace = run(residual=stream, band=grid_band)
-    shared_traces = [
-        (term.run(residual=term.residual, band=grid_band), term.weight_by_band) for term in shared
-    ]
+    shared_traces = [(term, term.run(residual=term.residual, band=grid_band)) for term in shared]
     valid_times = end_times[replica.index]
     corrections = []
     for days_ahead in range(1, LEAD_BAND_UPPER_DAYS[-1] + 1):
+        initialisation = day_ahead_initialisation(end_times=valid_times, days_ahead=days_ahead)
         cutoff = usable_cutoff_positions(
-            end_times=end_times,
-            initialisation=day_ahead_initialisation(end_times=valid_times, days_ahead=days_ahead),
-            delay_hours=delay_hours,
+            end_times=end_times, initialisation=initialisation, delay_hours=delay_hours
         )
+        weighted = [
+            WeightedTrace(
+                trace=trace,
+                weight_by_band=term.weight_by_band,
+                cutoff=(
+                    None
+                    if term.delay_hours is None
+                    else usable_cutoff_positions(
+                        end_times=end_times,
+                        initialisation=initialisation,
+                        delay_hours=term.delay_hours,
+                    )
+                ),
+            )
+            for term, trace in shared_traces
+        ]
         corrections.append(
             summed_correction_at(
                 local_trace=local_trace,
-                shared_traces=shared_traces,
+                shared_traces=weighted,
                 cutoff=cutoff,
                 target=replica.index,
                 band=replica.band,
