@@ -51,13 +51,21 @@ DEFAULT_DRIFT_STEP: Final[float] = 3000.0
 
 SMOOTH_DRIFT_STEP: Final[float] = 3000.0
 """Experiment 104's drift step, for the smoother descriptive arm `a1_smooth`."""
-ACTIVE_STEP_PENALTY: Final[float] = 300.0
-"""The largest step penalty on the tuning grid with steps that are not all zero (`a1s_300`)."""
+ACTIVE_STEP_PENALTY: Final[float] = 100.0
+"""The step penalty of the exploratory arm `a1s_smooth`.
+
+At the tuned drift step the tuned penalty of 1,000 switches every step off, and a penalty of 300
+shrinks a true 8-point step to about 70% of its size (known-answer gate), so the exploratory arm
+uses 100 with the smoother drift of experiment 104.
+"""
 
 TunedPath = common.WORK_DIR / "tuned.json"
 
 FilterKindType = Literal["kalman", "ewma"]
 """Which recent-level correction a filter arm applies."""
+
+FilterPartType = Literal["both", "level", "anomaly"]
+"""Which hidden states of the Kalman filter enter the correction."""
 
 
 @dataclass(frozen=True)
@@ -87,8 +95,8 @@ def arm_definitions(*, tuned: dict) -> dict[str, ArmDefinition]:
         tuned: The contents of `work/tuned.json`.
 
     Returns:
-        The arms keyed by name: `a0`, `a1`, `a1s`, `w`, `a1_fc`, `a1_cov`, `a1_smooth`, `a1s_300`,
-        and one `a1_knot_*` arm per final-knot variant.
+        The arms keyed by name: `a0`, `a1`, `a1s`, `w`, `a1_fc`, `a1_cov`, `a1_smooth`,
+        `a1s_smooth`, and one `a1_knot_*` arm per final-knot variant.
     """
     base = GamSpec(
         ridge=DEFAULT_RIDGE,
@@ -116,9 +124,14 @@ def arm_definitions(*, tuned: dict) -> dict[str, ArmDefinition]:
         "a1_smooth": ArmDefinition(
             "a1_smooth", replace(a1, drift_step=SMOOTH_DRIFT_STEP), all_years
         ),
-        "a1s_300": ArmDefinition(
-            "a1s_300",
-            replace(a1, drift="d1_steps", step_penalty=ACTIVE_STEP_PENALTY),
+        "a1s_smooth": ArmDefinition(
+            "a1s_smooth",
+            replace(
+                a1,
+                drift="d1_steps",
+                drift_step=SMOOTH_DRIFT_STEP,
+                step_penalty=ACTIVE_STEP_PENALTY,
+            ),
             all_years,
         ),
     }
@@ -234,13 +247,15 @@ def run_site(
 
 
 def trace_builder(
-    *, kind: FilterKindType, hyper: FilterHyperparameters | None
+    *, kind: FilterKindType, hyper: FilterHyperparameters | None, part: FilterPartType = "both"
 ) -> Callable[[np.ndarray, np.ndarray], CorrectionTrace]:
     """Return the function that builds a correction trace from a residual stream.
 
     Args:
         kind: Which correction.
         hyper: The Kalman filter's hyperparameters; unused by the EWMA.
+        part: Which hidden states the correction keeps: the other state's trace is set to zero.
+            The EWMA has only a level, so `anomaly` gives a zero correction.
 
     Returns:
         A function taking the grid residuals and bands and returning a `CorrectionTrace`.
@@ -248,12 +263,22 @@ def trace_builder(
     Raises:
         ValueError: If the Kalman filter has no hyperparameters.
     """
-    if kind == "ewma":
-        return lambda stream, band: run_ewma(residual=stream, band=band)
-    if hyper is None:
-        msg = "the Kalman correction needs hyperparameters"
-        raise ValueError(msg)
-    return lambda stream, band: run_kalman(residual=stream, band=band, hyper=hyper)
+
+    def build(stream: np.ndarray, band: np.ndarray) -> CorrectionTrace:
+        if kind == "ewma":
+            trace = run_ewma(residual=stream, band=band)
+        elif hyper is None:
+            msg = "the Kalman correction needs hyperparameters"
+            raise ValueError(msg)
+        else:
+            trace = run_kalman(residual=stream, band=band, hyper=hyper)
+        if part == "level":
+            return replace(trace, anomaly=tuple(np.zeros_like(a) for a in trace.anomaly))
+        if part == "anomaly":
+            return replace(trace, level=tuple(np.zeros_like(a) for a in trace.level))
+        return trace
+
+    return build
 
 
 @dataclass(frozen=True)
@@ -280,6 +305,7 @@ def filtered_forecast(
     days_ahead: int = 1,
     delay_hours: float = DEFAULT_DELAY_HOURS,
     lead_spread: LeadSpread | None = None,
+    part: FilterPartType = "both",
 ) -> FilteredForecast:
     """Correct a run's mean from the readings usable at its day-ahead initialisation.
 
@@ -291,11 +317,12 @@ def filtered_forecast(
         days_ahead: How many days before the valid day the forecast is made.
         delay_hours: The telemetry delay.
         lead_spread: The post-filter spread, built from the run's replica if not given.
+        part: Which hidden states of the Kalman filter enter the correction.
 
     Returns:
         The corrected mean, its quantiles, and the correction.
     """
-    build = trace_builder(kind=kind, hyper=hyper)
+    build = trace_builder(kind=kind, hyper=hyper, part=part)
     band = cache.calendar.band
     trace: CorrectionTrace = build(run.residual_stream(cache=cache), band)
     valid = cache.end_times[run.index]
