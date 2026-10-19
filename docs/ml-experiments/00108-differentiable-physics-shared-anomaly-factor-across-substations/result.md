@@ -190,8 +190,9 @@ contrast, and no leave-one-site-out contrast to report.
 ## What was not run
 
 - **Not run, because a failed gate test stops scoring:** the power check, the 13 refitted placebo
-  draws, the arms F, KF, KF-frz, KF-mva, KF-9h, KF-hind, the contrasts C1 to C3, and the replicate-year and scored-year scores. The code for the
-  arms and the gate is in `ml-experiments/00108-*/`.
+  draws, the arms F, KF, KF-frz, KF-mva, KF-9h, KF-hind, the contrasts C1 to C3, and the
+  replicate-year and scored-year scores. The code for
+  the arms and the gate is in `ml-experiments/00108-*/`.
 - **Known limit of the stale-contributor arm:** in KF-9h, a local stream built as the residual
   minus the loading times the scale times the factor reads factor values that are not yet usable
   at the local 3.5-hour cutoff, which changed 14 of 100 day-1 corrections in a module check. The
