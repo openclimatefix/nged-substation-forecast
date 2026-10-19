@@ -11,14 +11,16 @@ and day of year.
 | `x_12`, `x_all` | 12 months, all years | XGBoost's estimated base score |
 | `x_12z`, `x_allz` | 12 months, all years | zero |
 | `x_12am`, `x_allam` | 12 months, all years | zero plus the solar offset |
-| `x_12amm`, `x_allamm` | 12 months, all years | training median plus the solar offset (post hoc) |
+| `x_12amq`, `x_allamq` | 12 months, all years | training quantiles plus the offset (post hoc) |
 | `x_12z_ng`, `x_12am_ng` | 12 months | zero, and zero plus offset, no CAMS irradiance (post hoc) |
-| `l_12amm_d1`, `l_12amm_d6` | 12 months | `x_12amm` plus the three power lags, descriptive |
+| `l_12_d1`, `l_12_d6` | 12 months | `x_12` plus the three power lags, descriptive |
 
-The zero start turned out to be a weaker benchmark than the default start, so the post-hoc `amm`
-arms start from the median of the training targets, as experiment 87's offset arms do. The `ng`
-arms drop the CAMS irradiance input, which is the condition in which experiment 64 measured the
-offset's gain.
+The zero start turned out to be a weaker benchmark than the default start: XGBoost's default start
+gives each quantile level its own intercept, and a constant start leaves the extreme quantiles
+under-covered after 500 rounds. The post-hoc `amq` arms therefore start each quantile level from
+that level's quantile of the training targets, plus the offset. The `ng` arms drop the CAMS
+irradiance input, which is the condition in which experiment 64 measured the offset's gain. The
+lagged references have no offset, since the offset adds nothing when irradiance is an input.
 
 **The solar offset** (experiment 64's `am`) is a base margin `w * s * a(t)` for every quantile,
 in April to September and zero outside. `s` is the capacity over the effective capacity, in
@@ -322,10 +324,21 @@ def predict(
 
 
 def tile_margin(
-    *, offset: np.ndarray, weight: float, n_levels: int, base: float = 0.0
+    *, offset: np.ndarray, weight: float, n_levels: int, base: np.ndarray | None = None
 ) -> np.ndarray:
-    """Repeat `base + weight * offset` for every quantile level."""
-    return np.tile((base + weight * offset)[:, None], (1, n_levels)).astype(np.float32)
+    """Return `base + weight * offset` for every quantile level, shape (rows, n_levels).
+
+    Args:
+        offset: The solar offset per unit weight, one per row.
+        weight: The fitted weight `w`.
+        n_levels: The number of quantile levels.
+        base: The start of each level (zero if `None`).
+
+    Returns:
+        A float32 margin, the same offset for every level on top of the level's start.
+    """
+    start = np.zeros(n_levels) if base is None else base
+    return (start[None, :] + (weight * offset)[:, None]).astype(np.float32)
 
 
 def replica_weight(
@@ -510,8 +523,8 @@ def offset_arm(
         train: The window's training rows.
         window: The window rule.
         vintage: The capacity vintage.
-        start: `zero` for a margin of the offset alone, `estimated` for the training median plus
-            the offset (the weight is then fitted on the estimated-start replica).
+        start: `zero` for a margin of the offset alone, `estimated` for each level's training
+            quantile plus the offset (the weight is then fitted on the estimated-start replica).
         label: The arm's name, kept in the record.
         drop: Inputs the arm leaves out.
 
@@ -532,7 +545,11 @@ def offset_arm(
         drop=drop,
     )
     _, before = capacity_points_at(cache=cache, vintage=vintage, index=train)
-    base = 0.0 if start == "zero" else float(np.median(features.y[train]))
+    base = (
+        None
+        if start == "zero"
+        else np.quantile(features.y[train], np.array(QUANTILE_LEVELS)).astype(np.float64)
+    )
     margins = [
         tile_margin(
             offset=offset_per_unit_weight(
@@ -562,47 +579,49 @@ def offset_arm(
         "train_rows_before_vintage": before,
         "unobserved_weeks": vintage.n_unobserved,
         "vintage_origin": str(vintage.origin),
-        "base": base,
+        "start": start,
     }
     return OffsetArm(
         quantiles=quantiles, margin_train=margins[0], margin_score=margins[1], record=record
     )
 
 
-def lagged_arms(*, job: SiteJob, train: np.ndarray, offset: OffsetArm) -> dict[str, pl.DataFrame]:
-    """Fit the descriptive lagged reference arms, and re-key `x_12amm` to their initialisations.
+def lagged_arms(
+    *, job: SiteJob, train: np.ndarray, lagless_quantiles: np.ndarray
+) -> dict[str, pl.DataFrame]:
+    """Fit the descriptive lagged reference arms, and re-key `x_12` to their initialisations.
 
     Args:
         job: The substation's shared inputs.
         train: The 12-month window's training rows.
-        offset: The lagless `x_12amm` arm, whose margins the lagged arms reuse.
+        lagless_quantiles: The quantiles of `x_12`.
 
     Returns:
-        For each lagged scheme, `l_12amm_<scheme>` and `x_12amm_<scheme>` (the lagless arm's
-        quantiles under the same initialisation times, so the contrast pairs the same rows).
+        For each lagged scheme, `l_12_<scheme>` and `x_12_<scheme>` (the lagless arm's quantiles
+        under the same initialisation times, so the contrast pairs the same rows).
     """
     features = job.cache.sites[job.site]
     x_train = feature_matrix(cache=job.cache, site=job.site, index=train)
     levels = tuple(QUANTILE_LEVELS)
     frames: dict[str, pl.DataFrame] = {}
     for scheme in common.LAGGED_SCHEMES:
-        frames[f"x_12amm_{scheme}"] = job.frame_of(quantiles=offset.quantiles, scheme=scheme)
+        frames[f"x_12_{scheme}"] = job.frame_of(quantiles=lagless_quantiles, scheme=scheme)
         lag_train = lag_columns(cache=job.cache, site=job.site, index=train, scheme=scheme)
         lag_score = lag_columns(cache=job.cache, site=job.site, index=job.index, scheme=scheme)
         lagged = fit_booster(
             x=np.column_stack([x_train, lag_train]),
             y=features.y[train],
             levels=levels,
-            start="zero",
-            margin=offset.margin_train,
+            start="estimated",
+            margin=None,
         )
         quantiles = predict(
             booster=lagged,
             x=np.column_stack([job.x_score(), lag_score]),
-            margin=offset.margin_score,
+            margin=None,
             n_levels=len(levels),
         )
-        frames[f"l_12amm_{scheme}"] = job.frame_of(quantiles=quantiles, scheme=scheme)
+        frames[f"l_12_{scheme}"] = job.frame_of(quantiles=quantiles, scheme=scheme)
     return frames
 
 
@@ -637,16 +656,16 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
         for start, name in (("estimated", f"x_{label}"), ("zero", f"x_{label}z")):
             quantiles = plain_arm(job=job, train=train, start=start)
             frames[f"cold_{name}" if cold else name] = job.frame_of(quantiles=quantiles)
+            if name == "x_12" and not cold:
+                frames |= lagged_arms(job=job, train=train, lagless_quantiles=quantiles)
         if vintage is None:
             continue
-        for start, name in (("zero", f"x_{label}am"), ("estimated", f"x_{label}amm")):
+        for start, name in (("zero", f"x_{label}am"), ("estimated", f"x_{label}amq")):
             arm = offset_arm(
                 job=job, train=train, window=window, vintage=vintage, start=start, label=name
             )
             frames[name] = job.frame_of(quantiles=arm.quantiles)
             weights.append({**arm.record, "window": label})
-            if name == "x_12amm":
-                frames |= lagged_arms(job=job, train=train, offset=arm)
         if label == "12":
             ng = plain_arm(job=job, train=train, start="zero", drop=NO_IRRADIANCE)
             frames["x_12z_ng"] = job.frame_of(quantiles=ng)

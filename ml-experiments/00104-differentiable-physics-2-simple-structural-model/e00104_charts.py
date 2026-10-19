@@ -40,11 +40,11 @@ ARM_LABELS: Final[dict[str, str]] = {
     "x_12": "X-12",
     "x_12z": "X-12z",
     "x_12am": "X-12am",
-    "x_12amm": "X-12amm",
+    "x_12amq": "X-12amq",
     "x_all": "X-all",
     "x_allz": "X-allz",
     "x_allam": "X-allam",
-    "x_allamm": "X-allamm",
+    "x_allamq": "X-allamq",
     "x_12z_ng": "X-12z (no irradiance)",
     "x_12am_ng": "X-12am (no irradiance)",
     "climatology": "Climatology",
@@ -78,9 +78,9 @@ def figure_1_raw_weeks() -> alt.TopLevelMixin:
         "Winter: 12 to 18 January 2026": date(2026, 1, 12),
     }
     arms = {
-        name: report.load_arm(name=name, headline=False) for name in ("g1", "g_all_d1", "x_allamm")
+        name: report.load_arm(name=name, headline=False) for name in ("g1", "g_all_d1", "x_allamq")
     }
-    labels = {"g1": "G1", "g_all_d1": "G-all+D1", "x_allamm": "X-allamm"}
+    labels = {"g1": "G1", "g_all_d1": "G-all+D1", "x_allamq": "X-allamq"}
     frames = []
     for week, start in weeks.items():
         for name, frame in arms.items():
@@ -109,7 +109,7 @@ def figure_1_raw_weeks() -> alt.TopLevelMixin:
                     )
                 )
     table = pl.concat(frames).filter(pl.col("site").is_in(SITE_ORDER))
-    order = ["Actual", "G1", "G-all+D1", "X-allamm"]
+    order = ["Actual", "G1", "G-all+D1", "X-allamq"]
     return (
         alt.Chart(table)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1)
@@ -169,7 +169,7 @@ def figure_2_headline() -> alt.TopLevelMixin:
         ("G1 minus X-12 (default start)", "g1", "x_12", None, "exploratory"),
         ("G-all minus X-all (default start)", "g_all", "x_all", None, "exploratory"),
         ("G-all+D1 minus X-all (default start)", "g_all_d1", "x_all", None, "exploratory"),
-        ("X-12amm minus X-12 (offset)", "x_12amm", "x_12", None, "exploratory"),
+        ("X-12amq minus X-12 (offset)", "x_12amq", "x_12", None, "exploratory"),
         ("X-12z minus X-12 (zero start)", "x_12z", "x_12", None, "exploratory"),
     ):
         result = report.contrast(
@@ -433,7 +433,7 @@ def figure_6_tails() -> alt.TopLevelMixin:
 
 def figure_7_staleness() -> alt.TopLevelMixin:
     """Score and upper-tail coverage by month of the scored year."""
-    names = ("g1", "g_all", "g_all_d1", "x_12amm", "x_allamm")
+    names = ("g1", "g_all", "g_all_d1", "x_12amq", "x_allamq")
     rows = []
     for name in names:
         kept = report.load_arm(name=name).filter(pl.col("site").is_in(common.ELIGIBLE_SITES))

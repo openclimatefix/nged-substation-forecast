@@ -27,7 +27,7 @@ import argparse
 import json
 import time
 from collections.abc import Callable
-from typing import Final
+from typing import Any, Final
 
 import e00104_common as common
 import numpy as np
@@ -164,7 +164,7 @@ def main() -> None:
     n_resamples = 3 if arguments.smoke else N_BOOTSTRAP
     steps = 5 if arguments.smoke else POOLED_STEPS
     report: dict[str, dict] = {}
-    outputs: dict[str, dict[str, object]] = {}
+    outputs: dict[str, dict[str, Any]] = {}
     for device in arguments.devices:
         if device == "cuda":
             # A first call creates the CUDA context and loads the kernels; it is not the workload.
@@ -206,9 +206,8 @@ def main() -> None:
             summary[f"{name}_speedup"] = (
                 report["cpu"][name]["seconds"] / report["cuda"][name]["seconds"]
             )
-        print(
-            f"pooled proxy speedup {speedup:.1f}x; GPU from Part 3: {summary['use_gpu_from_part_3']}"
-        )
+        verdict = summary["use_gpu_from_part_3"]
+        print(f"pooled proxy speedup {speedup:.1f}x; GPU from Part 3: {verdict}")
     summary["pooled_proxy_detail"] = {d: outputs[d]["pooled_proxy"] for d in arguments.devices}
     suffix = "_smoke" if arguments.smoke else ""
     (common.WORK_DIR / f"benchmark{suffix}.json").write_text(json.dumps(summary, indent=2) + "\n")

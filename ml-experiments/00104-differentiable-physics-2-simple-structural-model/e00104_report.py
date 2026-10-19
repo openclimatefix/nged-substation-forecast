@@ -34,11 +34,11 @@ XGB_ARMS: Final[tuple[str, ...]] = (
     "x_12",
     "x_12z",
     "x_12am",
-    "x_12amm",
+    "x_12amq",
     "x_all",
     "x_allz",
     "x_allam",
-    "x_allamm",
+    "x_allamq",
 )
 NO_IRRADIANCE_ARMS: Final[tuple[str, ...]] = ("x_12z_ng", "x_12am_ng")
 REFERENCE_ARMS: Final[tuple[str, ...]] = ("climatology", "manual_heuristic")
@@ -201,18 +201,18 @@ def print_contrasts(*, arms: dict[str, pl.DataFrame]) -> dict[str, dict]:
         ("x_allz", "x_all"),
         ("x_12am", "x_12z"),
         ("x_allam", "x_allz"),
-        ("x_12amm", "x_12"),
-        ("x_allamm", "x_all"),
+        ("x_12amq", "x_12"),
+        ("x_allamq", "x_all"),
         ("x_12am_ng", "x_12z_ng"),
         ("x_all", "x_12"),
         ("x_allam", "x_12am"),
         ("g_all", "x_allam"),
         ("g1", "x_12"),
-        ("g1", "x_12amm"),
+        ("g1", "x_12amq"),
         ("g_all", "x_all"),
-        ("g_all", "x_allamm"),
+        ("g_all", "x_allamq"),
         ("g_all_d1", "x_all"),
-        ("g_all_d1", "x_allamm"),
+        ("g_all_d1", "x_allamq"),
     ):
         results[f"{treatment}-{reference}"] = contrast(
             arms=arms, treatment=treatment, reference=reference, sites=five, level=None
@@ -458,11 +458,11 @@ def print_lagged(*, arms: dict[str, pl.DataFrame]) -> None:
     """Print the descriptive lagged reference contrasts at the two lead bands."""
     print("\n== 11. Lagged reference (descriptive): lagged XGBoost minus the lagless arm ==")
     for scheme, band in (("d1", "leads 24.5 to 48 h"), ("d6", "leads 144.5 to 168 h")):
-        extra = {name: load_arm(name=name) for name in (f"x_12amm_{scheme}", f"l_12amm_{scheme}")}
+        extra = {name: load_arm(name=name) for name in (f"x_12_{scheme}", f"l_12_{scheme}")}
         result = contrast(
             arms=extra,
-            treatment=f"l_12amm_{scheme}",
-            reference=f"x_12amm_{scheme}",
+            treatment=f"l_12_{scheme}",
+            reference=f"x_12_{scheme}",
             sites=common.ELIGIBLE_SITES,
             level=None,
         )
