@@ -3,7 +3,8 @@ id: "00104"
 slug: differentiable-physics-2-simple-structural-model
 part: 2
 theme: differentiable-physics-demand-calendar-and-weather
-also_relevant_to: [differentiable-physics-long-history-and-drift, retraining-and-training-history, solar-disaggregation]
+also_relevant_to: [differentiable-physics-long-history-and-drift, retraining-and-training-history,
+solar-disaggregation]
 status: done
 size: >-
   complex for the framework module (new tested code in packages/studies, reused by Parts 3 to 6);
@@ -32,23 +33,21 @@ date: 2026-10-19
 pr: 1349
 take_home_message: >-
   A simple model of demand minus solar, fitted as one convex optimisation per substation, scored
-  0.25 points better than lagless XGBoost with its default start when both trained on 12 months (a
-  post hoc contrast; a lower score is better; interval 0.53 better to 0.01 better, borderline, 4 of
-  the 5 decision substations). More years of history did not clearly help the convex model: all
-  years without a drift term scored 0.25 worse than 12 months, and adding a slowly changing demand
-  level (drift) recovered that, leaving all years with drift level with 12 months (0.04 better,
-  interval 0.30 better to 0.21 worse, 2 of 5 substations better). A first version of this page
-  reported the opposite sign for two of the years contrasts (all years against 12 months, and drift
-  against no drift), because its forecast spread carried the previous year's mean bias; see the
-  Correction section. The lead over the zero-start XGBoost arm in the planned comparison C2 (0.55
-  points on the quantile score) is mostly in the tails and the spread: on the error of the mean
-  forecast it is 0.08 points (interval 0.40 better to 0.20 worse).
+  0.25 points better than lagless XGBoost with its default start when both trained on 12 months
+  (post hoc; a lower score is better; interval 0.53 better to 0.01 better), but that lead and the
+  0.55-point lead of the planned comparison C2 are mostly spread, because the error of the mean
+  forecast differs by only 0.08 points in each. More years of history did not clearly help: in the
+  scored year all years without a drift term scored 0.25 worse than 12 months and drift recovered
+  that (all years with drift 0.04 better, interval 0.30 better to 0.21 worse), but the tuning year
+  reversed both contrasts. A first version of this page had the opposite sign for two contrasts,
+  because its forecast spread carried the previous year's mean bias; see the Correction section.
 advice:
   - >-
-    Give a convex demand model a drift term when it trains on all years of history: all years
-    without drift scored 0.25 points worse than 12 months (G-all minus G1), drift lowered the score
-    by 0.29 (G-all+D1 minus G-all), and all years with drift was level with 12 months (-0.04, -0.30
-    to +0.21).
+    Treat the benefit of drift and of more years as unreplicated: in the scored year all years
+    without drift scored 0.25 points worse than 12 months (G-all minus G1; +0.03 without D16) and
+    drift lowered the score by 0.29 (G-all+D1 minus G-all), but the tuning year reversed both on the
+    error of the mean forecast (-0.25 and +0.06), and only C1 kept its sign (-0.04 in the scored
+    year, -0.20 in the tuning year). Score every history-window contrast on both years.
   - >-
     Start each XGBoost quantile from that level's own training quantile, not from a constant, since
     a zero start left the 95% and 99% quantiles covering only 66% and 73% and scored 0.30 points
@@ -78,17 +77,19 @@ history, but more years of history do not clearly help it.** This is part 2 of a
 models built from physical terms (a daily profile, holidays, heating, and solar output) and fitted
 by gradient-based optimisation; part 3 pools the model across substations. Trained on 12 months, the
 model scored 0.25 points better than lagless XGBoost with its default start (post hoc; a lower score
-is better). Trained on all usable years with no drift it scored 0.25 points worse than on 12 months,
-and a drift term recovered that, so the planned comparison, all years with drift against 12 months,
-gave 0.04 points better with an interval from 0.30 better to 0.21 worse, and 2 of the 5 decision
-substations improved. The verdict is `inconclusive`: the planned comparison's interval spans zero,
-and four of the five pre-registered positive controls fail (old years hurt, by size; the solar
-offset; the zero start; and baselines worse than every arm). On the comparison alone, the merged
-rule for the first scoring pass would give `partly supported`.
+is better). Trained on all usable years with no drift it scored 0.25 points worse than on 12 months
+in the scored year (+0.03 without D16, and the reverse in the tuning year), and a drift term
+recovered that, so the planned comparison, all years with drift against 12 months, gave 0.04 points
+better with an interval from 0.30 better to 0.21 worse, and 2 of the 5 decision substations
+improved. The verdict is `inconclusive`: the planned comparison's interval spans zero, and four of
+the five pre-registered positive controls fail (the fifth, the framework tests, holds). The four are
+old years hurt, by size; the solar offset; the zero start; and baselines worse than every arm. On
+the comparison alone, the merged rule for the first scoring pass would give `partly supported`.
 
-The result narrows the long-history question to "all years need a drift to be level with 12
-months, and the data cannot yet say whether they gain". By substation the planned comparison is
-mixed: D14 (-0.51) and D11 (-0.22) improve, and D10 (+0.41), D5 (+0.11), and D16 (+0.03) worsen.
+The result narrows the long-history question to "all years need a drift to be level with 12 months
+in the scored year, and the data cannot yet say whether they gain". By substation the planned
+comparison is mixed: D14 (-0.51) and D11 (-0.22) improve, and D10 (+0.41), D5 (+0.11), and D16
+(+0.03) worsen.
 
 We fitted the model, one convex optimisation (a problem with a single best answer) per Primary
 substation, on data to 30 June 2025, held it fixed, and scored it on every half-hour from 1 July
@@ -212,10 +213,41 @@ points at D10 and -10 points at D11 over the training years.
   weekly-retrained models) and that the solar offset adds nothing once CAMS irradiance is an input.
   Trigger 2 (a result against its prediction or an earlier finding): the same two results, with the
   explanations above, and the corrected years contrasts. Trigger 3 did not fire. Trigger 4 fired: C1
-  changes sign without D14. Trigger 5 fired: G1, trained on less data, beats G-all by 0.25 (the
-  audit found no leak, and drift recovers the gap), and steps do not beat D1 (+0.08, interval
-  spanning zero). Trigger 6 did not fire: no sister experiment scores these rows. Trigger 7 fired:
-  later parts of the series use G-all+D1 as the reference and D1 plus steps as the default drift.
+  changes sign without D14, from D14's winter against D10's summer (see the section above; the
+  second audit found no data or switching fault at D14). Trigger 5 fired: G1, trained on less data,
+  beats G-all by 0.25 (the audit found no leak, and drift recovers the gap), and steps do not beat
+  D1 (+0.08, interval spanning zero). Trigger 6 did not fire: no sister experiment scores these
+  rows. Trigger 7 fired: later parts of the series use G-all+D1 as the reference and D1 plus steps
+  as the default drift.
+
+## The tuning year as a replicate
+
+**The tuning year reverses two of the three years contrasts, so a one-year contrast between
+history windows is not yet a finding.** A second audit refitted the four convex arms at the
+2024-07-01 cut with the same penalties and scored them on the tuning year, 2024-07 to 2025-06, on
+the mean absolute error of the mean forecast (five sites), so the spread plays no part. No
+intervals were computed for the tuning-year column, and the steps row is in-sample because the
+step penalty was chosen on that year.
+
+| Contrast (error of the mean forecast, points) | Tuning year 2024-25 | Scored year 2025-26 |
+|---|---|---|
+| G-all minus G1 | -0.25 (4 of 5 better) | +0.31 |
+| C1: G-all+D1 minus G1 | -0.20 (3 of 5 better) | -0.08 |
+| G-all+D1 minus G-all (drift) | +0.06 | -0.38 |
+| G-all+D1+steps minus G-all+D1 | -0.22 (in-sample) | +0.10 |
+
+- **Two contrasts reverse between years and only C1 keeps its sign.** G-all minus G1 and the drift
+  contrast reverse. C1 favours all years with drift in both years.
+- **C1's sign rests on one site's winter against another site's summer.** C1 is -0.40 in November
+  to March and +0.19 in April to October (-0.19 and +0.25 without D14), and all years with drift
+  beats G1 in winter at 4 of 5 sites in both years. D14's gain (-0.51) is all November to March
+  (-1.17, against -0.04 in other months): G1 under-forecasts the cold weeks of January and February
+  2026 by 8 to 11 points, and D14's scored winter was 6.8 points higher than its training winter.
+  D10's loss (+0.41) is a summer effect: all years with drift over-forecasts D10's falling summer
+  level by 5 to 8 points (+0.91 in April to October, -0.30 in winter).
+- **G-all's scored-year loss to G1 is mostly D16.** G-all is biased +3.5 points at D16, whose
+  demand rose every year from 2022, and -1.6 at D10, whose demand fell. Without D16 G-all minus G1
+  is +0.03.
 
 ## Results
 
@@ -328,7 +360,8 @@ points at D10 and -10 points at D11 over the training years.
 
 Part 3 pools the model across substations on the GPU. A drift that re-estimates its level from
 recent data, for example by assimilating the latest observed demand, is one option for a later part.
-The corrected drift-by-month table says the existing drift helps in every scored month, so the next
-question about drift is whether its level can be re-estimated, not whether to keep it. Whether all
-years with drift beat 12 months remains open, and needs more substations or years than five
-substations and one scored year.
+The corrected drift-by-month table says the existing drift helps in every scored month, but the
+tuning year reverses that, so the next question is whether drift and more years help in both years
+and in winter and summer alike. Part 3's pooling comparison should score the tuning year as a
+second frozen replicate and split every contrast into November to March and April to October.
+Whether all years with drift beat 12 months remains open.
