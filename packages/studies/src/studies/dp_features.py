@@ -209,6 +209,24 @@ class FeatureCache:
         return pl.Series("time", self.end_times).dt.replace_time_zone("UTC")
 
 
+def naive_utc(*, moment: datetime) -> np.datetime64:
+    """Return a timezone-aware datetime as a naive UTC `datetime64[us]`.
+
+    Args:
+        moment: An aware datetime in any time zone.
+
+    Returns:
+        The same instant as UTC microseconds.
+
+    Raises:
+        ValueError: If `moment` has no time zone, since a naive wall time could be local.
+    """
+    if moment.tzinfo is None:
+        msg = "a cut or window bound must carry a time zone"
+        raise ValueError(msg)
+    return np.datetime64(moment.astimezone(UTC).replace(tzinfo=None), "us")
+
+
 def grid_end_times() -> pl.Series:
     """Return the cache's half-hourly grid as a polars UTC datetime series."""
     return pl.datetime_range(
