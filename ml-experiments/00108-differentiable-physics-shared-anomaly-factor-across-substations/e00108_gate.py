@@ -94,6 +94,13 @@ def free_windows(*, cache: FeatureCache) -> tuple[np.ndarray, np.ndarray]:
 def place_episodes(*, cache: FeatureCache, seed: int) -> list[Episode]:
     """Place the 20 episodes by randomised sequential packing into the free runs of days.
 
+    Args:
+        cache: The feature cache.
+        seed: The random seed.
+
+    Returns:
+        The episodes, ordered by first day.
+
     Raises:
         ValueError: If no packing is found in `N_ATTEMPTS` attempts.
     """
