@@ -49,6 +49,12 @@ headline: >-
   C1, the half-hourly fit M1 with CAMS at the substation, recovers a median 0.773 of injected
   capacity (95% 0.740 to 0.818) over 218 units. The daily fit M1d recovers 0.854 (0.815 to 0.866).
   On the real series 6 of 8 Primaries pass checks K1 to K4 in 2025/26, and K1 fails at Wrangle T1.
+take_home_message: >-
+  A fit of calendar-plus-temperature demand minus one satellite-driven solar shape recovers 0.854
+  (daily fit, 95% interval 0.815 to 0.866) of the capacity of real solar-farm output added to the
+  demand of the 8 directional Primaries. On the real series 6 of the 8 pass four checks that a
+  demand confound would fail, and one fails the placebo-sky check, so the verdict is partly
+  supported.
 lessons: >-
   Injected solar-farm output is recovered to within 25% of the true capacity, with a shortfall of
   15% to 23% that the planned contrasts attribute partly to noise in the CAMS irradiance and the

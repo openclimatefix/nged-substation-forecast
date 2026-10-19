@@ -5,6 +5,12 @@ theme: calibration-and-uncertainty
 also_relevant_to: []
 status: done
 size: complex
+take_home_message: >-
+  Pooling the ERA5-trained solar and wind quantiles over the 51 weather-forecast members beat a
+  model trained on archived weather forecasts: wind by 0.62 points of capacity (95% interval -0.99
+  to -0.26) and solar by 0.24 (-0.36 to -0.06), with the gain in the first six days. A second
+  calibration model on top did not improve on the pooling and made solar worse by 0.40 points (+0.26
+  to +0.61). The result rests on 6 solar farms, 3 wind farms, and one validation year.
 hypothesis: >-
   A shared per-technology calibrator and a learned blend, fed by ERA5-trained stage 1a quantiles
   applied to ENS weather, give a lower continuous ranked probability score than the pooled stage 1a

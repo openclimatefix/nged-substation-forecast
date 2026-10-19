@@ -50,6 +50,10 @@ headline: >-
   +0.73) at Skegness. B3 minus B0: -0.36 (-1.60 to +0.43) at Walpole and -0.40 (-1.84 to +0.97) at
   Bicker Fen. B4 minus B0: -0.02 (-0.06 to +0.03) and -0.04 (-0.13 to +0.07). The oracle that sees
   the observed children scores 5.6 and 3.4 points below N1 at the two BSPs.
+take_home_message: >-
+  Forecasts of the series beneath two bulk supply points added nothing (+0.04 and +0.19 points of
+  capacity), nor did wind and solar columns at two grid supply points; an N1 trained on ERA5 lowered
+  the grid supply point scores by 0.36 and 0.40 with intervals spanning -1.8 to +1.0.
 lessons: >-
   The children's forecasts added no measurable skill (B1 minus B0 +0.04 and +0.19 at the BSPs)
   although the oracle with observed children gains 3.4 to 5.6 points. The ERA5-trained N1 gained

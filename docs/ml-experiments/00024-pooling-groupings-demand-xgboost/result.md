@@ -54,6 +54,11 @@ headline: >-
   C1, by type with the identifier minus per series, Primary quantile score over all leads: +0.15
   points of capacity (99.44% interval +0.03 to +0.26). All series in one model, C2: +0.29 (+0.19 to
   +0.42). Dropping the identifier costs 0.8 to 1.0 points (C5 to C8).
+take_home_message: >-
+  Pooling the 16 Primary substations into 3 or 4 XGBoost models (with the series identifier) scored
+  0.15 points of capacity worse than 20 per-series models (99.44% interval +0.03 to +0.26), inside
+  the 0.30 margin; one model for all 20 series was 0.29 worse, and dropping the identifier cost 0.8
+  to 1.0.
 lessons: >-
   The 14-day correction removes 1.0 point from per-series models but only 0.6 from pooled models,
   so pooled models lose 0.15 to 0.29 points once both are corrected. On the 16 Primary series, a

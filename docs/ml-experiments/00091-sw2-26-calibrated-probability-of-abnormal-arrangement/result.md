@@ -6,9 +6,11 @@ also_relevant_to: []
 status: done
 size: medium
 take_home_message: >-
-  A probability built from the causal switching detector beat the detector's yes-or-no flag only on
-  injected transfers large enough to see (Brier score 11.2% lower, interval -20.3% to -2.0%).
-  Against NGED's switching logs it has almost no skill (area under the curve 0.52 to 0.53), so a
+  A probability built from the causal switching detector was not shown to beat the detector's
+  yes-or-no flag: on the planned rows its Brier score was 3.3% lower (97.5% interval -7.6% to +1.6%),
+  against the 20% the plan required. Only in a post hoc subset of injected transfers large enough to
+  see was the gain 11.2% (-20.3% to -2.0%). Against NGED's switching logs it has almost no skill
+  (area under the curve 0.52 to 0.53), so a
   rule that widened the uncertainty bands when the probability is high would cover only about 8% of
   the half-hours that the logs mark as switching.
 hypothesis: >-
