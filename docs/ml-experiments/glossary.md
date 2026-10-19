@@ -37,8 +37,8 @@ Primary models uses the forecast output of the unmetered solar panels behind the
 
 **The best guess is the forecasting recipe assembled in [experiment
 33](00033-best-guess-architecture-vs-production/result.md).** For Primary substation demand it is N1
-with the 14-day correction and a spread factor of 1.15, which is the stack without its half-life.
-For bulk and grid supply points it is N1 alone. For solar and wind farms it is a mixture, over the
+with the 14-day correction and a spread factor of 1.15, which is the stack without its half-life
+(the `stack_minus_h` arm of experiment 33). For bulk and grid supply points it is N1 alone. For solar and wind farms it is a mixture, over the
 51 ENS members, of XGBoost models trained on ERA5 weather, with a spread factor and, for wind, a
 power-curve base margin.
 
@@ -324,11 +324,12 @@ is fitted on earlier cases to bring the 5% to 95% coverage near its target
 ### Stack
 
 **The stack is N1 with the 14-day correction and a spread factor of 1.15, and the experiments differ
-on a third component.** The stack of [experiment
-19](00019-primary-demand-stack-vs-manual-heuristic/result.md) also has a half-life of 0.5 years. The
-stack of experiments [33](00033-best-guess-architecture-vs-production/result.md), 48, and
-[87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) has no half-life and is
-trained once, and in experiment 87 it is the frozen forecast plus the 14-day correction.
+on the half-life.** The stack of [experiment
+19](00019-primary-demand-stack-vs-manual-heuristic/result.md) weights older training rows with a
+half-life of 0.5 years. The stacks of experiments
+[33](00033-best-guess-architecture-vs-production/result.md), 34, and 48 use a half-life of 2 years,
+and are trained once. The experiment 87 scripts use the same 2-year weighting for its stack, which
+its write-up does not state, and there the stack is the frozen forecast plus the 14-day correction.
 
 ### Stages 0, 1a, and 2
 
