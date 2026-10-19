@@ -327,8 +327,9 @@ the step-penalty grid (the planned grid chose 1,000, its edge, and the extended 
   step penalty 100), and the check reads the rise of the level path, not the step columns. With a
   penalty of 300, the step columns carried 4.1 to 5.7 points and the level path 5.6 to 6.0 (limit 6
   to 10), which failed. With a penalty of 100 the level path rises 7.2 to 7.4 in every band at both
-  step series. The tuned arm's level path rises 5.9 to 6.8 and is reported, not blocking. The drift paths are recovered within 0.14 to 0.93 points
-  root mean square (limit 1.5), and the no-drift series adds 0.0 of steps.
+  step series. The tuned arm's level path rises 5.9 to 6.8 and is reported, not blocking. The
+  drift paths are recovered within 0.14 to 0.93 points root mean square (limit 1.5), and the
+  no-drift series adds 0.0 of steps.
 - **Test 3, injected transfers.** The script cannot import experiment 43's injection harness, so a
   compact injector with the same shapes was written. It covers 24 injected transfers and the 4 real
   ones, where the plan asked for the 66 real hand-filtered transfers; most of those are at other
