@@ -1,0 +1,158 @@
+shape: (49, 7)
+┌──────────────────┬──────────────┬──────────────────┬──────────┬──────────────┬────────┬──────────┐
+│ test             ┆ series       ┆ check            ┆ value    ┆ limit        ┆ passed ┆ blocking │
+│ ---              ┆ ---          ┆ ---              ┆ ---      ┆ ---          ┆ ---    ┆ ---      │
+│ str              ┆ str          ┆ str              ┆ f64      ┆ str          ┆ bool   ┆ bool     │
+╞══════════════════╪══════════════╪══════════════════╪══════════╪══════════════╪════════╪══════════╡
+│ 1 drift recovery ┆ S1           ┆ ramp_up rms      ┆ 0.275575 ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S2           ┆ ramp_down rms    ┆ 0.276318 ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S3           ┆ ramp_up rms      ┆ 0.381005 ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S4           ┆ ramp_down rms    ┆ 0.138339 ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S5           ┆ step rms         ┆ 0.800356 ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 7.36491  ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 0    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 7.202673 ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 1    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 7.18638  ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 2    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 7.357117 ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 3    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 6.12054  ┆ 8            ┆ true   ┆ false    │
+│                  ┆              ┆ sized, band 0    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 5.938912 ┆ 8            ┆ false  ┆ false    │
+│                  ┆              ┆ sized, band 1    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 5.898166 ┆ 8            ┆ false  ┆ false    │
+│                  ┆              ┆ sized, band 2    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S5           ┆ step placed and  ┆ 6.171374 ┆ 8            ┆ true   ┆ false    │
+│                  ┆              ┆ sized, band 3    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step rms         ┆ 0.933034 ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 6.997729 ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 0    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 7.389381 ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 1    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 7.284203 ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 2    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 7.371286 ┆ 8            ┆ true   ┆ true     │
+│                  ┆              ┆ sized, band 3    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 6.608686 ┆ 8            ┆ true   ┆ false    │
+│                  ┆              ┆ sized, band 0    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 6.751323 ┆ 8            ┆ true   ┆ false    │
+│                  ┆              ┆ sized, band 1    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 6.347204 ┆ 8            ┆ true   ┆ false    │
+│                  ┆              ┆ sized, band 2    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S6           ┆ step placed and  ┆ 6.707812 ┆ 8            ┆ true   ┆ false    │
+│                  ┆              ┆ sized, band 3    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (tuned arm)      ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S7           ┆ late_rise rms    ┆ 0.286582 ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S7           ┆ held value at    ┆ 0.389428 ┆ 1.5          ┆ true   ┆ true     │
+│                  ┆              ┆ the cut          ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S8           ┆ none rms         ┆ 0.28111  ┆ 1.5          ┆ true   ┆ true     │
+│ 1 drift recovery ┆ S8           ┆ steps added at   ┆ 0.0      ┆ 1            ┆ true   ┆ true     │
+│                  ┆              ┆ no drift         ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ (a1s_smooth)     ┆          ┆              ┆        ┆          │
+│ 1 drift recovery ┆ S8           ┆ steps added at   ┆ 0.0      ┆ 1            ┆ true   ┆ false    │
+│                  ┆              ┆ no drift (tuned  ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ arm)             ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D5           ┆ amplitude        ┆ 3.019631 ┆ 3            ┆ true   ┆ true     │
+│ 2a filter cycle  ┆ D5           ┆ lag in days      ┆ 0.721972 ┆ 7            ┆ true   ┆ true     │
+│                  ┆              ┆ (never leads)    ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D5           ┆ no-cycle annual  ┆ 0.02559  ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ harmonic         ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D10          ┆ amplitude        ┆ 3.023527 ┆ 3            ┆ true   ┆ true     │
+│ 2a filter cycle  ┆ D10          ┆ lag in days      ┆ 0.443238 ┆ 7            ┆ true   ┆ true     │
+│                  ┆              ┆ (never leads)    ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D10          ┆ no-cycle annual  ┆ 0.028101 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ harmonic         ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D11          ┆ amplitude        ┆ 3.020927 ┆ 3            ┆ true   ┆ true     │
+│ 2a filter cycle  ┆ D11          ┆ lag in days      ┆ 2.350374 ┆ 7            ┆ true   ┆ true     │
+│                  ┆              ┆ (never leads)    ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D11          ┆ no-cycle annual  ┆ 0.030911 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ harmonic         ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D14          ┆ amplitude        ┆ 3.004819 ┆ 3            ┆ true   ┆ true     │
+│ 2a filter cycle  ┆ D14          ┆ lag in days      ┆ 5.382755 ┆ 7            ┆ true   ┆ true     │
+│                  ┆              ┆ (never leads)    ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D14          ┆ no-cycle annual  ┆ 0.027499 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ harmonic         ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D16          ┆ amplitude        ┆ 3.023313 ┆ 3            ┆ true   ┆ true     │
+│ 2a filter cycle  ┆ D16          ┆ lag in days      ┆ 0.315883 ┆ 7            ┆ true   ┆ true     │
+│                  ┆              ┆ (never leads)    ┆          ┆              ┆        ┆          │
+│ 2a filter cycle  ┆ D16          ┆ no-cycle annual  ┆ 0.028127 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ harmonic         ┆          ┆              ┆        ┆          │
+│ 3 injected       ┆ median of 24 ┆ share carried by ┆ 0.93837  ┆ at least 0.5 ┆ true   ┆ true     │
+│ transfers        ┆              ┆ the end of day 2 ┆          ┆              ┆        ┆          │
+│ 3 injected       ┆ median of 24 ┆ share carried    ┆ 0.938712 ┆ 0.6 to 1.3   ┆ true   ┆ true     │
+│ transfers        ┆              ┆ from day 2 to    ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ the end          ┆          ┆              ┆        ┆          │
+│ 3 injected       ┆ median of 24 ┆ share left 3     ┆ 0.004449 ┆ under 0.25   ┆ true   ┆ true     │
+│ transfers        ┆              ┆ days after the   ┆          ┆              ┆        ┆          │
+│                  ┆              ┆ end              ┆          ┆              ┆        ┆          │
+│ 4 injected farm  ┆ D10          ┆ night-band drift ┆ 0.003921 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ moves            ┆          ┆              ┆        ┆          │
+│ 4 injected farm  ┆ D11          ┆ night-band drift ┆ 0.003183 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ moves            ┆          ┆              ┆        ┆          │
+│ 4 injected farm  ┆ D14          ┆ night-band drift ┆ 0.008141 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ moves            ┆          ┆              ┆        ┆          │
+│ 4 injected farm  ┆ D16          ┆ night-band drift ┆ 0.011291 ┆ 0.5          ┆ true   ┆ true     │
+│                  ┆              ┆ moves            ┆          ┆              ┆        ┆          │
+└──────────────────┴──────────────┴──────────────────┴──────────┴──────────────┴────────┴──────────┘
+
+2b real tuning-year level, by site
+shape: (5, 3)
+┌──────┬───────────────────────────────────────┬─────────────────────────────────────────┐
+│ site ┆ annual harmonic of the level (points) ┆ correlation with 7-day mean temperature │
+│ ---  ┆ ---                                   ┆ ---                                     │
+│ str  ┆ f64                                   ┆ f64                                     │
+╞══════╪═══════════════════════════════════════╪═════════════════════════════════════════╡
+│ D5   ┆ 0.752008                              ┆ -0.269291                               │
+│ D10  ┆ 2.459134                              ┆ 0.431245                                │
+│ D11  ┆ 2.60365                               ┆ 0.40577                                 │
+│ D14  ┆ 3.368782                              ┆ -0.806213                               │
+│ D16  ┆ 0.946483                              ┆ -0.105816                               │
+└──────┴───────────────────────────────────────┴─────────────────────────────────────────┘
+
+4 reported rows
+shape: (4, 8)
+┌──────┬─────────────┬────────────┬────────────┬────────────┬────────────┬────────────┬────────────┐
+│ site ┆ night drift ┆ morning    ┆ midday     ┆ evening    ┆ injected   ┆ recovered- ┆ in 0.75 to │
+│ ---  ┆ change      ┆ drift      ┆ drift      ┆ drift      ┆ capacity   ┆ to-injecte ┆ 1.25       │
+│ str  ┆ (points)    ┆ change     ┆ change     ┆ change     ┆ (points)   ┆ d capacity ┆ ---        │
+│      ┆ ---         ┆ (points)   ┆ (points)   ┆ (points)   ┆ ---        ┆ ratio      ┆ bool       │
+│      ┆ f64         ┆ ---        ┆ ---        ┆ ---        ┆ f64        ┆ ---        ┆            │
+│      ┆             ┆ f64        ┆ f64        ┆ f64        ┆            ┆ f64        ┆            │
+╞══════╪═════════════╪════════════╪════════════╪════════════╪════════════╪════════════╪════════════╡
+│ D10  ┆ -0.003921   ┆ -3.516131  ┆ -6.953542  ┆ -1.146287  ┆ 15.428252  ┆ 0.939319   ┆ true       │
+│ D11  ┆ -0.003183   ┆ -2.274328  ┆ -4.510857  ┆ -0.726878  ┆ 9.857371   ┆ 0.93255    ┆ true       │
+│ D14  ┆ -0.008141   ┆ -1.835507  ┆ -3.775523  ┆ -0.571114  ┆ 8.885019   ┆ 0.955357   ┆ true       │
+│ D16  ┆ -0.011291   ┆ -2.636909  ┆ -5.421081  ┆ -0.830417  ┆ 12.955046  ┆ 0.906139   ┆ true       │
+└──────┴─────────────┴────────────┴────────────┴────────────┴────────────┴────────────┴────────────┘
+
+3 real hand-filtered transfers of three days or more at the decision sites
+shape: (4, 6)
+┌───────┬───────────────┬───────────┬────────────────┬───────────────────┬─────────────────────────┐
+│ donor ┆ year starting ┆ days      ┆ moved (points) ┆ state after day 2 ┆ has a metered receiver  │
+│ ---   ┆ ---           ┆ ---       ┆ ---            ┆ (points)          ┆ ---                     │
+│ str   ┆ i64           ┆ f64       ┆ f64            ┆ ---               ┆ bool                    │
+│       ┆               ┆           ┆                ┆ f64               ┆                         │
+╞═══════╪═══════════════╪═══════════╪════════════════╪═══════════════════╪═════════════════════════╡
+│ D16   ┆ 2023          ┆ 4.208333  ┆ 8.776742       ┆ -2.24326          ┆ true                    │
+│ D16   ┆ 2023          ┆ 4.5       ┆ 8.776742       ┆ -6.325888         ┆ false                   │
+│ D16   ┆ 2024          ┆ 3.208333  ┆ 5.485464       ┆ 3.51334           ┆ false                   │
+│ D5    ┆ 2025          ┆ 15.458333 ┆ 26.210029      ┆ -13.83046         ┆ true                    │
+└───────┴───────────────┴───────────┴────────────────┴───────────────────┴─────────────────────────┘
+
+40 of 40 blocking readings pass; 2 of 9 reported-only readings fail

@@ -1,0 +1,59 @@
+== known-answer gate (tuning-year injections) ==
+1_recovery: PASS {'slope': 1.0997730598285422, 'pass': True, 'range': [0.8, 1.2]}
+2_shared_carry: FAIL {'ratio': 0.047051209805257434, 'pass': False, 'range': [0.4, 1.2], 'diagnostic_ratio_to_perfect_tracking_of_the_factor': 0.10279151922008643, 'diagnostic_ratio_by_episode_day': {'1': 0.029912120852924065, '2': 0.1621431673714063}}
+3_shared_release: FAIL {'worst_ratio': 0.7544563144815483, 'pass': False}
+4_factor_adds_value: FAIL {'kf_mean_abs_error': 2.4017354514741305, 'a2_mean_abs_error': 2.397028497616688, 'pass': False}
+5_no_foresight: PASS {'cases_checked': 218160, 'bit_identical': True, 'pass': True}
+6_locality: PASS {'own_site_shared_max_change': 0.0, 'others_mean_abs_move_points': 0.043255431829540635, 'pass': True}
+7a_nesting: PASS {'max_abs_gap': 0.0, 'pass': True, 'tolerance': 1e-06}
+
+release by episode
+  midday 2023-07-31: peak 0.467, 3 days after end 0.352, share 0.754
+  multi 2023-08-24: peak 0.422, 3 days after end 0.313, share 0.741
+  multi 2023-09-08: peak 0.972, 3 days after end 0.720, share 0.740
+  multi 2023-09-23: peak 0.410, 3 days after end 0.304, share 0.741
+  multi 2023-12-16: peak 0.673, 3 days after end 0.499, share 0.741
+  multi 2023-12-28: peak 0.315, 3 days after end 0.234, share 0.741
+  multi 2024-01-11: peak 0.797, 3 days after end 0.590, share 0.741
+  midday 2024-03-04: peak 0.542, 3 days after end 0.409, share 0.754
+  midday 2024-03-18: peak 0.788, 3 days after end 0.594, share 0.754
+  multi 2024-03-31: peak 0.707, 3 days after end 0.524, share 0.741
+  midday 2024-04-13: peak 0.704, 3 days after end 0.531, share 0.754
+  multi 2024-05-12: peak 0.408, 3 days after end 0.302, share 0.740
+
+== frozen settings ==
+raw Huber loadings: {'D5': 0.547, 'D10': 0.342, 'D11': 0.221, 'D14': 0.433, 'D16': 0.717}
+shrunk loadings: {'D5': 0.499, 'D9': 0.452, 'D10': 0.397, 'D11': 0.337, 'D14': 0.443, 'D16': 0.585}
+shared filter: q 0.0207 per day, phi 0.818 per half-hour, sigma_z 0.401, sigma_eps 0.134 (scaled units)
+local filter D5: q 3.262, phi 0.696, sigma_z 3.334, sigma_eps 1.247
+local filter D10: q 4.625, phi 0.808, sigma_z 2.266, sigma_eps 1.233
+local filter D11: q 1.397, phi 0.892, sigma_z 1.827, sigma_eps 0.718
+local filter D14: q 0.207, phi 0.884, sigma_z 1.488, sigma_eps 1.280
+local filter D16: q 2.820, phi 0.776, sigma_z 1.579, sigma_eps 0.836
+local filter D9: q 1.653, phi 0.822, sigma_z 2.005, sigma_eps 1.034
+
+== shared state after a 3-day unit step on days 1 to 3 (target days 2 to 13) ==
+0.000 0.998 0.999 0.999 0.681 0.484 0.352 0.258 0.191 0.141 0.105 0.078
+
+== 20 largest shared-anomaly days, tuning year only ==
+date weekday band value contributors temperature_anomaly_c
+2024-01-15 Mon night -2.76 5.0 -7.5
+2023-09-01 Fri evening -2.51 5.0 -0.1
+2024-01-12 Fri midday -2.44 5.0 -2.3
+2024-01-08 Mon night -2.29 5.0 -4.7
+2024-01-22 Mon night -2.26 5.0 +3.4
+2024-01-14 Sun morning -2.24 5.0 -5.1
+2024-02-02 Fri evening -2.19 5.0 +4.6
+2023-11-17 Fri evening -2.14 5.0 -2.4
+2024-02-16 Fri midday -2.08 5.0 +3.9
+2024-01-13 Sat night -2.05 5.0 -3.9
+2023-07-21 Fri evening -2.02 5.0 -2.8
+2023-12-04 Mon morning +2.02 5.0 -1.2
+2024-01-25 Thu midday -1.99 5.0 +2.7
+2024-06-28 Fri evening -1.98 5.0 +1.3
+2023-10-21 Sat night +1.98 5.0 -3.5
+2023-12-10 Sun night +1.96 5.0 +2.3
+2024-01-11 Thu midday -1.95 5.0 -2.5
+2024-01-29 Mon night -1.93 5.0 +4.8
+2024-06-07 Fri evening -1.93 5.0 -0.5
+2023-09-22 Fri evening -1.90 5.0 -4.3
