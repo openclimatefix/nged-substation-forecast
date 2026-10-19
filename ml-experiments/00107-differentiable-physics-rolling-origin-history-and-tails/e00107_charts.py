@@ -522,7 +522,7 @@ def figure_7_d16_bias() -> alt.TopLevelMixin:
         width=WIDTH - 60,
         height=180,
         title=_title(
-            text="At D16 forecasts without drift miss low by 3 to 4 points on average",
+            text="At D16 the forecasts without drift mostly miss low",
             subtitle=(
                 "Mean of measured minus forecast power at D16 in the 3 months after each "
                 "origin, in "
@@ -570,7 +570,7 @@ def figure_8_capacity() -> alt.TopLevelMixin:
         .facet(row=alt.Row("site:N", sort=list(common.DECISION_SITES), title=None))
         .properties(
             title=_title(
-                text="Pinned PV capacity is above the fitted capacity at four of five substations",
+                text="Pinned PV capacity is above the fitted capacity at four substations",
                 subtitle=(
                     "PV capacity at each cut, points of effective capacity, one row per "
                     "substation; the gap reaches 17 points at D5. "
