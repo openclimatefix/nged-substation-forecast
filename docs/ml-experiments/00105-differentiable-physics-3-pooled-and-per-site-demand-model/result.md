@@ -495,6 +495,16 @@ at `docs/ml-experiments/<id>-<slug>/result.md`.
   tails (coverage and pinball at q01, q05, q95, and q99, every arm); the sunny-hour residual
   against temperature; the score by month since the cut. No generator data appear, and G-a and G-b
   are not plotted.
+- **Substation cards**, a section near the end titled "Provisional: fitted to past weather on a
+  screening run". One compact card per demand substation (D-labels only), from the decision arm P,
+  with posterior intervals from the variational fit. Each card shows the inferred PV capacity per
+  season-year; the mix of the K shared daily shapes and the size of the substation's own deviation;
+  the resulting daily profile per day type; the heating response (slope, threshold, and the
+  thermal-inertia mix); the holiday and lighting effects; and drift, which P does not have. One
+  cross-substation figure shows the shared shapes beside each substation's mix of them. The cards of
+  the held-out onboarding substations (P-onb4w) sit beside the pooled ones, so the reader can see
+  how far four weeks of data move the shape mix and the capacity away from the pooled prior. The
+  card script is `e00105_cards.py`.
 - **Bullets only after the figures:** arms and absolute scores; C1 to C5 with intervals, counts,
   and labels; the tails table; each prediction marked held or failed, in two lists; the gate;
   the tuned K and penalties; the solar weights w; the cold block; D18; the scarce-data rows; the
