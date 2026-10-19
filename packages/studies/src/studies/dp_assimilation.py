@@ -35,7 +35,7 @@ from the sites' own fits (empirical Bayes).
 calendar quarter, and lead band, centred on their median (`LeadSpread`).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from math import exp, log, pi
 from typing import Final, Literal
@@ -44,7 +44,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from studies.dp_calendar import HALF_HOURS_PER_DAY
-from studies.dp_gam import N_BANDS, ResidualSpread
+from studies.dp_gam import N_BANDS, ReplicaResiduals, ResidualSpread
 
 DEFAULT_DELAY_HOURS: Final[float] = 3.5
 """The telemetry delay of experiments 87 and 104: 3 hours plus the half-hour a reading covers.
@@ -54,6 +54,9 @@ It is an assumption, not a measured value.
 
 INITIALISATION_HOUR_UTC: Final[int] = 9
 """The hour of the daily initialisation, 09:00 UTC."""
+
+REPLICA_BURN_IN_DAYS: Final[int] = 14
+"""The first days of a replica year are left out of the spread, while the filter converges."""
 
 INITIAL_LEVEL_VARIANCE: Final[float] = 100.0
 """The prior variance of the level at the first reading, in points squared."""
@@ -536,3 +539,62 @@ class LeadSpread:
             An array of shape (len(mean), 11), non-decreasing along the last axis.
         """
         return self.by_lead_band[lead_band].quantiles(mean=mean, band=band, quarter=quarter)
+
+
+def post_filter_lead_spread(
+    *,
+    end_times: np.ndarray,
+    replica: ReplicaResiduals,
+    run: Callable[[np.ndarray, np.ndarray], CorrectionTrace],
+    delay_hours: float = DEFAULT_DELAY_HOURS,
+    burn_in_days: int = REPLICA_BURN_IN_DAYS,
+) -> LeadSpread:
+    """Fit the spread of a corrected arm from its replica run through the same correction.
+
+    The replica's residuals form the residual stream, so the correction sees the same staleness a
+    scored forecast does. For each number of days ahead from 1 to 7, every replica row is
+    corrected from the readings that were usable at its day-ahead initialisation, and the
+    post-correction residuals are grouped by lead band. Rows inside the switching masks and the
+    first `burn_in_days` days of the replica year do not enter the spread.
+
+    Args:
+        end_times: The grid's half-hour ends as `datetime64[us]`.
+        replica: The replica's residuals, fitted with `drop_switching=False` so the stream holds
+            the switching rows, as a live filter would see them.
+        run: Builds the correction's trace from the residual stream and the hour band of each
+            grid row, for example `run_kalman` or `run_ewma` with the arm's hyperparameters.
+        delay_hours: The telemetry delay.
+        burn_in_days: How many days at the start of the replica year to leave out.
+
+    Returns:
+        The centred spread per lead band.
+    """
+    stream = np.full(len(end_times), np.nan)
+    stream[replica.index] = replica.residuals
+    grid_band = np.zeros(len(end_times), dtype=np.int64)
+    grid_band[replica.index] = replica.band
+    trace = run(stream, grid_band)
+    valid_times = end_times[replica.index]
+    settled = valid_times > valid_times.min() + np.timedelta64(burn_in_days, "D")
+    kept = settled & ~replica.switching
+    residuals: list[list[np.ndarray]] = [[] for _ in range(N_LEAD_BANDS)]
+    bands: list[list[np.ndarray]] = [[] for _ in range(N_LEAD_BANDS)]
+    quarters: list[list[np.ndarray]] = [[] for _ in range(N_LEAD_BANDS)]
+    for days_ahead in range(1, LEAD_BAND_UPPER_DAYS[-1] + 1):
+        cutoff = usable_cutoff_positions(
+            end_times=end_times,
+            initialisation=day_ahead_initialisation(end_times=valid_times, days_ahead=days_ahead),
+            delay_hours=delay_hours,
+        )
+        correction = correction_at(
+            trace=trace, cutoff=cutoff, target=replica.index, band=replica.band
+        )
+        lead_band = lead_band_of_days_ahead(days_ahead=days_ahead)
+        residuals[lead_band].append((replica.residuals - correction.total)[kept])
+        bands[lead_band].append(replica.band[kept])
+        quarters[lead_band].append(replica.quarter[kept])
+    return LeadSpread.fit(
+        residuals=[np.concatenate(r) for r in residuals],
+        band=[np.concatenate(b) for b in bands],
+        quarter=[np.concatenate(q) for q in quarters],
+    )

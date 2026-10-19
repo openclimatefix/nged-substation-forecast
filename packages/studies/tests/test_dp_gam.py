@@ -923,3 +923,26 @@ def test_the_replica_of_a_pinned_arm_needs_the_vintages(dp_synthetic_cache: Feat
             window=TrainingWindow(months=12),
             season_years=SEASON_YEARS,
         )
+
+
+def test_the_replica_can_keep_the_switching_rows_and_flag_them(dp_synthetic_cache: FeatureCache):
+    features = dp_synthetic_cache.sites["S1"]
+    masked = (dp_synthetic_cache.end_times > np.datetime64("2023-10-01T00:00", "us")) & (
+        dp_synthetic_cache.end_times <= np.datetime64("2023-10-08T00:00", "us")
+    )
+    cache = replace(dp_synthetic_cache, sites={"S1": replace(features, switching_mask=masked)})
+    replica = partial(
+        replica_residuals,
+        cache=cache,
+        site="S1",
+        spec=GamSpec(),
+        cut=CUT,
+        window=TrainingWindow(months=12),
+        season_years=SEASON_YEARS,
+    )
+    dropped = replica()
+    kept = replica(drop_switching=False)
+    assert not masked[dropped.index].any()
+    assert not dropped.switching.any()
+    assert kept.switching.sum() == masked[kept.index].sum() > 0
+    assert len(kept.index) == len(dropped.index) + kept.switching.sum()

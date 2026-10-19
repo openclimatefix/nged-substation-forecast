@@ -5,12 +5,14 @@ information cut by changing every residual after the cut, and the hyperparameter
 likelihood at the truth of a simulated stream.
 """
 
+from datetime import UTC, datetime
 from typing import Final
 
 import numpy as np
 import pytest
 
 torch = pytest.importorskip("torch")
+
 
 from studies.dp_assimilation import (  # noqa: E402
     N_LEAD_BANDS,
@@ -22,11 +24,13 @@ from studies.dp_assimilation import (  # noqa: E402
     fit_filter_hyperparameters,
     fit_site_hyperparameters,
     lead_band_of_days_ahead,
+    post_filter_lead_spread,
     run_ewma,
     run_kalman,
     site_log_likelihood,
     usable_cutoff_positions,
 )
+from studies.dp_gam import ReplicaResiduals, ResidualSpread  # noqa: E402
 
 HYPER: Final[FilterHyperparameters] = FilterHyperparameters(
     log_q=np.log(0.4), logit_phi=3.5, log_sigma_z=np.log(0.8), log_sigma_eps=np.log(0.7)
@@ -58,7 +62,9 @@ def _simulate(*, hyper: FilterHyperparameters, n: int, seed: int) -> np.ndarray:
     return residual
 
 
-def _dense_reference(*, values: np.ndarray, hyper: FilterHyperparameters) -> tuple[np.ndarray, ...]:
+def _dense_reference(
+    *, values: np.ndarray, hyper: FilterHyperparameters
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Run a dense two-state Kalman filter over one band's half-hours, stepping every half-hour.
 
     `values` has a `NaN` where the band has no reading. Returns the level and transient after each
@@ -277,3 +283,66 @@ def test_the_lead_spread_is_centred_per_lead_band_and_needs_one_array_per_band()
     assert wide[0, -1] - wide[0, 0] > narrow[0, -1] - narrow[0, 0]
     with pytest.raises(ValueError, match="one array per lead band"):
         LeadSpread.fit(residuals=arrays[:2], band=band[:2], quarter=quarter[:2])
+
+
+def test_a_drifting_level_widens_the_raw_spread_but_not_the_post_filter_spread():
+    end_times = np.arange(
+        np.datetime64("2024-01-01T00:30", "us"),
+        np.datetime64("2025-01-01T00:30", "us"),
+        np.timedelta64(30, "m"),
+    )
+    n = len(end_times)
+    generator = np.random.default_rng(9)
+    drift = np.linspace(0.0, 40.0, n)
+    residual = drift + 0.3 * generator.normal(size=n)
+    band = _bands(n=n)
+    quarter = ((end_times.astype("datetime64[M]").astype(int) % 12) // 3).astype(int)
+    replica = ReplicaResiduals(
+        residuals=residual,
+        band=band,
+        quarter=quarter,
+        index=np.arange(n),
+        fit_cut=datetime(2024, 1, 1, tzinfo=UTC),
+        switching=np.zeros(n, dtype=bool),
+    )
+    hyper = FilterHyperparameters(np.log(0.5), 3.5, np.log(0.3), np.log(0.5))
+    spread = post_filter_lead_spread(
+        end_times=end_times,
+        replica=replica,
+        run=lambda stream, bands: run_kalman(residual=stream, band=bands, hyper=hyper),
+    )
+    raw = ResidualSpread.fit(residuals=residual, band=band, quarter=quarter, centre=True)
+    post = spread.by_lead_band[0].table[0, 0]
+    assert post[-1] - post[0] < 0.4 * (raw.table[0, 0, -1] - raw.table[0, 0, 0])
+    far = spread.by_lead_band[2].table[0, 0]
+    assert far[-1] - far[0] >= post[-1] - post[0]
+
+
+def test_a_flagged_switching_row_stays_in_the_stream_but_leaves_the_spread():
+    end_times = np.arange(
+        np.datetime64("2024-01-01T00:30", "us"),
+        np.datetime64("2024-04-01T00:30", "us"),
+        np.timedelta64(30, "m"),
+    )
+    n = len(end_times)
+    residual = np.zeros(n)
+    switching = np.zeros(n, dtype=bool)
+    switching[48 * 40 : 48 * 45] = True
+    residual[switching] = 50.0
+    replica = ReplicaResiduals(
+        residuals=residual,
+        band=_bands(n=n),
+        quarter=np.zeros(n, dtype=int),
+        index=np.arange(n),
+        fit_cut=datetime(2024, 1, 1, tzinfo=UTC),
+        switching=switching,
+    )
+    streams: list[np.ndarray] = []
+
+    def run(stream: np.ndarray, bands: np.ndarray) -> CorrectionTrace:
+        streams.append(stream.copy())
+        return run_ewma(residual=stream, band=bands)
+
+    spread = post_filter_lead_spread(end_times=end_times, replica=replica, run=run)
+    assert streams[0][switching].min() == 50.0
+    assert spread.by_lead_band[0].table.max() < 60.0

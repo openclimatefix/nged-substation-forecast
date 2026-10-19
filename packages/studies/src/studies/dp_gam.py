@@ -1095,6 +1095,8 @@ class ReplicaResiduals:
         index: The grid rows of the residuals.
         fit_cut: The replica fit's cut, 12 months before the final cut; every residual row ends
             after it, and none ends after the final cut.
+        switching: True where a residual row sits inside the hand-filtered switching masks; all
+            false unless the replica kept those rows.
     """
 
     residuals: np.ndarray
@@ -1102,6 +1104,7 @@ class ReplicaResiduals:
     quarter: np.ndarray
     index: np.ndarray
     fit_cut: datetime
+    switching: np.ndarray
 
 
 def replica_cut(*, cut: datetime) -> datetime:
@@ -1118,6 +1121,7 @@ def replica_residuals(
     window: TrainingWindow,
     season_years: Sequence[int],
     capacity_vintages: pl.DataFrame | None = None,
+    drop_switching: bool = True,
 ) -> ReplicaResiduals:
     """Return the residuals of a replica of the scored forecast.
 
@@ -1137,10 +1141,13 @@ def replica_residuals(
         season_years: The season-years with a capacity increment.
         capacity_vintages: The real-time capacity vintages, from which the replica's pinned
             capacity at its own cut is built; required when the spec pins the capacity.
+        drop_switching: True to leave out the rows inside the switching masks, as a spread does;
+            False to keep them and flag them, as the recent-level filter needs, since the filter
+            has no mask.
 
     Returns:
-        The residuals over the rows that have a reading, sit outside the switching masks, and end
-        after the substation's first usable instant.
+        The residuals over the rows that have a reading and end after the substation's first usable
+        instant, outside the switching masks unless `drop_switching` is False.
 
     Raises:
         ValueError: If the spec pins the capacity and no vintages are given.
@@ -1164,7 +1171,7 @@ def replica_residuals(
     )
     keep = (
         features.present
-        & ~features.switching_mask
+        & (~features.switching_mask | (not drop_switching))
         & np.isfinite(features.y)
         & np.isfinite(features.pv_unit_shape)
         & np.isfinite(features.smoothed_temperature_c).all(axis=1)
@@ -1180,6 +1187,7 @@ def replica_residuals(
         quarter=cache.calendar.quarter[index],
         index=index,
         fit_cut=fit_cut,
+        switching=features.switching_mask[index],
     )
 
 
