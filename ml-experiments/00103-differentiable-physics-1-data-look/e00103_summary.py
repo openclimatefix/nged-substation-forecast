@@ -14,7 +14,7 @@ import json
 
 import polars as pl
 from e00103_common import MW_PRIMARIES, WORK_DIR, load_series
-from e00103_stats import load_panel
+from e00103_stats import load_panel, season_year
 
 TABLES = WORK_DIR / "tables"
 
@@ -96,6 +96,27 @@ def main() -> None:
                 f"after_fix={after}: vertex at {vertex:+.1f} minutes; mean correlation at"
                 f" -90/-30/0/+30/+90 = {c[-90]:.3f}/{c[-30]:.3f}/{c[0]:.3f}/{c[30]:.3f}/{c[90]:.3f}"
             )
+    season_panel = load_panel().filter(
+        pl.col("clean"), pl.col("site").is_in(["D5", "D10", "D11"]), ~pl.col("switching_mask")
+    )
+    print("== mean power by season-year, percent of capacity (D5, D10, D11) ==")
+    for band, (start, end) in {
+        "night 00:00-04:59": (0, 5),
+        "evening 17:00-20:59": (17, 21),
+    }.items():
+        table = (
+            season_panel.filter(
+                (pl.col("local_hour_start") >= start) & (pl.col("local_hour_start") < end)
+            )
+            .with_columns(season=season_year(date=pl.col("local_date")))
+            .group_by("site", "season")
+            .agg(pl.col("points").mean().round(1))
+            .pivot(on="season", index="site", values="points")
+            .sort("site")
+        )
+        table = table.select("site", *sorted(c for c in table.columns if c != "site"))
+        print(band)
+        print(table)
     peaks = peaks_by_test["clear-sky hours, April to September"]
     sites_table = pl.read_parquet(WORK_DIR / "sites.parquet")
     d18_start = sites_table.filter(pl.col("site") == "D18")["first_usable"][0]

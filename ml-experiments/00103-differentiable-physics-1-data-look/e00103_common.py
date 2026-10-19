@@ -18,8 +18,10 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR, STUDIES_DATA_DIR
 EXPERIMENT_SLUG: Final[str] = "00103-differentiable-physics-1-data-look"
 WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / EXPERIMENT_SLUG
 """The experiment's private folder: the panel, the handed-on files, and the printed reports."""
-FIGURE_DIR: Final[Path] = Path(__file__).parent / "draft"
-"""Where the figures are written while the docs freeze is in force."""
+FIGURE_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / EXPERIMENT_SLUG
+)
+"""The experiment's docs folder, where the figures are written beside `result.md`."""
 
 DEMAND_INPUTS_DIR: Final[Path] = STUDIES_DATA_DIR / "per_study/stage1_pilot/demand/inputs"
 SERIES_PATH: Final[Path] = DEMAND_INPUTS_DIR / "series.parquet"

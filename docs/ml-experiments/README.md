@@ -15,6 +15,9 @@ started. A folder holds `result.md` and its figures.
   cost of its errors, and by how well its tails are calibrated.
 - **[Demand inputs](themes/demand-inputs/index.md):** Which extra inputs lower the error of the
   substation demand forecast.
+- **[Differentiable physics: long history and drift](themes/differentiable-physics-long-history-and-drift/index.md):**
+  Whether a differentiable-physics model of Primary substation demand can use old years of history
+  and cope with drift in the demand level.
 - **[Generator forecasting](themes/generator-forecasting/index.md):** Forecasting the output of
   solar and wind farms.
 - **[Hierarchy and pooling](themes/hierarchy-and-pooling/index.md):** Forecasts that share

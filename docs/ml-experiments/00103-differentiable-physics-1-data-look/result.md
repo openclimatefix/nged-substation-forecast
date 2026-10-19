@@ -1,10 +1,9 @@
 ---
 id: "00103"
 slug: differentiable-physics-1-data-look
-title: "Differentiable physics, part 1: which substations, rows, and dates the model can use"
 part: 1
-theme: Long history and drift
-also_relevant_to: [Pooling across substations, "Demand: calendar and weather", Embedded generation]
+theme: differentiable-physics-long-history-and-drift
+also_relevant_to: [hierarchy-and-pooling, demand-inputs, solar-disaggregation]
 status: done
 size: >-
   medium, descriptive (no model). Stored: only private files under
@@ -26,24 +25,23 @@ prediction: >-
   daytime departure supports leaving out March 2020 to June 2021 (superseded: the series brief now
   fixes the window at 2020-03-23 to 2021-07-19).
 decision_rule: >-
-  Descriptive; each decision has a fixed rule, listed in the bullets below. Verdict `helps` means
-  the data supports Parts 2 and 3 with no redesign; `hurts` means a finding forces a redesign (a
-  timestamp offset, fewer than 5 eligible long-history MW sites, or under 0.5 dark site-years in a
-  part's training window at more than 2 MVA sites); `inconclusive` means a decision could not be
-  made from the plots. The cuts went beyond the predicted two series, and the dark-site-year
+  Descriptive; each decision has a fixed rule, listed in the bullets below. Verdict `supported`
+  means the data supports Parts 2 and 3 with no redesign; `refuted` means a finding forces a
+  redesign (a timestamp offset, fewer than 5 eligible long-history MW sites, or under 0.5 dark
+  site-years in a part's training window at more than 2 MVA sites); `inconclusive` means a decision
+  could not be made from the plots. The cuts went beyond the predicted two series, and the dark-site-year
   threshold is the series brief's amended 0.5, so the wording differs from the plan's.
 benchmark: none (no model)
 row_set_id: none (descriptive; defines dp_mw_v1 and dp_mva_dark_v1 for later parts)
 metric: counts, shares, slopes, and correlations
-verdict: helps
+verdict: supported
 prod: no
 take_home_message: >-
-  The data lets the series go ahead, with three changes. Cut leading months at 13 of the 16
-  Primaries (19 months at D4). Fix the lockdown window in advance, because the data does not
-  isolate it from drift. Count eligible long-history MW sites at each tuning year's first day, which
-  gives 5 at 2024-07-01 because D9 holds only 9.0 months then (6 at 2025-07-01); Phase A needs 4
-  of 5. The sunrise and sunset ramps put the stored stamps within about 5 minutes of the sun on
-  both sides of the 2026-03-26 fix, so no 30-minute error is present and no Part 2 arm is touched.
+  The data lets the series go ahead, with three changes: cut the first months of 13 of the 16
+  Primaries (19 months at D4), fix the lockdown window in advance because the data does not isolate
+  it from drift, and count eligible long-history MW sites at each tuning year's first day (5 at
+  2024-07-01, so 4 of 5 must improve). The power timestamps agree with the sun to within about 5
+  minutes on both sides of NGED's fix of 2026-03-26, so no timestamp correction is needed.
 date: 2026-10-19
 pr: 1348
 advice:
@@ -78,8 +76,8 @@ code: ml-experiments/00103-differentiable-physics-1-data-look/
 **The data lets the differentiable-physics series go ahead, with three changes.** Cut the leading
 months at 13 of the 16 Primary substations, fix the lockdown window in advance, and count eligible
 long-history MW sites at each tuning year's first day (5 at 2024-07-01, because D9 holds only 9.0
-months then). Verdict: `helps`, exactly at the minimum of 5 eligible sites, so Phase A needs 4 of 5.
-A sharper timestamp check, on the sunrise and sunset ramps of metered solar series, finds no
+months then). Verdict: `supported`, exactly at the minimum of 5 eligible sites, so Phase A needs 4
+of 5. A sharper timestamp check, on the sunrise and sunset ramps of metered solar series, finds no
 30-minute error on either side of the fix.
 
 This experiment fits no model. It looks at the power records of 22 series (16 Primary substations,
@@ -103,7 +101,7 @@ metered generators appear only in figure 9, as G-a and G-b, as aggregate statist
 
 ![Monthly level by hour band at the 8 MW Primaries](figure_03_monthly_levels.svg)
 
-![First 12 months against the same months a year later, 16 Primaries](figure_04_early_calibration.svg)
+![First 12 months against the same months later, 16 Primaries](figure_04_early_calibration.svg)
 
 ![Mean daily profile by season-year at the 8 MW Primaries](figure_05_profiles.svg)
 

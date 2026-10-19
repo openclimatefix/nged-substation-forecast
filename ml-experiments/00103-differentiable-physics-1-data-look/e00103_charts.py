@@ -1,4 +1,4 @@
-"""Draw experiment 103's figures 1 to 12 as SVG into `draft/`.
+"""Draw experiment 103's figures 1 to 13 as SVG into its docs folder.
 
 The two metered generators appear only in figure 9, as G-a and G-b, as aggregate statistics with no
 dates. Afterwards optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
