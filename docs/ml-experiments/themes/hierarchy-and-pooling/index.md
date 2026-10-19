@@ -1,14 +1,9 @@
 # Hierarchy and pooling
 
 **The summary of this theme is in progress.** This theme covers forecasts that share information
-across substations or across levels of the electricity network hierarchy. The
-[Experiments](experiments.md) page lists every experiment tried, with its verdict and a take-home
-message, and the [Research plan](plan.md) lists what is planned next.
+across substations or across levels of the electricity network hierarchy.
 
 ## What would change in production
-
-**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for
-the maintainer to confirm.
 
 - **[00024 - Pooled demand models, part
   1](../../00024-pooling-groupings-demand-xgboost/result.md):** Train one XGBoost model per

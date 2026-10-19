@@ -40,29 +40,13 @@ integer that orders the experiments by the order in which they were started. A f
 status, and the theme pages build their tables from it.** The Experiments table of each theme, the
 planned-experiments table of each Research plan, and the candidates table below are generated from
 the front matter when the documentation is built, so adding a finished experiment means writing its
-`result.md` and editing nothing else. The fields are:
-
-- `id`, `slug`: the five-digit id and the folder name without the id.
-- `theme`: the one theme the experiment belongs to, named by its folder under `themes/`.
-- `also_relevant_to`: a list of other themes that the experiment bears on, empty if none. Each such
-  theme lists the experiment with an "also relevant" marker.
-- `status`: `planned` before the code runs, `done` or `finished` after.
-- `hypothesis`, `prediction`, `decision_rule`: what was tested, stated before the run.
-- `verdict`: what happened to the hypothesis, one of `inconclusive`, `refuted`, `supported`, `partly
-  supported`, `small gain`, `not supported`, `invalid`, or `failed`. A planned experiment has none.
-- `production_status`: `candidate`, `not-for-production`, `adopted`, or `superseded`. A planned
-  experiment has none.
-- `take_home_message`: two or three plain sentences saying what the result means for the forecast.
-  It is required for ids above 102, and older experiments show the first sentence of `headline` in
-  its place.
-- `advice`: one-line imperatives for the next experiment's plan, each pointing to its evidence. A
-  plan begins by reading `advice` across every `result.md`.
+`result.md` and editing nothing else. The `ml-experiment` skill
+(`.claude/skills/ml-experiment/SKILL.md`) lists the front matter fields and their allowed values.
 
 `uv run python scripts/mkdocs_hooks/experiment_tables.py --check` validates every front matter
 block, and the documentation build runs the same check. `uv run python
 scripts/mkdocs_hooks/experiment_tables.py --theme <theme>` prints a theme's Experiments table as
-markdown. A new theme needs at least three related experiments, a folder under `themes/` with
-`index.md`, `experiments.md`, and `plan.md`, and an entry in the navigation.
+markdown.
 
 ## Planned experiments and their order
 
@@ -79,7 +63,8 @@ validation year with 12 months, and it resolves gains of roughly 0.3 points of c
 
 ## Candidates for the next release
 
-**These experiments are flagged `candidate` and are not yet adopted.** The maintainer reviews the
+**These experiments are flagged `candidate` and are not yet adopted.** The flags are proposals for
+the maintainer to confirm. The maintainer reviews the
 candidates every one to two weeks and ports the best into a new model release. The [release
 log](../live_service/model-releases.md) records which experiments each release adopted.
 

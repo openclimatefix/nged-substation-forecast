@@ -7,9 +7,6 @@ plan](plan.md) lists what is planned next.
 
 ## What would change in production
 
-**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for
-the maintainer to confirm.
-
 - **[00019 - Retraining and error correction, part
   2](../../00019-primary-demand-stack-vs-manual-heuristic/result.md):** Add a 14-day error
   correction and a spread factor of 1.15 to the single-stage ENS-trained quantile model N1 for

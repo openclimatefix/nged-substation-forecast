@@ -191,9 +191,6 @@ contrasts](../../00049-vp1-screening-reference-under-p-roll-demand/figure_1.svg)
 
 ## What would change in production
 
-**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for
-the maintainer to confirm.
-
 - **[00017 - Retraining and error correction, part
   1](../../00017-training-window-and-retraining-rule-drift-demand/result.md):** Train the stage 1a
   demand model on the last 12 months or with a 0.5-year half-life, retrain monthly, and add a 14-day

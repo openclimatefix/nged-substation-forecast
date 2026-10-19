@@ -21,11 +21,11 @@ skill](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.cla
 covers the work before and including the port in step 1 below: choosing the experiments, testing
 them together, and planning the port.
 
-1. Port the supported ml-experiments' winners into the production pipeline, in pull requests that do
-   not bump the release number.
+1. Port the supported ml-experiments' winners into the production pipeline, in pull requests that
+   do not bump the release number.
 2. Register a cross-validation run named `model-release-N` whose `config_overrides` include
-   `model_release: N`. The number is part of the run's registered configuration, so it travels with
-   the saved model in `meta.json`.
+   `model_release: N`. The number is part of the run's registered configuration, so it travels
+   with the saved model in `meta.json`.
 3. Promote the champion fold run and deploy it, following [Operating the live
    service](operations.md#step-2-materialise-promoted_model). The `promoted_model` asset reports
    `model_release` as output metadata, so check the number there.

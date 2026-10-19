@@ -68,9 +68,10 @@ review as `implement-issue` does.
 
 - **The id and the slug.** Call `studies.experiment_store.reserve_experiment(slug=...)`. It returns
   the next id, written as five digits, and creates `data/ml-experiments/<id>-<slug>/`. Make the slug
-  descriptive. **Write the id without leading zeros in the title of a pull request or an issue**, as
-  in "Experiment 6: which input features work best", never "Experiment 00006". The five digits
-  belong to folder and file names only.
+  descriptive.
+  **Write the id without leading zeros in the title of a pull request or an issue**, as in
+  "Experiment 6: which input features work best", never "Experiment 00006". The five digits belong
+  to folder and file names only.
 - **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it. The
   page is not in the navigation, because the generated Experiments table of its theme links to it,
   so do not edit `mkdocs.yml`.
@@ -78,9 +79,7 @@ review as `implement-issue` does.
   `docs/ml-experiments/themes/` with a Summary (`index.md`), an Experiments page, and a Research
   plan page (`plan.md`). The Experiments table and the planned-experiments table are generated from
   the `result.md` front matter when the documentation is built, so the experiment's front matter is
-  the only entry to write. The hand-written Research plan page lists the planned and proposed
-  experiments of the theme by priority. The section "Keep the theme's Research plan page current"
-  says what to update.
+  the only entry to write.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
   `ml-experiments/` may share a basename. A script imports its own folder, `studies.*`, and the
@@ -105,28 +104,29 @@ number, or `none`). Every result has the same front matter, so a later session f
 lists the other themes the result bears on (an empty list if none).** The experiment appears in the
 Experiments table of its own theme as "primary" and of each listed theme as "also relevant". A theme
 needs at least three related experiments, so an experiment that fits no existing theme takes the
-closest one rather than starting a theme of its own.
+closest one rather than starting a theme of its own. A new theme is a folder under `themes/` with
+`index.md`, `experiments.md`, and `plan.md`, and an entry in the `mkdocs.yml` navigation.
 
 **`take_home_message` is two or three plain sentences saying what the result means for the forecast,
 and it is required for every experiment with an id above 102.** Write it for a reader who has not
 opened the page, with no jargon, and put the effect on the forecast first. It is shown in the
 Experiments table of each theme. `uv run python scripts/mkdocs_hooks/experiment_tables.py --check`
-validates the whole front matter (a pre-commit hook runs it, as does `mkdocs build --strict`), and
-`... --theme <theme>` prints a theme's Experiments table.
+validates the whole front matter, and `... --theme <theme>` prints a theme's Experiments table.
 
 **`advice` is a YAML list of one-line imperatives for future experiments, and a result is not
-finished without it.** Each item says what to do and where it applies, and ends with a pointer to
-the evidence, such as a planned contrast (C1) or a section of the write-up. For example: "Put recent
+finished without it.** Each item says what to do and where it applies, and ends with a pointer to the
+evidence, such as a planned contrast (C1) or a section of the write-up. For example: "Put recent
 power in the stage 2 calibrator, not in stage 1b, for Primary substations (C1)." Write each item as
 a folded YAML scalar (`- >-`), wrapped at 100 characters, so that it makes sense without the page
 around it. Write the items from the write-up's lessons and headline contrasts, and drop any item
 that no number or statement in the write-up supports. The field is separate from the `lessons`
 summary and the page's lessons section, which explain the reasoning, and from `production_status`,
 which says whether the winner is ready for production. Before planning a new experiment, read the
-earlier advice with `awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f'
-docs/ml-experiments/*/result.md`, which prints a whole list however long it is, and say in the plan
-which items the plan follows and which it departs from. The overview's "What the experiments taught
-us so far" section is the curated roll-up of the `advice` lists.
+earlier advice with
+`awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f' docs/ml-experiments/*/result.md`,
+which prints a whole list however long it is, and say in the plan which items the plan follows and
+which it departs from. The overview's "What the experiments taught us so far" section is the
+curated roll-up of the `advice` lists.
 
 ## How to score
 
@@ -200,13 +200,13 @@ series by eye.** Write the slug as a few words naming the topic and the part, su
 
 ## Exploratory series
 
-**When the question is exploratory, run a series of small experiments, each designed from the result
-of the one before.** A question is exploratory when no single hypothesis yet states what to test,
-such as "can switching events be found in the telemetry at all?" or "can embedded solar be separated
-from substation demand?". A series replaces one large pre-registered experiment, which would spend
-its whole budget before anything is learned. Every experiment in the series still has its own
-`result.md`, hypothesis, prediction, decision rule, and stop rule, and the series shares one topic
-in the slugs of its experiments.
+**When the question is exploratory, run a series of small experiments, each designed from the
+result of the one before.** A question is exploratory when no single hypothesis yet states what to
+test, such as "can switching events be found in the telemetry at all?" or "can embedded solar be
+separated from substation demand?". A series replaces one large pre-registered experiment, which
+would spend its whole budget before anything is learned. Every experiment in the series still has
+its own `result.md`, hypothesis, prediction, decision rule, and stop rule, and the series shares one
+topic in the slugs of its experiments.
 
 The loop has two steps, repeated:
 
@@ -263,11 +263,11 @@ recipe. It reports the combined gain, and the loss in score when each component 
 
 ## When a winner reaches production
 
-**Flag each finished experiment for the next model release.** Set `production_status` in `result.md`
-to `candidate` when the verdict is `supported`, `small gain`, or `partly supported` and the result
-is worth considering for the next model release, and to `not-for-production` for a diagnostic, a
-refuted idea, or a stage that failed its test. The overview's "Candidates for the next release"
-table is the agenda for the maintainer's release review.
+**Flag each finished experiment for the next model release.** Set `production_status` in
+`result.md` to `candidate` when the verdict is `supported`, `small gain`, or `partly supported` and
+the result is worth considering for the next model release, and to `not-for-production` for a
+diagnostic, a refuted idea, or a stage that failed its test. The overview's "Candidates for the
+next release" table is the agenda for the maintainer's release review.
 
 **The pull request that cuts a model release records which experiments it adopted.** In that pull
 request, set `production_status` to `adopted` and `adopted_in` to the model release number in each
@@ -294,18 +294,18 @@ not tell.
 
 **Open `result.md` with a few plain sentences that say what question the experiment asked, how it
 went about answering the question, and what it concluded.** Write them for a reader who has not seen
-the experiment or the plan. The opening uses no jargon: it names what was tested in ordinary words,
-says what each number is a number of, and leaves the arm names, the check names, the abbreviations,
-and the decision rule to later sections. Test every phrase by asking "what is this a share of?",
-"what was put into what?", and "what does this label stand for?". A sentence such as "injected
-solar-farm output is recovered to within 25%, but the real series pass the four checks at 6 of 8
-Primaries" fails all three: it does not say what the output was injected into, what the 25% is a
-share of, or what the four checks test. Write the same finding as, for example: "We asked whether
-the power a substation draws can be split into ordinary demand and the output of rooftop solar
-panels. We added the recorded output of a real solar farm to a substation's demand, and checked how
-much of it a fitting method could find again. The method found about 77% to 85% of it. At 2 of the 8
-substations, other checks suggested the answer could not be trusted." The verdict word and its
-numbers follow in the next paragraph, with each term defined where it first appears.
+the experiment or the plan. The opening uses no jargon: it names what was tested
+in ordinary words, says what each number is a number of, and leaves the arm names, the check names,
+the abbreviations, and the decision rule to later sections. Test every phrase by asking "what is
+this a share of?", "what was put into what?", and "what does this label stand for?". A sentence such
+as "injected solar-farm output is recovered to within 25%, but the real series pass the four checks
+at 6 of 8 Primaries" fails all three: it does not say what the output was injected into, what the
+25% is a share of, or what the four checks test. Write the same finding as, for example: "We asked
+whether the power a substation draws can be split into ordinary demand and the output of rooftop
+solar panels. We added the recorded output of a real solar farm to a substation's demand, and
+checked how much of it a fitting method could find again. The method found about 77% to 85% of it.
+At 2 of the 8 substations, other checks suggested the answer could not be trusted." The verdict word
+and its numbers follow in the next paragraph, with each term defined where it first appears.
 
 **Keep the rest of `result.md` to about a screen:** the verdict in one sentence, the winner with its
 interval, each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and
@@ -336,7 +336,7 @@ with status `planned`. The overnight session:
 ## Merging
 
 **An experiment's PR may be merged without waiting for the maintainer when all three hold:** the
-diff touches only `ml-experiments/`, and `docs/ml-experiments/`; the experiment has had the reviews
+diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews
 its size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
 --check`; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
 `data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). **Before any

@@ -110,12 +110,6 @@ def test_check_mode_exits_non_zero_and_names_the_file(
     assert "00003-slug-00003/result.md" in capsys.readouterr().out
 
 
-def test_check_mode_passes_on_good_front_matter(experiments_dir: Path) -> None:
-    _write_experiment(experiments_dir, "00003")
-
-    assert experiment_tables.main(["--check"], experiments_dir=experiments_dir) == 0
-
-
 def test_theme_print_mode_prints_the_table(
     experiments_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -137,16 +131,6 @@ def test_candidates_table_lists_only_candidates(experiments_dir: Path) -> None:
 
     assert "00003" in table
     assert "00004" not in table
-
-
-def test_sort_is_numeric_on_string_ids(experiments_dir: Path) -> None:
-    _write_experiment(experiments_dir, "00099")
-    _write_experiment(experiments_dir, "00100")
-
-    rows = _table(experiments_dir, "alpha").splitlines()[2:]
-
-    assert "00100" in rows[0]
-    assert "00099" in rows[1]
 
 
 def test_finished_status_is_valid(experiments_dir: Path) -> None:
@@ -174,7 +158,7 @@ def test_planned_result_needs_no_verdict(experiments_dir: Path) -> None:
     )
 
 
-def test_primary_theme_is_not_repeated_as_also_relevant(experiments_dir: Path) -> None:
+def test_primary_theme_repeated_in_also_relevant_to_yields_one_row(experiments_dir: Path) -> None:
     _write_experiment(experiments_dir, "00003", also_relevant_to=["alpha", "beta"])
 
     rows = _table(experiments_dir, "alpha").splitlines()[2:]

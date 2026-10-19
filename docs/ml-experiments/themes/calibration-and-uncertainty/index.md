@@ -1,14 +1,9 @@
 # Calibration and uncertainty
 
 **The summary of this theme is in progress.** This theme covers whether the forecast's quantiles and
-ensemble members are well calibrated, and how to widen or sharpen them. The
-[Experiments](experiments.md) page lists every experiment tried, with its verdict and a take-home
-message, and the [Research plan](plan.md) lists what is planned next.
+ensemble members are well calibrated, and how to widen or sharpen them.
 
 ## What would change in production
-
-**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for
-the maintainer to confirm.
 
 - **[00002 - Stage 2 calibrator for solar and
   wind](../../00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md):** Pool the

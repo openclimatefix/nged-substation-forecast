@@ -162,9 +162,6 @@ table above, because a study is not an ml-experiment.
 
 ## What would change in production
 
-**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for
-the maintainer to confirm.
-
 - **[00001 - ERA5-trained stage 1, solar and wind, part
   1](../../00001-era5-trained-stage1a-vs-ens-trained/result.md):** Train the weather-to-power model
   on ERA5 and apply it to ENS members. Needs the staged design, and helps only up to day 6.

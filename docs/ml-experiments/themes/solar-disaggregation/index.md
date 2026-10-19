@@ -140,9 +140,6 @@ reads](../../00046-embedded-solar-share-of-primary-forecast-error/figure_1_contr
 
 ## What would change in production
 
-**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for
-the maintainer to confirm.
-
 - **[00064 - Demand minus forecast solar
   (PVDIS-5)](../../00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md):** Give the
   XGBoost model for Primary demand the forecast solar output as a base margin (capacity times the

@@ -53,6 +53,11 @@ EXPERIMENTS_PLACEHOLDER: Final[str] = "<!-- experiments-table -->"
 PLANNED_PLACEHOLDER: Final[str] = "<!-- planned-table -->"
 CANDIDATES_PLACEHOLDER: Final[str] = "<!-- candidates-table -->"
 
+THEME_PAGE_LINK_PREFIX: Final[str] = "../../"
+"""From `themes/<theme>/<page>.md` up to the experiment folders."""
+OVERVIEW_LINK_PREFIX: Final[str] = ""
+"""From `README.md`, which sits beside the experiment folders."""
+
 _FRONT_MATTER: Final[re.Pattern[str]] = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _FIRST_SENTENCE: Final[re.Pattern[str]] = re.compile(r"^.*?[.!?](?=\s|$)", re.DOTALL)
 
@@ -66,7 +71,7 @@ class Experiment:
 
     @property
     def number(self) -> int:
-        """The integer id, read from the folder name so a bad `id` field cannot break sorting."""
+        """The integer id, read from the folder name."""
         return int(self.folder.split("-", maxsplit=1)[0])
 
     @property
@@ -75,16 +80,16 @@ class Experiment:
         return self.front_matter.get("status") == "planned"
 
     def themes(self) -> list[str]:
-        """The primary theme followed by the `also_relevant_to` themes, without repeats."""
+        """The primary theme, then the `also_relevant_to` themes, without repeats."""
         primary = self.front_matter.get("theme")
         also = self.front_matter.get("also_relevant_to") or []
-        return [theme for theme in [primary, *also] if theme]
+        return list(dict.fromkeys(theme for theme in [primary, *also] if theme))
 
     def take_home(self) -> str:
         """The take-home message, or the first sentence of `headline` for older experiments."""
         message = self.front_matter.get("take_home_message")
         if message:
-            return " ".join(str(message).split())
+            return str(message)
         headline = " ".join(str(self.front_matter.get("headline") or "").split())
         match = _FIRST_SENTENCE.match(headline)
         return match.group(0) if match else headline
@@ -104,17 +109,14 @@ def load_experiments(*, experiments_dir: Path) -> list[Experiment]:
         The experiments, highest id first.
 
     Raises:
-        ValueError: If a `result.md` has no front matter block.
-        TypeError: If the front matter block is not a mapping.
+        TypeError: If a `result.md` has no front matter block, or the block is not a mapping.
     """
     experiments = []
     for path in experiments_dir.glob("[0-9]*/result.md"):
         match = _FRONT_MATTER.match(path.read_text())
-        if match is None:
-            raise ValueError(f"{path}: no front matter block")
-        front_matter = yaml.safe_load(match.group(1))
+        front_matter = yaml.safe_load(match.group(1)) if match else None
         if not isinstance(front_matter, dict):
-            raise TypeError(f"{path}: front matter is not a mapping")
+            raise TypeError(f"{path}: no front matter block holding a mapping")
         experiments.append(Experiment(folder=path.parent.name, front_matter=front_matter))
     return sorted(experiments, key=lambda experiment: experiment.number, reverse=True)
 
@@ -136,10 +138,6 @@ def validate_experiments(*, experiments: Sequence[Experiment], experiments_dir: 
         if status not in STATUSES:
             errors.append(
                 _error(experiment, f"`status` {status!r} is not one of {sorted(STATUSES)}")
-            )
-        if str(fields.get("id")) != experiment.folder.split("-", maxsplit=1)[0]:
-            errors.append(
-                _error(experiment, f"`id` {fields.get('id')!r} does not match the folder")
             )
         if not fields.get("theme"):
             errors.append(_error(experiment, "missing `theme`"))
@@ -188,25 +186,24 @@ def _link(experiment: Experiment, *, link_prefix: str) -> str:
     return f"[{folder.replace('-', ' ', 1)}]({link_prefix}{folder}/result.md)"
 
 
-def experiments_table(
-    *, experiments: Sequence[Experiment], theme: str, link_prefix: str = "../../"
-) -> str:
+def _relevance(experiment: Experiment, *, theme: str) -> str:
+    return "primary" if experiment.front_matter.get("theme") == theme else "also relevant"
+
+
+def experiments_table(*, experiments: Sequence[Experiment], theme: str) -> str:
     """Markdown table of the finished experiments relevant to `theme`, highest id first."""
-    rows = []
-    for experiment in experiments:
-        if experiment.is_planned or theme not in experiment.themes():
-            continue
-        fields = experiment.front_matter
-        rows.append(
-            [
-                _link(experiment, link_prefix=link_prefix),
-                str(fields.get("hypothesis", "")),
-                str(fields.get("verdict", "")),
-                str(fields.get("production_status", "")),
-                experiment.take_home(),
-                "primary" if fields.get("theme") == theme else "also relevant",
-            ]
-        )
+    rows = [
+        [
+            _link(experiment, link_prefix=THEME_PAGE_LINK_PREFIX),
+            str(experiment.front_matter.get("hypothesis", "")),
+            str(experiment.front_matter.get("verdict", "")),
+            str(experiment.front_matter.get("production_status", "")),
+            experiment.take_home(),
+            _relevance(experiment, theme=theme),
+        ]
+        for experiment in experiments
+        if not experiment.is_planned and theme in experiment.themes()
+    ]
     headers = [
         "Experiment",
         "Hypothesis",
@@ -218,15 +215,13 @@ def experiments_table(
     return _table(headers=headers, rows=rows)
 
 
-def planned_table(
-    *, experiments: Sequence[Experiment], theme: str, link_prefix: str = "../../"
-) -> str:
+def planned_table(*, experiments: Sequence[Experiment], theme: str) -> str:
     """Markdown table of the planned experiments relevant to `theme`, highest id first."""
     rows = [
         [
-            _link(experiment, link_prefix=link_prefix),
+            _link(experiment, link_prefix=THEME_PAGE_LINK_PREFIX),
             str(experiment.front_matter.get("hypothesis", "")),
-            "primary" if experiment.front_matter.get("theme") == theme else "also relevant",
+            _relevance(experiment, theme=theme),
         ]
         for experiment in experiments
         if experiment.is_planned and theme in experiment.themes()
@@ -234,18 +229,17 @@ def planned_table(
     return _table(headers=["Experiment", "Hypothesis", "Relevance"], rows=rows)
 
 
-def candidates_table(*, experiments: Sequence[Experiment], link_prefix: str = "") -> str:
-    """Markdown table of every finished experiment with `production_status: candidate`."""
+def candidates_table(*, experiments: Sequence[Experiment]) -> str:
+    """Markdown table of every experiment with `production_status: candidate`."""
     rows = [
         [
-            _link(experiment, link_prefix=link_prefix),
+            _link(experiment, link_prefix=OVERVIEW_LINK_PREFIX),
             str(experiment.front_matter.get("theme", "")),
             str(experiment.front_matter.get("verdict", "")),
             experiment.take_home(),
         ]
         for experiment in experiments
-        if not experiment.is_planned
-        and experiment.front_matter.get("production_status") == "candidate"
+        if experiment.front_matter.get("production_status") == "candidate"
     ]
     return _table(headers=["Experiment", "Theme", "Verdict", "Take-home message"], rows=rows)
 
@@ -272,29 +266,18 @@ def fill_placeholders(*, markdown: str, src_path: str, experiments: Sequence[Exp
     """
     path = Path(src_path)
     if src_path == "ml-experiments/README.md":
-        return _replace_placeholder(
-            markdown=markdown,
-            placeholder=CANDIDATES_PLACEHOLDER,
-            table=candidates_table(experiments=experiments),
-            src_path=src_path,
-        )
-    if path.parent.parent == Path("ml-experiments/themes"):
-        theme = path.parent.name
-        if path.name == "experiments.md":
-            return _replace_placeholder(
-                markdown=markdown,
-                placeholder=EXPERIMENTS_PLACEHOLDER,
-                table=experiments_table(experiments=experiments, theme=theme),
-                src_path=src_path,
-            )
-        if path.name == "plan.md":
-            return _replace_placeholder(
-                markdown=markdown,
-                placeholder=PLANNED_PLACEHOLDER,
-                table=planned_table(experiments=experiments, theme=theme),
-                src_path=src_path,
-            )
-    return markdown
+        placeholder, table = CANDIDATES_PLACEHOLDER, candidates_table(experiments=experiments)
+    elif path.parent.parent == Path("ml-experiments/themes") and path.name == "experiments.md":
+        placeholder = EXPERIMENTS_PLACEHOLDER
+        table = experiments_table(experiments=experiments, theme=path.parent.name)
+    elif path.parent.parent == Path("ml-experiments/themes") and path.name == "plan.md":
+        placeholder = PLANNED_PLACEHOLDER
+        table = planned_table(experiments=experiments, theme=path.parent.name)
+    else:
+        return markdown
+    return _replace_placeholder(
+        markdown=markdown, placeholder=placeholder, table=table, src_path=src_path
+    )
 
 
 def on_config(config: Any) -> Any:

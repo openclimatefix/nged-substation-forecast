@@ -212,9 +212,6 @@ better. In experiments 5, 24, and 32 the number is the extra score of the arm na
 
 ## What would change in production
 
-**These experiments are flagged `candidate`, and none is adopted yet.** The flags are proposals for
-the maintainer to confirm.
-
 - **[00006 - Stage 1a demand inputs](../../00006-stage1a-demand-input-feature-sweep/result.md):**
   Use the clock, a COVID indicator, and recency weights as the stage 1a demand inputs. The Christmas
   column needs its 14-day window, a 2023 start needs a fresh year, and windchill can go.
