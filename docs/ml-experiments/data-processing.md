@@ -357,6 +357,22 @@ labels. Treat it as interpolated, not as a separate measurement
 experiments. Confidence: high, because the mean absolute difference from the neighbours' average is
 zero.
 
+**Do not read the PV capacity of a pooled demand model as a measurement, and do not expect a prior
+to hold it near the vintages.** In the pooled differentiable-physics model, the inferred capacity
+of a substation changed by up to 20 points of capacity with another start or with the network off
+(D5 50 or 30, D9 12 or 23, in season-year 2023), and a prior centred on the vintage with scale 5
+changed nothing, because the prior is a few nats against about 340,000 rows of data. A swap of the
+fitted capacity paths among substations still worsened the summer-midday error at 6 of 6
+([experiment 105](00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md)).
+Applies to experiments that fit capacity inside a demand model. Confidence: medium. A capacity profile shows
+the free fit's loss is 4,563 nats above a fit with the capacities pinned at the convex model's, so
+the optimiser is the weak point; why it is slow is not tested.
+
+**Skip the solar-offset arms at D18, which has no capacity vintage before 2025-07-01.** Its first
+usable data begin in February 2025, so an origin on or before the cut does not exist
+([experiment 105](00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md)).
+Applies to experiments. Confidence: high.
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers
