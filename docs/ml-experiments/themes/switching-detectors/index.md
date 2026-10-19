@@ -1,64 +1,76 @@
 # Switching detectors
 
-**The best switching detector, [RO-NC](../../glossary.md#ro-nc), finds most of the power moved by
-large injected load transfers but only about a third of the power moved by real ones, and no
-experiment yet shows that using a detector improves a forecast.**
+**The best switching detector, [RO-NC](../../glossary.md#ro-nc), finds most of the [moved
+power](../../glossary.md#recall-mw-weighted) (the megawatts a transfer moves) of injected load
+transfers of 25% or more of the receiving load, but only about a third of that of the 35 real
+transfers lasting over 1 day, and no experiment yet shows that using a detector improves a
+forecast.**
 
 A [load transfer](../../glossary.md#injected-and-real-load-transfers) is a switching operation that
 moves part of one [Primary substation's](../../glossary.md#primary-substation) demand onto
 neighbouring substations for hours or days. Detectors find these transfers from power readings
 alone. We score them on injected transfers, whose start, end, and size are known, and on 35 real
-transfers lasting over 1 day that a language model labelled as visible. All results are from the
-lab, on 16 Primary series, and use hindsight to place the end of each transfer.
+transfers lasting over 1 day that a language model and a hand filter judged visible. The real
+transfers include 21 under 25% of the receiving load, so the two scores are not like for like. All
+results are from the lab, on 16 Primary series, and use hindsight to place the end of each transfer.
 
-![RO-NC and X find the most moved power of the five detectors on real transfers over 1 day](../../00101-ro-nc-detector-on-real-hand-filtered-switching-events/figure_1_recall_by_detector.svg)
+![Share of moved power found, by detector](../../00101-ro-nc-detector-on-real-hand-filtered-switching-events/figure_1_recall_by_detector.svg)
 
-**RO-NC and X find the most moved power on the 35 real transfers lasting over 1 day (RO-NC 0.357),
-and the 35 are too few to rank them.** Source: [experiment
+**RO-NC and the refit-offset detector (X) find the most moved power on the 35 real transfers lasting
+over 1 day (RO-NC 0.357), and the 35 are too few to rank them.** Source: [experiment
 101](../../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md).
 
 ## Does it work?
 
 **On injected transfers, RO-NC finds 0.770 of the moved power, against 0.656 for the benchmark
 [PF14](../../glossary.md#pf14).** The difference is +0.114 (+0.074 to +0.182; [experiment
-82](../../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)). The two parts of
-RO-NC each added about 0.05 on earlier draws of injected transfers, and neither helps transfers
-lasting 15.6 to 60 days. Recall here is [MW-weighted](../../glossary.md#recall-mw-weighted).
+82](../../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)). Neither part helps
+transfers lasting 15.6 to 60 days. Recall here is
+[MW-weighted](../../glossary.md#recall-mw-weighted).
 
-- **A second [refitted](../../glossary.md#refit-and-rolling-refit) demand model** removes PF14's
-  blind spot at the monthly refit: +0.050 (+0.012 to +0.107; [experiment
-  71](../../00071-sw2-18-refit-offset-and-gap-bridging/result.md)). Simply lifting the suppression
-  gave +0.056.
+- **Not ignoring alarms near the monthly [refit](../../glossary.md#refit-and-rolling-refit)** of the
+  demand model removes PF14's blind spot: a second model refitted half a month later gave +0.050
+  (+0.012 to +0.107), and lifting the suppression alone gave +0.056 (+0.016 to +0.113), so the
+  second model adds nothing on injected transfers ([experiment
+  71](../../00071-sw2-18-refit-offset-and-gap-bridging/result.md)).
 - **Counting the neighbours that step the same way** as the alarming substation: +0.048 (+0.021 to
   +0.096; [experiment 70](../../00070-sw2-19-same-sign-neighbour-count/result.md)).
 
-**On real transfers, RO-NC finds 12 of the 35 lasting over 1 day (0.357 of their moved power; 0.169
-to 0.553) and none of the 31 shorter ones.** On the 14 real transfers of 25% or more of the
+**On real transfers, RO-NC finds fewer than injected transfers of the same step size and metering
+predict: 12 of the 35 lasting over 1 day (0.357 of their moved power; 0.169 to 0.553), against 18.8
+expected, and none of the 31 shorter ones.** On the 14 real transfers of 25% or more of the
 receiving load, it finds 0.559 (0.203 to 0.816), an interval that includes 0.770, so that band alone
-shows no gap. Of the 35, 6 sit where the detector's [residual](../../glossary.md#residual) panel
-holds no readings and 12 have a step under 4 [noise units](../../glossary.md#noise-unit)
-([experiment 101](../../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md)).
+shows no gap, but it finds 6 of those 14 where 10.5 are expected. Of the 35, 6 sit where the
+detector's [residual](../../glossary.md#residual) panel holds no readings and 12 have a step under 4
+[noise units](../../glossary.md#noise-unit), and even the 17 with readings and a larger step are
+found less often than injected ones; the verdict is partly supported ([experiment
+101](../../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md)).
 
-![RO-NC finds 6 of 14 large real transfers and 2 of 10 with no metered receiver](../../00101-ro-nc-detector-on-real-hand-filtered-switching-events/figure_2_recall_by_band.svg)
+![Share of real transfers found, by size and duration](../../00101-ro-nc-detector-on-real-hand-filtered-switching-events/figure_2_recall_by_band.svg)
 
-**RO-NC misses small steps, mostly where the receiver is unmetered.** Among injected transfers that
-step by 4 noise units or more, the single-series detector D0 found 0.56 with a metered receiver and
-0.35 without ([experiment 58](../../00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md)).
-Before the PF14 end rule, a wrong interval end was D0's main miss ([experiment
+**RO-NC finds none of the real transfers shorter than 1 day, and more of those moving 25% or more of
+the receiving load than of those without a metered receiver (all 66 real transfers).**
+
+**RO-NC misses small steps, mostly where the receiver is unmetered.** Of the 35 real transfers over
+1 day, it finds 6 of 14 of 25% or more of the receiving load and 2 of 10 with no metered receiver.
+Among injected transfers that step by 4 noise units or more, the single-series detector D0 found
+0.56 with a metered receiver and 0.35 without ([experiment
+58](../../00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md)). Before the PF14 end rule, a
+wrong interval end was most of D0's misses among large transfers with a metered receiver, and about
+a third of its misses among transfers with a donor step of 6 noise units or more ([experiment
 59](../../00059-sw2-13-several-windows-in-one-detector/result.md), [experiment
-60](../../00060-sw2-7-profile-weighted-step-detector/result.md)). Of RO-NC's moved power on injected
-transfers, 0.195 sits in transfers with no alarm at the start and 0.035 in transfers with a wrong
-end.
+60](../../00060-sw2-7-profile-weighted-step-detector/result.md)).
 
-**The early [detectors](../../glossary.md#detectors-d0-d0m-d1-and-d2) found under a fifth of
-injected transfers.** D0 and the neighbour-balance detector D1 each found under a fifth of 600
-injected transfers ([experiment 43](../../00043-sw2-1-detector-scoreboard/result.md)). Moving D0's
-interval end to the strongest opposite step in the next 14 days then found +0.191 more (+0.148 to
-+0.237; [experiment 61](../../00061-sw2-6-paired-step-intervals/result.md)), and PF14 improved on
-that rule (0.688 against 0.646; [experiment 66](../../00066-sw2-16-end-rule-as-baseline/result.md)).
+**The early [detectors](../../glossary.md#detectors-d0-d0m-d1-and-d2) D0 and D1 each found under a
+fifth of 600 injected transfers** ([experiment
+43](../../00043-sw2-1-detector-scoreboard/result.md)). Moving D0's interval end to the strongest
+opposite step found +0.191 more (+0.148 to +0.237; [experiment
+61](../../00061-sw2-6-paired-step-intervals/result.md)), and the post hoc rule PF14 did better
+(0.688 against 0.646, no paired interval; [experiment
+66](../../00066-sw2-16-end-rule-as-baseline/result.md)).
 
-**Most other changes found no clear gain.** The experiments tested each against a detector without
-it, at the same number of unexplained alarms. Refuted: several averaging windows (experiment 59),
+**The changes listed here found no clear gain.** Each was tested against a detector without it, at
+the same number of unexplained alarms. Refuted: several averaging windows (experiment 59),
 profile-weighted steps (experiment 60), whitening the residual ([experiment
 62](../../00062-sw2-9-whitened-residual-step-detector/result.md)), scoring onset and return steps as
 a pair (experiment 61), and one joint fit across substations ([experiment
@@ -68,23 +80,27 @@ bank-holiday column ([experiment
 [55](../../00055-sw2-8-neighbour-veto-single-series-detector/result.md) and 58), refitting without
 detected transfers ([experiment 68](../../00068-sw2-5-train-detect-retrain-loop/result.md)), solar
 and heating corrections ([experiment
-98](../../00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md)), and
-accepting weaker onset alarms ([experiment
-69](../../00069-sw2-17-missed-onsets-of-the-end-rule/result.md)).
+98](../../00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md)), a joint
+linear fit of solar and transfer terms ([experiment
+63](../../00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md), of the differentiable-physics
+demand sub-theme), and accepting weaker onset alarms ([experiment
+69](../../00069-sw2-17-missed-onsets-of-the-end-rule/result.md)), and adding neighbours'
+opposite-sign steps to a substation's own step (+0.019, -0.011 to +0.062; [experiment
+65](../../00065-sw2-14-combined-single-series-and-neighbour-score/result.md)).
 
 **Using a detector has not yet improved a forecast, in one validation year (experiments 44 and 86)
 or four (experiment 38) on 16 Primary series.** In each result below, a positive change means a
 worse forecast.
 
-- **Masking:** leaving the half-hours that D1 flags out of the 7-day
-  [correction](../../glossary.md#14-day-correction) of the [stack](../../glossary.md#stack) (the
-  proxy stack of experiment 19, with a half-life) raised the tail error by 57% (0.4% to 134%),
-  because the interval builder ran one interval for 60 days. A mask from NGED's switching logs
-  lowered it by 8.9% (-21.8% to 0.0%), 95% of that in one closure ([experiment
-  38](../../00038-switching-mask-value/result.md)).
-- **Ceiling:** a perfect detector would lower the [best guess's](../../glossary.md#best-guess)
-  [quantile score](../../glossary.md#quantile-score-and-pinball-loss) by 0.42% (-0.47% to 1.96%)
-  ([experiment 44](../../00044-sw2-2-switching-share-of-best-guess-score/result.md)).
+- **Masking:** leaving the half-hours that D1 flags out of the 7-day error correction of the
+  [stack](../../glossary.md#stack) (experiment 17's H0.5 proxy, with a half-life of 0.5 years)
+  raised the tail error outside logged switching by 57% (0.4% to 134%), because one interval ran for
+  60 days. A mask from NGED's logs lowered it on the 14-day correction by 8.9% (-21.8% to 0.0%), 95%
+  of that in one closure ([experiment 38](../../00038-switching-mask-value/result.md)).
+- **Ceiling:** in the band of events the labeller finds most reliably (3 of the 16 Primaries), a
+  perfect detector would lower the [best guess's](../../glossary.md#best-guess) [quantile
+  score](../../glossary.md#quantile-score-and-pinball-loss) by 0.42% (-0.47% to 1.96%) ([experiment
+  44](../../00044-sw2-2-switching-share-of-best-guess-score/result.md)).
 - **Corrected lags:** lags corrected with RO-NC's labels raised the score by 0.056 points of
   [capacity](../../glossary.md#capacity-and-points-of-capacity) outside switching (0.016 to 0.126)
   and did not lower it inside logged events ([experiment
@@ -93,15 +109,14 @@ worse forecast.
 
 ## Best design so far
 
-**RO-NC is PF14 with two changes, tested in experiments
-[70](../../00070-sw2-19-same-sign-neighbour-count/result.md),
-[71](../../00071-sw2-18-refit-offset-and-gap-bridging/result.md), and
-[82](../../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md).**
+**RO-NC is PF14 with two changes ([experiment
+82](../../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)).**
 
 1. Subtract an XGBoost demand model's forecast, which uses no past power, from each Primary's power,
    and refit the model monthly.
 2. Take the 24-hour step of that residual from whichever of two such models, refitted half a month
-   apart, did not refit within 24 hours of the stamp, or simply lift the suppression near the refit.
+   apart, did not refit within 24 hours of the stamp. Lifting the suppression alone does as well on
+   injected transfers (experiment 71), but RO-NC was tested only with two models.
 3. Score each candidate alarm with a logistic regression on its own step, the largest opposite
    neighbour step, the number of neighbours, and the number that step the same way.
 4. Set the threshold to allow 80 unexplained alarms over all 16 Primary series on odd months, and
@@ -118,8 +133,8 @@ which arrives about 5 days after the event, and the end rule uses hindsight.
   transfers, a weak signal.
 - **An untested option** is to run RO-NC retrospectively to build a table of switching events for
   NGED. Experiment 44 found that a perfect detector would improve the best guess's quantile score by
-  little, so the table would serve NGED's own use of the events. The [switching
-  events](../../../roadmap/switching-events.md) roadmap page owns the decision.
+  little, so the table would serve NGED's own use of the events (roadmap page: [switching
+  events](../../../roadmap/switching-events.md)).
 
 ## Gotchas and implementation details
 
@@ -146,15 +161,16 @@ which arrives about 5 days after the event, and the end rule uses hindsight.
   gap the sample cannot show is reported as a finding. Re-check if the labelled real set grows.
 - **Score on several injection shapes and by donor step.** Recall depends on the donor step in noise
   units ([experiment 58](../../00058-sw2-8b-donor-step-recut-and-stronger-veto/result.md)), and
-  experiment 60 tested one step statistic on five shapes ([experiment
-  60](../../00060-sw2-7-profile-weighted-step-detector/result.md)). Otherwise a mix of small and
-  large steps hides which transfers are missed.
+  [experiment 60](../../00060-sw2-7-profile-weighted-step-detector/result.md) tested one step
+  statistic on five shapes. Otherwise a mix of small and large steps hides which transfers are
+  missed. Re-check if the injection builds transfers a new way.
 - **Interval ends need hindsight.** The strongest-opposite-step end rule needs up to 14 days of
   later data ([experiment
   65](../../00065-sw2-14-combined-single-series-and-neighbour-score/result.md)), and an interval
   that started at a return step ran for 60 days ([experiment
   38](../../00038-switching-mask-value/result.md)). Otherwise a detector scored with hindsight is
-  mistaken for one that could run live. Re-check if an end rule without hindsight is tried.
+  mistaken for one that could run live. Re-check when a detector is run on live data, or an end rule
+  without hindsight is tried.
 - **Recompute `moved_share_of_receiver` before scoring against the experiment 41 labels.** 62 of 81
   stored values are NaN, partly because series ids were written as strings ([experiment
   44](../../00044-sw2-2-switching-share-of-best-guess-score/result.md)). Otherwise a filter on that
