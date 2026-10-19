@@ -52,8 +52,9 @@ reasoning; this page records what Part 2 will do, with the three points the mana
 - **Verdict contrast.** C1 (years) answers Part 2's own question. C2 and C3 (gaps to lagless
   XGBoost with and without the solar offset) are reported beside it.
 - **Lagged reference.** Descriptive only: XGBoost with the three power lags of experiment 87,
-  trained on the same 12 months, scored at leads of 24 to 48 hours (initialisation at 00:00 UTC two
-  days before the valid day) and, where rows allow, at 7 days (initialisation seven days before).
+  trained on the same 12 months, scored at leads of 24 to 48 hours (initialisation at 00:00 UTC on
+  the day before the valid day) and, where rows allow, at 7 days (leads of 144 to 168 hours,
+  initialisation at 00:00 UTC six days before the valid day).
   The no-lag arm X-12am is scored on the same rows. SIMP1's roughly 0.9 point penalty for removing
   the lags is quoted beside it.
 
@@ -91,8 +92,9 @@ D11, D14, and D16, since D9 holds 9.0 months at 2024-07-01.
 | X-allz | XGBoost | all years | | zero |
 | X-allam | XGBoost | all years | | zero plus solar offset |
 
-Exploratory extras, labelled as such: X-allam with experiment 87's two-year half-life weights
-(X-allam-hl), and the two lagged references above (L-12am-d2 and L-12am-d7). Climatology and
+Exploratory extras, labelled as such: the two lagged references above (L-12am-d1 and L-12am-d6).
+The cross-fits that fit each site's solar weight `w` train a median-only XGBoost model with the same
+parameters as the arm, since only the median residual is used. Climatology and
 `manual_heuristic` are the reference rows.
 
 ## Design choices fixed here
