@@ -11,7 +11,7 @@ hypothesis: >-
   transfer's half-hours as targets, with the lags corrected by the transfer's signed MW and the MW
   as a column ("full NRA", NRA being the normal running arrangement), forecasts the power the
   substation would have drawn had no transfer happened better than the plain model does. This holds
-  when the MW comes from the RO-NC detector of experiment 82 (RO-NC, a logistic score on the 24-hour
+  when the MW comes from the RO-NC detector of experiment 82 (a logistic score on the 24-hour
   residual step) run causally on data up to the forecast origin, but by less than when the MW comes
   from the injected truth.
 prediction: >-
