@@ -535,7 +535,7 @@ def figure_profile_check() -> alt.TopLevelMixin | None:
     path = common.WORK_DIR / "capacity_profile.json"
     if not path.exists():
         return None
-    data = json.loads(path.read_text())
+    data = {k: v for k, v in json.loads(path.read_text()).items() if k != "free_fit"}
     rows = []
     best = min(entry["loss_nats"] for entry in data.values())
     for multiplier, entry in data.items():
