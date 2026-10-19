@@ -76,3 +76,60 @@ design; this page records what is committed before any figure is drawn.
 - **Review pipeline.** One code review and one numbers review, a prose sweep before any merge.
   The series brief asks Opus for the code and the reviews; this session writes the code itself and
   asks the manager to relay reviews.
+
+## Plan review triage
+
+The Opus plan review made 18 findings. Each was checked against the files on disk before it was
+accepted. Where a rule changes the series brief's meaning, the manager has been told rather than the
+brief edited.
+
+**Accepted, and changed in the plan:**
+
+- **Lockdown rule (1).** Confirmed: the weekday-daytime level of D5, D10, and D11 drifts by more than
+  5 points from 2023-24 in months far from lockdown. The rule now fits, per site, a calendar-month
+  effect plus a linear trend on the months outside March 2020 to June 2021, and measures each
+  month's departure from that fit. The lockdown window is the contiguous run of months containing
+  April 2020 in which at least 3 of the sites with data depart by more than 5 points in the same
+  direction (either sign counts).
+- **Generator screen (2, 3).** The screen runs on rows after the early-calibration cuts and the
+  switching masks. The second branch (flat night slope with a low amplitude-to-mean ratio) is
+  dropped as a decision rule, because the mean is near zero for the battery series and none of the
+  positive controls sits inside its thresholds; its inputs are still plotted. The negative-dark-share
+  branch is the only decision rule, so the MVA Primaries, whose |S| is never negative, go unscreened,
+  and the write-up says so. If the screen misses D15, G-a, or G-b, the thresholds are revised and the
+  write-up says so.
+- **Dark site-years (4).** Counted per window: all history after cuts with the lockdown months kept,
+  the same with them removed, and the latest two season-years. The drop rule (under 2 site-years)
+  applies to the window with lockdown removed. The 2-year window of Part 3 holds about 1 site-year
+  per MVA Primary, so the rule cannot apply there; the manager is asked what Part 3 should use.
+- **Site rules (5, 6).** `sites.parquet` reports months of history before each tuning origin
+  (2022-07-01, 2023-07-01, 2024-07-01, 2025-07-01) as well as before 2025-07-01, so D9's roughly 10
+  months before 2024-07-01 shows. The mapping to `hurts` is reported both ways and passed to the
+  manager.
+- **Early calibration (7).** The comparison month may fall after June 2026, using power, ERA5, and
+  CAMS to their last available month, for this descriptive check only. The cut works in whole
+  months, so the "fortnight" prediction becomes "D15's first months".
+- **Join key (8).** A power half-hour joins the CAMS hour that contains it: stamps at hh:00 join hh:00
+  and stamps at hh:30 join (hh+1):00. The panel build prints zero null irradiance values as the check.
+- **Timestamp test (9).** Uses all daylight hours on clear-sky days (clear-sky index above 0.8), reads
+  the correlation as negative and most negative at zero shift, reports the change from 0 to ±30
+  minutes, and extends the after-correction side to the end of CAMS (2026-09-10) because the figure is
+  not a scored statistic.
+- **Privacy (10).** The two "battery or biofuel" series appear in no dated figure. Figure 1 shows
+  them as G-a and G-b on a day-count axis, and every printed table and figure uses G-a and G-b.
+- **Heating-slope drift (11).** Tests the difference between the first and last winters' slopes with
+  a bootstrap of the difference, resampling whole months.
+- **Flagged rows (12).** Read from `cleaned_power_time_series.delta`, whose `drop_reason` column is
+  the only flag; the raw table carries none.
+- **Switching mask (13).** The filter is copied into this folder, with experiment 101's convention:
+  every half-hour from the one containing `onset_utc` to the one containing `end_utc`, inclusive.
+- **Calendar (14, 15).** Days are local (Europe/London). Bank holidays are England and Wales, from the
+  `holidays` package. `rows.parquet` holds every half-hour on the grid from the first usable time to
+  2026-06-30 with a `present` flag, `season_year`, `day_type`, and the bank-holiday and Christmas-run
+  flags.
+- **Predictions (16, 17, 18).** The generator screen now also predicts D13 and D17 (bulk supply
+  points, not flagged) and D1 and D6 (grid supply points). The run is about 2.4 million unflagged
+  half-hours (not 3.5 million), starting 2019-09-17 at most series. The write-up marks which
+  predictions were known from earlier rounds and so test nothing.
+
+**Rejected:** none.
