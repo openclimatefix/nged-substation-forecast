@@ -6,8 +6,7 @@ a shared calendar and weather module, an optional interaction network, a solar t
 and season-year, and a per-row observation operator (`studies.dp_operator`).
 
 **Every later module is a switch in `DpConfig`.** The switches for modules that are not built
-(the variational posterior, the smooth clip, the unmetered generator node, and drift in the pooled
-model) raise `NotImplementedError` when turned on, so a later part replaces one raise with code and
+(the smooth clip, the unmetered generator node, and drift in the pooled model) raise `NotImplementedError` when turned on, so a later part replaces one raise with code and
 changes no caller. `ResidualStates` and `WeatherInputLayer` are typed stubs for the per-site
 residual states and the weather-input layer per product.
 
@@ -27,11 +26,21 @@ residual states and the weather-input layer per product.
   layer starts at zero, so the solar term and the drift are not absorbed by it at the start.
 - The capacity is the cumulative sum of softplus increments over the season-years, so it never
   decreases.
+
+**Site-level parameters and their prior.** Six families of parameters belong to a substation: the
+level, the style loadings (`site_logits`), the deviation, the heating threshold, the heating slope,
+and the capacity increments. Each family has a population mean and a population scale, and a
+substation's value is drawn around the population mean. Three site priors exist. `decay` is the
+Part 2 configuration (fixed weight decay and the threshold prior). `map` fixes the population scales
+and finds the maximum a posteriori fit. `variational` gives every site-level value a mean-field
+Gaussian posterior, learns the population scales through the evidence lower bound, and forecasts
+with the posterior mean. The shared network weights are point estimates with weight decay in all
+three.
 """
 
 import time
 from dataclasses import dataclass, field
-from typing import Final, Protocol
+from typing import Final, Literal, Protocol
 
 import numpy as np
 import torch
@@ -68,6 +77,20 @@ trained year: its capacity increment and centring mean would rest on them.
 """
 INITIAL_POWER_FACTOR: Final[float] = 0.97
 """The power factor that the MVA substations' `tan(phi)` starts from."""
+SITE_FAMILIES: Final[tuple[str, ...]] = (
+    "level",
+    "site_logits",
+    "deviation",
+    "threshold",
+    "slope_raw",
+    "capacity_raw",
+)
+"""The site-level parameter families; each has a population mean and a population scale."""
+MEAN_LEARNED_FAMILIES: Final[tuple[str, ...]] = ("level", "threshold", "slope_raw", "capacity_raw")
+"""Families whose population mean is learned; the loadings and the deviation centre on zero."""
+SitePrior = Literal["decay", "map", "variational"]
+INITIAL_POSTERIOR_LOG_SD: Final[float] = -3.0
+"""A site-level posterior starts this tight, so the first draws sit near the point fit."""
 INTERACTION_INPUTS: Final[int] = 4 + 2 + 2 + len(DAY_TYPES) + 1
 """Harmonics, tent, half-hour sine and cosine, day-type one-hot, and the mixed temperature.
 
@@ -78,6 +101,34 @@ solar term.
 
 
 @dataclass(frozen=True)
+class PopulationScales:
+    """The population scale of each site-level family: the spread of sites around their mean.
+
+    The values are standard deviations in each family's own units (points for the level and
+    the deviation, degrees for the threshold, and the softplus or softmax inputs for the rest).
+
+    Attributes:
+        level: The scale of the substations' levels.
+        site_logits: The scale of the style loadings.
+        deviation: The scale of the per-site deviation from the shared shapes.
+        threshold: The scale of the heating thresholds.
+        slope_raw: The scale of the heating slopes before the softplus.
+        capacity_raw: The scale of the capacity increments before the softplus.
+    """
+
+    level: float = 5.0
+    site_logits: float = 1.0
+    deviation: float = 0.3
+    threshold: float = THRESHOLD_PRIOR_SCALE_C
+    slope_raw: float = 1.0
+    capacity_raw: float = 1.0
+
+    def as_dict(self) -> dict[str, float]:
+        """Return the scales keyed by family name."""
+        return {name: float(getattr(self, name)) for name in SITE_FAMILIES}
+
+
+@dataclass(frozen=True)
 class DpConfig:
     """Switches for every module of the DP model.
 
@@ -85,7 +136,10 @@ class DpConfig:
         shared_shapes: The number of shared daily shapes `K`; 0 gives each substation its own
             profile only.
         interaction_hidden: The hidden-layer widths of the interaction network; empty means off.
-        variational: Mean-field variational posterior over site-level parameters (not built).
+        variational: Mean-field variational posterior over the site-level parameters, with
+            population scales learned through the evidence lower bound.
+        population_scales: The population scales. With `variational` on they are the starting
+            values; with it off, giving them selects the MAP fit with these scales held fixed.
         drift: Drift form of the pooled model (only `none` is built).
         clip: The smooth export-limit clip of the solar term (not built).
         generator_node: The unmetered generator node (not built).
@@ -94,9 +148,17 @@ class DpConfig:
     shared_shapes: int = 4
     interaction_hidden: tuple[int, ...] = ()
     variational: bool = False
+    population_scales: PopulationScales | None = None
     drift: DriftType = "none"
     clip: bool = False
     generator_node: bool = False
+
+    @property
+    def site_prior(self) -> SitePrior:
+        """Return which prior the site-level parameters have."""
+        if self.variational:
+            return "variational"
+        return "map" if self.population_scales is not None else "decay"
 
     def check_supported(self) -> None:
         """Raise if a switch that is not built is on.
@@ -105,7 +167,6 @@ class DpConfig:
             NotImplementedError: Naming the first switch that is on but not built.
         """
         for name, value in (
-            ("variational", self.variational),
             ("clip", self.clip),
             ("generator_node", self.generator_node),
             ("drift", self.drift != "none"),
