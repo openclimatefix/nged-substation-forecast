@@ -427,6 +427,7 @@ include = [
     "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_onboard.py",
     "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_tune.py",
     "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_common.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_losses.py",
     "ml-experiments/00104-differentiable-physics-2-simple-structural-model/e00104_benchmark.py",
     "ml-experiments/00104-differentiable-physics-2-simple-structural-model/e00104_gam.py",
     "packages/studies/tests/test_battery_state_space.py",

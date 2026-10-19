@@ -350,3 +350,25 @@ drawn in this run.
   date of this page.
 - Run time and memory: P 256 s (0.44 GB) including its replica fit; S 636 s; P-all 463 s (0.86 GB);
   S-all 1,045 s. The GPU was shared throughout.
+
+## Audit triage
+
+The numbers review and audit of this page (`data/ml-experiments/briefs/dp_pr1355_numbers_audit_result.md`)
+found one bug and a list of smaller faults. Each finding was accepted; none was rejected.
+
+- **Fixed:** the comparison against Part 2's uncentred convex sets (now the `_centred` sets, which
+  changes C5, the equivalence gap, the tails row, and trigger 4); C2 and C3 quoted on matching site
+  sets with the five-site figures first; the test 1 numbers (the passed run) and its caveats (the
+  network off, K = 4 before tuning); the capacity table labelled as the K = 4 diagnostic fit; the
+  free-fit loss stored; D9's months; the take-home (C1 refutes pooling, the gate caps it); X-4w
+  described as untuned; the comparisons with climatology and the manual heuristic; the noise-floor
+  sentence; the stale "not identified" wording (page, figure subtitles, the next-experiment
+  bullet); the placeholder sentence; the figures committed (eight SVGs, optimised) with corrected
+  titles; the markdown wrapping; the theme plan row; the PR body; the module dependency (PR 1363
+  merges first).
+- **Run:** the cheap baselines (a per-site convex model and a fleet-profile baseline on the same
+  short histories); D18's scores.
+- **Listed as not run:** the leak tests of the variants, X-pool-onb4w, the tuning-year replicate,
+  the cold block, the scarce-data rows, G-2y, the lagged XGBoost arms' report, the coastal split,
+  the score by month since the cut, the usable-row counts, a second-seed profile point, and the
+  winner of the XGBoost arms on the tuning year.
