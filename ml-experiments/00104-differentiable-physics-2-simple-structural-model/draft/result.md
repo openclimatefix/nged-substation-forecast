@@ -130,15 +130,16 @@ parameters as the arm, since only the median residual is used. Climatology and
   Predictions are written once per valid time, against a day-ahead initialisation at 09:00 UTC on
   the previous day.
 
-## Changes after the plan was committed (before the scored fits were read)
+## Changes after the plan was committed
 
-- **The ridge grid** moved down, as the design choices above record.
+- **The ridge grid** moved down before any scored fit, as the design choices above record.
 - **The spread** is fitted on a replica of the scored forecast (one fit 12 months before the cut,
   predicting the following 12 months) and not on four quarter-by-quarter cross-fits: an Opus review
   showed the quarters were only 0 to 3 months stale while the scored fit is 0 to 12 months stale.
-- **Post-hoc arms**, labelled post hoc in the write-up: `x_all` (XGBoost, all years, default start),
+- **Post-hoc arms**, added after a first look at the scored arms and labelled post hoc in the
+  write-up: `x_all` (XGBoost, all years, default start),
   the `amm` arms (training median plus the solar offset), and the `ng` arms (no irradiance input).
-  They were added after a first look at the XGBoost arms showed the zero start scoring worse than
+  The first look showed the zero start scoring worse than
   the default start and the solar offset adding nothing when CAMS irradiance is an input. The
   planned contrasts C1 to C3 and the verdict are unchanged.
 - **The lagged references** use the `amm` arm as their lagless counterpart.
