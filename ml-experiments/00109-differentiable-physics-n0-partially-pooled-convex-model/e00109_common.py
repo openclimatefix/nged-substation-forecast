@@ -11,6 +11,7 @@ written once, against a day-ahead initialisation at 09:00 UTC on the previous da
 """
 
 import math
+import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -264,3 +265,24 @@ def quantile_score(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
     levels = np.array(QUANTILE_LEVELS)[None, :]
     error = actual[:, None] - quantiles
     return 2.0 * np.mean(np.maximum(levels * error, (levels - 1.0) * error), axis=1)
+
+
+def run_metadata() -> dict[str, str]:
+    """Return the commit of the checkout and of the last change to the pooled module.
+
+    Returns:
+        The two commit hashes, so a result records the code that produced it.
+    """
+
+    def last_commit(*arguments: str) -> str:
+        return subprocess.run(
+            ["git", "log", "-1", "--format=%H", *arguments],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    return {
+        "checkout": last_commit(),
+        "pooled_module": last_commit("--", "packages/studies/src/studies/dp_gam_pooled.py"),
+    }

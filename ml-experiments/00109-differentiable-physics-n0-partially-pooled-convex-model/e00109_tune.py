@@ -263,6 +263,7 @@ def main() -> None:
     table = run_grid(jobs=jobs, workers=arguments.workers)
     table.write_parquet(common.WORK_DIR / "tuning_scores.parquet")
     chosen = choose(table=table)
+    chosen["run"] = common.run_metadata()
     (common.WORK_DIR / "tuned.json").write_text(json.dumps(chosen, indent=2) + "\n")
     print(json.dumps({k: v for k, v in chosen.items() if k != "summary"}, indent=2))
     print("\nlam   all_delta  ratio_4w  ratio_3m")
