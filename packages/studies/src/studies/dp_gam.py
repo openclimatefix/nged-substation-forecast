@@ -620,8 +620,8 @@ def _solve(*, matrix: torch.Tensor, rhs: torch.Tensor) -> torch.Tensor:
 
     On the CPU a batch of more than one system is solved one system at a time. PyTorch's batched
     LU solve with the MKL backend fails ("Pivots given to lu_solve must all be greater or equal to
-    1") for systems larger than about 500 by 500 when it runs on more than one thread; a single
-    system is unaffected. The GPU solves the batch in one call.
+    1") from about 200 by 200 upwards when it runs on four or more threads, and it can return wrong
+    answers without raising; a single system is unaffected. The GPU solves the batch in one call.
 
     Args:
         matrix: Shape (batch, p, p).
