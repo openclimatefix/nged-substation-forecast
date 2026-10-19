@@ -129,6 +129,7 @@ the maintainer to confirm.
 | [00090 - Lag unusualness inputs, SW2-28](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) | Does giving the Primary demand model the PIT of each lag against a climatology improve the forecast on all rows, and widen the quantiles on rows with a lag inside a logged switching event? | Refuted: the PIT inputs raised the score by 0.355 points of capacity on all rows outside switching (97.5% interval +0.209 to +0.513); on rows with a lag inside a logged event +0.795 (-0.325 to +2.787, inconclusive) | Not for production | 2026-10-18 |
 | [00088 - Normal running arrangement forecast on injected switches, SW2-21](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md) | When a Primary substation is inside a switching transfer or has just left one, does the NRA forecast recover the true unmodified power, with the MW from the injection and from the refit-offset neighbour-count detector run only on data before the origin? | Inconclusive: with the true MW, a booster trained on NGED's logged transfers closes 83% (70% to 91%) of the error a transfer adds; with the MW from the refit-offset neighbour-count detector as built, a booster trained on that detector's transfers closes 16% (-17% to 67%), -0.149 points of capacity against the plain forecast (98.75% interval -1.174 to +0.148) | Not for production | 2026-10-18 |
 | [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
+| [00096 - Normal running arrangement forecast with synthetic training switches, SW2-23](00096-sw2-23-synthetic-switches-injected-into-training/result.md) | Does training on about three times as many injected switching transfers as the real record holds make the normal-arrangement forecast recover the unmodified power better, with the detector's MW as well as the true MW? | Inconclusive: synthetic-trained minus real-trained error +0.079 (98.75% interval -0.031 to +0.153) with the true MW and +0.038 (-0.008 to +0.053) with the largest-step detector MW | Not for production | 2026-10-19 |
 | [00094 - Explicit heating term, HT1](00094-explicit-heating-offset-primary-demand/result.md) | Does a per-series heating degree-hour term in the XGBoost base margin lower the cold-hour error of Primary demand? | Small gain: -0.143 points (98.75% interval -0.203 to -0.034) in cold hours up to 48 h, under the 0.3 threshold; q95 exceedance in cold hours barely moves (0.167 to 0.162) | Candidate | 2026-10-18 |
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
@@ -2374,3 +2375,30 @@ page](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md
 #1338](https://github.com/openclimatefix/nged-substation-forecast/pull/1338).
 
 ![Old-year gap on the control member and on ERA5](00095-age2-old-year-penalty-with-the-same-weather-product-demand/figure_1.svg)
+
+### 00096: synthetic switches in the training data
+
+**Adding about three times as many synthetic switching transfers (load moved between Primary
+substations, with the MW moved known exactly) to the training data did not improve the forecast of
+the power a substation would have drawn without the transfer; the verdict is inconclusive.** The
+experiment added 94 synthetic transfers (169 series-intervals, against 56 real series-intervals) to
+the training data of the XGBoost model for 16 Primary substations, and scored it on experiment 88's
+2,452 held-out injected cases.
+
+- **Headline result:** synthetic-trained minus real-trained mean absolute error, in points of
+  capacity (98.75% interval): +0.079 (-0.031 to +0.153) with the injected MW, +0.032 (-0.019 to
+  +0.067) with the RO-NC detector's MW, and +0.038 (-0.008 to +0.053) with the largest detector
+  step. With the injected MW, the real-trained model closed 83% of the gap between the error of a
+  plain model and the error with unmodified lags, and the synthetic-trained model 75%.
+- **Tails:** coverage of the q01 to q99 band stayed between 0.983 and 0.986 and the share of
+  actual values below the q01 forecast at 0.013 to 0.016, so synthetic training did not widen the
+  quantiles.
+- **Finding for later experiments:** exact MW makes a corrected lag equal the lag with no
+  transfer, so synthetic transfers look like rows with no transfer. Train with a MW that carries
+  the detector's errors, or improve the MW estimate itself.
+- **Write-up and pull request:**
+  [result](00096-sw2-23-synthetic-switches-injected-into-training/result.md),
+  [PR #1339 (Experiment 96: do synthetic switches in the training data help the NRA
+  forecast?)](https://github.com/openclimatefix/nged-substation-forecast/pull/1339).
+
+![Planned contrasts](00096-sw2-23-synthetic-switches-injected-into-training/figure_1.svg)

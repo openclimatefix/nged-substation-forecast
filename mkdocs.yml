@@ -240,6 +240,7 @@ nav:
       - "Can the causal switching detector give a calibrated probability of an abnormal running arrangement?": ml-experiments/00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md
       - "Do the detector's switching labels give the same gain as NGED's logs?": ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/result.md
       - "Does the longest history, with switching masked, improve the NRA forecast?": ml-experiments/00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/result.md
+      - "Do synthetic switches in the training data make the NRA forecast recover the normal arrangement better?": ml-experiments/00096-sw2-23-synthetic-switches-injected-into-training/result.md
       - "Does telling the model how unusual each lag is improve the forecast?": ml-experiments/00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md
       - "Is the drift of Primary demand mostly a per-series level?": ml-experiments/00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md
       - "Does an old training year still hurt once the demand level is removed?": ml-experiments/00093-age1-old-training-year-after-level-normalisation-demand/result.md
