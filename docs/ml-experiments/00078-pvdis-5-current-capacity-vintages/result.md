@@ -1,6 +1,8 @@
 ---
 id: "00078"
 slug: pvdis-5-current-capacity-vintages
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

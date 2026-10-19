@@ -1,6 +1,8 @@
 ---
 id: "00096"
 slug: sw2-23-synthetic-switches-injected-into-training
+theme: switching-labels-in-the-forecast
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

@@ -1,6 +1,8 @@
 ---
 id: "00073"
 slug: pvdis-6-orientation-mix-and-dc-ac-ratio
+theme: solar-disaggregation
+also_relevant_to: []
 status: finished
 size: medium
 hypothesis: >-

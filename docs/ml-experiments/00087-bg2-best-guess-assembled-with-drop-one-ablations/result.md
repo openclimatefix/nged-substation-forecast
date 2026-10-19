@@ -1,6 +1,8 @@
 ---
 id: "00087"
 slug: bg2-best-guess-assembled-with-drop-one-ablations
+theme: production-reference-and-best-guess
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

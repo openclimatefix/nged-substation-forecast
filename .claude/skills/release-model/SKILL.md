@@ -26,12 +26,14 @@ load before a fit.
 
 ## Step 0: write the agenda
 
-**List every experiment now in the "Candidates for the next release" section of
-`docs/ml-experiments/research-log.md`.** An adopted experiment leaves that section, so the section
-holds exactly the experiments not yet released, including winners that an earlier release deferred.
-For each candidate, give the verdict, the headline number with its interval, and the production
-setting it would change. Mark candidates that change the same setting, because only one of them can
-be ported. Step 1 tests them head to head and not in the same arm.
+**List every experiment now in the "Candidates for the next release" table of
+`docs/ml-experiments/README.md`.** The table is generated from the experiments whose `result.md`
+front matter says `production_status: candidate`, and `grep -l "production_status: candidate"
+docs/ml-experiments/*/result.md` lists the same experiments. An adopted experiment leaves the table,
+so the table holds exactly the experiments not yet released, including winners that an earlier
+release deferred. For each candidate, give the verdict, the headline number with its interval, and
+the production setting it would change. Mark candidates that change the same setting, because only
+one of them can be ported. Step 1 tests them head to head and not in the same arm.
 
 **Exclude a candidate that needs a design production does not have yet.** The staged design of
 experiments 00001 and 00002 is an example. Such a candidate goes through `plan-issue` as its own
@@ -147,7 +149,7 @@ that the `promoted_model` asset reports `model_release: N`. The PR that records 
 row to the log with the promoted run's identifier and image tag and the rollback pairing, and the
 maintainer tags the commit `model-N`. The first release has no earlier release to roll back to. The
 same PR sets `production_status: adopted` and `adopted_in: N` in each incorporated experiment's
-`result.md`, moves those experiments in the research log, and updates the flag of each winner that
+`result.md`, which removes them from the candidates table, and updates the flag of each winner that
 step 1 dropped. The output is the deployed release.
 
 ## Step 7: watch the first runs

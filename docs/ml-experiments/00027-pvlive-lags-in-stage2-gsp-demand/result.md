@@ -1,6 +1,8 @@
 ---
 id: "00027"
 slug: pvlive-lags-in-stage2-gsp-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

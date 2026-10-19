@@ -1,6 +1,8 @@
 ---
 id: "00025"
 slug: price-change-features-stage1-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

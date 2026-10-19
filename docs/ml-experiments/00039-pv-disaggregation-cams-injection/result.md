@@ -1,6 +1,8 @@
 ---
 id: "00039"
 slug: pv-disaggregation-cams-injection
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

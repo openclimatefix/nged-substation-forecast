@@ -379,12 +379,16 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 # own test suite — `packages/ml_core/tests`, say — is an `unresolved-import` error even though
 # pytest runs it fine.
 #
+# `scripts/mkdocs_hooks` is listed so the tests can import the MkDocs hook `experiment_tables` by
+# bare name; MkDocs loads it by path, so it needs no installed package.
+#
 # Each folder under `studies/` that holds a script a test imports by bare name is listed here and in
 # `pythonpath` under `[tool.pytest.ini_options]`, so `ty` resolves `import wind_products` the same
 # way pytest does. A script imports only its own folder, `studies.*`, and the other reviewed
 # packages, which `packages/studies/tests/test_study_boundaries.py` enforces.
 extra-paths = [
     "tests",
+    "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
     "studies/embedded_battery_forecast",
     "studies/ens_backfill_pilot",
@@ -466,6 +470,7 @@ python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_d
 # tests import helpers from a sibling test module by bare name.
 pythonpath = [
     "tests",
+    "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
     "studies/embedded_battery_forecast",
     "studies/ens_backfill_pilot",

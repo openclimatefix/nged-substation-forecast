@@ -1,6 +1,8 @@
 ---
 id: "00075"
 slug: sw2-11-nra-forecast-with-labelled-switching-masks
+theme: switching-labels-in-the-forecast
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

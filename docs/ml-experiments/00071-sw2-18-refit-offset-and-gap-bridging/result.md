@@ -1,8 +1,14 @@
 ---
 id: "00071"
 slug: sw2-18-refit-offset-and-gap-bridging
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  The detector ignored every alarm within 24 hours of the monthly refit of its forecasting model,
+  which lowered recall by about 5% of the moved power. Lifting that rule recovers the loss, and the
+  second residual model added to replace the ignored alarms adds nothing on injected transfers.
 hypothesis: >-
   The detector D0M with the end rule PF14 (experiment 69's benchmark) cannot raise an alarm, or
   accept a return step, within 24 hours of the monthly refit of the residual's XGBoost model.

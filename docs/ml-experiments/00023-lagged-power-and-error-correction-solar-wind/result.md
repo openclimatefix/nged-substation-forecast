@@ -1,6 +1,8 @@
 ---
 id: "00023"
 slug: lagged-power-and-error-correction-solar-wind
+theme: generator-forecasting
+also_relevant_to: [retraining-and-training-history]
 status: done
 size: medium
 hypothesis: >-
@@ -84,11 +86,12 @@ capacity, and the 14-day correction made the forecast about 0.4 points worse.
 left the stage 2 calibrator's continuous ranked probability score (CRPS) unchanged for 6 solar farms
 and 3 wind farms, to within the resolution of about 0.1 points of capacity. The pre-registered
 14-day correction raised the CRPS of the pooled mixture by about 0.4 points for both technologies.
-This is proposal P18 of the [research plan](../research-plan.md), with the 14-day correction of
-[experiment 00017](../00017-training-window-and-retraining-rule-drift-demand/result.md) and
-[experiment 00019](../00019-primary-demand-stack-vs-manual-heuristic/result.md) added. ENS is the
-European Centre for Medium-Range Weather Forecasts ensemble. The stage 2 calibrator is a second
-model that corrects the forecast quantiles that stage 1a produces.
+This is proposal P18 of the [research plan](../themes/generator-forecasting/plan.md), with the
+14-day correction of [experiment
+00017](../00017-training-window-and-retraining-rule-drift-demand/result.md) and [experiment
+00019](../00019-primary-demand-stack-vs-manual-heuristic/result.md) added. ENS is the European
+Centre for Medium-Range Weather Forecasts ensemble. The stage 2 calibrator is a second model that
+corrects the forecast quantiles that stage 1a produces.
 
 ## Size
 
