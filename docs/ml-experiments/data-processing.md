@@ -407,8 +407,12 @@ production once a detector runs there.
 20 points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and
 both are probably unlabelled switching. Dropping the 2025 window lowered D10's scores by 0.09 to 0.53
 points and moved the five-site contrasts by under 0.08 points ([experiment
-104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction). Applies to
-experiments scoring D10. Confidence: medium, because the cause is not confirmed.
+104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction). Masking both
+windows in the quarterly refits of [experiment
+107](00107-differentiable-physics-rolling-origin-history-and-tails/result.md) moved the quantile
+score contrast of all years with drift minus all years without drift from -0.451 to -0.512 points
+(a larger drift gain) and left every label unchanged. Applies to experiments scoring D10.
+Confidence: medium, because the cause is not confirmed.
 
 **Do not conclude that a logged closure moved no load because no detector flagged the closure.** Of
 381,830 logged half-hours on 16 series, 80.5% lie in closures over 60 days that no label covers, and
