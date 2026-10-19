@@ -39,9 +39,7 @@ def _model(*, batch, config: DpConfig, seed: int = 0) -> PooledDemandModel:  # n
     )
 
 
-@pytest.mark.parametrize(
-    "switch", [{"variational": True}, {"clip": True}, {"generator_node": True}, {"drift": "d1"}]
-)
+@pytest.mark.parametrize("switch", [{"clip": True}, {"generator_node": True}, {"drift": "d1"}])
 def test_a_switch_for_a_module_that_is_not_built_raises(switch: dict):
     with pytest.raises(NotImplementedError, match="not built yet"):
         DpConfig(**switch).check_supported()
