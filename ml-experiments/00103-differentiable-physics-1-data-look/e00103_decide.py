@@ -86,6 +86,7 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
         .then(pl.col("first_usable"))
         .otherwise(pl.col("first_clean"))
     )
+    cuts = apply_recommended_cuts(cuts=cuts, ids=ids)
     first_usable = dict(cuts.select("time_series_id", "first_usable").iter_rows())
     calibration.write_parquet(TABLE_DIR / "early_calibration.parquet")
     cuts.write_parquet(TABLE_DIR / "cuts.parquet")
@@ -93,7 +94,9 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
     for site in PRIMARIES:
         row = cuts.filter(pl.col("time_series_id") == ids[site]).row(0, named=True)
         print(
-            f"{site}: first clean {row['first_clean']:%Y-%m-%d}, cut {row['cut_months']} months,"
+            f"{site}: first clean {row['first_clean']:%Y-%m-%d};"
+            f" rule {row['rule_first_usable']:%Y-%m-%d};"
+            f" recommended {row['recommended_first_usable']:%Y-%m-%d};"
             f" first usable {row['first_usable']:%Y-%m-%d}"
         )
 
@@ -268,6 +271,43 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
         clip=clip,
         drift=drift,
         correlations=correlations,
+    )
+
+
+def apply_recommended_cuts(*, cuts: pl.DataFrame, ids: dict[str, int]) -> pl.DataFrame:
+    """Set each series' first usable date from the design session's review of series starts.
+
+    The review recommends a first usable date per series (`recommended_cut_dates.csv`, copied into
+    the private folder). Part 1 may only move a recommended date later, so a Primary's first usable
+    date is the later of the rule's date and the recommended one, except at D15. Other series with
+    a recommended date use it, and the two metered generators, which the review does not list, start
+    at their first clean row.
+    """
+    recommended = pl.read_csv(WORK_DIR / "recommended_cut_dates.csv").select(
+        time_series_id=pl.col("series_label").replace_strict(ids, return_dtype=pl.Int32),
+        recommended_first_usable=pl.col("recommended_first_usable_date").str.to_datetime(
+            "%Y-%m-%d", time_zone="UTC"
+        ),
+    )
+    primary_ids = [ids[site] for site in PRIMARIES]
+    merged = cuts.rename({"first_usable": "rule_first_usable"}).join(
+        recommended, on="time_series_id", how="left"
+    )
+    # D15's rule date reflects a later level change, not calibration; its recommended date is used.
+    keep_later = pl.col("time_series_id").is_in(primary_ids) & (
+        pl.col("time_series_id") != ids["D15"]
+    )
+    return merged.with_columns(
+        first_usable=pl.when(keep_later)
+        .then(pl.max_horizontal("rule_first_usable", "recommended_first_usable"))
+        .otherwise(pl.coalesce("recommended_first_usable", "rule_first_usable")),
+    ).with_columns(
+        recommended_first_usable=pl.col("recommended_first_usable").fill_null(
+            pl.col("first_clean")
+        ),
+        cut_months=(
+            (pl.col("first_usable") - pl.col("first_clean")).dt.total_days() / 30.4375
+        ).round(1),
     )
 
 
