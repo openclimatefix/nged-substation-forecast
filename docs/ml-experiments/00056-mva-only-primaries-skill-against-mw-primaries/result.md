@@ -1,8 +1,15 @@
 ---
 id: "00056"
 slug: mva-only-primaries-skill-against-mw-primaries
+theme: production-reference-and-best-guess
+also_relevant_to: []
 status: done
 size: simple
+take_home_message: >-
+  At sunny middays the best guess has 5.6 percentage points less skill at the 8 Primary substations
+  metered only in MVA than at the 8 metered in MW, but the 95% interval (-5.0 to 14.6) includes
+  zero. The data show no need for special handling of MVA-only Primaries and cannot rule out a loss
+  of up to about 15 percentage points.
 hypothesis: >-
   The best guess (experiment 33's N1 with the 14-day correction and the spread factor) forecasts the
   8 trial Primary substations metered in MVA clearly worse, relative to `manual_heuristic`, than the

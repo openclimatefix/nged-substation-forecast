@@ -1,6 +1,8 @@
 ---
 id: "00094"
 slug: explicit-heating-offset-primary-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

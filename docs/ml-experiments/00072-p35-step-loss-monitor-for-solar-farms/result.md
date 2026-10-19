@@ -1,6 +1,8 @@
 ---
 id: "00072"
 slug: p35-step-loss-monitor-for-solar-farms
+theme: generator-forecasting
+also_relevant_to: [solar-disaggregation]
 status: finished
 size: medium
 hypothesis: >-

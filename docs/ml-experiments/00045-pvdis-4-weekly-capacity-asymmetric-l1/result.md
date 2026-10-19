@@ -1,8 +1,16 @@
 ---
 id: "00045"
 slug: pvdis-4-weekly-capacity-asymmetric-l1
+theme: solar-disaggregation
+also_relevant_to: []
 status: finished
 size: complex
+take_home_message: >-
+  No weekly capacity fit met the limits fixed in advance for tuning: the best penalty pair recovered
+  none of a 26-week fall of 30% and gave 0.66 false steps per Primary-year at the median Primary,
+  against a limit of 0.5. Weekly changes in embedded solar capacity cannot yet be read from
+  Primary-substation data at the accuracy a weekly series needs, so the next experiment should use
+  one capacity per season-year and read it as a range.
 hypothesis: >-
   On the 8 Primary substations (substations that feed 11 kV circuits from the 33 kV network)
   metered in MW, a least-squares fit of the daylight power to a calendar-and-temperature demand term
@@ -25,104 +33,111 @@ prediction: >-
   0.17 (0.13 to 0.22) for the season-year constant. A free weekly capacity has a standard error of
   8% to 11% of capacity in June and July and over 30% from November to February. The smallest step
   detected in at least 80% of injections is 10% of capacity for a step placed from April to
-  September at 6 of the 8 Primaries, and no step of 30% or less is detected from October to March
-  at 5 or more Primaries. The placebo sky gives 0.3 false steps per Primary-year (0.1 to 0.6).
-  Because rises are lightly penalised and falls heavily penalised, the path ratchets upward on
-  noise alone (the ratchet drift), by 2% to 6% of capacity over 5 years. That prediction straddles
-  the 0.05 limit, so the drift condition (iv) in the decision rule is close to a coin flip and the
-  likeliest condition to fail. A temporary fall of 30% lasting 8 weeks is recovered at under 0.3 of
-  its depth, and a fall lasting 26 weeks at 0.5 to 0.8. A bootstrap interval of 90% covers 0.82 to
-  0.92 of non-step weeks and 0.55 to 0.75 of step weeks. The latest week of a real-time vintage has
-  a path error 1.3 to 2 times the error of the same week in the final fit. The Department for Energy
+  September at 6 of the 8 Primaries, and no step of 30% or less is detected from October to March at
+  5 or more Primaries. The placebo sky gives 0.3 false steps per Primary-year (0.1 to 0.6). Because
+  rises are lightly penalised and falls heavily penalised, the path ratchets upward on noise alone
+  (the ratchet drift), by 2% to 6% of capacity over 5 years. That prediction straddles the 0.05
+  limit, so the drift condition (iv) in the decision rule is close to a coin flip and the likeliest
+  condition to fail. A temporary fall of 30% lasting 8 weeks is recovered at under 0.3 of its depth,
+  and a fall lasting 26 weeks at 0.5 to 0.8. A bootstrap interval of 90% covers 0.82 to 0.92 of
+  non-step weeks and 0.55 to 0.75 of step weeks. The latest week of a real-time vintage has a path
+  error 1.3 to 2 times the error of the same week in the final fit. The Department for Energy
   Security and Net Zero (DESNZ) small-scale solar statistics agree with the series within the stated
   tolerance at 4 to 6 of the 6 comparisons. These numbers are priors from the argument that a
   season-year standard error of 1.2% implies about 8.7% per week, and from experiments 00039 and
-  00040. No weekly fit has been run. decision_rule: >- Scores are medians over farms and path seeds
-         within each Primary, then medians over the 8 Primaries. Every interval is a 95%
-         cluster-bootstrap interval that resamples the 8 Primaries (the main interval), with a
-         two-way interval (Primaries and farms resampled independently) reported beside it. Only
-         contrast C2 decides the verdict, so there is no multiple-comparison correction; contrasts
-         C1, C3, C4, and C5 are descriptive and are reported without a correction. C1 is the path
-         error of the asymmetric fit minus that of the free weekly fit, on ramps, steps of 10% or
-         more, and a constant path. C2 is the path error of the asymmetric fit divided by that of
-         the season-year constant, minus 1, on ramps and steps of 10% or more, so that -0.20 means a
-         20% lower error (a relative change, not an absolute path-error difference). C3 is the
-         asymmetric fit minus the symmetric L1 fit with the same rise penalty, in false steps per
-         Primary-year on the placebo sky and in the share of a 26-week fall that is recovered. C4 is
-         the asymmetric fit minus the strictly non-decreasing fit, in path error on temporary falls
-         and on transfers out. C5 is the path error of the latest week of a real-time vintage minus
-         that week's error in the final fit. The six conditions are scored on the scoring set (farms
-         D to F). (i) The median path error of the asymmetric fit on ramps and steps is at most
-         0.15, because the smallest step the series exists to show is 10% of capacity, and a median
-         error above 0.15 would hide it. Experiment 00039 set the same ceiling for the half-hourly
-         error, but that is not the reason. (ii) The upper limit of C2 is below -0.20: a weekly
-         series with two tuned penalties and a new solver is worth keeping only if it cuts the error
-         of a yearly constant by a fifth, which is a judgement, not a derived number. (iii) The
-         placebo sky and a constant injected path from the scoring farms both give at most 0.5 false
-         steps of 10% of capacity per Primary-year at the median Primary and at most 1.0 at the
-         worst Primary, because one false alarm in two years at a Primary is the most a reader can
-         discount. (iv) The ratchet drift, the median rise of the path from its first to its last
-         year on constant injected paths and on the placebo sky, is at most 0.05 of capacity per 5
-         years, which is 1% a year and well under the smallest step of 10%. (v) A 30% fall lasting
-         26 weeks is recovered at 0.5 or more of its depth and an 8-week fall at under 0.5, which
-         shows that falls are held reluctantly and not forbidden. (vi) The coverage of the 90%
-         interval at non-step weeks lies in [0.85, 0.95] and at step weeks is at least 0.60.
-         Condition (i) is scored twice, on the semi-synthetic baseline and on the real series plus
-         injection, and the verdict uses the worse of the two. Every outcome maps to exactly one
-         verdict, tested in this order. Verdict `inconclusive` when a self-test fails, or when the
-         smallest detectable step exceeds 25% of capacity at 5 or more Primaries in every season,
-         because the weekly grid is then finer than the data support. Verdict `refuted` when no pair
-         on the tuning grid meets the tuning limits, or when (i) fails, or when the median
-         false-step rate exceeds 1.5 per Primary-year, or when the lower limit of C2 is above 0 (the
-         asymmetric fit is worse than the yearly constant). Verdict `supported` when all six
-         conditions hold. Verdict `partly supported` when none of the above applies, (i) holds, the
-         upper limit of C2 is below 0, and at least one of (ii) to (vi) fails; this includes a small
-         real gain, where the C2 interval lies below 0 and above -0.20, and the write-up then states
-         which penalty or interval change would be needed. Every other outcome, including a C2
-         interval that contains 0, is `inconclusive`. The outside checks and the vintage limit (C5
-         within 2.0) are reported and never alter the verdict. The penalty pair is chosen on tuning
-         units only (farms A to C), frozen in a committed file, and scored once on scoring units
-         (farms D to F). There is no threshold on the effort of porting, because the series is an
-         offline table and the production forecast does not read it. benchmark: >- The capacity of
-         experiment 00040 held constant within each season-year (the six-arm capacity C, and the
-         half-hourly fit M1 divided by its recovery ratio, which is the share of an injected
-         capacity that the fit recovers, for like-for-like paths), and the free weekly fit with no
-         penalty. The known injected path is the truth, so there is no forecast benchmark.
-         row_set_id: none metric: >- Path error: the mean absolute difference between the recovered
-         and the true weekly capacity path, as a share of the true path's mean. Also the false steps
-         of 10% of capacity per Primary-year, the ratchet drift, the share of a temporary fall
-         recovered, the smallest detectable step by season, the 90% interval coverage at step and
-         non-step weeks, and the latest-week error of a real-time vintage. verdict: refuted
-         verdict_note: >- No pair of penalties on the grid met the pre-registered tuning limits, so
-         the asymmetric design is refuted on this grid. The plan's literal clause order also reads
-         inconclusive, because the detection clause was evaluated on a degenerate pair (the frozen
-         placeholder, which equals the strictly non-decreasing fit). The body of the page says why
-         refuted is the verdict that applies. best_arm: >- The capacity held constant within each
-         season-year, which scored a median path error of 0.027 of the mean capacity on injected
-         ramps and steps (semi-synthetic baseline). No weekly arm beat it on that baseline. The
-         frozen asymmetric fit (a=4, r=30) scored 0.040 and the free weekly fit 0.159. On the real
-         series plus injection every weekly arm scored 0.012 to 0.017 against 0.020 for the
-         constant. headline: >- Frozen asymmetric fit against the season-year constant: path error
-         0.040 against 0.027 on the semi-synthetic baseline (0.017 against 0.020 on the real series
-         plus injection), and C2 (relative change in path error) +0.400, with a Primaries-only 95%
-         interval of +0.029 to +0.634 (the plan's main interval) and a two-way interval of -0.078 to
-         +0.773. Constant-path false steps per Primary-year: median 0.66 and worst 1.43 against
-         limits of 0.5 and 1.0. A 26-week fall of 30% was recovered at 0.000 of its depth. The post
-         hoc pair (a=2, r=10) recovered 0.576 but gave a median of 1.22 and a worst of 3.32 false
-         steps. The 90% bootstrap interval covered 0.620 of non-step weeks and 0.347 of step weeks
-         on 94 units (post hoc pair: 0.708 and 0.470). The latest week of a real-time vintage had
-         3.63 times the path error of the same week in the final fit. lessons: >- One global pair of
-         penalties cannot be both quiet on noise and responsive to a real fall. The semi-synthetic
-         baseline, which favours the season-year constant by construction, no weekly fit beat a
-         capacity held constant within each season-year on injected ramps and steps; on the real
-         series plus injection every weekly fit did. The smallest step that the frozen pair detects
-         in 80% of injections is above 25% of capacity at all 8 Primaries; the free weekly fit
-         reaches 80% at 5% steps at 3 of 8 Primaries from April to September, with a median of 11.6
-         false steps per Primary-year. Intervals from a residual block bootstrap under-cover badly.
-         The outside checks are partial counts and cannot confirm or refute the series. The
-         recommended series for SW2-10 is the season-year constant. production_status:
-         not-for-production adopted_in: none code:
-         ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/ advice:
+  00040. No weekly fit has been run.
+decision_rule: >-
+  Scores are medians over farms and path seeds within each Primary, then medians over the 8
+  Primaries. Every interval is a 95% cluster-bootstrap interval that resamples the 8 Primaries (the
+  main interval), with a two-way interval (Primaries and farms resampled independently) reported
+  beside it. Only contrast C2 decides the verdict, so there is no multiple-comparison correction;
+  contrasts C1, C3, C4, and C5 are descriptive and are reported without a correction. C1 is the path
+  error of the asymmetric fit minus that of the free weekly fit, on ramps, steps of 10% or more, and
+  a constant path. C2 is the path error of the asymmetric fit divided by that of the season-year
+  constant, minus 1, on ramps and steps of 10% or more, so that -0.20 means a 20% lower error (a
+  relative change, not an absolute path-error difference). C3 is the asymmetric fit minus the
+  symmetric L1 fit with the same rise penalty, in false steps per Primary-year on the placebo sky
+  and in the share of a 26-week fall that is recovered. C4 is the asymmetric fit minus the strictly
+  non-decreasing fit, in path error on temporary falls and on transfers out. C5 is the path error of
+  the latest week of a real-time vintage minus that week's error in the final fit. The six
+  conditions are scored on the scoring set (farms D to F). (i) The median path error of the
+  asymmetric fit on ramps and steps is at most 0.15, because the smallest step the series exists to
+  show is 10% of capacity, and a median error above 0.15 would hide it. Experiment 00039 set the
+  same ceiling for the half-hourly error, but that is not the reason. (ii) The upper limit of C2 is
+  below -0.20: a weekly series with two tuned penalties and a new solver is worth keeping only if it
+  cuts the error of a yearly constant by a fifth, which is a judgement, not a derived number. (iii)
+  The placebo sky and a constant injected path from the scoring farms both give at most 0.5 false
+  steps of 10% of capacity per Primary-year at the median Primary and at most 1.0 at the worst
+  Primary, because one false alarm in two years at a Primary is the most a reader can discount. (iv)
+  The ratchet drift, the median rise of the path from its first to its last year on constant
+  injected paths and on the placebo sky, is at most 0.05 of capacity per 5 years, which is 1% a year
+  and well under the smallest step of 10%. (v) A 30% fall lasting 26 weeks is recovered at 0.5 or
+  more of its depth and an 8-week fall at under 0.5, which shows that falls are held reluctantly and
+  not forbidden. (vi) The coverage of the 90% interval at non-step weeks lies in [0.85, 0.95] and at
+  step weeks is at least 0.60. Condition (i) is scored twice, on the semi-synthetic baseline and on
+  the real series plus injection, and the verdict uses the worse of the two. Every outcome maps to
+  exactly one verdict, tested in this order. Verdict `inconclusive` when a self-test fails, or when
+  the smallest detectable step exceeds 25% of capacity at 5 or more Primaries in every season,
+  because the weekly grid is then finer than the data support. Verdict `refuted` when no pair on the
+  tuning grid meets the tuning limits, or when (i) fails, or when the median false-step rate exceeds
+  1.5 per Primary-year, or when the lower limit of C2 is above 0 (the asymmetric fit is worse than
+  the yearly constant). Verdict `supported` when all six conditions hold. Verdict `partly supported`
+  when none of the above applies, (i) holds, the upper limit of C2 is below 0, and at least one of
+  (ii) to (vi) fails; this includes a small real gain, where the C2 interval lies below 0 and above
+  -0.20, and the write-up then states which penalty or interval change would be needed. Every other
+  outcome, including a C2 interval that contains 0, is `inconclusive`. The outside checks and the
+  vintage limit (C5 within 2.0) are reported and never alter the verdict. The penalty pair is chosen
+  on tuning units only (farms A to C), frozen in a committed file, and scored once on scoring units
+  (farms D to F). There is no threshold on the effort of porting, because the series is an offline
+  table and the production forecast does not read it.
+benchmark: >-
+  The capacity of experiment 00040 held constant within each season-year (the six-arm capacity C,
+  and the half-hourly fit M1 divided by its recovery ratio, which is the share of an injected
+  capacity that the fit recovers, for like-for-like paths), and the free weekly fit with no penalty.
+  The known injected path is the truth, so there is no forecast benchmark.
+row_set_id: none
+metric: >-
+  Path error: the mean absolute difference between the recovered and the true weekly capacity path,
+  as a share of the true path's mean. Also the false steps of 10% of capacity per Primary-year, the
+  ratchet drift, the share of a temporary fall recovered, the smallest detectable step by season,
+  the 90% interval coverage at step and non-step weeks, and the latest-week error of a real-time
+  vintage.
+verdict: refuted
+verdict_note: >-
+  No pair of penalties on the grid met the pre-registered tuning limits, so the asymmetric design is
+  refuted on this grid. The plan's literal clause order also reads inconclusive, because the
+  detection clause was evaluated on a degenerate pair (the frozen placeholder, which equals the
+  strictly non-decreasing fit). The body of the page says why refuted is the verdict that applies.
+best_arm: >-
+  The capacity held constant within each season-year, which scored a median path error of 0.027 of
+  the mean capacity on injected ramps and steps (semi-synthetic baseline). No weekly arm beat it on
+  that baseline. The frozen asymmetric fit (a=4, r=30) scored 0.040 and the free weekly fit 0.159.
+  On the real series plus injection every weekly arm scored 0.012 to 0.017 against 0.020 for the
+  constant.
+headline: >-
+  Frozen asymmetric fit against the season-year constant: path error 0.040 against 0.027 on the
+  semi-synthetic baseline (0.017 against 0.020 on the real series plus injection), and C2 (relative
+  change in path error) +0.400, with a Primaries-only 95% interval of +0.029 to +0.634 (the plan's
+  main interval) and a two-way interval of -0.078 to +0.773. Constant-path false steps per
+  Primary-year: median 0.66 and worst 1.43 against limits of 0.5 and 1.0. A 26-week fall of 30% was
+  recovered at 0.000 of its depth. The post hoc pair (a=2, r=10) recovered 0.576 but gave a median
+  of 1.22 and a worst of 3.32 false steps. The 90% bootstrap interval covered 0.620 of non-step
+  weeks and 0.347 of step weeks on 94 units (post hoc pair: 0.708 and 0.470). The latest week of a
+  real-time vintage had 3.63 times the path error of the same week in the final fit.
+lessons: >-
+  One global pair of penalties cannot be both quiet on noise and responsive to a real fall. The
+  semi-synthetic baseline, which favours the season-year constant by construction, no weekly fit
+  beat a capacity held constant within each season-year on injected ramps and steps; on the real
+  series plus injection every weekly fit did. The smallest step that the frozen pair detects in 80%
+  of injections is above 25% of capacity at all 8 Primaries; the free weekly fit reaches 80% at 5%
+  steps at 3 of 8 Primaries from April to September, with a median of 11.6 false steps per
+  Primary-year. Intervals from a residual block bootstrap under-cover badly. The outside checks are
+  partial counts and cannot confirm or refute the series. The recommended series for SW2-10 is the
+  season-year constant.
+production_status: not-for-production
+adopted_in: none
+code: ml-experiments/00045-pvdis-4-weekly-capacity-asymmetric-l1/
+advice:
   - >-
     Use the capacity held constant within each season-year as the solar capacity input to SW2-10,
     and read it as a range at Kirton and not at all at Wrangle T1 (report.txt, recommended_variant;

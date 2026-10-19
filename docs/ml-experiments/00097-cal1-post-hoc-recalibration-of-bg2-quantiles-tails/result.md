@@ -1,6 +1,8 @@
 ---
 id: "00097"
 slug: cal1-post-hoc-recalibration-of-bg2-quantiles-tails
+theme: calibration-and-uncertainty
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

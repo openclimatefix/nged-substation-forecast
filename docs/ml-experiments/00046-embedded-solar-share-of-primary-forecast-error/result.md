@@ -1,6 +1,8 @@
 ---
 id: "00046"
 slug: embedded-solar-share-of-primary-forecast-error
+theme: solar-disaggregation
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

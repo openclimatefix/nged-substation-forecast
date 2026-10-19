@@ -1,6 +1,8 @@
 ---
 id: "00085"
 slug: cheaper-retraining-schedules-rank-arms-like-weekly-demand
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-
