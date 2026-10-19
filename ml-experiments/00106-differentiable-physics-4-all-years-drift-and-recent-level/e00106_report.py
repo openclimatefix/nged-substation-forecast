@@ -46,12 +46,16 @@ class Contrast:
         treatment: The treatment set's arm name without the cut label.
         reference: The reference set's arm name without the cut label.
         planned: True for the six pre-registered contrasts.
+        sites: The sites the contrast is read on, the five decision sites if not given.
+        years: The years the contrast exists in.
     """
 
     name: str
     treatment: str
     reference: str
     planned: bool = False
+    sites: tuple[str, ...] | None = None
+    years: tuple[str, ...] = ("scored", "replicate")
 
 
 CONTRASTS: Final[tuple[Contrast, ...]] = (
@@ -60,6 +64,8 @@ CONTRASTS: Final[tuple[Contrast, ...]] = (
     Contrast("C2 assimilation on drift: A3 - A1", "a3", "a1", planned=True),
     Contrast("C3 Kalman against EWMA: A3 - A4", "a3", "a4", planned=True),
     Contrast("C4 drift once filtered: A2 - A3", "a2", "a3", planned=True),
+    Contrast("C5 filter replaces weekly refits: A3 - A1 weekly", "a3", "a1_weekly", planned=True),
+    Contrast("C6 DP against lagless XGBoost: A1 - X-best", "a1", "x_best", planned=True),
     Contrast("A2 - A0 (filter alone)", "a2", "a0"),
     Contrast("A4_0 - A0 (EWMA alone)", "a4_0", "a0"),
     Contrast("A2 - A4_0", "a2", "a4_0"),
@@ -76,7 +82,48 @@ CONTRASTS: Final[tuple[Contrast, ...]] = (
     Contrast("A1 fitted capacity - A1 pinned", "a1_fc", "a1"),
     Contrast("A1 with COVID flag - A1", "a1_cov", "a1"),
     Contrast("A3 fitted capacity - A3", "a3_fc", "a3"),
+    Contrast("A1 - A1 4-weekly refits", "a1", "a1_4weekly"),
+    Contrast("A1 weekly - A1 4-weekly", "a1_weekly", "a1_4weekly"),
+    Contrast("A3 - A3 4-weekly refits", "a3", "a3_4weekly"),
+    Contrast("A3 - A3 weekly refits", "a3", "a3_weekly"),
+    Contrast("A3 4-weekly - A1 4-weekly", "a3_4weekly", "a1_4weekly"),
+    Contrast("A3 weekly - A1 weekly", "a3_weekly", "a1_weekly"),
+    Contrast("A3 delay 0 h - A3 (3.5 h)", "a3_delay0", "a3"),
+    Contrast("A3 delay 9 h - A3 (3.5 h)", "a3_delay9", "a3"),
+    Contrast("A3 delay 24 h - A3 (3.5 h)", "a3_delay24", "a3"),
+    Contrast("A3 - X-best with the filter", "a3", "x_best_k"),
+    Contrast("X-best with the filter - X-best", "x_best_k", "x_best"),
+    Contrast("X-best zero start - X-best", "x_bestz", "x_best"),
+    Contrast("X-best offset, zero start - zero start", "x_bestam", "x_bestz"),
+    Contrast("X-best offset, quantile start - X-best", "x_bestamq", "x_best"),
+    Contrast("A1 - climatology", "a1", "climatology"),
+    Contrast("A1 - manual heuristic", "a1", "manual_heuristic"),
+    Contrast("A3 - manual heuristic", "a3", "manual_heuristic"),
+    Contrast("A1 - Part 2 G-all+D1", "a1", "p2_g_all_d1", years=("scored",)),
+    Contrast("A1 - Part 2 G1", "a1", "p2_g1", years=("scored",)),
+    Contrast("lead 24.5-48 h: A3 - lagged XGBoost", "a3_lag24", "l_best_d1"),
+    Contrast("lead 24.5-48 h: A1 - lagged XGBoost", "a1_lag24", "l_best_d1"),
+    Contrast("lead 144.5-168 h: A3 - lagged XGBoost", "a3_lag144", "l_best_d6"),
+    Contrast("lead 144.5-168 h: A1 - lagged XGBoost", "a1_lag144", "l_best_d6"),
+    Contrast(
+        "D10 only: A1 with Nov 2024 jump masked - A1",
+        "a1_d10mask",
+        "a1",
+        sites=("D10",),
+        years=("scored",),
+    ),
 )
+
+PART_2_DIR: Final = (
+    common.ML_EXPERIMENTS_DATA_DIR / "00104-differentiable-physics-2-simple-structural-model"
+)
+"""Experiment 104's private folder, for its stored G-all+D1 and G1 predictions."""
+PART_2_SETS: Final[dict[str, str]] = {"p2_g_all_d1": "g_all_d1_centred", "p2_g1": "g1_centred"}
+D10_WINDOWS: Final[dict[str, tuple[str, str]]] = {
+    "scored": ("2025-11-17", "2025-12-14"),
+    "replicate": ("2024-11-08", "2024-12-01"),
+}
+"""D10's two unlabelled switching windows, dropped from scoring in one robustness column."""
 
 
 @cache
@@ -91,9 +138,12 @@ def load_arm(*, label: str, arm: str, drop_switching: bool = True) -> pl.DataFra
     Returns:
         The set with columns `site_name`, `qs`, and `ae` added.
     """
-    frame = pl.read_parquet(
-        common.DATA_DIR / "predictions" / f"{label}_{arm}" / "predictions.parquet"
+    folder = (
+        PART_2_DIR / "predictions" / PART_2_SETS[arm]
+        if arm in PART_2_SETS
+        else common.DATA_DIR / "predictions" / f"{label}_{arm}"
     )
+    frame = pl.read_parquet(folder / "predictions.parquet")
     if drop_switching:
         frame = frame.filter(~pl.col("switching_mask"))
     quantiles = frame.select(QUANTILE_COLUMNS).to_numpy().astype(np.float64)
@@ -105,11 +155,41 @@ def load_arm(*, label: str, arm: str, drop_switching: bool = True) -> pl.DataFra
     )
 
 
-def paired(*, label: str, treatment: str, reference: str, sites: tuple[str, ...]) -> pl.DataFrame:
-    """Return both arms' rows on the sites, paired, as the frame `studies.bootstrap` reads."""
+def paired(
+    *,
+    label: str,
+    treatment: str,
+    reference: str,
+    sites: tuple[str, ...],
+    drop_switching: bool = True,
+    drop_d10_windows: bool = False,
+) -> pl.DataFrame:
+    """Return both arms' rows on the sites, paired, as the frame `studies.bootstrap` reads.
+
+    Args:
+        label: The cut label.
+        treatment: The treatment arm.
+        reference: The reference arm.
+        sites: The sites to keep.
+        drop_switching: True to leave out the rows inside the switching masks.
+        drop_d10_windows: True to leave out D10's two unlabelled switching windows.
+
+    Returns:
+        The paired loss frame.
+    """
     arms = {}
     for name in (treatment, reference):
-        frame = load_arm(label=label, arm=name).filter(pl.col("site_name").is_in(sites))
+        frame = load_arm(label=label, arm=name, drop_switching=drop_switching).filter(
+            pl.col("site_name").is_in(sites)
+        )
+        if drop_d10_windows:
+            start, end = D10_WINDOWS[label]
+            inside = (
+                (pl.col("site_name") == "D10")
+                & (pl.col("valid_time") > pl.lit(start).str.to_datetime(time_zone="UTC"))
+                & (pl.col("valid_time") <= pl.lit(end).str.to_datetime(time_zone="UTC"))
+            )
+            frame = frame.filter(~inside)
         arms[name] = frame.select(
             "time_series_id", "power_fcst_init_time", "valid_time", "seed", "qs", "ae"
         )
@@ -121,7 +201,13 @@ def paired(*, label: str, treatment: str, reference: str, sites: tuple[str, ...]
 
 
 def estimate(
-    *, label: str, contrast: Contrast, sites: tuple[str, ...], months: tuple[int, ...] | None = None
+    *,
+    label: str,
+    contrast: Contrast,
+    sites: tuple[str, ...],
+    months: tuple[int, ...] | None = None,
+    drop_switching: bool = True,
+    drop_d10_windows: bool = False,
 ) -> tuple[float, float, int]:
     """Return the mean paired difference in quantile score, in the mean absolute error, and rows.
 
@@ -130,12 +216,19 @@ def estimate(
         contrast: The contrast.
         sites: The sites to include.
         months: Calendar months of the valid time to keep, or `None` for all.
+        drop_switching: True to leave out the rows inside the switching masks.
+        drop_d10_windows: True to leave out D10's two unlabelled switching windows.
 
     Returns:
         The treatment-minus-reference means of `qs` and `ae`, and the number of rows.
     """
     losses = paired(
-        label=label, treatment=contrast.treatment, reference=contrast.reference, sites=sites
+        label=label,
+        treatment=contrast.treatment,
+        reference=contrast.reference,
+        sites=sites,
+        drop_switching=drop_switching,
+        drop_d10_windows=drop_d10_windows,
     )
     if months is not None:
         valid_month = losses["time"].str.split("|").list.get(1).str.slice(5, 2).cast(pl.Int32)
@@ -151,7 +244,10 @@ def estimate(
 def interval(*, label: str, contrast: Contrast, level: float) -> tuple[float, float]:
     """Return the month-resampled interval of the contrast on the decision sites."""
     losses = paired(
-        label=label, treatment=contrast.treatment, reference=contrast.reference, sites=DECISION
+        label=label,
+        treatment=contrast.treatment,
+        reference=contrast.reference,
+        sites=contrast.sites or DECISION,
     )
     return bootstrap_difference_at_level(
         losses=losses,
@@ -164,45 +260,73 @@ def interval(*, label: str, contrast: Contrast, level: float) -> tuple[float, fl
 
 
 def sites_improving(*, label: str, contrast: Contrast) -> int:
-    """Return how many decision sites have a negative contrast (the treatment scores lower)."""
+    """Return how many of the contrast's sites have a negative difference (treatment better)."""
     count = 0
-    for site in DECISION:
+    for site in contrast.sites or DECISION:
         difference, _, _ = estimate(label=label, contrast=contrast, sites=(site,))
         count += int(difference < 0.0)
     return count
 
 
+def _contrast_row(*, contrast: Contrast, level: float) -> dict[str, object]:
+    """Return one contrast's row: scored year with intervals and splits, replicate beside it."""
+    sites = contrast.sites or DECISION
+    row: dict[str, object] = {"contrast": contrast.name}
+    for label in contrast.years:
+        difference, mean_error, _ = estimate(label=label, contrast=contrast, sites=sites)
+        row[f"{label} QS"] = difference
+        row[f"{label} MAE of mean"] = mean_error
+        row[f"{label} sites better"] = sites_improving(label=label, contrast=contrast)
+        row[f"{label} all rows"] = estimate(
+            label=label, contrast=contrast, sites=sites, drop_switching=False
+        )[0]
+        if "D10" in sites and len(sites) > 1:
+            row[f"{label} D10 windows dropped"] = estimate(
+                label=label, contrast=contrast, sites=sites, drop_d10_windows=True
+            )[0]
+    if "scored" in contrast.years:
+        low, high = interval(label="scored", contrast=contrast, level=level)
+        row["scored low"], row["scored high"] = low, high
+        if len(sites) > 1:
+            row["without D16"] = estimate(
+                label="scored", contrast=contrast, sites=tuple(s for s in sites if s != "D16")
+            )[0]
+            row["Nov-Mar"] = estimate(
+                label="scored", contrast=contrast, sites=sites, months=WINTER_MONTHS
+            )[0]
+            row["Apr-Oct"] = estimate(
+                label="scored",
+                contrast=contrast,
+                sites=sites,
+                months=tuple(m for m in range(1, 13) if m not in WINTER_MONTHS),
+            )[0]
+    return row
+
+
 def contrast_table(*, planned: bool) -> pl.DataFrame:
     """Return the contrast table: scored-year interval and splits, with the replicate beside."""
-    rows = []
     level = PLANNED_LEVEL if planned else EXPLORATORY_LEVEL
+    rows = [
+        _contrast_row(contrast=contrast, level=level)
+        for contrast in CONTRASTS
+        if contrast.planned == planned
+    ]
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def leave_one_site_out() -> pl.DataFrame:
+    """Return each planned contrast with each decision site left out, scored and replicate years."""
+    rows = []
     for contrast in CONTRASTS:
-        if planned != contrast.planned:
+        if not contrast.planned:
             continue
-        row: dict[str, object] = {"contrast": contrast.name}
         for label in ("scored", "replicate"):
-            difference, mean_error, _ = estimate(label=label, contrast=contrast, sites=DECISION)
-            row[f"{label} QS"] = difference
-            row[f"{label} MAE of mean"] = mean_error
-            row[f"{label} sites better"] = sites_improving(label=label, contrast=contrast)
-            if label == "scored":
-                low, high = interval(label=label, contrast=contrast, level=level)
-                row[f"{label} low"], row[f"{label} high"] = low, high
-                row["without D16"] = estimate(
-                    label=label,
-                    contrast=contrast,
-                    sites=tuple(s for s in DECISION if s != "D16"),
-                )[0]
-                row["Nov-Mar"] = estimate(
-                    label=label, contrast=contrast, sites=DECISION, months=WINTER_MONTHS
-                )[0]
-                row["Apr-Oct"] = estimate(
-                    label=label,
-                    contrast=contrast,
-                    sites=DECISION,
-                    months=tuple(m for m in range(1, 13) if m not in WINTER_MONTHS),
-                )[0]
-        rows.append(row)
+            row: dict[str, object] = {"contrast": contrast.name, "year": label}
+            row["all five"] = estimate(label=label, contrast=contrast, sites=DECISION)[0]
+            for left_out in DECISION:
+                kept = tuple(s for s in DECISION if s != left_out)
+                row[f"without {left_out}"] = estimate(label=label, contrast=contrast, sites=kept)[0]
+            rows.append(row)
     return pl.DataFrame(rows)
 
 
@@ -282,26 +406,21 @@ def lead_curve() -> pl.DataFrame:
 
 
 def main() -> None:
-    """Print every table of the report."""
-    pl.Config.set_tbl_rows(200)
-    pl.Config.set_tbl_cols(30)
-    pl.Config.set_tbl_width_chars(220)
-    pl.Config.set_fmt_str_lengths(70)
-    rounded = pl.selectors.float()
+    """Print every table of the report as comma-separated values."""
     print("== Absolute quantile score by arm, points of capacity (rows outside the masks) ==")
-    print(absolute_table().with_columns(rounded.round(3)))
-    print(
-        f"\n== Planned contrasts ({PLANNED_LEVEL:.2f}% intervals), negative = treatment better =="
-    )
-    print(contrast_table(planned=True).with_columns(rounded.round(3)))
-    print("\n== Exploratory contrasts (95% intervals) ==")
-    print(contrast_table(planned=False).with_columns(rounded.round(3)))
-    print("\n== Median forecast minus mean forecast, points ==")
-    print(median_minus_mean().with_columns(rounded.round(3)))
-    print("\n== Tail calibration on the five decision sites ==")
-    print(tail_table().with_columns(rounded.round(4)))
-    print("\n== Quantile score by days ahead ==")
-    print(lead_curve().with_columns(rounded.round(3)))
+    print(absolute_table().write_csv(float_precision=3))
+    print(f"== Planned contrasts ({PLANNED_LEVEL:.2f}% intervals), negative = treatment better ==")
+    print(contrast_table(planned=True).write_csv(float_precision=3))
+    print("== Exploratory contrasts (95% intervals) ==")
+    print(contrast_table(planned=False).write_csv(float_precision=3))
+    print("== Planned contrasts with each decision site left out (quantile score) ==")
+    print(leave_one_site_out().write_csv(float_precision=3))
+    print("== Median forecast minus mean forecast, points ==")
+    print(median_minus_mean().write_csv(float_precision=3))
+    print("== Tail calibration on the five decision sites ==")
+    print(tail_table().write_csv(float_precision=4))
+    print("== Quantile score by days ahead ==")
+    print(lead_curve().write_csv(float_precision=3))
 
 
 if __name__ == "__main__":
