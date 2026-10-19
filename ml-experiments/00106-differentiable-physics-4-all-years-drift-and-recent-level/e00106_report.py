@@ -443,21 +443,21 @@ def lead_curve() -> pl.DataFrame:
 def main() -> None:
     """Print every table of the report as comma-separated values."""
     print("== Absolute quantile score by arm, points of capacity (rows outside the masks) ==")
-    print(absolute_table().write_csv(float_precision=3))
+    print(absolute_table().write_csv(float_precision=3), end="")
     print(f"== Planned contrasts ({PLANNED_LEVEL:.2f}% intervals), negative = treatment better ==")
-    print(contrast_table(planned=True).write_csv(float_precision=3))
+    print(contrast_table(planned=True).write_csv(float_precision=3), end="")
     print("== Exploratory contrasts (95% intervals) ==")
-    print(contrast_table(planned=False).write_csv(float_precision=3))
+    print(contrast_table(planned=False).write_csv(float_precision=3), end="")
     print("== Planned contrasts with each decision site left out (quantile score) ==")
-    print(leave_one_site_out().write_csv(float_precision=3))
+    print(leave_one_site_out().write_csv(float_precision=3), end="")
     print("== Planned contrasts by season at each site, scored year ==")
-    print(season_by_site().write_csv(float_precision=3))
+    print(season_by_site().write_csv(float_precision=3), end="")
     print("== Median forecast minus mean forecast, points ==")
-    print(median_minus_mean().write_csv(float_precision=3))
+    print(median_minus_mean().write_csv(float_precision=3), end="")
     print("== Tail calibration on the five decision sites ==")
-    print(tail_table().write_csv(float_precision=4))
+    print(tail_table().write_csv(float_precision=4), end="")
     print("== Quantile score by days ahead ==")
-    print(lead_curve().write_csv(float_precision=3))
+    print(lead_curve().write_csv(float_precision=3), end="")
 
 
 if __name__ == "__main__":
