@@ -71,6 +71,9 @@ LAMBDA_GRID: Final[tuple[float, ...]] = (
 G_SHORT_RIDGE_GRID: Final[tuple[float, ...]] = (0.1, 1.0, 10.0, 100.0)
 """The ridges tried for the per-site comparator on a short history."""
 WEEK_DAYS: Final[int] = 7
+HALF_HOURS_PER_DAY: Final[int] = 48
+SHORT_WINDOW_COVERAGE: Final[float] = 0.7
+"""The share of a short window's half-hours that must hold a usable row."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +102,15 @@ class History:
         if self.months is not None:
             return TrainingWindow(months=self.months)
         return TrainingWindow(start=cut - timedelta(days=WEEK_DAYS * (self.weeks or 0)))
+
+    @property
+    def minimum_rows(self) -> int:
+        """The fewest usable rows the held-out site needs: 70% of its window's half-hours.
+
+        The masks around hand-filtered transfers and missing readings remove some half-hours of
+        almost every window.
+        """
+        return int(SHORT_WINDOW_COVERAGE * self.weeks_of_history * WEEK_DAYS * HALF_HOURS_PER_DAY)
 
     @property
     def weeks_of_history(self) -> int:

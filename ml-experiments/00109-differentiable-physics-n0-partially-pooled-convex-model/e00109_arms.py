@@ -172,10 +172,17 @@ def history_transform(
     )
 
 
-def trainable(*, cache: FeatureCache, site: str, cut: datetime, window: TrainingWindow) -> bool:
-    """Return True if the site holds at least `MIN_TRAINING_ROWS` usable rows in its window."""
+def trainable(
+    *,
+    cache: FeatureCache,
+    site: str,
+    cut: datetime,
+    window: TrainingWindow,
+    minimum: int = common.MIN_TRAINING_ROWS,
+) -> bool:
+    """Return True if the site holds at least `minimum` usable rows in its window."""
     rows = training_rows(features=cache.sites[site], cache=cache, cut=cut, window=window)
-    return len(rows) >= common.MIN_TRAINING_ROWS
+    return len(rows) >= minimum
 
 
 @dataclass(frozen=True)
@@ -225,7 +232,13 @@ def build_arm(
     held_window = None
     if held_out is not None and history is not None:
         held_window = history.window(cut=cut)
-        if not trainable(cache=cache, site=held_out, cut=cut, window=held_window):
+        if not trainable(
+            cache=cache,
+            site=held_out,
+            cut=cut,
+            window=held_window,
+            minimum=history.minimum_rows,
+        ):
             msg = f"{held_out} has too few rows in a {history.label} window before {cut}"
             raise ValueError(msg)
         prior = 0.0
@@ -250,6 +263,11 @@ def build_arm(
                 site=site,
                 cut=cut,
                 window=held_window if site == held_out and held_window else common.FULL_WINDOW,
+                minimum=(
+                    history.minimum_rows
+                    if site == held_out and history is not None
+                    else common.MIN_TRAINING_ROWS
+                ),
             )
         ]
     )
