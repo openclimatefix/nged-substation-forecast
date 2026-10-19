@@ -251,7 +251,8 @@ CPU with `nthread` within the slot.
   matching arm's cross-fitted residuals in April to September. Report each site's w.
 - **Lagged XGBoost (descriptive):** the same recipe with the three power lags, on the 2-year
   window, scored at leads of 24.5 to 48 hours and 144.5 to 168 hours, as in Part 2.
-- **References:** Part 2's stored G-all+D1, G-all, and G1 predictions; `baseline_forecasters.climatology` and
+- **References:** Part 2's stored G-all+D1, G-all, and G1 predictions;
+  `baseline_forecasters.climatology` and
   `manual_heuristic` on the same rows.
 
 **Per-site comparators are tuned fairly.** S-4w, S-3m, X-4w, and X-3m are not run with penalties
