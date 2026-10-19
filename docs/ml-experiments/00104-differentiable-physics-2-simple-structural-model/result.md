@@ -145,6 +145,23 @@ under their original names (`g1`, `g_all`, and so on) as the uncentred arm; the 
   five-site contrasts move by under 0.08 (report section 13): G-all minus G1 +0.24, C1 -0.05,
   G-all+D1 minus G-all -0.29, C2 -0.47, C3 -0.41, G-all minus X-12 +0.05. No conclusion changes.
 
+## What the model learns
+
+**The mean forecast is the sum of seven pieces, each a block of the design matrix times its fitted
+coefficients.** The figures split the fitted G-all+D1 model (final cut 2025-07-01, centred spread,
+which plays no part in a mean) at three decision substations, D10, D11, and D14, in points of
+effective capacity. The pieces add up to the model's mean forecast (checked in the script to 1e-6
+points). The steps panel comes from the steps arm and is not zero: its cumulative steps reach +20
+points at D10 and -10 points at D11 over the training years.
+
+![The calendar pieces: daily profile, holidays, Christmas tent, and day-of-year harmonics](figure_09_pieces_calendar.svg)
+
+![The weather pieces: heating against temperature and over the scored year, and lighting](figure_10_pieces_weather.svg)
+
+![The solar, drift, and step pieces](figure_11_pieces_solar_drift.svg)
+
+![The seven pieces and their sum against observed net power in a summer and a winter week](figure_12_pieces_stacked_weeks.svg)
+
 ## Figures
 
 ![Net power and three forecasts in a summer and a winter week at six substations](figure_01_raw_weeks.svg)
