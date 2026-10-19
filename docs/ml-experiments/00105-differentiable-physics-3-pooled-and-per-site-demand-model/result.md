@@ -24,7 +24,7 @@ decision_rule: see "Decision rule"
 benchmark: >-
   Per-site DP (the same model fitted one substation at a time); lagless XGBoost on the same ERA5
   and CAMS inputs and window, plain and with experiment 64's solar offset, each with its matching
-  start arm; Part 2's convex all-years model G-all (stored predictions); climatology;
+  start arm; Part 2's convex models G-all+D1, G-all, and G1 (stored predictions); climatology;
   manual_heuristic; lagged XGBoost as a descriptive reference at leads of 24 to 48 hours
 row_set_id: dp_mw_v1 and dp_mva_dark_v1 (experiment 103); MW sites scored 2025-07-01 to 2026-06-30
 metric: >-
@@ -48,20 +48,24 @@ substation with plenty of history; it has to match it there and beat it where hi
 Part 3 answers pooling on a 2-year window (series brief, "Merging single-site and pooled DP");
 Part 4 answers years.
 
-**Part 2 sets the bar the pooled DP must clear.** Part 2's convex model trained on all usable years
-with no drift (G-all) scored 2.73 points at the five decision sites, 0.40 points better than the
-same model on 12 months (G1, 3.13; 95% interval 0.15 to 0.66 better, 4 of 5 sites better). Part
-2's numbers review found a third of that gain sits at D14's winter of 2025-26 (without D14 the gain
-is about 0.22, 3 of 4 sites better). The lagless XGBoost arms scored 3.07 (12 months, default start)
-and 3.15 (all years), and lagged XGBoost at leads of 24.5 to 48 hours scored 2.49, so lagged
-XGBoost still beats G-all. Part 3 scores the same rows in the same frozen year, so Part 2's stored
-G-all and G1 predictions pair row for row with Part 3's arms (contrast C5).
+**Part 2 sets the bar the pooled DP must clear.** Part 2's corrected result (the spread centred
+on the mean forecast) found that its convex model trained on all usable years with no drift (G-all)
+scored 0.25 points worse than the same model on 12 months (G1, 2.82), that adding a drift term to
+G-all helped by 0.29 points (G-all+D1, 2.78), and that G-all was no better than lagless XGBoost
+(difference +0.00). Lagged XGBoost at leads of 24.5 to 48 hours still beats the convex models. The
+bars for the pooled DP on all years are therefore G-all+D1 (2.78) and G1 (2.82), and G-all is no
+longer a bar to beat. Part 3 scores the same rows in the same frozen year, so Part 2's stored G-all,
+G-all+D1, and G1 predictions pair row for row with Part 3's arms (contrast C5). The numbers come
+from the corrected Part 2 result; the plan quotes them from the design session's note until that
+result merges.
 
 **Four Part 2 findings shape this plan:**
 
-- **No drift.** A frozen drift term gave most of the all-years gain back (G-all+D1 minus G-all
-  +0.20), so every Part 3 arm runs without drift. The pooled drift switch stays off (it raises
-  `NotImplementedError` in `studies.dp_pooled`, and Part 4 builds it).
+- **No drift in Part 3.** Part 2's corrected result found that drift helps the convex model on all
+  years (G-all+D1 minus G-all −0.29), but pooling and years stay separate, so every Part 3 arm runs
+  without drift. The pooled drift switch stays off (it raises `NotImplementedError` in
+  `studies.dp_pooled`, and Part 4 builds it). P-all is therefore compared with G-all+D1 as well as
+  with G-all.
 - **The solar offset adds nothing when CAMS irradiance is an input** (X-12am minus X-12z +0.006;
   fitted weights −0.02 to −0.34, not −1). The offset arm is therefore effectively plain lagless
   XGBoost on these inputs. Both arms stay, but the offset arm is not treated as the stronger bar:
@@ -247,7 +251,7 @@ CPU with `nthread` within the slot.
   matching arm's cross-fitted residuals in April to September. Report each site's w.
 - **Lagged XGBoost (descriptive):** the same recipe with the three power lags, on the 2-year
   window, scored at leads of 24.5 to 48 hours and 144.5 to 168 hours, as in Part 2.
-- **References:** Part 2's stored G-all and G1 predictions; `baseline_forecasters.climatology` and
+- **References:** Part 2's stored G-all+D1, G-all, and G1 predictions; `baseline_forecasters.climatology` and
   `manual_heuristic` on the same rows.
 
 **Per-site comparators are tuned fairly.** S-4w, S-3m, X-4w, and X-3m are not run with penalties
@@ -321,7 +325,8 @@ design session (2026-10-19) fix the definitions:
 - **C3, short history:** P-short3m minus S-3m.
 - **C4, the DP against lagless XGBoost:** P minus the tuning-year winner of X-2y, X-2yq, and X-2yamq.
   Labelled and reported, not part of the verdict.
-- **C5, the DP against Part 2's bar:** P-all minus G-all (Part 2's stored predictions, same rows).
+- **C5, the DP against Part 2's bar:** P-all minus G-all+D1, and P-all minus G1 (Part 2's stored
+  predictions, same rows). P-all minus G-all is reported beside them.
   Descriptive: the bar the pooled DP must clear before Part 4.
 - **Secondary pooling contrast beside C1:** P-all minus S-all (both on all years, no drift).
 
@@ -344,8 +349,9 @@ Written before any fit; each line can fail, and none of them overrides the decis
 - **C3:** P-short3m minus S-3m is −0.2 to −1.0 points, interval below zero, at least 4 of 5 sites
   better.
 - **C4:** P is 0.0 to 0.4 points better than the stronger lagless XGBoost arm.
-- **C5:** P-all minus G-all is −0.4 to +0.1 points: the pooled DP on all years matches or beats
-  the convex model on all years, because it has more expressive terms.
+- **C5:** P-all minus G-all+D1 is −0.3 to +0.3 points, interval spanning zero: the pooled DP
+  without drift roughly matches the convex model with drift, because the DP has more expressive
+  terms and the convex model has the drift. P-all minus G1 is −0.3 to 0.0 points.
 - **Onboarding recovery:** P-onb4w is within 0.5 points of P.
 - **P-all minus S-all:** within ±0.15 points, as for C1.
 - **Ablations:** P-map within ±0.1 points of P; P-nonet within ±0.15 points of P.
@@ -394,7 +400,7 @@ and `small gain` are Phase B labels and are not reachable here.
 
 **C4, C5, and the P-all contrast get a label in the bullets and play no part in the `verdict`
 field.** A DP gain over XGBoost is claimed only from C4. C5 is labelled for the hand-on decision
-only. A pooled DP that loses C5 (the P-all minus G-all estimate above zero) is reported in the
+only. A pooled DP that loses C5 (the P-all minus G-all+D1 estimate above zero) is reported in the
 take-home whatever the verdict, because Part 4 would then start from the convex all-years model
 rather than the pooled DP.
 
