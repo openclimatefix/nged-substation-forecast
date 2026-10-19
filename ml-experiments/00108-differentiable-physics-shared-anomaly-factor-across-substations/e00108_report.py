@@ -104,7 +104,7 @@ def shared_response(*, tuning: tune_lib.Tuning) -> dict[str, list[float]]:
         correction = correction_at(trace=trace, cutoff=cutoff, target=target, band=np.full(n, 2))
         daily.append(float(correction.total[0]))
     del rows
-    return {"days_from_start": list(range(1, 13)), "response": daily}
+    return {"days_from_start": list(range(2, 14)), "response": daily}
 
 
 def figure_gate(*, gate: dict) -> alt.Chart:
@@ -151,7 +151,7 @@ def figure_response(*, response: dict[str, list[float]]) -> alt.Chart:
         alt.Chart(frame)
         .mark_line(point=True, color=ocf.DATA_BLUE)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("day:Q", title="Target day (the factor is 1 on days 0 to 2, then 0)"),
+            x=alt.X("day:Q", title="Target day (the factor is 1 on days 1 to 3, then 0)"),
             y=alt.Y("level:Q", title="Shared state at day-ahead cutoff"),
         )
     )
@@ -225,7 +225,7 @@ def main() -> None:
             f"sigma_z {local.sigma_z:.3f}, sigma_eps {local.sigma_eps:.3f}"
         )
     response = shared_response(tuning=tuning)
-    print("\n== shared state after a three-day unit step (days 1 to 12) ==")
+    print("\n== shared state after a 3-day unit step on days 1 to 3 (target days 2 to 13) ==")
     print(" ".join(f"{v:.3f}" for v in response["response"]))
     days = top_days(cache=cache, panel=panel)
     print("\n== 20 largest shared-anomaly days, tuning year only ==")
