@@ -39,7 +39,10 @@ from e00100_profile import Shape, inject_shaped
 
 OFFSET: Final[int] = harness.OFFSET
 """Half-hours from the dense grid's start (2019-09-01) to experiment 00082's grid (2022-01-01)."""
-SCORED_SHAPES: Final[tuple[Shape, ...]] = ("S1", "S2", "S3", "S4", "S6")
+SCORED_SHAPES: Final[tuple[Shape, ...]] = ("S2", "S3", "S4", "S6")
+"""The shapes of the headline family A cases; S1 and S5 are descriptive in experiment 00088."""
+BATCH_STRIDE: Final[int] = 2
+"""Every second batch of experiment 00088's events, so the run takes about 3 hours."""
 MAX_LEAD_HOURS: Final[float] = 240.0
 MEMBERS: Final[tuple[int, ...]] = tuple(range(0, 51, 5))
 """The control member and every fifth member: 11 of the 51, the same in every arm."""
@@ -55,9 +58,6 @@ VARIANTS: Final[tuple[tuple[str, str, str | None], ...]] = (
     ("mask_inj", "mask", "inj"),
     ("drop10_inj", "drop10", "inj"),
     ("drop30_inj", "drop30", "inj"),
-    ("mask_caus", "mask", "caus"),
-    ("drop10_caus", "drop10", "caus"),
-    ("drop30_caus", "drop30", "caus"),
 )
 """Each variant's name, its booster arm, and its mask source (None: no mask)."""
 _STATE: dict[str, Any] = {}
@@ -358,6 +358,7 @@ def run_batch(job: tuple[int, list[Event], Shape]) -> str:
         if _STATE.get("origin_ok", lambda _: True)(o)
     ]
     causal_cache: dict[int, list[causal.CausalInterval]] = {}
+    uses_causal = any(source == "caus" for _, _, source in variants)
     for origin in origins:
         newest = newest_stamp(origin=origin)
         todo = []
@@ -369,14 +370,14 @@ def run_batch(job: tuple[int, list[Event], Shape]) -> str:
         if not todo:
             continue
         cut = newest + 1
-        if cut not in causal_cache:
+        if uses_causal and cut not in causal_cache:
             causal_cache[cut] = causal.causal_intervals(
                 state=state,
                 residual=residual,
                 offset=offset,
                 cut=cut,
             )
-        intervals = causal_cache[cut]
+        intervals = causal_cache[cut] if uses_causal else []
         for event, sid, (family, hours) in todo:
             row = rows_of[sid]
             power, injected_mw = powers[sid]
@@ -497,7 +498,9 @@ def main() -> None:
     state = harness.make_state()
     events = harness.cached_events(power=state["panel"]["power"])
     batches = harness.seeded_batches(events=events)
-    jobs = [(seed, batch, shape) for shape in SCORED_SHAPES for seed, batch in batches]
+    jobs = [
+        (seed, batch, shape) for shape in SCORED_SHAPES for seed, batch in batches[::BATCH_STRIDE]
+    ]
     if args.pilot:
         init_worker()
         _STATE["origin_ok"] = lambda o: o.month == 8  # pilot: the refit whose boosters exist
