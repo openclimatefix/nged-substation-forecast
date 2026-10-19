@@ -122,7 +122,7 @@ def main() -> None:
         print(
             f"K={k}: {report['k'][str(k)]:.4f} ({time.perf_counter() - started:.0f} s)", flush=True
         )
-    settings["k"] = int(min(report["k"], key=report["k"].get))
+    settings["k"] = int(min(report["k"], key=lambda name: report["k"][name]))
     for scale in DEVIATION_GRID:
         trial = {**settings, "map_deviation": scale, "site_deviation": scale}
         report["map_deviation"][str(scale)] = score_pooled(
@@ -137,12 +137,14 @@ def main() -> None:
             cache=cache, config=arms.config_for(kind="s", settings=trial)
         )
         print(f"S short-history deviation {scale}: {report['short_deviation'][str(scale)]:.4f}")
-    settings["map_deviation"] = float(min(report["map_deviation"], key=report["map_deviation"].get))
+    settings["map_deviation"] = float(
+        min(report["map_deviation"], key=lambda name: report["map_deviation"][name])
+    )
     settings["site_deviation"] = float(
-        min(report["site_deviation"], key=report["site_deviation"].get)
+        min(report["site_deviation"], key=lambda name: report["site_deviation"][name])
     )
     settings["short_deviation"] = float(
-        min(report["short_deviation"], key=report["short_deviation"].get)
+        min(report["short_deviation"], key=lambda name: report["short_deviation"][name])
     )
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     arms.TUNED_PATH.write_text(json.dumps({**settings, "scores": report}, indent=2) + "\n")

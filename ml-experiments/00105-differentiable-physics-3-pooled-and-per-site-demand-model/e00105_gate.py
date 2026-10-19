@@ -402,8 +402,9 @@ def gate_2_injected(
     context["train_batch"] = batch
     config = config or config_p()
     fixed = None if capacity_scale is None else {"capacity_first": capacity_scale}
-    common_copy = {"fixed_scales": fixed, "capacity_init": capacity_init, "capacity_prior": prior}
-    copies = [FitCopy(name="base", **common_copy)]
+    copies = [
+        FitCopy(name="base", fixed_scales=fixed, capacity_init=capacity_init, capacity_prior=prior)
+    ]
     coverage, keeps, farms = {}, {}, {}
     for site in INJECTED_SITES:
         index = batch.site_labels.index(site)
@@ -418,9 +419,24 @@ def gate_2_injected(
             site_rows & has_farm, farm, torch.zeros_like(farm)
         )
         coverage[site] = float(has_farm[site_rows].float().mean())
-        copies.append(FitCopy(name=f"base {site}", keep=keep, **common_copy))
         copies.append(
-            FitCopy(name=f"inject {site}", keep=keep, y=batch.y - farms[site], **common_copy)
+            FitCopy(
+                name=f"base {site}",
+                keep=keep,
+                fixed_scales=fixed,
+                capacity_init=capacity_init,
+                capacity_prior=prior,
+            )
+        )
+        copies.append(
+            FitCopy(
+                name=f"inject {site}",
+                keep=keep,
+                y=batch.y - farms[site],
+                fixed_scales=fixed,
+                capacity_init=capacity_init,
+                capacity_prior=prior,
+            )
         )
     models, results = fit_many(
         batch=batch,

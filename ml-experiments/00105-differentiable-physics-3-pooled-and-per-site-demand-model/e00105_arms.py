@@ -22,6 +22,7 @@ from studies.dp_features import FeatureCache
 from studies.dp_gam import MIN_SPREAD_GROUP_ROWS, QUANTILE_COLUMNS
 from studies.dp_onboarding import (
     FitCopy,
+    PooledResiduals,
     fit_centred_spread,
     fit_many,
     pooled_residuals,
@@ -294,7 +295,7 @@ def per_site_forecasts(
     """
     cut_r = common.months_before(moment=cut, months=common.REPLICA_MONTHS)
     fitted: dict[str, tuple[PooledDemandModel, PooledBatch]] = {}
-    residuals: dict[str, object] = {}
+    residuals: dict[str, PooledResiduals] = {}
     record = {"seconds": 0.0, "rows": 0.0, "peak_gpu_gb": 0.0}
     for site in sites:
         train = common.pooled_batch_for(cache=cache, sites=(site,), cut=cut, months=months)

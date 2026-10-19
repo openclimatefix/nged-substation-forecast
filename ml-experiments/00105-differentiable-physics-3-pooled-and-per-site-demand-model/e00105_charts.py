@@ -183,6 +183,12 @@ def figure_absolute() -> alt.TopLevelMixin:
     )
 
 
+def scored_mean(*, frame: pl.DataFrame) -> float:
+    """Return the mean score over the six scored substations."""
+    kept = frame.filter(pl.col("site").is_in(common.SCORED_SITES))
+    return float(kept["score"].to_numpy().mean())
+
+
 def figure_onboarding() -> alt.TopLevelMixin:
     """Score against weeks of history for the pooled onboarding arms, with reference marks."""
     ids = report.site_of_id()
@@ -194,15 +200,14 @@ def figure_onboarding() -> alt.TopLevelMixin:
         rows.append(
             {
                 "weeks": weeks,
-                "score": float(
-                    frame.filter(pl.col("site").is_in(common.SCORED_SITES))["score"].mean()
-                ),
+                "score": scored_mean(frame=frame),
             }
         )
     arms = _arms()
     for name, label in (("p", "P (full history)"), ("s", "S (full history)"), ("x_4w", "X-4w")):
         frame = arms[name].filter(pl.col("site").is_in(common.SCORED_SITES))
-        marks.append({"label": label, "score": float(frame["score"].mean())})
+        mean_score: float = frame["score"].mean()  # ty: ignore[invalid-assignment]
+        marks.append({"label": label, "score": mean_score})
     line = (
         alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, color=ocf.BRAND_ORANGE)
@@ -317,7 +322,7 @@ def figure_shapes() -> alt.TopLevelMixin:
 
 
 def capacity_sources() -> pl.DataFrame:
-    """Return capacity per scored substation and season-year from P, the convex model, and vintages."""
+    """Return capacity per scored substation and season-year: pooled fit P and the convex model."""
     state = load_pooled()
     trained = state["trained"]
     capacity = np.cumsum(softplus(state["capacity_raw"]) * trained, axis=1)
@@ -345,24 +350,24 @@ def capacity_sources() -> pl.DataFrame:
     convex = pl.read_parquet(common.PART_2_DIR / "work" / "gam_capacities_scored.parquet").filter(
         pl.col("arm") == "g_all"
     )
-    for row in convex.iter_rows(named=True):
-        rows.append(
-            {
-                "site": row["site"],
-                "season_year": row["season_year"],
-                "source": "convex model G-all",
-                "points": row["capacity_points"],
-                "low": row["capacity_points"],
-                "high": row["capacity_points"],
-            }
-        )
+    rows.extend(
+        {
+            "site": row["site"],
+            "season_year": row["season_year"],
+            "source": "convex model G-all",
+            "points": row["capacity_points"],
+            "low": row["capacity_points"],
+            "high": row["capacity_points"],
+        }
+        for row in convex.iter_rows(named=True)
+    )
     return pl.DataFrame(rows).filter(pl.col("site").is_in(common.SCORED_SITES))
 
 
 def figure_cards_capacity() -> alt.TopLevelMixin:
     """Substation cards, panel 1: capacity per season-year, pooled fit against convex model."""
     table = capacity_sources()
-    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(table).encode(
         x=alt.X("season_year:O", title="Season-year (July to June)"),
         color=alt.Color(
             "source:N",
@@ -409,26 +414,26 @@ def figure_cards_profiles() -> alt.TopLevelMixin:
         i = common.POOL.index(site)
         profile = (mix[i] @ shapes + deviation[i]).reshape(len(DAY_TYPES), 48)
         for d in range(3):
-            for h in range(48):
-                profile_rows.append(
-                    {
-                        "site": site,
-                        "day type": DAY_TYPES[d],
-                        "hour": h / 2.0,
-                        "value": float(profile[d, h]),
-                    }
-                )
-        slope = softplus(state["slope_raw"][i]).mean()
-        threshold = float(state["threshold"][i])
-        for t in temperature:
-            heating_rows.append(
+            profile_rows.extend(
                 {
                     "site": site,
-                    "temperature": float(t),
-                    "points": float(slope * max(threshold - t, 0) / 10.0),
-                    "threshold": threshold,
+                    "day type": DAY_TYPES[d],
+                    "hour": h / 2.0,
+                    "value": float(profile[d, h]),
                 }
+                for h in range(48)
             )
+        slope = softplus(state["slope_raw"][i]).mean()
+        threshold = float(state["threshold"][i])
+        heating_rows.extend(
+            {
+                "site": site,
+                "temperature": float(t),
+                "points": float(slope * max(threshold - t, 0) / 10.0),
+                "threshold": threshold,
+            }
+            for t in temperature
+        )
     profiles = (
         alt.Chart(pl.DataFrame(profile_rows))  # ty: ignore[unresolved-attribute]
         .mark_line()
