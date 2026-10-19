@@ -322,24 +322,31 @@ donor substation's solar output and looks like a capacity step ([experiment
 45](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md) applies this mask). Applies to
 experiments. Confidence: medium, because the write-up states the rule and does not test the rule.
 
-**Do not treat the real-time `frozen` capacity vintage as the season-year constant.** Over the
-weeks that experiment 45's real-time vintage and its hindsight season-year constant share, the
-ratio of the two runs from 0.30 to 1.48 across six Primaries and no week agrees to 0.1%
-([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md)). Each origin of
-the vintage lists weekly capacities back to 2019-09, but the first origin is 2023-08, so a cut
+**Do not treat the real-time `frozen` capacity vintage as the season-year constant.** The vintage
+is experiment 45's weekly capacity estimate made with data up to each origin date. Over the weeks
+that it and the hindsight season-year constant share, the two differ in every week, by a ratio of
+0.30 to 1.48 in the early weeks of 2020 and 2021 and by up to about 10% in the weeks near the end of
+the data ([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md)). Each
+origin lists weekly capacities back to 2019-09, but the first origin is 2023-08, so a training cut
 before then has no real-time capacity. Take the latest origin on or before the cut, hold its last
 week afterwards, and hold the last observed value through unobserved weeks. Applies to experiments.
-Scope: six MW Primaries.
+Scope: six MW Primaries. Confidence: high for the difference, which was measured week by week;
+medium for the size near the cut, which comes from five Primaries.
 
-**Do not count a season-year as trained because a few half-hours of it precede the cut.** A cut on
-1 July 00:00 UTC leaves two dark half-hours that start on 1 July in British Summer Time, so they
-fall in the next season-year. Count a season-year as trained only when it holds enough rows with
-solar signal (experiment 104 uses at least 30 days of half-hours for centring and any solar signal
-for capacity). Applies to experiments.
+**Do not count a season-year as trained because a few half-hours of it precede the cut.** A
+season-year runs from 1 July to 30 June. A training cut at 1 July 00:00 UTC leaves two night-time
+half-hours of the next season-year in the training data, because local time is an hour ahead in
+summer, so a model would count a whole extra season-year as trained and give it a capacity and a
+centring mean from those two rows. Count a season-year as trained only when it holds enough rows
+(experiment 104 uses 30 days of half-hours for centring, and any solar signal for capacity).
+Applies to experiments. Confidence: high, because a test of the training rows shows it.
 
 **Treat the ERA5 half-hourly file's :30 values as interpolated.** Each :30 value is the mean of the
-neighbouring hourly values, so a half-hour ending at :30 uses the next hour's reading (experiment
-104). Applies to experiments.
+hourly values either side of it, so it contains the reading from the hour after the half-hour it
+labels. Treat it as interpolated, not as a separate measurement
+([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md)). Applies to
+experiments. Confidence: high, because the mean absolute difference from the neighbours' average is
+zero.
 
 ## Switching and the switching log
 

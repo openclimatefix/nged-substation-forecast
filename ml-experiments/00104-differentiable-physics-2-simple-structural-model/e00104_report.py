@@ -210,6 +210,8 @@ def print_contrasts(*, arms: dict[str, pl.DataFrame]) -> dict[str, dict]:
         ("g1", "x_12"),
         ("g1", "x_12amq"),
         ("g_all", "x_all"),
+        ("g_all", "x_12"),
+        ("g_all_d1", "x_12"),
         ("g_all", "x_allamq"),
         ("g_all_d1", "x_all"),
         ("g_all_d1", "x_allamq"),
@@ -232,14 +234,16 @@ def print_contrasts(*, arms: dict[str, pl.DataFrame]) -> dict[str, dict]:
 
 
 def verdict(*, c1: dict) -> str:
-    """Apply the Phase A rule to C1: helps, hurts, or inconclusive (before positive controls)."""
+    """Apply the merged Phase A rule to C1 alone: supported, partly supported, or not supported."""
     if c1["high"] < 0 and c1["better"] >= 4:
-        return "helps"
+        return "supported"
     if c1["estimate"] < 0 and c1["better"] >= 4:
-        return "helps (provisional, by the Phase A point rule)"
+        return "partly supported"
+    if c1["estimate"] < 0:
+        return "partly supported"
     if c1["low"] > 0:
-        return "hurts"
-    return "inconclusive"
+        return "refuted"
+    return "not supported"
 
 
 def print_checks(*, results: dict[str, dict], arms: dict[str, pl.DataFrame]) -> None:
@@ -293,7 +297,10 @@ def print_checks(*, results: dict[str, dict], arms: dict[str, pl.DataFrame]) -> 
                 if value >= base:
                     worse.append(f"{name} vs {reference} at {site} ({value:.2f} vs {base:.2f})")
     line("baselines worse than every model arm at every site", not worse, "; ".join(worse) or "yes")
-    print(f"\nVerdict by the Phase A rule on C1 (before positive controls): {verdict(c1=c1)}")
+    print(
+        f"\nC1 alone under the merged Phase A rule: {verdict(c1=c1)}. The plan overrides this with "
+        "`inconclusive` when a positive control fails."
+    )
 
 
 def print_tails(*, arms: dict[str, pl.DataFrame]) -> None:

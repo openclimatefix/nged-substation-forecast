@@ -24,13 +24,13 @@ manual_heuristic     3.886   4.129   3.381   2.931   3.142   2.899   3.488   3.3
 
 == 2. Planned contrasts (Bonferroni, 3 contrasts), decision set of five ==
 C1 years: g_all_d1 - g1: -0.203 (-0.683 to +0.216, 98.33%); 3 sites better, 2 worse
-   per site: {'D10': 0.541, 'D11': -0.042, 'D14': -1.523, 'D16': 0.16, 'D5': -0.144}
+   per site: {'D14': -1.523, 'D5': -0.144, 'D10': 0.541, 'D16': 0.16, 'D11': -0.042}
    with D9 (six sites): +0.548 (+0.178 to +0.896, 98.33%); 3 sites better, 3 worse
 C2 GAM vs XGBoost, 12 months: g1 - x_12am: -0.244 (-0.802 to +0.238, 98.33%); 3 sites better, 2 worse
-   per site: {'D16': -0.72, 'D14': 0.39, 'D11': -0.34, 'D10': -0.559, 'D5': 0.031}
+   per site: {'D14': 0.39, 'D16': -0.72, 'D5': 0.031, 'D10': -0.559, 'D11': -0.34}
    with D9 (six sites): -0.203 (-0.687 to +0.217, 98.33%); 4 sites better, 2 worse
 C3 GAM vs XGBoost, all years: g_all_d1 - x_allam: -0.293 (-0.668 to +0.033, 98.33%); 4 sites better, 1 worse
-   per site: {'D11': -0.033, 'D16': -1.212, 'D14': -0.343, 'D10': 0.129, 'D5': -0.017}
+   per site: {'D10': 0.129, 'D14': -0.343, 'D11': -0.033, 'D16': -1.212, 'D5': -0.017}
    with D9 (six sites): +0.497 (+0.172 to +0.894, 98.33%); 4 sites better, 2 worse
 
 == 3. Exploratory contrasts (95%), decision set of five ==
@@ -50,14 +50,16 @@ g_all - x_allam: -0.489 (-0.647 to -0.327, 95.00%); 4 sites better, 1 worse
 g1 - x_12: +0.058 (-0.251 to +0.374, 95.00%); 3 sites better, 2 worse
 g1 - x_12amq: +0.063 (-0.246 to +0.371, 95.00%); 3 sites better, 2 worse
 g_all - x_all: -0.425 (-0.561 to -0.288, 95.00%); 3 sites better, 2 worse
+g_all - x_12: -0.342 (-0.664 to -0.070, 95.00%); 4 sites better, 1 worse
+g_all_d1 - x_12: -0.145 (-0.670 to +0.295, 95.00%); 3 sites better, 2 worse
 g_all - x_allamq: -0.401 (-0.542 to -0.263, 95.00%); 3 sites better, 2 worse
 g_all_d1 - x_all: -0.228 (-0.452 to -0.009, 95.00%); 3 sites better, 2 worse
 g_all_d1 - x_allamq: -0.205 (-0.436 to +0.019, 95.00%); 2 sites better, 3 worse
 
 == 3b. The coastal substations (D5 and D9) ==
-g_all_d1 - g1: +2.151 (+1.154 to +3.208, 95.00%); 1 sites better, 1 worse; per site {'D5': -0.1440186521216877, 'D9': 4.144303728841259}
-g1 - x_12am: +0.010 (-0.392 to +0.354, 95.00%); 1 sites better, 1 worse; per site {'D9': -0.00938514183067444, 'D5': 0.03133957354895533}
-g_all_d1 - x_allam: +2.284 (+1.457 to +3.266, 95.00%); 1 sites better, 1 worse; per site {'D9': 4.282411164268942, 'D5': -0.016627195952153607}
+g_all_d1 - g1: +2.151 (+1.154 to +3.208, 95.00%); 1 sites better, 1 worse; per site {'D9': 4.14430372884126, 'D5': -0.14401865212168785}
+g1 - x_12am: +0.010 (-0.392 to +0.354, 95.00%); 1 sites better, 1 worse; per site {'D5': 0.0313395735489553, 'D9': -0.00938514183067441}
+g_all_d1 - x_allam: +2.284 (+1.457 to +3.266, 95.00%); 1 sites better, 1 worse; per site {'D5': -0.016627195952153596, 'D9': 4.282411164268942}
 
 == 4. Prediction checks ==
 FAILED old years without drift hurt (G-all - G1 +0.3 to +0.8, interval above zero): -0.399 (-0.658 to -0.148, 95.00%); 4 sites better, 1 worse
@@ -68,9 +70,9 @@ FAILED C1 +0.0 to +0.4, interval spanning zero: -0.203 (-0.683 to +0.216, 98.33%
 FAILED C2 +0.1 to +0.5: -0.244 (-0.802 to +0.238, 98.33%); 3 sites better, 2 worse
 FAILED C3 +0.0 to +0.5: -0.293 (-0.668 to +0.033, 98.33%); 4 sites better, 1 worse
 HELD   steps within +-0.1 of D1: +0.063 (+0.023 to +0.105, 95.00%); 3 sites better, 2 worse
-FAILED baselines worse than every model arm at every site: g1 vs climatology at D14 (3.80 vs 3.21); g1 vs manual_heuristic at D14 (3.80 vs 2.93); g_all_d1 vs climatology at D9 (6.39 vs 3.04); g_all_d1 vs manual_heuristic at D9 (6.39 vs 2.90); g_all_d1_steps vs climatology at D9 (15.67 vs 3.04); g_all_d1_steps vs manual_heuristic at D9 (15.67 vs 2.90); g_all_d1_steps vs manual_heuristic at D10 (4.43 vs 4.13); x_12 vs manual_heuristic at D14 (2.98 vs 2.93); x_12z vs manual_heuristic at D16 (3.15 vs 3.14); x_12z vs climatology at D14 (3.40 vs 3.21); x_12z vs manual_heuristic at D14 (3.40 vs 2.93); x_12am vs manual_heuristic at D16 (3.15 vs 3.14); x_12am vs climatology at D14 (3.41 vs 3.21); x_12am vs manual_heuristic at D14 (3.41 vs 2.93); x_12amq vs manual_heuristic at D14 (2.98 vs 2.93); x_all vs manual_heuristic at D16 (3.64 vs 3.14); x_allz vs manual_heuristic at D16 (3.85 vs 3.14); x_allam vs manual_heuristic at D16 (3.80 vs 3.14); x_allamq vs manual_heuristic at D16 (3.59 vs 3.14)
+FAILED baselines worse than every model arm at every site: g1 vs climatology at D14 (3.80 vs 3.21); g1 vs manual_heuristic at D14 (3.80 vs 2.93); g_all_d1 vs climatology at D9 (6.39 vs 3.04); g_all_d1 vs manual_heuristic at D9 (6.39 vs 2.90); g_all_d1_steps vs climatology at D9 (15.67 vs 3.04); g_all_d1_steps vs manual_heuristic at D9 (15.67 vs 2.90); g_all_d1_steps vs manual_heuristic at D10 (4.43 vs 4.13); x_12 vs manual_heuristic at D14 (2.98 vs 2.93); x_12z vs manual_heuristic at D16 (3.15 vs 3.14); x_12z vs climatology at D14 (3.40 vs 3.21); x_12z vs manual_heuristic at D14 (3.40 vs 2.93); x_12am vs climatology at D14 (3.41 vs 3.21); x_12am vs manual_heuristic at D14 (3.41 vs 2.93); x_12am vs manual_heuristic at D16 (3.15 vs 3.14); x_12amq vs manual_heuristic at D14 (2.98 vs 2.93); x_all vs manual_heuristic at D16 (3.64 vs 3.14); x_allz vs manual_heuristic at D16 (3.85 vs 3.14); x_allam vs manual_heuristic at D16 (3.80 vs 3.14); x_allamq vs manual_heuristic at D16 (3.59 vs 3.14)
 
-Verdict by the Phase A rule on C1 (before positive controls): inconclusive
+C1 alone under the merged Phase A rule: partly supported. The plan overrides this with `inconclusive` when a positive control fails.
 
 == 5. Tails: coverage (nominal 1%, 5%, 95%, 99%) and pinball loss at each level ==
 arm                     q01      q05      q95      q99   |   pinball
