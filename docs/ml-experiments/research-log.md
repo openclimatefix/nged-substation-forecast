@@ -2378,21 +2378,24 @@ page](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md
 
 ### 00096: synthetic switches in the training data
 
-**Training the normal-arrangement forecast on about three times as many synthetic switching
-transfers did not help, because what limits the forecast is the MW estimate at forecast time; the
-verdict is inconclusive.** The experiment added 94 synthetic transfers (169 series-intervals,
-against 56 real ones) to the training data of the XGBoost demand booster for 16 Primary
-substations, and scored it on experiment 88's 2,452 held-out injected transfers.
+**Adding about three times as many synthetic switching transfers (load moved between Primary
+substations, with the MW moved known exactly) to the training data did not improve the forecast of
+the power a substation would have drawn without the transfer; the verdict is inconclusive.** The
+experiment added 94 synthetic transfers (169 series-intervals, against 56 real series-intervals) to
+the training data of the XGBoost model for 16 Primary substations, and scored it on experiment 88's
+2,452 held-out injected cases.
 
 - **Headline result:** synthetic-trained minus real-trained mean absolute error, in points of
   capacity (98.75% interval): +0.079 (-0.031 to +0.153) with the injected MW, +0.032 (-0.019 to
   +0.067) with the RO-NC detector's MW, and +0.038 (-0.008 to +0.053) with the largest detector
-  step. The shares of the plain-to-ceiling gap closed were 83% against 75% with the injected MW.
-- **Tails:** coverage of q01 to q99 stayed at 0.985 and the share of actuals below q01 at 0.013 to
-  0.016, so synthetic training did not widen the quantiles.
-- **Finding for later experiments:** exact MW makes a corrected lag equal the clean lag, so
-  synthetic transfers look like ordinary rows. Train with a MW that carries the detector's errors,
-  or improve the MW estimate itself.
+  step. With the injected MW, the real-trained model closed 83% of the gap between the error of a
+  plain model and the error with unmodified lags, and the synthetic-trained model 75%.
+- **Tails:** coverage of the q01 to q99 band stayed between 0.983 and 0.986 and the share of
+  actual values below the q01 forecast at 0.013 to 0.016, so synthetic training did not widen the
+  quantiles.
+- **Finding for later experiments:** exact MW makes a corrected lag equal the lag with no
+  transfer, so synthetic transfers look like rows with no transfer. Train with a MW that carries
+  the detector's errors, or improve the MW estimate itself.
 - **Write-up and pull request:**
   [result](00096-sw2-23-synthetic-switches-injected-into-training/result.md),
   [PR #1339 (Experiment 96: do synthetic switches in the training data help the NRA

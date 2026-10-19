@@ -25,18 +25,19 @@ decision_rule: >-
   Four planned contrasts on family A cases, shapes S2, S3, S4, and S6 pooled with equal weight, as
   in experiment 88. The measure is the MW-weighted mean absolute error of the median forecast
   against the true unmodified series, in points of capacity, over leads up to 10 days. Each
-  contrast is read at 98.75% (Bonferroni across four) from 20,000 resamples of whole calendar months
-  of the transfer's onset. C1: arm 2 (synthetic-trained, injected MW) minus arm 1 (real-trained,
-  injected MW). C2: arm 3 (synthetic-trained, RO-NC MW) minus arm 1 with RO-NC MW. C3: arm 4
-  (synthetic-trained, largest-step MW) minus arm 1 with largest-step MW. C4: arm 4 minus the plain
-  booster (the total gain over doing nothing). The verdict is `supported` when the upper end of C3
-  is below zero and C3's point value is negative in at least 3 of the 4 scored onset months;
-  `small gain` when only C1 or C2 has an upper end below zero; `inconclusive` when no interval
-  excludes zero; `refuted` when the lower end of C3 is above zero. The threshold is zero: the
-  injection lives in the training loop and adds nothing to the serving path, so a change whose
-  interval excludes zero is worth porting once the full NRA forecast is. C1 to C3 each pair an arm
-  with its real-trained twin on the same cases and the same MW source. Family B, the time since
-  onset, the lead band, the quantile score, and the tail calibration at q01 to q99 are descriptive.
+  contrast is read at 98.75% (Bonferroni across four) from 20,000 resamples of whole calendar
+  months of the transfer's onset. C1: arm 2 (synthetic-trained, injected MW) minus arm 1
+  (real-trained, injected MW). C2: arm 3 (synthetic-trained, RO-NC MW) minus arm 1 with RO-NC MW.
+  C3: arm 4 (synthetic-trained, largest-step MW) minus arm 1 with largest-step MW. C4: arm 4 minus
+  the plain booster (the total gain over doing nothing). The verdict is `supported` when the upper
+  end of C3 is below zero and C3's point value is negative in at least 3 of the 4 scored onset
+  months; `small gain` when only C1 or C2 has an upper end below zero; `inconclusive` when no
+  interval of C1 to C3 excludes zero; `refuted` when the lower end of C3 is above zero. The
+  threshold is zero: the injection lives in the training loop and adds nothing to the serving
+  path, so a change whose interval excludes zero is worth porting once the full NRA forecast is.
+  C1 to C3 each pair an arm with its real-trained twin on the same cases and the same MW source.
+  Family B, the time since onset, the lead band, the quantile score, and the tail calibration at
+  q01 to q99 are descriptive.
 benchmark: >-
   Arm 1, the booster trained on the real logged transfers only (experiment 88's `nra_oracle`,
   refitted at 11 quantile levels), scored with the same forecast-time MW as each synthetic-trained
@@ -71,7 +72,8 @@ advice:
     booster: three times the real count moved the error by +0.03 to +0.08 points (C1 to C3).
   - >-
     Put the effort into the MW estimate at forecast time: with the injected MW the booster closes
-    75% to 83% of the plain-to-ceiling gap, and with the RO-NC MW 32% to 53% (figure 2).
+    75% to 83% of the plain-to-ceiling gap, and with the detector's MW
+    32% to 53% (figure 2).
   - >-
     If synthetic transfers are tried again, train with a MW that carries the detector's errors (1.5
     times too large, ending days late) and not the exact MW, because exact MW makes the injected rows
@@ -87,29 +89,32 @@ code: ml-experiments/00096-*/
 
 # Experiment 96: do synthetic switches in the training data make the NRA forecast recover the normal arrangement better?
 
-**Take-home message: adding about three times as many synthetic switching transfers to the training
-data did not improve the forecast of the power a substation would have drawn without the transfer,
-and what limits that forecast is the MW estimate at forecast time, not the amount of training
-data.** The point estimates were slightly worse (+0.03 to +0.08 points of capacity) and no interval
-excluded zero. With the true MW the booster already closes 83% of the gap between the plain booster
-and the ceiling, so little was left to gain. With the detector's MW it closes about a third to a
-half, and training on exact MW did not change that. A likely reason is that a lag corrected by the
-exact MW equals the clean lag, so a synthetic transfer looks like an ordinary row to the booster.
-The next test of synthetic transfers should train with a MW that carries the detector's errors. The
-verdict is **inconclusive**.
+**Take-home message: adding about three times as many synthetic switching transfers to the
+training data did not improve the forecast of the power a substation would have drawn without the
+transfer, so the verdict is inconclusive, and the limit is the estimate of the MW moved, not the
+amount of training data.** A switching transfer is load that the network operator NGED moves from
+one Primary substation (the donor) to its neighbours (the receivers) for hours or days. A synthetic
+transfer is one made by adding a known MW to the recorded power of a donor and its receivers. The
+forecast error rose by 0.03 to 0.08 points of capacity (percentage points of the substation's
+capacity, in mean absolute error) when synthetic transfers were added, and no 98.75% interval
+excluded zero. Given the true MW, the XGBoost model trained on real transfers alone already closes
+83% of the gap between the error of a plain model (no correction) and the error of the same model
+reading unmodified lags (the ceiling). A lag is an earlier power reading. Given the detector's MW,
+the same model closes 32% to 53% of the gap, and training on exact MW did not change that. A likely
+reason is that a lag corrected by the exact MW equals the lag with no transfer, so a synthetic
+transfer looks like a row with no transfer. The next test of synthetic transfers should train with a
+MW that carries the detector's errors.
 
-**The experiment asked whether more switching examples in training help the booster that recovers
-the normal running arrangement (NRA).** A switching transfer is load that the network operator NGED
-moves from one Primary substation to its neighbours for hours or days. The NRA forecast corrects the
-earlier power readings it reads (the lags) by the MW moved. [Experiment
+**The experiment asked whether more switching examples in training help the model that recovers
+the normal running arrangement (NRA).** The NRA forecast subtracts the MW moved from each earlier
+power reading it uses. [Experiment
 88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)
-trained that booster on the 56 real transfer intervals of its training windows. Here a second
-booster was also trained on 169 more intervals (94 synthetic transfers, 3.0 times the real
-count), made by adding known MW to the recorded power of a donor and its receivers. Both
-boosters were scored on
-experiment 88's held-out injected transfers, with the MW at forecast time taken from the injection,
-from the causal refit-offset neighbour-count detector (RO-NC, called XL in earlier experiments), or
-from the largest overlapping detector step.
+trained that XGBoost model on the 56 real transfer intervals (one per series and transfer) of its
+training windows. In this experiment a second XGBoost model was trained on those 56 intervals plus
+169 synthetic ones (from 94 synthetic transfers, 3.0 times the real count). Both models were scored
+on experiment 88's held-out synthetic transfers, with the MW at forecast time taken from the
+injection, from the causal refit-offset neighbour-count detector (RO-NC), or from the largest
+overlapping detector step.
 
 ![Planned contrasts](figure_1.svg)
 
@@ -121,11 +126,12 @@ from the largest overlapping detector step.
   refitted at 11 quantile levels). Arms 2 to 4: one booster trained on the real and the synthetic
   transfers, scored with the injected MW (2), the RO-NC MW as built (3), or the largest-step MW (4).
   Each synthetic arm is compared with arm 1 scored with the same MW source.
-- **Training recipe.** Monthly refits (P-roll: 365-day window, 150 rounds, eta 0.15, half-life 0.5
-  years, seed 0). The ensemble-control rows inside a real or synthetic transfer are dropped as
-  targets. Each lag is replaced by the lag minus the signed MW at the lag time, and the signed MW at
-  the three lags is a column. A synthetic transfer's signed MW is its median injected MW, constant
-  over the transfer. The correction is the one experiment 88 used, with no other.
+- **Training recipe.** Monthly rolling refits (P-roll: 365-day window, 150 rounds, learning rate
+  0.15, recency half-life 0.5 years, seed 0). The ensemble-control rows inside a real or synthetic
+  transfer are dropped as targets. Each lag is replaced by the lag minus the signed MW at the lag
+  time, and the signed MW at the three lags is a column. A synthetic transfer's signed MW is its
+  median injected MW, constant over the transfer. The correction is the one experiment 88 used,
+  with no other.
 - **Rows.** Experiment 88's 2,452 injected cases in even onset months (October 2025, February, April,
   and June 2026), shapes S2, S3, S4, and S6, forecast origins inside the transfer (family A). The
   synthetic training transfers start only in odd months (2024-07 to 2026-05); one of the 94 ends in
@@ -135,7 +141,7 @@ from the largest overlapping detector step.
   5.325). RO-NC MW: 5.068 (4.332 to 5.782) and 5.101 (4.322 to 5.843). Largest-step MW: 4.905 (4.227
   to 5.644) and 4.943 (4.219 to 5.690).
 - **Planned contrasts (98.75%).** C1 +0.079 (-0.031 to +0.153). C2 +0.032 (-0.019 to +0.067). C3
-  +0.038 (-0.008 to +0.053). C4 -0.466 (-1.283 to -0.004). C1 to C3 were negative in 1 of 4 months.
+  +0.038 (-0.008 to +0.053). C4 -0.466 (-1.283 to -0.004). C1 to C3 were negative in 1 of 4 onset months.
   The decision rule gives `inconclusive`: no interval of C1 to C3 excludes zero in either direction.
 - **Share of the plain-to-ceiling gap closed (95%).** Injected MW: arm 1 83% (71% to 90%), arm 2 75%
   (54% to 87%). RO-NC MW: 36% (-3% to 73%) and 32% (-10% to 73%). Largest-step MW: 53% (14% to 79%)
@@ -145,17 +151,17 @@ from the largest overlapping detector step.
   +0.173) from 1 to 3 days, and +0.128 (-0.034 to +0.211) after 3 days. With the largest-step MW
   -0.006, +0.059, and +0.075; every interval includes zero.
 - **After a transfer ends (family B, descriptive).** Every contrast lies within +/-0.03 points and
-  every interval includes zero. All arms with the RO-NC MW stay about 0.4 points above plain, as in
-  experiment 88.
+  every interval includes zero. All arms with the RO-NC MW have an error about 0.4 points of
+  capacity higher than the plain model's (5.31 against 4.86), as in experiment 88.
 - **Tails (family A).** Nominal values are 0.01 for the share of actuals below q01 and above q99,
-  and 0.05 for the share above q95. Real-trained and synthetic-trained arms with the injected
-  MW: below q01 0.0136 and
-  0.0134; above q95 0.0130 and 0.0139; above q99 0.0004 and 0.0003; pinball loss at q01 0.212 and
-  0.212, at q99 0.329 and 0.330; coverage of q01 to q99 0.985 and 0.986. With the largest-step MW:
-  below q01 0.0145 and 0.0143; above q99 0.0004 for both. Synthetic training did not widen the
-  quantiles. The lower tail is slightly under-covered and the upper tail over-covered in every arm.
-  The plain booster has 9 quantile levels, so its tails are not scored. The curtailment-cost metric
-  was not scored, because the injected cases are single series and not a node with its generators.
+  and 0.05 for the share above q95. Real-trained and synthetic-trained arms with the injected MW:
+  below q01 0.0136 and 0.0134; above q95 0.0133 and 0.0139; above q99 0.0004 and 0.0003; pinball
+  loss at q01 0.212 and 0.212, at q99 0.329 and 0.330; coverage of q01 to q99 0.986 and 0.986.
+  With the largest-step MW: below q01 0.0145 and 0.0144; above q99 0.0004 for both. Synthetic
+  training did not widen the quantiles. The lower tail is slightly under-covered and the upper
+  tail over-covered in every arm. The plain booster has 9 quantile levels, so its tails are not
+  scored. The curtailment-cost metric was not scored, because the injected cases are single series
+  and not a node with its generators.
 - **Reproduction check.** Arm 1's error minus experiment 88's stored nine-level scores is +0.000
   (-0.008 to +0.007) with the injected MW and -0.000 (-0.009 to +0.008) with the RO-NC MW.
 - **Schedule and lab conditions.** Monthly P-roll refits; the contrast is about training data, not
