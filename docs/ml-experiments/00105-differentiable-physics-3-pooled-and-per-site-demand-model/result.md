@@ -339,6 +339,20 @@ minus X-2yz (the solar offset); X-2yq minus X-2y; the coastal sites; D18 under P
 scarce-data rows (bank holidays, the Christmas run, days below 0 °C, no interval); the cold block
 (no interval); and the score by month since the cut.
 
+## Extra reporting from Part 2's second audit
+
+Part 2's audit found that two of its contrasts reverse sign between the tuning year and the scored
+year. Part 3 therefore reports, beside every decision contrast (C1 to C3, and C5):
+
+- **The tuning year as a second replicate.** The contrast is scored on 2024-07 to 2025-06 as well,
+  with the same arms fitted before 2024-07-01. It decides no verdict.
+- **Winter and summer separately.** Each contrast is split into November to March and April to
+  October rows.
+- **D10 with its November 2024 jump masked, and D16 with and without.** Part 2's gap between G1 and
+  G-all sat mostly at D16.
+- **Three convex comparators for C5:** G-all+D1, G1, and the steps arm (G-all+D1 with steps), all
+  from Part 2's stored predictions.
+
 ## Predictions
 
 Written before any fit; each line can fail, and none of them overrides the decision rule.

@@ -28,7 +28,7 @@ import e00105_common as common
 import numpy as np
 import polars as pl
 import torch
-from studies.dp_features import FeatureCache, default_input_paths, unit_pv_shape
+from studies.dp_features import FeatureCache, default_input_paths, grid_end_times, unit_pv_shape
 from studies.dp_onboarding import (
     FitCopy,
     after_mask,
@@ -352,23 +352,35 @@ def p99_unit_shape(*, batch: PooledBatch, site: int) -> float:
 
 
 def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str, Any]:
-    """Return the injected-farm recovery results."""
+    """Return the injected-farm recovery results.
+
+    A farm reports for about 30% of the window, so a farm's output cannot be added at every row.
+    Each injection copy therefore drops the injected substation's rows where the farm has no
+    reading, and is compared with a base fit on exactly the same rows.
+    """
     batch = common.pooled_batch_for(cache=cache, sites=common.POOL, cut=common.TUNING_CUT)
     context["train_batch"] = batch
     config = config_p()
     copies = [FitCopy(name="base")]
-    coverage = {}
+    coverage, keeps, farms = {}, {}, {}
     for site in INJECTED_SITES:
         index = batch.site_labels.index(site)
-        mask = batch.site == index
-        end = cache.end_times[batch.row[mask].cpu().numpy()]
-        farm = farm_series(farm=FARM_OF_SITE[site], end_times=end)
-        coverage[site] = float((farm > 0).mean())
-        injection = torch.zeros_like(batch.y)
-        injection[mask] = torch.as_tensor(
-            INJECTED_POINTS * farm, dtype=batch.y.dtype, device=batch.y.device
+        site_rows = batch.site == index
+        end = cache.end_times[batch.row.cpu().numpy()]
+        farm = torch.as_tensor(
+            farm_series(farm=FARM_OF_SITE[site], end_times=end),
+            dtype=batch.y.dtype,
+            device=batch.y.device,
         )
-        copies.append(FitCopy(name=f"inject {site}", y=batch.y - injection))
+        has_farm = farm > 0
+        keep = ~site_rows | has_farm
+        keeps[site] = keep
+        farms[site] = INJECTED_POINTS * torch.where(
+            site_rows & has_farm, farm, torch.zeros_like(farm)
+        )
+        coverage[site] = float(has_farm[site_rows].float().mean())
+        copies.append(FitCopy(name=f"base {site}", keep=keep))
+        copies.append(FitCopy(name=f"inject {site}", keep=keep, y=batch.y - farms[site]))
     models, results = fit_many(
         batch=batch,
         copies=copies,
@@ -378,16 +390,15 @@ def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
         learning_rate=common.FIT_RATE,
         final_rate_fraction=common.FINAL_RATE_FRACTION,
     )
-    base, injected = models[0], models[1:]
-    context["base_model"] = base
-    base_cap = base.capacities()[:, -1].detach().cpu().numpy()
+    context["base_model"] = models[0]
     midday = midday_summer(batch=batch, cache=cache)
-    base_shared = shared_midday_output(model=base, batch=batch, mask=midday)
     ratios, others, shared_moves = {}, {}, {}
     solar_sites = [s for s in common.MW_POOL if s in batch.site_labels]
-    for site, model in zip(INJECTED_SITES, injected, strict=True):
+    for position, site in enumerate(INJECTED_SITES):
+        base, injected = models[1 + 2 * position], models[2 + 2 * position]
         index = batch.site_labels.index(site)
-        cap = model.capacities()[:, -1].detach().cpu().numpy()
+        base_cap = base.capacities()[:, -1].detach().cpu().numpy()
+        cap = injected.capacities()[:, -1].detach().cpu().numpy()
         recovered = (cap[index] - base_cap[index]) * p99_unit_shape(batch=batch, site=index)
         ratios[site] = float(recovered / INJECTED_POINTS)
         others[site] = float(
@@ -398,7 +409,8 @@ def gate_2_injected(*, cache: FeatureCache, context: dict[str, Any]) -> dict[str
             )
         )
         shared_moves[site] = abs(
-            shared_midday_output(model=model, batch=batch, mask=midday) - base_shared
+            shared_midday_output(model=injected, batch=batch, mask=midday)
+            - shared_midday_output(model=base, batch=batch, mask=midday)
         )
     median = float(np.median(list(ratios.values())))
     return {
@@ -421,7 +433,7 @@ def placebo_cache(*, cache: FeatureCache) -> FeatureCache:
     """Return a cache whose CAMS irradiance is the same site's from a year earlier (or later)."""
     paths = default_input_paths()
     cams = pl.read_parquet(paths.cams, columns=["site", "time", "ghi_w_m2"])
-    grid = cache.times_series
+    grid = grid_end_times()
     sites = dict(cache.sites)
     for label in common.MW_POOL:
         features = cache.sites[label]

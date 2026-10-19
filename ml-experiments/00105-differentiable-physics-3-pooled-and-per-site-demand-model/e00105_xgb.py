@@ -647,7 +647,10 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
     )
     frames: dict[str, pl.DataFrame] = {}
     weights: list[dict] = []
-    vintage = None if cold else vintage_capacity(cache=cache, site=site, cut=cut)
+    try:
+        vintage = None if cold else vintage_capacity(cache=cache, site=site, cut=cut)
+    except ValueError:
+        vintage = None  # no capacity vintage before the cut (D18): the offset arms are skipped
     window = TrainingWindow(months=common.WINDOW_MONTHS)
     train = training_rows(features=features, cache=cache, cut=cut, window=window)
     check_no_lookahead(cache=cache, train=train, cut=cut)
@@ -681,7 +684,8 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
     )
     frames["x_2yz"] = job.frame_of(quantiles=plain_arm(job=job, train=train, start="zero"))
     frames |= lagged_arms(job=job, train=train, lagless_quantiles=plain)
-    assert vintage is not None
+    if vintage is None:
+        return {"frames": frames, "weights": weights}
     for start, name in (("zero", "x_2yam"), ("estimated", "x_2yamq")):
         arm = offset_arm(
             job=job, train=train, window=window, vintage=vintage, start=start, label=name
