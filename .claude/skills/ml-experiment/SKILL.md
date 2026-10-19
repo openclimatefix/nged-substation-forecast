@@ -57,6 +57,8 @@ whose callers you could not name without searching.
   the code and writes up, Sonnet reviews the write-up against the printed report, and a second
   Sonnet reviewer runs the prose review that "The write-up" describes.
 
+Either size then runs the triggers in "Audit before merge", below, and gets an audit if one fires.
+
 Reuse `implement-issue` by reference for the mechanics: the worktree, the green-before-push set, one
 commit per review, and the triage rule (verify each finding, record each rejected one with its
 reason). An experiment merges on its own under "Merging", below, so it does not stop for human
@@ -347,12 +349,62 @@ until the experiment has had its reviews. A result that contradicts an entry cha
 same PR. Keep a rule about how to run an experiment, such as a control arm or a scoring rule, in this
 skill and not on that page.
 
+## Audit before merge
+
+**A review that checks the printed numbers against the stored predictions cannot catch a method that
+is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.**
+Experiment 104 showed why. Its numbers review confirmed every printed number, yet the residual spread
+shifted each forecast by the previous year's bias. That shift reversed two of the headline
+conclusions, and three failed controls had been explained away instead of investigated.
+
+**An audit is triggered when any of these holds:**
+
+1. **A control fails:** a positive control, a known-answer test, or a placebo.
+2. **A result contradicts its own prediction or an earlier experiment's finding** without a tested
+   explanation. Experiment 87's solar offset gained 0.010 points against a predicted 0.10 to 0.15
+   and experiment 64's 0.152.
+3. **The quantile-score contrast and the same contrast on the error of the mean or median forecast
+   point in different directions.**
+4. **Leaving one site out flips the sign or the verdict of a planned contrast.** Experiment 104's C1
+   rested on D14 alone. Also flag any site whose score is more than twice the median across sites;
+   with five sites that ratio is noisy, so a flag alone does not trigger an audit.
+5. **A nested arm beats the arm that contains it,** such as the same model given less information,
+   **or a control that should change nothing moves the score by more than the noise floor.**
+6. **A headline interval is much wider or narrower than the noise floor,** or than the same contrast
+   in a sister experiment.
+7. **The result changes the plan for later experiments,** as experiment 104 changed the plan for
+   part 4 of its series.
+
+**Who runs it.** The manager, or the experiment's owner when no manager is running, starts a fresh
+Opus agent with the audit brief. The experiment's author never runs its own audit. The audit brief
+differs from a review brief: the agent re-derives the headline contrasts from the raw stored
+predictions, by its own code, and tries to break them. It checks each method's assumptions, such as
+how quantiles are built, how a base margin enters, and how a held value is extrapolated. It does not
+re-check the printed arithmetic. The audit report goes in the private
+`data/ml-experiments/briefs/` folder, and the PR triages each finding.
+
+**A shared method is audited once, where it lives.** A method reused from `packages/studies/`, such
+as a spread model or a base-margin helper, counts as checked only once its own tests or an audit
+cover the property in question. An experiment that is first to depend on an unchecked property
+audits it there, and the fix goes into the package.
+
+**Two checks go in every write-up, triggered or not:**
+
+- **the median forecast minus the mean forecast, per site,** which exposes a spread that shifts the
+  forecast;
+- **the error of the mean or median forecast beside every quantile-score contrast,** which exposes
+  trigger 3.
+
+**The write-up says which triggers fired,** and links the audit's findings and how each was
+triaged.
+
 ## Merging
 
-**An experiment's PR may be merged without waiting for the maintainer when all three hold:** the
+**An experiment's PR may be merged without waiting for the maintainer when all four hold:** the
 diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews
 its size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
---check`; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
+--check`; any audit a trigger in "Audit before merge" calls for has run, with its findings triaged
+in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
 `data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). **Before any
 merge, a fresh Sonnet agent reviews the prose of `result.md` and its `take_home_message`.** The
 agent receives the files and no account of the reasoning behind them, loads the `prose-review`
