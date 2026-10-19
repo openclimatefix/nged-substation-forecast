@@ -227,17 +227,21 @@ tests ran with K = 4 shared shapes, before tuning chose K = 2; test 1 runs P wit
   to 1.3 times the convex capacity and refits the rest: the training loss is 774,009 nats at 0.5,
   769,644 at 0.7, 767,187 at 0.85, 767,141 at 1.0, 771,197 at 1.15, and 776,076 at 1.3, a clear
   minimum near the convex capacity, flat within 46 nats between 0.85 and 1.0. **The free fit's loss
-  is FREE_LOSS nats, 4,5xx above the loss with the capacities pinned at the convex values
+  is 771,694 nats, 4,553 above the loss with the capacities pinned at the convex values
   (767,141).** The data therefore carry information about capacity, between about −15% and +10% of
   the convex value (the profile is flat on the low side), and the free fit did not find the best
   capacity; the cause is only partly tested. The pinned and free fits differ in their posterior
-  sampling and in the Kullback-Leibler term, and variant (c), which started at the convex
-  capacities, moved away from them (loss VARIANT_C_LOSS nats).
-- **Labelled post hoc variants** (screening tier, tuning cut; the primary P is unchanged): (a)
-  temperature hidden from the network by day, (c) capacity started at the convex path, and (a+c).
-  Their capacities are in the diagnostics file (`work/diagnostics.json`) and their training losses
-  in `work/variant_losses.json`: VARIANT_LOSSES. **The leak tests of the variants were not run**
-  (they were queued behind the scored fits and had not finished).
+  sampling and in the Kullback-Leibler term. Variant (c), which started at the convex capacities,
+  ended at 777,050 nats, worse than the free fit, so a start at the convex capacities does not keep
+  the fit there; variant (a), with temperature hidden from the network by day, reached 768,292
+  nats, 3,402 below the free fit and 1,151 above the pinned fit, so the network's use of
+  temperature explains most of the gap.
+- **Labelled post hoc variants** (screening tier, tuning cut, K = 4; the primary P is unchanged):
+  training loss in nats of the free fit 771,694, network off 777,200, (a) temperature hidden from
+  the network by day 768,292, (c) capacity started at the convex path 777,050, and (a+c) 774,771,
+  against 767,141 with the capacities pinned. Their capacities are in `work/diagnostics.json` and
+  the losses in `work/variant_losses.json`. **The leak tests of the variants were not run** (they
+  were queued behind the scored fits and had not finished).
 
 ## Cheap baselines on the same short history
 
