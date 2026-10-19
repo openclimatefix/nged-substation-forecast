@@ -39,7 +39,7 @@ verdict: supported
 prod: no
 take_home_message: >-
   The data lets the series go ahead, with three changes: start 13 of the 16 Primaries later than
-  their first record, fix the lockdown window in advance because the data
+  their first record (19.4 months later at D4), fix the lockdown window in advance because the data
   does not isolate it from drift, and count eligible long-history MW sites at each tuning year's
   first day (5 at 2024-07-01, so 4 of 5 must improve in Part 2's tuning contrast). The power
   timestamps show no 30-minute error on either side of the 2026-03-26 fix: at the 6 metered
