@@ -2,6 +2,10 @@
 id: "00100"
 slug: drop1-random-lag-dropout-widens-intervals
 status: planned
+theme: calibration-and-uncertainty
+also_relevant_to:
+  - switching-labels-in-the-forecast
+  - lagged-power-and-error-correction
 size: complex
 hypothesis: >-
   An XGBoost quantile model for Primary substation demand that is trained with labelled switching
