@@ -30,6 +30,9 @@ from studies.dp_gam import QUANTILE_COLUMNS, GamFit, ResidualSpread
 
 CLIMATOLOGY_BEFORE: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 """CAMS irradiance after this date never enters the climatology the solar shrink pulls towards."""
+MIN_WINDOW_HALF_HOURS: Final[int] = 48
+"""A run needs a day of grid after its origin; the last run of the scored year has less, because
+the grid ends before the held-out period, and is left out."""
 ZERO_SPREAD: Final[LeadHourSpread] = LeadHourSpread(
     by_lead_band=tuple(ResidualSpread(table=np.zeros((4, 4, 11))) for _ in range(4)),
     factors=np.ones(4),
@@ -187,6 +190,8 @@ def forecast_frame(
     frames = []
     for index in run_indices:
         run = setup.runs[index]
+        if len(cache.end_times) - run.origin_position - 1 < MIN_WINDOW_HALF_HOURS:
+            continue
         forecast = forecast_run(
             cache=cache,
             context=setup.context,
