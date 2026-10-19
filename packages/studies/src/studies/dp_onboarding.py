@@ -94,11 +94,14 @@ class FitCopy:
         name: A label for the copy.
         keep: A boolean tensor over the batch's rows, or `None` to keep every row.
         y: Replacement readings for every row of the batch, or `None` to keep the real ones.
+        capacity_prior: A prior centre for each substation's first capacity increment before the
+            softplus, with `NaN` for none (see `PooledDemandModel.capacity_prior`), or `None`.
     """
 
     name: str
     keep: torch.Tensor | None = None
     y: torch.Tensor | None = None
+    capacity_prior: torch.Tensor | None = None
 
 
 def fit_many(
@@ -141,6 +144,8 @@ def fit_many(
             n_season_years=batch.n_season_years,
             initial_level=initial_level,
         )
+        if copy.capacity_prior is not None:
+            model.capacity_prior.copy_(copy.capacity_prior)
         results.append(
             fit_pooled(
                 model=model,
@@ -215,6 +220,7 @@ def onboard_site(
     history_end: np.datetime64,
     forecast_season_year: int,
     steps: int,
+    weeks_of_history: int | None = None,
     learning_rate: float = 0.05,
     seed: int = 0,
 ) -> dict[str, float]:
@@ -235,6 +241,8 @@ def onboard_site(
         history_end: The substation's history ends here; no row may end after it.
         forecast_season_year: The season-year of the forecast.
         steps: Optimiser steps.
+        weeks_of_history: The weeks of history this arm gives the substation, recorded on the
+            model so the pooled residuals can be checked against the arm they are used for.
         learning_rate: Adam's learning rate.
         seed: Seeds the posterior draws.
 
@@ -255,6 +263,8 @@ def onboard_site(
         forecast_season_year=forecast_season_year,
     )
     n_years = model.n_season_years
+    if weeks_of_history is not None:
+        model.onboarding_weeks[label] = weeks_of_history
     saved_trained = model.trained.clone()
     saved_centres = model.centre_means.clone()
     saved_flags = {name: p.requires_grad for name, p in model.named_parameters()}
@@ -396,16 +406,22 @@ def pooled_residuals(
     Args:
         model: The replica fit.
         batch: The replica year's rows.
-        weeks_of_history: The weeks of history of the onboarding arm, if the model was onboarded.
+        weeks_of_history: The weeks of history of the onboarding arm, if the model was onboarded;
+            it must match the weeks recorded when the model was onboarded.
 
     Returns:
         The residuals, tagged with the substations the fit excluded and the weeks of history.
     """
+    if weeks_of_history is not None and any(
+        weeks != weeks_of_history for weeks in model.onboarding_weeks.values()
+    ):
+        msg = f"the model was onboarded with {model.onboarding_weeks} weeks, not {weeks_of_history}"
+        raise ValueError(msg)
     predicted = predict_pooled(model=model, batch=batch)
     labels = np.array(batch.site_labels)[batch.site.cpu().numpy()]
     excluded = tuple(
         label
-        for label, active in zip(batch.site_labels, model.site_active.tolist(), strict=True)
+        for label, active in zip(batch.site_labels, model.fit_had_rows.tolist(), strict=True)
         if active == 0
     )
     return PooledResiduals(
@@ -419,7 +435,11 @@ def pooled_residuals(
 
 
 def cross_fitted_spread(
-    *, residuals: PooledResiduals, held_out: str, weeks_of_history: int | None = None
+    *,
+    residuals: PooledResiduals,
+    held_out: str,
+    weeks_of_history: int | None = None,
+    allow_seen: bool = False,
 ) -> ResidualSpread:
     """Fit a spread on the other substations' residuals from a fit that never saw `held_out`.
 
@@ -433,6 +453,8 @@ def cross_fitted_spread(
         residuals: The replica residuals of all substations.
         held_out: The label of the substation whose forecast the spread is for.
         weeks_of_history: The weeks of history of the arm the spread is for.
+        allow_seen: Accept residuals from fits that trained on `held_out`'s rows before the
+            replica cut. The caller then states that caveat in the write-up.
 
     Returns:
         The spread, with the quantile levels of `studies.dp_gam.QUANTILE_LEVELS`.
@@ -441,7 +463,7 @@ def cross_fitted_spread(
         ValueError: If the replica fit saw `held_out`, the weeks of history differ, or no other
             substation has residuals.
     """
-    if held_out not in residuals.fit_excluded:
+    if held_out not in residuals.fit_excluded and not allow_seen:
         msg = f"the replica fit saw {held_out}: its residuals cannot make {held_out}'s spread"
         raise ValueError(msg)
     if residuals.weeks_of_history != weeks_of_history:
