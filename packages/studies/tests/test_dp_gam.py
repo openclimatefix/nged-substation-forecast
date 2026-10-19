@@ -291,7 +291,7 @@ def test_the_default_tolerance_loosens_in_float32_and_a_wellconditioned_problem_
 
 
 def test_a_batch_of_large_systems_solves_on_the_cpu_with_several_threads():
-    # PyTorch's batched MKL LU solve fails above about 500 by 500 on several threads; the solver
+    # PyTorch's batched MKL LU solve fails from about 200 by 200 on four or more threads; the solver
     # solves a CPU batch one system at a time. The failure needs an explicit thread count.
     generator = np.random.default_rng(16)
     size = 567
