@@ -1,6 +1,8 @@
 ---
 id: "00099"
 slug: crps1-crps-type-loss-over-ens-members-primary-demand-pilot
+theme: calibration-and-uncertainty
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

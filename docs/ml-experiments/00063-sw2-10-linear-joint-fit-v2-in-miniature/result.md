@@ -1,6 +1,8 @@
 ---
 id: "00063"
 slug: sw2-10-linear-joint-fit-v2-in-miniature
+theme: switching-detectors
+also_relevant_to: []
 status: finished
 size: medium
 hypothesis: >-

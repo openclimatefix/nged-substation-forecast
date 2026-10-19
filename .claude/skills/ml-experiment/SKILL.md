@@ -40,7 +40,7 @@ porting at any gain whose interval excludes zero, so its threshold is zero. A ch
 model, a data source, or a pipeline step needs a threshold that pays for the added complexity. Write
 the threshold into the decision rule, with the reason. Do not copy a threshold from an earlier
 experiment, because a paired contrast on the same rows often resolves gains much finer than the
-whole-sample figures the research plan quotes.
+whole-sample figures a theme's Research plan page quotes.
 
 **Size the experiment with the five `plan-issue` triggers, and write one line for each:** what gets
 stored, whether the experiment touches the production serving path, whether it touches a degradation
@@ -72,15 +72,14 @@ review as `implement-issue` does.
   **Write the id without leading zeros in the title of a pull request or an issue**, as in
   "Experiment 6: which input features work best", never "Experiment 00006". The five digits belong
   to folder and file names only.
-- **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it. Add it
-  to the navigation in `mkdocs.yml`, under "ML experiments" and titled with the hypothesis, in the
-  commit that first adds the page. When two experiments finish together, the two navigation lines
-  conflict on rebase; keep both.
-- **The research log and plan:** `docs/ml-experiments/research-log.md` lists every finished
-  experiment in the order it was started, with its question, headline result, date, and links.
-  `docs/ml-experiments/research-plan.md` lists the planned and proposed experiments, sorted by
-  priority. Keep both current in the same PR that changes an experiment's state, as the next
-  section says.
+- **The write-up:** `docs/ml-experiments/<id>-<slug>/result.md`, with its figures beside it. The
+  page is not in the navigation, because the generated Experiments table of its theme links to it,
+  so do not edit `mkdocs.yml`.
+- **The themes:** every experiment belongs to one theme, a folder under
+  `docs/ml-experiments/themes/` with a Summary (`index.md`), an Experiments page, and a Research
+  plan page (`plan.md`). The Experiments table and the planned-experiments table are generated from
+  the `result.md` front matter when the documentation is built, so the experiment's front matter is
+  the only entry to write.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
   `ml-experiments/` may share a basename. A script imports its own folder, `studies.*`, and the
@@ -92,13 +91,27 @@ review as `implement-issue` does.
 
 **`result.md` is the plan first and the write-up second.** Commit it with status `planned` before
 the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
-hypothesis, the prediction, the decision rule, the status, the size, the benchmark, the row set id,
-the metric, and, when finished, the verdict (`supported`, `small gain`, `refuted`, `inconclusive`,
-`invalid`, or `failed`), the best arm with its headline number, the lessons learned, and `advice`
-(below). A finished experiment also has `production_status` (`candidate`, `adopted`, `superseded`, or
-`not-for-production`) and `adopted_in` (the model release number, or `none`). Every result has the
-same front matter, so a later session finds results with `grep` over
-`docs/ml-experiments/*/result.md`.
+`id`, `slug`, `theme`, `also_relevant_to`, `status`, `size`, `hypothesis`, `prediction`,
+`decision_rule`, `benchmark`, `row_set_id`, and `metric`, and, when finished, the `verdict`
+(`supported`, `partly supported`, `small gain`, `not supported`, `refuted`, `inconclusive`,
+`invalid`, or `failed`), `best_arm` with its headline number, `headline`, `lessons`,
+`take_home_message`, and `advice` (below). A finished experiment also has `production_status`
+(`candidate`, `adopted`, `superseded`, or `not-for-production`) and `adopted_in` (the model release
+number, or `none`). Every result has the same front matter, so a later session finds results with
+`grep` over `docs/ml-experiments/*/result.md`.
+
+**`theme` names exactly one theme folder under `docs/ml-experiments/themes/`, and `also_relevant_to`
+lists the other themes the result bears on (an empty list if none).** The experiment appears in the
+Experiments table of its own theme as "primary" and of each listed theme as "also relevant". An
+experiment that fits no existing theme takes the closest theme. A new theme should cover several
+related experiments, and is a folder under `themes/` with `index.md`, `experiments.md`, and
+`plan.md`, plus an entry in the `mkdocs.yml` navigation.
+
+**`take_home_message` is two or three plain sentences saying what the result means for the forecast,
+and it is required for every experiment with an id of 103 or more.** Write it for a reader who has not
+opened the page, with no jargon, and put the effect on the forecast first. It is shown in the
+Experiments table of each theme. `uv run python scripts/mkdocs_hooks/experiment_tables.py --check`
+validates the whole front matter, and `... --theme <theme>` prints a theme's Experiments table.
 
 **`advice` is a YAML list of one-line imperatives for future experiments, and a result is not
 finished without it.** Each item says what to do and where it applies, and ends with a pointer to the
@@ -112,8 +125,11 @@ which says whether the winner is ready for production. Before planning a new exp
 earlier advice with
 `awk '/^advice:/{f=1; print FILENAME} /^[a-z_]+:/&&!/^advice:/{f=0} f' docs/ml-experiments/*/result.md`,
 which prints a whole list however long it is, and say in the plan which items the plan follows and
-which it departs from. The research log's "What the experiments taught us so far" section is the
+which it departs from. The overview's "What the experiments taught us so far" section is the
 curated roll-up of the `advice` lists.
+
+A plan also begins by reading `docs/ml-experiments/data-processing.md`, which lists the processing
+that the data needs before a model trains or scores on it.
 
 ## How to score
 
@@ -167,24 +183,23 @@ time would have taken under an hour.
   to its own file, and write it atomically, so that a run in parallel gives the numbers a run in
   series would, and a crashed worker is rerun without touching the others.
 
-## Keep the research log current
+## Keep the theme's Research plan page current
 
-**Update `docs/ml-experiments/research-plan.md` in the PR that commits the `planned` `result.md`,
-and `docs/ml-experiments/research-log.md` in the PR that adds the finished write-up.** The first PR
-updates the experiment's row in the table of `research-plan.md` with its id, the question in one
-line, the priority, what it waits for, and the state. The finished PR deletes that row and its
-section from `research-plan.md`, adds the experiment to the table at the top of `research-log.md`,
-and adds a short entry: the question, the verdict in one sentence, the
-headline number with its interval, any finding that changes how later experiments are run, links
-to `result.md` and the PR, and one figure. An idea the maintainer has agreed to run but that has no
-folder yet goes in the table of `research-plan.md` marked "Proposed". An experiment that ends
-`invalid` or `failed` keeps its entry, and the entry says why. Write the entry for a reader who has
-not opened `result.md`.
+**Update the owning theme's Research plan page (`docs/ml-experiments/themes/<theme>/plan.md`) in the
+PR that commits the `planned` `result.md`, and again in the PR that adds the finished write-up.** The
+first PR updates the experiment's row in the priority table at the top of the page with its id, the
+question in one line, the priority, what it waits for, and the state, and commits the `result.md`
+with `status: planned`, which the page's generated planned-experiments table then lists. The finished
+PR deletes that row and the experiment's proposal section from the page, sets the final `status`,
+`verdict`, and `production_status` in the front matter, and writes `take_home_message`. Nothing else
+is edited: the Experiments table of the theme, and the candidates table on the overview, are
+generated from the front matter. An idea the maintainer has agreed to run but that has no folder yet
+goes in the priority table marked "Proposed". An experiment that ends `invalid` or `failed` keeps its
+`result.md`, and its `take_home_message` says why.
 
-**The first column of each table in `research-log.md` states the topic, and the position in a series
-when the experiment belongs to one.** Write it as the id, a dash, a few words naming the topic, and
-the part number for an experiment in a series, such as "00037 - Switching event detector, part 1".
-Name every experiment in a series with the same topic words, so a reader can find the series by eye.
+**Name every experiment in a series with the same topic words in its slug, so a reader can find the
+series by eye.** Write the slug as a few words naming the topic and the part, such as
+`switching-event-detector-part-1`.
 
 ## Exploratory series
 
@@ -193,8 +208,8 @@ result of the one before.** A question is exploratory when no single hypothesis 
 test, such as "can switching events be found in the telemetry at all?" or "can embedded solar be
 separated from substation demand?". A series replaces one large pre-registered experiment, which
 would spend its whole budget before anything is learned. Every experiment in the series still has
-its own `result.md`, hypothesis, prediction, decision rule, and stop rule, and the series is one
-topic in the research log.
+its own `result.md`, hypothesis, prediction, decision rule, and stop rule, and the series shares one
+topic in the slugs of its experiments.
 
 The loop has two steps, repeated:
 
@@ -221,10 +236,10 @@ written after Opus has read the results. The experiment's own session does not s
 experiment. The maintainer decides when each step runs, and may stop the series at any step.
 
 **When a series of more than three experiments finishes or pauses, write one summary report that
-tells the whole story.** A series is a set of experiments sharing a topic in the research log. The
-report lives at `docs/ml-experiments/series/<topic>.md`, with its entry in `mkdocs.yml`. The report refits
-nothing: it collates figures and numbers from the existing write-ups into one page. Its three parts,
-in this order:
+tells the whole story.** A series is a set of experiments sharing a topic in their slugs. The report
+is the Summary page of the series' theme, `docs/ml-experiments/themes/<theme>/index.md`. The report
+refits nothing: it collates figures and numbers from the existing write-ups into one page. Its three
+parts, in this order:
 
 - **What the data looks like.** Plots of the raw data and of the labelled examples, with one plain
   sentence each, taken from the series' first experiments.
@@ -254,17 +269,17 @@ recipe. It reports the combined gain, and the loss in score when each component 
 **Flag each finished experiment for the next model release.** Set `production_status` in
 `result.md` to `candidate` when the verdict is `supported`, `small gain`, or `partly supported` and
 the result is worth considering for the next model release, and to `not-for-production` for a
-diagnostic, a refuted idea, or a stage that failed its test. The log's "Candidates for the next
-release" section is the agenda for the maintainer's release review.
+diagnostic, a refuted idea, or a stage that failed its test. The overview's "Candidates for the
+next release" table is the agenda for the maintainer's release review.
 
 **The pull request that cuts a model release records which experiments it adopted.** In that pull
 request, set `production_status` to `adopted` and `adopted_in` to the model release number in each
-incorporated experiment's `result.md`, move the experiment's row in the research log, and add a row
-to `docs/live_service/model-releases.md` listing the experiments the release incorporates. The pull
-requests that port the winners earlier do not set `adopted_in`, because the release number does not
-exist until the release is cut. A later experiment that overturns an adopted result sets
-`production_status` to `superseded` on the old experiment and names the new one in the log. The
-`release-model` skill describes the whole routine.
+incorporated experiment's `result.md`, and add a row to `docs/live_service/model-releases.md`
+listing the experiments the release incorporates. The pull requests that port the winners earlier do
+not set `adopted_in`, because the release number does not exist until the release is cut. A later
+experiment that overturns an adopted result sets `production_status` to `superseded` on the old
+experiment and names the new one in its `take_home_message`. The `release-model` skill describes the
+whole routine.
 
 ## The write-up
 
@@ -282,7 +297,7 @@ not tell.
 
 **Open `result.md` with a few plain sentences that say what question the experiment asked, how it
 went about answering the question, and what it concluded.** Write them for a reader who has not seen
-the experiment, the plan, or the research log. The opening uses no jargon: it names what was tested
+the experiment or the plan. The opening uses no jargon: it names what was tested
 in ordinary words, says what each number is a number of, and leaves the arm names, the check names,
 the abbreviations, and the decision rule to later sections. Test every phrase by asking "what is
 this a share of?", "what was put into what?", and "what does this label stand for?". A sentence such
@@ -321,17 +336,28 @@ with status `planned`. The overnight session:
   take-home message, then its verdict and link, what failed, and the hypotheses it proposes for the
   next plan.
 
+**Record every new finding about data processing in `docs/ml-experiments/data-processing.md`, in the
+same PR as the write-up.** A finding about data processing is a step that the data needs before a
+model trains or scores on it: a period to cut or mask, a series to exclude, a unit, sign, or
+timestamp convention, a product that cannot be mixed with another, or a check that failed silently.
+Write it as an instruction with a bold lead, followed by where it applies (experiments, production,
+or both), the evidence with a link to the experiment, the series and period it covers, and the
+confidence. Update an existing entry instead of adding a second one, and mark the entry provisional
+until the experiment has had its reviews. A result that contradicts an entry changes the entry in the
+same PR. Keep a rule about how to run an experiment, such as a control arm or a scoring rule, in this
+skill and not on that page.
+
 ## Merging
 
 **An experiment's PR may be merged without waiting for the maintainer when all three hold:** the
-diff touches only `ml-experiments/`, `docs/ml-experiments/`, and the experiment's line in
-`mkdocs.yml`; the experiment has had the reviews its size calls for, with the findings triaged, and
-the research log is updated; and the checks pass (`ci` green, no closing keyword in the PR body or
-commit messages, no `data/` or `.env` file, the branch contains `main`, a merge commit and not a
-squash). **Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and the research-log
-entry.** The agent receives the files and no account of the reasoning behind them, loads the
-`prose-review` skill, and reads the opening paragraph first. It reports every term, abbreviation, and
-number in the opening that a reader who has not seen the experiment could not parse, and then checks
-the rest of the page against the prose rules in `CLAUDE.md`. The experiment's session triages the
-findings, applies the valid ones, and records each rejected one with its reason. A change to
+diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews
+its size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
+--check`; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
+`data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). **Before any
+merge, a fresh Sonnet agent reviews the prose of `result.md` and its `take_home_message`.** The
+agent receives the files and no account of the reasoning behind them, loads the `prose-review`
+skill, and reads the opening paragraph first. It reports every term, abbreviation, and number in the
+opening that a reader who has not seen the experiment could not parse, and then checks the rest of
+the page against the prose rules in `CLAUDE.md`. The experiment's session triages the findings,
+applies the valid ones, and records each rejected one with its reason. A change to
 `packages/studies/` stops at a reviewed PR, as `implement-issue` does.

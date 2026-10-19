@@ -12,16 +12,19 @@ description: >-
 # Managing the ml-experiment sessions
 
 **The manager is one long-lived top-level session that runs no experiment itself.** It orders the
-queue in `docs/ml-experiments/research-plan.md`, starts one Claude Code session per experiment,
-allocates compute between the sessions, merges their PRs, archives the finished sessions, and tells
-the maintainer about new science results and blockers. Each experiment session follows the
-`ml-experiment` skill. This skill covers what a manager does when more than one experiment is running.
+queues in the Research plan pages under `docs/ml-experiments/themes/`, starts one Claude Code
+session per experiment, allocates compute between the sessions, merges their PRs, archives the
+finished sessions, and tells the maintainer about new science results and blockers. Each experiment
+session follows the `ml-experiment` skill. This skill covers what a manager does when more than one
+experiment is running.
 
 ## The state the manager keeps
 
-**Git holds the queue and the finished results, and a private folder holds everything else.**
-`docs/ml-experiments/research-plan.md` is the queue, and `research-log.md` is the finished work.
-Under `data/ml-experiments/`, which is never committed:
+**Git holds each theme's queue and the finished results, and a private folder holds the order across
+themes and everything else.** The `plan.md` page of each theme under `docs/ml-experiments/themes/`
+holds that theme's queue, and the Experiments table of each theme, generated from the `result.md`
+front matter, is the finished work. The manager merges the themes' orders into one order in its
+private brief. Under `data/ml-experiments/`, which is never committed:
 
 - `SLOTS.md` is the slot ledger.
 - `MANAGER_STATE.md` is an append-only log, one timestamped line per event: a session started, a
@@ -61,12 +64,12 @@ slot, the holder's session id, the GPU share, the cores, and the start date.
 
 ## Ordering the queue
 
-**Start experiments in the priority order of `research-plan.md`, and start one as soon as a slot
-frees.** An experiment that waits for another's result stays in the queue until that result merges.
-A hold from the maintainer, such as "start nothing new until PR N merges", overrides the order.
-Ideas that the maintainer has not agreed to run go to the maintainer as a ranked list, and nothing is
-committed to the plan until the maintainer has seen the ranking. Exploratory questions run as a
-series, as the `ml-experiment` skill's "Exploratory series" section describes.
+**Start experiments in the priority order of the manager's private brief, and start one as soon as a
+slot frees.** An experiment that waits for another's result stays in the queue until that result
+merges. A hold from the maintainer, such as "start nothing new until PR N merges", overrides the
+order. Ideas that the maintainer has not agreed to run go to the maintainer as a ranked list, and
+nothing is committed to the plan until the maintainer has seen the ranking. Exploratory questions
+run as a series, as the `ml-experiment` skill's "Exploratory series" section describes.
 
 ## Starting a session
 
@@ -113,12 +116,12 @@ state with `gh pr view`, and the log files in the experiment's data folder.
 
 **A session merges its own PR under the `ml-experiment` skill's "Merging" rules, and the manager
 merges it when the session cannot.** The conditions are: the diff touches only `ml-experiments/`,
-`docs/ml-experiments/`, and the experiment's line in `mkdocs.yml`; the reviews are done and triaged;
-`ci` is green; the research log is updated; no `data/` or `.env` file is in the diff; no closing
-keyword appears in the PR body or the commit messages; the branch contains `main`; and the merge is
-a merge commit and never a squash (`gh pr merge --merge`, without `--delete-branch`). Read the PR
-body and the commit messages for a closing keyword before merging, because
-`closingIssuesReferences` is empty until the merge lands.
+and `docs/ml-experiments/`; the reviews are done and triaged; `ci` is green; the experiment's
+`result.md` front matter passes `experiment_tables.py --check`; no `data/` or `.env` file is in the
+diff; no closing keyword appears in the PR body or the commit messages; the branch contains `main`;
+and the merge is a merge commit and never a squash (`gh pr merge --merge`, without
+`--delete-branch`). Read the PR body and the commit messages for a closing keyword before merging,
+because `closingIssuesReferences` is empty until the merge lands.
 
 - **A diff outside those paths, such as a change under `src/` or `packages/`, stops at a reviewed PR
   for the maintainer.** Tell a session
@@ -170,8 +173,9 @@ allows Opus:
 
 - **Worktrees share one data folder.** Only one session may re-run a published script, or the others
   overwrite its evidence.
-- **Keep the plan and the log current.** Each experiment's PRs update `research-plan.md` and
-  `research-log.md`; a stale "Not yet merged" cell misleads the next reader.
+- **Keep the plan current.** Each experiment's PRs update the owning theme's Research plan page and
+  the `result.md` front matter, which generates every table; a stale "Not yet merged" cell misleads
+  the next reader.
 - **Run the local CI checks before every push.** Each lint failure adds a rerun of about 6 minutes,
   and a quarter of the CI runs on experiment branches failed before the sessions did this.
 - **Anonymise NGED's metered generators** in every message, chart, and PR body. Substations may be

@@ -1,6 +1,8 @@
 ---
 id: "00095"
 slug: age2-old-year-penalty-with-the-same-weather-product-demand
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

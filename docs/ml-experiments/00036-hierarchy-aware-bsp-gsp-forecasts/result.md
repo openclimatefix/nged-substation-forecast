@@ -1,6 +1,8 @@
 ---
 id: "00036"
 slug: hierarchy-aware-bsp-gsp-forecasts
+theme: hierarchy-and-pooling
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

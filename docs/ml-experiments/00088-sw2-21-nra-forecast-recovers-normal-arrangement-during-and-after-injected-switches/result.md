@@ -1,6 +1,8 @@
 ---
 id: "00088"
 slug: sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches
+theme: switching-labels-in-the-forecast
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

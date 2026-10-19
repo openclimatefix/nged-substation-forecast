@@ -1,8 +1,16 @@
 ---
 id: "00066"
 slug: sw2-16-end-rule-as-baseline
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  A post hoc rule that ends each alarm interval at the first opposite step of at least half the
+  onset step found more of the moved power than searching 14 days for the strongest opposite step,
+  and a 24-hour averaging window beat a 4-hour window. A longer search cap repairs transfers lasting
+  over 15.6 days but picks a wrong end for some shorter ones, so the pre-registered verdict is
+  inconclusive.
 hypothesis: >-
   Experiment 61's end rule (each alarm interval ends at the strongest opposite step within a cap of
   14 days) can be improved by a longer cap, a shorter step window, or both. A cap of 30 or 60 days

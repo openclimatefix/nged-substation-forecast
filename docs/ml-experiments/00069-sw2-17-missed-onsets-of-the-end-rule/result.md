@@ -1,8 +1,16 @@
 ---
 id: "00069"
 slug: sw2-17-missed-onsets-of-the-end-rule
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Of the 24 real load transfers lasting over 1 day that raised no alarm at their start, 12 are not a
+  threshold problem: 6 lie in data gaps, 3 in a monthly refit that suppresses the alarm, and 3 have
+  an alarm 2 to 12 hours from the labelled start. Accepting weaker alarms that a step back confirms
+  recovered 0.146 of the moved power, but the stricter threshold needed to hold the alarm count lost
+  0.140.
 hypothesis: >-
   An onset rule that accepts a weak alarm only when a matching opposite step follows within 14 days
   (the paired low-threshold onset, PP) recovers more of the moved MW than D0M with the same end

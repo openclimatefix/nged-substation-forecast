@@ -1,6 +1,8 @@
 ---
 id: "00029"
 slug: physics-stage1-solar-pytorch
+theme: generator-forecasting
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-
@@ -80,9 +82,9 @@ No combination beat XGBoost, and the physics model alone was worse by 0.079 poin
 XGBoost stage 1, and the PyTorch physics stage 1 alone scored 0.079 points of capacity worse (98.75%
 interval +0.029 to +0.135).
 
-This page is proposal P31 in the [research plan](../research-plan.md). ENS is the ECMWF ensemble,
-ERA5 is the ECMWF reanalysis, and CAMS is the Copernicus Atmosphere Monitoring Service's satellite
-irradiance estimate. Farms appear only under anonymous labels A to F.
+This page is proposal P31 in the [research plan](../themes/generator-forecasting/plan.md). ENS is
+the ECMWF ensemble, ERA5 is the ECMWF reanalysis, and CAMS is the Copernicus Atmosphere Monitoring
+Service's satellite irradiance estimate. Farms appear only under anonymous labels A to F.
 
 ## Survey of the earlier PV fits (step 1)
 

@@ -1,9 +1,8 @@
 # A staged probabilistic forecast
 
-> **Status: 🔬 Research.** The design on this page is a best guess under test. The
-> [research log](../ml-experiments/research-log.md) holds the experiments that test it, and the
-> [research plan](../ml-experiments/research-plan.md) lists the experiments to run next. No
-> production code implements it.
+> **Status: 🔬 Research.** The design on this page is a best guess under test. The [ML
+> experiments](../ml-experiments/README.md) pages hold the experiments that test it, and each
+> theme's Research plan page lists the experiments to run next. No production code implements it.
 
 **The page describes a probabilistic power forecast in three parts with fixed roles.** Stage 1 turns
 weather into power, stage 2 calibrates the result, uses lagged power, and blends weather products,
@@ -297,8 +296,9 @@ must clear a low bar. The risks are thin data per bucket and quantile jumps at b
   or sites are added.
 - **A new NWP with short history:** add an adapter table. Stage 1 is untouched. Stage 2's calibrator
   keeps its form: the new product's rows join the pooled fit with one new spread factor, and the
-  blend gains the product's weight, shrunk towards equal weights. The second-product experiments in
-  the research plan measure how few months of history this needs. The single-stage challenger
+  blend gains the product's weight, shrunk towards equal weights. The second-product experiments on
+  the [weather products Research plan](../ml-experiments/themes/weather-products-and-blending/plan.md)
+  measure how few months of history this needs. The single-stage challenger
   instead adds a correction (a few numbers per technology) to a frozen champion, and the
   per-product-columns control retrains in full.
 
@@ -406,12 +406,12 @@ versioned stage 1 artefact, and a rule-based detector first.
 
 ## What the experiments show
 
-**Seven experiments and one closed study give the evidence so far.** The [research
-log](../ml-experiments/research-log.md) holds
-each experiment's question, verdict, and figures; the bullets give the headline of each. Pull
-request numbers for 00005 and 00006 are [PR #1195 (Experiment 5: where lagged power enters a
-two-stage demand forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195)
-and [PR #1202 (Experiment 6: which input features work best for the ERA5-trained demand
+**Seven experiments and one closed study give the evidence so far.** The [ML
+experiments](../ml-experiments/README.md) pages hold each experiment's question, verdict, and
+figures; the bullets give the headline of each. Pull request numbers for 00005 and 00006 are
+[PR #1195 (Experiment 5: where lagged power enters a two-stage demand
+forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195) and [PR #1202
+(Experiment 6: which input features work best for the ERA5-trained demand
 model)](https://github.com/openclimatefix/nged-substation-forecast/pull/1202).
 
 - **00001, solar and wind, ENS only:** stage 1 trained on ERA5 and applied to the 51 ENS members and
@@ -487,7 +487,8 @@ and input/output still probably dominate wall-clock time and need chunking by se
 - Which uses need coherence across time, across series, or both, and does feeder-to-substation
   hierarchy data exist for scoring it?
 - Is the target overall CRPS or exceedance at the 95th percentile? The answer decides between the
-  location-and-scale form and a free quantile calibrator, which the research plan tests.
+  location-and-scale form and a free quantile calibrator, which the [calibration Research
+  plan](../ml-experiments/themes/calibration-and-uncertainty/plan.md) tests.
 - The final 51-member output fits `PowerForecast`, whose `ensemble_member` already has a different
   meaning for each forecaster (for `climatology` it is the rank of a quantile level). Should a
   docstring line say what the index means for the staged forecaster? The 19-level quantile table and
@@ -577,7 +578,7 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
   technique page.
 - **Reuse of stage 1:** the [capacity-estimation](capacity-estimation.md) and
   [data-cleaning](data-cleaning.md) roadmap pages.
-- **Evidence and process:** the [research log](../ml-experiments/research-log.md), which holds the
+- **Evidence and process:** the [ML experiments](../ml-experiments/README.md) pages, which hold the
   experiments' results, and the `release-model` skill, which describes how winners reach a numbered
   model release. Earlier evidence: the [lag-features study](../studies/forecasts/lag-features.md)
   and the [production feature faults study](../studies/forecasts/production-feature-faults.md).
@@ -586,10 +587,10 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
 
 ## Work still to do
 
-**The research plan lists the experiments to run next, and two pieces of infrastructure are tracked
-as GitHub issues because they change production-facing code.** The [research
-plan](../ml-experiments/research-plan.md) is a page next to the [research
-log](../ml-experiments/research-log.md). The two pieces of infrastructure are:
+**Each theme's Research plan page lists the experiments to run next, and two pieces of
+infrastructure are tracked as GitHub issues because they change production-facing code.** The
+Research plan pages are linked from the [ML experiments overview](../ml-experiments/README.md). The
+two pieces of infrastructure are:
 
 - **The conventions adapter.** The radiation and wind rules have shipped. Remaining: step widths for
   hourly-stepped NWPs, the same adapter for ERA5 and CAMS, the per-NWP convention table, and the

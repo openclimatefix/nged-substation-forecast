@@ -1,6 +1,8 @@
 ---
 id: "00018"
 slug: staged-chain-vs-n1-serving-latency-lag-anomalies-demand
+theme: lagged-power-and-error-correction
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-
