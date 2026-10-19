@@ -169,6 +169,11 @@ contrast, and no leave-one-site-out contrast to report.
 - **Not run:** the power check, the 13 refitted placebo draws, the arms F, KF, KF-frz, KF-mva, KF-9h,
   KF-hind, the contrasts C1 to C3, and the replicate-year and scored-year scores. The code for the
   arms and the gate is in `ml-experiments/00108-*/`.
+- **Known limit of the stale-contributor arm:** in KF-9h, a local stream built as the residual
+  minus the loading times the scale times the factor reads factor values that are not yet usable
+  at the local 3.5-hour cutoff, which changed 14 of 100 day-1 corrections in a module check. The
+  module cannot detect this, and the arm's script would have to delay the factor inside the local
+  stream too.
 - **Caveats:** ERA5 and CAMS inputs up to the cut would make any result a ceiling; the 3.5-hour delay
   is assumed; the gate injected into the five MW sites in one small area; and the 2021 and 2022
   fits read the 2023-08-07 capacity vintage 13 to 25 months late.
