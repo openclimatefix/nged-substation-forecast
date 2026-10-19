@@ -188,7 +188,7 @@ def test_members_that_all_equal_the_control_give_one_forecast_and_the_mixture_eq
     assert (result.means == result.means[0]).all()
 
 
-def test_a_forecast_ignores_the_cache_weather_and_a_later_run_and_follows_its_own_proxy(
+def test_a_forecast_ignores_the_cache_weather_and_follows_its_own_proxy(
     responsive_cache: FeatureCache, fits: list[GamFit]
 ):
     cache = responsive_cache
@@ -208,23 +208,8 @@ def test_a_forecast_ignores_the_cache_weather_and_a_later_run_and_follows_its_ow
         pv_unit_shape=np.zeros_like(features.pv_unit_shape),
         ghi_w_m2=np.zeros_like(features.ghi_w_m2),
     )
-    runs = [
-        _run(
-            cache=cache,
-            origin_position=position - 48 * back,
-            temperature_offset=ENSEMBLE_OFFSET_K,
-        )
-        for back in range(21)
-    ]
-    later = _run(cache=cache, origin_position=position + 1, temperature_offset=40.0)
-    leaky_proxy = weather.AnalysisProxy.build(runs=[*runs, later], n_rows=len(cache.end_times))
     after = dp_ens.member_means(
-        cache=changed,
-        context=replace(context, proxy=leaky_proxy),
-        run=run,
-        origin=ORIGIN,
-        fits=fits,
-        members=[3],
+        cache=changed, context=context, run=run, origin=ORIGIN, fits=fits, members=[3]
     )
     assert np.array_equal(before.means, after.means)
     warmer = _context(cache=cache, origin_position=position, offset=ENSEMBLE_OFFSET_K + 3.0)

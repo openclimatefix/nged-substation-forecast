@@ -29,7 +29,6 @@ from studies.dp_assimilation import (
     usable_cutoff_positions,
 )
 from studies.dp_ens_weather import (
-    HALF_HOURS_PER_HOUR,
     N_LEAD_BANDS,
     EnsSiteRun,
     RunWindow,
@@ -39,6 +38,7 @@ from studies.dp_ens_weather import (
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import QUANTILE_LEVELS, GamFit, ResidualSpread, predict_gam
 from studies.ens_members import CONTROL_MEMBER, MIXTURE_LEVELS, mixture_quantiles
+from studies.power import HALF_HOURS_PER_HOUR
 
 if tuple(QUANTILE_LEVELS) != MIXTURE_LEVELS:
     msg = "the DP's quantile levels and the mixture's must be the same 11 levels"

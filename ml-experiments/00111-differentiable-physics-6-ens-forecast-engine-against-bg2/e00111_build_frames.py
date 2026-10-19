@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Final
 
 import h3
+import numpy as np
 import polars as pl
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from studies.dp_features import default_input_paths
@@ -246,13 +247,18 @@ def validate_frame(*, frame: pl.DataFrame, run: datetime) -> dict[str, int]:
         problems.append("duplicate (series, member, valid time) keys")
     if frame.height % (N_SITES * ENSEMBLE_SIZE):
         problems.append(f"{frame.height} rows is not a whole number of half-hours per member")
-    if frame["lead_hours"].min() != 0.5 or frame["lead_hours"].max() > HORIZON_HOURS:
+    leads = frame["lead_hours"].to_numpy()
+    if leads.min() != 0.5 or leads.max() > HORIZON_HOURS:
         problems.append("the leads do not run from 0.5 hours to at most 351 hours")
-    temperature = frame["temperature_2m"]
-    if temperature.null_count() or not -30.0 < temperature.min() < temperature.max() < 45.0:
-        problems.append("a temperature is missing or outside -30 to 45 degrees Celsius")
-    shortwave = frame["shortwave"].drop_nulls()
-    if shortwave.min() < 0.0 or shortwave.max() > 1400.0:
+    temperature = frame["temperature_2m"].to_numpy()
+    if frame["temperature_2m"].null_count() or np.isnan(temperature).any():
+        problems.append("a temperature is missing or NaN")
+    elif not -30.0 < temperature.min() < temperature.max() < 45.0:
+        problems.append("a temperature is outside -30 to 45 degrees Celsius")
+    shortwave = frame["shortwave"].drop_nulls().to_numpy()
+    if np.isnan(shortwave).any():
+        problems.append("a shortwave value is NaN")
+    elif shortwave.min() < 0.0 or shortwave.max() > 1400.0:
         problems.append("a shortwave value is negative or above 1,400 W/m2")
     if problems:
         msg = f"the {run:%Y-%m-%d} frame failed validation: " + "; ".join(problems)

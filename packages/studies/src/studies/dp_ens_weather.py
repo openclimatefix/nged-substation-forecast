@@ -54,9 +54,9 @@ from studies.dp_calendar import (
 )
 from studies.dp_features import FLEET, FeatureCache, SiteFeatures, naive_utc
 from studies.ens_members import CONTROL_MEMBER, ENSEMBLE_SIZE
+from studies.power import HALF_HOURS_PER_HOUR
 from studies.pv_physics import SunAndSky, plant_power_mw, solar_position
 
-HALF_HOURS_PER_HOUR: Final[int] = 2
 HORIZON_HALF_HOURS: Final[int] = 336
 """The forecast horizon: 168 hours of half-hours, from the origin."""
 

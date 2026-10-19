@@ -170,6 +170,22 @@ def test_a_calibration_cell_with_few_rows_keeps_the_identity():
     assert (calibration.irradiance_ratio == 1.0).all()
 
 
+def test_the_calibration_fit_refuses_runs_from_a_month_that_is_not_a_tuning_month():
+    origins = np.array(["2024-07-15T09:00", "2024-08-15T09:00"], dtype="datetime64[us]")
+    with pytest.raises(ValueError, match="not allowed"):
+        weather.Calibration.fit(
+            origin_time=origins,
+            allowed_months={(2024, 7)},
+            season=np.zeros(2, dtype=int),
+            lead_band=np.zeros(2, dtype=int),
+            hour_band=np.zeros(2, dtype=int),
+            ens_mean_temperature_c=np.zeros(2),
+            target_temperature_c=np.zeros(2),
+            ens_mean_ghi=np.zeros(2),
+            target_ghi=np.zeros(2),
+        )
+
+
 def test_the_calibration_refuses_rows_from_a_month_that_is_not_a_tuning_month():
     times = np.array(["2024-07-15T12:00", "2024-08-15T12:00"], dtype="datetime64[us]")
     with pytest.raises(ValueError, match="not allowed"):
@@ -455,6 +471,14 @@ def test_the_proxy_cache_uses_the_first_lead_band_and_does_not_shrink(
         solar_shrink=np.zeros(4),
     )
     context = _context(cache=cache, origin_position=position, calibration=calibration)
+    scaled_runs = [
+        _run(cache=cache, origin_position=position - 48 * back, shortwave_scale=0.5)
+        for back in range(21)
+    ]
+    context = replace(
+        context,
+        proxy=weather.AnalysisProxy.build(runs=scaled_runs, n_rows=len(cache.end_times)),
+    )
     proxied = weather.proxy_cache(cache=cache, context=context).sites[SITE]
     covered = np.isfinite(context.proxy.temperature_c)
     assert np.allclose(proxied.temperature_c[covered], context.proxy.temperature_c[covered] + 1.0)
@@ -466,7 +490,7 @@ def test_the_proxy_cache_uses_the_first_lead_band_and_does_not_shrink(
     raw = cache.sites[SITE].ghi_w_m2[span].reshape(-1, 2).mean(axis=1)
     midday = raw > MIDDAY_W_M2
     assert midday.any()
-    assert np.allclose(pairs[midday], raw[midday], rtol=1e-6)
+    assert np.allclose(pairs[midday], 0.5 * raw[midday], rtol=1e-6)
     assert np.isnan(proxied.temperature_c[~covered]).all()
 
 
