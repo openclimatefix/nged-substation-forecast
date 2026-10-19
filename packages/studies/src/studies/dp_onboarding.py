@@ -456,7 +456,7 @@ def cross_fitted_spread(
         raise ValueError(msg)
     band, quarter = residuals.band[others], residuals.quarter[others]
     centred = _centre_by_group(residual=residuals.residual[others], band=band, quarter=quarter)
-    return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter)
+    return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter, centre=False)
 
 
 def _centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:
