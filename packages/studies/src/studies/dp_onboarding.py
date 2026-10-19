@@ -94,11 +94,14 @@ class FitCopy:
         name: A label for the copy.
         keep: A boolean tensor over the batch's rows, or `None` to keep every row.
         y: Replacement readings for every row of the batch, or `None` to keep the real ones.
+        capacity_prior: A prior centre for each substation's first capacity increment before the
+            softplus, with `NaN` for none (see `PooledDemandModel.capacity_prior`), or `None`.
     """
 
     name: str
     keep: torch.Tensor | None = None
     y: torch.Tensor | None = None
+    capacity_prior: torch.Tensor | None = None
 
 
 def fit_many(
@@ -141,6 +144,8 @@ def fit_many(
             n_season_years=batch.n_season_years,
             initial_level=initial_level,
         )
+        if copy.capacity_prior is not None:
+            model.capacity_prior.copy_(copy.capacity_prior)
         results.append(
             fit_pooled(
                 model=model,
@@ -419,7 +424,11 @@ def pooled_residuals(
 
 
 def cross_fitted_spread(
-    *, residuals: PooledResiduals, held_out: str, weeks_of_history: int | None = None
+    *,
+    residuals: PooledResiduals,
+    held_out: str,
+    weeks_of_history: int | None = None,
+    allow_seen: bool = False,
 ) -> ResidualSpread:
     """Fit a spread on the other substations' residuals from a fit that never saw `held_out`.
 
@@ -433,6 +442,8 @@ def cross_fitted_spread(
         residuals: The replica residuals of all substations.
         held_out: The label of the substation whose forecast the spread is for.
         weeks_of_history: The weeks of history of the arm the spread is for.
+        allow_seen: Accept residuals from fits that trained on `held_out`'s rows before the
+            replica cut. The caller then states that caveat in the write-up.
 
     Returns:
         The spread, with the quantile levels of `studies.dp_gam.QUANTILE_LEVELS`.
@@ -441,7 +452,7 @@ def cross_fitted_spread(
         ValueError: If the replica fit saw `held_out`, the weeks of history differ, or no other
             substation has residuals.
     """
-    if held_out not in residuals.fit_excluded:
+    if held_out not in residuals.fit_excluded and not allow_seen:
         msg = f"the replica fit saw {held_out}: its residuals cannot make {held_out}'s spread"
         raise ValueError(msg)
     if residuals.weeks_of_history != weeks_of_history:

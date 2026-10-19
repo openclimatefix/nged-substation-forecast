@@ -139,6 +139,19 @@ def test_the_kl_term_matches_its_closed_form():
     assert float(term) == pytest.approx(float((expected - 0.5).sum()), rel=1e-5)
 
 
+def test_a_site_specific_capacity_prior_centres_the_first_capacity_increment(batch: PooledBatch):
+    (model,), _ = _fit(batch, DpConfig(population_scales=PopulationScales()), [FitCopy(name="m")])
+    site = batch.site_labels.index("S1")
+    base = float(model.site_prior_term())
+    with torch.no_grad():
+        model.capacity_prior[site] = float(model.capacity_raw[site].max())
+        near = float(model.site_prior_term())
+        model.capacity_prior[site] = 50.0
+        far = float(model.site_prior_term())
+    assert far > near
+    assert near != base or far != base
+
+
 def test_the_loss_is_the_negative_elbo_per_row(batch: PooledBatch):
     (model,), _ = _fit(batch, DpConfig(variational=True), [FitCopy(name="v")])
     model.eval()
@@ -416,6 +429,10 @@ def test_the_cross_fitted_spread_needs_a_fit_that_never_saw_the_held_out_site():
         cross_fitted_spread(residuals=residuals, held_out="A", weeks_of_history=8)
     with pytest.raises(ValueError, match="saw B"):
         cross_fitted_spread(residuals=residuals, held_out="B", weeks_of_history=4)
+    seen = cross_fitted_spread(
+        residuals=residuals, held_out="B", weeks_of_history=4, allow_seen=True
+    )
+    assert np.allclose(seen.table, 0.0)
     only_held_out = replace(residuals, site=np.array(["A"] * 800))
     with pytest.raises(ValueError, match="no residuals"):
         cross_fitted_spread(residuals=only_held_out, held_out="A", weeks_of_history=4)
@@ -452,6 +469,18 @@ def test_the_pooled_residuals_are_actual_minus_the_predicted_mean_and_name_the_e
     assert set(result.site) == set(SITES)
     assert result.fit_excluded == (HELD_OUT,)
     assert result.weeks_of_history == 4
+
+
+def test_all_present_rows_adds_the_rows_the_default_rows_leave_out(cache: FeatureCache):
+    masked = replace(
+        cache.sites["S1"],
+        default_rows=cache.sites["S1"].default_rows
+        & (cache.end_times.astype("datetime64[M]").astype(int) % 2 == 0),
+    )
+    edited = replace(cache, sites={**cache.sites, "S1": masked})
+    default = build_pooled_batch(cache=edited, sites=("S1",), cut_end=CUT)
+    every = build_pooled_batch(cache=edited, sites=("S1",), cut_end=CUT, all_present_rows=True)
+    assert every.n_rows > default.n_rows
 
 
 def test_after_mask_keeps_only_rows_ending_after_the_instant(

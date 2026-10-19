@@ -11,6 +11,7 @@ written once, against a day-ahead initialisation at 09:00 UTC on the previous da
 one.
 """
 
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal
@@ -24,6 +25,7 @@ from studies.dp_features import (
     load_or_build_feature_cache,
 )
 from studies.dp_gam import QUANTILE_COLUMNS, QUANTILE_LEVELS
+from studies.dp_pooled import PooledBatch, build_pooled_batch
 from studies.experiment_store import HOLDOUT_START, write_predictions
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -31,7 +33,9 @@ EXPERIMENT_ID: Final[int] = 105
 SLUG: Final[str] = "differentiable-physics-3-pooled-and-per-site-demand-model"
 ROW_SET_ID: Final[str] = "dp_mw_v1"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
-PART_2_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00104-differentiable-physics-2-simple-structural-model"
+PART_2_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00104-differentiable-physics-2-simple-structural-model"
+)
 CACHE_DIR: Final[Path] = PART_2_DIR / "cache"
 """Part 2's feature cache, reused: the inputs and the cut dates are the same."""
 WORK_DIR: Final[Path] = DATA_DIR / "work"
@@ -207,3 +211,94 @@ def quantile_score(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
     levels = np.array(QUANTILE_LEVELS)[None, :]
     error = actual[:, None] - quantiles
     return 2.0 * np.mean(np.maximum(levels * error, (levels - 1.0) * error), axis=1)
+
+
+# ---- Part 3 additions: the pooled set, the fit settings, and small helpers -----------------------
+
+MW_POOL: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16", "D18")
+"""The MW Primaries in the pooled training set (D15 carries a generator and is out)."""
+MVA_POOL: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
+"""The MVA Primaries, on dark rows only."""
+POOL: Final[tuple[str, ...]] = (*MW_POOL, *MVA_POOL)
+WINDOW_MONTHS: Final[int] = 24
+"""The 2-year window of every main arm."""
+FIT_STEPS: Final[int] = 800
+"""Optimiser steps of a pooled fit: the training loss is still falling at 600 steps."""
+FIT_RATE: Final[float] = 0.05
+FINAL_RATE_FRACTION: Final[float] = 0.01
+"""The cosine learning-rate schedule ends at this fraction of the starting rate."""
+INTERACTION: Final[tuple[int, ...]] = (64, 64)
+TIMEOUT_MINUTES: Final[float] = 10.0
+
+SERIES_TABLE: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR.parent / "studies/per_study/stage1_pilot/demand/inputs/series.parquet"
+)
+VINTAGES: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00045-pvdis-4-weekly-capacity-asymmetric-l1"
+    / "capacity_weekly_vintages.parquet"
+)
+FARMS_FILE: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00045-pvdis-4-weekly-capacity-asymmetric-l1"
+    / "farm_half_hourly.parquet"
+)
+
+
+def months_before(*, moment: datetime, months: int) -> datetime:
+    """Return `moment` shifted back by whole calendar months (first of the month)."""
+    total = moment.year * 12 + moment.month - 1 - months
+    return moment.replace(year=total // 12, month=total % 12 + 1, day=1)
+
+
+def pooled_batch_for(
+    *,
+    cache: FeatureCache,
+    sites: tuple[str, ...],
+    cut: datetime,
+    months: int = WINDOW_MONTHS,
+    device: str = "cuda",
+) -> PooledBatch:
+    """Return the pooled training rows of the `months` months before `cut`."""
+    return build_pooled_batch(
+        cache=cache,
+        sites=sites,
+        cut_end=to_64(moment=cut),
+        after=to_64(moment=months_before(moment=cut, months=months)),
+        device=device,
+    )
+
+
+def scoring_batch_for(
+    *,
+    cache: FeatureCache,
+    sites: tuple[str, ...],
+    after: datetime,
+    through: datetime,
+    device: str = "cuda",
+) -> PooledBatch:
+    """Return the rows in (`after`, `through`] for the sites, at most the last valid time."""
+    return build_pooled_batch(
+        cache=cache,
+        sites=sites,
+        cut_end=to_64(moment=min(through, HOLDOUT_START - timedelta(minutes=30))),
+        after=to_64(moment=after),
+        device=device,
+    )
+
+
+def effective_capacity_mw(*, cache: FeatureCache, site: str) -> float:
+    """Return a substation's effective capacity in MW."""
+    return float(cache.sites[site].table.effective_capacity_mw)
+
+
+def write_json(*, name: str, payload: object) -> Path:
+    """Write a small result file under the experiment's work folder."""
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    path = WORK_DIR / name
+    path.write_text(json.dumps(payload, indent=2, default=float) + "\n")
+    return path
+
+
+REPORT_SITES: Final[tuple[str, ...]] = (*SCORED_SITES, "D18")
+"""The scored sites plus D18, the one short-history site, which is reported beside them."""

@@ -277,6 +277,7 @@ def build_pooled_batch(
     after: np.datetime64 | None = None,
     device: torch.device | str = "cpu",
     dtype: torch.dtype = torch.float32,
+    all_present_rows: bool = False,
 ) -> PooledBatch:
     """Gather the pooled rows: default rows of MW substations and dark default rows of MVA ones.
 
@@ -288,6 +289,8 @@ def build_pooled_batch(
             rows of a forecast year.
         device: Where the tensors live.
         dtype: The floating-point type of the real-valued tensors.
+        all_present_rows: Keep every row that has a reading, including those inside a switching
+            mask or the lockdown window, which scoring wants beside the default rows.
 
     Returns:
         The batch.
@@ -300,8 +303,7 @@ def build_pooled_batch(
         features = cache.sites[label]
         apparent = features.table.units == "MVA"
         keep = (
-            features.default_rows
-            & features.present
+            (features.present if all_present_rows else features.default_rows & features.present)
             & np.isfinite(features.y)
             & np.isfinite(features.pv_unit_shape)
             & np.isfinite(features.smoothed_temperature_c).all(axis=1)
@@ -386,6 +388,12 @@ class PooledDemandModel(nn.Module):
     """1 for each substation that has training rows, else 0 (a buffer)."""
     solar_sites: torch.Tensor
     """1 for each substation that has training rows with the solar term on, else 0 (a buffer)."""
+    capacity_prior: torch.Tensor
+    """A site-specific centre for the first capacity increment, before the softplus; `NaN` for none.
+
+    The population mean centres a site with `NaN`. The values are inputs, not fitted parameters:
+    they carry a prior capacity, such as an earlier vintage's, into the fit.
+    """
 
     def __init__(
         self,
@@ -430,6 +438,7 @@ class PooledDemandModel(nn.Module):
         self.register_buffer("centre_means", torch.zeros(n_sites * n_season_years))
         self.register_buffer("site_active", torch.ones(n_sites))
         self.register_buffer("solar_sites", torch.ones(n_sites))
+        self.register_buffer("capacity_prior", torch.full((n_sites,), float("nan")))
         self._build_site_prior(initial_level=initial_level)
 
     def _build_site_prior(self, *, initial_level: torch.Tensor) -> None:
@@ -499,6 +508,9 @@ class PooledDemandModel(nn.Module):
     ) -> torch.Tensor:
         """Return one family's prior term over the entries where `active` is 1."""
         centre = self.population_mean.get(name, 0.0)
+        if name == "capacity_first":
+            own = self.capacity_prior.to(mean.dtype)[:, None]
+            centre = torch.where(torch.isnan(own), centre, own)
         log_scale = self.population_log_scale[name]
         scale_sq = torch.exp(2.0 * log_scale)
         squared = (mean - centre) ** 2
