@@ -33,11 +33,14 @@ the maintainer to confirm.
 | [00078 - Current capacity and a zero start, PVDIS-5 check 2](00078-pvdis-5-current-capacity-vintages/result.md) | Refresh the capacity table that feeds the base margin once per season-year, and test a base margin of zero in the production XGBoost recipe | Re-estimating the capacity lowers the score by 0.018 points (-0.036 to -0.004); a zero start lowers `d0` by 0.071 (-0.099 to -0.047, against a refit of `d0`) in this experiment, and has not been tested on other series types |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Retrain the Primary, BSP, and GSP demand models weekly and drop the 14-day correction | Weekly scores 0.20 points below the stack on 292 further daily runs (99.44% interval -0.40 to -0.04), and 0.13 below monthly |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Retrain the Primary demand model weekly and drop the 14-day correction | Second set of runs (control-only, 2023-07 to 2024-03): weekly scores 0.24 points below the stack (99.17% interval -0.36 to -0.15) and 0.04 below monthly (control member of the ECMWF ensemble only) |
+| [00087 - Best guess assembled (BG2)](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) | Serve the BG2 recipe: weekly refits, a five-model blend for Primary demand, weekly refits with no correction for supply points | Lowers the score by 0.283 points at Primaries and 0.634 at supply points compared with the previous best; the farm models cannot yet be ranked |
+| [00094 - Explicit heating term, HT1](00094-explicit-heating-offset-primary-demand/result.md) | Add a per-series heating degree-hour term to the base margin of the Primary demand model | Lowers the cold-hour score by 0.143 points (-0.203 to -0.034) and the all-rows score by 0.022 (-0.042 to +0.000); needs a coefficient fit in training and a margin in serving; leaves cold-hour q95 exceedance at 16% to 17% |
 
 ## The experiments so far
 
 | Experiment | Question | Verdict | Production status | Merged |
 |---|---|---|---|---|
+| [00087 - Best guess assembled (BG2)](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) | Do the ideas that scored best in the last experiments, combined, beat the previous best forecast of each target class, and which idea gives which part of the gain? | Partly supported | Candidate | 2026-10-19 |
 | [00001 - ERA5-trained stage 1, solar and wind, part 1](00001-era5-trained-stage1a-vs-ens-trained/result.md) | Does a weather-to-power model trained on ERA5 beat the same model trained on ENS weather? | Supported up to day 6 | Candidate | 2026-10-14 |
 | [00002 - Stage 2 calibrator for solar and wind](00002-stage2-calibrator-and-mixture-vs-ens-quantile/result.md) | Does a stage 2 calibrator beat the pooled stage 1a mixture? | Partly supported | Candidate | 2026-10-14 |
 | [00003 - ERA5-trained stage 1, demand, part 2](00003-era5-trained-stage1a-vs-ens-trained-demand/result.md) | Does the ERA5-trained model beat the ENS-trained model on demand series? | Not supported | Not for production | 2026-10-14 |
@@ -105,7 +108,7 @@ the maintainer to confirm.
 | [00053 - UKV against ENS for the solar anomaly, PVDIS part 8b](00053-ukv-vs-ens-solar-anomaly/result.md) | Does the Met Office UKV, alone or blended with ENS, track the CAMS solar anomaly better than ENS within 120 hours? | Small gain for the blend only, from the pre-stated cross-validation gate: mean squared error 7.6% lower over 0 to 54 hours; in the validation year the correlation gain is +0.011 (-0.006 to +0.027) over 0 to 54 hours; UKV alone is worse than ENS in every band; no gain beyond 54 hours; post hoc | Not for production | Pending |
 | [00056 - MVA-only Primaries against MW Primaries](00056-mva-only-primaries-skill-against-mw-primaries/result.md) | Does Flexpectation v1 forecast the 8 trial-area Primary substations that record only the magnitude of power (MVA) clearly worse than the 8 that record signed MW, relative to the rule-based `manual_heuristic`, in particular at sunny middays? | Inconclusive: at sunny middays the MVA group has 5.6 percentage points less skill, 95% interval -5.0 to 14.6; skill is lower at the MVA group all year, and one MW substation accounts for most of that gap | Not for production | Pending |
 | [00054 - UKV for the wind farms](00054-product-trained-xgboost-wind-farms/result.md) | Does an XGBoost model given UKV's wind as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Small gain, as an upper limit: -0.198 (-0.316 to -0.069) points of capacity against a 0.15 target; the UKV data are a research archive, not the live feed | Not for production | 2026-10-16 |
-| [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Does a Primary demand forecast with an explicit solar term (capacity times a calibrated forecast of the sunshine anomaly) match the best guess by 0.10 points of capacity, and beat its placebo twin? | Supported: the base-margin arm `am` is -0.152 (-0.199 to -0.111) against the best guess at 98.75% | Candidate | Pending |
+| [00064 - Demand minus forecast solar (PVDIS-5)](00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md) | Does a Primary demand forecast with an explicit solar term (capacity times a calibrated forecast of the sunshine anomaly) match the best guess by 0.10 points of capacity, and beat its placebo twin? | Supported: the base-margin arm `am` is -0.152 (-0.199 to -0.111) against the best guess at 98.75% | Candidate | 2026-10-19 |
 | [00063 - SW2-10 joint fit, v2 in miniature](00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) | Does one linear fit per Primary, holding a weather baseline without radiation, embedded solar capacity times the CAMS sunshine shape, and a share term per labelled transfer, beat the frozen v1 baseline outside switching, and recover injected solar and transfers? | Inconclusive: C1 is -0.322 points of capacity (-0.437 to -0.207) at 5 Primaries, close to the 0.35-point threshold, but both injection gates failed for reasons of test design | Not for production | Pending |
 | [00057 - UKV for the solar farms](00057-product-trained-xgboost-solar-farms/result.md) | Does an XGBoost model given UKV's shortwave, cloud, and temperature as extra inputs, trained on UKV's own history, beat the same model trained on ENS alone at 1 to 2 days ahead? | Inconclusive: -0.035 (-0.119 to +0.037) points of capacity against a 0.10 target; a gain above 0.12 is ruled out | Not for production | 2026-10-16 |
 | [00048 - Retraining cadence, part 2](00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md) | Does weekly retraining of the demand model still beat the stack on the 292 daily runs experiment 34 left out, and does retraining help BSP, GSP, solar, and wind? | Supported: weekly minus the stack -0.20 points (99.44% interval -0.40 to -0.04); weekly minus monthly -0.13 (-0.24 to -0.03); solar and wind change by 0.04 or less | Candidate | 2026-10-16 |
@@ -126,9 +129,36 @@ the maintainer to confirm.
 | [00090 - Lag unusualness inputs, SW2-28](00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md) | Does giving the Primary demand model the PIT of each lag against a climatology improve the forecast on all rows, and widen the quantiles on rows with a lag inside a logged switching event? | Refuted: the PIT inputs raised the score by 0.355 points of capacity on all rows outside switching (97.5% interval +0.209 to +0.513); on rows with a lag inside a logged event +0.795 (-0.325 to +2.787, inconclusive) | Not for production | 2026-10-18 |
 | [00088 - Normal running arrangement forecast on injected switches, SW2-21](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md) | When a Primary substation is inside a switching transfer or has just left one, does the NRA forecast recover the true unmodified power, with the MW from the injection and from the refit-offset neighbour-count detector run only on data before the origin? | Inconclusive: with the true MW, a booster trained on NGED's logged transfers closes 83% (70% to 91%) of the error a transfer adds; with the MW from the refit-offset neighbour-count detector as built, a booster trained on that detector's transfers closes 16% (-17% to 67%), -0.149 points of capacity against the plain forecast (98.75% interval -1.174 to +0.148) | Not for production | 2026-10-18 |
 | [00091 - Calibrated probability of an abnormal running arrangement, SW2-26](00091-sw2-26-calibrated-probability-of-abnormal-arrangement/result.md) | Can the switching detector that uses only past data give a calibrated probability that a past half-hour lies inside an abnormal running arrangement (a period when a normally open switch is closed)? | Inconclusive: the calibrated score's Brier score is 3.3% below the yes-or-no flag (97.5% interval -7.6% to +1.6%), against a 20% target; 11.2% below in a post hoc subset of large transfers (-20.3% to -2.0%); area under the curve (0.5 is no skill) 0.53 against NGED's logs | Not for production | 2026-10-18 |
+| [00094 - Explicit heating term, HT1](00094-explicit-heating-offset-primary-demand/result.md) | Does a per-series heating degree-hour term in the XGBoost base margin lower the cold-hour error of Primary demand? | Small gain: -0.143 points (98.75% interval -0.203 to -0.034) in cold hours up to 48 h, under the 0.3 threshold; q95 exceedance in cold hours barely moves (0.167 to 0.162) | Candidate | 2026-10-18 |
 | [00092 - Drift diagnostics, LV0](00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md) | How has Primary demand drifted since 2022, and does a level shift explain why longer training history and pooled XGBoost models score worse? | Inconclusive. Most series drift by 1 point of capacity a year or more in some hours, but the loss from extra history is not linked to drift once one series is set aside, and the pooled models' extra bias does not follow each series' level | Not for production | 2026-10-18 |
 | [00093 - Old training year, AGE1](00093-age1-old-training-year-after-level-normalisation-demand/result.md) | Does an old training year still hurt a frozen Primary demand model once a trailing 365-day level is subtracted? | Refuted: an old training year scores 1.57 percentage points of capacity worse than a recent one, and removing the level takes off 42% of the gap, and none of it without the substation with the largest gap | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1335) |
+| [00097 - Tail recalibration, CAL1](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md) | Which post-hoc recalibration of the best guess's stored quantiles gives the best tail coverage without hurting the centre? | Refuted by the pre-registered rule, inconclusive about recalibration in general: no arm passed both tests; stored Primary q05 and q95 cover 0.035 and 0.938 at 12 to 36 hours, and no arm of 1 to 7b moved them by more than 0.013 | Not for production | 2026-10-18 |
+| [00099 - CRPS loss over ensemble members, CRPS1 pilot](00099-crps1-crps-type-loss-over-ens-members-primary-demand-pilot/result.md) | Does training the Primary-substation quantile model on the CRPS of the pooled ensemble forecast, with 6 members per run as rows, beat the pinball loss on the same rows? | Small gain: the CRPS loss beats the pinball loss by 0.039 points (-0.057 to -0.018), but 6 members as rows cost the pinball loss 0.052, so the CRPS arm is within 0.036 (-0.022 to +0.111) of the control-member recipe, an interval that includes zero; tails not within 0.01 of nominal | Not for production | 2026-10-19 |
+| [00095 - Old training year, AGE2](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md) | Does an old training year still hurt a frozen Primary demand model when the old and recent years use the same weather product? | Refuted: on ERA5 the 2021-07 year is 1.71 points of capacity behind the 2024-07 year (99% interval 1.15 to 2.29), no smaller than the 1.57 on the control member, so the penalty is age, not the weather product | 2026-10-18 | [PR](https://github.com/openclimatefix/nged-substation-forecast/pull/1338) |
+| [00098 - Switching event detector, part 14](00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md) | Do the best guess's solar and heating offsets in the lagless demand model's residual make RO-NC find more of the moved MW? | Inconclusive: RO-NC recall 0.766 for the control, +0.003 (-0.014 to +0.011) with CAMS solar, -0.002 (-0.019 to +0.012) with ERA5 solar, +0.010 (-0.012 to +0.034) with heating added, although CAMS solar cuts the summer midday residual by 12% | Not for production | 2026-10-18 |
 | [00081 - Weekly retraining, part 3](00081-r11-control-member-second-validation-year-demand/result.md) | Do the weekly-retraining findings of experiments 48 and 49 hold on 274 control-member runs of 2023-07 to 2024-03, and on an 18 km fold? | Supported: weekly minus the stack -0.24 points (99.17% interval -0.36 to -0.15); weekly minus monthly -0.04 (-0.06 to -0.01); Christmas column and half-life unresolved over the fold | Candidate | 2026-10-18 |
+
+### 00087: the best guess so far and what each part contributes (BG2)
+
+**Weekly refitting and a blend of five models lower the forecast error at Primary substations and
+at bulk and grid supply points, while the solar and wind farm forecasts are still too close to
+call.** The experiment combined the ideas that scored best in earlier experiments, refitted each
+XGBoost model weekly or monthly as its idea requires, and scored 292 daily runs from July 2025 to
+June 2026. The verdict is partly supported.
+
+- **Headline result:** at 16 Primary substations the quantile score is 5.260 points of capacity
+  against 5.543 for the stack (-0.283, 98.75% interval -0.425 to -0.146). At 4 supply points it is
+  12.925 against 13.559 (-0.634, -1.111 to -0.279). At solar and wind farms, training on the
+  ensemble forecasts scored +0.050 (-0.125 to +0.168) and +0.228 (-0.178 to +0.653) against
+  experiment 33's ERA5-trained mixture, and the farm models refit monthly.
+- **Finding for later experiments:** the solar offset lowers the Primary score by only 0.010 over
+  the whole year, and adding the 14-day correction raises the supply-point score by 0.305 (0.060 to
+  0.594). The solar forecast bands are too wide at the 0.05, 0.95, and 0.99 quantiles.
+- **Write-up and pull request:**
+  [result](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md),
+  [PR #1326](https://github.com/openclimatefix/nged-substation-forecast/pull/1326).
+
+![How we got to the best guess](00087-bg2-best-guess-assembled-with-drop-one-ablations/figure_3_staircase.svg)
 
 ### 00081: do the weekly-retraining findings hold on a second set of forecast runs?
 
@@ -1556,6 +1586,26 @@ contrasts that are 0.05 points or larger.
 
 ![Contrasts under each schedule](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/figure_1.svg)
 
+### 00094: does an explicit heating term lower the cold-hour error? (HT1)
+
+**Giving the XGBoost demand model an explicit heating term lowered its error in cold weather by a
+little, and did not fix the cold-weather tail.** For the 16 Primary substations, the heating term
+lowered the quantile score (an error measure in points of capacity) by 0.143 points in cold hours
+(ensemble-mean forecast temperature below 3 °C) at leads up to 48 hours (98.75% interval -0.203 to
+-0.034), under the 0.3 threshold fixed in advance, and by 0.022 over all rows (-0.042 to +0.000).
+The share of observations above the q95 forecast, which a calibrated forecast would hold at 0.05,
+fell from 0.167 to 0.162 in those hours. The median forecast stayed about 2.7 points of capacity too
+low in cold hours at leads over 48 hours. A decreasing monotone constraint on temperature gained
+about half as much (0.074, -0.111 to -0.020) and needs no new serving column. Added to experiment
+64's solar term at the 5 Primaries that have one, over 73 forecast runs, the heating term lowered
+the all-rows score by 0.050 (-0.065 to -0.036). The 16-substation arms have no solar term. The
+experiment did not locate the remaining cold-hour error; the ENS temperature forecast is one
+untested candidate.
+
+- **Write-up:** [the full result page](00094-explicit-heating-offset-primary-demand/result.md).
+
+![Contrasts of the arms against the reference](00094-explicit-heating-offset-primary-demand/figure_1.svg)
+
 ### 00084: can the substation-limit curtailment metric rank forecasts on the pilot?
 
 **Two substations hold too few half-hours beyond a limit to rank forecasts, so the pilot proves the
@@ -2245,3 +2295,82 @@ could not separate from age, so the next experiment should test the change of we
   [PR #1335](https://github.com/openclimatefix/nged-substation-forecast/pull/1335).
 
 ![Age penalty, raw and level removed](00093-age1-old-training-year-after-level-normalisation-demand/figure_1.svg)
+
+### 00099: does training on the CRPS of the pooled ensemble forecast beat the pinball loss? (CRPS1 pilot)
+
+**Showing the XGBoost quantile model 6 ensemble members per run, with a loss that scores their
+pooled forecast, recovers about half of the harm that extra members do to the pinball loss and does
+not show a gain over the control-member recipe, so a run on all 51 members is not worth its cost
+for Primary substations on this evidence.** The continuous ranked probability score (CRPS) loss
+beat the pinball loss on the same rows by 0.039 points of capacity. The verdict is
+`small gain`. The pilot used monthly refits, 16 Primary substations, and 292 daily runs.
+
+- **Headline result:** CRPS minus pinball (same 6 members, same optimiser) -0.039 (95% interval
+  -0.057 to -0.018); 6 members minus control member for the pinball loss +0.052 (0.029 to 0.074);
+  CRPS arm minus control-member recipe +0.036 (-0.022 to +0.111), in points of capacity.
+- **Finding for later experiments:** the CRPS loss moved the median (mean absolute error -0.109
+  points) and not the tails: at 12 to 36 hours the 0.95 quantile covers 0.924 and the 0.05 quantile
+  0.061, outside 0.01 of nominal and further from it than the pinball loss on the same rows (0.938
+  and 0.051).
+- **Write-up and pull request:**
+  [result](00099-crps1-crps-type-loss-over-ens-members-primary-demand-pilot/result.md), [PR #1342
+  (Experiment 99: does training on the CRPS of the pooled ensemble forecast beat the pinball loss?
+  (CRPS1 pilot))](https://github.com/openclimatefix/nged-substation-forecast/pull/1342).
+
+![Paired differences between arms](00099-crps1-crps-type-loss-over-ens-members-primary-demand-pilot/figure_2_paired_differences.svg)
+
+### 00097: which post-hoc recalibration of the best guess fixes its tails? (CAL1)
+
+**The best guess's stored tails are already close to nominal, and no recalibration fitted on earlier
+months improved them by more than the sampling noise of 9 months.** At 12 to 36 hours lead for
+Primary substations, the stored q05 covers 0.035 of measurements (nominal 0.05) and q95 covers 0.938
+(nominal 0.95). We fitted eight recalibrations of the stored quantiles of the weekly-retrained best
+guess on every earlier month and scored them on October 2025 to June 2026 for 16 Primary substations
+and 4 bulk or grid supply points. No arm moved Primary q05 or q95 coverage by more than 0.013, less
+than the plus or minus 0.02 interval, and a global factor of 1.15 made the quantile score worse
+(+0.00032 points of capacity, 95% interval +0.00021 to +0.00043). Coverage of q95 swung between 0.88
+and 0.97 from month to month, and the stored median covers only 0.45, and a static table cannot
+correct either.
+
+- **Write-up:** [the full result page](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md),
+  [PR #1340](https://github.com/openclimatefix/nged-substation-forecast/pull/1340).
+
+![Tail coverage, Primary substations](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/figure_1_primary_tail_coverage.svg)
+
+### 00098: do the best guess's solar and heating offsets sharpen the switching detector? (DET-BG)
+
+**A cleaner summer residual did not make the switching detector find more moved power.** We gave
+the XGBoost demand forecast behind the refit-offset neighbour-count detector (RO-NC) the solar
+offset of the project's best-guess forecast, from ERA5 or CAMS irradiance (two estimates of past
+weather), and then a heating offset, and re-ran experiment 82's detector on the same synthetic
+load transfers. The CAMS solar offset cut the median summer midday
+residual of the 5 Primaries with a solar capacity by 12% (5.26 to 4.63 points of capacity), and
+the ERA5 offset cut nothing, because H0.5 already reads ERA5 shortwave. RO-NC's MW-weighted recall
+stayed at 0.764 to 0.776 in every arm, and every contrast interval straddles zero (heating added to
+CAMS solar: +0.010, 98.75% interval -0.012 to +0.034). The remaining misses are small transfers
+with no metered receiver, so the next test needs a different signal.
+
+- **Write-up:** [the full result page](00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md),
+  [PR #1341](https://github.com/openclimatefix/nged-substation-forecast/pull/1341).
+
+![Share of moved MW found, by arm](00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/figure_1_recall_by_arm.svg)
+
+### 00095: does an old training year score worse because of the weather product, or its age? (AGE2)
+
+**An old training year scores worse than a recent one, and the coarser weather forecast of the old
+years is not the main reason.** We trained one XGBoost quantile model per Primary substation (13
+substations) on one year of data, once and not retrained, with ERA5 weather or with the control
+member of the ECMWF ensemble forecast, and scored 365 daily forecast runs from July 2025 to June
+2026. On ERA5 the 2021-07 year scored 1.71 points of capacity worse than the 2024-07 year (99%
+interval 1.15 to 2.29), against 1.57 (1.12 to 2.03) on the control member, so the gap did not shrink
+when both years used one weather product. On ERA5 the gap fell with each newer year (1.71, 1.26, and
+0.46 points for the 2021-07, 2022-07, and 2023-07 years). One substation, D8, carries most of the
+gap; its demand fell smoothly, with no step or stuck meter. Experiment 93 found that an average
+level shift does not explain the gap, and this experiment found the same for the weather product.
+Explicit demand-shape terms, such as heating and embedded solar, are the next candidates.
+
+- **Write-up:** [the full result
+page](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md),   [PR
+#1338](https://github.com/openclimatefix/nged-substation-forecast/pull/1338).
+
+![Old-year gap on the control member and on ERA5](00095-age2-old-year-penalty-with-the-same-weather-product-demand/figure_1.svg)

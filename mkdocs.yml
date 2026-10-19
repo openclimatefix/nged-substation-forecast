@@ -212,7 +212,10 @@ nav:
       - "Does a zero starting value lower the error of the production XGBoost models?": ml-experiments/00080-bm0-zero-base-margin-xgboost-quantile-models/result.md
       - "Are the tails of the stored demand forecasts too narrow?": ml-experiments/00083-curtailment-cost-and-tail-calibration-worked-example/result.md
       - "Can the substation-limit curtailment metric rank forecasts on the pilot?": ml-experiments/00084-substation-limit-curtailment-cost-worked-example/result.md
+      - "Which post-hoc recalibration of the best guess fixes its tails?": ml-experiments/00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md
+      - "Does training on the CRPS of the pooled ensemble forecast beat the pinball loss?": ml-experiments/00099-crps1-crps-type-loss-over-ens-members-primary-demand-pilot/result.md
       - "Do cheaper retraining schedules rank arms the way weekly retraining does?": ml-experiments/00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md
+      - "Does an explicit heating term lower the cold-hour error?": ml-experiments/00094-explicit-heating-offset-primary-demand/result.md
       - "Do the weekly-retraining findings hold on July-to-March forecast runs the project has not scored?": ml-experiments/00081-r11-control-member-second-validation-year-demand/result.md
       - "Does a linear joint fit of baseline, embedded solar, and labelled transfers beat the v1 baseline outside switching?": ml-experiments/00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md
       - "Does pairing an onset step with its return step find more of the moved load than the single-step detector?": ml-experiments/00061-sw2-6-paired-step-intervals/result.md
@@ -223,9 +226,11 @@ nav:
       - "Do the mechanical misses of the end rule come from monthly refits and data gaps?": ml-experiments/00071-sw2-18-refit-offset-and-gap-bridging/result.md
       - "Does the count of neighbours that step the same way find more of the moved load?": ml-experiments/00070-sw2-19-same-sign-neighbour-count/result.md
       - "Do the refit offset and the same-sign neighbour count add up in one switching detector?": ml-experiments/00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md
+      - "Do the best guess's solar and heating offsets sharpen the switching detector?": ml-experiments/00098-det-bg-solar-and-heating-offsets-in-switching-detector-residual/result.md
       - "Does the full NRA forecast recover the normal running arrangement during and after an injected switch?": ml-experiments/00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md
       - "Does a step-loss monitor find a lost inverter at the solar farms?": ml-experiments/00072-p35-step-loss-monitor-for-solar-farms/result.md
       - "Does refitting the lagless XGBoost model without the detected switching help the detector and the forecast?": ml-experiments/00068-sw2-5-train-detect-retrain-loop/result.md
+      - "How well does the best guess so far do, and what does each part add?": ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md
       - "Does weekly retraining still win on the 292 daily runs experiment 34 left out?": ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators/result.md
       - "Does one convex fit of load flows across all boundaries find more of the moved load?": ml-experiments/00067-sw2-15-joint-edge-flow-estimator/result.md
       - "Does a differentiable physics stage 1 beat the XGBoost stage 1 for solar farms?": ml-experiments/00029-physics-stage1-solar-pytorch/result.md
@@ -239,6 +244,7 @@ nav:
       - "Does telling the model how unusual each lag is improve the forecast?": ml-experiments/00090-sw2-28-lag-unusualness-inputs-all-rows-and-switching/result.md
       - "Is the drift of Primary demand mostly a per-series level?": ml-experiments/00092-lv0-drift-diagnostics-on-stored-predictions-demand/result.md
       - "Does an old training year still hurt once the demand level is removed?": ml-experiments/00093-age1-old-training-year-after-level-normalisation-demand/result.md
+      - "Is the old training year's penalty the weather product or the age?": ml-experiments/00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md
       - "Do same-time sunshine analogues add anything once the solar forecast is explicit?": ml-experiments/00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md
   - Live service:
       - Overview: live_service/index.md
