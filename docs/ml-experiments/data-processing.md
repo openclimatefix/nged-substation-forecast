@@ -215,6 +215,24 @@ of its hour. A naive join on equal timestamps drops or misassigns half the rows,
 join by a whole half-hour raised the error score by more than 0.04. Applies to experiments and
 production.
 
+**Do not shift power timestamps: the `time` column of the cleaned power table marks the end of the
+half-hour (provisional; high confidence that no 30-minute error exists).** Power timestamps are
+correct to within a few minutes on both sides of NGED's fix of 2026-03-26 08:30 UTC, and the
+ingest's correction of the earlier late stamps goes the right way by the right amount. The test used
+clear days and the change in net power against a sun-height predictor at sunrise and sunset, with an
+offset search from -120 to +120 minutes and 95% intervals from resampling days, on the aggregate of
+the 6 metered solar farms. Before the fix, the corrected stamps read 0.9 minutes late (series from
+-0.2 to +2.9), so the raw feed was about 31 minutes late and the 30-minute ingest correction is
+right to within about 3 minutes. After the fix, from April to 2026-09-10, the median is +4.7 minutes
+(+1.5 to +13.3). The same months before the fix read +2.0 (-3.3 to +5.4), so the two sides do not
+differ. Primaries metered in MW are a weaker test, because demand ramps bias the fit: only D5 and
+D18 gave usable fits (+7 to +18 minutes). A correlation-peak test on summer middays is
+uninformative, because the correlation is flat near -0.18 with peaks at +/-60 to 90 minutes, so use
+sunrise and sunset ramps on clear days. Applies to experiments and production. Scope: all power
+series, 2019 to 2026. The limits are that the metered solar farms lie within one 25 km area, the
+side after the fix has under 50 clear days, and the only known-answer check is the 30-minute sign
+test.
+
 ## Weather products
 
 **Train each model on the history of the weather product that will serve it, and do not train on the
