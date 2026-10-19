@@ -40,3 +40,12 @@ a take-home message, and the [Research plan](plan.md) lists what is planned next
   term added nothing measurable and refitting made the score slightly worse. Against lagged XGBoost
   at the same lead, the filtered model was 0.138 points better, which is not significant. The
   filter's residuals use estimates of past weather.
+- **[00107 - Differentiable physics, rolling-origin history and
+  tails](../../00107-differentiable-physics-rolling-origin-history-and-tails/result.md):** Refitting
+  the convex model every quarter, 12 times from 2023 to 2026, adding a drift term to the model
+  trained on all years lowered the score at 10 of 12 refits (0.45 points, 99% interval 0.23 to 0.68
+  better). In a post hoc split, about three-fifths of that size is one substation (D10) at the
+  2023-24 refits, and the 2025-26 refits give 0.30, as in experiment 104. All years without drift
+  scored worse than 12 months at 8 of 12 refits, and all years with drift against 12 months has no
+  stable answer, with winter-quarter refits favouring more years. A spread that depends on the
+  forecast level made the 95% and 99% quantile coverage worse. The verdict is partly supported.

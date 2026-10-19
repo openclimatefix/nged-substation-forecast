@@ -139,6 +139,191 @@ def test_the_kl_term_matches_its_closed_form():
     assert float(term) == pytest.approx(float((expected - 0.5).sum()), rel=1e-5)
 
 
+def test_a_site_specific_capacity_prior_centres_the_first_capacity_increment(batch: PooledBatch):
+    (model,), _ = _fit(batch, DpConfig(population_scales=PopulationScales()), [FitCopy(name="m")])
+    site = batch.site_labels.index("S1")
+    with torch.no_grad():
+        model.capacity_prior[site] = float(model.capacity_raw[site].max())
+        near = float(model.site_prior_term())
+        model.capacity_prior[site] = 50.0
+        far = float(model.site_prior_term())
+    assert far > near
+
+
+def test_a_capacity_prior_given_through_a_fit_copy_pulls_the_first_increment(batch: PooledBatch):
+    site = batch.site_labels.index("S1")
+    prior = torch.full((len(batch.site_labels),), float("nan"))
+    prior[site] = 40.0
+    config = DpConfig(population_scales=PopulationScales(capacity_first=0.5))
+    free, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="free")],
+        config=config,
+        initial_level=_level(batch),
+        steps=STEPS,
+    )
+    pulled, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="pulled", capacity_prior=prior)],
+        config=config,
+        initial_level=_level(batch),
+        steps=STEPS,
+    )
+    assert float(pulled[0].capacity_prior[site]) == 40.0
+    assert float(pulled[0].capacity_raw[site].max()) > float(free[0].capacity_raw[site].max())
+
+
+def test_the_capacity_override_is_saved_with_the_model_and_moves_with_it(batch: PooledBatch):
+    model = PooledDemandModel(
+        config=DpConfig(population_scales=PopulationScales()),
+        n_sites=3,
+        n_season_years=batch.n_season_years,
+        initial_level=_level(batch),
+    )
+    assert "capacity_override" not in model.state_dict()
+    model.capacity_override = torch.ones(3, batch.n_season_years)
+    assert "capacity_override" in model.state_dict()
+    moved = model.to(dtype=torch.float64).capacity_override
+    assert moved is not None
+    assert moved.dtype == torch.float64
+
+
+def test_the_first_trained_years_capacity_uses_its_own_population_mean(batch: PooledBatch):
+    model = PooledDemandModel(
+        config=DpConfig(population_scales=PopulationScales()),
+        n_sites=3,
+        n_season_years=batch.n_season_years,
+        initial_level=_level(batch),
+    )
+    model.mark_trained_years(batch=batch)
+    site = batch.site_labels.index("S1")
+    first_year = int((model.trained[site] > 0).to(torch.int64).argmax())
+    with torch.no_grad():
+        model.population_mean["capacity_first"].fill_(10.0)
+        model.population_mean["capacity_raw"].fill_(-3.0)
+        model.capacity_raw.fill_(-3.0)
+        growth_only = float(model.site_prior_term())
+        model.capacity_raw[site, first_year] = 10.0
+        first_at_first_mean = float(model.site_prior_term())
+    assert first_at_first_mean < growth_only
+
+
+def test_the_kl_term_matches_numpy_on_random_inputs():
+    generator = np.random.default_rng(1)
+    model = PooledDemandModel(
+        config=DpConfig(variational=True), n_sites=4, n_season_years=2, initial_level=torch.zeros(4)
+    )
+    for _ in range(20):
+        mean, centre = generator.normal(size=4), generator.normal()
+        sd, scale = np.exp(generator.normal(size=4)), float(np.exp(generator.normal()))
+        with torch.no_grad():
+            model.population_mean["level"].fill_(centre)
+            model.population_log_scale["level"].fill_(float(np.log(scale)))
+        term = model._family_term(
+            name="level",
+            mean=torch.as_tensor(mean, dtype=torch.float32),
+            log_sd=torch.as_tensor(np.log(sd), dtype=torch.float32),
+            active=torch.ones(4),
+        )
+        expected = np.log(scale / sd) + (sd**2 + (mean - centre) ** 2) / (2 * scale**2) - 0.5
+        assert float(term) == pytest.approx(float(expected.sum()), rel=1e-3, abs=1e-4)
+
+
+def test_a_capacity_override_replaces_the_capacity_in_the_forecast(batch: PooledBatch):
+    (model,), _ = _fit(batch, DpConfig(population_scales=PopulationScales()), [FitCopy(name="m")])
+    base = predict_pooled(model=model, batch=batch)
+    model.capacity_override = model.capacities().detach() * 0.0
+    nothing = predict_pooled(model=model, batch=batch)
+    model.capacity_override = None
+    assert np.array_equal(base, predict_pooled(model=model, batch=batch))
+    daylight = (batch.pv_shape > 0.05).numpy() & batch.solar_gate.numpy()
+    assert float(np.abs(nothing - base)[daylight].mean()) > 0.0
+
+
+def test_a_capacity_override_with_nan_leaves_those_capacities_learned(batch: PooledBatch):
+    override = torch.full((len(batch.site_labels), batch.n_season_years), float("nan"))
+    override[0] = 3.0
+    models, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="o", capacity_override=override)],
+        config=DpConfig(population_scales=PopulationScales()),
+        initial_level=_level(batch),
+        steps=2,
+    )
+    capacity = models[0].capacities().detach()
+    assert torch.allclose(capacity[0], torch.full_like(capacity[0], 3.0))
+    assert torch.isfinite(capacity[2]).all()
+    assert not torch.allclose(capacity[2], torch.full_like(capacity[2], 3.0))
+
+
+def test_a_capacity_start_is_copied_into_the_model_before_fitting(batch: PooledBatch):
+    start = torch.full((len(batch.site_labels), batch.n_season_years), 1.25)
+    models, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="s", capacity_init=start)],
+        config=DpConfig(population_scales=PopulationScales()),
+        initial_level=_level(batch),
+        steps=1,
+    )
+    assert torch.allclose(models[0].capacity_raw, start, atol=0.2)
+
+
+def test_all_present_rows_still_keeps_only_dark_rows_of_an_mva_substation(cache: FeatureCache):
+    batch = build_pooled_batch(cache=cache, sites=("S2",), cut_end=CUT, all_present_rows=True)
+    mva = cache.sites["S2"]
+    assert bool(mva.dark[batch.row.numpy()].all())
+
+
+def test_a_fixed_scale_stays_fixed_and_is_not_learned(batch: PooledBatch):
+    models, _ = fit_many(
+        batch=batch,
+        copies=[FitCopy(name="f", fixed_scales={"capacity_first": 7.0})],
+        config=DpConfig(variational=True),
+        initial_level=_level(batch),
+        steps=STEPS,
+    )
+    scale = models[0].population_log_scale["capacity_first"]
+    assert not scale.requires_grad
+    assert float(scale.detach()) == pytest.approx(float(np.log(7.0)), rel=1e-5)
+
+
+def test_the_capacity_prior_centre_applies_only_to_the_first_increment(batch: PooledBatch):
+    model = PooledDemandModel(
+        config=DpConfig(population_scales=PopulationScales()),
+        n_sites=3,
+        n_season_years=batch.n_season_years,
+        initial_level=_level(batch),
+    )
+    model.mark_trained_years(batch=batch)
+    site = batch.site_labels.index("S1")
+    with torch.no_grad():
+        model.capacity_raw.fill_(2.0)
+        model.capacity_prior[site] = 2.0
+        near = float(model.site_prior_term())
+        model.capacity_prior[site] = 12.0
+        far = float(model.site_prior_term())
+        first, _ = model.capacity_masks()
+        scale = float(torch.exp(model.population_log_scale["capacity_first"]))
+        centre = float(model.population_mean["capacity_first"])
+    n_first = float(first[site].sum())
+    expected = n_first * ((2.0 - 12.0) ** 2 - (2.0 - 2.0) ** 2) / (2.0 * scale**2)
+    other = n_first * ((2.0 - centre) ** 2 - (2.0 - centre) ** 2)
+    assert far - near == pytest.approx(expected + other, rel=1e-4)
+
+
+def test_allow_seen_does_not_skip_the_weeks_of_history_check():
+    residuals = PooledResiduals(
+        site=np.array(["A"] * 400 + ["B"] * 400),
+        residual=np.linspace(-1, 1, 800),
+        band=np.zeros(800, dtype=np.int64),
+        quarter=np.zeros(800, dtype=np.int64),
+        fit_excluded=("A",),
+        weeks_of_history=4,
+    )
+    with pytest.raises(ValueError, match="weeks of history"):
+        cross_fitted_spread(residuals=residuals, held_out="B", weeks_of_history=8, allow_seen=True)
+
+
 def test_the_loss_is_the_negative_elbo_per_row(batch: PooledBatch):
     (model,), _ = _fit(batch, DpConfig(variational=True), [FitCopy(name="v")])
     model.eval()
@@ -416,6 +601,10 @@ def test_the_cross_fitted_spread_needs_a_fit_that_never_saw_the_held_out_site():
         cross_fitted_spread(residuals=residuals, held_out="A", weeks_of_history=8)
     with pytest.raises(ValueError, match="saw B"):
         cross_fitted_spread(residuals=residuals, held_out="B", weeks_of_history=4)
+    seen = cross_fitted_spread(
+        residuals=residuals, held_out="B", weeks_of_history=4, allow_seen=True
+    )
+    assert np.allclose(seen.table, 0.0)
     only_held_out = replace(residuals, site=np.array(["A"] * 800))
     with pytest.raises(ValueError, match="no residuals"):
         cross_fitted_spread(residuals=only_held_out, held_out="A", weeks_of_history=4)
@@ -452,6 +641,43 @@ def test_the_pooled_residuals_are_actual_minus_the_predicted_mean_and_name_the_e
     assert set(result.site) == set(SITES)
     assert result.fit_excluded == (HELD_OUT,)
     assert result.weeks_of_history == 4
+
+
+def test_an_onboarded_model_still_names_the_site_it_excluded_and_checks_the_weeks(
+    solar_batch: PooledBatch, cache: FeatureCache
+):
+    config = DpConfig(population_scales=PopulationScales())
+    (model,), _ = _fit(solar_batch, config, [FitCopy(name="l", keep=_held_out_keep(solar_batch))])
+    own = select_rows(batch=solar_batch, keep=site_mask(batch=solar_batch, label=HELD_OUT))
+    onboard_site(
+        model=model,
+        batch=own,
+        label=HELD_OUT,
+        cache=cache,
+        history_end=CUT,
+        forecast_season_year=FORECAST_YEAR,
+        steps=1,
+        weeks_of_history=4,
+    )
+    others = select_rows(batch=solar_batch, keep=_held_out_keep(solar_batch))
+    result = pooled_residuals(model=model, batch=others, weeks_of_history=4)
+    assert result.fit_excluded == (HELD_OUT,)
+    with pytest.raises(ValueError, match="onboarded with"):
+        pooled_residuals(model=model, batch=others, weeks_of_history=8)
+    with pytest.raises(ValueError, match="onboarded with"):
+        pooled_residuals(model=model, batch=others)
+
+
+def test_all_present_rows_adds_the_rows_the_default_rows_leave_out(cache: FeatureCache):
+    masked = replace(
+        cache.sites["S1"],
+        default_rows=cache.sites["S1"].default_rows
+        & (cache.end_times.astype("datetime64[M]").astype(int) % 2 == 0),
+    )
+    edited = replace(cache, sites={**cache.sites, "S1": masked})
+    default = build_pooled_batch(cache=edited, sites=("S1",), cut_end=CUT)
+    every = build_pooled_batch(cache=edited, sites=("S1",), cut_end=CUT, all_present_rows=True)
+    assert every.n_rows > default.n_rows
 
 
 def test_after_mask_keeps_only_rows_ending_after_the_instant(
