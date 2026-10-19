@@ -217,6 +217,7 @@ def fit_gam_through_meter(
     window: TrainingWindow,
     season_years: Sequence[int],
     qmode: QModeType,
+    weights: np.ndarray | None = None,
 ) -> MeterFit:
     """Fit the convex model to a substation's `|S|` readings through the meter operator.
 
@@ -229,13 +230,16 @@ def fit_gam_through_meter(
         window: The window rule.
         season_years: The season-years with a capacity increment.
         qmode: `zero` for NGED's convention, `learned` to fit the power factor and `q0`.
+        weights: Row weights over the training rows (one per row `prepare_fit` returns, in order),
+            such as the counts of a month-block bootstrap resample; ones if not given.
 
     Returns:
         The start with the lowest loss, with every start's summary.
 
     Raises:
         ValueError: If the spec pins the capacity or has a clip or node, no row carries solar
-            signal, or a start's quadratic program does not converge.
+            signal, the weights have the wrong length or a negative entry, or a start's quadratic
+            program does not converge.
     """
     if spec.capacity != "fitted" or spec.clip is not None or spec.node is not None:
         msg = "the meter fit needs a fitted capacity and no clip or node"
@@ -248,7 +252,14 @@ def fit_gam_through_meter(
     if not signal.any():
         msg = f"{site} has no training row that carries solar signal before {cut}"
         raise ValueError(msg)
-    problem = _Problem.build(cache=cache, features=features, layout=layout, index=index)
+    if weights is None:
+        weights = np.ones(len(index))
+    if weights.shape != (len(index),) or (weights < 0.0).any():
+        msg = f"the weights need one non-negative entry per training row, {len(index)} in all"
+        raise ValueError(msg)
+    problem = _Problem.build(
+        cache=cache, features=features, layout=layout, index=index, weights=weights
+    )
     summaries: list[StartSummary] = []
     best: tuple[float, np.ndarray, float, float] | None = None
     for name, start in problem.starts(features=features, index=index, layout=layout):
@@ -351,6 +362,7 @@ class _Problem:
     demand_design: np.ndarray
     demand_mask: np.ndarray
     readings: np.ndarray
+    weights: np.ndarray
     penalty: np.ndarray
     cost: np.ndarray
     constrained: torch.Tensor
@@ -358,7 +370,12 @@ class _Problem:
 
     @staticmethod
     def build(
-        *, cache: FeatureCache, features: SiteFeatures, layout: GamLayout, index: np.ndarray
+        *,
+        cache: FeatureCache,
+        features: SiteFeatures,
+        layout: GamLayout,
+        index: np.ndarray,
+        weights: np.ndarray,
     ) -> _Problem:
         """Build the design once, in memory, and the penalty."""
         design = np.empty((len(index), layout.n_columns))
@@ -381,6 +398,7 @@ class _Problem:
             demand_design=design * mask[None, :],
             demand_mask=mask,
             readings=features.y[index],
+            weights=weights,
             penalty=penalty if orthogonal is None else penalty + orthogonal,
             cost=cost,
             constrained=torch.as_tensor(layout.constrained),
@@ -391,7 +409,7 @@ class _Problem:
         self, *, features: SiteFeatures, index: np.ndarray, layout: GamLayout
     ) -> list[tuple[str, np.ndarray]]:
         """Return the named starting coefficients."""
-        naive = self._solve_plain(weights=np.ones(len(index)))
+        naive = self._solve_plain(weights=self.weights)
         capacity = layout.slices["capacity"]
         result: list[tuple[str, np.ndarray]] = []
         for multiplier in CAPACITY_START_MULTIPLIERS:
@@ -400,7 +418,7 @@ class _Problem:
             result.append((f"naive capacity x{multiplier:g}", theta))
         dark = features.dark[index]
         if dark.any():
-            theta = self._solve_plain(weights=dark.astype(np.float64))
+            theta = self._solve_plain(weights=self.weights * dark)
             name = "dark-row demand, no solar"
         else:
             theta = naive.copy()
@@ -464,16 +482,18 @@ class _Problem:
         return state[:-2], float(state[-2]), float(state[-1]), final_loss, iterations
 
     def _prior_weight(self, *, state: np.ndarray) -> float:
-        """Return the residual variance at `state`, which weights the priors."""
-        squares = float(np.square(self.readings - self._apparent(state=state)[3]).sum())
-        return squares / len(self.readings)
+        """Return the weighted residual variance at `state`, which weights the priors."""
+        squares = float(
+            (self.weights * np.square(self.readings - self._apparent(state=state)[3])).sum()
+        )
+        return squares / float(self.weights.sum())
 
     def _loss(self, *, state: np.ndarray, weight: float, learned: bool) -> float:
         """Return the penalised loss: squared residuals, coefficient penalty, and the priors."""
         theta = state[:-2]
         apparent = self._apparent(state=state)[3]
         loss = float(
-            np.square(self.readings - apparent).sum()
+            (self.weights * np.square(self.readings - apparent)).sum()
             + theta @ self.penalty @ theta
             + self.cost @ theta
         )
@@ -511,7 +531,9 @@ class _Problem:
             )
             jacobian[:, n_coefficients] = reactive * demand / apparent
             jacobian[:, n_coefficients + 1] = reactive / apparent
-        target = self.readings - apparent + jacobian @ state[:n_unknowns]
+        root_weights = np.sqrt(self.weights)
+        jacobian *= root_weights[:, None]
+        target = root_weights * (self.readings - apparent) + jacobian @ state[:n_unknowns]
         gram = np.zeros((n_unknowns, n_unknowns))
         rhs = np.zeros(n_unknowns)
         gram[:n_coefficients, :n_coefficients] = self.penalty
