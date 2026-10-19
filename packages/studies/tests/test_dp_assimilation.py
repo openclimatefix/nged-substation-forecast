@@ -316,7 +316,7 @@ def test_a_drifting_level_widens_the_raw_spread_but_not_the_post_filter_spread()
     post = spread.by_lead_band[0].table[0, 0]
     assert post[-1] - post[0] < 0.4 * (raw.table[0, 0, -1] - raw.table[0, 0, 0])
     far = spread.by_lead_band[2].table[0, 0]
-    assert far[-1] - far[0] > post[-1] - post[0]
+    assert far[-1] - far[0] > post[-1] - post[0] + 0.05
 
 
 def test_a_flagged_switching_row_stays_in_the_stream_but_leaves_the_spread():
@@ -444,8 +444,29 @@ def test_a_residual_outside_the_fitting_window_is_refused():
         )
 
 
-def test_a_tiny_observation_noise_keeps_the_variances_positive():
+def test_the_variance_floor_is_applied_after_each_update(monkeypatch: pytest.MonkeyPatch):
+    stream = _simulate(hyper=HYPER, n=48 * 20, seed=12)
+    band = _bands(n=len(stream))
+    normal = run_kalman(residual=stream, band=band, hyper=HYPER)
+    monkeypatch.setattr("studies.dp_assimilation.VARIANCE_FLOOR", -1e9)
+    unfloored = run_kalman(residual=stream, band=band, hyper=HYPER)
+    assert np.allclose(normal.level[1], unfloored.level[1])  # the default floor never binds here
+    monkeypatch.setattr("studies.dp_assimilation.VARIANCE_FLOOR", 1e3)
+    floored = run_kalman(residual=stream, band=band, hyper=HYPER)
+    assert np.abs(floored.level[1] - normal.level[1]).max() > 1e-3
+
+
+def test_a_tiny_observation_noise_keeps_the_filter_finite():
     stream = _simulate(hyper=HYPER, n=48 * 20, seed=12)
     tiny = replace(HYPER, log_sigma_eps=np.log(1e-6))
     trace = run_kalman(residual=stream, band=_bands(n=len(stream)), hyper=tiny)
     assert np.isfinite(trace.log_likelihood)
+
+
+def test_a_fitting_window_without_the_grid_is_refused():
+    with pytest.raises(ValueError, match="needs the grid's end_times"):
+        fit_filter_hyperparameters(
+            residuals={"S1": np.zeros(48)},
+            band=np.zeros(48, dtype=int),
+            window=(np.datetime64("2024-01-01", "us"), np.datetime64("2024-01-05", "us")),
+        )

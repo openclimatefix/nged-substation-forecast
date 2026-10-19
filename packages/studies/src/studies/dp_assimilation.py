@@ -521,10 +521,14 @@ def fit_filter_hyperparameters(
         Each site's fitted hyperparameters.
 
     Raises:
-        ValueError: If there are no sites, or a residual lies outside `window`.
+        ValueError: If there are no sites, `window` is given without `end_times`, or a residual
+            lies outside `window`.
     """
     if not residuals:
         msg = "no residual streams to fit the filter on"
+        raise ValueError(msg)
+    if window is not None and end_times is None:
+        msg = "a fitting window needs the grid's end_times"
         raise ValueError(msg)
     if window is not None and end_times is not None:
         for site, stream in residuals.items():
