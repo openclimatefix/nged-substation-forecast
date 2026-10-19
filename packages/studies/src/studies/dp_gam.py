@@ -933,22 +933,48 @@ def fit_gam(
         rhs=rhs - 0.5 * linear,
         constrained=torch.as_tensor(layout.constrained),
     )
-    signal = derated_unit_shape(features=features, index=index) > LAST_TRAINED_MIN_SHAPE
-    if not signal.any() and pinned is None:
-        msg = f"{site} has no training row that carries solar signal before {cut}"
-        raise ValueError(msg)
     return GamFit(
         layout=layout,
         theta=theta.cpu().numpy(),
         cut=cut,
         n_rows=len(index),
         site=site,
-        last_season_year=int(cache.calendar.season_year[index[signal]].max())
-        if signal.any()
-        else -1,
+        last_season_year=last_signal_season_year(
+            cache=cache, site=site, index=index, cut=cut, pinned=pinned
+        ),
         violation=violation.cpu().numpy(),
         pinned=pinned,
     )
+
+
+def last_signal_season_year(
+    *,
+    cache: FeatureCache,
+    site: str,
+    index: np.ndarray,
+    cut: datetime,
+    pinned: PinnedCapacity | None,
+) -> int:
+    """Return the latest season-year with a training row that carries solar signal.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        index: The training rows.
+        cut: The fit's cut, for the error message.
+        pinned: The pinned capacity of the fit, or `None` for a fitted capacity.
+
+    Returns:
+        The season-year, or -1 for a pinned fit with no signal row.
+
+    Raises:
+        ValueError: If a fitted-capacity fit has no training row that carries solar signal.
+    """
+    signal = derated_unit_shape(features=cache.sites[site], index=index) > LAST_TRAINED_MIN_SHAPE
+    if not signal.any() and pinned is None:
+        msg = f"{site} has no training row that carries solar signal before {cut}"
+        raise ValueError(msg)
+    return int(cache.calendar.season_year[index[signal]].max()) if signal.any() else -1
 
 
 def predict_gam(
