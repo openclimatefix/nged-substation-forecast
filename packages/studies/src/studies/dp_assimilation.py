@@ -666,7 +666,11 @@ class SharedTerm:
             the site's loading times its scale in that band (beta times sigma).
         delay_hours: How long after a reading the term may see it, when that differs from the
             telemetry delay of the local term (for example, contributors whose telemetry is later);
-            `None` uses the same delay as the local term.
+            `None` uses the same delay as the local term. The module cannot check the local
+            stream: a local stream built from the shared stream (such as the residual minus the
+            loading times the factor) reads factor values that a later-delayed term could not
+            yet use, which changes the local correction. The caller must build it with the same
+            delay.
     """
 
     residual: np.ndarray
@@ -681,7 +685,7 @@ class SharedTerm:
             ValueError: If `weight_by_band` does not hold exactly one weight per hour band.
         """
         if np.shape(self.weight_by_band) != (N_BANDS,):
-            msg = f"weight_by_band needs {N_BANDS} entries, one per hour band"
+            msg = f"weight_by_band needs {N_BANDS} weights, one per hour band"
             raise ValueError(msg)
 
 
@@ -699,6 +703,16 @@ class WeightedTrace:
     trace: CorrectionTrace
     weight_by_band: np.ndarray
     cutoff: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        """Check the weights have one entry per hour band.
+
+        Raises:
+            ValueError: If `weight_by_band` does not hold exactly one weight per hour band.
+        """
+        if np.shape(self.weight_by_band) != (N_BANDS,):
+            msg = f"weight_by_band needs {N_BANDS} weights, one per hour band"
+            raise ValueError(msg)
 
 
 def summed_correction_at(
@@ -784,6 +798,9 @@ def replica_corrections(
     streams = [local_residual, *(term.residual for term in shared), grid_band]
     if any(stream is not None and len(stream) != n_grid for stream in streams):
         msg = "every stream and grid_band must have one entry per grid row"
+        raise ValueError(msg)
+    if not np.array_equal(grid_band[replica.index], replica.band):
+        msg = "grid_band must agree with the replica's bands at the replica's rows"
         raise ValueError(msg)
     stream = local_residual
     if stream is None:
