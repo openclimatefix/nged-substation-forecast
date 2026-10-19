@@ -72,6 +72,13 @@ advice:
     over all leads and 5.94 beyond 3 days, below every other arm (C3).
 production_status: not-for-production
 adopted_in: none
+take_home_message: >-
+  With lagged inputs built only from data a live service has, including NGED's real telemetry delay,
+  the two-stage chain was not distinguishable from the single-stage N1 over all leads: 6.41 against
+  6.33, a difference of +0.08 points of capacity (99.17% interval -0.11 to +0.25; positive means the
+  chain is worse). Up to 48 hours the chain was 0.27 lower (-0.62 to +0.03). It scored 0.52 above
+  the stored manual_heuristic baseline (-0.25 to +1.25), so the staged design is not supported for
+  demand on this evidence.
 code: ml-experiments/00018-staged-chain-vs-n1-serving-latency-lag-anomalies-demand/
 pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/1224
 ---
