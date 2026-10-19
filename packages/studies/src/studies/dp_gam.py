@@ -1173,6 +1173,37 @@ def prepare_fit(
     return layout, index
 
 
+def check_pinned_capacity(
+    *,
+    capacity: CapacityType,
+    pinned: PinnedCapacity | None,
+    site: str,
+    features: SiteFeatures,
+    cut: datetime,
+) -> None:
+    """Raise unless a pinned capacity is given exactly when the capacity is pinned, for this fit.
+
+    Args:
+        capacity: The spec's capacity mode.
+        pinned: The pinned capacity given to the fit, or `None`.
+        site: The substation's label.
+        features: The substation's arrays.
+        cut: The fit's cut.
+
+    Raises:
+        ValueError: If the pinned capacity is missing, unexpected, or built for another
+            substation or cut.
+    """
+    if (pinned is not None) != (capacity == "pinned"):
+        msg = "a pinned capacity is required exactly when the specs pin the capacity"
+        raise ValueError(msg)
+    if pinned is not None and (pinned.cut != cut or pinned.site != features.table.site):
+        msg = (
+            f"the pinned capacity was built for {pinned.site} at {pinned.cut}, not {site} at {cut}"
+        )
+        raise ValueError(msg)
+
+
 def fit_gam(
     *,
     cache: FeatureCache,
@@ -1235,14 +1266,9 @@ def fit_gam(
             " solar form, harmonics and heating options, clip, and node presence"
         )
         raise ValueError(msg)
-    if (pinned is not None) != (specs[0].capacity == "pinned"):
-        msg = "a pinned capacity is required exactly when the specs pin the capacity"
-        raise ValueError(msg)
-    if pinned is not None and (pinned.cut != cut or pinned.site != features.table.site):
-        msg = (
-            f"the pinned capacity was built for {pinned.site} at {pinned.cut}, not {site} at {cut}"
-        )
-        raise ValueError(msg)
+    check_pinned_capacity(
+        capacity=specs[0].capacity, pinned=pinned, site=site, features=features, cut=cut
+    )
     layout, index = prepare_fit(
         cache=cache,
         site=site,
@@ -1295,22 +1321,48 @@ def fit_gam(
         constrained=torch.as_tensor(layout.constrained),
         max_iterations=NODE_MAX_ITERATIONS if specs[0].node is not None else 500,
     )
-    signal = derated_unit_shape(features=features, index=index) > LAST_TRAINED_MIN_SHAPE
-    if not signal.any() and pinned is None:
-        msg = f"{site} has no training row that carries solar signal before {cut}"
-        raise ValueError(msg)
     return GamFit(
         layout=layout,
         theta=theta.cpu().numpy(),
         cut=cut,
         n_rows=len(index),
         site=site,
-        last_season_year=int(cache.calendar.season_year[index[signal]].max())
-        if signal.any()
-        else -1,
+        last_season_year=last_signal_season_year(
+            cache=cache, site=site, index=index, cut=cut, pinned=pinned
+        ),
         violation=violation.cpu().numpy(),
         pinned=pinned,
     )
+
+
+def last_signal_season_year(
+    *,
+    cache: FeatureCache,
+    site: str,
+    index: np.ndarray,
+    cut: datetime,
+    pinned: PinnedCapacity | None,
+) -> int:
+    """Return the latest season-year with a training row that carries solar signal.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        index: The training rows.
+        cut: The fit's cut, for the error message.
+        pinned: The pinned capacity of the fit, or `None` for a fitted capacity.
+
+    Returns:
+        The season-year, or -1 for a pinned fit with no signal row.
+
+    Raises:
+        ValueError: If a fitted-capacity fit has no training row that carries solar signal.
+    """
+    signal = derated_unit_shape(features=cache.sites[site], index=index) > LAST_TRAINED_MIN_SHAPE
+    if not signal.any() and pinned is None:
+        msg = f"{site} has no training row that carries solar signal before {cut}"
+        raise ValueError(msg)
+    return int(cache.calendar.season_year[index[signal]].max()) if signal.any() else -1
 
 
 def predict_gam(
@@ -1764,20 +1816,20 @@ def replica_cut(*, cut: datetime) -> datetime:
 
 
 def replica_rows(
-    *, cache: FeatureCache, site: str, fit_cut: datetime, cut: datetime, drop_switching: bool
+    *, cache: FeatureCache, site: str, fit_cut: datetime, cut: datetime, drop_switching: bool = True
 ) -> np.ndarray:
-    """Return the grid rows a replica fitted at `fit_cut` predicts: the year up to `cut`.
+    """Return the rows a replica fit's residuals are taken over.
 
     Args:
         cache: The cache.
         site: The substation's label.
         fit_cut: The replica fit's cut.
-        cut: The cut of the final fit.
+        cut: The final fit's cut.
         drop_switching: True to leave out the rows inside the switching masks.
 
     Returns:
-        The rows that have a reading and end after both the replica's cut and the substation's
-        first usable instant, and no later than `cut`.
+        The rows that have a reading and finite inputs, end after the replica's cut and after the
+        substation's first usable instant, and end no later than the final cut.
     """
     features = cache.sites[site]
     keep = (

@@ -316,3 +316,74 @@ def test_a_dark_only_window_trains_on_dark_rows_and_a_zero_capacity_removes_the_
         cache=cache, fit=fit, index=sunny, columns=np.ones(fit.layout.n_columns, dtype=bool)
     )
     assert reading == pytest.approx(demand_only)
+
+
+def test_ones_weights_reproduce_the_unweighted_fit_and_zero_weights_drop_rows(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, _, _, _ = _cache_with_reading(
+        cache=dp_synthetic_cache, capacity={2020: 35.0, 2022: 40.0, 2023: 25.0}, reactive=True
+    )
+    _, index = prepare_fit(
+        cache=cache, site="S1", spec=SPEC, cut=CUT, window=WINDOW, season_years=SEASON_YEARS
+    )
+    unweighted = _meter(cache=cache, qmode="learned")
+    ones = fit_gam_through_meter(
+        cache=cache,
+        site="S1",
+        spec=SPEC,
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+        qmode="learned",
+        weights=np.ones(len(index)),
+    )
+    assert np.allclose(ones.fit.theta, unweighted.fit.theta, atol=1e-9)
+    assert ones.tan_phi == pytest.approx(unweighted.tan_phi)
+    early_cut = datetime(2024, 1, 1, tzinfo=UTC)
+    fixed_start = TrainingWindow(start=datetime(2023, 1, 1, tzinfo=UTC))
+    _, long_index = prepare_fit(
+        cache=cache, site="S1", spec=SPEC, cut=CUT, window=fixed_start, season_years=SEASON_YEARS
+    )
+    keep = (cache.end_times[long_index] <= common_cut_64(early_cut)).astype(np.float64)
+    zeroed = fit_gam_through_meter(
+        cache=cache,
+        site="S1",
+        spec=SPEC,
+        cut=CUT,
+        window=fixed_start,
+        season_years=SEASON_YEARS,
+        qmode="zero",
+        weights=keep,
+    )
+    shorter = fit_gam_through_meter(
+        cache=cache,
+        site="S1",
+        spec=SPEC,
+        cut=early_cut,
+        window=fixed_start,
+        season_years=SEASON_YEARS,
+        qmode="zero",
+    )
+    assert np.allclose(zeroed.fit.theta, shorter.fit.theta, atol=1e-6)
+
+
+def common_cut_64(moment: datetime) -> np.datetime64:
+    """Return a timezone-aware datetime as a naive UTC `datetime64[us]`."""
+    return np.datetime64(moment.replace(tzinfo=None), "us")
+
+
+def test_weights_with_the_wrong_length_or_a_negative_entry_are_refused(
+    dp_synthetic_cache: FeatureCache,
+):
+    with pytest.raises(ValueError, match="one non-negative entry per training row"):
+        fit_gam_through_meter(
+            cache=dp_synthetic_cache,
+            site="S1",
+            spec=SPEC,
+            cut=CUT,
+            window=WINDOW,
+            season_years=SEASON_YEARS,
+            qmode="zero",
+            weights=np.ones(3),
+        )
