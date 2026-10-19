@@ -15,11 +15,12 @@ from e00103_common import (
     HOURS_BANDS,
     PANEL_END,
     PANEL_PATH,
-    PERIOD_END,
     STAMP_FIX_UTC,
     load_series,
 )
 
+LAST_SCORED_DAY: Final[date] = date(2026, 6, 30)
+"""The last local date of any counted or scored statistic."""
 LOCKDOWN_FIRST_DAY: Final[date] = date(2020, 3, 23)
 LOCKDOWN_LAST_DAY: Final[date] = date(2021, 7, 19)
 """The fixed lockdown window, experiment 6's COVID indicator, fixed by the series brief."""
@@ -38,7 +39,7 @@ def load_panel(*, extended: bool = False) -> pl.DataFrame:
     return (
         pl.read_parquet(PANEL_PATH)
         .join(capacity, on="time_series_id")
-        .filter(True if extended else pl.col("time") <= PERIOD_END)
+        .filter(True if extended else pl.col("local_date") <= LAST_SCORED_DAY)
         .with_columns(
             clean=pl.col("present") & ~pl.col("flagged"),
             points=100.0 * pl.col("power") / pl.col("effective_capacity_mw"),
@@ -128,7 +129,7 @@ def first_clean_month(*, panel: pl.DataFrame) -> pl.DataFrame:
 def early_calibration(*, levels: pl.DataFrame, first_clean: pl.DataFrame) -> pl.DataFrame:
     """Each of the first 12 months' night and weekday-day levels minus a later month's.
 
-    The comparison month is a year later, unless that month falls in March 2020 to June 2021, in
+    The comparison month is a year later, unless that month falls in the fixed lockdown window, in
     which case it is the first later year outside the lockdown window. `differs` is true when either
     band differs by more than 15 points.
     """
@@ -201,14 +202,16 @@ def _add_months(stamp: datetime, months: int) -> datetime:
     return stamp.replace(year=total // 12, month=total % 12 + 1)
 
 
-def timestamp_correlation(*, panel: pl.DataFrame) -> pl.DataFrame:
+def timestamp_correlation(*, panel: pl.DataFrame, summer_middays: bool = False) -> pl.DataFrame:
     """Correlation of hourly mean power with CAMS GHI on clear-sky daylight hours, by shift.
 
     Callers restrict the panel to the months they compare; the like-for-like check uses April to
     September on both sides of the correction.
 
     The power hour is shifted by -90 to +90 minutes in 30-minute steps. Clear-sky hours: clear-sky
-    index above 0.8 with clear-sky GHI above 100 W/m2, any month, MW Primaries only (net power falls
+    index above 0.8 with clear-sky GHI above 100 W/m2, any month, MW Primaries only. With
+    `summer_middays`, the plan's stricter test: May to August, CAMS hours ending 11:00 to 14:00 UTC,
+    and clear-sky GHI above 400 W/m2 (net power falls
     as GHI rises, so the correlation is negative and the right shift makes it most negative). The
     split is at the ingest correction instant. Returns series, side, shift, correlation.
     """
@@ -253,9 +256,14 @@ def timestamp_correlation(*, panel: pl.DataFrame) -> pl.DataFrame:
             left_on=["time_series_id", "hour_end"],
             right_on=["time_series_id", "cams_hour_end"],
         ).filter(
-            pl.col("clear_sky_ghi_w_m2") > 100,
+            pl.col("clear_sky_ghi_w_m2") > (400 if summer_middays else 100),
             pl.col("ghi_w_m2") / pl.col("clear_sky_ghi_w_m2") > 0.8,
         )
+        if summer_middays:
+            joined = joined.filter(
+                pl.col("hour_end").dt.month().is_between(5, 8),
+                pl.col("hour_end").dt.hour().is_between(11, 14),
+            )
         for (series_id, after), part in joined.with_columns(
             after=pl.col("hour_end") >= STAMP_FIX_UTC
         ).group_by("time_series_id", "after"):
@@ -426,7 +434,7 @@ def clip_slopes(*, panel: pl.DataFrame) -> pl.DataFrame:
 def level_correlations(*, levels: pl.DataFrame, series_ids: list[int], band: str) -> pl.DataFrame:
     """Pairwise correlation of monthly band levels after removing each series' mean seasonal cycle.
 
-    Uses the months where all the listed series have data and outside March 2020 to June 2021.
+    Uses the months where all the listed series have data and outside the fixed lockdown window.
     """
     wide = (
         levels.filter(
@@ -527,7 +535,7 @@ def lockdown_departures(
     """Weekday 09:00-16:59 level minus a no-lockdown fit, per site, for 2020-01 to 2021-12.
 
     Per site: least squares of the monthly level on 11 calendar-month dummies and a linear trend,
-    fitted on the months after the site's first usable time and outside March 2020 to June 2021.
+    fitted on the months after the site's first usable time and outside the fixed lockdown window.
     """
     rows = []
     for series_id in series_ids:

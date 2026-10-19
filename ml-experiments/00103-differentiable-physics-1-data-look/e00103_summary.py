@@ -34,9 +34,9 @@ def clip_decisions(*, sites: dict) -> pl.DataFrame:
     )
 
 
-def timestamp_peaks(*, sites: dict) -> pl.DataFrame:
+def timestamp_peaks(*, sites: dict, table_name: str) -> pl.DataFrame:
     """The most negative shift per MW Primary and side, and the change at plus or minus 30."""
-    table = pl.read_parquet(TABLES / "timestamp.parquet").with_columns(
+    table = pl.read_parquet(TABLES / f"{table_name}.parquet").with_columns(
         site=pl.col("time_series_id").replace_strict(sites, return_dtype=pl.String)
     )
     rows = []
@@ -68,29 +68,37 @@ def main() -> None:
     clip = clip_decisions(sites=sites)
     print("== clip decision ==")
     print(clip)
-    peaks = timestamp_peaks(sites=sites)
-    print("== timestamp peaks ==")
-    print(
-        peaks.filter(pl.col("site").is_in(MW_PRIMARIES)).with_columns(pl.col(pl.Float64).round(4))
-    )
-    means = (
-        pl.read_parquet(TABLES / "timestamp.parquet")
-        .filter(pl.col("time_series_id").is_in([ids[s] for s in MW_PRIMARIES]))
-        .group_by("after_fix", "shift_minutes")
-        .agg(pl.col("correlation").mean())
-    )
-    print(
-        "== timestamp: vertex of the parabola through the mean correlation at -30, 0, +30 minutes "
-        "=="
-    )
-    for after in (False, True):
-        part = means.filter(pl.col("after_fix") == after)
-        c = {r["shift_minutes"]: r["correlation"] for r in part.iter_rows(named=True)}
-        vertex = 30 * (c[-30] - c[30]) / (2 * (c[-30] - 2 * c[0] + c[30]))
+    peaks_by_test = {}
+    for test, table_name in (
+        ("clear-sky hours, April to September", "timestamp"),
+        ("summer middays, May to August, 10:00 to 14:00 UTC", "timestamp_summer_middays"),
+    ):
+        peaks = timestamp_peaks(sites=sites, table_name=table_name)
+        peaks_by_test[test] = peaks
+        print(f"== timestamp peaks: {test} ==")
         print(
-            f"after_fix={after}: vertex at {vertex:+.1f} minutes; mean correlation at -30/0/+30 ="
-            f" {c[-30]:.3f}/{c[0]:.3f}/{c[30]:.3f}"
+            peaks.filter(pl.col("site").is_in(MW_PRIMARIES)).with_columns(
+                pl.col(pl.Float64).round(4)
+            )
         )
+        means = (
+            pl.read_parquet(TABLES / f"{table_name}.parquet")
+            .filter(pl.col("time_series_id").is_in([ids[s] for s in MW_PRIMARIES]))
+            .group_by("after_fix", "shift_minutes")
+            .agg(pl.col("correlation").mean())
+        )
+        print(f"== timestamp, {test}: mean correlation and parabola vertex ==")
+        for after in (False, True):
+            part = means.filter(pl.col("after_fix") == after)
+            c = {r["shift_minutes"]: r["correlation"] for r in part.iter_rows(named=True)}
+            vertex = 30 * (c[-30] - c[30]) / (2 * (c[-30] - 2 * c[0] + c[30]))
+            print(
+                f"after_fix={after}: vertex at {vertex:+.1f} minutes; mean correlation at"
+                f" -90/-30/0/+30/+90 = {c[-90]:.3f}/{c[-30]:.3f}/{c[0]:.3f}/{c[30]:.3f}/{c[90]:.3f}"
+            )
+    peaks = peaks_by_test["clear-sky hours, April to September"]
+    sites_table = pl.read_parquet(WORK_DIR / "sites.parquet")
+    d18_start = sites_table.filter(pl.col("site") == "D18")["first_usable"][0]
     panel = load_panel()
     d18 = panel.filter(
         pl.col("time_series_id") == ids["D18"],
@@ -103,12 +111,16 @@ def main() -> None:
         .agg(dark=pl.len(), negative=(pl.col("power") < 0).sum())
         .sort("month")
     )
-    print("== D18 negative dark rows by month ==")
+    print("== D18 negative dark rows by month (all clean rows, before any cut) ==")
     print(by_month.filter(pl.col("negative") > 0))
-    after = d18.filter(pl.col("local_date") >= pl.date(2025, 2, 1))
+    before_share = (d18["power"] < 0).sum() / d18.height
+    after = d18.filter(pl.col("time") >= d18_start)
     share_after = (after["power"] < 0).sum() / after.height
-    print(f"D18 negative dark share from 2025-02-01: {share_after:.4%} ({after.height} dark rows)")
-    sites_table = pl.read_parquet(WORK_DIR / "sites.parquet")
+    print(f"D18 negative dark share before its cut: {before_share:.4%} ({d18.height} dark rows)")
+    print(
+        f"D18 negative dark share from its first usable date {d18_start:%Y-%m-%d}:"
+        f" {share_after:.4%} ({after.height} dark rows)"
+    )
     long_history = {
         col: int(((sites_table["role"].is_in(["mw_long"])) & (sites_table[col] >= 12)).sum())
         for col in sites_table.columns
@@ -121,7 +133,8 @@ def main() -> None:
         f"{r['site']}_{'after' if r['after_fix'] else 'before'}": r["best_shift"]
         for r in peaks.filter(pl.col("site").is_in(MW_PRIMARIES)).iter_rows(named=True)
     }
-    decisions["d18_negative_dark_share_from_2025_02"] = share_after
+    decisions["d18_negative_dark_share_before_cut"] = before_share
+    decisions["d18_negative_dark_share_after_cut"] = share_after
     decisions["long_history_counts_by_origin"] = long_history
     (WORK_DIR / "decisions.json").write_text(json.dumps(decisions, indent=2, default=str))
 

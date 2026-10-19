@@ -123,7 +123,11 @@ def main() -> None:
 
 
 def add_switching_mask(*, panel: pl.DataFrame) -> pl.DataFrame:
-    """Flag `switching_mask` on every series an event touches, from `onset_utc` to `end_utc`."""
+    """Flag `switching_mask` on every series an event touches, from `onset_utc` to `end_utc`.
+
+    The labelled set's `onset_utc` and `end_utc` are the power stamps (half-hour ends) of the first
+    and the last affected half-hours, so both are inside the mask.
+    """
     events = (
         hand_filtered_events()
         .explode("series_ids")
@@ -134,8 +138,8 @@ def add_switching_mask(*, panel: pl.DataFrame) -> pl.DataFrame:
         panel.select("time_series_id", "time")
         .join(events, on="time_series_id")
         .filter(
-            pl.col("time") > pl.col("onset_utc").dt.truncate("30m"),
-            pl.col("time") <= pl.col("end_utc").dt.truncate("30m") + pl.duration(minutes=30),
+            pl.col("time") >= pl.col("onset_utc"),
+            pl.col("time") <= pl.col("end_utc"),
         )
         .select("time_series_id", "time")
         .unique()

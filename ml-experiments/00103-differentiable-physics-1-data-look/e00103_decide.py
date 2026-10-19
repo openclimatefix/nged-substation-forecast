@@ -52,6 +52,8 @@ ORIGINS: Final[tuple[datetime, ...]] = tuple(
 """The first instant of each tuning year; months of history are counted up to these."""
 NEGATIVE_DARK_SHARE_LIMIT: Final[float] = 0.01
 """A series is flagged when more than this share of its dark clean half-hours are below zero."""
+PART3_WINDOW: Final[str] = "2023-07 to 2025-06"
+"""Part 3's 2-year training window (it trains on rows before 2025-07-01)."""
 MIN_DARK_SITE_YEARS: Final[float] = 0.5
 
 
@@ -105,8 +107,21 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
     availability_by_month(panel=panel).write_parquet(TABLE_DIR / "availability.parquet")
 
     # Lockdown window.
+    # Mark rows.
+    panel = panel.join(
+        cuts.select("time_series_id", "first_usable"), on="time_series_id"
+    ).with_columns(
+        early_cut=pl.col("time") < pl.col("first_usable"),
+        lockdown=in_lockdown_window(local_date=pl.col("local_date")),
+        season=season_year(date=pl.col("local_date")),
+    )
+    after_cut = panel.filter(~pl.col("early_cut"))
+    # Statistics that compare sites use rows after the cuts and outside the switching masks.
+    levels_used = monthly_levels(panel=after_cut.filter(~pl.col("switching_mask")))
+    levels_used.write_parquet(TABLE_DIR / "monthly_levels_after_cuts_and_masks.parquet")
+
     departures = lockdown_departures(
-        levels=levels,
+        levels=levels_used,
         series_ids=[ids[s] for s in ("D5", "D10", "D11", "D14")],
         first_usable=first_usable,
     )
@@ -117,22 +132,12 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
     print("weekday 09:00-16:59 departure from a no-lockdown fit, points of effective capacity:")
     print(departures.pivot(on="time_series_id", index="month", values="departure").sort("month"))
 
-    # Mark rows.
-    panel = panel.join(
-        cuts.select("time_series_id", "first_usable"), on="time_series_id"
-    ).with_columns(
-        early_cut=pl.col("time") < pl.col("first_usable"),
-        lockdown=in_lockdown_window(local_date=pl.col("local_date")),
-        season=season_year(date=pl.col("local_date")),
-    )
-    after_cut = panel.filter(~pl.col("early_cut"))
-
     # Dark site-years per window.
     usable_dark = after_cut.filter(pl.col("clean"), pl.col("dark"), ~pl.col("switching_mask"))
     windows = {
         "all history, lockdown kept": usable_dark,
         "lockdown removed": usable_dark.filter(~pl.col("lockdown")),
-        "latest two season-years": usable_dark.filter(pl.col("season") >= 2024),
+        PART3_WINDOW: usable_dark.filter(pl.col("season").is_between(2023, 2024)),
     }
     dark_rows = []
     for name, frame in windows.items():
@@ -180,7 +185,11 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
     )
     screen.write_parquet(TABLE_DIR / "generator_screen.parquet")
     print("\n== generator screen (after cuts and masks) ==")
-    print(screen.with_columns(site=pl.col("site").replace(GENERATOR_SERIES)).drop("time_series_id"))
+    print(
+        screen.with_columns(site=pl.col("site").replace(GENERATOR_SERIES)).drop(
+            "time_series_id", "group"
+        )
+    )
 
     # Clip, heating, correlations, timestamps, census.
     clip = clip_slopes(panel=after_cut.filter(~pl.col("switching_mask")))
@@ -211,7 +220,9 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
     correlations = {}
     for band in ("night", "evening"):
         corr = level_correlations(
-            levels=levels, series_ids=[ids[s] for s in MW_LONG_HISTORY if s != "D9"], band=band
+            levels=levels_used,
+            series_ids=[ids[s] for s in MW_LONG_HISTORY if s != "D9"],
+            band=band,
         )
         corr.write_parquet(TABLE_DIR / f"level_correlation_{band}.parquet")
         matrix = corr.drop("series", "months").to_numpy()
@@ -229,13 +240,16 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
         panel=extended.filter(pl.col("time").dt.month().is_between(4, 9))
     )
     timestamps.write_parquet(TABLE_DIR / "timestamp.parquet")
+    timestamp_correlation(panel=extended, summer_middays=True).write_parquet(
+        TABLE_DIR / "timestamp_summer_middays.parquet"
+    )
     print("\n== timestamp: mean correlation over MW Primaries by shift ==")
     print(
         timestamps.group_by("after_fix", "shift_minutes")
         .agg(pl.col("correlation").mean(), pl.col("n").sum())
         .sort("after_fix", "shift_minutes")
     )
-    census = scarce_census(panel=panel.filter(pl.col("time_series_id").is_in(primary_ids)))
+    census = scarce_census(panel=after_cut.filter(pl.col("time_series_id").is_in(primary_ids)))
     census.write_parquet(TABLE_DIR / "census.parquet")
     print("\n== scarce-data census: mean per MW long-history site ==")
     print(
@@ -271,6 +285,7 @@ def main() -> None:  # noqa: PLR0915  (runs each decision in turn and prints its
         clip=clip,
         drift=drift,
         correlations=correlations,
+        mask_census=mask_census,
     )
 
 
@@ -373,6 +388,7 @@ def write_handed_on(
     clip: pl.DataFrame,
     drift: pl.DataFrame,
     correlations: dict[str, dict[str, float]],
+    mask_census: pl.DataFrame,
 ) -> None:
     """Write `sites.parquet`, `rows.parquet`, and `decisions.json`."""
     import holidays
@@ -380,6 +396,17 @@ def write_handed_on(
     england = holidays.UnitedKingdom(subdiv="ENG", years=range(2019, 2027))
     bank_days = pl.Series(sorted(england.keys())).cast(pl.Date)
     flagged = set(screen.filter(pl.col("flagged"))["site"].to_list())
+    screen_labels = [GENERATOR_SERIES.get(site, site) for site in screen["site"].to_list()]
+    clip_flags = (
+        clip.with_columns(
+            site=pl.col("time_series_id").replace_strict(sites, return_dtype=pl.String),
+            clipped=(pl.col("above_600") > -1) & (pl.col("below_500") < -4),
+        )
+        .filter(pl.col("site").is_in(MW_PRIMARIES))
+        .group_by("site")
+        .agg(clip=pl.col("clipped").sum() >= 2)
+        .to_dicts()
+    )
     first_usable = dict(cuts.select("time_series_id", "first_usable").iter_rows())
     dark_lockdown_removed = {
         r["site"]: r["site_years"]
@@ -387,7 +414,7 @@ def write_handed_on(
     }
     dark_two_years = {
         r["site"]: r["site_years"]
-        for r in dark.filter(pl.col("window") == "latest two season-years").iter_rows(named=True)
+        for r in dark.filter(pl.col("window") == PART3_WINDOW).iter_rows(named=True)
     }
     rows = []
     for site in series["site"].to_list():
@@ -402,11 +429,7 @@ def write_handed_on(
             role, reason = "excluded", "flagged by the generator screen"
         elif site in MVA_PRIMARIES:
             role = "mva_dark" if dark_two_years.get(site, 0) >= MIN_DARK_SITE_YEARS else "excluded"
-            reason = (
-                "under 0.5 dark site-years in the latest two season-years"
-                if role == "excluded"
-                else ""
-            )
+            reason = f"under 0.5 dark site-years in {PART3_WINDOW}" if role == "excluded" else ""
         elif history["months_before_2025-07"] >= 12 and site != "D18":
             role, reason = "mw_long", ""
         else:
@@ -428,10 +451,28 @@ def write_handed_on(
                 "dark_site_years_two_years": dark_two_years.get(site),
             }
         )
-    sites_table = pl.DataFrame(rows)
+    sites_table = pl.DataFrame(rows).with_columns(
+        clip=pl.col("site").replace_strict(
+            {r["site"]: r["clip"] for r in clip_flags}, default=None, return_dtype=pl.Boolean
+        ),
+        generator_flag=pl.col("site").replace_strict(
+            dict(zip(screen_labels, screen["flagged"].to_list(), strict=True)),
+            default=None,
+            return_dtype=pl.Boolean,
+        ),
+    )
     sites_table.write_parquet(WORK_DIR / "sites.parquet")
-    print("\n== site table ==")
-    print(sites_table.drop("time_series_id"))
+    print("\n== site table (the metered generators show only their role and screen flag) ==")
+    generator_labels = list(GENERATOR_SERIES.values())
+    printable = sites_table.drop("time_series_id", "note").with_columns(
+        pl.when(pl.col("site").is_in(generator_labels))
+        .then(None)
+        .otherwise(pl.col(column))
+        .alias(column)
+        for column in sites_table.columns
+        if column not in ("site", "units", "role", "time_series_id", "note", "generator_flag")
+    )
+    print(printable)
     role_of = {r["site"]: r["role"] for r in rows}
     pool = panel.filter(pl.col("time_series_id").is_in([ids[s] for s in PRIMARIES]))
     day_type = (
@@ -446,23 +487,32 @@ def write_handed_on(
     christmas = (
         (pl.col("local_date").dt.month() == 12) & (pl.col("local_date").dt.day() >= 24)
     ) | ((pl.col("local_date").dt.month() == 1) & (pl.col("local_date").dt.day() == 1))
-    pool = pool.with_columns(
-        day_type=day_type,
-        christmas_run=christmas,
-        role=pl.col("site").replace_strict(role_of, return_dtype=pl.String),
-    ).with_columns(
-        in_pool=pl.col("role").is_in(["mw_long", "mw_short", "mva_dark"])
-        & ~pl.col("early_cut")
-        & pl.col("clean"),
-        scarce_kind=pl.when(pl.col("temperature_c").mean().over("time_series_id", "local_date") < 0)
-        .then(pl.lit("cold_day"))
-        .when(pl.col("day_type") == "bank_holiday")
-        .then(pl.lit("bank_holiday"))
-        .when(pl.col("christmas_run"))
-        .then(pl.lit("christmas_run")),
+    pool = (
+        pool.with_columns(
+            day_type=day_type,
+            christmas_run=christmas,
+            role=pl.col("site").replace_strict(role_of, return_dtype=pl.String),
+        )
+        .with_columns(
+            in_pool=pl.col("role").is_in(["mw_long", "mw_short", "mva_dark"])
+            & ~pl.col("early_cut")
+            & pl.col("clean"),
+            scarce_kind=pl.when(
+                pl.col("temperature_c").mean().over("time_series_id", "local_date") < 0
+            )
+            .then(pl.lit("cold_day"))
+            .when(pl.col("day_type") == "bank_holiday")
+            .then(pl.lit("bank_holiday"))
+            .when(pl.col("christmas_run"))
+            .then(pl.lit("christmas_run")),
+        )
+        .with_columns(
+            default_rows=pl.col("in_pool") & ~pl.col("lockdown") & ~pl.col("switching_mask")
+        )
     )
+    first_clean_of = dict(cuts.select("time_series_id", "first_clean").iter_rows())
     rows_table = (
-        pool.filter(pl.col("time") >= pl.col("first_usable"))
+        pool.filter(pl.col("time") >= pl.col("time_series_id").replace_strict(first_clean_of))
         .select(
             "time_series_id",
             "site",
@@ -470,6 +520,7 @@ def write_handed_on(
             "power",
             "present",
             "in_pool",
+            "default_rows",
             "early_cut",
             "lockdown",
             "switching_mask",
@@ -483,19 +534,49 @@ def write_handed_on(
     )
     rows_table.write_parquet(WORK_DIR / "rows.parquet")
     mw_rows = rows_table.filter(
-        pl.col("in_pool"), pl.col("role").is_in(["mw_long", "mw_short"])
+        pl.col("default_rows"), pl.col("role").is_in(["mw_long", "mw_short"])
     ).height
     mva_rows = rows_table.filter(
-        pl.col("in_pool"), pl.col("role") == "mva_dark", pl.col("dark")
+        pl.col("default_rows"), pl.col("role") == "mva_dark", pl.col("dark")
     ).height
     print(
-        f"\nrows.parquet: {rows_table.height} rows; dp_mw_v1 rows {mw_rows};"
-        f" dp_mva_dark_v1 rows {mva_rows}"
+        f"\nrows.parquet: {rows_table.height} rows from each Primary's first clean row;"
+        f" in_pool rows {rows_table.filter(pl.col('in_pool')).height};"
+        f" default_rows (in_pool, outside the lockdown window and the switching masks) "
+        f"{rows_table.filter(pl.col('default_rows')).height};"
+        f" dp_mw_v1 rows {mw_rows}; dp_mva_dark_v1 rows {mva_rows}"
+    )
+    print(
+        "masked half-hours present in rows.parquet:"
+        f" {rows_table.filter(pl.col('switching_mask'), pl.col('present')).height}"
     )
     decisions = {
         "lockdown_window": "fixed, 2020-03-23 to 2021-07-19 (experiment 6's COVID indicator)",
         "correlations_of_monthly_levels": correlations,
         "roles": role_of,
+        "first_usable": {
+            r["site"]: f"{r['first_usable']:%Y-%m-%d}"
+            for r in sites_table.iter_rows(named=True)
+            if r["site"] not in generator_labels
+        },
+        "generator_screen_flagged": [
+            label
+            for label, flag in zip(screen_labels, screen["flagged"].to_list(), strict=True)
+            if flag
+        ],
+        "dark_site_years_per_mva_primary": {
+            r["site"]: {
+                "lockdown_removed": r["dark_site_years_no_lockdown"],
+                PART3_WINDOW: r["dark_site_years_two_years"],
+            }
+            for r in sites_table.filter(pl.col("role") == "mva_dark").iter_rows(named=True)
+        },
+        "masked_half_hours_on_the_grid_per_primary": {
+            r["site"]: int(r["masked"])
+            for r in mask_census.group_by("site")
+            .agg(masked=pl.col("masked").sum())
+            .iter_rows(named=True)
+        },
         "heating_slope_drift_sites_excluding_zero": [
             r["series_id"]
             for r in drift.iter_rows(named=True)

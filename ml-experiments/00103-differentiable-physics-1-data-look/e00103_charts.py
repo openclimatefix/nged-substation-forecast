@@ -780,9 +780,9 @@ def figure_9_generator_screen() -> alt.TopLevelMixin:
         )
         return alt.layer(  # ty: ignore[invalid-return-type]
             limit,
-            base.mark_circle(size=60).encode(color=colour),  # ty: ignore[unresolved-attribute]
+            base.mark_circle(size=60, aria=False).encode(color=colour),  # ty: ignore[unresolved-attribute]
             base.transform_filter(alt.datum.labelled)  # ty: ignore[unresolved-attribute]
-            .mark_text(dx=7, dy=-5, align="left", fontSize=9)
+            .mark_text(dx=7, dy=-5, align="left", fontSize=9, aria=False)
             .encode(text="label:N"),
         ).properties(width=WIDTH - 40, height=110)
 
@@ -872,15 +872,16 @@ def figure_9_generator_screen() -> alt.TopLevelMixin:
     )
 
 
-def figure_10_timestamp() -> alt.TopLevelMixin:
-    """Correlation of hourly power with CAMS irradiance by stamp shift, either side of the fix."""
+def _timestamp_panel(*, table_name: str, panel_title: str, after_label: str) -> alt.LayerChart:
+    """One panel of figure 10: correlation against stamp shift, before and after the fix."""
+    before_label = "before the correction"
     table = (
-        pl.read_parquet(TABLES / "timestamp.parquet")
+        pl.read_parquet(TABLES / f"{table_name}.parquet")
         .with_columns(
             site=pl.col("time_series_id").replace_strict(SITES, return_dtype=pl.String),
             side=pl.when(pl.col("after_fix"))
-            .then(pl.lit("after the correction (April to September 2026)"))
-            .otherwise(pl.lit("before the correction (April to September)")),
+            .then(pl.lit(after_label))
+            .otherwise(pl.lit(before_label)),
         )
         .filter(pl.col("site").is_in(MW_ORDER))
     )
@@ -888,11 +889,7 @@ def figure_10_timestamp() -> alt.TopLevelMixin:
     colour = alt.Color(
         "side:N",
         scale=alt.Scale(
-            domain=[
-                "before the correction (April to September)",
-                "after the correction (April to September 2026)",
-            ],
-            range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE],
+            domain=[before_label, after_label], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]
         ),
         legend=alt.Legend(title="Rows", orient="top", direction="vertical", labelLimit=400),
     )
@@ -916,25 +913,44 @@ def figure_10_timestamp() -> alt.TopLevelMixin:
         .mark_line(strokeWidth=3, point=True)
         .encode(x=x, y="correlation:Q", color=colour)
     )
-    return alt.layer(thin, bold).properties(
+    return alt.layer(thin, bold).properties(  # ty: ignore[invalid-return-type]
         width=WIDTH - 40,
-        height=220,
-        title=_title(
-            text="Timestamp convention: the correlation is most negative near zero shift",
-            lines=[
-                (
-                    "Correlation of the hourly mean net power at the 8 MW Primaries with CAMS "
-                    "irradiance, on clear-sky hours (clear-sky index above 0.8, clear-sky "
-                    "irradiance "
-                    "above 100 W/m\u00b2), when the power stamps are shifted by the amount on the "
-                    "axis. Net power falls as irradiance rises, so the correlation is negative and"
-                    " the"
-                    " right shift makes it most negative. Thin lines: one site; thick line: the "
-                    "mean "
-                    "over sites."
-                )
-            ],
-        ),
+        height=170,
+        title=alt.TitleParams(panel_title, fontSize=12, anchor="start"),
+    )
+
+
+def figure_10_timestamp() -> alt.TopLevelMixin:
+    """Correlation of hourly power with CAMS irradiance by stamp shift, in two tests."""
+    top = _timestamp_panel(
+        table_name="timestamp",
+        panel_title="Clear-sky hours in April to September",
+        after_label="after the correction (April to September 2026)",
+    )
+    bottom = _timestamp_panel(
+        table_name="timestamp_summer_middays",
+        panel_title="Summer middays: May to August, 10:00 to 14:00 UTC",
+        after_label="after the correction (May to August 2026)",
+    )
+    return (
+        alt.vconcat(top, bottom, spacing=14)
+        .resolve_scale(color="independent")
+        .properties(
+            title=_title(
+                text="Timestamp convention: the correlation is most negative between -30 and +30",
+                lines=[
+                    (
+                        "Correlation of the hourly mean net power at the 8 MW Primaries with CAMS "
+                        "irradiance when the power stamps are shifted by the amount on the axis. "
+                        "Net power falls as irradiance rises, so the correlation is negative and "
+                        "the right shift makes it most negative. Top: clear-sky hours (clear-sky "
+                        "index above 0.8, clear-sky irradiance above 100 W/m\u00b2). Bottom: the "
+                        "plan's stricter test, with clear-sky irradiance above 400 W/m\u00b2. "
+                        "The bottom panel is nearly flat. Thin lines: one site; thick line: the mean over sites."
+                    )
+                ],
+            )
+        )
     )
 
 
