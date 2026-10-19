@@ -220,6 +220,8 @@ MW_POOL: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16", "D18"
 MVA_POOL: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
 """The MVA Primaries, on dark rows only."""
 POOL: Final[tuple[str, ...]] = (*MW_POOL, *MVA_POOL)
+REPLICA_MONTHS: Final[int] = 12
+"""The replica fit is made this many months before the cut."""
 WINDOW_MONTHS: Final[int] = 24
 """The 2-year window of every main arm."""
 FIT_STEPS: int = 1200
@@ -256,15 +258,15 @@ def pooled_batch_for(
     cache: FeatureCache,
     sites: tuple[str, ...],
     cut: datetime,
-    months: int = WINDOW_MONTHS,
+    months: int | None = WINDOW_MONTHS,
     device: str = "cuda",
 ) -> PooledBatch:
-    """Return the pooled training rows of the `months` months before `cut`."""
+    """Return the pooled training rows of the `months` months before `cut` (all years if None)."""
     return build_pooled_batch(
         cache=cache,
         sites=sites,
         cut_end=to_64(moment=cut),
-        after=to_64(moment=months_before(moment=cut, months=months)),
+        after=None if months is None else to_64(moment=months_before(moment=cut, months=months)),
         device=device,
     )
 
@@ -276,14 +278,20 @@ def scoring_batch_for(
     after: datetime,
     through: datetime,
     device: str = "cuda",
+    all_present_rows: bool = False,
 ) -> PooledBatch:
-    """Return the rows in (`after`, `through`] for the sites, at most the last valid time."""
+    """Return the rows in (`after`, `through`] for the sites, at most the last valid time.
+
+    With `all_present_rows` the rows inside switching masks are kept too, for scoring beside the
+    default rows.
+    """
     return build_pooled_batch(
         cache=cache,
         sites=sites,
         cut_end=to_64(moment=min(through, HOLDOUT_START - timedelta(minutes=30))),
         after=to_64(moment=after),
         device=device,
+        all_present_rows=all_present_rows,
     )
 
 

@@ -446,7 +446,7 @@ def cross_fitted_spread(
     The residuals must come from a replica fit in which `held_out` had no rows, and from the
     onboarding arm with the same weeks of history, so the spread for a new substation carries
     neither its own history nor another arm's staleness. The residuals are centred per group
-    first (see `_centre_by_group`), so the spread is a spread around the mean forecast and carries
+    first (see `centre_by_group`), so the spread is a spread around the mean forecast and carries
     no shift.
 
     Args:
@@ -477,11 +477,27 @@ def cross_fitted_spread(
         msg = f"no residuals from a substation other than {held_out}"
         raise ValueError(msg)
     band, quarter = residuals.band[others], residuals.quarter[others]
-    centred = _centre_by_group(residual=residuals.residual[others], band=band, quarter=quarter)
+    return fit_centred_spread(residual=residuals.residual[others], band=band, quarter=quarter)
+
+
+def fit_centred_spread(
+    *, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray
+) -> ResidualSpread:
+    """Fit a spread on residuals centred per (band, quarter) group.
+
+    Args:
+        residual: Actual minus predicted mean, in points.
+        band: The hour band of each residual.
+        quarter: The calendar quarter of each residual.
+
+    Returns:
+        The spread around the mean forecast, with mean zero in each group.
+    """
+    centred = centre_by_group(residual=residual, band=band, quarter=quarter)
     return ResidualSpread.fit(residuals=centred, band=band, quarter=quarter)
 
 
-def _centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:
+def centre_by_group(*, residual: np.ndarray, band: np.ndarray, quarter: np.ndarray) -> np.ndarray:
     """Subtract the mean residual of each (band, quarter) group, so the spread has mean zero.
 
     The forecast is a mean forecast, so a group's mean residual in the replica year is the replica
@@ -509,6 +525,7 @@ __all__ = [
     "PooledResiduals",
     "after_mask",
     "cross_fitted_spread",
+    "fit_centred_spread",
     "fit_many",
     "onboard_site",
     "pooled_residuals",
