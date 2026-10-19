@@ -1,6 +1,8 @@
 ---
 id: "00048"
 slug: weekly-retraining-confirmation-and-extension-demand-generators
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

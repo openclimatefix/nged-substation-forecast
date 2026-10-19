@@ -1,6 +1,8 @@
 ---
 id: "00032"
 slug: substation-fingerprints-pooled-demand
+theme: hierarchy-and-pooling
+also_relevant_to: [demand-inputs]
 status: done
 size: complex
 hypothesis: >-

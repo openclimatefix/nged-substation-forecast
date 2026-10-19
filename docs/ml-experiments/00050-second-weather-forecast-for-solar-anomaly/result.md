@@ -1,6 +1,8 @@
 ---
 id: "00050"
 slug: second-weather-forecast-for-solar-anomaly
+theme: weather-products-and-blending
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

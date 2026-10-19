@@ -1,6 +1,8 @@
 ---
 id: "00083"
 slug: curtailment-cost-and-tail-calibration-worked-example
+theme: curtailment-cost
+also_relevant_to: []
 status: done
 size: simple
 hypothesis: >-

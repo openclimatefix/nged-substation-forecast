@@ -1,8 +1,15 @@
 ---
 id: "00101"
 slug: ro-nc-detector-on-real-hand-filtered-switching-events
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: simple
+take_home_message: >-
+  The refit-offset neighbour-count detector found 12 of the 35 real load transfers lasting over 1
+  day and none of the 31 shorter ones, against 0.770 of the moved power on injected transfers. Of
+  the 35, 6 sit where the detector's residual panel holds no readings and 12 have a step under 4
+  noise units.
 hypothesis: >-
   Post hoc, and descriptive: the refit-offset neighbour-count detector (RO-NC, called XL in
   experiments 70 to 82) finds less of the moved power on the 66 real, hand-filtered switching

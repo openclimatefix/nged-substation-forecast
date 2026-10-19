@@ -1,6 +1,8 @@
 ---
 id: "00015"
 slug: same-time-price-stage1-demand
+theme: demand-inputs
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

@@ -1,8 +1,15 @@
 ---
 id: "00054"
 slug: product-trained-xgboost-wind-farms
+theme: generator-forecasting
+also_relevant_to: [weather-products-and-blending]
 status: done
 size: complex
+take_home_message: >-
+  Giving the Met Office's UKV wind forecast to an ENS-trained wind-farm model lowered the quantile
+  score by about 0.2 points of capacity at 1 to 2 days ahead (95% interval 0.07 to 0.32), and a
+  shuffled-UKV placebo shows the gain is information and not extra columns. The UKV data come from a
+  research archive and not the live feed, so the gain is an upper limit on what a service could get.
 hypothesis: >-
   For the three metered wind farms, an XGBoost quantile model trained on ENS and given UKV's wind as
   extra input columns scores lower on the quantile score at lead days 1 and 2 than the same model

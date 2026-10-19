@@ -1,6 +1,8 @@
 ---
 id: "00003"
 slug: era5-trained-stage1a-vs-ens-trained-demand
+theme: weather-products-and-blending
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-

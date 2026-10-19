@@ -1,8 +1,15 @@
 ---
 id: "00044"
 slug: sw2-2-switching-share-of-best-guess-score
+theme: switching-labels-in-the-forecast
+also_relevant_to: [switching-detectors]
 status: done
 size: simple
+take_home_message: >-
+  In the band of events the labeller finds most reliably, a perfect switching detector would lower
+  the best guess's quantile score by 0.42% (95% interval -0.47% to 1.96%) and its tail score by
+  nothing, against a threshold of 3%. Switching in that band touches 3 of the 16 Primary series and
+  few half-hours.
 hypothesis: >-
   Half-hours in labelled switching events, and half-hours whose lagged power falls inside one, carry
   a larger share of the best guess's quantile score and tail score than their share of half-hours,

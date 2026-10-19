@@ -1,8 +1,15 @@
 ---
 id: "00065"
 slug: sw2-14-combined-single-series-and-neighbour-score
+theme: switching-detectors
+also_relevant_to: []
 status: done
 size: medium
+take_home_message: >-
+  Adding the neighbouring substations' opposite-sign steps to a substation's own step did not find
+  clearly more of the moved power than the own step alone (0.665 against 0.646; 99.17% interval
+  -0.011 to +0.062 on the difference). In a post hoc variant, adding the count of neighbours that
+  stepped the same way raised the share found.
 hypothesis: >-
   One alarm score that adds a substation's own 24-hour step evidence to the opposite-step evidence
   from its neighbouring substations, with neither acting as a gate, finds more of the MW moved by

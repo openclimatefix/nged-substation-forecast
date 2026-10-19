@@ -1,6 +1,8 @@
 ---
 id: "00084"
 slug: substation-limit-curtailment-cost-worked-example
+theme: curtailment-cost
+also_relevant_to: []
 status: done
 size: medium
 hypothesis: >-

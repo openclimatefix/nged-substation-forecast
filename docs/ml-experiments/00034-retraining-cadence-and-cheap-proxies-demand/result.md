@@ -1,6 +1,8 @@
 ---
 id: "00034"
 slug: retraining-cadence-and-cheap-proxies-demand
+theme: retraining-and-training-history
+also_relevant_to: []
 status: done
 size: complex
 hypothesis: >-
