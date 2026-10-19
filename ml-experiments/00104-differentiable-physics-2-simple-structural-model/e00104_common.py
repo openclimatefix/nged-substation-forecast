@@ -17,7 +17,12 @@ from typing import Final, Literal
 
 import numpy as np
 import polars as pl
-from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
+from studies.dp_features import (
+    PART_1_DIR,
+    FeatureCache,
+    default_input_paths,
+    load_or_build_feature_cache,
+)
 from studies.dp_gam import QUANTILE_COLUMNS, QUANTILE_LEVELS
 from studies.experiment_store import HOLDOUT_START, write_predictions
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -29,6 +34,9 @@ DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
 CACHE_DIR: Final[Path] = DATA_DIR / "cache"
 WORK_DIR: Final[Path] = DATA_DIR / "work"
 """Small result files (tuning, capacities, weights, reports); private and never committed."""
+
+PART_1_ROWS: Final[Path] = PART_1_DIR / "rows.parquet"
+"""Experiment 103's row table (scarce-data kinds, masks, day types)."""
 
 SCORED_SITES: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16")
 """The six MW long-history substations that are scored."""

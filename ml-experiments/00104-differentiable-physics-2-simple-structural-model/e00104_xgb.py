@@ -8,12 +8,17 @@ and day of year.
 
 | Arm | Window | Start |
 |---|---|---|
-| `x_12` | 12 months | XGBoost's estimated base score |
-| `x_12z` | 12 months | zero |
-| `x_12am` | 12 months | zero plus the solar offset |
-| `x_allz` | all years | zero |
-| `x_allam` | all years | zero plus the solar offset |
-| `l_12am_d1`, `l_12am_d6` | 12 months | `x_12am` plus the three power lags, descriptive |
+| `x_12`, `x_all` | 12 months, all years | XGBoost's estimated base score |
+| `x_12z`, `x_allz` | 12 months, all years | zero |
+| `x_12am`, `x_allam` | 12 months, all years | zero plus the solar offset |
+| `x_12amm`, `x_allamm` | 12 months, all years | training median plus the solar offset (post hoc) |
+| `x_12z_ng`, `x_12am_ng` | 12 months | zero, and zero plus offset, no CAMS irradiance (post hoc) |
+| `l_12amm_d1`, `l_12amm_d6` | 12 months | `x_12amm` plus the three power lags, descriptive |
+
+The zero start turned out to be a weaker benchmark than the default start, so the post-hoc `amm`
+arms start from the median of the training targets, as experiment 87's offset arms do. The `ng`
+arms drop the CAMS irradiance input, which is the condition in which experiment 64 measured the
+offset's gain.
 
 **The solar offset** (experiment 64's `am`) is a base margin `w * s * a(t)` for every quantile,
 in April to September and zero outside. `s` is the capacity over the effective capacity, in
@@ -38,7 +43,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 import e00104_common as common
 import numpy as np
@@ -98,33 +103,43 @@ LAG_COLUMNS: Final[tuple[str, ...]] = (
 )
 
 
-def feature_matrix(*, cache: FeatureCache, site: str, index: np.ndarray) -> np.ndarray:
+def feature_matrix(
+    *, cache: FeatureCache, site: str, index: np.ndarray, drop: tuple[str, ...] = ()
+) -> np.ndarray:
     """Return the lagless inputs of the rows `index`.
 
     Args:
         cache: The feature cache.
         site: The substation's label.
         index: Grid rows.
+        drop: Names in `FEATURE_COLUMNS` to leave out.
 
     Returns:
-        A float32 array of shape (len(index), len(FEATURE_COLUMNS)).
+        A float32 array of shape (len(index), len(FEATURE_COLUMNS) - len(drop)).
     """
     features = cache.sites[site]
     calendar = cache.calendar
-    return np.column_stack(
-        [
-            features.temperature_c[index],
-            features.smoothed_temperature_c[index],
-            features.ghi_w_m2[index],
-            features.elevation_deg[index],
-            calendar.half_hour[index],
-            calendar.day_type[index],
-            calendar.holiday_period[index],
-            calendar.tent[index],
-            calendar.signed_tent[index],
-            calendar.day_of_year[index],
-        ]
-    ).astype(np.float32)
+    columns = {
+        "temperature_c": features.temperature_c[index],
+        "temperature_c_k6": features.smoothed_temperature_c[index, 0],
+        "temperature_c_k24": features.smoothed_temperature_c[index, 1],
+        "temperature_c_k72": features.smoothed_temperature_c[index, 2],
+        "temperature_c_k168": features.smoothed_temperature_c[index, 3],
+        "ghi_w_m2": features.ghi_w_m2[index],
+        "elevation_deg": features.elevation_deg[index],
+        "half_hour": calendar.half_hour[index],
+        "day_type": calendar.day_type[index],
+        "holiday_period": calendar.holiday_period[index],
+        "tent": calendar.tent[index],
+        "signed_tent": calendar.signed_tent[index],
+        "day_of_year": calendar.day_of_year[index],
+    }
+    if set(columns) != set(FEATURE_COLUMNS):
+        msg = "the feature dictionary and FEATURE_COLUMNS disagree"
+        raise ValueError(msg)
+    return np.column_stack([columns[name] for name in FEATURE_COLUMNS if name not in drop]).astype(
+        np.float32
+    )
 
 
 @dataclass(frozen=True)
@@ -261,12 +276,18 @@ def offset_per_unit_weight(
     return np.where(np.isin(month_number, OFFSET_MONTHS), capacity * anomaly, 0.0)
 
 
+StartType = Literal["estimated", "zero"]
+"""XGBoost's own base score, or a base score of zero."""
+NO_IRRADIANCE: Final[tuple[str, ...]] = ("ghi_w_m2",)
+"""The input the `ng` arms leave out."""
+
+
 def fit_booster(
     *,
     x: np.ndarray,
     y: np.ndarray,
     levels: tuple[float, ...],
-    start: str,
+    start: StartType,
     margin: np.ndarray | None,
 ) -> xgb.Booster:
     """Fit one quantile model with experiment 87's parameters.
@@ -275,8 +296,7 @@ def fit_booster(
         x: Inputs.
         y: Targets in points.
         levels: The quantile levels to fit.
-        start: `estimated` for XGBoost's own base score, `zero` for a base score of zero. A
-            margin overrides the start, so `margin` is used when given.
+        start: The base score. A margin overrides it, so `margin` is used when given.
         margin: A base margin of shape (rows, len(levels)), or `None`.
 
     Returns:
@@ -301,9 +321,11 @@ def predict(
     return np.sort(raw.reshape(len(x), n_levels), axis=1)
 
 
-def tile_margin(*, offset: np.ndarray, weight: float, n_levels: int) -> np.ndarray:
-    """Repeat the offset `weight * offset` for every quantile level."""
-    return np.tile((weight * offset)[:, None], (1, n_levels)).astype(np.float32)
+def tile_margin(
+    *, offset: np.ndarray, weight: float, n_levels: int, base: float = 0.0
+) -> np.ndarray:
+    """Repeat `base + weight * offset` for every quantile level."""
+    return np.tile((base + weight * offset)[:, None], (1, n_levels)).astype(np.float32)
 
 
 def replica_weight(
@@ -314,8 +336,10 @@ def replica_weight(
     window: TrainingWindow,
     final_train: np.ndarray,
     vintage: VintageCapacity,
+    start: StartType,
+    drop: tuple[str, ...] = (),
 ) -> tuple[float, int]:
-    """Fit the solar weight `w` on the median residuals of a replica of the zero-start forecast.
+    """Fit the solar weight `w` on the median residuals of a replica of the matching forecast.
 
     A median-only model with the arm's parameters is trained on the window that ends 12 months
     before the cut, and predicts the following 12 months, so its residuals are as stale as the
@@ -329,6 +353,8 @@ def replica_weight(
         window: The arm's window rule.
         final_train: The final fit's training rows, which set the climatology of the anomaly.
         vintage: The capacity vintage.
+        start: The matching arm's start (`zero` or `estimated`).
+        drop: Inputs the matching arm leaves out.
 
     Returns:
         `w` and the number of April to September residual rows it was fitted on.
@@ -337,17 +363,17 @@ def replica_weight(
     fit_cut = replica_cut(cut=cut)
     train = training_rows(features=features, cache=cache, cut=fit_cut, window=window)
     booster = fit_booster(
-        x=feature_matrix(cache=cache, site=site, index=train),
+        x=feature_matrix(cache=cache, site=site, index=train, drop=drop),
         y=features.y[train],
         levels=(0.5,),
-        start="zero",
+        start=start,
         margin=None,
     )
     rows = common.scoring_index(cache=cache, site=site, after=fit_cut, through=cut)
     rows = rows[~features.switching_mask[rows]]
     median = predict(
         booster=booster,
-        x=feature_matrix(cache=cache, site=site, index=rows),
+        x=feature_matrix(cache=cache, site=site, index=rows, drop=drop),
         margin=None,
         n_levels=1,
     )[:, 0]
@@ -413,14 +439,16 @@ class SiteJob:
         site: The substation's label.
         cut: The cut.
         index: The rows to score.
-        x_score: The lagless inputs of the rows to score.
     """
 
     cache: FeatureCache
     site: str
     cut: datetime
     index: np.ndarray
-    x_score: np.ndarray
+
+    def x_score(self, *, drop: tuple[str, ...] = ()) -> np.ndarray:
+        """Return the lagless inputs of the rows to score."""
+        return feature_matrix(cache=self.cache, site=self.site, index=self.index, drop=drop)
 
     def frame_of(
         self, *, quantiles: np.ndarray, scheme: common.SchemeType = "day_ahead"
@@ -431,74 +459,80 @@ class SiteJob:
         )
 
 
-def lagged_arms(
-    *,
-    job: SiteJob,
-    train: np.ndarray,
-    margin_train: np.ndarray,
-    margin_score: np.ndarray,
-    lagless_quantiles: np.ndarray,
-) -> dict[str, pl.DataFrame]:
-    """Fit the descriptive lagged reference arms, and re-key `x_12am` to their initialisations.
-
-    Args:
-        job: The substation's shared inputs.
-        train: The 12-month window's training rows.
-        margin_train: The solar offset on the training rows.
-        margin_score: The solar offset on the rows to score.
-        lagless_quantiles: The quantiles of `x_12am`.
-
-    Returns:
-        For each lagged scheme, `l_12am_<scheme>` and `x_12am_<scheme>` (the lagless arm's
-        quantiles under the same initialisation times, so the contrast pairs the same rows).
-    """
+def plain_arm(
+    *, job: SiteJob, train: np.ndarray, start: StartType, drop: tuple[str, ...] = ()
+) -> np.ndarray:
+    """Fit an arm with no solar offset and return its quantiles on the rows to score."""
     features = job.cache.sites[job.site]
-    x_train = feature_matrix(cache=job.cache, site=job.site, index=train)
-    levels = tuple(QUANTILE_LEVELS)
-    frames: dict[str, pl.DataFrame] = {}
-    for scheme in common.LAGGED_SCHEMES:
-        frames[f"x_12am_{scheme}"] = job.frame_of(quantiles=lagless_quantiles, scheme=scheme)
-        lag_train = lag_columns(cache=job.cache, site=job.site, index=train, scheme=scheme)
-        lag_score = lag_columns(cache=job.cache, site=job.site, index=job.index, scheme=scheme)
-        lagged = fit_booster(
-            x=np.column_stack([x_train, lag_train]),
-            y=features.y[train],
-            levels=levels,
-            start="zero",
-            margin=margin_train,
-        )
-        quantiles = predict(
-            booster=lagged,
-            x=np.column_stack([job.x_score, lag_score]),
-            margin=margin_score,
-            n_levels=len(levels),
-        )
-        frames[f"l_12am_{scheme}"] = job.frame_of(quantiles=quantiles, scheme=scheme)
-    return frames
+    booster = fit_booster(
+        x=feature_matrix(cache=job.cache, site=job.site, index=train, drop=drop),
+        y=features.y[train],
+        levels=tuple(QUANTILE_LEVELS),
+        start=start,
+        margin=None,
+    )
+    return predict(
+        booster=booster, x=job.x_score(drop=drop), margin=None, n_levels=len(QUANTILE_LEVELS)
+    )
+
+
+@dataclass(frozen=True)
+class OffsetArm:
+    """An arm with a solar offset, fitted.
+
+    Attributes:
+        quantiles: The quantiles on the rows to score.
+        margin_train: The base margin of the training rows.
+        margin_score: The base margin of the rows to score.
+        record: The weight, the rows it was fitted on, and the capacity bookkeeping.
+    """
+
+    quantiles: np.ndarray
+    margin_train: np.ndarray
+    margin_score: np.ndarray
+    record: dict
 
 
 def offset_arm(
-    *, job: SiteJob, train: np.ndarray, window: TrainingWindow, vintage: VintageCapacity
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
-    """Fit the solar weight and the `am` arm for one window.
+    *,
+    job: SiteJob,
+    train: np.ndarray,
+    window: TrainingWindow,
+    vintage: VintageCapacity,
+    start: StartType,
+    label: str,
+    drop: tuple[str, ...] = (),
+) -> OffsetArm:
+    """Fit the solar weight and an arm whose base margin is a start plus the offset.
 
     Args:
         job: The substation's shared inputs.
         train: The window's training rows.
         window: The window rule.
         vintage: The capacity vintage.
+        start: `zero` for a margin of the offset alone, `estimated` for the training median plus
+            the offset (the weight is then fitted on the estimated-start replica).
+        label: The arm's name, kept in the record.
+        drop: Inputs the arm leaves out.
 
     Returns:
-        The quantiles of the arm, the offset margins on the training rows and on the rows to
-        score, and a record of the weight and how many rows needed the vintage's first week.
+        The fitted arm.
     """
     cache, site = job.cache, job.site
     features = cache.sites[site]
     levels = tuple(QUANTILE_LEVELS)
     weight, n_fit = replica_weight(
-        cache=cache, site=site, cut=job.cut, window=window, final_train=train, vintage=vintage
+        cache=cache,
+        site=site,
+        cut=job.cut,
+        window=window,
+        final_train=train,
+        vintage=vintage,
+        start=start,
+        drop=drop,
     )
     _, before = capacity_points_at(cache=cache, vintage=vintage, index=train)
+    base = 0.0 if start == "zero" else float(np.median(features.y[train]))
     margins = [
         tile_margin(
             offset=offset_per_unit_weight(
@@ -506,26 +540,70 @@ def offset_arm(
             ),
             weight=weight,
             n_levels=len(levels),
+            base=base,
         )
         for rows in (train, job.index)
     ]
     booster = fit_booster(
-        x=feature_matrix(cache=cache, site=site, index=train),
+        x=feature_matrix(cache=cache, site=site, index=train, drop=drop),
         y=features.y[train],
         levels=levels,
         start="zero",
         margin=margins[0],
     )
-    quantiles = predict(booster=booster, x=job.x_score, margin=margins[1], n_levels=len(levels))
+    quantiles = predict(
+        booster=booster, x=job.x_score(drop=drop), margin=margins[1], n_levels=len(levels)
+    )
     record = {
         "site": site,
+        "arm": label,
         "w": weight,
         "rows": n_fit,
         "train_rows_before_vintage": before,
         "unobserved_weeks": vintage.n_unobserved,
         "vintage_origin": str(vintage.origin),
+        "base": base,
     }
-    return quantiles, margins[0], margins[1], record
+    return OffsetArm(
+        quantiles=quantiles, margin_train=margins[0], margin_score=margins[1], record=record
+    )
+
+
+def lagged_arms(*, job: SiteJob, train: np.ndarray, offset: OffsetArm) -> dict[str, pl.DataFrame]:
+    """Fit the descriptive lagged reference arms, and re-key `x_12amm` to their initialisations.
+
+    Args:
+        job: The substation's shared inputs.
+        train: The 12-month window's training rows.
+        offset: The lagless `x_12amm` arm, whose margins the lagged arms reuse.
+
+    Returns:
+        For each lagged scheme, `l_12amm_<scheme>` and `x_12amm_<scheme>` (the lagless arm's
+        quantiles under the same initialisation times, so the contrast pairs the same rows).
+    """
+    features = job.cache.sites[job.site]
+    x_train = feature_matrix(cache=job.cache, site=job.site, index=train)
+    levels = tuple(QUANTILE_LEVELS)
+    frames: dict[str, pl.DataFrame] = {}
+    for scheme in common.LAGGED_SCHEMES:
+        frames[f"x_12amm_{scheme}"] = job.frame_of(quantiles=offset.quantiles, scheme=scheme)
+        lag_train = lag_columns(cache=job.cache, site=job.site, index=train, scheme=scheme)
+        lag_score = lag_columns(cache=job.cache, site=job.site, index=job.index, scheme=scheme)
+        lagged = fit_booster(
+            x=np.column_stack([x_train, lag_train]),
+            y=features.y[train],
+            levels=levels,
+            start="zero",
+            margin=offset.margin_train,
+        )
+        quantiles = predict(
+            booster=lagged,
+            x=np.column_stack([job.x_score(), lag_score]),
+            margin=offset.margin_score,
+            n_levels=len(levels),
+        )
+        frames[f"l_12amm_{scheme}"] = job.frame_of(quantiles=quantiles, scheme=scheme)
+    return frames
 
 
 def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
@@ -533,7 +611,7 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
 
     Args:
         site: The substation's label.
-        cold: True for the cold block, which runs `x_12` only.
+        cold: True for the cold block, which runs the two plain 12-month arms only.
 
     Returns:
         `frames` (arm name to predictions) and `weights` rows.
@@ -542,15 +620,12 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
     features = cache.sites[site]
     cut = common.COLD_CUT if cold else common.FINAL_CUT
     through = common.COLD_END if cold else common.SCORING_END
-    index = common.scoring_index(cache=cache, site=site, after=cut, through=through)
     job = SiteJob(
         cache=cache,
         site=site,
         cut=cut,
-        index=index,
-        x_score=feature_matrix(cache=cache, site=site, index=index),
+        index=common.scoring_index(cache=cache, site=site, after=cut, through=through),
     )
-    levels = tuple(QUANTILE_LEVELS)
     frames: dict[str, pl.DataFrame] = {}
     weights: list[dict] = []
     vintage = None if cold else vintage_capacity(cache=cache, site=site, cut=cut)
@@ -559,29 +634,33 @@ def fit_site(*, site: str, cold: bool) -> dict[str, Any]:
             continue
         train = training_rows(features=features, cache=cache, cut=cut, window=window)
         check_no_lookahead(cache=cache, train=train, cut=cut)
-        x_train = feature_matrix(cache=cache, site=site, index=train)
-        for start in ("estimated", "zero") if label == "12" else ("zero",):
-            booster = fit_booster(
-                x=x_train, y=features.y[train], levels=levels, start=start, margin=None
-            )
-            quantiles = predict(booster=booster, x=job.x_score, margin=None, n_levels=len(levels))
-            name = f"x_{label}" if start == "estimated" else f"x_{label}z"
+        for start, name in (("estimated", f"x_{label}"), ("zero", f"x_{label}z")):
+            quantiles = plain_arm(job=job, train=train, start=start)
             frames[f"cold_{name}" if cold else name] = job.frame_of(quantiles=quantiles)
         if vintage is None:
             continue
-        quantiles, margin_train, margin_score, record = offset_arm(
-            job=job, train=train, window=window, vintage=vintage
-        )
-        weights.append({**record, "window": label})
-        frames[f"x_{label}am"] = job.frame_of(quantiles=quantiles)
+        for start, name in (("zero", f"x_{label}am"), ("estimated", f"x_{label}amm")):
+            arm = offset_arm(
+                job=job, train=train, window=window, vintage=vintage, start=start, label=name
+            )
+            frames[name] = job.frame_of(quantiles=arm.quantiles)
+            weights.append({**arm.record, "window": label})
+            if name == "x_12amm":
+                frames |= lagged_arms(job=job, train=train, offset=arm)
         if label == "12":
-            frames |= lagged_arms(
+            ng = plain_arm(job=job, train=train, start="zero", drop=NO_IRRADIANCE)
+            frames["x_12z_ng"] = job.frame_of(quantiles=ng)
+            arm = offset_arm(
                 job=job,
                 train=train,
-                margin_train=margin_train,
-                margin_score=margin_score,
-                lagless_quantiles=quantiles,
+                window=window,
+                vintage=vintage,
+                start="zero",
+                label="x_12am_ng",
+                drop=NO_IRRADIANCE,
             )
+            frames["x_12am_ng"] = job.frame_of(quantiles=arm.quantiles)
+            weights.append({**arm.record, "window": label})
     print(f"{site}: {sorted(frames)}", flush=True)
     return {"frames": frames, "weights": weights}
 

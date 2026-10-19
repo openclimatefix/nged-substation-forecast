@@ -25,14 +25,24 @@ from studies.bootstrap import (
     bootstrap_difference_at_level,
     paired_differences,
 )
-from studies.dp_gam import QUANTILE_COLUMNS, QUANTILE_LEVELS
+from studies.dp_gam import QUANTILE_COLUMNS
 from studies.experiment_store import losses_for_bootstrap
 
 SITE_OF_ID: Final[dict[int, str]] = {7: "D9", 8: "D11", 10: "D10", 16: "D14", 17: "D5", 18: "D16"}
 GAM_ARMS: Final[tuple[str, ...]] = ("g1", "g_all", "g_all_d1", "g_all_d1_steps")
-XGB_ARMS: Final[tuple[str, ...]] = ("x_12", "x_12z", "x_12am", "x_allz", "x_allam")
+XGB_ARMS: Final[tuple[str, ...]] = (
+    "x_12",
+    "x_12z",
+    "x_12am",
+    "x_12amm",
+    "x_all",
+    "x_allz",
+    "x_allam",
+    "x_allamm",
+)
+NO_IRRADIANCE_ARMS: Final[tuple[str, ...]] = ("x_12z_ng", "x_12am_ng")
 REFERENCE_ARMS: Final[tuple[str, ...]] = ("climatology", "manual_heuristic")
-MAIN_ARMS: Final[tuple[str, ...]] = (*GAM_ARMS, *XGB_ARMS, *REFERENCE_ARMS)
+MAIN_ARMS: Final[tuple[str, ...]] = (*GAM_ARMS, *XGB_ARMS, *NO_IRRADIANCE_ARMS, *REFERENCE_ARMS)
 KEYS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time", "seed")
 N_PLANNED_CONTRASTS: Final[int] = 3
 BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / N_PLANNED_CONTRASTS)
@@ -147,7 +157,9 @@ def fmt(result: dict) -> str:
 
 def print_absolute(*, arms: dict[str, pl.DataFrame]) -> None:
     """Print each arm's headline score per site and pooled over the decision set."""
-    print("\n== 1. Absolute quantile score, points of capacity (rows outside the switching masks) ==")
+    print(
+        "\n== 1. Absolute quantile score, points of capacity (rows outside the switching masks) =="
+    )
     order = ["D5", "D10", "D11", "D14", "D16", "D9"]
     print(f"{'arm':18}" + "".join(f"{site:>8}" for site in order) + f"{'five':>8}{'six':>8}")
     for name, frame in arms.items():
@@ -184,13 +196,23 @@ def print_contrasts(*, arms: dict[str, pl.DataFrame]) -> dict[str, dict]:
     for treatment, reference in (
         ("g_all", "g1"),
         ("g_all_d1_steps", "g_all_d1"),
+        ("g_all_d1", "g_all"),
+        ("x_12z", "x_12"),
+        ("x_allz", "x_all"),
         ("x_12am", "x_12z"),
         ("x_allam", "x_allz"),
-        ("x_12z", "x_12"),
-        ("x_allz", "x_12z"),
+        ("x_12amm", "x_12"),
+        ("x_allamm", "x_all"),
+        ("x_12am_ng", "x_12z_ng"),
+        ("x_all", "x_12"),
         ("x_allam", "x_12am"),
         ("g_all", "x_allam"),
-        ("g_all_d1", "g_all"),
+        ("g1", "x_12"),
+        ("g1", "x_12amm"),
+        ("g_all", "x_all"),
+        ("g_all", "x_allamm"),
+        ("g_all_d1", "x_all"),
+        ("g_all_d1", "x_allamm"),
     ):
         results[f"{treatment}-{reference}"] = contrast(
             arms=arms, treatment=treatment, reference=reference, sites=five, level=None
@@ -211,9 +233,9 @@ def print_contrasts(*, arms: dict[str, pl.DataFrame]) -> dict[str, dict]:
 
 def verdict(*, c1: dict) -> str:
     """Apply the Phase A rule to C1: helps, hurts, or inconclusive (before positive controls)."""
-    if c1["high"] < 0 and c1["better"] >= 4:  # noqa: PLR2004 (4 of the 5 decision sites)
+    if c1["high"] < 0 and c1["better"] >= 4:
         return "helps"
-    if c1["estimate"] < 0 and c1["better"] >= 4:  # noqa: PLR2004
+    if c1["estimate"] < 0 and c1["better"] >= 4:
         return "helps (provisional, by the Phase A point rule)"
     if c1["low"] > 0:
         return "hurts"
@@ -230,33 +252,39 @@ def print_checks(*, results: dict[str, dict], arms: dict[str, pl.DataFrame]) -> 
     g_all = results["g_all-g1"]
     line(
         "old years without drift hurt (G-all - G1 +0.3 to +0.8, interval above zero)",
-        0.3 <= g_all["estimate"] <= 0.8 and g_all["low"] > 0,  # noqa: PLR2004
+        0.3 <= g_all["estimate"] <= 0.8 and g_all["low"] > 0,
         fmt(g_all),
     )
     solar = results["x_12am-x_12z"]
     line(
         "solar offset (X-12am - X-12z -0.40 to -0.10, interval below zero)",
-        -0.4 <= solar["estimate"] <= -0.1 and solar["high"] < 0,  # noqa: PLR2004
+        -0.4 <= solar["estimate"] <= -0.1 and solar["high"] < 0,
         fmt(solar),
+    )
+    ng = results["x_12am_ng-x_12z_ng"]
+    line(
+        "solar offset without the irradiance input (X-12am-ng - X-12z-ng -0.40 to -0.10)",
+        -0.4 <= ng["estimate"] <= -0.1 and ng["high"] < 0,
+        fmt(ng),
     )
     zero = results["x_12z-x_12"]
     line(
         "zero start (X-12z - X-12 between -0.10 and +0.02)",
-        -0.1 <= zero["estimate"] <= 0.02,  # noqa: PLR2004
+        -0.1 <= zero["estimate"] <= 0.02,
         fmt(zero),
     )
     c1 = results["C1 years"]
     line(
         "C1 +0.0 to +0.4, interval spanning zero",
-        0.0 <= c1["estimate"] <= 0.4 and c1["low"] < 0 < c1["high"],  # noqa: PLR2004
+        0.0 <= c1["estimate"] <= 0.4 and c1["low"] < 0 < c1["high"],
         fmt(c1),
     )
     c2 = results["C2 GAM vs XGBoost, 12 months"]
-    line("C2 +0.1 to +0.5", 0.1 <= c2["estimate"] <= 0.5, fmt(c2))  # noqa: PLR2004
+    line("C2 +0.1 to +0.5", 0.1 <= c2["estimate"] <= 0.5, fmt(c2))
     c3 = results["C3 GAM vs XGBoost, all years"]
-    line("C3 +0.0 to +0.5", 0.0 <= c3["estimate"] <= 0.5, fmt(c3))  # noqa: PLR2004
+    line("C3 +0.0 to +0.5", 0.0 <= c3["estimate"] <= 0.5, fmt(c3))
     steps = results["g_all_d1_steps-g_all_d1"]
-    line("steps within +-0.1 of D1", abs(steps["estimate"]) <= 0.1, fmt(steps))  # noqa: PLR2004
+    line("steps within +-0.1 of D1", abs(steps["estimate"]) <= 0.1, fmt(steps))
     worse = []
     for name in (*GAM_ARMS, *XGB_ARMS):
         for site, value in arms[name].group_by("site").agg(pl.col("score").mean()).iter_rows():
@@ -297,9 +325,15 @@ def print_staleness(*, arms: dict[str, pl.DataFrame]) -> None:
     print("score | q05 coverage | q95 coverage\n" + header)
     months: dict[str, dict[int, tuple[float, float, float]]] = {}
     for name in names:
-        kept = arms[name].filter(pl.col("site").is_in(common.ELIGIBLE_SITES)).with_columns(
-            month=(
-                (pl.col("valid_time").dt.year() - 2025) * 12 + pl.col("valid_time").dt.month() - 7
+        kept = (
+            arms[name]
+            .filter(pl.col("site").is_in(common.ELIGIBLE_SITES))
+            .with_columns(
+                month=(
+                    (pl.col("valid_time").dt.year() - 2025) * 12
+                    + pl.col("valid_time").dt.month()
+                    - 7
+                )
             )
         )
         stats = kept.group_by("month").agg(
@@ -311,22 +345,22 @@ def print_staleness(*, arms: dict[str, pl.DataFrame]) -> None:
     for month in range(12):
         print(
             f"{month:6d}"
-            + "".join(
-                f"   {months[n][month][0]:5.2f} {months[n][month][1]:5.3f} {months[n][month][2]:5.3f}"
-                for n in names
-            )
+            + "".join("   {:5.2f} {:5.3f} {:5.3f}".format(*months[n][month]) for n in names)
         )
 
 
 def vintage_and_hindsight(*, site: str) -> pl.DataFrame:
     """Return the season-year capacity in MW from the real-time vintage and the hindsight file."""
-    from e00104_xgb import VINTAGES_PATH, vintage_capacity  # noqa: PLC0415
+    from e00104_xgb import VINTAGES_PATH, vintage_capacity
 
     cache = common.load_cache()
     table = cache.sites[site].table
     vintage = vintage_capacity(cache=cache, site=site, cut=common.FINAL_CUT)
     weeks = pl.DataFrame(
-        {"week_start": vintage.weeks, "vintage_mw": vintage.points * table.effective_capacity_mw / 100}
+        {
+            "week_start": vintage.weeks,
+            "vintage_mw": vintage.points * table.effective_capacity_mw / 100,
+        }
     )
     hindsight = (
         pl.read_parquet(VINTAGES_PATH.parent / "capacity_weekly.parquet")
@@ -352,13 +386,15 @@ def print_capacity() -> None:
         print(
             f"{site}: vintage 'frozen' over hindsight season-year constant, {len(both)} weeks: "
             f"min {ratio.min():.4f}, max {ratio.max():.4f}, "
-            f"share within 0.1%: {float((ratio.sub(1).abs() < 1e-3).mean()):.3f}"
+            f"share within 0.1%: {float(np.mean(np.abs(ratio.to_numpy() - 1.0) < 1e-3)):.3f}"
         )
         by_year = both.group_by("season_year").agg(
             pl.col("vintage_mw").mean(), pl.col("hindsight_mw").mean()
         )
         for arm in ("g1", "g_all", "g_all_d1"):
-            row = fitted.filter(pl.col("site") == site, pl.col("arm") == arm, pl.col("season_year") == 2024)
+            row = fitted.filter(
+                pl.col("site") == site, pl.col("arm") == arm, pl.col("season_year") == 2024
+            )
             vintage_2024 = by_year.filter(pl.col("season_year") == 2024)["vintage_mw"]
             if row.height and vintage_2024.len():
                 value = row["capacity_mw"][0]
@@ -378,9 +414,9 @@ def print_weights() -> None:
 def print_scarce(*, arms: dict[str, pl.DataFrame]) -> None:
     """Print mean score by scarce-data row kind, with no interval."""
     print("\n== 9. Scarce-data rows (descriptive, no interval): mean score by kind ==")
-    rows = pl.read_parquet(
-        common.PART_1_ROWS, columns=["site", "time", "scarce_kind"]
-    ).rename({"time": "valid_time"})
+    rows = pl.read_parquet(common.PART_1_ROWS, columns=["site", "time", "scarce_kind"]).rename(
+        {"time": "valid_time"}
+    )
     names = ("g1", "g_all", "g_all_d1", "x_12am", "x_allam", "manual_heuristic")
     print(f"{'kind':14}{'rows':>8}" + "".join(f"{n:>17}" for n in names))
     joined = {
@@ -397,7 +433,7 @@ def print_scarce(*, arms: dict[str, pl.DataFrame]) -> None:
 
 
 def print_cold() -> None:
-    """Print the cold block: the central forecast's absolute error, November 2022 to February 2023."""
+    """Print the cold block, November 2022 to February 2023: the central forecast's error."""
     print("\n== 10. Cold block, November 2022 to February 2023 (descriptive) ==")
     print("Mean absolute error of the central forecast (GAM mean; XGBoost median), points:")
     names = ("cold_g1", "cold_g_all", "cold_g_all_d1", "cold_x_12")
@@ -408,19 +444,13 @@ def print_cold() -> None:
         for n in names:
             kept = frames[n].filter(pl.col("site") == site)
             centre = kept["mean"] if "mean" in kept.columns else kept["q50"]
-            values.append(float((kept["actual"] - centre).abs().mean()))
+            values.append(float(np.mean(np.abs((kept["actual"] - centre).to_numpy()))))
         print(f"{site:6}" + "".join(f"{v:16.3f}" for v in values))
-    mean_of = {
-        n: float(
-            (
-                f.filter(pl.col("site").is_in(common.COLD_SITES))["actual"]
-                - f.filter(pl.col("site").is_in(common.COLD_SITES))["mean" if "mean" in f.columns else "q50"]
-            )
-            .abs()
-            .mean()
-        )
-        for n, f in frames.items()
-    }
+    mean_of = {}
+    for n, f in frames.items():
+        kept = f.filter(pl.col("site").is_in(common.COLD_SITES))
+        centre = kept["mean"] if "mean" in kept.columns else kept["q50"]
+        mean_of[n] = float(np.mean(np.abs((kept["actual"] - centre).to_numpy())))
     print("pooled:", {k: round(v, 3) for k, v in mean_of.items()})
 
 
@@ -428,18 +458,25 @@ def print_lagged(*, arms: dict[str, pl.DataFrame]) -> None:
     """Print the descriptive lagged reference contrasts at the two lead bands."""
     print("\n== 11. Lagged reference (descriptive): lagged XGBoost minus the lagless arm ==")
     for scheme, band in (("d1", "leads 24.5 to 48 h"), ("d6", "leads 144.5 to 168 h")):
-        extra = {
-            name: load_arm(name=name)
-            for name in (f"x_12am_{scheme}", f"l_12am_{scheme}")
-        }
+        extra = {name: load_arm(name=name) for name in (f"x_12amm_{scheme}", f"l_12amm_{scheme}")}
         result = contrast(
             arms=extra,
-            treatment=f"l_12am_{scheme}",
-            reference=f"x_12am_{scheme}",
+            treatment=f"l_12amm_{scheme}",
+            reference=f"x_12amm_{scheme}",
             sites=common.ELIGIBLE_SITES,
             level=None,
         )
-        scores = {n: round(float(f.filter(pl.col('site').is_in(common.ELIGIBLE_SITES))['score'].mean()), 3) for n, f in extra.items()}
+        scores = {
+            n: round(
+                float(
+                    np.mean(
+                        f.filter(pl.col("site").is_in(common.ELIGIBLE_SITES))["score"].to_numpy()
+                    )
+                ),
+                3,
+            )
+            for n, f in extra.items()
+        }
         print(f"{band}: {fmt(result)}; absolute {scores}")
     del arms
 
@@ -450,9 +487,14 @@ def main() -> None:
     print("Experiment 104 report. Rows outside the switching masks; points of effective capacity.")
     tuned = json.loads((common.WORK_DIR / "tuned.json").read_text())
     print(
-        "tuned: ridge", tuned["ridge"]["chosen"], "drift step", tuned["drift_step"]["chosen"],
-        "step penalty", tuned["step_penalty"]["chosen"],
-        "steps gain over D1 on the tuning year", round(tuned["steps_gain_over_d1"], 3),
+        "tuned: ridge",
+        tuned["ridge"]["chosen"],
+        "drift step",
+        tuned["drift_step"]["chosen"],
+        "step penalty",
+        tuned["step_penalty"]["chosen"],
+        "steps gain over D1 on the tuning year",
+        round(tuned["steps_gain_over_d1"], 3),
     )
     print_absolute(arms=arms)
     results = print_contrasts(arms=arms)
