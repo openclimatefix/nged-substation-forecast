@@ -45,9 +45,10 @@ to 4 exactly.**
   climatology per month and half-hour.
 - **The export clip.** `clip` applies a smooth clip to the pinned solar output, and `profile_clip`
   profiles the clip's capacity multiplier and ceiling on a grid, one convex fit each.
-- **The unmetered generator node.** `node` adds a non-negative daily level path `g_d` and its
-  positive and negative daily steps, joined by a stiff quadratic tie and a linear (L1) cost on the
-  steps, so the fit stays a bounded quadratic program and the level never goes below zero.
+- **The unmetered generator node.** `node` adds a non-negative level path `g_d` with one value per
+  block of `step_days` days (a day by default), and a positive and a negative step part per block.
+  A stiff quadratic tie makes the step parts carry the change in level, and a linear (L1) cost
+  charges them, so the fit stays a bounded quadratic program and the level never goes below zero.
 
 **The solver works on the Gram matrix.** `accumulate_gram` builds the design in chunks and sums
 `X^T W X` and `X^T W y`, with a leading batch dimension of weightings (a month-block bootstrap
@@ -237,6 +238,10 @@ class NodeSpec:
             resolve an outage shorter than the block.
     """
 
+    step_penalty: float = 300.0
+    level_penalty: float = 1.0
+    step_days: int = 1
+
     def __post_init__(self) -> None:
         """Refuse a block shorter than one day.
 
@@ -246,10 +251,6 @@ class NodeSpec:
         if self.step_days < 1:
             msg = f"step_days must be at least 1, not {self.step_days}"
             raise ValueError(msg)
-
-    step_penalty: float = 300.0
-    level_penalty: float = 1.0
-    step_days: int = 1
 
 
 @dataclass(frozen=True)
