@@ -21,9 +21,14 @@ import plotting.ocf_theme as ocf
 import polars as pl
 import torch
 from studies.dp_calendar import BAND_NAMES, DAY_TYPES, HOLIDAY_PERIODS
-from studies.sources import ML_EXPERIMENTS_DOCS_DIR
 
-FIGURE_DIR: Final[Path] = ML_EXPERIMENTS_DOCS_DIR / f"{common.EXPERIMENT_ID:05d}-{common.SLUG}"
+FIGURE_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2]
+    / "docs"
+    / "ml-experiments"
+    / f"{common.EXPERIMENT_ID:05d}-{common.SLUG}"
+)
+"""The page folder in this checkout; the shared data folders resolve to the main checkout."""
 WIDTH: Final[int] = 560
 WRAP: Final[int] = 95
 SITE_ORDER: Final[list[str]] = ["D5", "D10", "D11", "D14", "D16", "D9"]
