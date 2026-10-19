@@ -74,6 +74,8 @@ SOLVER_TOLERANCE: Final[float] = 1e-10
 The solver's default of 1e-7 leaves coefficients of weakly determined columns off by about 1e-3,
 which feeds an error of the same order into the gradient on `phi`.
 """
+WARM_START_RATE: Final[float] = 0.05
+"""Adam's learning rate in the optional warm start of `fit_pooled_vp`."""
 ADAM_STEPS: Final[int] = 1200
 """Adam's steps on `phi`, with an exact solve each step, when L-BFGS fails its convergence test."""
 ADAM_RATE: Final[float] = 0.02
@@ -170,6 +172,8 @@ class VpFitResult:
         objective_per_row: The same, divided by the number of rows.
         lbfgs_objective: The objective at the end of L-BFGS.
         adam_objective: The objective after the Adam fallback, or `None` when it did not run.
+        warm_start_objective: The objective in nats after the optional Adam warm start, or `None`
+            when there was none.
         evaluations: The number of objective evaluations L-BFGS spent, line search included.
         converged: True if L-BFGS stopped on its tolerance and not on the evaluation cap.
         gradient_norm: The largest absolute entry of the final objective-per-row gradient on
@@ -185,6 +189,7 @@ class VpFitResult:
     objective_per_row: float
     lbfgs_objective: float
     adam_objective: float | None
+    warm_start_objective: float | None
     evaluations: int
     converged: bool
     gradient_norm: float
@@ -677,6 +682,164 @@ def penalty_system(
     return matrix + torch.diag(diagonal)
 
 
+def _sparse_columns(
+    *,
+    model: PooledDemandModel,
+    layout: VpLayout,
+    rows: PooledBatch,
+    site: int,
+    profile: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, int]:
+    """Return the one-hot columns (shapes, holiday indicators, deviation) as row-wise entries.
+
+    Every row has the same number of non-zero entries among these columns: one per shared shape,
+    one holiday indicator, and one deviation indicator.
+
+    Returns:
+        The column and the value of each row's entries, both of shape (rows, entries per row), and
+        the number of these columns.
+    """
+    n, dtype, device = rows.n_rows, rows.y.dtype, rows.y.device
+    shapes_width, holiday_width = layout.n_shapes * N_PROFILE, (N_PERIODS + 1) * N_BANDS
+    cols, vals = [], []
+    if layout.n_shapes:
+        mix = torch.softmax(model.site_logits[site], dim=0)
+        shape_columns = torch.arange(layout.n_shapes, device=device)[None, :] * N_PROFILE
+        cols.append(shape_columns + profile[:, None])
+        vals.append(mix[None, :].expand(n, -1))
+    cols.append((shapes_width + rows.holiday * N_BANDS + rows.band)[:, None])
+    cols.append((shapes_width + holiday_width + profile)[:, None])
+    vals += [torch.ones((n, 1), dtype=dtype, device=device)] * 2
+    return torch.cat(cols, dim=1), torch.cat(vals, dim=1), shapes_width + holiday_width + N_PROFILE
+
+
+def _dense_columns(
+    *, model: PooledDemandModel, layout: VpLayout, rows: PooledBatch, site: int
+) -> tuple[torch.Tensor, int]:
+    """Return the continuous columns, and how many of their first columns are centred.
+
+    The order is tent, harmonics, lighting, network (all centred), then level, heating, and
+    capacity (not centred).
+    """
+    n, dtype, device = rows.n_rows, rows.y.dtype, rows.y.device
+    band_hot = _one_hot(index=rows.band, width=N_BANDS, dtype=dtype)
+    mixed = rows.smoothed_temperature @ torch.softmax(model.inertia_logits, dim=0)
+    dense = [
+        (rows.tent[:, :, None] * band_hot[:, None, :]).reshape(n, -1),
+        (rows.harmonics[:, :, None] * band_hot[:, None, :]).reshape(n, -1),
+        rows.lighting,
+    ]
+    if model.interaction is not None:
+        dense.append(model.interaction[:-1](model.interaction_inputs(batch=rows, mixed=mixed)))
+    n_centred = sum(block.shape[1] for block in dense)
+    hinge = torch.relu(model.threshold[site] - mixed) / HEATING_SCALE_C
+    dense += [torch.ones((n, 1), dtype=dtype, device=device), hinge[:, None] * band_hot]
+    years = layout.capacity_years[site]
+    if years:
+        slot = rows.season_slot - site * model.n_season_years
+        after = slot[:, None] >= torch.tensor(years, device=device)[None, :]
+        solar = rows.solar_gate.to(dtype) * rows.pv_shape
+        dense.append(-solar[:, None] * after.to(dtype))
+    return torch.cat(dense, dim=1), n_centred
+
+
+def _site_normal_equations(
+    *, model: PooledDemandModel, batch: PooledBatch, layout: VpLayout, site: int
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Return one substation's columns, `X^T X` block, and `X^T y` block of the normal equations.
+
+    This is the fast twin of `linear_design`: the one-hot columns (the shared shapes, the holiday
+    indicators, and the deviation) go into a sparse matrix, so their products with every other
+    column cost a few operations per row, and only the continuous columns (tent, harmonics,
+    lighting, network, level, heating, capacity) form dense products. The calendar, lighting, and
+    network columns are centred per season-year by subtracting the slot means from the products
+    afterwards, which is exact: for a centred column `i`, `x_i^T x_j` loses `sum_slots n m_i m_j`
+    with `m` the slot means of the raw columns, and `x_i^T y` loses `sum_slots n m_i mean(y)`.
+
+    Returns:
+        The system's column index of each of the substation's raw columns (sparse columns first,
+        then dense), the block of `X^T X`, and the block of `X^T y`.
+    """
+    start, stop = site_bounds(batch=batch, n_sites=model.n_sites)[site]
+    rows = _slice_batch(batch=batch, start=start, stop=stop)
+    dtype, device = rows.y.dtype, rows.y.device
+    n_slots = model.n_season_years
+    profile = rows.day_type * HALF_HOURS_PER_DAY + rows.half_hour
+    slot = rows.season_slot - site * n_slots
+    column, value, width_sparse = _sparse_columns(
+        model=model, layout=layout, rows=rows, site=site, profile=profile
+    )
+    dense, n_centred = _dense_columns(model=model, layout=layout, rows=rows, site=site)
+    target = rows.y
+    if model.capacity_override is not None:
+        pinned = torch.nan_to_num(model.capacity_override.to(dtype))
+        gate = rows.solar_gate.to(dtype)
+        target = target + gate * rows.pv_shape * pinned.reshape(-1)[rows.season_slot]
+    # Products of the one-hot columns, from their row-wise entries.
+    entries = column.shape[1]
+    g_ss = torch.zeros((width_sparse, width_sparse), dtype=dtype, device=device)
+    g_sd = torch.zeros((width_sparse, dense.shape[1]), dtype=dtype, device=device)
+    xty_s = torch.zeros(width_sparse, dtype=dtype, device=device)
+    for a in range(entries):
+        g_sd.index_add_(0, column[:, a], value[:, a, None] * dense)
+        xty_s.index_add_(0, column[:, a], value[:, a] * target)
+        for b in range(entries):
+            g_ss.index_put_(
+                (column[:, a], column[:, b]), value[:, a] * value[:, b], accumulate=True
+            )
+    gram = torch.cat(
+        [torch.cat([g_ss, g_sd], dim=1), torch.cat([g_sd.T, dense.T @ dense], dim=1)], dim=0
+    )
+    xty = torch.cat([xty_s, dense.T @ target])
+    # Centring, applied to the products from the slot means of the raw columns.
+    counts = torch.bincount(slot, minlength=n_slots).to(dtype)
+    sums_sparse = torch.zeros((n_slots, width_sparse), dtype=dtype, device=device)
+    sums_sparse.index_put_(
+        (slot[:, None].expand_as(column).reshape(-1), column.reshape(-1)),
+        value.reshape(-1),
+        accumulate=True,
+    )
+    sums_dense = torch.zeros((n_slots, dense.shape[1]), dtype=dtype, device=device)
+    sums_dense.index_add_(0, slot, dense)
+    safe = counts.clamp(min=1)
+    means = torch.cat([sums_sparse, sums_dense], dim=1) / safe[:, None]
+    mean_target = (
+        torch.zeros(n_slots, dtype=dtype, device=device).index_add_(0, slot, target) / safe
+    )
+    centred = torch.zeros(width_sparse + dense.shape[1], dtype=torch.bool, device=device)
+    shapes_width = layout.n_shapes * N_PROFILE
+    centred[shapes_width : shapes_width + (N_PERIODS + 1) * N_BANDS] = True
+    centred[width_sparse : width_sparse + n_centred] = True
+    correction = means.T @ (counts[:, None] * means)
+    pair = centred[:, None] | centred[None, :]
+    gram = gram - torch.where(pair, correction, torch.zeros_like(gram))
+    xty = xty - torch.where(centred, means.T @ (counts * mean_target), torch.zeros_like(xty))
+    return _system_columns(layout=layout, site=site, device=device), gram, xty
+
+
+def _system_columns(*, layout: VpLayout, site: int, device: torch.device) -> torch.Tensor:
+    """Return the system column of every raw column of `_site_normal_equations`, in its order."""
+    shared, block, begin = layout.shared, layout.local[site], layout.local_start[site]
+
+    def span(window: slice, offset: int = 0) -> torch.Tensor:
+        return torch.arange(window.start + offset, window.stop + offset, device=device)
+
+    return torch.cat(
+        [
+            span(shared["shapes"]),
+            span(shared["holiday"]),
+            span(block["deviation"], begin),
+            span(shared["tent"]),
+            span(shared["harmonics"]),
+            span(shared["lighting"]),
+            span(shared["network"]),
+            span(block["level"], begin),
+            span(block["slope"], begin),
+            span(block["capacity"], begin),
+        ]
+    )
+
+
 @torch.no_grad()
 def assemble_system(
     *, model: PooledDemandModel, batch: PooledBatch, layout: VpLayout, settings: VpSettings
@@ -697,21 +860,15 @@ def assemble_system(
         `(A, b)` of shapes (columns, columns) and (columns,).
     """
     dtype, device = batch.y.dtype, batch.y.device
-    p, q = layout.n_columns, layout.n_shared
+    p = layout.n_columns
     gram = torch.zeros((p, p), dtype=dtype, device=device)
     rhs = torch.zeros(p, dtype=dtype, device=device)
-    bounds = site_bounds(batch=batch, n_sites=model.n_sites)
     for site in layout.sites:
-        design = linear_design(model=model, batch=batch, layout=layout, site=site)
-        target = batch.y[bounds[site][0] : bounds[site][1]] - design.offset
-        columns = slice(layout.local_start[site], layout.local_start[site] + design.local.shape[1])
-        gram[:q, :q] += design.shared.T @ design.shared
-        cross = design.shared.T @ design.local
-        gram[:q, columns] = cross
-        gram[columns, :q] = cross.T
-        gram[columns, columns] = design.local.T @ design.local
-        rhs[:q] += design.shared.T @ target
-        rhs[columns] = design.local.T @ target
+        index, block, vector = _site_normal_equations(
+            model=model, batch=batch, layout=layout, site=site
+        )
+        gram[index[:, None], index[None, :]] += block
+        rhs[index] += vector
     penalty = penalty_system(layout=layout, settings=settings, dtype=dtype, device=device)
     return gram + 2.0 * settings.noise_sd**2 * penalty, rhs
 
@@ -881,6 +1038,7 @@ def fit_pooled_vp(
     settings: VpSettings,
     max_evaluations: int = MAX_EVALUATIONS,
     adam_steps: int = ADAM_STEPS,
+    warm_start_steps: int = 0,
 ) -> VpFitResult:
     """Fit the pooled model by variable projection.
 
@@ -903,6 +1061,11 @@ def fit_pooled_vp(
         settings: The noise standard deviation and the prior scales.
         max_evaluations: The most L-BFGS objective evaluations.
         adam_steps: The Adam fallback's steps.
+        warm_start_steps: Steps of Adam on every parameter of the model's variable-projection
+            objective before the first exact solve (`fit_pooled_adam_on_vp_objective`), which
+            moves the non-linear parameters cheaply towards a good region; 0 gives a cold start.
+            The model must then carry a MAP prior (`DpConfig.population_scales`) so the
+            population means train.
 
     Returns:
         What the fit reports. The model holds the fitted parameters and the final centring means.
@@ -918,6 +1081,18 @@ def fit_pooled_vp(
     model.mark_trained_years(batch=batch)
     model.start_from_batch(batch=batch)
     freeze_operator_for_vp(model=model)
+    warm_start_objective: float | None = None
+    if warm_start_steps:
+        fit_pooled_adam_on_vp_objective(
+            model=model,
+            batch=batch,
+            settings=settings,
+            steps=warm_start_steps,
+            learning_rate=WARM_START_RATE,
+            final_rate_fraction=0.1,
+        )
+        with torch.no_grad():
+            warm_start_objective = float(vp_objective(model=model, batch=batch, settings=settings))
     layout = make_vp_layout(model=model, batch=batch)
     phi = phi_parameters(model=model)
     saved_flags = {name: p.requires_grad for name, p in model.named_parameters()}
@@ -965,6 +1140,7 @@ def fit_pooled_vp(
         objective_per_row=final / batch.n_rows,
         lbfgs_objective=lbfgs_objective * batch.n_rows,
         adam_objective=None if adam_objective is None else adam_objective * batch.n_rows,
+        warm_start_objective=warm_start_objective,
         evaluations=evaluations,
         converged=converged,
         gradient_norm=max(float(g.abs().max()) for g in gradients),

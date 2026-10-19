@@ -523,3 +523,34 @@ def test_the_adam_fit_on_the_vp_objective_lowers_it(dp_synthetic_cache: FeatureC
 def _frozen(model: PooledDemandModel) -> PooledDemandModel:
     freeze_operator_for_vp(model=model)
     return model
+
+
+def test_an_adam_warm_start_lowers_the_objective_before_the_exact_solves(
+    dp_synthetic_cache: FeatureCache,
+):
+    _, batch = _truth_batch(dp_synthetic_cache, seed=81)
+    model = PooledDemandModel(
+        config=DpConfig(shared_shapes=2, population_scales=PopulationScales(deviation=1.0)),
+        n_sites=2,
+        n_season_years=batch.n_season_years,
+        initial_level=torch.full((2,), 50.0),
+    ).to(dtype=torch.float64)
+    result = fit_pooled_vp(
+        model=model,
+        batch=batch,
+        settings=SETTINGS,
+        max_evaluations=6,
+        adam_steps=0,
+        warm_start_steps=20,
+    )
+    assert result.warm_start_objective is not None
+    assert result.history[0] * batch.n_rows < result.warm_start_objective + 1.0
+    cold = fit_pooled_vp(
+        model=_model(batch=batch, hidden=(), shapes=2, seed=82),
+        batch=batch,
+        settings=SETTINGS,
+        max_evaluations=1,
+        adam_steps=0,
+    )
+    assert cold.warm_start_objective is None
+    assert result.history[0] < cold.history[0]
