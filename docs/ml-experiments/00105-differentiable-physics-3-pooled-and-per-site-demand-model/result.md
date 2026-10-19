@@ -4,7 +4,7 @@ slug: differentiable-physics-3-pooled-and-per-site-demand-model
 title: "Differentiable physics, part 3: one pooled demand model across substations"
 part: 3
 theme: differentiable-physics-pooling-across-substations
-also_relevant_to: [hierarchy-and-pooling]
+also_relevant_to: [differentiable-physics-demand-calendar-and-weather, hierarchy-and-pooling]
 status: planned
 size: >-
   complex for the module changes (variational posterior, batched fits over row weights and targets,
