@@ -236,4 +236,3 @@ keeping, given the correlations above.
   is reported beside the clear-sky one, and the eligibility count is a proposal.
 - **Not changed:** the heating-drift test and the one-criterion generator screen differ from the
   plan, and both follow the series brief or are stricter.
-

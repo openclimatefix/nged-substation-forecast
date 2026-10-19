@@ -946,7 +946,8 @@ def figure_10_timestamp() -> alt.TopLevelMixin:
                         "the right shift makes it most negative. Top: clear-sky hours (clear-sky "
                         "index above 0.8, clear-sky irradiance above 100 W/m\u00b2). Bottom: the "
                         "plan's stricter test, with clear-sky irradiance above 400 W/m\u00b2. "
-                        "The bottom panel is nearly flat. Thin lines: one site; thick line: the mean over sites."
+                        "The bottom panel is nearly flat. Thin lines: one site; thick line: "
+                        "the mean over sites."
                     )
                 ],
             )
