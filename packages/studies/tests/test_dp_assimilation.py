@@ -681,8 +681,45 @@ def test_readings_outside_the_replica_rows_go_to_their_own_band_not_band_zero():
     )
     in_band_one = half.band == 1
     in_band_two = half.band == 2
-    assert np.mean(corrections[0][in_band_one]) > 4.0
+    assert np.mean(corrections[0][in_band_one]) > 4.9
     assert abs(np.mean(corrections[0][in_band_two])) < 0.5
+    assert abs(np.mean(corrections[0][half.band == 0])) < 0.05
+
+
+def test_a_shared_trace_reads_every_reading_in_its_own_band():
+    end_times, replica, _local, _shared = _summed_replica()
+    n = len(end_times)
+    grid_band = _bands(n=n)
+    stream = np.where(grid_band == 1, 5.0, 0.0)
+    corrections = replica_corrections(
+        end_times=end_times,
+        replica=replica,
+        run=partial(run_kalman, hyper=HYPER),
+        grid_band=grid_band,
+        local_residual=np.zeros(n),
+        shared=[_shared_term(stream=stream, weights=(1.0, 1.0, 1.0, 1.0))],
+    )
+    assert np.mean(corrections[0][replica.band == 1]) > 4.5
+    assert abs(np.mean(corrections[0][replica.band == 0])) < 0.05
+
+
+def test_grid_bands_that_disagree_with_the_replica_bands_are_refused():
+    end_times, replica, local, _shared = _summed_replica()
+    wrong = (_bands(n=len(end_times)) + 1) % 4
+    with pytest.raises(ValueError, match="must agree with the replica"):
+        replica_corrections(
+            end_times=end_times,
+            replica=replica,
+            run=partial(run_kalman, hyper=HYPER),
+            grid_band=wrong,
+            local_residual=local,
+        )
+
+
+def test_a_weighted_trace_needs_one_weight_per_hour_band():
+    trace = run_kalman(residual=np.full(100, np.nan), band=np.zeros(100, dtype=int), hyper=HYPER)
+    with pytest.raises(ValueError, match="one per hour band"):
+        WeightedTrace(trace=trace, weight_by_band=np.ones(3))
 
 
 def test_a_local_stream_or_shared_term_without_grid_bands_is_refused():
