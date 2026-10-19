@@ -4,9 +4,8 @@
 capacity estimates all need processing before an XGBoost model trains or scores on them.** This page
 lists each step as an instruction. Every entry says where the step applies (experiments, production,
 or both), links the experiments that are the evidence, and states the scope the evidence covers. An
-entry marked *provisional* rests on the differentiable-physics design analysis, whose write-up has
-not finished review, so the entry links no experiment and gives its confidence in words. A plan for
-an experiment begins by reading this page.
+entry whose evidence is a first look at the data gives its confidence in words. A plan for an
+experiment begins by reading this page.
 
 ## Terms used on this page
 
@@ -67,19 +66,21 @@ availability.** The cleaned table holds only unflagged rows
 6](00006-stage1a-demand-input-feature-sweep/result.md), which scores on cleaned power.
 
 **Count a series' history from its first unflagged row, which is later than its first row of any
-kind (provisional; high confidence).** D9 starts in 2023-04 and its first unflagged row is in
-2023-08. Only five Primaries hold long histories: D5, D10, and D11 start in 2019-09, D14 in 2019-10,
-and D16 in 2020-12. The late starters begin between 2023 and 2025. Applies to experiments.
+kind (high confidence).** D9 starts in 2023-04 and its first unflagged row is in 2023-08. Only five
+Primaries hold long histories: D5, D10, and D11 start in 2019-09, D14 in 2019-10, and D16 in
+2020-12. The late starters begin between 2023 and 2025. Applies to experiments. Evidence:
+[experiment 103](00103-differentiable-physics-1-data-look/result.md).
 
 ## Trim the start of each series
 
-**Cut the first months of most demand series (provisional; high confidence for D4, D14, D9, D16, and
-D18, medium to low for the rest).** The first 1 to 19 months of a series often sit far from the same
-months in later years. A new meter can read near zero for days to weeks and then step up, and a new
-site can commission in stages. Cut until the level, the daily shape, and the share of rows present
-match the same months in later years. Cut more when the match is uncertain, and let a later look
-move a cut later and never earlier. Applies to experiments, and to production for a series that has
-just started reporting. The cuts found so far cover 15 of the 20 series examined:
+**Cut the first months of most demand series (high confidence for D4, D14, D9, D16, and D18, medium
+to low for the rest).** The first 1 to 19 months of a series often sit far from the same months in
+later years. A new meter can read near zero for days to weeks and then step up, and a new site can
+commission in stages. Cut until the level, the daily shape, and the share of rows present match the
+same months in later years. Cut more when the match is uncertain, and let a later look move a cut
+later and never earlier. Applies to experiments, and to production for a series that has just
+started reporting. The cuts found so far cover 16 of the 20 series examined ([experiment
+103](00103-differentiable-physics-1-data-look/result.md), figure 4):
 
 | Series | Cut | Confidence | Reason |
 |---|---|---|---|
@@ -94,25 +95,27 @@ just started reporting. The cuts found so far cover 15 of the 20 series examined
 | D9, D16 | 1.3 months | High | Near zero, then a staged switch-on |
 | D13, D19 | 0.9 months | Low | Level steps in the first weeks |
 | D15 | 0.8 months | Medium | Erratic for 2 weeks while the meter was commissioned |
+| D12 | 7.4 months | Low | Night level 1.5 to 2 times later years; the start-of-series review recommends no cut, and the 15-point rule cuts it |
 
 ![Daily mean power of 7 Primaries, dropped months in grey and kept months in
 blue](data-processing/figure_1_trim.svg)
 
 **Figure 1 shows the dropped months sitting far from the kept months at D4, D14, D9, D16, and D18.**
-The figure draws 7 Primaries, and the cut dates are provisional, from the differentiable-physics
-design analysis. The grey dropped months are read from the raw power table, because the cleaned
-table removes flagged rows and the early months are often flagged. The blue kept months are read
-from the cleaned table. At D10 and D5 the dropped months look less different from the kept months,
-which fits their medium confidence.
+The figure draws 7 Primaries, and the cut dates come from the start-of-series review that
+[experiment 103](00103-differentiable-physics-1-data-look/result.md) confirmed. The grey dropped
+months are read from the raw power table, because the cleaned table removes flagged rows and the
+early months are often flagged. The blue kept months are read from the cleaned table. At D10 and D5
+the dropped months look less different from the kept months, which fits their medium confidence.
 
 ## Decide which rows are demand
 
-**Use a Primary metered in MVA for demand only on dark rows (provisional; high confidence).** An MVA
-reading cannot show reverse flow, so the solar output behind the Primary reads as demand in
-daylight. A filter that keeps rows with irradiance below 100 W/m² still keeps rows with solar
-output, because the filter admits irradiance above 1 W/m². The dark rows leave about 3.3 site-years
-per MVA Primary with the 2020 lockdown kept, and about 2.7 site-years with it removed. Applies to
-experiments.
+**Use a Primary metered in MVA for demand only on dark rows (high confidence).** An MVA reading
+cannot show reverse flow, so the solar output behind the Primary reads as demand in daylight. A
+filter that keeps rows with irradiance below 100 W/m² still keeps rows with solar output, because
+the filter admits irradiance above 1 W/m². After the start cuts, the dark rows leave 2.4 to 3.3
+site-years per MVA Primary with the 2020 lockdown kept, 2.3 to 2.7 with the fixed lockdown window
+removed, and 0.9 to 1.0 in 2023-07 to 2025-06. Applies to experiments. Evidence: [experiment
+103](00103-differentiable-physics-1-data-look/result.md).
 
 ![Two summer weeks of half-hourly power at an MVA-only Primary, with dark half-hours in
 blue](data-processing/figure_2_dark_rows.svg)
@@ -123,33 +126,37 @@ output reduces the net flow and the apparent power cannot show its sign. The blu
 form the smooth evening and night curve that holds demand alone. The figure draws one Primary (D2)
 for two weeks of July 2025.
 
-**Do not treat grid supply points or bulk supply points as clean demand (provisional; high
-confidence).** The grid supply points are dominated by generation: D1 is below 5 points of capacity
-on 75% of nights. The bulk supply points sum the trial Primaries: D17 reverses flow on 57% of summer
-middays. Applies to experiments.
+**Do not treat grid supply points or bulk supply points as clean demand (high confidence).** The
+grid supply points are dominated by generation: D1 is below 5 points of capacity on 75% of nights.
+The bulk supply points sum the trial Primaries: D17 reverses flow on 51% of May to August days at
+midday. Applies to experiments. Evidence: [experiment
+103](00103-differentiable-physics-1-data-look/result.md).
 
-**Screen for embedded generation with the share of negative dark half-hours (provisional; high
-confidence).** Series with 26% to 74% of their dark half-hours negative carry embedded generation or
-an exporting grid connection. The screen cannot work on an MVA Primary. One Primary (D15) carries a
-flat export of about 2 MW through one transformer, and the export changes over 2025 and 2026.
-Applies to experiments.
+**Screen for embedded generation with the share of negative dark half-hours (high confidence).**
+Series with 26% to 82% of their dark half-hours negative carry embedded generation or an exporting
+grid connection. The screen cannot work on an MVA Primary. One Primary (D15) carries a flat export
+of about 2 MW through one transformer, and the export changes over 2025 and 2026. Applies to
+experiments. Evidence: [experiment 103](00103-differentiable-physics-1-data-look/result.md), figure
+9.
 
 ## Fixed windows
 
 **Use the fixed lockdown window, 2020-03-23 to 2021-07-19, and do not detect the window from the
 data.** [Experiment 6](00006-stage1a-demand-input-feature-sweep/result.md) defines its indicator
 with these dates, and the indicator lowered the error by 0.26 points of capacity on the selection
-fold. A window found from the data picks up drift and solar growth as well (provisional; medium
-confidence): a drift-removed fit finds April 2020 more than 5 points low only at D11 (-26 points)
-and D10 (-7 points), and August 2020 to September 2021 sits 5 to 17 points above the fit at D5, D10,
-D11, and D14. Applies to experiments and production.
+fold. A window found from the data picks up drift and solar growth as well ([experiment
+103](00103-differentiable-physics-1-data-look/result.md), figure 12; medium confidence): a
+drift-removed fit finds April 2020 more than 5 points low only at D11 (-26 points) and D10 (-7
+points), and August 2020 to September 2021 sits 5 to 17 points above the fit at D5, D10, D11, and
+D14. Applies to experiments and production.
 
-**Give the series that changed regime an individual start date or a flag (provisional; medium
-confidence).** D8 weekday daytime demand falls from about 9 MW to about 3 MW between 2023-10 and
-2025. D12 switches between a high-night and a low-night regime. D18 steps up about 1.1 MW at night
-      around 2026-07-03, and D5 shows a flat midday floor since 2022. Month-mean steps of over three
-      monthly standard deviations occur at D6 (a drop of 218 MW in 2023-07) and D11 (2020-04).
-      Applies to experiments.
+**Give the series that changed regime an individual start date or a flag (medium confidence).** D8
+weekday daytime demand falls from about 9 MW to about 3 MW between 2023-10 and 2025. D12 switches
+between a high-night and a low-night regime. D18 steps up about 1.1 MW at night around 2026-07-03 (a
+date after the experiment's window, not rechecked there), and D5 shows a flat midday floor since
+2022. Month-mean steps of over three monthly standard deviations occur at D6 (a drop of 218 MW in
+2023-07) and D11 (2020-04). Applies to experiments. Evidence: [experiment
+103](00103-differentiable-physics-1-data-look/result.md) for the step list and D8.
 
 ## Drift in demand over the years
 
@@ -169,17 +176,20 @@ worse than a recent one ([experiment
 95](00095-age2-old-year-penalty-with-the-same-weather-product-demand/result.md)). Applies to
 experiments and production.
 
-**Allow for a demand drop shared across sites in season-year 2022 (provisional; medium
-confidence).** Evening and night demand fell by 5 to 10 points at D10, D11, and D5 and partly
-recovered by 2025, probably after the rise in energy prices. A model trained across years can read
-the drop as a trend. Applies to experiments.
+**Allow for a demand drop shared across sites in season-year 2022 (medium confidence).** Evening
+demand fell by 7 to 10 points and night demand by 2 to 7 points of capacity at D10, D11, and D5
+against season-year 2021, and recovered partly by 2025 at D5 and D11 but not at D10, probably after
+the rise in energy prices. Evidence: [experiment
+103](00103-differentiable-physics-1-data-look/result.md), the season-year means in `report.txt`. A
+model trained across years can read the drop as a trend. Applies to experiments.
 
 **Expect monthly night demand to move together across the long-history Primaries, and expect the
-winter heating slope of night power not to drift (provisional; medium confidence).** Winter heating
-slopes of night power show no detectable drift between the first and last winter at the long-history
-sites. Monthly levels move together across sites, with a mean pairwise correlation of 0.53 at night
-and 0.43 in the evening after the seasonal cycle is removed. Applies to experiments, before pooling
-sites.
+winter heating slope of night power not to drift (medium confidence).** Winter heating slopes of
+night power show no detectable drift between the first and last winter at the long-history sites.
+Monthly levels move together across sites, with a mean pairwise correlation of 0.56 at night and
+0.47 in the evening after the seasonal cycle is removed ([experiment
+103](00103-differentiable-physics-1-data-look/result.md), figure 8). Applies to experiments, before
+pooling sites.
 
 ![Monthly mean night power at 5 long-history Primaries, as a percentage of each series' own
 mean](data-processing/figure_3_shared_level.svg)
@@ -209,29 +219,30 @@ so changing the constant changes the training features. A replay of a past `init
 the delay, because joining a run that landed afterwards is lookahead bias. Applies to experiments
 and production. Source: the constant's docstring in that file.
 
-**Join power and CAMS timestamps on `(time - 1 µs).truncate("1h") + 1h` (provisional; medium to high
+**Join power and CAMS timestamps on `(time - 1 µs).truncate("1h") + 1h` (medium to high
 confidence).** A power timestamp marks the end of its half-hour, and a CAMS timestamp marks the end
 of its hour. A naive join on equal timestamps drops or misassigns half the rows, and shifting the
-join by a whole half-hour raised the error score by more than 0.04. Applies to experiments and
-production.
+join by 30 minutes earlier weakens the correlation between hourly power and irradiance by 0.04
+([experiment 103](00103-differentiable-physics-1-data-look/result.md), figure 10). Applies to
+experiments and production.
 
 **Do not shift power timestamps: the `time` column of the cleaned power table marks the end of the
-half-hour (provisional; high confidence that no 30-minute error exists).** Power timestamps are
-correct to within a few minutes on both sides of NGED's fix of 2026-03-26 08:30 UTC, and the
-ingest's correction of the earlier late stamps goes the right way by the right amount. The test used
-clear days and the change in net power against a sun-height predictor at sunrise and sunset, with an
-offset search from -120 to +120 minutes and 95% intervals from resampling days, on the aggregate of
-the 6 metered solar farms. Before the fix, the corrected stamps read 0.9 minutes late (series from
--0.2 to +2.9), so the raw feed was about 31 minutes late and the 30-minute ingest correction is
-right to within about 3 minutes. After the fix, from April to 2026-09-10, the median is +4.7 minutes
-(+1.5 to +13.3). The same months before the fix read +2.0 (-3.3 to +5.4), so the two sides do not
-differ. Primaries metered in MW are a weaker test, because demand ramps bias the fit: only D5 and
-D18 gave usable fits (+7 to +18 minutes). A correlation-peak test on summer middays is
-uninformative, because the correlation is flat near -0.18 with peaks at +/-60 to 90 minutes, so use
-sunrise and sunset ramps on clear days. Applies to experiments and production. Scope: all power
-series, 2019 to 2026. The limits are that the metered solar farms lie within one 25 km area, the
-side after the fix has under 50 clear days, and the only known-answer check is the 30-minute sign
-test.
+half-hour (high confidence that no 30-minute error exists).** Power timestamps show no 30-minute
+error on either side of NGED's fix of 2026-03-26 08:30 UTC, and the ingest's correction of the
+earlier late stamps goes the right way by the right amount. The test used clear days and the change
+in net power against a sun-height predictor at sunrise and sunset, with an offset search from -120
+to +120 minutes and 95% intervals from resampling days, on the aggregate of the 6 metered solar
+farms. Before the fix, the corrected stamps read 0.9 minutes late (series from -0.2 to +2.9), so the
+raw feed was about 31 minutes late and the 30-minute ingest correction is right to within about 3
+minutes. After the fix, from April to 2026-09-10, the median is +4.7 minutes (+1.5 to +13.3). The
+same months before the fix read +2.0 (-3.3 to +5.4), so the two sides do not differ. Primaries
+metered in MW are a weaker test, because demand ramps bias the fit: only D5 and D18 gave usable fits
+(+7 to +18 minutes). A correlation-peak test on summer middays is uninformative, because the
+correlation is flat near -0.18 with peaks at +/-60 to 90 minutes, so use sunrise and sunset ramps on
+clear days ([experiment 103](00103-differentiable-physics-1-data-look/result.md), figure 13).
+Applies to experiments and production. Scope: all power series, 2019 to 2026. The limits are that
+the metered solar farms lie within one 25 km area, the side after the fix has under 50 clear days,
+and the only known-answer check is the 30-minute sign test.
 
 ## Weather products
 
@@ -310,6 +321,32 @@ better than shifting each member (experiment 51). Applies to experiments, in sum
 donor substation's solar output and looks like a capacity step ([experiment
 45](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md) applies this mask). Applies to
 experiments. Confidence: medium, because the write-up states the rule and does not test the rule.
+
+**Do not treat the real-time `frozen` capacity vintage as the season-year constant.** The vintage
+is experiment 45's weekly capacity estimate made with data up to each origin date. Over the weeks
+that it and the hindsight season-year constant share, the two differ in every week, by a ratio of
+0.30 to 1.48 in the early weeks of 2020 and 2021 and by up to about 10% in the weeks near the end of
+the data ([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md)). Each
+origin lists weekly capacities back to 2019-09, but the first origin is 2023-08, so a training cut
+before then has no real-time capacity. Take the latest origin on or before the cut, hold its last
+week afterwards, and hold the last observed value through unobserved weeks. Applies to experiments.
+Scope: six MW Primaries. Confidence: high for the difference, which was measured week by week;
+medium for the size near the cut, which comes from five Primaries.
+
+**Do not count a season-year as trained because a few half-hours of it precede the cut.** A
+season-year runs from 1 July to 30 June. A training cut at 1 July 00:00 UTC leaves two night-time
+half-hours of the next season-year in the training data, because local time is an hour ahead in
+summer, so a model would count a whole extra season-year as trained and give it a capacity and a
+centring mean from those two rows. Count a season-year as trained only when it holds enough rows
+(experiment 104 uses 30 days of half-hours for centring, and any solar signal for capacity).
+Applies to experiments. Confidence: high, because a test of the training rows shows it.
+
+**Treat the ERA5 half-hourly file's :30 values as interpolated.** Each :30 value is the mean of the
+hourly values either side of it, so it contains the reading from the hour after the half-hour it
+labels. Treat it as interpolated, not as a separate measurement
+([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md)). Applies to
+experiments. Confidence: high, because the mean absolute difference from the neighbours' average is
+zero.
 
 ## Switching and the switching log
 
