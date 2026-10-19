@@ -41,12 +41,15 @@ from studies.dp_gam import (
     training_rows,
 )
 from studies.dp_gam_pooled import (
+    PooledReplica,
     PooledSite,
     PoolingStrength,
-    ShortHistoryReplica,
     fit_pooled,
     pooled_replica_residuals,
+    rebuilt_effective_capacity_mw,
+    short_history_replica,
     short_history_spread,
+    with_effective_capacity,
 )
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
@@ -103,75 +106,70 @@ class ArmConfig:
 
 @dataclass(frozen=True)
 class Transform:
-    """A held-out site's change of target: a new scale and a capacity prior shifted into it.
+    """A held-out site's change of target: a rebuilt scale and a capacity prior shifted into it.
 
     Attributes:
         site: The substation's label.
         scale: Original points divided by rebuilt points (the factor the target is multiplied by).
+        capacity_mw: The rebuilt effective capacity in MW, or 0 to keep the whole-history scale.
         prior: The capacity prior in rebuilt points, or 0 for none.
     """
 
     site: str
     scale: float = 1.0
+    capacity_mw: float = 0.0
     prior: float = 0.0
 
 
-def transformed_cache(
-    *, cache: FeatureCache, transform: Transform | None, shape_rows: np.ndarray | None = None
-) -> FeatureCache:
-    """Return the cache with one site's target rescaled and its capacity prior shifted in.
+def transformed_cache(*, cache: FeatureCache, transform: Transform | None) -> FeatureCache:
+    """Return the cache with one site's scale rebuilt and its capacity prior shifted in.
 
     Args:
         cache: The cache in original points.
         transform: The change, or `None` for the cache as it is.
-        shape_rows: Unused; present so callers may pass precomputed rows.
 
     Returns:
-        A cache whose site has `y * scale + prior * derated_shape` and `effective_capacity_mw`
-        divided by the scale, so pinned capacities in megawatts convert to the rebuilt points.
+        A cache whose site has `y * scale + prior * derated_shape` and the rebuilt effective
+        capacity in its table, so pinned capacities in megawatts convert to the rebuilt points.
     """
     if transform is None:
         return cache
-    features = cache.sites[transform.site]
+    changed = (
+        with_effective_capacity(cache=cache, site=transform.site, capacity_mw=transform.capacity_mw)
+        if transform.capacity_mw > 0.0
+        else cache
+    )
+    if transform.prior == 0.0:
+        return changed
+    features = changed.sites[transform.site]
     index = np.arange(len(cache.end_times))
     shape = np.nan_to_num(derated_unit_shape(features=features, index=index), nan=0.0)
-    table = replace(
-        features.table, effective_capacity_mw=features.table.effective_capacity_mw / transform.scale
-    )
-    changed = replace(
-        features, table=table, y=features.y * transform.scale + transform.prior * shape
-    )
-    return replace(cache, sites={**cache.sites, transform.site: changed})
+    shifted = replace(features, y=features.y + transform.prior * shape)
+    return replace(changed, sites={**changed.sites, transform.site: shifted})
 
 
-def history_scale(
-    *, cache: FeatureCache, site: str, cut: datetime, window: TrainingWindow
-) -> float:
-    """Return original points divided by points rebuilt from the rows a short window holds.
-
-    The effective capacity of a series is the 99th percentile of its absolute power over its
-    history. For the short window it is rebuilt from the rows the window trains on.
+def history_transform(
+    *, cache: FeatureCache, site: str, cut: datetime, window: TrainingWindow, prior: float = 0.0
+) -> Transform:
+    """Return the held-out site's change of target for a window, with the scale rebuilt.
 
     Args:
         cache: The cache in original points.
         site: The held-out substation's label.
         cut: The cut.
         window: The held-out site's window.
+        prior: The capacity prior in rebuilt points.
 
     Returns:
-        `capacity_original / capacity_rebuilt`, so a rebuilt target is the original times this.
-
-    Raises:
-        ValueError: If the window holds no training row.
+        The transform; `scale` is `capacity_original / capacity_rebuilt`.
     """
-    features = cache.sites[site]
-    rows = training_rows(features=features, cache=cache, cut=cut, window=window)
-    if len(rows) == 0:
-        msg = f"{site} has no training row in its window before {cut}"
-        raise ValueError(msg)
-    power_mw = np.abs(features.y[rows]) * features.table.effective_capacity_mw / 100.0
-    rebuilt = float(np.quantile(power_mw, 0.99))
-    return features.table.effective_capacity_mw / rebuilt
+    rebuilt = rebuilt_effective_capacity_mw(cache=cache, site=site, cut=cut, window=window)
+    return Transform(
+        site=site,
+        scale=cache.sites[site].table.effective_capacity_mw / rebuilt,
+        capacity_mw=rebuilt,
+        prior=prior,
+    )
 
 
 def trainable(*, cache: FeatureCache, site: str, cut: datetime, window: TrainingWindow) -> bool:
@@ -231,16 +229,15 @@ def build_arm(
             msg = f"{held_out} has too few rows in a {history.label} window before {cut}"
             raise ValueError(msg)
         prior = 0.0
-        scale = (
-            history_scale(cache=cache, site=held_out, cut=cut, window=held_window)
-            if config.rebuild_scale
-            else 1.0
-        )
         if config.capacity_prior:
             prior = _capacity_prior(
                 cache=cache, vintages=vintages, cut=cut, config=config, excluded=held_out
             )
-        transform = Transform(site=held_out, scale=scale, prior=prior)
+        transform = (
+            history_transform(cache=cache, site=held_out, cut=cut, window=held_window, prior=prior)
+            if config.rebuild_scale
+            else Transform(site=held_out, prior=prior)
+        )
     used = transformed_cache(cache=cache, transform=transform)
     labels = (
         [held_out]
@@ -311,30 +308,34 @@ def _replica_path(*, cut: datetime, config: ArmConfig, history: str, site: str) 
     return REPLICA_DIR / f"{cut:%Y%m%d}_{config.family}_{history}_{site}.npz"
 
 
-def _save_replica(*, path: Path, replica: ReplicaResiduals) -> None:
+def _save_replica(*, path: Path, replica: PooledReplica) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp.npz")
     np.savez(
         temporary,
-        residuals=replica.residuals,
-        band=replica.band,
-        quarter=replica.quarter,
-        index=replica.index,
-        switching=replica.switching,
-        fit_cut=np.array(replica.fit_cut.isoformat()),
+        residuals=replica.residuals.residuals,
+        band=replica.residuals.band,
+        quarter=replica.residuals.quarter,
+        index=replica.residuals.index,
+        switching=replica.residuals.switching,
+        fit_cut=np.array(replica.residuals.fit_cut.isoformat()),
+        n_training_rows=np.array(replica.n_training_rows),
     )
     temporary.replace(path)
 
 
-def _load_replica(*, path: Path) -> ReplicaResiduals:
+def _load_replica(*, path: Path) -> PooledReplica:
     stored = np.load(path)
-    return ReplicaResiduals(
-        residuals=stored["residuals"],
-        band=stored["band"],
-        quarter=stored["quarter"],
-        index=stored["index"],
-        fit_cut=datetime.fromisoformat(str(stored["fit_cut"])),
-        switching=stored["switching"],
+    return PooledReplica(
+        residuals=ReplicaResiduals(
+            residuals=stored["residuals"],
+            band=stored["band"],
+            quarter=stored["quarter"],
+            index=stored["index"],
+            fit_cut=datetime.fromisoformat(str(stored["fit_cut"])),
+            switching=stored["switching"],
+        ),
+        n_training_rows=int(stored["n_training_rows"]),
     )
 
 
@@ -346,7 +347,7 @@ def replica_of(
     config: ArmConfig,
     held_out: str | None,
     history: common.History | None,
-) -> dict[str, ReplicaResiduals]:
+) -> dict[str, PooledReplica]:
     """Return the replica residuals of every site of an arm, stored once on disk.
 
     Args:
@@ -423,7 +424,7 @@ def fit_and_score_site(
         cache=built.cache,
         sites=built.sites,
         cut=cut,
-        strengths=[config.strength],
+        strengths=() if config.kind == "tied" else [config.strength],
         tied=config.kind == "tied",
     )
     index = common.scoring_index(
@@ -434,7 +435,7 @@ def fit_and_score_site(
         replicas = replica_of(
             cache=cache, vintages=vintages, cut=cut, config=config, held_out=None, history=None
         )
-        spread = _centre_spread(replica=replicas[target])
+        spread = _centre_spread(replica=replicas[target].residuals)
     else:
         short_replicas = []
         for other in decision_pool:
@@ -448,16 +449,17 @@ def fit_and_score_site(
                 held_out=other,
                 history=history,
             )
+            entry = short_history_replica(
+                replicas=others, short_site=other, weeks_of_history=history.weeks_of_history
+            )
             short_replicas.append(
-                ShortHistoryReplica(
-                    short_site=other,
-                    weeks_of_history=history.weeks_of_history,
+                replace(
+                    entry,
                     residuals=_to_scale(
                         cache=cache,
-                        replica=others[other],
+                        replica=entry.residuals,
                         other=other,
                         config=config,
-                        vintages=vintages,
                         cut=cut,
                         history=history,
                     ),
@@ -494,7 +496,6 @@ def _to_scale(
     replica: ReplicaResiduals,
     other: str,
     config: ArmConfig,
-    vintages: pl.DataFrame,
     cut: datetime,
     history: common.History,
 ) -> ReplicaResiduals:
@@ -504,13 +505,12 @@ def _to_scale(
     are divided by that scale, so they are comparable across sites and with the target's original
     scale.
     """
+    if not config.rebuild_scale:
+        return replica
     fit_cut = replica_cut(cut=cut)
     window = history.window(cut=fit_cut)
-    scale = (
-        history_scale(cache=cache, site=other, cut=fit_cut, window=window)
-        if config.rebuild_scale
-        else 1.0
-    )
+    rebuilt = rebuilt_effective_capacity_mw(cache=cache, site=other, cut=fit_cut, window=window)
+    scale = cache.sites[other].table.effective_capacity_mw / rebuilt
     return replace(replica, residuals=replica.residuals / scale)
 
 

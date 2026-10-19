@@ -34,7 +34,7 @@ from studies.dp_gam_pooled import PoolingStrength
 
 TARGETS: Final[tuple[str, ...]] = common.HELD_OUT_SITES
 HEATING_FACTORS: Final[tuple[float, ...]] = (0.1, 1.0, 10.0)
-"""The 3 by 3 grid of `n2l_*` multiplies `lambda*` by these for heating and for the other families."""
+"""The 3 by 3 grid of `n2l_*` multiplies `lambda*` by these, for heating and for the others."""
 
 
 @dataclass(frozen=True)

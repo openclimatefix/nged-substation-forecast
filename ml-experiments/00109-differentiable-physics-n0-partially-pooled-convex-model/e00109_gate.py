@@ -73,7 +73,9 @@ TUNING_DECISION: Final[tuple[str, ...]] = SYNTHETIC_LABELS[:5]
 VARIANTS: Final[dict[str, float]] = {"base": 1.0, "tau_x10": 10.0, "tau_x0.1": 0.1}
 WEEK_ROWS: Final[int] = 7 * HALF_HOURS_PER_DAY
 FLEET_CUT: Final[datetime] = common.SCORED_CUT
-SEED: Final[int] = 20261019
+SEED: Final[int] = 20261020
+"""The seed of the synthetic fleets. The first gate run used 20261019, with shrinkage measured on
+raw heating coefficients; its result is kept in `work/gate/gate_run1.json`."""
 
 
 def _g_fits(*, cache: FeatureCache, vintages: pl.DataFrame) -> tuple[Any, dict[str, np.ndarray]]:
@@ -453,6 +455,7 @@ def shrinkage_checks(
     layout: GamLayout = truth["layout"]
     heating = layout.slices["heating"]
     strength = PoolingStrength.uniform(value=tuned["base"]["lambda_star"])
+    cache, _ = arms.load_source(source=sources["base"])
     true_heating = np.stack([theta[heating] for theta in truth["thetas"]])
     true_mean = true_heating.mean(axis=0)
     true_delta = true_heating - true_mean

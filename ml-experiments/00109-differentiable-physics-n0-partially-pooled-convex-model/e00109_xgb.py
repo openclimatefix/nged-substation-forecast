@@ -12,7 +12,7 @@ history.
 | `x_2y` | the substation's 2 years before the cut | XGBoost's estimated base score |
 | `x_2yamq` | the same | training quantiles plus experiment 64's solar offset |
 | `x_4w`, `x_3m` | the substation's last 4 weeks, or 3 months | estimated base score |
-| `x_pool_4w` | every other pool substation's 2 years, plus the held-out substation's last 4 weeks, with no site input | estimated base score |
+| `x_pool_4w` | the other sites' 2 years plus the held-out site's 4 weeks | estimated base score |
 
 The C4 bar is whichever of `x_2y` and `x_2yamq` scores better on the tuning year, chosen by
 `e00109_report.py` before any scored number is read. The solar offset is the base margin
@@ -21,7 +21,7 @@ rules apply to the convex model only; here the vintage is read as experiment 104
 is the unit PV shape minus its month-by-half-hour mean over the training window, and `w` is fitted
 per substation on the median residuals of a replica of the matching plain arm.
 
-    uv run python ml-experiments/00109-*/e00109_xgb.py --cuts tuning replicate scored winter \\
+    uv run python ml-experiments/00109-*/e00109_xgb.py --cuts tuning replicate scored winter \
         [--workers 6]
 """
 
@@ -30,7 +30,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Final, Literal
+from typing import Final, Literal
 
 import e00109_common as common
 import numpy as np
@@ -489,7 +489,7 @@ def offset_arm_quantiles(
 
 
 def pooled_short_arm(*, job: SiteJob, short_window: TrainingWindow) -> np.ndarray:
-    """Fit one site-agnostic XGBoost model on every other site plus the held-out site's short window.
+    """Fit one site-agnostic XGBoost model on the other sites plus the held-out site's short window.
 
     Args:
         job: The held-out substation's shared inputs.
