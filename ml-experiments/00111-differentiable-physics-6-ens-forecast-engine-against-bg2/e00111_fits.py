@@ -45,12 +45,21 @@ def tuned() -> dict:
     return json.loads(common.PART_4_TUNED.read_text())
 
 
-def arm_spec(*, arm: str, settings: dict) -> GamSpec:
+def chosen_drift_step() -> float:
+    """Return the drift step `e00111_drift.py` chose for `gam0`; Part 4's step if none is stored."""
+    path = common.WORK_DIR / "drift.json"
+    if path.exists():
+        return float(json.loads(path.read_text())["chosen_step"])
+    return float(tuned()["drift_step"])
+
+
+def arm_spec(*, arm: str, settings: dict, drift_step: float | None = None) -> GamSpec:
     """Return an arm's penalties and drift form.
 
     Args:
         arm: `gam0` or `gamk`.
         settings: Part 4's tuned settings.
+        drift_step: The drift step of `gam0`; the chosen step if not given.
 
     Returns:
         The spec.
@@ -60,7 +69,7 @@ def arm_spec(*, arm: str, settings: dict) -> GamSpec:
     """
     base = GamSpec(
         ridge=RIDGE,
-        drift_step=settings["drift_step"],
+        drift_step=chosen_drift_step() if drift_step is None else drift_step,
         step_penalty=settings["step_penalty"],
         capacity="pinned",
         final_knot="free",
@@ -73,9 +82,9 @@ def arm_spec(*, arm: str, settings: dict) -> GamSpec:
     raise ValueError(msg)
 
 
-def fit_path(*, arm: str, site: str) -> Path:
-    """Return the file that holds an arm's fits at one site."""
-    return common.FITS_DIR / arm / f"{site}.pkl"
+def fit_path(*, arm: str, site: str, tag: str = "") -> Path:
+    """Return the file that holds an arm's fits at one site; `tag` names a drift-step variant."""
+    return common.FITS_DIR / f"{arm}{tag}" / f"{site}.pkl"
 
 
 def first_cut_index(*, cache: FeatureCache, site: str, cuts: list[datetime]) -> int:
@@ -102,12 +111,14 @@ def first_cut_index(*, cache: FeatureCache, site: str, cuts: list[datetime]) -> 
     raise ValueError(msg)
 
 
-def fit_site(*, arm: str, site: str) -> str:
+def fit_site(*, arm: str, site: str, drift_step: float | None = None, tag: str = "") -> str:
     """Fit one arm at one site for every monthly cut from its first cut, and store the fits.
 
     Args:
         arm: `gam0` or `gamk`.
         site: The substation's label.
+        drift_step: The drift step of `gam0`, or `None` for the chosen one.
+        tag: A suffix for the folder of a variant.
 
     Returns:
         A progress line.
@@ -116,7 +127,7 @@ def fit_site(*, arm: str, site: str) -> str:
     cache = common.load_cache()
     vintages = read_vintages()
     cuts = common.monthly_cuts()
-    spec = arm_spec(arm=arm, settings=tuned())
+    spec = arm_spec(arm=arm, settings=tuned(), drift_step=drift_step)
     first = first_cut_index(cache=cache, site=site, cuts=cuts)
     fits: list[GamFit] = []
     for cut in cuts[first:]:
@@ -132,7 +143,7 @@ def fit_site(*, arm: str, site: str) -> str:
                 pinned=pinned,
             )
         )
-    target = fit_path(arm=arm, site=site)
+    target = fit_path(arm=arm, site=site, tag=tag)
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp")
     temporary.write_bytes(pickle.dumps(fits))
@@ -143,9 +154,9 @@ def fit_site(*, arm: str, site: str) -> str:
     )
 
 
-def load_fits(*, arm: str, site: str) -> list[GamFit]:
+def load_fits(*, arm: str, site: str, tag: str = "") -> list[GamFit]:
     """Return the stored monthly fits of an arm at a site, ascending by cut."""
-    return pickle.loads(fit_path(arm=arm, site=site).read_bytes())
+    return pickle.loads(fit_path(arm=arm, site=site, tag=tag).read_bytes())
 
 
 def _job(job: tuple[str, str]) -> str:

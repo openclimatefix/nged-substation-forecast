@@ -72,6 +72,8 @@ TRANSFERS_PER_SITE: Final[int] = 4
 CLEARANCE_HALF_HOURS: Final[int] = 96
 STEPS_PER_DAY: Final[int] = 48
 MARGIN_TOLERANCE: Final[float] = 0.20
+PROXY_WARM_UP_RUNS: Final[int] = 9
+"""Runs before this index lack a week of analysis proxy before their origin."""
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 MODULE_TESTS: Final[tuple[str, ...]] = (
     "packages/studies/tests/test_dp_ens.py",
@@ -98,11 +100,14 @@ def fake_run(*, cache: FeatureCache, site: str, run: EnsSiteRun, noise: bool) ->
         The fake run.
     """
     features = cache.sites[site]
-    rows = np.arange(run.origin_position + 1, run.origin_position + 1 + run.n_targets)
+    last = len(cache.end_times) - 1
+    rows = np.minimum(
+        np.arange(run.origin_position + 1, run.origin_position + 1 + run.n_targets), last
+    )
     lead_hours = np.arange(1, run.n_targets + 1) / 2.0
     temperature = features.temperature_c[rows] + lead_bias(lead_hours=lead_hours)
-    shortwave = features.ghi_w_m2[rows] / IRRADIANCE_FACTOR
-    # The fake is the biased truth; the calibration should map it back with 0.8 and -bias.
+    shortwave = features.ghi_w_m2[rows] * IRRADIANCE_FACTOR
+    # The fake is the biased truth; the calibration should map it back with 1.25 and -bias.
     temperature = np.tile(temperature, (run.temperature_c.shape[0], 1))
     shortwave = np.tile(shortwave, (run.temperature_c.shape[0], 1))
     if noise:
@@ -131,7 +136,7 @@ def test_one(*, cache: FeatureCache) -> list[dict]:
             fitted = float(np.median(calibration.temperature_shift_c[:, lead, :]))
             shifts.append((site, lead, fitted, expected))
         fitted_ratio = float(np.median(calibration.irradiance_ratio[:, :, daylight]))
-        ratios.append((site, fitted_ratio, 1.0 / (1.0 / IRRADIANCE_FACTOR)))
+        ratios.append((site, fitted_ratio, 1.0 / IRRADIANCE_FACTOR))
         # Nesting: the deterministic fake, calibrated, against ERA5 and CAMS.
         deterministic = replace(
             setup,
@@ -159,7 +164,7 @@ def test_one(*, cache: FeatureCache) -> list[dict]:
         del reference
         nesting.append((site, float(np.nanmean(errors["fake"])), float(np.nanmean(errors["era5"]))))
     worst_shift = max(abs(fitted - expected) / abs(expected) for _, _, fitted, expected in shifts)
-    worst_ratio = max(abs(fitted - 1.25) / 1.25 for _, fitted, _ in ratios)
+    worst_ratio = max(abs(fitted - expected) / expected for _, fitted, expected in ratios)
     for name, value, limit, passed in (
         (
             "worst relative error of the recovered temperature shift",
@@ -446,7 +451,7 @@ def test_four(*, cache: FeatureCache) -> list[dict]:
             period = common.period_of_run(run=run_date)
             if period not in {"warm_up", "tuning"} or key >= (2025, 6):
                 continue
-            if index % 3:
+            if index % 3 or index < PROXY_WARM_UP_RUNS:
                 continue
             result = member_means(
                 cache=cache,
@@ -515,11 +520,16 @@ def main() -> None:
     """Run the gate, print the report, write `work/gate.json`, and exit 1 on a blocking failure."""
     torch.set_num_threads(2)
     cache = common.load_cache()
-    checks = test_one(cache=cache)
-    checks += test_two(cache=cache)
-    checks += test_three(cache=cache)
-    checks += test_four(cache=cache)
-    checks += test_five()
+    checks = []
+    for name, test in (
+        ("1", lambda: test_one(cache=cache)),
+        ("2", lambda: test_two(cache=cache)),
+        ("3", lambda: test_three(cache=cache)),
+        ("4", lambda: test_four(cache=cache)),
+        ("5", test_five),
+    ):
+        checks += test()
+        print(f"test {name} done", flush=True)
     table = pl.DataFrame(checks).with_columns(limit=pl.col("limit").cast(pl.String))
     with pl.Config(tbl_rows=200, tbl_cols=20, fmt_str_lengths=70):
         print(table)
