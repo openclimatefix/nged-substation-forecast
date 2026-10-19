@@ -168,6 +168,10 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-long-history-and-drift/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-long-history-and-drift/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-long-history-and-drift/plan.md
+          - Pooling across substations:
+              - Summary: ml-experiments/themes/differentiable-physics-pooling-across-substations/index.md
+              - Experiments: ml-experiments/themes/differentiable-physics-pooling-across-substations/experiments.md
+              - Research plan: ml-experiments/themes/differentiable-physics-pooling-across-substations/plan.md
       - Generator forecasting:
           - Summary: ml-experiments/themes/generator-forecasting/index.md
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
