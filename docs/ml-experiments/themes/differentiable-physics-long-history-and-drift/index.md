@@ -30,7 +30,8 @@ message, and the [Research plan](plan.md) lists what is planned next.
 - **[00107 - Differentiable physics, rolling-origin history and
   tails](../../00107-differentiable-physics-rolling-origin-history-and-tails/result.md):** Refitting
   the convex model every quarter at 12 origins, adding a drift term to the all-years model lowered
-  the score at 10 of 12 origins (0.45 points, 99% interval 0.23 to 0.68 better). All years without
-  drift scored worse than 12 months at 8 of 12 origins, almost entirely because of D10, and all
-  years with drift against 12 months stayed unresolved, with winter-quarter origins favouring more
-  years. Two new spreads for the 95% and 99% quantiles made their coverage worse.
+  the score at 10 of 12 origins (0.45 points, 99% interval 0.23 to 0.68 better), mostly through one
+  substation (D10) at the 2023-24 origins; the 2025-26 origins give 0.30, as in experiment 104. All
+  years without drift scored worse than 12 months at 8 of 12 origins, and all years with drift
+  against 12 months has no stable answer, with winter-quarter origins favouring more years. A
+  level-tercile spread made the 95% and 99% quantile coverage worse.

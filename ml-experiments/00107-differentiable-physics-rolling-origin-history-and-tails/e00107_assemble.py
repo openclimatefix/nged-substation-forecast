@@ -26,6 +26,7 @@ import polars as pl
 from e00107_spread import ConformalSpread, LevelTercileSpread
 from studies.dp_features import FeatureCache
 from studies.dp_gam import N_BANDS, QUANTILE_COLUMNS, ResidualSpread
+from studies.experiment_store import write_predictions
 
 SPREAD_ARMS: Final[tuple[str, ...]] = ("g1", "g_all_d1")
 """The convex arms that also get S1 and S2."""
@@ -39,6 +40,7 @@ KEY_COLUMNS: Final[tuple[str, ...]] = (
     "actual",
     "switching_mask",
     "jump_window",
+    "seed",
 )
 
 
@@ -49,6 +51,11 @@ def read_folder(*, folder: Path) -> pl.DataFrame:
         msg = f"no job files in {folder}"
         raise FileNotFoundError(msg)
     return pl.concat([pl.read_parquet(file) for file in files])
+
+
+def with_seed(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add the `seed` column: one fit per arm, so seed 0 on every row."""
+    return frame.with_columns(seed=pl.lit(0, dtype=pl.Int8))
 
 
 def read_fits(*, kind: str, variant: str) -> pl.DataFrame:
@@ -202,13 +209,17 @@ def convex_predictions(
                     groups += s1_group_rows(s1=s1, arm=arm, site=site, cut=cut)
                 for spread, values in quantiles.items():
                     ordered = np.sort(values, axis=1)
-                    frame = scored.select(*KEY_COLUMNS, "mean").with_columns(
-                        arm=pl.lit(arm),
-                        spread=pl.lit(spread),
-                        **{
-                            column: pl.Series(ordered[:, position])
-                            for position, column in enumerate(QUANTILE_COLUMNS)
-                        },
+                    frame = (
+                        with_seed(frame=scored)
+                        .select(*KEY_COLUMNS, "mean")
+                        .with_columns(
+                            arm=pl.lit(arm),
+                            spread=pl.lit(spread),
+                            **{
+                                column: pl.Series(ordered[:, position])
+                                for position, column in enumerate(QUANTILE_COLUMNS)
+                            },
+                        )
                     )
                     frames.setdefault(f"{arm}__{spread}", []).append(frame)
     return {name: pl.concat(parts) for name, parts in frames.items()}, pl.DataFrame(groups)
@@ -244,10 +255,35 @@ def xgb_predictions(*, xgb: pl.DataFrame, variant: str) -> dict[str, pl.DataFram
             continue
         if variant == "d10_masked":
             rows = rows.filter(~pl.col("jump_window"))
-        frames[f"{arm}__own"] = rows.select(*KEY_COLUMNS, "mean", *QUANTILE_COLUMNS).with_columns(
-            arm=pl.lit(arm), spread=pl.lit("own")
+        frames[f"{arm}__own"] = (
+            with_seed(frame=rows)
+            .select(*KEY_COLUMNS, "mean", *QUANTILE_COLUMNS)
+            .with_columns(arm=pl.lit(arm), spread=pl.lit("own"))
         )
     return frames
+
+
+def store_prediction_set(*, name: str, frame: pl.DataFrame) -> None:
+    """Write one (arm, spread) as an immutable prediction set, once.
+
+    The set holds `time_series_id`, `valid_time`, `power_fcst_init_time` (the cut), `lead_hours`,
+    `seed`, the 11 quantile columns, `actual`, and the identifying columns of the scored files.
+    A set that already exists is left alone.
+
+    Args:
+        name: The scored file's stem, such as `g_all_d1__s0`; stored as `g_all_d1-s0`.
+        frame: The scored rows.
+    """
+    set_name = name.replace("__", "-")
+    if (common.DATA_DIR / "predictions" / set_name).exists():
+        return
+    write_predictions(
+        experiment_id=common.EXPERIMENT_ID,
+        name=set_name,
+        frame=frame,
+        kind="quantiles",
+        row_set_id=common.ROW_SET_ID,
+    )
 
 
 def capacity_sources() -> pl.DataFrame:
@@ -291,6 +327,8 @@ def main() -> None:
     for name, frame in {**convex, **xgb}.items():
         common.write_atomic(frame=frame, path=folder / f"{name}.parquet")
         print(f"{name}: {frame.height} rows", flush=True)
+        if arguments.variant == "base":
+            store_prediction_set(name=name, frame=frame)
     if arguments.variant == "base":
         common.write_atomic(frame=groups, path=common.WORK_DIR / "s1_groups.parquet")
         common.write_atomic(

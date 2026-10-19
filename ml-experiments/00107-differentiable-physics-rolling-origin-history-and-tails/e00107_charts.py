@@ -299,7 +299,6 @@ def figure_4_tails() -> alt.TopLevelMixin:
     names = {
         "g_all_d1__s0": "S0 (hour band and quarter)",
         "g_all_d1__s1": "S1 (adds level tercile)",
-        "g_all_d1__s2": "S2 (S0 plus conformal shift)",
     }
     frames = [
         _coverage_by_origin(name=name, level=level).with_columns(
@@ -340,10 +339,10 @@ def figure_4_tails() -> alt.TopLevelMixin:
         .facet(row=alt.Row("level:N", sort=["q95", "q99"], title=None))
         .properties(
             title=_title(
-                text="No spread brings the 95% and 99% quantiles to their nominal coverage",
+                text="Neither spread brings the 95% and 99% quantiles to their nominal coverage",
                 subtitle=(
                     "Coverage of the upper quantiles of the all-years convex model with drift "
-                    "(G-all+D1) per origin, under three spreads; five substations. The dashed line "
+                    "(G-all+D1) per origin, under two spreads; five substations. The dashed line is "
                     "the nominal level (95% and 99%); below it the quantile is exceeded too often."
                 ),
             )
@@ -445,9 +444,7 @@ def figure_6_exploratory() -> alt.TopLevelMixin:
         "K2": "Control: G-all+D1 without harmonics",
         "K3": "Control: XGBoost with minus without day of year",
         "E5": "XGBoost: solar offset minus plain (X-12amq minus X-12)",
-        "T1": "Tails: S2 minus S0 on G-all+D1",
         "T2": "Tails: S1 minus S0 on G1",
-        "T3": "Tails: S2 minus S0 on G1",
     }
     rows = [
         {

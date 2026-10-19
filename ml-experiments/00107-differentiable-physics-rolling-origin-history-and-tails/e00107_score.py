@@ -748,7 +748,16 @@ def report_verdict(
         out = by_name[name]["pooled"]["8 out-of-tuning"]
         sides = sides_in(table=by_name[name]["table"], origins=out_of_tuning)
         text = interval_text(value=out)
-        print(f"- {name} on the 8 out-of-tuning origins (95%): {text}; sides {sides}")
+        label = labels[name]
+        survives = (
+            label.name == "stable" and sides[0 if label.side == -1 else 1] >= 7
+            if label.side
+            else None
+        )
+        print(
+            f"- {name} on the 8 out-of-tuning origins (95%): {text}; sides {sides}; "
+            f"the label survives (stable needs 7 of 8 on its side): {survives}"
+        )
     c3, c4 = labels["C3"], labels["C4"]
     c3_text = interval_text(value=by_name["C3"]["pooled"]["all 12"])
     c4_text = interval_text(value=by_name["C4"]["pooled_mae"])
@@ -877,7 +886,12 @@ def report_descriptive(*, scored: dict[str, pl.DataFrame], suffix: str) -> None:
         print(f"| {origin} | " + " | ".join(cells) + " |")
     print("\n## D9 (descriptive; origins from 2025-10-01): mean quantile score per arm\n")
     for name, frame in scored.items():
-        rows = frame.filter(pl.col("site") == "D9", ~pl.col("switching_mask"))
+        rows = frame.filter(
+            pl.col("site") == "D9",
+            ~pl.col("switching_mask"),
+            pl.col("origin")
+            >= common.cut_label(cut=common.add_months(moment=common.D9_FIRST_CUT, months=12)),
+        )
         if rows.is_empty():
             continue
         per_row = common.quantile_score(
@@ -928,6 +942,121 @@ def report_descriptive(*, scored: dict[str, pl.DataFrame], suffix: str) -> None:
                 coverage_text.append(f"{column} {100 * covered:.1f}")
             text = ", ".join(coverage_text)
             print(f"- {arm}, {site}: {text}")
+
+
+def mean_difference(
+    *,
+    wide: pl.DataFrame,
+    contrast: Contrast,
+    metric: str,
+    sites: Sequence[str],
+    origins: Sequence[str],
+) -> float:
+    """Return the mean treatment-minus-reference difference over the chosen sites and origins."""
+    rows = wide.filter(
+        pl.col("site").is_in(list(sites)),
+        pl.col("origin").is_in(list(origins)),
+        ~pl.col("switching_mask"),
+        pl.col(f"{metric}__{contrast.treatment}").is_not_null(),
+        pl.col(f"{metric}__{contrast.reference}").is_not_null(),
+    )
+    return float(
+        rows.select(
+            (
+                pl.col(f"{metric}__{contrast.treatment}")
+                - pl.col(f"{metric}__{contrast.reference}")
+            ).mean()
+        ).item()
+    )
+
+
+def report_post_hoc(*, wide: pl.DataFrame, contrasts: list[Contrast]) -> None:
+    """Print, post hoc, each history contrast by origin year, per site, and without D10 or D16."""
+    groups = origin_groups()
+    years = [
+        "all 12",
+        "2023-24 (pre-tuning)",
+        "2024-25 (in-tuning)",
+        "2025-26 (post-tuning)",
+    ]
+    sites = common.DECISION_SITES
+    print("\n## Post hoc: C1 to C3 by origin year, per site, and without D10 or D16\n")
+    print("Mean treatment-minus-reference difference (points); not planned, no interval.\n")
+    for contrast in (c for c in contrasts if c.name in ("C1", "C2", "C3")):
+        print(f"### {contrast.name}: {contrast.description}\n")
+        header = "| origins | quantile score | error of the mean | " + " | ".join(sites)
+        print(header + " | without D10 | without D16 |\n|---|" + "---|" * (len(sites) + 4))
+        for year in years:
+            members = groups[year]
+            score = mean_difference(
+                wide=wide, contrast=contrast, metric="score", sites=sites, origins=members
+            )
+            mae = mean_difference(
+                wide=wide, contrast=contrast, metric="mae", sites=sites, origins=members
+            )
+            per_site = [
+                mean_difference(
+                    wide=wide, contrast=contrast, metric="score", sites=[site], origins=members
+                )
+                for site in sites
+            ]
+            without = [
+                mean_difference(
+                    wide=wide,
+                    contrast=contrast,
+                    metric="score",
+                    sites=[s for s in sites if s != left_out],
+                    origins=members,
+                )
+                for left_out in ("D10", "D16")
+            ]
+            cells = [f"{v:+.3f}" for v in (score, mae, *per_site, *without)]
+            print(f"| {year} | " + " | ".join(cells) + " |")
+        print()
+
+
+def report_headline_table(*, results: list[dict]) -> None:
+    """Print planned contrasts over all 12 origins, the post-tuning 4, and the out-of-tuning 8."""
+    print("\n## Headline table: planned contrasts over three origin sets (95% for the subsets)\n")
+    print("| contrast | all 12 (99%) | 4 post-tuning | 8 out-of-tuning | post-tuning 95% width |")
+    print("|---|---|---|---|---|")
+    for row in results:
+        if not row["planned"]:
+            continue
+        pooled = row["pooled"]
+        post = pooled["2025-26 (post-tuning)"]
+        out = pooled["8 out-of-tuning"]
+        print(
+            f"| {row['contrast']} | {interval_text(value=pooled['all 12'])} | "
+            f"{interval_text(value=post)} | {interval_text(value=out)} | "
+            f"{post['upper'] - post['lower']:.3f} |"
+        )
+
+
+def report_per_site_tails(*, scored: dict[str, pl.DataFrame]) -> None:
+    """Print the pinball loss at the four tail levels, per site and arm."""
+    print("\n## Pinball loss at q01, q05, q95, q99 per site (12 origins)\n")
+    print("| arm | site | q01 | q05 | q95 | q99 |\n|---|---|---|---|---|---|")
+    for name, frame in scored.items():
+        rows = decision_rows(frame=frame)
+        for site in common.DECISION_SITES:
+            part = rows.filter(pl.col("site") == site)
+            actual = part["actual"].to_numpy()
+            cells = []
+            for level in TAIL_LEVELS:
+                error = actual - part[f"q{round(level * 100):02d}"].to_numpy()
+                cells.append(f"{np.maximum(level * error, (level - 1.0) * error).mean():.3f}")
+            print(f"| {name} | {site} | " + " | ".join(cells) + " |")
+
+
+def report_offset_weights() -> None:
+    """Print X-12amq's solar offset weight `w` per site and origin."""
+    files = sorted((common.WORK_DIR / "xgb" / "base" / "records").glob("*.parquet"))
+    records = pl.concat([pl.read_parquet(file) for file in files]).sort("site", "origin")
+    print("\n## X-12amq's fitted solar weight w per site and origin\n")
+    table = records.pivot(on="origin", index="site", values="w")
+    with pl.Config(tbl_rows=20, tbl_cols=20, float_precision=5):
+        print(table)
 
 
 def main() -> None:
@@ -998,9 +1127,14 @@ def main() -> None:
     )
     labels, loso_min = report_contrasts(results=results)
     verdict = report_verdict(results=results, labels=labels, loso_min=loso_min)
+    report_headline_table(results=results)
+    report_post_hoc(wide=wide, contrasts=contrasts)
     report_controls(results=results)
     report_tails(scored=scored, wide=wide, suffix=suffix)
     report_descriptive(scored=scored, suffix=suffix)
+    report_per_site_tails(scored=scored)
+    if arguments.variant == "base":
+        report_offset_weights()
     report_absolute(scored=scored, suffix=suffix)
     summary = {
         name: {"label": item.name, "side": item.side, "sign_varies": item.sign_varies}

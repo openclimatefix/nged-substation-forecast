@@ -25,6 +25,7 @@ from typing import Final
 import e00107_common as common
 import numpy as np
 import polars as pl
+from e00107_assemble import store_prediction_set
 from studies.dp_features import FeatureCache
 from studies.dp_gam import QUANTILE_COLUMNS, QUANTILE_LEVELS, TrainingWindow, training_rows
 
@@ -110,7 +111,7 @@ def reference_frame(
     extra["mean"] = ordered[:, QUANTILE_LEVELS.index(0.5)]
     frame = common.base_frame(cache=cache, site=site, cut=cut, index=index, extra=extra)
     return frame.select(*KEY_COLUMNS, "mean", *QUANTILE_COLUMNS).with_columns(
-        arm=pl.lit(name), spread=pl.lit("own")
+        seed=pl.lit(0, dtype=pl.Int8), arm=pl.lit(name), spread=pl.lit("own")
     )
 
 
@@ -141,6 +142,7 @@ def main() -> None:
     for name, parts in frames.items():
         frame = pl.concat(parts)
         common.write_atomic(frame=frame, path=common.WORK_DIR / "scored" / f"{name}__own.parquet")
+        store_prediction_set(name=f"{name}__own", frame=frame)
         print(f"{name}: {frame.height} rows")
     print("manual-heuristic rows with no analogue:", {k: v for k, v in fallback.items() if v})
 

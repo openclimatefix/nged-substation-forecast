@@ -12,7 +12,11 @@ none has a valid time after `c`. Rows inside the hand-filtered switching masks a
   them. A group under `MIN_SPREAD_GROUP_ROWS` falls back to its (band, quarter) group of S0.
 - **S2** (exploratory) is S0 fitted on the pool without its newest window, plus a split-conformal
   shift per level (the median excluded) and hour band, calibrated on that newest window so that its
-  coverage is nominal. Calibrating on the rows S0 was fitted on would shift nothing.
+  coverage is nominal. **Known flaw: S2's results are not interpreted.** The older windows hold no
+  rows of the newest window's calendar quarter, so that quarter falls back to a band-level table
+  about 3 points wider than S0's quarter table. The shift calibrated on it then narrows every
+  quarter's quantiles, which is what produces S2's low coverage. The code review of experiment 107
+  found this after the run.
 
 Every function takes only residuals and predicted means that end at or before the origin, which
 `e00107_checks.py` tests by perturbing the data at and after the origin.
