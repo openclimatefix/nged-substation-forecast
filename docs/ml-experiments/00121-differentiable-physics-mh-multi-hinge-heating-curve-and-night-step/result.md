@@ -197,6 +197,50 @@ design.
    level at the injected half-hour is under half the injection). Failure: `indexing not
    identified`; the NS-U against NS-L contrast is printed unlabelled.
 
+## Clarifications made after the tuning-year work and before any replicate or scored fit
+
+**These changes follow the first tuning-year run (cuts 2022-07-01 and 2023-07-01 only). No
+replicate-year or scored-year fit had been run, and no score of those years had been read.** They
+are agreed with the experiment manager.
+
+- **NS-L is redundant by construction.** B0's free profile has one level per day type and local
+  half-hour of day, so a free level per local half-hour adds nothing: its added effective degrees of
+  freedom are 0.0 at every decision site, and its fitted values equal B0's. NS-L is kept as the
+  labelled control that shows this. NS-U differs from the profile only in British Summer Time rows,
+  so it tests UTC-fixed timers, not a winter step.
+- **NS-HW is added as a full arm (N4), judged on winter nights like N1 to N3.** It is B0 plus the
+  15.5 C heating hinge of each of the four smoothed temperatures times each of the 20 UTC night
+  half-hours (80 columns, non-negative slopes, B0's ridge). It models a step that grows with cold,
+  which is how storage heating (Economy 7) behaves. It was added after the tuning-year run showed
+  NS-L and NS-U cannot represent a winter-only step. The night family is now four contrasts, so the
+  Bonferroni level is 99.375%.
+- **The MH-sh multiplier grid is extended to {10, 100, 1000, 10000, 100000}.** The first tuning run
+  chose 1000, the edge of the grid {10, 100, 1000}. The extension is made on the tuning year alone.
+- **Gate 4 is run as written, and its result is recorded as it stands.** Winter local time equals
+  UTC, and a winter step is already free in B0's profile, so criterion (b) (both NS-L and NS-U beat
+  B0 on winter nights) fails by construction. A failure of gate 4 as written does not cap any other
+  label.
+- **Gate 4' replaces gate 4 as the gate for the indexing contrast and for N4.** On the same
+  generator and noise as gate 4: **(a)** with a flat 4-point step injected at 01:00 UTC, NS-U beats
+  B0 on British Summer Time nights in at least 80% of draws; with the step injected at 01:00 local
+  time, B0 beats NS-U on those nights in at least 80% of draws (B0's profile already holds a local
+  step). **(b)** with a step that grows with cold injected on winter nights (4 points on average over
+  the winter nights, proportional to the 15.5 C hinge of the first smoothed temperature), NS-HW beats
+  B0 on winter nights in at least 90% of draws, and the mean of NS-HW minus B0 is wholly below zero.
+  A failure of 4'(a) makes the indexing contrast unlabelled (`indexing not identified`); a failure of
+  4'(b) makes the N4 label `not powered`. NS-L is not part of 4'.
+- **Winter breakdown and cold snaps (maintainer priority).** Every contrast is also reported on
+  November to March rows, on a cold-snap subset, and on evening peaks within them, with paired
+  intervals against BG2 and lagless XGBoost where their stored predictions cover the same rows. A
+  cold snap is the days of the scored winter whose daily mean ERA5 temperature at the site's cell is
+  in the coldest 10% of days of that winter; the rule and the day count are stated, and "too few
+  days" is reported where fewer than 5 days qualify. A winter loss alongside an annual gain is
+  stated in the verdict as a reason to hold the arm back. The page states how many independent
+  winters the evidence holds. The substation cards gain a cold-snap panel and the fitted night step
+  (as a score change, not a level).
+- **A winner is carried as a standard GAM-K piece in the recommendation** (subject to the ENS
+  confirmation in "Handed on").
+
 ## Planned contrasts
 
 **One planned contrast: 97.5% interval from `studies.bootstrap`, resampling whole calendar months
@@ -206,10 +250,10 @@ replicate year's estimate and count, November to March against April to October,
 bands, and leaving one site out.
 
 - **C1:** MH-K minus B0-K (decision, if the gate passes). Beside it: MH minus B0 (unfiltered).
-- **N1, N2, N3 (night family):** NS-L-K, NS-U-K, and NS-H-K each minus B0-K, **on winter nights as
-  the primary score** (November to February, valid times 22:00 to 08:00 local), at 99.17%
-  (Bonferroni over three). **Non-inferiority on all other rows:** the contrast on every row outside
-  winter nights must have its 99.17% upper bound at most +0.02 points. The annual average is
+- **N1, N2, N3, N4 (night family):** NS-L-K, NS-U-K, NS-H-K, and NS-HW-K each minus B0-K,
+  **on winter nights as the primary score** (November to February, valid times 22:00 to 08:00 local), at 99.375%
+  (Bonferroni over four). **Non-inferiority on all other rows:** the contrast on every row outside
+  winter nights must have its 99.375% upper bound at most +0.02 points. The annual average is
   reported and is not decisive. Calendar-type terms act on a few hours of the year, so the annual
   mean dilutes them. Each arm has its own filter hyperparameters, with the control below.
 - **Indexing contrast:** NS-U-K minus NS-L-K on BST nights (April to October), 95%, labelled `UTC`
@@ -269,13 +313,13 @@ Written before any fit; each line can fail, and none overrides the decision rule
   otherwise. The replicate condition is required because the MH-sh multiplier and the filter's
   hyperparameters are chosen on the tuning year. The replicate estimate is printed beside every
   scored estimate in the headline chart and tables.
-- **Label for N1 to N3 (gate 4 not required for N1 to N3 themselves):** `gain` if the winter-night
-  estimate is at most −0.05 points, the 99.17% interval lies wholly below zero, the replicate
+- **Label for N1 to N4 (gate 4' gates only N4 and the indexing contrast):** `gain` if the winter-night
+  estimate is at most −0.05 points, the 99.375% interval lies wholly below zero, the replicate
   year's winter-night estimate is below zero, at least 3 of 5 sites improve (the step is large at
   three substations), and non-inferiority holds. `small gain` if the interval lies wholly below
   zero, the estimate is between −0.05 and zero, and the replicate is below zero. `not replicated`
   and `worse` (interval wholly above zero) as for C1; `tie` otherwise. Failure of non-inferiority
-  gives `worse on other rows` and no `gain`. The **NS label** is the best label among N1 to N3.
+  gives `worse on other rows` and no `gain`. The **NS label** is the best label among N1 to N4.
   The reported winning indexing is whichever of NS-L and NS-U has the lower winter-night filtered
   score, with the indexing contrast beside it.
 - **Gate failure or control disagreement (MH):** label `not powered` (gate) or `inconclusive`
