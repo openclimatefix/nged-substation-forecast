@@ -1,12 +1,13 @@
 # Differentiable physics: the forecast engine: research plan
 
-**Part 6 of the series is the first experiment of this theme.** The confirmation run depends on its
-margin contrast.
+**Part 6 of the series was the first experiment of this theme, and its follow-ups wait on the
+maintainer.** The rows below are proposals, not agreed work.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 00111 | Does the convex differentiable-physics model, driven by ECMWF ensemble forecasts, beat lagless XGBoost, and does using its forecast as the starting point of the production recipe's lagged XGBoost improve that recipe? | High | The `studies.dp_features` ensemble layer pull request | Planned |
-| BG2-margin confirmation (inside 00111) | Does the production blend with the DP margin in its weekly member beat the rebuilt production blend like for like? | Conditional | 00111's margin contrast (C3) estimate below zero | Proposed |
+| Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
+| ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
+| Filter in the production serving path (proposed) | Does a Kalman filter on the recent residuals of the production XGBoost blend lower its day-ahead score as it does for the convex model? | 1 | Nothing; a candidate for the next release review | Proposed |
 
 ## Planned experiments
 
