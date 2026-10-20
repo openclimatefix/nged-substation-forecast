@@ -181,6 +181,40 @@ def median_minus_mean(*, loaded: dict[str, pl.DataFrame], sites: tuple[str, ...]
     return rows
 
 
+HEADLINE_ARMS: Final[tuple[str, ...]] = (
+    "gam0",
+    "gamk",
+    "gam_margin",
+    "xnl",
+    "xnl_k",
+    "xlag_d",
+    "bg2",
+    "climatology",
+    "manual_heuristic",
+)
+
+
+def headline_scores(*, loaded: dict[str, pl.DataFrame]) -> list[dict]:
+    """Return each headline arm's mean quantile score by site and lead day, on shared rows."""
+    present = {arm: loaded[arm] for arm in HEADLINE_ARMS if arm in loaded}
+    if len(present) < 2:
+        return []
+    shared = score.common_rows(arms_by_name=present)
+    rows = []
+    for arm, frame in shared.items():
+        table = (
+            frame.with_columns(
+                score.quantile_score(frame=frame),
+                day=((pl.col("lead_hours") - 1e-9) // 24).cast(pl.Int32) + 1,
+            )
+            .group_by("site", "day")
+            .agg(pl.col("qs").mean(), n=pl.len())
+            .sort("site", "day")
+        )
+        rows += [{"arm": arm, **r} for r in table.iter_rows(named=True)]
+    return rows
+
+
 def main() -> None:
     """Score and write the report."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -195,6 +229,7 @@ def main() -> None:
         loaded = load_all(periods=periods, sites=sites)
         results[f"arms_{sites_label}"] = sorted(loaded)
         results[f"tails_{sites_label}"] = tail_table(loaded=loaded)
+        results[f"headline_scores_{sites_label}"] = headline_scores(loaded=loaded)
         results[f"median_minus_mean_{sites_label}"] = median_minus_mean(loaded=loaded, sites=sites)
         for name, pair in SCREENING.items():
             summary = summarise(name=name, pair=pair, loaded=loaded, level=score.BONFERRONI_LEVEL)
