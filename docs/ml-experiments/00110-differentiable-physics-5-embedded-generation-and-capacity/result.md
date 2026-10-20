@@ -350,10 +350,15 @@ at the node. They change this plan's text above; the rest of the plan stands.
   1.25, clipped at 60% of its peak, so that the truth lies in the profile's grid.
 - **Intervals.** The capacity bootstrap keeps each calendar quarter's months and is widened by
   sqrt(m / (m - 1)) (experiment 113), and the ratio of K-iii to K-base uses the same month draws.
-  Gate tests 1 and 2 also report an 80% month-block bootstrap interval for the recovered capacity
-  with its coverage over at least 20 synthetic sites, at independent noise of 5.0 points and at
-  noise made of month blocks of real residuals; the point tolerances stay as the pre-registered
-  record. The substation cards show heating slopes and capacities with intervals, and the line
+  A separate calibration gate (`e00110_gate_intervals.py`) tests the capacity intervals of the four
+  capacity arms on 20 synthetic substations each, at independent noise of 5.0 points and at noise
+  made of the real residuals of random months of the same quarter. It tests both the 80% interval
+  (coverage 70 to 90%) and the 90% range that the cards and the `identified` rule print (coverage
+  80 to 100%), reports the counts with binomial ranges, and is weak evidence: 20 substations pass
+  an interval that truly covers 80% about 84% of the time, and one that covers 60% or 95% about a
+  quarter of the time. Months are drawn independently, so it cannot catch dependence between
+  months. The point tolerances of the main gate stay as the pre-registered record. The substation cards
+  show heating slopes and capacities with intervals, and the line
   "weakly identified at real noise levels (experiment 112); compare across substations with care".
 - **C4's arm** is chosen among K-base, K-i, and K-ii, because K-iii has no `identified` label, and
   C4 runs only if its arm is `identified`. `robust` does not require K-base, and handing fitted

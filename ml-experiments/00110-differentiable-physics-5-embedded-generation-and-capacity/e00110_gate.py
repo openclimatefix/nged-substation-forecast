@@ -26,7 +26,8 @@ quantity. A failed blocking test stops scoring of the component it tests.
 5. **The clip recovers an injected clip (blocking for the clip).** The model's own rooftop output
    times 1.25 (a capacity multiplier inside the profile's grid, so the truth has the model's form)
    is clipped at 60% of its peak. The profiled ceiling must be within 10% of the injected clip at 3
-   or more of 4 sites.
+   or more of 4 sites, on both legs: with the clip profiled on B-D1 (as B-gen does) and on B (as
+   B-clip does).
 
 Tests 1 and 3 run at the five decision substations, and tests 2, 4, and 5 at D10, D11, D14, and
 D16. Every fit uses the window of the scored arm it certifies (all years for the K arms, the meter
@@ -86,6 +87,8 @@ NODE_GENERATOR: Final[dict[str, Any]] = {
     "long_outage": (2022, 9, 12, 14),
     "short_outage": (2023, 1, 17, 1),
 }
+CLIP_BASES: Final[tuple[str, ...]] = ("b_d1", "b")
+"""The bases the clip is profiled on: B-D1 for B-gen and B for B-clip."""
 CLIP_SHARE_OF_PEAK: Final[float] = 0.6
 CAPACITY_TOLERANCE: Final[float] = 0.20
 FARM_RATIO_BAND: Final[tuple[float, float]] = (0.75, 1.25)
@@ -349,12 +352,14 @@ def _node_job(site: str) -> dict[str, Any]:
     }
 
 
-def _clip_job(site: str) -> dict[str, Any]:
-    """Gate test 5 at one site."""
+def _clip_job(job: tuple[str, str]) -> dict[str, Any]:
+    """Gate test 5 at one site, with the clip profiled on B-D1 (B-gen) or on B (B-clip)."""
+    site, base = job
     cache: FeatureCache = _STATE["cache"]
     pinned, _ = _pinned_b(cache=cache, site=site)
-    # The scored clip arms profile the clip on B-D1 without its node, so the gate does too.
-    spec = arms.base_specs(part_4=arms.read_part_4_tuned())["b_d1"]
+    # B-gen profiles its clip on B-D1 without the node and B-clip profiles it on B, so the gate
+    # runs one leg for each.
+    spec = arms.base_specs(part_4=arms.read_part_4_tuned())[base]
     features = cache.sites[site]
     rows = np.flatnonzero(np.isfinite(features.y) & np.isfinite(features.pv_unit_shape))
     rooftop = np.full(len(cache.end_times), np.nan)
@@ -380,6 +385,7 @@ def _clip_job(site: str) -> dict[str, Any]:
     return {
         "test": 5,
         "site": site,
+        "base": base,
         "injected_clip_points": level,
         "recovered_clip_points": recovered,
         "ratio": recovered / level,
@@ -424,8 +430,14 @@ def _summarise(*, results: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         ),
     }
     summary["test_4"] = {"passed": all(row["passed"] for row in results["4"])}
-    n_clip = sum(row["passed"] for row in results["5"])
-    summary["test_5"] = {"passed": n_clip >= 3, "n_passed": n_clip}
+    legs = {
+        base: sum(row["passed"] for row in results["5"] if row["base"] == base)
+        for base in CLIP_BASES
+    }
+    summary["test_5"] = {
+        "passed": all(count >= 3 for count in legs.values()),
+        "n_passed_by_base": legs,
+    }
     return summary
 
 
@@ -449,7 +461,9 @@ def main() -> None:
         for rows in pool.map(_meter_job, decision_sites):
             results["3"] += rows
         results["4"] += list(pool.map(_node_job, sites))
-        results["5"] += list(pool.map(_clip_job, sites))
+        results["5"] += list(
+            pool.map(_clip_job, [(site, base) for site in sites for base in CLIP_BASES])
+        )
     summary = _summarise(results=results)
     (common.WORK_DIR / "gate.json").write_text(
         json.dumps({"summary": summary, "rows": results}, indent=2, default=float) + "\n"

@@ -387,6 +387,27 @@ def reproduction_check() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def interval_gate_table() -> pl.DataFrame:
+    """Return the calibration gate's coverage counts with their binomial ranges."""
+    path = common.WORK_DIR / "gate_intervals.json"
+    rows = [
+        {
+            "arm": line["arm"],
+            "noise": line["noise"],
+            "80% covered": f"{line['covered_80']}/{line['n_substations']}",
+            "80% binomial 95%": "{:.2f} to {:.2f}".format(*line["coverage_80_binomial_95"]),
+            "80% calibrated": line["calibrated_80"],
+            "90% range covered": f"{line['covered_90']}/{line['n_substations']}",
+            "90% binomial 95%": "{:.2f} to {:.2f}".format(*line["coverage_90_binomial_95"]),
+            "90% calibrated": line["calibrated_90"],
+            "mean 90% width": line["mean_width_90_points"],
+            "mean bias": line["mean_bias_points"],
+        }
+        for line in json.loads(path.read_text())["summary"]
+    ]
+    return pl.DataFrame(rows)
+
+
 def contrast_table(*, planned: bool) -> pl.DataFrame:
     """Return the contrast table: scored-year interval and splits, with the replicate beside."""
     level = PLANNED_LEVEL if planned else EXPLORATORY_LEVEL
@@ -704,6 +725,8 @@ def main() -> None:
     print(contrast_table(planned=False).write_csv(float_precision=3), end="")
     print("== Planned MW contrasts with each decision site left out (quantile score) ==")
     print(leave_one_site_out().write_csv(float_precision=3), end="")
+    print("== Calibration gate of the capacity intervals (weak evidence: 20 substations) ==")
+    print(interval_gate_table().write_csv(float_precision=3), end="")
     print("== Reproduction of Part 4's A2 by B ==")
     print(reproduction_check().write_csv(float_precision=4), end="")
     print("== Capacity by site, arm, and cut ==")
