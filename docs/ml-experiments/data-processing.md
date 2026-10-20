@@ -107,6 +107,16 @@ months are read from the raw power table, because the cleaned table removes flag
 early months are often flagged. The blue kept months are read from the cleaned table. At D10 and D5
 the dropped months look less different from the kept months, which fits their medium confidence.
 
+**An uncut start hurts a model without recent power far more than a model with it (high confidence
+for D18).** In [experiment 102](00102-simp1-simplifying-the-bg2-best-guess-before-production/result.md),
+D18's training rows began in December 2024 at zero output. A weekly-refitted XGBoost model without the
+three recent-power inputs forecast 20% of capacity in December 2025 against an actual of 75%, and its
+score at D18 was 5.7 points of capacity worse than the same model with the inputs. With the first 2.6
+months cut (training from 2025-03-01), the difference at D18 fell to -0.03 points. The cost of
+removing the inputs across the 16 Primaries fell from 0.710 to 0.361 points. Applies to experiments,
+and to any comparison of a model with and without recent power. A comparison that cuts the start for
+one arm must cut it for every arm.
+
 ## Decide which rows are demand
 
 **Use a Primary metered in MVA for demand only on dark rows (high confidence).** An MVA reading
@@ -394,6 +404,45 @@ labels. Treat it as interpolated, not as a separate measurement
 experiments. Confidence: high, because the mean absolute difference from the neighbours' average is
 zero.
 
+**Do not read the PV capacity of a pooled demand model as a measurement, and do not expect a prior
+to hold it near the vintages.** In the pooled differentiable-physics model, the inferred capacity of
+a substation changed by up to 20 points of capacity with another start or with the network off (D5
+50 or 30, D9 12 or 23, in season-year 2023), and a prior centred on the vintage with scale 5 changed
+nothing, because the prior is a few nats against about 340,000 rows of data. A swap of the fitted
+capacity paths among substations still worsened the summer-midday error at 6 of 6 ([experiment
+105](00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md)). Applies to
+experiments that fit capacity inside a demand model. Confidence: medium. A capacity profile shows
+the free fit's loss is 4,563 nats above a fit with the capacities pinned at the convex model's, so
+the optimiser is the weak point; why it is slow is not tested.
+
+**Skip the solar-offset arms at D18, which has no capacity vintage before 2025-07-01.** Its first
+usable data begin in February 2025, so an origin on or before the cut does not exist
+([experiment 105](00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md)).
+Applies to experiments. Confidence: high.
+
+**Rebuild a new substation's effective capacity from its own rows before a model pools it in points,
+and fit its solar capacity from the same rows.** A power series is divided by its effective capacity,
+the 99th percentile of its absolute power over its history, and a substation with 4 weeks of history
+has only that window to take the percentile from. In experiment 109 the whole-history capacity was
+1.29 to 2.04 times the capacity rebuilt from June 4-week windows, 1.09 to 1.66 times the one rebuilt
+from April-to-June 3-month windows, and 0.91 to 0.98 times the one rebuilt from January 4-week
+windows, so a model that pools coefficients in points sees a June substation as larger than it is.
+A vintage capacity that is fitted after the cut holds the future, so a model that reads it for a
+short window leaks it. The same applies to a pooled substation that holds only part of its window
+(D18 in experiment 109): its scale is rebuilt from the rows it holds. Applies to experiments that
+pool a substation with a short history, and to onboarding in production. Evidence: [experiment
+109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) (scored year, six
+held-out Primaries; provisional: one experiment, gate not passed under its pre-registered
+definition). The rule is motivated by leakage. Pooling D18 on its whole-history scale instead moves
+three contrasts by 0.03 to 0.05 points.
+
+**Do not pool a capacity read from a vintage fitted long after the cut.** In a joint fit such a
+capacity moves the fleet mean, and so every other substation's forecast. Give the substation a
+capacity fitted from its own rows before the cut instead (D9 at the 2024-07-01 cut and D18 at the
+2025-07-01 cut, [experiment
+109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md); provisional: not
+measured, and the experiment's gate did not pass under its pre-registered definition).
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers
@@ -403,9 +452,9 @@ set of [experiment 41](00041-sw2-0a-labeller-gate/result.md)). Applies to experi
 production once a detector runs there.
 
 **Expect D10 to carry unlabelled jumps of 15 to 20 points.** D10's night-time floor rose from 25 to
-45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to
-20 points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and
-both are probably unlabelled switching. Dropping the 2025 window lowered D10's scores by 0.09 to 0.53
+45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to 20
+points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and both
+are probably unlabelled switching. Dropping the 2025 window lowered D10's scores by 0.09 to 0.53
 points and moved the five-site contrasts by under 0.08 points ([experiment
 104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction). Masking both
 windows in the quarterly refits of [experiment

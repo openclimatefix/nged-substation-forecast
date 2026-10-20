@@ -66,7 +66,7 @@ into quantiles per hour band and calendar quarter.
 import calendar
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Final, Literal
 
 import numpy as np
@@ -82,28 +82,9 @@ from studies.dp_calendar import (
     SMOOTHING_HOURS,
     lighting_ramps,
 )
-from studies.dp_features import FeatureCache, SiteFeatures
+from studies.dp_features import FeatureCache, SiteFeatures, naive_utc
 from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity
 from studies.experiment_store import HOLDOUT_START
-
-
-def naive_utc(*, moment: datetime) -> np.datetime64:
-    """Return a timezone-aware datetime as a naive UTC `datetime64[us]`.
-
-    Args:
-        moment: An aware datetime in any time zone.
-
-    Returns:
-        The same instant as UTC microseconds.
-
-    Raises:
-        ValueError: If `moment` has no time zone, since a naive wall time could be local.
-    """
-    if moment.tzinfo is None:
-        msg = "a cut or window bound must carry a time zone"
-        raise ValueError(msg)
-    return np.datetime64(moment.astimezone(UTC).replace(tzinfo=None), "us")
-
 
 DriftType = Literal["none", "d1", "d1_steps"]
 """The drift form: no drift, the smooth level path, or the smooth path plus sparse steps."""
