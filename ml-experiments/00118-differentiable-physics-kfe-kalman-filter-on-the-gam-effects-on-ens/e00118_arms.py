@@ -9,6 +9,7 @@
 | KEZ-Q0 | level (4) | yes | fitted for the level |
 | KEZ-QI | all 14 | yes | one q for every weight, fitted |
 | KEZ-drop-g | all but group g | yes | fitted |
+| KEZ-DT | all 14 | yes | fitted on a stream without holiday-day readings |
 """
 
 from dataclasses import dataclass
@@ -41,6 +42,8 @@ class ArmConfig:
         use_anomaly: Whether the anomaly states are in use.
         shared_q: Whether one q is fitted for every moving weight.
         inflated: Whether the observation noise is held at the inflated value of KE.
+        skip_holidays: Whether readings on holiday days are left out of the filter and the level
+            and anomaly corrections are zero on holiday target days (the day-type-aware arm).
     """
 
     name: str
@@ -48,11 +51,14 @@ class ArmConfig:
     use_anomaly: bool
     shared_q: bool = False
     inflated: bool = False
+    skip_holidays: bool = False
 
     @property
     def variant(self) -> FilterVariant:
         """The arm as the module's `FilterVariant`."""
-        return FilterVariant(moving=self.moving, use_anomaly=self.use_anomaly, shared_q=self.shared_q)
+        return FilterVariant(
+            moving=self.moving, use_anomaly=self.use_anomaly, shared_q=self.shared_q
+        )
 
 
 def _moving_except(*, group: str | None) -> np.ndarray:
@@ -69,6 +75,7 @@ FITTED_ARMS: Final[dict[str, ArmConfig]] = {
     "KEZ": ArmConfig("KEZ", _moving_except(group=None), use_anomaly=True),
     "KEZ-Q0": ArmConfig("KEZ-Q0", LEVEL_ONLY, use_anomaly=True),
     "KEZ-QI": ArmConfig("KEZ-QI", _moving_except(group=None), use_anomaly=True, shared_q=True),
+    "KEZ-DT": ArmConfig("KEZ-DT", _moving_except(group=None), use_anomaly=True, skip_holidays=True),
     **{
         f"KEZ-drop-{group}": ArmConfig(
             f"KEZ-drop-{group}", _moving_except(group=group), use_anomaly=True

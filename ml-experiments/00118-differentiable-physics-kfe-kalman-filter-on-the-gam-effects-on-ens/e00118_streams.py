@@ -13,6 +13,7 @@ from typing import Final
 
 import e00118_common as common
 import numpy as np
+from studies.dp_calendar import DAY_TYPES
 from studies.dp_effects_filter import (
     N_BANDS,
     N_WEIGHTS,
@@ -26,6 +27,8 @@ from studies.dp_gam import GamFit
 
 FIT_END: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
 """The noise matrix is fitted on a stream cut here, so no scored-year residual reaches the fit."""
+BANK_HOLIDAY: Final[int] = DAY_TYPES.index("bank_holiday")
+"""The index of the bank-holiday day type."""
 STREAM_TOLERANCE: Final[float] = 1e-9
 """How closely the decomposition's residual must match `proxy_residual_stream`."""
 
@@ -44,6 +47,8 @@ class SiteStreams:
         tuning_mask: True on grid rows that count in the likelihood: finite residuals in the
             tuning months.
         scale: The root mean square of each regressor over the tuning mask, shape (14,).
+        holiday_day: True on grid rows of a holiday day: a named holiday period (each bank holiday,
+            Easter, bridge days, the Christmas to New Year run) or the bank-holiday day type.
     """
 
     site: str
@@ -52,15 +57,27 @@ class SiteStreams:
     band: np.ndarray
     tuning_mask: np.ndarray
     scale: np.ndarray
+    holiday_day: np.ndarray
 
     @property
     def standardised(self) -> np.ndarray:
         """The regressors divided by their scale, shape (grid rows, 14)."""
         return self.contributions / self.scale
 
-    def fit_residual(self, *, cache: FeatureCache) -> np.ndarray:
-        """Return the residual stream cut at `FIT_END`, which is all a noise fit may see."""
-        return np.where(cache.end_times <= naive_utc(moment=FIT_END), self.residual, np.nan)
+    def arm_residual(self, *, skip_holidays: bool) -> np.ndarray:
+        """Return the residual stream an arm's filter reads.
+
+        Holiday-day readings are missing for a day-type-aware arm.
+        """
+        return np.where(self.holiday_day, np.nan, self.residual) if skip_holidays else self.residual
+
+    def fit_residual(self, *, cache: FeatureCache, skip_holidays: bool = False) -> np.ndarray:
+        """Return the arm's residual stream cut at `FIT_END`, which is all a noise fit may see."""
+        return np.where(
+            cache.end_times <= naive_utc(moment=FIT_END),
+            self.arm_residual(skip_holidays=skip_holidays),
+            np.nan,
+        )
 
 
 def build_site_streams(
@@ -91,9 +108,7 @@ def build_site_streams(
     ):
         msg = f"{setup.site}: the decomposition's residual differs from proxy_residual_stream"
         raise ValueError(msg)
-    tuning_mask = np.isfinite(residual) & common.in_months(
-        cache=cache, months=common.TUNING_MONTHS
-    )
+    tuning_mask = np.isfinite(residual) & common.in_months(cache=cache, months=common.TUNING_MONTHS)
     scale = regressor_scale(contributions=pieces.contributions, mask=tuning_mask)
     return SiteStreams(
         site=setup.site,
@@ -102,6 +117,8 @@ def build_site_streams(
         band=cache.calendar.band.astype(np.int64),
         tuning_mask=tuning_mask,
         scale=scale,
+        holiday_day=(cache.calendar.holiday_period >= 0)
+        | (cache.calendar.day_type == BANK_HOLIDAY),
     )
 
 
