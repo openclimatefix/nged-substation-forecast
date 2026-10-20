@@ -1017,6 +1017,12 @@ def _solve_member(
 ) -> tuple[torch.Tensor, torch.Tensor, float, bool]:
     """Solve one member by Cholesky, falling back to the LU solver if that fails.
 
+    Args:
+        matrix: `A`, shape (p, p), positive definite.
+        rhs: `b`, shape (p,).
+        constrained: Boolean, shape (p,), True for the non-negative parameters.
+        start_free: Boolean, shape (p,), the starting free set.
+
     Returns:
         `(theta, free, violation, fell_back)`, where `fell_back` is True if the LU solver solved
         the member.
