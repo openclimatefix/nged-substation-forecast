@@ -6,7 +6,7 @@ theme: differentiable-physics-demand-calendar-and-weather
 also_relevant_to:
   - differentiable-physics-forecast-engine
   - differentiable-physics-long-history-and-drift
-status: planned
+status: done
 size: >-
   simple. Stored: private files under
   data/ml-experiments/00122-differentiable-physics-three-winter-backtest-gam-k/ only (a scoring
@@ -18,7 +18,7 @@ hypothesis: >-
   On past weather, the convex model with the Kalman filter (GAM-K) forecasts Primary demand one day
   ahead better than both the plain convex model (GAM) and lagless XGBoost, in each of the three
   winters 2023-24, 2024-25, and 2025-26, by at least 1 point of mean absolute error.
-prediction: see "Predictions"
+prediction: see "Predictions against outcome"
 decision_rule: see "Decision rule"
 benchmark: >-
   The plain convex model (B0 of experiment 114) and lagless XGBoost over 2 years of history (x_2y of
@@ -29,144 +29,197 @@ row_set_id: >-
 metric: >-
   Mean absolute error of the median forecast, in points of effective capacity, at the day-ahead lead
   (day D+1 from a 09:00 UTC initialisation on day D, leads 15.5 to 39 hours)
-verdict: <supported, partly supported, small gain, refuted, or inconclusive>
+verdict: supported
+best_arm: "GAM-K, 3.73, 4.14, and 4.19 points of mean absolute error in the three winters"
+headline: >-
+  GAM-K minus the plain GAM is -3.06 (95% interval -3.54 to -2.52), -1.83 (-2.47 to -1.28), and
+  -1.90 (-2.49 to -1.36) points in 2023-24, 2024-25, and 2025-26; against lagless XGBoost it is
+  -3.10 (-3.57 to -2.63), -2.00 (-2.60 to -1.46), and -2.17 (-2.99 to -1.45). All six meet the bar
+  of 1 point.
+lessons: >-
+  Most of GAM-K's gain over the two plain models is the Kalman filter removing a level error that a
+  fit frozen for a year carries. The plain models under-forecast by 2 to 7 points at most
+  substations in the later winters, and over-forecast by 12 points at D10 in 2023-24.
 production_status: not-for-production
-take_home_message: <written after the results>
-date: <date>
+adopted_in: none
+take_home_message: >-
+  In all three winters, the convex demand model with the recent-error filter (GAM-K) forecast
+  Primary demand one day ahead 1.8 to 3.1 points of capacity better than the same model without
+  the filter, and 1.8 to 3.1 points better than lagless XGBoost. Most of the gain is the filter
+  removing a level error that a fit frozen for a year carries, so the contrast says little about
+  winter demand structure, and the lagless XGBoost has no recent power to correct the same error.
+  The scoring uses past weather, so the size of the gain under live weather forecasts is unknown.
+date: 2026-10-20
 pr: <pr>
-advice: <written after the results>
+advice:
+  - >-
+    Count GAM-K's gain over a fit frozen for a year as a level-tracking gain, and compare it with a
+    lagged XGBoost model before calling it a structural gain (per-site bias, figure 3).
+  - >-
+    Report each winter's contrast beside its leave-one-substation-out contrasts, because one
+    substation with a level shift (D10 in 2023-24) can carry half of a winter's gap (checks).
+  - >-
+    Treat 2023-24 as a weaker test than 2024-25 and 2025-26, because GAM-K's filter settings and
+    the convex model's window were chosen on that winter (design).
 code: ml-experiments/00122-differentiable-physics-three-winter-backtest-gam-k/
 ---
 
 # Differentiable physics: GAM-K against the plain GAM and lagless XGBoost over three winters
 
-**Planned, not yet run.** We ask whether the convex differentiable-physics demand model with a
-Kalman filter of recent errors (GAM-K, the series' candidate) beats both the same model without the
-filter (GAM) and lagless XGBoost in each of three winters, using observed past temperature and
-irradiance, not weather forecasts. An earlier read-only analysis of stored forecasts found GAM-K
-ahead in 2024-25 and 2025-26 but had only two winters. A third winter, 2023-24, is also stored, in
-the first-year files of [experiment
-114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md) and
-[experiment 109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md). We
-score the three winters side by side, with one rule for the cold-snap days and one for the evening
-peak.
+**In all three winters, GAM-K forecast Primary demand one day ahead better than both the plain
+convex model and lagless XGBoost, by 1.8 to 3.1 points of capacity.** GAM-K is the convex
+differentiable-physics demand model with a Kalman filter of recent errors, which [experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md) chose as the
+series' candidate. We rescored the stored day-ahead forecasts of [experiment
+114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md) (the plain
+model and GAM-K) and [experiment
+109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) (lagless XGBoost)
+for November to March of 2023-24, 2024-25, and 2025-26, at five Primary substations. Nothing was
+refitted. Each mean absolute error is a mean over the winter's days, in points of effective
+capacity, and each interval comes from resampling blocks of 7 consecutive days.
 
 **Past-weather scoring ranks model structure and does not give production skill.** The inputs are
-observed temperature and irradiance, so no weather-forecast error enters. A gap measured here is a
-ceiling for the gap under live forecasts.
+observed temperature and irradiance, so no weather-forecast error enters, and a gap measured here
+is a ceiling for the gap under live weather forecasts.
 
-## Size
+**Most of the gain is the filter removing a level error, not better winter structure.** The plain
+convex model and lagless XGBoost are each frozen for a year after their fit and carry a level
+error: both under-forecast by 2 to 7 points at most substations in 2024-25 and 2025-26, and both
+over-forecast by 12 points at D10 in 2023-24 (figure 3). GAM-K's filter corrects that error from recent
+residuals. Lagless XGBoost has no recent power as an input. On ensemble weather in 2025-26, a
+read-only analysis found GAM-K only 0.3 to 1.5 points better than every other arm there, filtered
+XGBoost and BG2 included, so the gap to a model that sees recent power is smaller.
 
-The five `plan-issue` triggers, each answered:
+**The verdict is `supported`.** All six planned contrasts meet the bar (estimate at most −1.0 points,
+95% interval wholly below zero). There are three independent winters: separate weather samples,
+whose fits share part of their 24-month training window. Two of the winters (2024-25 and 2025-26)
+had been read in a read-only analysis before this plan, so only 2023-24 was a new test.
 
-1. **What gets stored:** one private scoring table; nothing in `packages/` or any contract.
-2. **Serving path:** not touched.
-3. **Degradation rule:** not touched.
-4. **More than one defensible design:** no. The arms, cuts, row set, and scoring follow experiments
-   107, 109, and 114, and the maintainer fixed the contrasts.
-5. **Code whose callers could not be named without searching:** none. The script reads three stored
-   prediction sets and imports `studies.experiment_store` only.
+## Figures
 
-Size: simple, a rescoring of stored forecasts with existing settings. The reviews are one Sonnet code
-review (leakage, and each fit stopping at the cut), one Sonnet write-up review, and the prose
-review. No Opus review runs at this stage. Audit triggers are listed under "Checks" in the
-write-up.
+**Figure 1 shows all six planned contrasts well past the 1-point bar.** The smallest estimate is
+−1.83 points (GAM-K against the plain model in 2024-25, interval −2.47 to −1.28).
 
-## Terms
+![Interval chart of the six planned contrasts: every estimate lies between −3.2 and −1.8 points,
+every 95% interval lies left of the dashed line at −1 point.](figure_1_headline.svg)
 
-- **Points:** percentage points of a substation's effective capacity.
-- **GAM, GAM-K:** experiment 114's B0 (24-month window, no drift, PV capacity pinned, ridge 0.1)
-  without and with the Kalman filter of recent errors. [Experiment
-  111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md) chose the
-  filtered model as the series' candidate.
-- **Lagless XGBoost:** experiment 109's `x_2y`: experiment 87's recipe with the three power lags
-  removed, trained on the 2 years before each cut, on the same ERA5 and CAMS inputs.
-- **Winter:** 1 November to 31 March, by the local (Europe/London) calendar day of the valid time.
-- **Cold-snap days:** in each winter, the coldest 10% of covered days by daily mean ERA5 2 m
-  temperature, averaged over the five Primaries (at least 3 days).
-- **Evening peak:** valid times from 16:00 to 20:00 local time.
+**Figure 2 shows GAM-K's error at 3.7 to 4.2 points in every winter, against 6.0 to 6.8 for the plain
+models.** The plain convex model and lagless XGBoost are level with each other in each winter.
 
-## Design
+![Dot chart of mean absolute error by winter for the three models.](figure_2_absolute.svg)
 
-**No fit runs.** Experiments 109 and 114 already fitted every arm at the cuts 2022-07-01 (the
-replica of 2023-24's spread), 2023-07-01, 2024-07-01, and 2025-07-01, one frozen fit per cut and
-site, and stored the day-ahead predictions for the year after each cut. Refitting would reproduce
-the same numbers, so this experiment reads them. The three winters come from the fits at 2023-07-01,
-2024-07-01, and 2025-07-01, each frozen for its year, so no forecast uses data after its cut.
+**Figure 3 shows why: the plain models are biased, and the filter removes the bias.** The bias is
+the mean signed error over the winter, by substation.
 
-**Five Primaries in every winter.** D5, D10, D11, D14, and D16 only, because D9 has no history at
-the 2023-07-01 cut and GAM-K lacks it in 2024-25. The planned contrasts use these five in all three
-winters, so the winters are comparable. D9 is added to 2025-26 as a labelled sensitivity.
+![Dot chart of mean signed error by substation and winter: the plain models range from −12 to +7
+points, GAM-K stays within ±0.6 points.](figure_3_bias.svg)
 
-**Rows.** An inner join of the three arms on series, forecast origin, and valid time; rows inside
-any arm's switching mask are dropped, as in experiments 107, 109, and 114. No valid time on or after
-2026-07-01 is read.
+## Results
 
-**Statistic.** For each arm and each winter, the mean absolute error of the median forecast is
-averaged over the rows of each local day (all five Primaries pooled), then over the days. The same
-daily means, restricted to the evening peak and to the cold-snap days, give the other two columns.
+Mean absolute error of the median forecast, all November to March days, points of capacity
+(`report.txt` has every table):
 
-**Interval.** The unit of resampling is a block of 7 consecutive calendar days, paired across arms,
-2,000 draws of 95% intervals with a fixed seed. Consecutive days share weather, so a day-level
-bootstrap would be too narrow, and a month-level bootstrap leaves only 5 blocks in a winter. A week
-spans a typical weather spell. A 14-day block is the sensitivity. The interval covers within-winter
-weather and not the difference between years or substations, and there are only three winters.
+| Winter | GAM | GAM-K | Lagless XGBoost | GAM-K minus GAM | GAM-K minus lagless XGBoost |
+|---|---|---|---|---|---|
+| 2023-24 | 6.79 | 3.73 | 6.83 | −3.06 (−3.54 to −2.52) | −3.10 (−3.57 to −2.63) |
+| 2024-25 | 5.97 | 4.14 | 6.14 | −1.83 (−2.47 to −1.28) | −2.00 (−2.60 to −1.46) |
+| 2025-26 | 6.09 | 4.19 | 6.36 | −1.90 (−2.49 to −1.36) | −2.17 (−2.99 to −1.45) |
 
-**How many independent winters.** Three. They are separate weather samples, but consecutive winters'
-fits share part of their 24-month training window, and the two later winters have already been seen
-in the read-only analysis (GAM-K minus GAM −1.83 and −1.64, GAM-K minus lagless XGBoost −2.00 and
-−1.82 on six Primaries). Only 2023-24 is a new test of the hypothesis.
+**Exploratory: cold-snap days.** The coldest 10% of each winter's days (15 days in each winter) by
+daily mean temperature. GAM-K minus the plain model is −3.33 (−3.99 to −2.65), −3.48 (−5.52 to
+−1.65), and −2.11 (−3.92 to −0.66) in the three winters. GAM-K minus lagless XGBoost is −3.47
+(−4.16 to −2.30), −3.26 (−4.53 to −1.33), and −0.99 (−3.03 to +0.29): the 2025-26 interval crosses
+zero. Cold-snap days come in a few spells, so these intervals rest on about 8 blocks and are rough.
 
-**One bias to state.** GAM-K's filter settings (four numbers per substation) were fitted by marginal
-likelihood on the 2023-24 residuals in experiment 114, so 2023-24 is not out of sample for those
-four numbers. The bias favours GAM-K in that winter. The 2024-25 and 2025-26 filter settings are the
-same numbers, fitted a year or two earlier. The write-up shows GAM-K minus GAM in each winter so a
-reader can see whether 2023-24 stands out. Experiment 109's choice of `x_2y` over `x_2yamq` was
-also made on the 2023-24 year, which favours XGBoost there if anything.
+**Exploratory: evening peaks (16:00 to 20:00).** GAM-K minus the plain model is −3.33, −2.09, and
+−2.13 points, and GAM-K minus lagless XGBoost −3.47, −2.17, and −2.45 points. Every 95% interval
+lies wholly below zero (`report.txt`).
 
-Experiment 114's fit script is the only place a fit would live. Because nothing is refitted, the
-Sonnet code review reads that script and experiment 109's to confirm each fit stops at its cut.
+**Post hoc: a sixth Primary.** Adding D9 to 2025-26 gives −1.64 (−2.12 to −1.20) against the plain
+model and −1.82 (−2.48 to −1.23) against lagless XGBoost, as in the earlier analysis. D9 has no
+history at the 2023-07-01 cut, so the other two winters have five substations.
 
-## Planned contrasts
+**Interval choice.** Consecutive days share weather, so a day-level resample would be too narrow,
+and a month-level resample leaves 5 blocks in a winter. A 7-day block spans a typical weather spell.
+A 14-day block gives the same estimates with wider intervals (for example −1.83 (−2.75 to −1.16) in
+2024-25), and the verdict is unchanged. The intervals cover within-winter weather only, not the
+differences between substations or between years.
 
-All six are planned: GAM-K minus GAM, and GAM-K minus lagless XGBoost, each in 2023-24, 2024-25, and
-2025-26, on all winter days. Negative means GAM-K is better. Everything else (cold-snap days,
-evening peaks, D9, the 14-day blocks, the quantile score) is exploratory.
+## Predictions against outcome
 
-## Decision rule
-
-A contrast **meets the bar** if its estimate is at most −1.0 points and its 95% interval lies wholly
-below zero. The 1-point bar is the maintainer's, and it is set by the cost of the filter: GAM-K adds
-a pipeline step over GAM and a different model family over XGBoost, so a gain must be large to pay
-for it. One point is about a fifth of the winter error (4 to 6 points).
-
-- **Supported:** all six contrasts meet the bar.
-- **Partly supported:** 3 to 5 contrasts meet the bar and no contrast has an interval wholly above
-  zero.
-- **Small gain:** at most 2 contrasts meet the bar, all six intervals lie wholly below zero.
-- **Refuted:** any contrast has an interval wholly above zero.
-- **Inconclusive:** anything else.
-
-The rule uses 95% intervals without a multiplicity correction, because "supported" needs all six to
-pass, which is harder than any one passing.
-
-## Predictions
-
-GAM-K minus GAM is −1.0 to −1.8 points and GAM-K minus lagless XGBoost is −1.0 to −2.0 in 2023-24,
-about the size seen in the later winters. The risk is 2023-24: in experiment 107 the best unfiltered
-GAM beat lagless XGBoost by only 0.69 points there (two other winters, 1.55 and 0.73), and the filter
-must add the rest. We put the chance that all six contrasts meet the bar at about 50%, and the
-chance that all six are wholly below zero at about 85%. Cold-snap days: GAM-K ahead in the point
-estimate everywhere but with intervals that cross zero in at least one winter, because a winter holds
-12 to 15 cold-snap days in a few spells. Evening peaks: GAM-K ahead in every winter, as in the
-earlier analysis.
+The plan predicted GAM-K minus the plain model at −1.0 to −1.8 points, and minus lagless
+XGBoost at −1.0 to −2.0, in 2023-24. **The outcome
+was −3.06 and −3.10, outside the predicted range, and the explanation was tested.** In 2023-24 the
+plain models over-forecast by 12.0 points at D10 and by 6.6 at D11 (figure 3), a level shift that
+a frozen fit misses and the filter corrects. Leaving D10 out gives −1.62 (−1.94 to −1.28) against
+the plain model and −1.85 (−2.21 to −1.48) against lagless XGBoost, inside the predicted ranges. The
+plan's other predictions held: the cold-snap interval crosses zero in one winter, and GAM-K is ahead
+on evening peaks in every winter.
 
 ## Checks
 
-To be filled from the printed report: the error of the median forecast beside the quantile-score
-contrasts (trigger 3), leave-one-site-out for each contrast (trigger 4), and which audit triggers
-fired. Substation cards are not needed: no new fitted properties.
+- **Median minus mean forecast:** the stored sets hold 11 quantiles and no mean forecast. As a
+  stand-in, the median minus the mean of the 11 quantiles is between −0.5 and +0.8 points for every
+  arm and winter (`report.txt`).
+- **Quantile score beside the error contrast:** the quantile-score contrasts agree in sign with the
+  mean-absolute-error contrasts in all six cases, for example −2.17 (−2.53 to −1.77) in 2023-24
+  against the plain model.
+- **Leave-one-substation-out:** every contrast in every winter still meets the bar (smallest −1.55,
+  2025-26 against the plain model without D10).
+- **Triggers fired:** trigger 2 only, a result outside the prediction. The explanation above was
+  tested in this write-up, so no audit is called for. Triggers 1, 3, 4, and 5 did not fire. Trigger 6
+  (interval width against a sister experiment) cannot be checked, because no sister experiment
+  scored these rows. Whether a later experiment depends on this result (trigger 7) is for the
+  manager to judge.
+- **Code review:** one Sonnet review of the scoring script found no code change needed. It confirmed
+  that each stored fit stops at its cut, and that every join, mask, and interval is as planned.
+
+## Limitations
+
+- **Settings chosen on the scored winters.** GAM-K's filter settings (four numbers per substation)
+  were fitted on the 2023-24 residuals in experiment 114, and experiment 109 chose its XGBoost
+  variant on 2023-24. The convex model's ridge penalty was tuned on 2024-07 to 2025-06 and its
+  24-month window was chosen on 2023-24 (experiments 104 and 106). The first bias favours GAM-K in
+  2023-24. The ridge and the window favour both convex models over XGBoost in 2023-24 and 2024-25,
+  and cancel in GAM-K minus the plain model.
+- **Past weather.** Every input is observed temperature and CAMS irradiance.
+- **Five substations.** Substation D9 is left out of the planned contrasts, because it has no
+  history before 2024.
+- **Lagless XGBoost** is the weakest of the XGBoost recipes, because it has no recent power.
+- **Quantile score uses stored quantiles,** so the check of the mean forecast is a proxy.
+
+Substation cards are not needed: the experiment fits nothing and has no new fitted properties.
+
+## Plan, written before any result existed
+
+**Hypothesis.** On past weather, GAM-K forecasts Primary demand one day ahead better than both the
+plain convex model and lagless XGBoost in each of the three winters, by at least 1 point of mean
+absolute error.
+
+**Decision rule.** A contrast meets the bar if its estimate is at most −1.0 points and its 95%
+interval lies wholly below zero. The 1-point bar was set by the maintainer, and it reflects what the
+filter adds: GAM-K adds a pipeline step over the plain model and a different model family over
+XGBoost. One point is about a fifth of the winter error. Supported: all six contrasts meet the bar.
+Partly supported: 3 to 5 meet it and none is wholly above zero. Small gain: at most 2 meet it and
+all six intervals lie below zero. Refuted: any interval lies wholly above zero. Inconclusive:
+anything else. The rule uses 95% intervals without a multiplicity correction, because "supported"
+needs all six to pass.
+
+**Size.** Simple. What gets stored: one private scoring table. Serving path: not touched.
+Degradation rule: not touched. More than one defensible design: no, because the arms, cuts, row set,
+and scoring follow experiments 107, 109, and 114. Code whose callers could not be named without
+searching: none. The plan is the first commit of the branch.
+
+**Cold-snap rule (fixed in the plan commit).** In each winter, the coldest 10% of covered days by
+daily mean ERA5 2 m temperature over the five substations, at least 3 days.
+
+**Planned contrasts.** GAM-K minus the plain model, and GAM-K minus lagless XGBoost, each in the
+three winters, on all winter days. Everything else is exploratory.
+
+**Row set.** `dp_mw_v1` at D5, D10, D11, D14, and D16, rows outside the hand-filtered switching
+events, an inner join of the three arms, no valid time on or after 2026-07-01.
 
 ## Reproducing
 
     uv run python ml-experiments/00122-differentiable-physics-three-winter-backtest-gam-k/e00122_report.py
+    uv run python ml-experiments/00122-differentiable-physics-three-winter-backtest-gam-k/e00122_charts.py

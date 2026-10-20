@@ -317,6 +317,44 @@ def _write(*, lines: list[str]) -> None:
     (DATA_DIR / "report.txt").write_text(text)
 
 
+def _leave_one_site_out_lines(*, rows: pl.DataFrame) -> list[str]:
+    """Return the report lines of GAM-K minus each other arm with each site left out in turn."""
+    lines = ["", "Leave-one-site-out, GAM-K minus the other arm on all winter days:", ""]
+    lines += ["| Site left out | GAM | XGBoost |", "|---|---|---|"]
+    for left_out in DECISION_SITES:
+        kept = tuple(site for site in DECISION_SITES if site != left_out)
+        reduced = _daily(rows=rows, sites=kept, column="absolute_error", evening=False)
+        cells = [
+            _format(
+                contrast=_contrast(
+                    daily=reduced, other=other, days=None, block_days=BLOCK_DAYS, seed=SEED
+                )
+            )
+            for other in OTHER_ARMS
+        ]
+        lines.append(f"| {left_out} | " + " | ".join(cells) + " |")
+    return lines
+
+
+def _proxy_lines(*, rows: pl.DataFrame) -> list[str]:
+    """Return the report lines of each arm's median forecast minus the mean of its 11 quantiles."""
+    proxy = (
+        rows.filter(pl.col("site").is_in(DECISION_SITES))
+        .group_by("arm")
+        .agg(proxy=pl.col("median_minus_mean_proxy").mean())
+        .sort("arm")
+    )
+    return [
+        "",
+        (
+            "Median forecast minus the mean of the 11 quantiles (a stand-in for median minus mean "
+            "forecast; the stored sets hold quantiles only): "
+            + ", ".join(f"{row['arm']} {row['proxy']:+.3f}" for row in proxy.iter_rows(named=True))
+        ),
+        "",
+    ]
+
+
 def main() -> None:
     """Score the three winters and print the report."""
     labels = _site_labels()
@@ -334,6 +372,7 @@ def main() -> None:
     ]
     planned: list[tuple[float, float, float, int]] = []
     summary: dict[str, object] = {}
+    numbers: dict[str, dict[str, dict[str, object]]] = {"mae": {}, "contrast": {}, "bias": {}}
     for winter in WINTERS:
         rows = _winter_rows(winter=winter, labels=labels)
         daily = _daily(rows=rows, sites=DECISION_SITES, column="absolute_error", evening=False)
@@ -367,6 +406,11 @@ def main() -> None:
                     part = part.filter(pl.col("day").is_in(selected))
                 return float(np.mean(part["value"].to_numpy()))
 
+            numbers["mae"].setdefault(winter, {})[arm.label] = {
+                "all": mean_of(daily),
+                "cold": mean_of(daily, cold_set),
+                "evening": mean_of(evening),
+            }
             lines.append(
                 f"| {arm.label} | {mean_of(daily):.2f} | {mean_of(daily, cold_set):.2f} | "
                 f"{mean_of(evening):.2f} | {mean_of(quantile):.3f} |"
@@ -385,48 +429,31 @@ def main() -> None:
             )
             planned.append(main_contrast)
             summary[f"{winter}:{other}"] = main_contrast[:3]
-            cells = [
-                _format(contrast=main_contrast),
-                _format(
-                    contrast=_contrast(
-                        daily=daily, other=other, days=cold_set, block_days=BLOCK_DAYS, seed=SEED
-                    )
+            variants = {
+                "all": main_contrast,
+                "cold": _contrast(
+                    daily=daily, other=other, days=cold_set, block_days=BLOCK_DAYS, seed=SEED
                 ),
-                _format(
-                    contrast=_contrast(
-                        daily=evening, other=other, days=None, block_days=BLOCK_DAYS, seed=SEED
-                    )
+                "evening": _contrast(
+                    daily=evening, other=other, days=None, block_days=BLOCK_DAYS, seed=SEED
                 ),
-                _format(
-                    contrast=_contrast(
-                        daily=quantile, other=other, days=None, block_days=BLOCK_DAYS, seed=SEED
-                    )
+                "quantile": _contrast(
+                    daily=quantile, other=other, days=None, block_days=BLOCK_DAYS, seed=SEED
                 ),
-                _format(
-                    contrast=_contrast(
-                        daily=daily,
-                        other=other,
-                        days=None,
-                        block_days=SENSITIVITY_BLOCK_DAYS,
-                        seed=SEED,
-                    )
+                "blocks14": _contrast(
+                    daily=daily,
+                    other=other,
+                    days=None,
+                    block_days=SENSITIVITY_BLOCK_DAYS,
+                    seed=SEED,
                 ),
-            ]
+            }
+            numbers["contrast"].setdefault(winter, {})[other] = {
+                key: list(value[:3]) for key, value in variants.items()
+            }
+            cells = [_format(contrast=value) for value in variants.values()]
             lines.append(f"| {other} | " + " | ".join(cells) + " |")
-        lines += ["", "Leave-one-site-out, GAM-K minus the other arm on all winter days:", ""]
-        lines += ["| Site left out | GAM | XGBoost |", "|---|---|---|"]
-        for left_out in DECISION_SITES:
-            kept = tuple(site for site in DECISION_SITES if site != left_out)
-            reduced = _daily(rows=rows, sites=kept, column="absolute_error", evening=False)
-            cells = [
-                _format(
-                    contrast=_contrast(
-                        daily=reduced, other=other, days=None, block_days=BLOCK_DAYS, seed=SEED
-                    )
-                )
-                for other in OTHER_ARMS
-            ]
-            lines.append(f"| {left_out} | " + " | ".join(cells) + " |")
+        lines += _leave_one_site_out_lines(rows=rows)
         bias = (
             rows.filter(pl.col("site").is_in(DECISION_SITES))
             .group_by("arm", "site")
@@ -446,21 +473,10 @@ def main() -> None:
             arm_bias = dict(
                 bias.filter(pl.col("arm") == arm.label).select("site", "bias").iter_rows()
             )
+            numbers["bias"].setdefault(winter, {})[arm.label] = arm_bias
             cells = [f"{arm_bias[site]:+.2f}" for site in DECISION_SITES]
             lines.append(f"| {arm.label} | " + " | ".join(cells) + " |")
-        proxy = (
-            rows.filter(pl.col("site").is_in(DECISION_SITES))
-            .group_by("arm")
-            .agg(proxy=pl.col("median_minus_mean_proxy").mean())
-            .sort("arm")
-        )
-        lines += [
-            "",
-            "Median forecast minus the mean of the 11 quantiles (a stand-in for median minus mean "
-            "forecast; the stored sets hold quantiles only): "
-            + ", ".join(f"{row['arm']} {row['proxy']:+.3f}" for row in proxy.iter_rows(named=True)),
-            "",
-        ]
+        lines += _proxy_lines(rows=rows)
         if winter == WINTERS[-1]:
             extended = _daily(
                 rows=rows, sites=SENSITIVITY_SITES, column="absolute_error", evening=False
@@ -490,6 +506,7 @@ def main() -> None:
     ]
     _write(lines=lines)
     (DATA_DIR / "planned_contrasts.json").write_text(json.dumps(summary, indent=2))
+    (DATA_DIR / "numbers.json").write_text(json.dumps(numbers, indent=2))
     print("\n".join(lines))
 
 
