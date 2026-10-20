@@ -13,6 +13,7 @@ daily run pooled into 11 mixture quantiles. They differ in the inputs and the st
 | `xlag_z` | 3 | leads to 168 h | zero | the same |
 | `xlag_o` | 3 | leads to 168 h | median label plus the solar offset (offset sites) | the same |
 | `gam_margin` | 3 | leads to 168 h | the DP's forecast, forward-chained | the same |
+| `xlag_o_prod`, `gam_margin_prod` | 3 | leads to 168 h | as `xlag_o`, as `gam_margin` | monthly, 500 rounds, eta 0.05 |
 
 The margin arms refit monthly, not weekly as the plan said, because the plan's compute estimate was
 20 times too low. They train on leads to 168 hours because the DP's forecast covers 168 hours; the
@@ -141,6 +142,10 @@ ARMS: Final[dict[str, Arm]] = {
     "xlag_z": Arm("xlag_z", True, "zero", data.MAX_LEAD_HOURS, 150, 0.15, "monthly"),
     "xlag_o": Arm("xlag_o", True, "offset", data.MAX_LEAD_HOURS, 150, 0.15, "monthly"),
     "gam_margin": Arm("gam_margin", True, "gam", data.MAX_LEAD_HOURS, 150, 0.15, "monthly"),
+    "xlag_o_prod": Arm("xlag_o_prod", True, "offset", data.MAX_LEAD_HOURS, 500, 0.05, "monthly"),
+    "gam_margin_prod": Arm(
+        "gam_margin_prod", True, "gam", data.MAX_LEAD_HOURS, 500, 0.05, "monthly"
+    ),
 }
 
 
