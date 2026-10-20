@@ -220,7 +220,7 @@ differ only in this shift.
 
 **Give a capacity increment only to a season-year with enough training rows (provisional).** A fit
 whose cut is 2024-07-01 includes the half-hour that ends exactly at the cut, which belongs to
-season-year 2024 and leaves that season-year 2 rows at D5. A free capacity increment for those 2 rows
+season-year 2024, so that season-year has only 2 rows at D5. A free capacity increment for those 2 rows
 reached -56 points in an unconstrained fit. The N5 scripts drop any season-year with fewer than 1,000
 training rows from the capacity columns, so the rows count towards the previous season-year's
 capacity ([experiment 113](00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result.md)).
