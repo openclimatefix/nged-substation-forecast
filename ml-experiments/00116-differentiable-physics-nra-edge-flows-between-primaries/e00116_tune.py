@@ -126,7 +126,7 @@ def evaluate(*, config: data_module.FlowConfig, limit: int | None = None) -> dic
 
 def _worker(config: data_module.FlowConfig) -> str:
     """Evaluate one configuration in a worker process and write its result."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     target = result_path(config=config)

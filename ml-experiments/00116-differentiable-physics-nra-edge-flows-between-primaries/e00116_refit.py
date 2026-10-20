@@ -72,12 +72,12 @@ def flow_free_cache(*, cache: FeatureCache, cut_name: str) -> FeatureCache:
 
 def job_path(*, site: str, cut: datetime) -> Any:
     """Return the file a job writes."""
-    return gam.job_path(arm="a4", site=site, cut=cut)  # ty: ignore[invalid-argument-type]
+    return gam.job_path(arm="a4", site=site, cut=cut)
 
 
 def _worker(job: tuple[str, str]) -> str:
     """Refit one substation at one cut in a worker process with one thread."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     cut_name, site = job

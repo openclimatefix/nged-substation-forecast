@@ -139,7 +139,7 @@ def figure_recall_cells() -> alt.TopLevelMixin:
     table = pl.DataFrame(chosen["recall_by_cell"]).with_columns(
         label=pl.col("recall").round(2).cast(pl.String)
     )
-    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(table).encode(
         x=alt.X(
             "duration:N",
             sort=list(inject.DURATION_BANDS_HOURS),
@@ -149,14 +149,14 @@ def figure_recall_cells() -> alt.TopLevelMixin:
             "size:N", sort=list(inject.SIZE_LEVELS), title="Size (MW, or share of receiving load)"
         ),
     )
-    cells = base.mark_rect().encode(
+    cells = base.mark_rect().encode(  # ty: ignore[unresolved-attribute]
         color=alt.Color(
             "recall:Q",
             scale=alt.Scale(domain=[0, 1], range=["#FFFFFF", ocf.DATA_BLUE]),
             legend=alt.Legend(title="Recall", orient="top", direction="horizontal"),
         )
     )
-    text = base.mark_text(fontSize=11).encode(text="label:N")
+    text = base.mark_text(fontSize=11).encode(text="label:N")  # ty: ignore[unresolved-attribute]
     return (cells + text).properties(
         width=WIDTH - 140,
         height=170,
@@ -375,20 +375,20 @@ def _week_frame(*, site: str, week: tuple[str, str], arm: str = "a4") -> pl.Data
     return losses.filter(pl.col("time") > start, pl.col("time") <= stop)
 
 
-def _forecast_panel(*, site: str, week: tuple[str, str], label: str, scale: float) -> alt.Chart:
+def _forecast_panel(
+    *, site: str, week: tuple[str, str], label: str, scale: float
+) -> alt.TopLevelMixin:
     """Draw one week of observed power against the A4 forecast and its 80% and 90% bands."""
     frame = _week_frame(site=site, week=week).with_columns(
         pl.col(["actual", "mean", "q05", "q10", "q90", "q95"]) * scale
     )
-    base = alt.Chart(frame).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("time:T", title=None, axis=alt.Axis(format="%a %d %b"))
-    )
-    band90 = base.mark_area(opacity=0.18, color=ocf.DATA_BLUE).encode(y="q05:Q", y2="q95:Q")
-    band80 = base.mark_area(opacity=0.30, color=ocf.DATA_BLUE).encode(y="q10:Q", y2="q90:Q")
-    forecast = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5).encode(
+    base = alt.Chart(frame).encode(x=alt.X("time:T", title=None, axis=alt.Axis(format="%a %d %b")))
+    band90 = base.mark_area(opacity=0.18, color=ocf.DATA_BLUE).encode(y="q05:Q", y2="q95:Q")  # ty: ignore[unresolved-attribute]
+    band80 = base.mark_area(opacity=0.30, color=ocf.DATA_BLUE).encode(y="q10:Q", y2="q90:Q")  # ty: ignore[unresolved-attribute]
+    forecast = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("mean:Q", title="Power (MW)", scale=alt.Scale(zero=False))
     )
-    observed = base.mark_line(color=DARK, strokeWidth=1.2).encode(y="actual:Q")
+    observed = base.mark_line(color=DARK, strokeWidth=1.2).encode(y="actual:Q")  # ty: ignore[unresolved-attribute]
     event_rows = frame.filter(pl.col("in_event")).with_columns(
         start=pl.col("time") - pl.duration(minutes=30)
     )
@@ -438,6 +438,8 @@ def _flow_panel(
         )
     )
     table = pl.concat(parts).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
+    if float(np.max(np.abs(table["flow"].to_numpy()))) < 0.01:
+        label = f"{label}: no flow above 0.01 MW on any path"
     return (
         alt.Chart(table)  # ty: ignore[unresolved-attribute]
         .mark_line(interpolate="step-after", strokeWidth=1.4)
@@ -459,10 +461,10 @@ def figure_card(*, site: str) -> alt.TopLevelMixin:
     cache = common.load_cache()
     scale = cache.sites[site].table.effective_capacity_mw / 100.0
     return alt.vconcat(
-        _forecast_panel(
+        _forecast_panel(  # ty: ignore[invalid-argument-type]
             site=site, week=WINTER_WEEK, label="Winter week, 1 to 7 December 2025", scale=scale
         ),
-        _forecast_panel(
+        _forecast_panel(  # ty: ignore[invalid-argument-type]
             site=site, week=SUMMER_WEEK, label="Summer week, 1 to 7 June 2026", scale=scale
         ),
         _flow_panel(
@@ -477,6 +479,7 @@ def figure_card(*, site: str) -> alt.TopLevelMixin:
             label="Fitted flows, summer week",
             cache_end=cache.end_times,
         ),
+        _cold_snap_panel(site=site),
     ).properties(
         title=title(
             text=f"Network card for {site} (provisional: past weather, screening run)",
@@ -496,13 +499,13 @@ def _forest(
 ) -> alt.Chart:
     """Draw dots with interval lines for a table of label, estimate, lower, upper, and colour."""
     order = table["label"].to_list()
-    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(table).encode(
         y=alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=300))
     )
-    rule = base.mark_rule(strokeWidth=2).encode(
+    rule = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lower:Q", title=x_title), x2="upper:Q", color=alt.Color("group:N", legend=None)
     )
-    dot = base.mark_point(filled=True, size=70).encode(
+    dot = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
         x="estimate:Q", color=alt.Color("group:N", legend=None)
     )
     zero = (
@@ -524,7 +527,7 @@ def figure_headline() -> alt.TopLevelMixin:
         table=pl.DataFrame(
             [
                 {
-                    "label": "C1: share of injected MW rebuilt (needs 0.5 or more)",
+                    "label": "share rebuilt (needs 0.5)",
                     "estimate": c1["estimate"],
                     "lower": c1["lower"],
                     "upper": c1["upper"],
@@ -607,12 +610,164 @@ def decide_summary_c1() -> dict:
     return decide.c1_summary()
 
 
+def _cold_snap_panel(*, site: str) -> alt.Chart:
+    """Draw A4 minus A0 on the site's cold-snap days (winter days with a daily mean under 2 C)."""
+    losses = pl.read_parquet(common.WORK_DIR / "c2_losses.parquet").filter(
+        pl.col("site") == site, pl.col("cut") == "scored", pl.col("cold_snap"), ~pl.col("in_event")
+    )
+    days = losses["time"].dt.date().n_unique()
+    scores = {
+        arm: float(np.mean(losses.filter(pl.col("arm") == arm)["score"].to_numpy()))
+        for arm in ("a0", "a4")
+    }
+    too_few = days < common.MIN_COLD_SNAP_DAYS
+    label = (
+        f"Cold snap: {days} days (under the {common.MIN_COLD_SNAP_DAYS} needed: too few days)"
+        if too_few
+        else f"Cold snap: {days} days"
+    )
+    table = pl.DataFrame(
+        {
+            "arm": ["A0 (trained on every row)", "A4 (trained with edge flows removed)"],
+            "score": [scores["a0"], scores["a4"]],
+        }
+    )
+    return (
+        alt.Chart(table)  # ty: ignore[unresolved-attribute]
+        .mark_bar()
+        .encode(
+            y=alt.Y("arm:N", title=None, axis=alt.Axis(labelLimit=260)),
+            x=alt.X(
+                "score:Q",
+                title="Day-ahead quantile score on cold-snap days (points; smaller is better)",
+            ),
+            color=alt.Color(
+                "arm:N",
+                scale=alt.Scale(
+                    domain=list(table["arm"]), range=[ocf.DATA_BLUE_LIGHT, ocf.BRAND_ORANGE]
+                ),
+                legend=None,
+            ),
+        )
+        .properties(width=WIDTH - 200, height=60, title=label)
+    )
+
+
+def figure_transfer_weeks() -> alt.TopLevelMixin:
+    """Forecasts around one injected transfer at each gate site."""
+    cache = common.load_cache()
+    rows = pl.read_parquet(common.WORK_DIR / "c3_rows_scored.parquet")
+    table = inject.draw_set(set_name="C3", year_name="scored", cache=cache)
+    present = set(rows["transfer_id"].unique().to_list())
+    panels = []
+    for site in common.GATE_SITES:
+        chosen = (
+            table.filter(
+                pl.col("transfer_id").is_in(present),
+                pl.col("receiver") == site,
+                (pl.col("end") - pl.col("onset")) >= 48,
+            )
+            .sort("transfer_id")
+            .row(0, named=True)
+        )
+        part = rows.filter(
+            pl.col("transfer_id") == chosen["transfer_id"],
+            pl.col("node") == site,
+            pl.col("lead_hours") >= 12.0,
+            pl.col("lead_hours") < 18.0,
+        )
+        scale = cache.sites[site].table.effective_capacity_mw / 100.0
+        frames = []
+        for arm, name in (("a4", "A4 plain filter"), ("a5", "A5 causal flows"), ("or", "Oracle")):
+            arm_rows = part.filter(pl.col("arm") == arm).sort("target")
+            frames.append(
+                pl.DataFrame(
+                    {
+                        "time": cache.end_times[arm_rows["target"].to_numpy()],
+                        "mw": arm_rows["mean"].to_numpy() * scale,
+                        "low": arm_rows["q10"].to_numpy() * scale,
+                        "high": arm_rows["q90"].to_numpy() * scale,
+                        "series": name,
+                    }
+                )
+            )
+        observed = part.filter(pl.col("arm") == "a4").sort("target")
+        frames.append(
+            pl.DataFrame(
+                {
+                    "time": cache.end_times[observed["target"].to_numpy()],
+                    "mw": observed["actual"].to_numpy() * scale,
+                    "low": observed["actual"].to_numpy() * scale,
+                    "high": observed["actual"].to_numpy() * scale,
+                    "series": "Observed (with the injected transfer)",
+                }
+            )
+        )
+        data = pl.concat(frames).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
+        domain = [
+            "Observed (with the injected transfer)",
+            "A4 plain filter",
+            "A5 causal flows",
+            "Oracle",
+        ]
+        lines = (
+            alt.Chart(data)  # ty: ignore[unresolved-attribute]
+            .mark_line(strokeWidth=1.4)
+            .encode(
+                x=alt.X("time:T", title=None, axis=alt.Axis(format="%d %b")),
+                y=alt.Y("mw:Q", title="Power (MW)", scale=alt.Scale(zero=False)),
+                strokeDash=alt.StrokeDash(
+                    "series:N",
+                    scale=alt.Scale(domain=domain, range=[[1, 0], [1, 0], [5, 3], [1, 0]]),
+                    legend=None,
+                ),
+                color=alt.Color(
+                    "series:N",
+                    scale=alt.Scale(
+                        domain=domain, range=[DARK, ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]
+                    ),
+                    legend=alt.Legend(title=None, orient="top", direction="horizontal", columns=2),
+                ),
+            )
+        )
+        band = (
+            alt.Chart(data.filter(pl.col("series") == "A4 plain filter"))  # ty: ignore[unresolved-attribute]
+            .mark_area(opacity=0.2, color=ocf.DATA_BLUE)
+            .encode(x="time:T", y="low:Q", y2="high:Q")
+        )
+        panels.append(
+            (band + lines).properties(
+                width=WIDTH - 60,
+                height=110,
+                title=(
+                    f"{site}: injected transfer of {chosen['size_mw']:.1f} MW "
+                    f"({(chosen['end'] - chosen['onset']) / 2:.0f} hours)"
+                    if chosen["size_mw"] > 0
+                    else f"{site}: injected transfer"
+                ),
+            )
+        )
+    return alt.vconcat(*panels).properties(
+        title=title(
+            text="Forecasts around four injected transfers",
+            subtitle=(
+                "Scored year. For each gate site, the first injected transfer (by identifier) of "
+                "at least 24 hours that moves load onto the site, from the 100-transfer sample. "
+                "Each line is the forecast made 12 to 18 hours ahead; the dashed A5 line lies on "
+                "the plain filter wherever the fit finds no flow. The shaded band is the plain "
+                "filter's 80% band. The transfers were chosen before any score was read."
+            ),
+        )
+    )
+
+
 FIGURES: Final[dict[str, Callable[[], alt.TopLevelMixin]]] = {
     "tuning": figure_tuning,
     "recall_cells": figure_recall_cells,
     "examples": figure_examples,
     "variants": figure_variants,
     "headline": figure_headline,
+    "transfer_weeks": figure_transfer_weeks,
     "fleet": figure_fleet,
     **{
         f"card_{site}": (lambda site=site: figure_card(site=site)) for site in common.DECISION_SITES

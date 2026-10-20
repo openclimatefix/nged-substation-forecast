@@ -35,7 +35,7 @@ RESULT_PATH: Final = common.WORK_DIR / "variants.json"
 
 def run_variant(item: tuple[str, data_module.FlowConfig]) -> dict[str, Any]:
     """Score one variant on the sample and the placebo pairs."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     name, config = item

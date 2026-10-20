@@ -218,7 +218,7 @@ def transfers_dir(*, set_name: str, year_name: str) -> Path:
 
 def _transfer_worker(job: tuple[dict, str, str, bool]) -> str:
     """Run one transfer in a worker process with one thread, and write its file."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     transfer, set_name, year_name, refresh = job
@@ -309,7 +309,7 @@ def run_replica(
 
 def _replica_worker(job: tuple[str, str, int, int, bool]) -> str:
     """Run one replica chunk in a worker process with one thread, and write its file."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     year_name, arm, chunk, n_chunks, own_year = job

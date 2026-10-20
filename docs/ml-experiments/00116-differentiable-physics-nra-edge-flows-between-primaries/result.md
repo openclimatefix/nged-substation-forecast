@@ -6,7 +6,7 @@ part: NRA-A
 theme: differentiable-physics-network
 also_relevant_to: [switching-detectors, switching-labels-in-the-forecast,
   lagged-power-and-error-correction, differentiable-physics-forecast-engine]
-status: planned
+status: done
 size: >-
   complex for the new module studies.dp_edge_flow (own PR, two code reviews, causal window first);
   medium for the scripts. Stored: private files only. Serving path and degradation rules: untouched.
@@ -28,17 +28,247 @@ row_set_id: >-
 metric: >-
   C1 hindsight NRA reconstruction share; C2 quantile score in points outside events at day D+1; C3
   quantile score on injected in-event and 48-hour post-event rows, leads 0.5 to 48 hours
+verdict: inconclusive
+best_arm: >-
+  none: the registered gate failed all seven readings, so no arm is read as better (C2: A4 minus A0
+  -0.003 points, 98.33% interval -0.015 to +0.010, scored year; C3: A5 minus A4 -0.002, -0.026 to
+  +0.017)
+headline: >-
+  Flows fitted to a no-drift convex model's residuals cannot be read as switching: every setting
+  that finds the injected transfers also finds flow between unconnected substations (18 and 29
+  MW-days a year against a limit of 0.05)
+lessons: >-
+  The registered settings find 0.22 of the injected megawatts over 1 day and change no forecast;
+  the loosest post hoc setting finds 0.86 but puts 29 MW-days a year on a pair with no
+  interconnection, so the missing piece is a drift term or a topology check, not a better penalty.
+take_home_message: >-
+  Flows fitted to a convex demand model's residuals cannot be read as load transfers: every setting
+  that finds injected transfers also finds opposite-signed slow drifts between substations that are
+  not connected (18 and 29 MW-days a year on two such pairs, against a limit of 0.05). With the
+  registered settings the fit finds under a quarter of the injected megawatts and changes no
+  forecast, so the verdict is inconclusive. A drift term in the demand model, or a topology check on
+  candidate flows, is the next step to test.
+advice:
+  - >-
+    Do not read edge flows fitted to a no-drift model's residuals as switching evidence; add a
+    drift term or a topology check first (gate reading 4 and the post hoc variants).
+  - >-
+    Score any flow detector on pairs with no interconnection as well as on injected transfers,
+    because recall alone rewards a detector that fits slow drift (gate reading 4).
+  - >-
+    Do not tune a flow penalty to the placebo limit and the recall together without a drift term:
+    at every setting tried, recall above 0.5 came with 17 to 30 MW-days on the placebo pairs
+    (tuning grid).
+  - >-
+    Keep the day-ahead forecast of the Primaries trained on all rows: removing the (nearly empty)
+    fitted flows from training changed the quantile score by under 0.02 points (C2).
+  - >-
+    Score a normal-running forecast against a truth that excludes real switching, or the removal of
+    a real flow will look like a loss (gate reading 5).
 production_status: not-for-production
 code: ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/
+date: 2026-10-20
+pr: 1399
 ---
 
-**Status: planned. No fit has run.** This page is the plan, committed before any result exists.
+**Flows fitted to a convex demand model's residuals cannot be read as load transfers.** Every
+setting that finds injected transfers also finds flow between substations that have no
+interconnection: the loosest variant recovers 0.86 of the injected megawatts over 1 day, and puts 18
+and 29 MW-days a year on the two tuning pairs with no link, against a limit of 0.05 MW-days. The two
+pairs soak up the opposite-signed slow drifts that a demand model with no drift term leaves in its
+residuals. With the settings registered before any fit, the fit finds 0.22 of the injected megawatts
+over 1 day and changes no forecast, so all seven readings of the known-answer gate fail and the
+verdict is `inconclusive`. A drift term in the demand model, or a topology check on candidate flows,
+is the next step to test; this page proposes it and does not commit the project to it.
+
+We asked whether load that the network operator moves between two neighbouring Primary substations
+ can be found from the half-hourly power
+readings alone. The method fits a flow for each interconnection between two substations to the
+residuals of a convex demand model (the model's forecast error), with a penalty that keeps flows
+constant for hours. We checked it by adding known transfers of load between two substations to the
+real residuals (400 per set, on two interconnected pairs, D5–D16 and D10–D11) and asking how much of
+the moved power the fit found again, whether it found flow between pairs with no interconnection,
+and whether removing the flows from the training data or adding them back to the forecast changed
+the day-ahead error. It did not pass: the settings that find transfers also find false ones, and the
+settings that avoid false ones find almost nothing.
+
+## Figures
+
+![Two injected transfers and the flows the fit finds, hindsight fit on the tuning year](examples.svg)
+
+![Recall against flow on unconnected pairs, every configuration](tuning.svg)
+
+![Recall of the chosen configuration by transfer size and duration](recall_cells.svg)
+
+![Post hoc variants: recall over one day against flow on the unconnected pairs](variants.svg)
+
+![The three planned contrasts with 98.33% intervals, winter breakdowns included](headline.svg)
+
+![Forecasts around four injected transfers in the scored year](transfer_weeks.svg)
+
+![Where the registered fit puts flow, by edge](fleet.svg)
+
+## Results
+
+**The gate.** The registered configuration (half-hourly flows, step constant 300, level constant 0,
+Huber threshold 1.5 noise scales) was chosen on 400 tuning transfers by the largest recall with
+under 0.05 MW-days of flow on each tuning pair. The gate then read 400 other transfers in the tuning
+year. All readings failed:
+
+- moved-MW ratio, the median over transfers of the fitted mean flow over the true mean flow: 0.05
+  (needs 0.8 to 1.25);
+
+- release, the share of found transfers whose causal flow is under 20% of the moved MW at the
+  deadline: 0 (needs 0.5);
+
+- recall: 0.22 over 1 day (needs 0.77), 0.10 for 6 to 24 hours (needs 0.5), and 0.46 over 1 day on
+  the realistic set (needs 0.5);
+
+- placebo in the replicate year: 0.0 MW-days on D5–D11 and 2.9 on D16–D10 (needs under 0.05 each);
+
+- normal-running gap: the forecast with the causal flows removed has a mean absolute error of 7.07
+  points against 5.82 for the plain filter and 3.76 for the oracle (the share of the gap closed is
+  -0.60, needs 0.5). The first run of this reading, 7.28 points and -0.71, removed each substation's
+  outside path as well as its edge flows by mistake; it was corrected and re-run, and both runs are
+  on file.
+
+**C1, the hindsight reconstruction.** The edge flows rebuild 0.25 (98.33% interval 0.18 to 0.26) of
+the injected megawatts on 400 realistic transfers, against a requirement of at least 0.5 with the
+lower end above 0.25. Models trained on the injected history forecast the clean scored year with
+mean absolute errors of 5.82 (as trained), 5.79 (flows removed), and 5.78 points (oracle mask):
+transfers of up to a fortnight barely move a model with no drift.
+
+**C2, no harm outside events.** Training with the edge flows removed (A4) scores 2.258 points
+against 2.262 for training on every row (A0) in the scored year: the difference is -0.003 (-0.015 to
++0.010), and in the replicate year it is +0.007 (-0.002 to +0.018). Both upper ends are under the
+0.05 margin, so C2 passes, but the flows are nearly empty, so this shows only that removing almost
+nothing changes almost nothing. Dropping the hand-filtered events (A1) changes the score by -0.000
+(-0.006 to +0.005) in the scored year.
+
+**C3, causal flows in the forecast.** On a sample of 100 injected transfers per year, A5 (A4's fit
+with causal flows) minus A4 is -0.002 (-0.026 to +0.017) in the scored year and -0.007 (-0.033 to
++0.020) in the replicate year; it needs -0.5 or lower. The oracle, which knows the true flow, scores
+4.02 points better than A4 in the scored year (-4.02, -4.69 to -3.12) and 4.46 points in the
+replicate year, so a correct flow would matter a great deal: scaled by the 4.5% of rows that lie
+inside hand-filtered events, the oracle gain is 0.18 points on all rows. A5 closes 0.0004 of the
+gap. A5 minus A4 on real rows outside events is -0.0003 (scored) and +0.017 (replicate); the limit
+is +0.03.
+
+**Post hoc variants (exploratory, chosen after the gate failed; the verdict does not use them).** On
+100 gate transfers of 25% and 40% of the receiving load: registered penalties with a Huber threshold
+of 10 noise scales give recall 0.35 over 1 day; step constant 10 and level constant 0.3 give 0.69
+over 1 day with 28.6 MW-days on D16–D14; adding the larger Huber threshold gives 0.70 and 43.7; step
+constant 3, level constant 0, and the larger threshold give recall 0.86 over 1 day, 0.74 for 6 to 24
+hours, a moved-MW ratio of 0.79, and 18.4 and 29.5 MW-days on the two pairs.
+
+**Real transfers (descriptive, no verdict role).** Three of the eight hand-filtered events on the
+two gate edges fall in a year with hindsight flows. The registered fit puts a mean flow of 1.19 MW
+on the edge over a 371-hour event that the labeller put at 1.5 MW, 0.10 MW over a 5.5-hour event
+labelled 2.8 MW, and nothing over a 101-hour event labelled 0.8 MW.
+
+## Winter
+
+**Winter results.** Winter is November to March, a cold-snap day has a UTC-day mean ERA5 temperature
+under 2 °C, and an evening peak ends between 16:30 and 20:00 UTC; the rules were fixed before any
+score was read. C2 on winter rows: A4 minus A0 is -0.001 (-0.026 to +0.020) in the scored year and
++0.010 (-0.005 to +0.024) in the replicate year. On cold-snap days (10 days scored, 20 replicate) it
+is +0.026 (-0.028 to +0.155) and +0.015 (-0.007 to +0.064), and on evening peaks -0.005 (-0.035 to
++0.025) and +0.009 (-0.010 to +0.032). No arm loses in winter by more than the intervals, which are
+wide on cold-snap days; no arm is proposed for production, so none is held back. C3 on winter rows:
+A5 minus A4 is -0.010 (-0.027 to +0.044) in the scored year (28 transfers, which is too few) and
++0.006 (-0.006 to +0.039) in the replicate year (37 transfers). The evidence holds two independent
+winters (2024-25 and 2025-26); the 2023-24 winter was used for tuning and the gate. The two series
+labelled G-c have no winter in the data, and the injected transfers give no winter result at G-c.
+
+## Checks and bullets
+
+- **Arms.** A0: convex model (24-month window, no drift, pinned capacity) trained on every row. A1:
+  the same with the hand-filtered events dropped. A4: A0 refitted on power minus the edge flows of
+  the tuning and replicate years. A5: A4 with flows refitted causally at each origin on the trailing
+  30 days and added back with a Kaplan–Meier decay. Oracle: the true flow removed and added back.
+
+- **Rows and scoring.** 13 to 14 Primaries with data at each cut; scoring sites D5, D10, D11, D14,
+  D16, with D9 beside them; quantile score in points of effective capacity, rows outside
+  hand-filtered events; filter hyperparameters fitted on the tuning year; spreads from each arm's
+  own run over the year before. C3 rows are origins every 6 hours from 6 hours before a transfer to
+  48 hours after its end, leads 0.5 to 48 hours, both ends of the transfer.
+
+- **Tails.** Scored year, rows outside events, day ahead: coverage at q01, q05, q95, q99 is 0.015,
+  0.053, 0.941, 0.983 for A0 and 0.015, 0.053, 0.941, 0.983 for A4; pinball loss at q01 and q99 is
+  0.173 and 0.183 (A0) and 0.173 and 0.183 (A4). On injected-transfer rows the plain filter's q01
+  coverage is 0.124 and q99 coverage 0.872 (nominal 0.01 and 0.99), and the oracle's are 0.014 and
+  0.983.
+
+- **Checks.** The median forecast equals the mean forecast at every site by construction, because
+  the spread is centred on its median (difference 0.000). The mean-forecast error beside each
+  quantile-score contrast agrees in sign for every C2 contrast outside events (-0.007 and +0.009
+  against -0.003 and +0.007 in the scored and replicate years). The plumbing controls pass: the
+  module's 42 tests, causality of the causal fit (exact), A5 with zero flows equal to the plain
+  filter (difference 0), the same fits with the label file emptied or the power after the cut
+  changed (difference 0), noise scales from pre-cut rows (difference 0), and 66 hand-filtered events
+  (35 conserved, 31 one-sided).
+
+- **Audit triggers.** Trigger 1 fired (the gate failed) and trigger 2 fired (C1 and the gate recall
+  are far below the predicted 0.55 to 0.85 and 0.8 to 0.95); an Opus audit is needed before the
+  merge. Triggers 3 to 7 did not fire: the C2 and C3 contrasts are inside their intervals, so a
+  leave-one-out check would only move noise.
+
+- **Deviations from the plan.** C3 ran on a 100-transfer sample per year (seeds 0 to 12) instead of
+  400, because the registered flows are nearly empty and the gate had failed. Injected transfers are
+  fitted as neighbourhoods (the paths at the two ends, on a window of 3 days either side) instead of
+  as whole-year fits. Realistic transfers last at most 14 days. Replica spreads use the 09:00 UTC
+  origin of every third day. The step-size rule for outside paths takes the node's first edge by
+  name. A5 takes out edge flows only. C1 and the gate readings use the replicate and tuning years'
+  frozen fits. The exploratory arms (demand-shaped shares, S = 1, a larger outside factor, the
+  MVA rescale, and the sensitivity with G-c) were not run, because the registered gate failed.
+
+- **Module.** Tuning, the gate's first run, and the 400 tuning-year transfer runs used
+  `studies.dp_edge_flow` at commit 6a57d0944; C1, C2, the replicate- and scored-year flows, the
+  replicas, and C3 used commit abaac6097 (the Sonnet review's fixes). The Opus reviews of the module
+  had not run when this page was written.
+
+- **What to try next (proposal only).** Add a slow drift term per substation to the convex model
+  before fitting flows, and compare flows on connected and unconnected pairs again; or accept a
+  candidate flow only where the topology says the two substations are connected and the residuals
+  move oppositely over days. The oracle's 4-point gain on injected rows says the payoff of a correct
+  flow is large; the problem is finding it.
+
+- **Privacy and links.** Substations are shown by D-label; the two generator-carrying series are not
+  shown. Plan and scripts are in [pull request
+  1399](https://github.com/openclimatefix/nged-substation-forecast/pull/1399). The module is in
+  [pull request 1400](https://github.com/openclimatefix/nged-substation-forecast/pull/1400). The
+  numbers on this page are printed by `e00116_report.py`.
+
+## Substation cards (provisional)
+
+**Provisional: fitted to past weather on a screening run.** Each card shows two weeks fixed before
+any score was read, the first full weeks of December 2025 and June 2026: the day-ahead forecast of
+A4 with its 80% and 90% bands against the observed power, hand-filtered events shaded, the hindsight
+flows on the substation's edges and its outside path, and how A4 and A0 score on cold-snap days
+(with the day count, and "too few days" where there are under 10). The cards name each substation's
+interconnected partners as pairs and show no other topology. The flows are small because the
+registered penalties are stiff.
+
+![Network card for D5](card_D5.svg)
+
+![Network card for D10](card_D10.svg)
+
+![Network card for D11](card_D11.svg)
+
+![Network card for D14](card_D14.svg)
+
+![Network card for D16](card_D16.svg)
+
+## The plan, as registered
+
+The sections below are the plan committed before any fit, with the tuning result and the predicted
+gate failure recorded before the gate ran. They are kept as registered.
 
 **This plan's PR creates the Network theme** (stub pages, a navigation entry under "Differentiable
 physics", a pointer in the two switching themes' `plan.md`). One id, one PR for plan and result;
 the module has its own PR off `main`.
 
-## What experiment A asks, and what the data allow
+### What experiment A asks, and what the data allow
 
 **Experiment A is a switching-and-NRA experiment, not a mean-forecast experiment.** A perfect
 detector was worth 0.42% of the best guess's score ([experiment
@@ -63,7 +293,7 @@ moved MW by day 2, all but 0.004 released within 3 days), so a causal flow can a
 transfer's first day, the two days after it ends, and transfers under a day. C3 is built around
 those rows.
 
-## The base model and the graph
+### The base model and the graph
 
 **GAM-K is [experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s decision form,
@@ -87,7 +317,7 @@ script), with one G-c series given a convex fit (drift D1, fitted capacity) on i
 its triangles are checked for circulations in P2. The script commits the edge counts before any
 residual is read.
 
-## Arms
+### Arms
 
 | Arm | GAM | Flows | Filter |
 |---|---|---|---|
@@ -173,7 +403,7 @@ supply the real-data flows that A4 removes and the run lengths for S. An injecte
 to the frozen fit's residuals, which is exact for a fit that did not train on the injected rows; C1
 is the exception, and refits A0 on the injected history.
 
-## Years, rows, and the tuning split
+### Years, rows, and the tuning split
 
 | Period | Cut | Role |
 |---|---|---|
@@ -196,7 +426,7 @@ the keys, `q01` to `q99`, `actual`, `lead_hours`, `level`, `anomaly`, `flow`, an
 Spread: `LeadSpread` at day D+1; for C3 a lead-hours spread fitted on the replica through each arm's
 own pipeline.
 
-## Plumbing controls and the known-answer gate
+### Plumbing controls and the known-answer gate
 
 **Plumbing controls run first; an unfixable failure makes the verdict `inconclusive`:**
 
@@ -236,7 +466,7 @@ valid time, so the 6-hour allowance includes the 3.5-hour delay.
 **Reported, not blocking:** reading 1 on in-sample residuals (injections in the 2023-07-01 cut's
 window, GAM refitted); MW–MVA power curves; one-sided injections at D11 and D16.
 
-## Winter breakdown
+### Winter breakdown
 
 **Winter matters most, so every contrast is also read on winter rows.** The best model reaches
 production in about a month, and the network operator first sees it in winter. Three winter scopes
@@ -255,7 +485,7 @@ carries the gate only, since A4 equals A0 there. Injected transfers are placed a
 so the winter subset of C3 holds about 5 of the 12 months of each year's transfers, from the same
 two winters. The two series labelled G-c have no winter in the evidence, and the page says so.
 
-## Planned contrasts
+### Planned contrasts
 
 **Three contrasts, Bonferroni-corrected (98.3% intervals from `studies.bootstrap`, resampling whole
 calendar months within each seed with seeds pooled, paired across arms), each with site counts,
@@ -292,7 +522,7 @@ here). **Comparators:** every arm, climatology, `manual_heuristic`, and [experim
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s GAM-K (2.800)
 and BG2 (2.780) on ENS.
 
-## Tuning result, recorded before the gate runs
+### Tuning result, recorded before the gate runs
 
 **The registered choice rule picked a configuration that finds little of the injected megawatts.**
 Tuning ran on the 400 transfers of seeds T and the two tuning placebo pairs (module commit
@@ -310,7 +540,7 @@ verdict at `inconclusive`. The gate runs exactly as registered and its first run
 Any variant run afterwards, such as a larger Huber threshold or a looser step constant that ignores
 the placebo limit, is labelled post hoc and exploratory, and cannot change the verdict.
 
-## Predictions
+### Predictions
 
 Written before any fit; each line can fail, and none overrides the decision rule.
 
@@ -325,7 +555,7 @@ Written before any fit; each line can fail, and none overrides the decision rule
 - **Other:** A3 beats A2 on donor-shaped injections only; S = 1 loses most of C3's post-event gain;
   A4's receiver q99 exceedance inside transfers is 3 to 10 times nominal, and A5 halves it.
 
-## Decision rule
+### Decision rule
 
 **The gate first, then C1, C2, and C3; C2 and C3 must hold in the replicate year too.**
 
@@ -341,7 +571,7 @@ Written before any fit; each line can fail, and none overrides the decision rule
 
 **The verdict rests on injected transfers only; real events never enter it.**
 
-## Substation cards and privacy
+### Substation cards and privacy
 
 **Each decision site's card gets a "network" panel:** hindsight and causal flows with labelled
 events shaded, the g path, S, and A4's NRA forecast for a winter and a summer week. Edges are
@@ -355,7 +585,7 @@ beside a D-label, name, or identifier; no dates; day counts on axes; own-capacit
 The page may name interconnected D-label pairs, but no substation names and no other topology (no
 supply-point membership, no unmetered partners, no edge counts per named site).
 
-## Audit before merge: the seven triggers
+### Audit before merge: the seven triggers
 
 1. **A control fails:** any plumbing control or gate reading.
 2. **A contradiction:** C3 beyond the oracle; real-event recall above injected recall at the same
@@ -370,7 +600,7 @@ supply-point membership, no unmetered partners, no edge counts per named site).
 
 "Checks" bullets: median minus mean forecast per site and arm, mean error beside each contrast.
 
-## Module, run order, compute, and open questions
+### Module, run order, compute, and open questions
 
 **Module `studies.dp_edge_flow` (own PR, two reviews, green tests):** graph builder, path
 solver and ADMM fallback, block means, block-coordinate descent, stitched causal fit, Kalman

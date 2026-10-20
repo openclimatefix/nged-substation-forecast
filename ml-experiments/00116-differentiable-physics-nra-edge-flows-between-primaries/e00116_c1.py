@@ -215,7 +215,7 @@ def run_seed(*, seed: int) -> pl.DataFrame:
 
 def _worker(seed: int) -> str:
     """Run one seed in a worker process with one thread, and write its file."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     target = RESULT_DIR / f"seed_{seed:02d}.parquet"

@@ -80,7 +80,7 @@ def _setup(*, cut_name: str) -> None:
 
 def local_readings(job: tuple[dict, str, bool]) -> dict[str, Any]:
     """Fit one transfer's neighbourhood and return its hindsight reading and its release test."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     transfer, cut_name, with_release = job
