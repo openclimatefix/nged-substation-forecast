@@ -39,7 +39,7 @@ take_home_message: >-
   only by size, by giving each substation a mix of a few shared daily shapes instead of one
   fleet-mean profile.
 date: 2026-10-20
-pr: 0
+pr: 1410
 adopted_in: none
 advice:
   - >-
