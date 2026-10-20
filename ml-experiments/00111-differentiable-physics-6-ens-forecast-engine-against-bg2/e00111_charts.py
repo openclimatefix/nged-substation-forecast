@@ -286,12 +286,30 @@ def figure_calibration() -> alt.TopLevelMixin:
     )
 
 
+GATE_LABELS: Final[dict[str, str]] = {
+    "worst relative error of the recovered temperature shift": "1 temperature shift recovered",
+    "worst relative error of the recovered irradiance ratio (expected 1.25)": (
+        "1 irradiance ratio recovered"
+    ),
+    "largest MAE difference, calibrated fake against ERA5 and CAMS (points)": (
+        "1 calibrated fake matches ERA5 and CAMS"
+    ),
+    "share carried by the end of day 2": "3 transfer carried by end of day 2",
+    "share carried from day 2 to the end": "3 transfer carried until its end",
+    "share left 3 days after the end": "3 transfer left 3 days after its end",
+    "margin error on earlier runs over error on the tuning months' runs": (
+        "4 margin error, earlier over tuning runs"
+    ),
+    "pytest exit code": "5 module tests pass (exit code)",
+}
+
+
 def figure_gate() -> alt.TopLevelMixin:
     """The known-answer gate's readings as pass or fail dots."""
     gate = json.loads((common.WORK_DIR / "gate.json").read_text())
     rows = [
         {
-            "check": f"{c['test']}: {c['check']}"[:78],
+            "check": GATE_LABELS.get(c["check"], c["check"]),
             "value": c["value"],
             "limit": c["limit"],
             "passed": "passed" if c["passed"] else "failed",
@@ -359,7 +377,11 @@ def figure_tails(*, data: dict) -> alt.TopLevelMixin:
     zero = alt.Chart(table).mark_rule(color=GREY, strokeDash=[4, 3]).encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
     return (
         (zero + chart)
-        .facet(row=alt.Row("lead_band:N", title=None))
+        .facet(
+            row=alt.Row(
+                "lead_band:N", sort=["0-24 h", "24-48 h", "48-144 h", "144-168 h"], title=None
+            )
+        )
         .properties(
             title=_title(
                 text="Tail calibration of every arm",
