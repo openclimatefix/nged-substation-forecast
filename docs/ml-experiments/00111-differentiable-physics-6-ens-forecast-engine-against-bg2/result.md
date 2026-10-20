@@ -57,7 +57,7 @@ lessons:
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-20
-pr: 1389
+pr: 1394
 take_home_message: >-
   With real ensemble weather forecasts as input, the physics-based demand model with a filter on
   its recent errors forecast seven days ahead about as well as the production recipe at five
