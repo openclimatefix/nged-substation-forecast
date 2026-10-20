@@ -115,7 +115,13 @@ def check_signs(*, cache: FeatureCache, base: design.BaseFit, site: str, label: 
             cache=cache, site=site, index=base.index, arm=arm, cut=base.cut
         )
         x = design.arm_matrix(
-            cache=cache, layout=base.layout, site=site, index=base.index, x0=base.x0, arm=arm
+            cache=cache,
+            layout=base.layout,
+            site=site,
+            index=base.index,
+            x0=base.x0,
+            arm=arm,
+            cut=base.cut,
         )
         penalty = design.penalty_for(cache=cache, base=base, arm=arm, x=x)
         n_added = block.shape[1]
