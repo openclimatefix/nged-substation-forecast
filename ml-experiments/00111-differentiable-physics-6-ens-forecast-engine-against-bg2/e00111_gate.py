@@ -72,8 +72,6 @@ TRANSFERS_PER_SITE: Final[int] = 4
 CLEARANCE_HALF_HOURS: Final[int] = 96
 STEPS_PER_DAY: Final[int] = 48
 MARGIN_TOLERANCE: Final[float] = 0.20
-PROXY_WARM_UP_RUNS: Final[int] = 9
-"""Runs before this index lack a week of analysis proxy before their origin."""
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 MODULE_TESTS: Final[tuple[str, ...]] = (
     "packages/studies/tests/test_dp_ens.py",
@@ -451,7 +449,7 @@ def test_four(*, cache: FeatureCache) -> list[dict]:
             period = common.period_of_run(run=run_date)
             if period not in {"warm_up", "tuning"} or key >= (2025, 6):
                 continue
-            if index % 3 or index < PROXY_WARM_UP_RUNS:
+            if index % 3 or index < common.PROXY_WARM_UP_RUNS:
                 continue
             result = member_means(
                 cache=cache,

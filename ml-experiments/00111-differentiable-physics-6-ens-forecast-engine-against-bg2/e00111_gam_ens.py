@@ -30,7 +30,6 @@ import e00111_fits as fits_module
 import numpy as np
 import torch
 from studies.dp_calendar import CalendarColumns
-from studies.dp_ens import choose_fit  # noqa: F401
 from studies.dp_ens_weather import HORIZON_HALF_HOURS, RunWindow
 from studies.dp_features import FeatureCache, SiteFeatures
 from studies.dp_gam import TrainingWindow, fit_gam, prepare_fit
@@ -38,8 +37,6 @@ from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
 CUT: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
 ARM: Final[str] = "gamens"
-FIRST_RUN_INDEX: Final[int] = 9
-"""Runs before this index lack a week of analysis proxy before their origin."""
 
 
 def expanded_cache(*, cache: FeatureCache, setup: ens.SiteSetup, cut: datetime) -> FeatureCache:
@@ -56,7 +53,7 @@ def expanded_cache(*, cache: FeatureCache, setup: ens.SiteSetup, cut: datetime) 
     site = setup.site
     windows: list[FeatureCache] = []
     for index, run in enumerate(setup.runs):
-        if index < FIRST_RUN_INDEX or setup.origins[index] >= cut:
+        if index < common.PROXY_WARM_UP_RUNS or setup.origins[index] >= cut:
             continue
         if len(cache.end_times) - run.origin_position - 1 < HORIZON_HALF_HOURS:
             continue

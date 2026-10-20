@@ -154,10 +154,16 @@ contrast (C3) showed no gain.
 - **XGBoost arms.** X-nl is SIMP1's no-lag monthly recipe (500 rounds, eta 0.05, half-life 0.5
   years), reused for the scored year from SIMP1's stored refits after one refit at D10 reproduced
   within -0.003 points of quantile score, and refitted here for the 12 tuning and replicate months.
+  X-nl is SIMP1's raw refit, with no spread factor: SIMP1's stored `p_nl_monthly` widens its
+  quantiles by 1.15 and scores 3.110 against 3.088 here.
   X-nl+K adds the same Kalman filter, fitted on X-nl's 24-hour block residuals. Xlag-d is the lagged
   member with three origin lags, GAM-margin is Xlag-d with the DP's forward-chained forecast as the
   base margin, both refitted monthly at 150 rounds and eta 0.15 on leads up to 168 hours. X-nl-z and
   X-nl-o (zero start; median plus experiment 64's solar offset) ran for the scored year only.
+- **Predictions** are stored in the experiment store, one set per arm and period (`<arm>_scored` and
+  `<arm>_replicate`), in points of effective capacity with the 11 quantiles, the observed power, the
+  lead, and a switching-event flag; the filter arms add the filter's level and transient, and
+  GAM-margin adds the DP's margin.
 - **Rows.** 464,358 half-hours shared by the arms of C1 at the five decision substations in the
   scored year; D9 is scored beside them in the 6-substation rows; D18 is descriptive and enters no
   contrast.
@@ -307,8 +313,11 @@ from day 2 to the end, and 0.000 three days after the end (16 transfers at D10, 
 the margin's error on earlier runs was 0.98 of its error on the tuning months' runs; and the module's
 tests passed (Figure 8). The recovery readings are exact (0.000) because the fake's member noise has
 zero mean across the 51 members, so they check the indexing and the arithmetic and not the
-calibration's response to noise, and the calibrated fake's error differed from ERA5's by 0.049
-against a limit of 0.05.
+calibration's response to noise. The calibrated fake's error differed from ERA5's by 0.049 against
+a limit of 0.05, and that reading compares mean absolute errors where the plan says quantile
+score, with the real ensemble's analysis proxy kept in the noise-free fake. Test 4 is a stability
+check, not a leakage check: it compares margin errors by period and cannot catch a leak in the
+training join, and it omits the replicate months.
 
 ## Departures from the plan
 
@@ -319,7 +328,8 @@ against a limit of 0.05.
   ran for the scored year only; the placebo margin, the zero-start lagged arm, GAM-K-w, GAM-K-fc,
   and the tuning-month choice among start rules were not run, so X-bar is X-nl with its default
   start; and C5, the like-for-like comparison with BG2, was not run because C3 showed no gain. The
-  XGBoost jobs logged 7.88 job-hours, plus the early refits, which were not logged.
+  XGBoost jobs logged 7.88 job-hours (including about 0.02 job-hours of smoke jobs), plus the
+  early refits, which were not logged.
 - **Implementation.** No `WeatherInputLayer` was filled (the pooled arms did not run). The PV shape
   is not derated by the member's temperature in the weather layer, because the convex model derates
   it itself. A member with a missing shortwave value is dropped from its run at that site (member 36
@@ -328,6 +338,19 @@ against a limit of 0.05.
   omit the last two weeks of June 2025, which experiment 87's anomaly table lacks. The filter's
   hyperparameters were fitted in one round, with Part 4's fitted prior, not by the plan's
   empirical-Bayes rounds. The "all rows" robustness row was not run.
+- **The XGBoost arms' spread was not tuned,** where the plan tunes a factor per arm on the tuning
+  months. The code review found that even the best factor chosen on the scored year would gain at
+  most 0.004 points, so C1 and C2 are unaffected.
+- **Xlag-bar is Xlag-d,** fixed in advance of the margin results, where the plan chose it among Xlag-d,
+  Xlag-o, and Xlag-z on the tuning months. Xlag-o minus Xlag-d is -0.003, and C3 against Xlag-o
+  would be -0.020.
+- **X-nl+K at D10 in July 2025** uses this experiment's own reproduction refit and not SIMP1's (an
+  effect of about 0.003 points).
+- **The offset arms use held capacity.** X-nl-o, and the offset start in general, take experiment
+  64's held capacity for training and prediction rows alike, and not experiment 87's real-time
+  capacity vintages.
+- **The tails table** is on each arm's own rows and not on shared rows, and holds no
+  threshold-weighted CRPS; curtailment cost was not computed.
 - **D18.** SIMP1's refit with D18's commissioning months cut is the source of D18's X-nl rows;
   D18 enters no contrast.
 
@@ -382,11 +405,23 @@ uv run python ml-experiments/00111-*/e00111_store.py
 uv run python ml-experiments/00111-*/e00111_fits.py
 uv run python ml-experiments/00111-*/e00111_tune.py
 uv run python ml-experiments/00111-*/e00111_drift.py
+uv run python ml-experiments/00111-*/e00111_fits.py --arms gam0
+uv run python ml-experiments/00111-*/e00111_tune.py --spread-arms gam0
 uv run python ml-experiments/00111-*/e00111_gate.py
 uv run python ml-experiments/00111-*/e00111_dp_run.py
 uv run python ml-experiments/00111-*/e00111_gam_ens.py
 uv run python ml-experiments/00111-*/e00111_xgb.py --arm xnl --before 2025-07-01
+for arm in xlag_d gam_margin; do
+  uv run python ml-experiments/00111-*/e00111_xgb.py --arm $arm
+done
+for arm in xlag_o xnl_z xnl_o; do
+  uv run python ml-experiments/00111-*/e00111_xgb.py --arm $arm --first 2025-07-01
+done
 uv run python ml-experiments/00111-*/e00111_xnl_k.py
 uv run python ml-experiments/00111-*/e00111_report.py
+uv run python ml-experiments/00111-*/e00111_report.py --periods replicate
+uv run python ml-experiments/00111-*/e00111_report.py --periods replicate \
+  --months 2025-02 2025-04 2025-06
+uv run python ml-experiments/00111-*/e00111_predictions.py
 uv run python ml-experiments/00111-*/e00111_charts.py
 ```

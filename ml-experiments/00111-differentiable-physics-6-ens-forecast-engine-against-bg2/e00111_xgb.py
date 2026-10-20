@@ -13,7 +13,6 @@ daily run pooled into 11 mixture quantiles. They differ in the inputs and the st
 | `xlag_z` | 3 | leads to 168 h | zero | the same |
 | `xlag_o` | 3 | leads to 168 h | median label plus the solar offset (offset sites) | the same |
 | `gam_margin` | 3 | leads to 168 h | the DP's forecast, forward-chained | the same |
-| `*_prod` | 3 | leads to 168 h | `xlag_o` and `gam_margin` again | monthly, 500 rounds, eta 0.05 |
 
 The margin arms refit monthly, not weekly as the plan said, because the plan's compute estimate was
 20 times too low. They train on leads to 168 hours because the DP's forecast covers 168 hours; the
@@ -48,7 +47,6 @@ import numpy as np
 import polars as pl
 import xgboost as xgb
 from studies.dp_ens import margin_frame
-from studies.dp_ens_weather import lead_band_of_hours  # noqa: F401
 from studies.ens_members import mixture_quantiles
 
 LEVELS: Final[np.ndarray] = np.array(
@@ -82,7 +80,6 @@ HALF_LIFE_DAYS: Final[float] = 0.5 * 365.25
 REFIT_CUTOFF_AGE: Final[timedelta] = timedelta(hours=3.5)
 FIRST_REFIT: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 LAST_MONTHLY_REFIT: Final[datetime] = datetime(2026, 6, 1, tzinfo=UTC)
-LAST_WEEKLY_REFIT: Final[datetime] = datetime(2026, 6, 22, tzinfo=UTC)
 SERVED_PERIODS: Final[frozenset[str]] = frozenset({"tuning", "replicate", "scored"})
 OFFSET_SITES: Final[tuple[str, ...]] = ("D9", "D10", "D11", "D14", "D16")
 SMOKE_ROUNDS: Final[int] = 20
@@ -122,7 +119,6 @@ class Arm:
         max_train_lead: The longest lead of a training row in hours, or `None` for all leads.
         rounds: Boosting rounds.
         eta: Learning rate.
-        schedule: `monthly` or `weekly`.
     """
 
     name: str
@@ -131,34 +127,22 @@ class Arm:
     max_train_lead: float | None
     rounds: int
     eta: float
-    schedule: str
 
 
 ARMS: Final[dict[str, Arm]] = {
-    "xnl": Arm("xnl", False, "default", None, 500, 0.05, "monthly"),
-    "xnl_z": Arm("xnl_z", False, "zero", None, 500, 0.05, "monthly"),
-    "xnl_o": Arm("xnl_o", False, "offset", None, 500, 0.05, "monthly"),
-    "xlag_d": Arm("xlag_d", True, "default", data.MAX_LEAD_HOURS, 150, 0.15, "monthly"),
-    "xlag_z": Arm("xlag_z", True, "zero", data.MAX_LEAD_HOURS, 150, 0.15, "monthly"),
-    "xlag_o": Arm("xlag_o", True, "offset", data.MAX_LEAD_HOURS, 150, 0.15, "monthly"),
-    "gam_margin": Arm("gam_margin", True, "gam", data.MAX_LEAD_HOURS, 150, 0.15, "monthly"),
-    "xlag_o_prod": Arm("xlag_o_prod", True, "offset", data.MAX_LEAD_HOURS, 500, 0.05, "monthly"),
-    "gam_margin_prod": Arm(
-        "gam_margin_prod", True, "gam", data.MAX_LEAD_HOURS, 500, 0.05, "monthly"
-    ),
+    "xnl": Arm("xnl", False, "default", None, 500, 0.05),
+    "xnl_z": Arm("xnl_z", False, "zero", None, 500, 0.05),
+    "xnl_o": Arm("xnl_o", False, "offset", None, 500, 0.05),
+    "xlag_d": Arm("xlag_d", True, "default", data.MAX_LEAD_HOURS, 150, 0.15),
+    "xlag_z": Arm("xlag_z", True, "zero", data.MAX_LEAD_HOURS, 150, 0.15),
+    "xlag_o": Arm("xlag_o", True, "offset", data.MAX_LEAD_HOURS, 150, 0.15),
+    "gam_margin": Arm("gam_margin", True, "gam", data.MAX_LEAD_HOURS, 150, 0.15),
 }
 
 
-def refit_times(*, schedule: str) -> list[datetime]:
-    """Return an arm's refit times from 2024-07-01."""
-    if schedule == "monthly":
-        return [t for t in common.monthly_cuts(last=LAST_MONTHLY_REFIT) if t >= FIRST_REFIT]
-    times = []
-    moment = FIRST_REFIT
-    while moment <= LAST_WEEKLY_REFIT:
-        times.append(moment)
-        moment += timedelta(days=7)
-    return times
+def refit_times() -> list[datetime]:
+    """Return the monthly refit times from 2024-07-01 to 2026-06-01."""
+    return [t for t in common.monthly_cuts(last=LAST_MONTHLY_REFIT) if t >= FIRST_REFIT]
 
 
 def served(
@@ -183,6 +167,15 @@ def served(
 
 def known_rows(*, rows: pl.DataFrame, refit: datetime, first_usable: datetime) -> pl.DataFrame:
     """Return the rows a refit may see, and check that none comes from its future.
+
+    Args:
+        rows: One site's control-member rows of every run.
+        refit: The refit time.
+        first_usable: The site's first usable instant (experiment 103's start cut).
+
+    Returns:
+        The rows with a valid time at least 3.5 hours before the refit, from a run that began at or
+        before it, and after the start cut.
 
     Raises:
         ValueError: If no row is usable, or a kept row is newer than the refit allows.
@@ -337,7 +330,7 @@ class SiteData:
                     continue
                 if len(self.cache.end_times) - run.origin_position - 1 < ens.MIN_WINDOW_HALF_HOURS:
                     continue
-                if index < 9:
+                if index < common.PROXY_WARM_UP_RUNS:
                     continue
                 frames.append(
                     margin_frame(
@@ -542,7 +535,8 @@ def run_job(job: tuple[str, str, datetime, list[datetime], int, int, str]) -> st
     frame.write_parquet(temporary)
     temporary.rename(target)
     seconds = time.monotonic() - started
-    log_seconds(job=f"{arm_name} {site} {refit:%Y-%m-%d}", seconds=seconds)
+    if not folder.endswith("_smoke"):
+        log_seconds(job=f"{arm_name} {site} {refit:%Y-%m-%d}", seconds=seconds)
     return (
         f"{arm_name} {site} {refit:%Y-%m-%d}: {known.height:,} rows, {len(runs)} runs, "
         f"{seconds:.0f} s"
@@ -561,13 +555,12 @@ def main() -> None:
     parser.add_argument("--first", help="fit only refits on or after YYYY-MM-DD")
     parser.add_argument("--before", help="fit only refits before YYYY-MM-DD")
     args = parser.parse_args()
-    arm = ARMS[args.arm]
     origins = {
         run: common.origin_of(run=run)
         for run in common.run_dates()
         if common.period_of_run(run=run) in SERVED_PERIODS
     }
-    jobs_by_refit = served(refits=refit_times(schedule=arm.schedule), origins=origins)
+    jobs_by_refit = served(refits=refit_times(), origins=origins)
     nthread = max(1, args.cores // args.workers)
     items = list(jobs_by_refit.items())
     if args.first:

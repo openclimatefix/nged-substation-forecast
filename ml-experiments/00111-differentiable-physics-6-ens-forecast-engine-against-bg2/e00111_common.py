@@ -81,6 +81,8 @@ MIN_TRAINING_DAYS: Final[int] = 90
 """A site's first fit has at least this many days of usable rows."""
 SEASON_YEARS: Final[range] = range(2019, 2027)
 HORIZON_HALF_HOURS: Final[int] = 336
+PROXY_WARM_UP_RUNS: Final[int] = 9
+"""Runs before this index lack a week of analysis proxy before their origin."""
 
 
 def load_cache() -> FeatureCache:
@@ -139,6 +141,12 @@ def period_of_run(*, run: datetime) -> str:
 
 def frame_path(*, run: datetime) -> Path:
     """Return the file that holds a run's frame.
+
+    Args:
+        run: The run's 00:00 UTC initialisation time.
+
+    Returns:
+        The frame's path in the first folder of `FRAME_FOLDERS` that holds it.
 
     Raises:
         FileNotFoundError: If no folder holds the run.
