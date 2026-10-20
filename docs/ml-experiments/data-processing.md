@@ -407,25 +407,25 @@ zero.
 **Rebuild a new substation's effective capacity from its own rows before a model pools it in points,
 and fit its solar capacity from the same rows.** A power series is divided by its effective capacity,
 the 99th percentile of its absolute power over its history, and a substation with 4 weeks of history
-has only that window to take the percentile from. In experiment 109 the capacity rebuilt from June
-4-week windows was 1.29 to 2.04 times smaller than the whole-history capacity, from April-to-June
-3-month windows 1.09 to 1.66 times, and from January 4-week windows 0.91 to 0.98 times, so a model
-that pools coefficients in points sees a June substation as larger than it is. A vintage capacity
-that is fitted after the cut holds the future, so a model that reads it for a short window leaks
-it. The same applies to a pooled substation that holds only part of its window (D18 in experiment
-109): its scale is rebuilt from the rows it holds. Applies to experiments that pool a
-substation with a short history, and to onboarding in production. Evidence: [experiment
+has only that window to take the percentile from. In experiment 109 the whole-history capacity was
+1.29 to 2.04 times the capacity rebuilt from June 4-week windows, 1.09 to 1.66 times the one rebuilt
+from April-to-June 3-month windows, and 0.91 to 0.98 times the one rebuilt from January 4-week
+windows, so a model that pools coefficients in points sees a June substation as larger than it is.
+A vintage capacity that is fitted after the cut holds the future, so a model that reads it for a
+short window leaks it. The same applies to a pooled substation that holds only part of its window
+(D18 in experiment 109): its scale is rebuilt from the rows it holds. Applies to experiments that
+pool a substation with a short history, and to onboarding in production. Evidence: [experiment
 109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) (scored year, six
-held-out Primaries; provisional until the reviews finish). The rule is motivated by leakage; only
-the first version of that experiment, which pooled D18 on its whole-history scale, measured an
-effect (0.03 to 0.05 points on three contrasts).
+held-out Primaries; provisional: one experiment, gate not passed under its pre-registered
+definition). The rule is motivated by leakage. Pooling D18 on its whole-history scale instead moves
+three contrasts by 0.03 to 0.05 points.
 
 **Do not pool a capacity read from a vintage fitted long after the cut.** In a joint fit such a
 capacity moves the fleet mean, and so every other substation's forecast. Give the substation a
 capacity fitted from its own rows before the cut instead (D9 at the 2024-07-01 cut and D18 at the
 2025-07-01 cut, [experiment
-109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md); provisional, not
-measured).
+109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md); provisional: not
+measured, and the experiment's gate did not pass under its pre-registered definition).
 
 ## Switching and the switching log
 
