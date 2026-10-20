@@ -31,6 +31,7 @@ from studies.dp_effects_filter import (  # noqa: E402
     FilterState,
     FilterVariant,
     SiteStream,
+    _filter_core,
     active_counts,
     correction_from_state,
     effect_regressors,
@@ -45,14 +46,13 @@ from studies.dp_effects_filter import (  # noqa: E402
 )
 from studies.dp_ens import proxy_residual_stream  # noqa: E402
 from studies.dp_features import FeatureCache  # noqa: E402
-from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam  # noqa: E402
+from studies.dp_gam import N_BANDS, GamSpec, TrainingWindow, fit_gam, predict_gam  # noqa: E402
 from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity  # noqa: E402
 
 from studies import dp_gam  # noqa: E402
 
 CUT: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 SEASON_YEARS: Final[range] = range(2019, 2026)
-N_BANDS: Final[int] = 4
 HYPER: Final[FilterHyperparameters] = FilterHyperparameters(
     log_q=np.log(0.4), logit_phi=3.5, log_sigma_z=np.log(0.8), log_sigma_eps=np.log(0.7)
 )
@@ -147,13 +147,11 @@ def test_the_rank_one_filter_matches_a_dense_kalman_filter(seed: int):
 
 
 def test_a_batch_of_noise_settings_gives_the_likelihoods_of_separate_runs():
-    from studies.dp_effects_filter import _filter_core
-
     residual, regressors, band, noise = _random_problem(seed=1)
     settings = [
         _noise(q=np.exp(np.full(N_WEIGHTS, log_q)), moving=ALL_MOVING) for log_q in (-8, -4, -1)
     ]
-    batch, _, _, _ = _filter_core(
+    batch, _, _, _, _ = _filter_core(
         residual=residual,
         regressors=regressors,
         band=band,
@@ -323,8 +321,8 @@ def test_a_simulated_stream_recovers_the_random_walk_variances_it_was_built_with
         prior_mean=np.full(N_WEIGHTS, np.log(0.05)),
         prior_spread=np.full(N_WEIGHTS, 20.0),
     )
-    assert fitted.noise.q[HEATING.start] == pytest.approx(true_q[HEATING.start], rel=2.0)
-    assert fitted.noise.q[PV_INDEX] == pytest.approx(true_q[PV_INDEX], rel=2.0)
+    for index in (HEATING.start, PV_INDEX):
+        assert 0.5 < fitted.noise.q[index] / true_q[index] < 2.0
     assert fitted.noise.q[PROFILE.start] < 1e-6
     assert fitted.noise.sigma_eps == pytest.approx(0.6, rel=0.15)
     assert not fitted.set_by_prior.any()
@@ -379,7 +377,7 @@ def test_the_identity_variant_fits_one_q_for_every_moving_weight():
         prior_spread=np.full(N_WEIGHTS, 20.0),
     )
     assert fitted.noise.q[HEATING.start] == fitted.noise.q[PV_INDEX]
-    assert fitted.noise.q[HEATING.start] == pytest.approx(5e-2, rel=2.0)
+    assert 0.5 < fitted.noise.q[HEATING.start] / 5e-2 < 2.0
 
 
 def test_the_site_prior_is_refitted_from_the_sites_that_fitted_each_weight():
@@ -564,28 +562,68 @@ def test_each_regressor_is_zero_where_its_term_is_zero(dp_synthetic_cache: Featu
             )
 
 
-def test_the_stitched_regressors_are_finite_exactly_where_the_residual_stream_is(
-    dp_synthetic_cache: FeatureCache,
-):
-    cache, fit = _fitted(cache=dp_synthetic_cache)
-    later = dp_gam.fit_gam(
+def _two_fits(*, cache: FeatureCache) -> tuple[dp_gam.GamFit, dp_gam.GamFit]:
+    _, first = _fitted(cache=cache)
+    cut = datetime(2024, 8, 1, tzinfo=UTC)
+    later = fit_gam(
         cache=cache,
         site="S1",
         specs=[GamSpec(capacity="pinned", ridge=0.01)],
-        cut=datetime(2024, 8, 1, tzinfo=UTC),
+        cut=cut,
         window=TrainingWindow(),
         season_years=SEASON_YEARS,
-        pinned=_pinned_capacity(cache=cache, cut=datetime(2024, 8, 1, tzinfo=UTC)),
+        pinned=_pinned_capacity(cache=cache, cut=cut),
     )
+    return first, later
+
+
+def test_the_stitched_regressors_are_finite_exactly_where_the_residual_stream_is(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, _ = _fitted(cache=dp_synthetic_cache)
+    fit, later = _two_fits(cache=cache)
     stream = proxy_residual_stream(cache=cache, fits=[fit, later], site="S1")
     pieces = stitched_effect_regressors(cache=cache, fits=[fit, later], site="S1")
     assert np.array_equal(np.isfinite(stream), np.isfinite(pieces.contributions).all(axis=1))
-    rows = np.flatnonzero(np.isfinite(stream))[:500]
-    assert rows.size
     with pytest.raises(ValueError, match="strictly ascending"):
         stitched_effect_regressors(cache=cache, fits=[later, fit], site="S1")
     with pytest.raises(ValueError, match="at least one fit"):
         stitched_effect_regressors(cache=cache, fits=[], site="S1")
+
+
+def test_each_fit_supplies_only_the_rows_after_its_own_cut_and_up_to_the_next_cut(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, _ = _fitted(cache=dp_synthetic_cache)
+    fit, later = _two_fits(cache=cache)
+    pieces = stitched_effect_regressors(cache=cache, fits=[fit, later], site="S1")
+    finite = np.isfinite(pieces.contributions).all(axis=1)
+    first_cut = np.datetime64("2024-07-01T00:00", "us")
+    second_cut = np.datetime64("2024-08-01T00:00", "us")
+    assert not finite[cache.end_times <= first_cut].any()
+    from_first = np.flatnonzero(finite & (cache.end_times <= second_cut))[:200]
+    from_later = np.flatnonzero(finite & (cache.end_times > second_cut))[:200]
+    assert from_first.size
+    assert from_later.size
+    for rows, owner in ((from_first, fit), (from_later, later)):
+        expected = effect_regressors(cache=cache, fit=owner, index=rows)
+        assert np.array_equal(pieces.contributions[rows], expected.contributions)
+        assert np.array_equal(pieces.remainder[rows], expected.remainder)
+
+
+def test_changing_a_later_fit_leaves_the_rows_before_its_cut_unchanged(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, _ = _fitted(cache=dp_synthetic_cache)
+    fit, later = _two_fits(cache=cache)
+    before = stitched_effect_regressors(cache=cache, fits=[fit, later], site="S1")
+    changed = stitched_effect_regressors(
+        cache=cache, fits=[fit, replace(later, theta=later.theta + 1.0)], site="S1"
+    )
+    early = cache.end_times <= np.datetime64("2024-08-01T00:00", "us")
+    assert np.array_equal(before.contributions[early], changed.contributions[early], equal_nan=True)
+    assert np.array_equal(before.remainder[early], changed.remainder[early], equal_nan=True)
+    assert not np.array_equal(before.remainder[~early], changed.remainder[~early], equal_nan=True)
 
 
 def test_a_fit_without_a_pinned_capacity_is_refused(dp_synthetic_cache: FeatureCache):
@@ -594,3 +632,132 @@ def test_a_fit_without_a_pinned_capacity_is_refused(dp_synthetic_cache: FeatureC
         effect_regressors(
             cache=dp_synthetic_cache, fit=replace(fit, pinned=None), index=np.array([0])
         )
+
+
+def test_the_likelihood_is_clearly_lower_when_q_is_ten_times_too_big_or_too_small():
+    true_q = np.zeros(N_WEIGHTS)
+    true_q[[HEATING.start, PV_INDEX]] = (1e-2, 1e-1)
+    residual, regressors, band = _simulate_stream(true_q=true_q, seed=7)
+    moving = np.zeros(N_WEIGHTS, dtype=bool)
+    moving[[HEATING.start, PV_INDEX]] = True
+
+    def log_likelihood(*, scale_heating: float, scale_pv: float) -> float:
+        q = true_q * np.where(np.arange(N_WEIGHTS) == HEATING.start, scale_heating, 1.0)
+        q = q * np.where(np.arange(N_WEIGHTS) == PV_INDEX, scale_pv, 1.0)
+        return run_effects_filter(
+            residual=residual,
+            regressors=regressors,
+            band=band,
+            noise=replace(_noise(q=q, moving=moving, use_anomaly=False), sigma_eps=0.6),
+        ).log_likelihood
+
+    truth = log_likelihood(scale_heating=1.0, scale_pv=1.0)
+    for scale_heating, scale_pv in ((10.0, 1.0), (0.1, 1.0), (1.0, 10.0), (1.0, 0.1)):
+        assert truth - log_likelihood(scale_heating=scale_heating, scale_pv=scale_pv) > 3.0
+
+
+def test_the_identity_variant_with_every_weight_set_by_the_prior_still_fits():
+    true_q = np.zeros(N_WEIGHTS)
+    residual, regressors, band = _simulate_stream(true_q=true_q, seed=12, n=48 * 20)
+    moving = np.zeros(N_WEIGHTS, dtype=bool)
+    moving[[HEATING.start, PV_INDEX]] = True
+    regressors[:, [HEATING.start, PV_INDEX]] = 0.0
+    regressors[:30, [HEATING.start, PV_INDEX]] = 1.0
+    fitted = fit_effects_noise(
+        residual=residual,
+        regressors=regressors,
+        band=band,
+        scale=np.ones(N_WEIGHTS),
+        variant=FilterVariant(moving=moving, use_anomaly=False, shared_q=True),
+        phi=0.98,
+        sigma_z=0.3,
+        sigma_eps_start=0.6,
+        likelihood_mask=np.ones(len(residual), dtype=bool),
+        prior_mean=np.full(N_WEIGHTS, -3.0),
+        prior_spread=np.full(N_WEIGHTS, 2.0),
+    )
+    assert fitted.set_by_prior[moving].all()
+    assert fitted.noise.q[HEATING.start] == pytest.approx(np.exp(-3.0))
+    assert fitted.noise.sigma_eps > 0.0
+
+
+def test_changing_readings_after_the_likelihood_mask_leaves_the_fit_and_the_scale_unchanged():
+    true_q = np.zeros(N_WEIGHTS)
+    true_q[HEATING.start] = 1e-2
+    residual, regressors, band = _simulate_stream(true_q=true_q, seed=13, n=48 * 120)
+    n_tuning = 48 * 80
+    mask = np.arange(len(residual)) < n_tuning
+    moving = np.zeros(N_WEIGHTS, dtype=bool)
+    moving[HEATING.start] = True
+
+    def fit(*, stream: np.ndarray, design: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        scale = regressor_scale(contributions=design, mask=mask)
+        fitted = fit_effects_noise(
+            residual=stream,
+            regressors=design / scale,
+            band=band,
+            scale=scale,
+            variant=FilterVariant(moving=moving, use_anomaly=False),
+            phi=0.98,
+            sigma_z=0.3,
+            sigma_eps_start=0.6,
+            likelihood_mask=mask,
+            prior_mean=np.full(N_WEIGHTS, -3.0),
+            prior_spread=np.full(N_WEIGHTS, 2.0),
+        )
+        return scale, fitted.noise.q
+
+    scale_before, q_before = fit(stream=residual, design=regressors)
+    altered_stream = residual.copy()
+    altered_stream[n_tuning:] += 40.0
+    altered_design = regressors.copy()
+    altered_design[n_tuning:, N_BANDS:] *= 5.0
+    scale_after, q_after = fit(stream=altered_stream, design=altered_design)
+    assert np.array_equal(scale_before, scale_after)
+    assert np.array_equal(q_before, q_after)
+
+
+def test_a_cutoff_exactly_at_a_reading_includes_that_reading_and_one_before_it_does_not():
+    residual, regressors, band, noise = _random_problem(seed=14)
+    trace = run_effects_filter(residual=residual, regressors=regressors, band=band, noise=noise)
+    position = int(trace.positions[10])
+    at = state_at(trace=trace, cutoff=position)
+    before = state_at(trace=trace, cutoff=position - 1)
+    assert at.position == position
+    assert before.position == int(trace.positions[9])
+    assert np.array_equal(at.delta, trace.state[10, :N_WEIGHTS])
+
+
+def test_a_target_at_or_before_the_state_position_gets_the_anomaly_undecayed():
+    state, contributions, band, _ = _correction_inputs()
+    result = correction_from_state(
+        state=state,
+        standardised_contributions=contributions,
+        scale=np.ones(N_WEIGHTS),
+        band=band,
+        target=np.array([100, 95, 50, 10]),
+        phi=0.9,
+    )
+    assert np.allclose(result.anomaly, state.anomaly[band])
+
+
+def test_after_a_long_run_the_covariance_is_symmetric_and_positive_semi_definite():
+    generator = np.random.default_rng(15)
+    n = 60_000
+    band = _bands(n=n)
+    regressors = generator.normal(size=(n, N_WEIGHTS))
+    regressors[:, :N_BANDS] = np.eye(N_BANDS)[band]
+    residual = generator.normal(size=n)
+    noise = _noise(q=np.full(N_WEIGHTS, 1e-3), moving=ALL_MOVING)
+    trace = run_effects_filter(residual=residual, regressors=regressors, band=band, noise=noise)
+    covariance = trace.final_covariance
+    assert np.abs(covariance - covariance.T).max() < 1e-9
+    assert np.linalg.eigvalsh(covariance).min() > -1e-9
+
+
+def test_a_held_weight_stays_at_exactly_zero():
+    residual, regressors, band, noise = _random_problem(seed=16)
+    trace = run_effects_filter(residual=residual, regressors=regressors, band=band, noise=noise)
+    held = noise.initial_sd == 0.0
+    assert held.any()
+    assert not trace.state[:, :N_WEIGHTS][:, held].any()

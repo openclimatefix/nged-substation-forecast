@@ -1,11 +1,27 @@
 """A Kalman filter on the weights of the convex model's frozen effects, for the DP series.
 
-**The convex model (`studies.dp_gam`) is a sum of effects, and a filter can let a weight on each
-effect drift.** `studies.dp_assimilation` corrects a frozen forecast with one level and one
-transient anomaly per hour band. The filter here follows [de Vilmarest et al.
-(2024)](https://doi.org/10.1109/TPWRS.2023.3310280): it freezes the fitted effects, puts a random
-walk on one weight per effect, and fits a diagonal noise matrix by likelihood, so that the heating
-response, the PV capacity, the profile scale, and the holiday effects can change between refits.
+**This module re-implements the method of [de Vilmarest et al.
+(2024)](https://doi.org/10.1109/TPWRS.2023.3310280) on our convex model (`studies.dp_gam`).** The
+convex model is a sum of effects, and the filter lets a weight on each effect drift.
+`studies.dp_assimilation` corrects a frozen forecast with one level and one transient anomaly per
+hour band. The filter here freezes the fitted effects, puts a random walk on one weight per effect,
+and fits a diagonal noise matrix by likelihood, so that the heating response, the PV capacity, the
+profile scale, and the holiday effects can change between refits.
+
+**Where the design differs from the paper and from its R package
+[viking](https://CRAN.R-project.org/package=viking)** (checked against viking 1.0.1):
+
+- The state holds 14 weights on groups of effects (a group is several of the model's columns), not
+  one coefficient per column, and optionally an AR(1) anomaly per hour band.
+- viking adds the noise matrix after every reading, whereas the state here moves by the exact
+  discretisation over the gap in half-hours since the previous reading, so a missing half-hour needs
+  no placeholder.
+- viking's `iterative_grid_search` maximises the likelihood over `Q` divided by the observation
+  variance, with the observation variance profiled out, and each iteration applies the one grid
+  change that improves the likelihood most. Here the observation noise is a parameter, each weight
+  in turn takes its best grid value in two sweeps (cheaper), and an L-BFGS polish follows.
+- The estimate is a maximum a posteriori one: every `log q_k` carries a normal prior shared across
+  sites, and a weight with too few active half-hours takes the prior mean. viking has no prior.
 
 **The 14 weights.** `effect_regressors` splits a fit's prediction into five groups of frozen
 effects, each with its contribution `c_k(t)` at a weight of 1:
@@ -33,7 +49,10 @@ filter equals the per-band filter of `studies.dp_assimilation` (the nesting cont
 
 **The information cut.** `state_at` returns the state after the newest reading at or before a
 cutoff position, so a forecast sees only readings that are old enough. The filter is causal and has
-no switching mask.
+no switching mask. The module does not know which months are tuning months: the likelihood mask, the
+rows `regressor_scale` and `active_counts` look at, and the sites' streams in
+`fit_effects_noise_sites` come from the caller, so keeping them to the tuning months is the
+caller's duty.
 
 **The noise matrix** is fitted by `fit_effects_noise` as a maximum a posteriori estimate: a batched
 greedy search over a grid of `log q_k` for each weight in turn, then an L-BFGS polish. All `log q_k`
@@ -97,15 +116,25 @@ MIN_ACTIVE_HALF_HOURS: Final[int] = 200
 LOG_Q_BOUNDS: Final[tuple[float, float]] = (-20.0, 2.0)
 """Bounds on `log q`, which keep the optimiser off degenerate corners."""
 LOG_SIGMA_EPS_BOUNDS: Final[tuple[float, float]] = (log(0.05), 6.0)
+"""Bounds on `log sigma_eps` in points, which keep the update stable."""
 GREEDY_GRID: Final[tuple[float, ...]] = (-18.0, -14.0, -11.0, -9.0, -7.0, -5.0, -3.0, -1.0)
 """The `log q` values the greedy search tries for each weight in turn."""
 FINITE_DIFFERENCE_STEP: Final[float] = 1e-4
+"""The forward-difference step in `log q` of the polish's gradient."""
 PRIOR_LOG_Q_START: Final[float] = log(0.05)
+"""The first round's prior mean of `log q`: 0.05 points squared per day."""
 PRIOR_LOG_Q_SPREAD_START: Final[float] = 2.0
+"""The first round's prior standard deviation of `log q`."""
 MIN_PRIOR_SPREAD: Final[float] = 0.5
+"""The shared prior's spread never shrinks below this, so it stays a prior with few sites."""
 SIGMA_EPS_PRIOR_SPREAD: Final[float] = 1.0
+"""The standard deviation of the normal prior on `log sigma_eps`, centred on its start."""
 N_EMPIRICAL_BAYES_ROUNDS: Final[int] = 3
+"""How many times the shared prior is refitted from the sites' own fits."""
 MAX_POLISH_ITERATIONS: Final[int] = 40
+"""The most L-BFGS iterations of the polish."""
+SYMMETRISE_EVERY: Final[int] = 512
+"""The covariance is replaced by the mean of itself and its transpose after this many readings."""
 
 
 @dataclass(frozen=True)
@@ -171,6 +200,7 @@ class EffectsTrace:
         sd: Shape (readings, 14): the posterior standard deviation of each weight deviation.
         log_likelihood: The marginal log likelihood of the readings in the likelihood mask.
         noise: The noise the run used.
+        final_covariance: Shape (18, 18): the state's covariance after the last reading.
     """
 
     positions: np.ndarray
@@ -178,6 +208,7 @@ class EffectsTrace:
     sd: np.ndarray
     log_likelihood: float
     noise: FilterNoise
+    final_covariance: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -362,7 +393,7 @@ def _filter_core(
     use_anomaly: bool,
     likelihood_mask: np.ndarray | None,
     keep_trace: bool,
-) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None, np.ndarray, np.ndarray]:
     """Run the filter for a batch of noise settings that share the data.
 
     Args:
@@ -380,12 +411,14 @@ def _filter_core(
 
     Returns:
         The log likelihood of each batch member, the state after each reading and the posterior
-        standard deviations (both `None` unless `keep_trace`), and the readings' positions.
+        standard deviations (both `None` unless `keep_trace`), the readings' positions, and the
+        covariance after the last reading, shape (batch, 18, 18). A weight whose `initial_sd` is 0
+        is held at 1 exactly: its regressor is left out of the update.
     """
     positions = np.flatnonzero(np.isfinite(residual) & np.isfinite(regressors).all(axis=1))
     n_batch = len(sigma_eps)
     design = np.zeros((len(positions), N_STATES))
-    design[:, :N_WEIGHTS] = regressors[positions]
+    design[:, :N_WEIGHTS] = regressors[positions] * (initial_sd > 0.0)
     if use_anomaly:
         design[np.arange(len(positions)), N_WEIGHTS + band[positions].astype(np.int64)] = 1.0
     values = residual[positions]
@@ -398,8 +431,7 @@ def _filter_core(
     x = np.zeros((n_batch, N_STATES))
     covariance = np.zeros((n_batch, N_STATES, N_STATES))
     diagonal = covariance.reshape(n_batch, -1)[:, :: N_STATES + 1]
-    diagonal[:, :N_WEIGHTS] = initial_sd**2
-    diagonal[:, N_WEIGHTS:] = stationary
+    diagonal[:] = np.r_[initial_sd**2, np.full(N_BANDS, stationary)]
     noise = sigma_eps**2
     q_step = q / HALF_HOURS_PER_DAY
     grows = np.ones(N_WEIGHTS)
@@ -434,10 +466,12 @@ def _filter_core(
         x += gain * innovation[:, None]
         covariance -= gain[:, :, None] * p_h[:, None, :]
         np.maximum(diagonal, VARIANCE_FLOOR, out=diagonal)
+        if k % SYMMETRISE_EVERY == SYMMETRISE_EVERY - 1:
+            covariance[:] = 0.5 * (covariance + covariance.transpose(0, 2, 1))
         if state is not None and sd is not None:
             state[k] = x[0]
             sd[k] = np.sqrt(diagonal[0, :N_WEIGHTS])
-    return log_likelihood, state, sd, positions
+    return log_likelihood, state, sd, positions, covariance
 
 
 def run_effects_filter(
@@ -463,7 +497,7 @@ def run_effects_filter(
     Returns:
         The trace.
     """
-    log_likelihood, state, sd, positions = _filter_core(
+    log_likelihood, state, sd, positions, covariance = _filter_core(
         residual=residual,
         regressors=regressors,
         band=band,
@@ -482,6 +516,7 @@ def run_effects_filter(
         sd=np.zeros((0, N_WEIGHTS)) if sd is None else sd,
         log_likelihood=float(log_likelihood[0]),
         noise=noise,
+        final_covariance=covariance[0],
     )
 
 
@@ -540,6 +575,8 @@ def correction_from_state(
     The profile-scale, heating, and PV weights are floored at 0 (a weight below 0 would flip an
     effect's sign), and the weights are held at their value at the cutoff for every lead.
 
+    A target at or before the state's position gets the state's anomaly undecayed.
+
     Args:
         state: The state at the cutoff.
         standardised_contributions: Each member's regressors divided by `scale`, shape
@@ -557,7 +594,7 @@ def correction_from_state(
     weighted = standardised_contributions @ delta
     anomaly = np.zeros(len(target))
     if state.position >= 0:
-        anomaly = phi ** (target - state.position) * state.anomaly[band]
+        anomaly = phi ** np.maximum(target - state.position, 0) * state.anomaly[band]
     level = delta[LEVEL][band]
     return Correction(shift=weighted + anomaly[None, :], level=level, anomaly=anomaly)
 
@@ -664,7 +701,9 @@ def fit_effects_noise(
 
     def log_prior(theta: np.ndarray) -> np.ndarray:
         theta_q = theta[:, :n_free]
-        if variant.shared_q:
+        if n_free == 0:
+            penalty = np.zeros(theta.shape[0])
+        elif variant.shared_q:
             penalty = ((theta_q[:, 0] - shared_mean) / shared_spread) ** 2
         else:
             penalty = (((theta_q - prior_mean[free_index]) / prior_spread[free_index]) ** 2).sum(1)
@@ -674,7 +713,7 @@ def fit_effects_noise(
     def evaluate(theta: np.ndarray) -> np.ndarray:
         q = to_q(theta)
         q = np.where(variant.moving[None, :], q, 0.0)
-        log_likelihood, _, _, _ = _filter_core(
+        log_likelihood, _, _, _, _ = _filter_core(
             residual=residual,
             regressors=regressors,
             band=band,
