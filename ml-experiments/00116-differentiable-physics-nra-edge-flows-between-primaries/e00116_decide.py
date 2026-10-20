@@ -92,13 +92,8 @@ def decide() -> dict[str, Any]:
     c2_passes = all(v["upper"] <= C2_MARGIN for v in c2_by_year.values())
     c2_harm = any(v["lower"] > C2_MARGIN for v in c2_by_year.values())
     conditions = {year: c3_passes(year=c3[year]) for year in ("scored", "replicate")}
-    full = {
-        year: all(v for k, v in c.items() if k != "interval_above_zero")
-        for year, c in conditions.items()
-    }
-    # the full pass needs the interval below zero as well as the size, site, gap and real-row tests
-    for year, c in conditions.items():
-        full[year] = all(c[k] for k in ("interval_below_zero", "size", "sites", "gap", "real_rows"))
+    needed = ("interval_below_zero", "size", "sites", "gap", "real_rows")
+    full = {year: all(c[k] for k in needed) for year, c in conditions.items()}
     c3_passes_both = all(full.values())
     c3_scored_wholly_below = conditions["scored"]["interval_below_zero"]
     c3_scored_wholly_above = conditions["scored"]["interval_above_zero"]
